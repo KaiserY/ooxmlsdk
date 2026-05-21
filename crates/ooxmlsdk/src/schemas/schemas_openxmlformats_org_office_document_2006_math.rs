@@ -2339,7 +2339,7 @@ pub enum ParagraphChoice {
   XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OfficeMathChoice2 {
+pub enum OfficeMathChoice {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -2400,9 +2400,6 @@ pub enum OfficeMathChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OfficeMathChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -2525,75 +2522,6 @@ pub enum OfficeMathChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OfficeMathChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<OfficeMathChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<OfficeMathChoice3>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MathPropertiesChoice {
@@ -2640,264 +2568,7 @@ pub enum ControlPropertiesChoice {
   WMoveTo(std::boxed::Box<crate::schemas::w::MoveToMathControl>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum BaseChoice2 {
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum BaseChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
-  WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
-  /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
-  WDel(std::boxed::Box<crate::schemas::w::DeletedRun>),
-  /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
-  WMoveFrom(std::boxed::Box<crate::schemas::w::MoveFromRun>),
-  /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
-  WMoveTo(std::boxed::Box<crate::schemas::w::MoveToRun>),
-  /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
-  WContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
-  /// Defines the RunConflictInsertion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
-  /// Defines the RunConflictDeletion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
-  /// Defines the Paragraph Class.
-  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
-  MOMathPara(std::boxed::Box<Paragraph>),
-  /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
-  MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<BaseChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<BaseChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NumeratorChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -2958,9 +2629,6 @@ pub enum NumeratorChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NumeratorChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -3083,78 +2751,9 @@ pub enum NumeratorChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<NumeratorChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<NumeratorChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DenominatorChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3215,9 +2814,6 @@ pub enum DenominatorChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DenominatorChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -3340,78 +2936,9 @@ pub enum DenominatorChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<DenominatorChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<DenominatorChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FunctionNameChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3472,9 +2999,6 @@ pub enum FunctionNameChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FunctionNameChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -3597,78 +3121,9 @@ pub enum FunctionNameChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<FunctionNameChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<FunctionNameChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum LimitChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3729,9 +3184,6 @@ pub enum LimitChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum LimitChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -3854,78 +3306,9 @@ pub enum LimitChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<LimitChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<LimitChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SubArgumentChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -3986,9 +3369,6 @@ pub enum SubArgumentChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SubArgumentChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -4111,78 +3491,9 @@ pub enum SubArgumentChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<SubArgumentChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<SubArgumentChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SuperArgumentChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4243,9 +3554,6 @@ pub enum SuperArgumentChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SuperArgumentChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -4368,78 +3676,9 @@ pub enum SuperArgumentChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<SuperArgumentChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<SuperArgumentChoice3>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DegreeChoice2 {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4500,9 +3739,6 @@ pub enum DegreeChoice2 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DegreeChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -4625,6 +3861,9 @@ pub enum DegreeChoice3 {
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   MOMath(std::boxed::Box<OfficeMath>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum DegreeChoice {
   /// Accent.
   #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   MAcc(std::boxed::Box<Accent>),
@@ -4685,13 +3924,126 @@ pub enum DegreeChoice3 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DegreeChoice {
-  /// Choice of m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<DegreeChoice2>),
-  /// Choice of choice1, choice2
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<DegreeChoice3>),
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+  /// Inserted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+  WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
+  /// Deleted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+  WDel(std::boxed::Box<crate::schemas::w::DeletedRun>),
+  /// Move Source Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+  WMoveFrom(std::boxed::Box<crate::schemas::w::MoveFromRun>),
+  /// Move Destination Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+  WMoveTo(std::boxed::Box<crate::schemas::w::MoveToRun>),
+  /// Defines the ContentPart Class.
+  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
+  WContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
+  /// Defines the Paragraph Class.
+  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+  MOMathPara(std::boxed::Box<Paragraph>),
+  /// Defines the OfficeMath Class.
+  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+  MOMath(std::boxed::Box<OfficeMath>),
 }

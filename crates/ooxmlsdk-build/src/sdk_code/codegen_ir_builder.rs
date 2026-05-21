@@ -191,6 +191,12 @@ fn inline_safe_choice_members(
   members: &[MemberDecl],
   choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
 ) -> Vec<MemberDecl> {
+  if let Some(inlined) =
+    safe_pure_choice_wrapper_group_inline_candidate(parent_name, members, choice_members_by_name)
+  {
+    return inlined;
+  }
+
   let mut inlined = Vec::with_capacity(members.len());
   let mut used_variant_names = std::collections::HashSet::new();
   let mut used_start_qnames = std::collections::HashSet::new();
@@ -243,6 +249,113 @@ fn inline_safe_choice_members(
   }
 
   inlined
+}
+
+fn safe_pure_choice_wrapper_group_inline_candidate(
+  parent_name: &str,
+  members: &[MemberDecl],
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> Option<Vec<MemberDecl>> {
+  let mut inlined = Vec::new();
+  let mut variants_by_qname = std::collections::HashMap::<String, usize>::new();
+
+  if members.is_empty() {
+    return None;
+  }
+
+  for member in members {
+    let MemberDecl::Variant(parent_variant) = member else {
+      return None;
+    };
+    let VariantWireDecl::Child { .. } = &parent_variant.wire else {
+      return None;
+    };
+    if !is_generic_choice_variant_name(parent_variant.rust_name.as_str())
+      || parent_variant.payload.module_path.is_some()
+      || parent_variant.payload.rust_type == parent_name
+      || !choice_members_by_name.contains_key(parent_variant.payload.rust_type.as_str())
+    {
+      return None;
+    }
+
+    let payload_variants = collect_recursive_choice_leaf_variants(
+      parent_variant.payload.rust_type.as_str(),
+      choice_members_by_name,
+      &mut std::collections::HashSet::new(),
+    )?;
+    if payload_variants.is_empty() {
+      return None;
+    }
+
+    for payload_variant in payload_variants {
+      let mut variant = payload_variant.clone();
+      variant.version =
+        effective_version(parent_variant.version.as_str(), variant.version.as_str()).to_string();
+      let qnames = variant_start_qnames(&variant)?;
+      let qname_key = qnames.join("\u{1f}");
+
+      if let Some(existing_index) = variants_by_qname.get(qname_key.as_str()).copied() {
+        let existing = match &inlined[existing_index] {
+          MemberDecl::Variant(existing) => existing,
+          MemberDecl::Field(_) => return None,
+        };
+        if !choice_leaf_variants_are_equivalent(existing, &variant) {
+          return None;
+        }
+        continue;
+      }
+
+      variants_by_qname.insert(qname_key, inlined.len());
+      inlined.push(MemberDecl::Variant(variant));
+    }
+  }
+
+  (!inlined.is_empty()).then_some(inlined)
+}
+
+fn collect_recursive_choice_leaf_variants<'a>(
+  choice_name: &str,
+  choice_members_by_name: &'a std::collections::HashMap<String, Vec<MemberDecl>>,
+  visiting: &mut std::collections::HashSet<String>,
+) -> Option<Vec<&'a VariantDecl>> {
+  if !visiting.insert(choice_name.to_string()) {
+    return None;
+  }
+
+  let members = choice_members_by_name.get(choice_name)?;
+  let mut variants = Vec::new();
+  for member in members {
+    let MemberDecl::Variant(variant) = member else {
+      visiting.remove(choice_name);
+      return None;
+    };
+    let VariantWireDecl::Child { .. } = &variant.wire else {
+      visiting.remove(choice_name);
+      return None;
+    };
+
+    if variant.payload.module_path.is_none()
+      && choice_members_by_name.contains_key(variant.payload.rust_type.as_str())
+    {
+      variants.extend(collect_recursive_choice_leaf_variants(
+        variant.payload.rust_type.as_str(),
+        choice_members_by_name,
+        visiting,
+      )?);
+    } else {
+      variants.push(variant);
+    }
+  }
+
+  visiting.remove(choice_name);
+  Some(variants)
+}
+
+fn choice_leaf_variants_are_equivalent(left: &VariantDecl, right: &VariantDecl) -> bool {
+  left.rust_name == right.rust_name
+    && left.wire == right.wire
+    && left.payload == right.payload
+    && left.version == right.version
 }
 
 fn safe_anonymous_choice_wrapper_inline_candidate(
@@ -4512,7 +4625,7 @@ mod tests {
   }
 
   #[test]
-  fn preserves_overlapping_sibling_choice_group_branches_as_numbered_variants() {
+  fn flattens_overlapping_sibling_choice_group_branches_when_leafs_match() {
     let schema = Schema {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -4600,25 +4713,7 @@ mod tests {
       .iter()
       .filter_map(member_variant_name)
       .collect::<Vec<_>>();
-    assert_eq!(variant_names, vec!["Choice1", "Choice2"]);
-    assert!(ir.types.iter().any(|ty| {
-      ty.rust_name == "HolderChoice1"
-        && ty
-          .members
-          .iter()
-          .filter_map(member_variant_name)
-          .collect::<Vec<_>>()
-          == vec!["TA", "TB"]
-    }));
-    assert!(ir.types.iter().any(|ty| {
-      ty.rust_name == "HolderChoice2"
-        && ty
-          .members
-          .iter()
-          .filter_map(member_variant_name)
-          .collect::<Vec<_>>()
-          == vec!["TA", "TD"]
-    }));
+    assert_eq!(variant_names, vec!["TA", "TB", "TD"]);
   }
 
   fn expected_content_structure_from_schema_type(

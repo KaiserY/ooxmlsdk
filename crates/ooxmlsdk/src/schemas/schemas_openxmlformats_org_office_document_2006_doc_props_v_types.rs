@@ -286,13 +286,10 @@ pub struct VtClipboardData {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantChoice {
   /// Variant.
-  #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   Variant(std::boxed::Box<Variant>),
   /// Vector.
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
   VtVector(std::boxed::Box<VtVector>),
   /// Array.
-  #[sdk(child(qname = "vt:CT_Array/vt:array"))]
   VtArray(std::boxed::Box<VtArray>),
   /// Binary Blob.
   #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "xsd:base64Binary/vt:blob"))]
@@ -394,19 +391,16 @@ pub enum VariantChoice {
   ))]
   VtoStorage(VtoStorage),
   /// Binary Versioned Stream.
-  #[sdk(child(qname = "vt:CT_Vstream/vt:vstream"))]
   VtvStreamData(std::boxed::Box<VtvStreamData>),
   /// Class ID.
   #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Clsid/vt:clsid"))]
   VtClassId(VtClassId),
   /// Clipboard Data.
-  #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtClipboardData(std::boxed::Box<VtClipboardData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtVectorChoice {
   /// Variant.
-  #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   Variant(std::boxed::Box<Variant>),
   /// 1-Byte Signed Integer.
   #[sdk(text_child(simple_type = "SByteValue", qname = "xsd:byte/vt:i1"))]
@@ -466,13 +460,11 @@ pub enum VtVectorChoice {
   #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Clsid/vt:clsid"))]
   VtClassId(VtClassId),
   /// Clipboard Data.
-  #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtClipboardData(std::boxed::Box<VtClipboardData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VtArrayChoice {
   /// Variant.
-  #[sdk(child(qname = "vt:CT_Variant/vt:variant"))]
   Variant(std::boxed::Box<Variant>),
   /// 1-Byte Signed Integer.
   #[sdk(text_child(simple_type = "SByteValue", qname = "xsd:byte/vt:i1"))]

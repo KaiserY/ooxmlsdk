@@ -705,58 +705,40 @@ pub struct NullEventRecord {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LaserColorChoice {
   /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowEventRecordListChoice {
   /// Defines the TriggerEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_TriggerEventRecord/p14:triggerEvt"))]
   TriggerEventRecord(std::boxed::Box<TriggerEventRecord>),
   /// Defines the PlayEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt"))]
   PlayEventRecord(std::boxed::Box<PlayEventRecord>),
   /// Defines the StopEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt"))]
   StopEventRecord(std::boxed::Box<StopEventRecord>),
   /// Defines the PauseEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt"))]
   PauseEventRecord(std::boxed::Box<PauseEventRecord>),
   /// Defines the ResumeEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt"))]
   ResumeEventRecord(std::boxed::Box<ResumeEventRecord>),
   /// Defines the SeekEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt"))]
   SeekEventRecord(std::boxed::Box<SeekEventRecord>),
   /// Defines the NullEventRecord Class.
-  #[sdk(child(office2010, qname = "p14:CT_NullEventRecord/p14:nullEvt"))]
   NullEventRecord(std::boxed::Box<NullEventRecord>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
-  #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
   AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
-  #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
   WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
-  #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
   AudioFromFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
-  #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
   VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
-  #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
   QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }

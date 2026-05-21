@@ -288,46 +288,35 @@ pub struct TextBodyProperties {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice {
   /// Defines the NonVisualDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr"))]
   NonVisualDrawingShapeProperties(std::boxed::Box<NonVisualDrawingShapeProperties>),
   /// Defines the NonVisualConnectorProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"))]
   NonVisualConnectorProperties(std::boxed::Box<NonVisualConnectorProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice2 {
   /// Defines the TextBoxInfo2 Class.
-  #[sdk(child(office2010, qname = "wps:CT_TextboxInfo/wps:txbx"))]
   TextBoxInfo2(std::boxed::Box<TextBoxInfo2>),
   /// Defines the LinkedTextBox Class.
-  #[sdk(child(office2010, qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"))]
   LinkedTextBox(std::boxed::Box<LinkedTextBox>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
-  #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
-  #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
@@ -336,10 +325,8 @@ pub enum ShapePropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -348,18 +335,14 @@ pub enum TextBodyPropertiesChoice {
   #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
   NoAutoFit,
   /// Normal AutoFit.
-  #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
   ShapeAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
-  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
   FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
 }

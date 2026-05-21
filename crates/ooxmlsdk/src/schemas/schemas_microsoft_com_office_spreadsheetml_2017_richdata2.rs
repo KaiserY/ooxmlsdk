@@ -585,27 +585,20 @@ pub struct RichValueTypeReservedKeyFlag {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RichFilterColumnChoice {
   /// Defines the RichFilters Class.
-  #[sdk(child(office2019, qname = "xlrd2:CT_RichFilters/xlrd2:filters"))]
   RichFilters(std::boxed::Box<RichFilters>),
   /// Defines the RichTop10 Class.
-  #[sdk(child(office2019, qname = "xlrd2:CT_RichTop10/xlrd2:top10"))]
   RichTop10(std::boxed::Box<RichTop10>),
   /// Defines the CustomRichFilters Class.
-  #[sdk(child(office2019, qname = "xlrd2:CT_CustomRichFilters/xlrd2:customFilters"))]
   CustomRichFilters(std::boxed::Box<CustomRichFilters>),
   /// Defines the DynamicRichFilter Class.
-  #[sdk(child(office2019, qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter"))]
   DynamicRichFilter(std::boxed::Box<DynamicRichFilter>),
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomRichFiltersChoice {
   /// Defines the CustomRichFilter Class.
-  #[sdk(child(office2019, qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter"))]
   CustomRichFilter(std::boxed::Box<CustomRichFilter>),
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   ExtensionList(std::boxed::Box<ExtensionList>),
 }

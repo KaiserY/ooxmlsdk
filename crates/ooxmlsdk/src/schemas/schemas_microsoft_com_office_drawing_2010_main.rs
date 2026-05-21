@@ -864,19 +864,14 @@ pub struct Transform2D {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenFillPropertiesChoice {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
@@ -885,25 +880,19 @@ pub enum HiddenFillPropertiesChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice2 {
   /// Preset Dash.
-  #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   PresetDash(std::boxed::Box<crate::schemas::a::PresetDash>),
   /// Custom Dash.
-  #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   CustomDash(std::boxed::Box<crate::schemas::a::CustomDash>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -915,162 +904,69 @@ pub enum HiddenLinePropertiesChoice3 {
   #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
-  #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   Miter(std::boxed::Box<crate::schemas::a::Miter>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenEffectsPropertiesChoice {
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ImageEffectChoice {
   /// Defines the ArtisticBlur Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectBlur/a14:artisticBlur"))]
   ArtisticBlur(std::boxed::Box<ArtisticBlur>),
   /// Defines the ArtisticCement Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectCement/a14:artisticCement"))]
   ArtisticCement(std::boxed::Box<ArtisticCement>),
   /// Defines the ArtisticChalkSketch Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectChalkSketch/a14:artisticChalkSketch"
-  ))]
   ArtisticChalkSketch(std::boxed::Box<ArtisticChalkSketch>),
   /// Defines the ArtisticCrisscrossEtching Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectCrisscrossEtching/a14:artisticCrisscrossEtching"
-  ))]
   ArtisticCrisscrossEtching(std::boxed::Box<ArtisticCrisscrossEtching>),
   /// Defines the ArtisticCutout Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectCutout/a14:artisticCutout"))]
   ArtisticCutout(std::boxed::Box<ArtisticCutout>),
   /// Defines the ArtisticFilmGrain Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectFilmGrain/a14:artisticFilmGrain"
-  ))]
   ArtisticFilmGrain(std::boxed::Box<ArtisticFilmGrain>),
   /// Defines the ArtisticGlass Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectGlass/a14:artisticGlass"))]
   ArtisticGlass(std::boxed::Box<ArtisticGlass>),
   /// Defines the ArtisticGlowDiffused Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectGlowDiffused/a14:artisticGlowDiffused"
-  ))]
   ArtisticGlowDiffused(std::boxed::Box<ArtisticGlowDiffused>),
   /// Defines the ArtisticGlowEdges Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectGlowEdges/a14:artisticGlowEdges"
-  ))]
   ArtisticGlowEdges(std::boxed::Box<ArtisticGlowEdges>),
   /// Defines the ArtisticLightScreen Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectLightScreen/a14:artisticLightScreen"
-  ))]
   ArtisticLightScreen(std::boxed::Box<ArtisticLightScreen>),
   /// Defines the ArtisticLineDrawing Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectLineDrawing/a14:artisticLineDrawing"
-  ))]
   ArtisticLineDrawing(std::boxed::Box<ArtisticLineDrawing>),
   /// Defines the ArtisticMarker Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectMarker/a14:artisticMarker"))]
   ArtisticMarker(std::boxed::Box<ArtisticMarker>),
   /// Defines the ArtisticMosaicBubbles Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectMosiaicBubbles/a14:artisticMosiaicBubbles"
-  ))]
   ArtisticMosaicBubbles(std::boxed::Box<ArtisticMosaicBubbles>),
   /// Defines the ArtisticPaintStrokes Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPaintStrokes/a14:artisticPaintStrokes"
-  ))]
   ArtisticPaintStrokes(std::boxed::Box<ArtisticPaintStrokes>),
   /// Defines the ArtisticPaintBrush Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPaintBrush/a14:artisticPaintBrush"
-  ))]
   ArtisticPaintBrush(std::boxed::Box<ArtisticPaintBrush>),
   /// Defines the ArtisticPastelsSmooth Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPastelsSmooth/a14:artisticPastelsSmooth"
-  ))]
   ArtisticPastelsSmooth(std::boxed::Box<ArtisticPastelsSmooth>),
   /// Defines the ArtisticPencilGrayscale Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPencilGrayscale/a14:artisticPencilGrayscale"
-  ))]
   ArtisticPencilGrayscale(std::boxed::Box<ArtisticPencilGrayscale>),
   /// Defines the ArtisticPencilSketch Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPencilSketch/a14:artisticPencilSketch"
-  ))]
   ArtisticPencilSketch(std::boxed::Box<ArtisticPencilSketch>),
   /// Defines the ArtisticPhotocopy Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPhotocopy/a14:artisticPhotocopy"
-  ))]
   ArtisticPhotocopy(std::boxed::Box<ArtisticPhotocopy>),
   /// Defines the ArtisticPlasticWrap Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectPlasticWrap/a14:artisticPlasticWrap"
-  ))]
   ArtisticPlasticWrap(std::boxed::Box<ArtisticPlasticWrap>),
   /// Defines the ArtisticTexturizer Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectTexturizer/a14:artisticTexturizer"
-  ))]
   ArtisticTexturizer(std::boxed::Box<ArtisticTexturizer>),
   /// Defines the ArtisticWatercolorSponge Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectWatercolorSponge/a14:artisticWatercolorSponge"
-  ))]
   ArtisticWatercolorSponge(std::boxed::Box<ArtisticWatercolorSponge>),
   /// Defines the BackgroundRemoval Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectBackgroundRemoval/a14:backgroundRemoval"
-  ))]
   BackgroundRemoval(std::boxed::Box<BackgroundRemoval>),
   /// Defines the BrightnessContrast Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectBrightnessContrast/a14:brightnessContrast"
-  ))]
   BrightnessContrast(std::boxed::Box<BrightnessContrast>),
   /// Defines the ColorTemperature Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectColorTemperature/a14:colorTemperature"
-  ))]
   ColorTemperature(std::boxed::Box<ColorTemperature>),
   /// Defines the Saturation Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffectSaturation/a14:saturation"))]
   Saturation(std::boxed::Box<Saturation>),
   /// Defines the SharpenSoften Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften"
-  ))]
   SharpenSoften(std::boxed::Box<SharpenSoften>),
 }

@@ -34,9 +34,7 @@ pub struct Fallback {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlternateContentChoice {
   /// Defines the Choice Class.
-  #[sdk(child(qname = "mc:CT_Choice/mc:Choice"))]
   Choice(std::boxed::Box<Choice>),
   /// Defines the Fallback Class.
-  #[sdk(child(qname = "mc:CT_Fallback/mc:Fallback"))]
   Fallback(std::boxed::Box<Fallback>),
 }

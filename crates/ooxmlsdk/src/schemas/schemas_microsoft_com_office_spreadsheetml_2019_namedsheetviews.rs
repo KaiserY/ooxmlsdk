@@ -244,10 +244,8 @@ pub struct RichSortCondition {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FilterColumnChoice {
   /// Filter Criteria.
-  #[sdk(child(qname = "x:CT_Filters/x:filters"))]
   Filters(std::boxed::Box<crate::schemas::x::Filters>),
   /// Top 10.
-  #[sdk(child(qname = "x:CT_Top10/x:top10"))]
   Top10(std::boxed::Box<crate::schemas::x::Top10>),
   /// Defines the CustomFilters Class.
   #[sdk(child(office2010, qname = "x14:CT_CustomFilters/x14:customFilters"))]
@@ -256,10 +254,8 @@ pub enum FilterColumnChoice {
   #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
   XCustomFilters(std::boxed::Box<crate::schemas::x::CustomFilters>),
   /// Dynamic Filter.
-  #[sdk(child(qname = "x:CT_DynamicFilter/x:dynamicFilter"))]
   DynamicFilter(std::boxed::Box<crate::schemas::x::DynamicFilter>),
   /// Color Filter Criteria.
-  #[sdk(child(qname = "x:CT_ColorFilter/x:colorFilter"))]
   ColorFilter(std::boxed::Box<crate::schemas::x::ColorFilter>),
   /// Defines the IconFilter Class.
   #[sdk(child(office2010, qname = "x14:CT_IconFilter/x14:iconFilter"))]
@@ -268,18 +264,12 @@ pub enum FilterColumnChoice {
   #[sdk(child(qname = "x:CT_IconFilter/x:iconFilter"))]
   XIconFilter(std::boxed::Box<crate::schemas::x::IconFilter>),
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   ExtensionList(std::boxed::Box<crate::schemas::x::ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortRuleChoice {
   /// Defines the SortCondition Class.
-  #[sdk(child(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
   SortCondition(std::boxed::Box<SortCondition>),
   /// Defines the RichSortCondition Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
-  ))]
   RichSortCondition(std::boxed::Box<RichSortCondition>),
 }

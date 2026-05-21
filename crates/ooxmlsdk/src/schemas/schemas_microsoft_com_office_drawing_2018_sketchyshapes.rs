@@ -58,9 +58,7 @@ pub struct OfficeArtExtensionList {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchStylePropertiesChoice {
-  #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
-  #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

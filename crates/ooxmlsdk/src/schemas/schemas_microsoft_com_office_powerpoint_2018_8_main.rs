@@ -236,7 +236,6 @@ pub struct Comment {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {
-  #[sdk(child(office2016, qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
   SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
   #[sdk(any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst"))]
   SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),

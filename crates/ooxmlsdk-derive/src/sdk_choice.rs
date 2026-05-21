@@ -67,6 +67,20 @@ fn write_typed_child_tokens(
   }
 }
 
+fn write_typed_child_element_name_tokens(
+  child_ty: &syn::Type,
+  value: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  quote! {
+    <#child_ty as crate::sdk::SdkType>::write_inner(
+      #value,
+      writer,
+      xmlns_prefix,
+      <#child_ty as crate::sdk::SdkType>::ELEMENT_NAME,
+    )?;
+  }
+}
+
 fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
   mode.deserialize_inner_ident()
 }
@@ -187,7 +201,8 @@ fn choice_child_local_name_fallback_qnames(
         }
       }
       Some(
-        SdkChoiceVariantKind::Choice
+        SdkChoiceVariantKind::TypedChild
+        | SdkChoiceVariantKind::Choice
         | SdkChoiceVariantKind::Sequence
         | SdkChoiceVariantKind::Any
         | SdkChoiceVariantKind::Text,
@@ -497,13 +512,86 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   for variant in variants {
     let variant_ident = &variant.ident;
     let cfg_attrs = cfg_attrs(&variant.attrs);
-    let kind = parse_sdk_choice_variant_kind(&variant.attrs)?.ok_or_else(|| {
-      syn::Error::new_spanned(
-        variant,
-        "missing #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(any_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
-      )
-    })?;
+    let parsed_kind = parse_sdk_choice_variant_kind(&variant.attrs)?;
+    let kind = match parsed_kind {
+      Some(kind) => kind,
+      None
+        if matches!(
+          &variant.fields,
+          Fields::Unnamed(fields) if fields.unnamed.len() == 1
+        ) =>
+      {
+        SdkChoiceVariantKind::TypedChild
+      }
+      None => {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "missing #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(any_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
+        ));
+      }
+    };
     match (&variant.fields, kind) {
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::TypedChild) if fields.unnamed.len() == 1 => {
+        let payload_ty = choice_variant_payload_type(variant)?;
+        let inner_payload_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+        let inner_ty = choice_variant_inner_type(&payload_ty);
+        let constructor = if is_box_type(&payload_ty) {
+          quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
+        } else {
+          quote! { Self::#variant_ident(parsed_child) }
+        };
+        helper_matcher_checks.push(quote! {
+          #(#cfg_attrs)*
+          if <#inner_ty as crate::sdk::SdkType>::matches_type_start_qname(name) {
+            return true;
+          }
+        });
+        helper_child_dispatch_tokens_borrowed.push(quote! {
+          #(#cfg_attrs)*
+          if <#inner_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) {
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
+            return Ok(#constructor);
+          }
+        });
+        helper_child_dispatch_tokens_io.push(quote! {
+          #(#cfg_attrs)*
+          if <#inner_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) {
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
+            return Ok(#constructor);
+          }
+        });
+        let value_expr = if is_box_type(&payload_ty) {
+          quote! { value.as_ref() }
+        } else {
+          quote! { value }
+        };
+        let write_child = write_typed_child_element_name_tokens(&inner_payload_ty, value_expr);
+        write_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            #write_child
+            Ok(())
+          },
+        });
+        let validate_arm = if is_box_type(&payload_ty) {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value.as_ref(), context),
+          }
+        } else {
+          quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value, context),
+          }
+        };
+        validate_arms.push(validate_arm);
+        mce_choice_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)
+          },
+        });
+      }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Child { qnames })
         if fields.unnamed.len() == 1 =>
       {

@@ -333,25 +333,18 @@ pub type Xsddouble = crate::simple_type::DoubleValue;
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FeaturePropertyBagChoice {
   /// Defines the ArrayFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a"))]
   ArrayFeatureProperty(std::boxed::Box<ArrayFeatureProperty>),
   /// Defines the BagFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId"))]
   BagFeatureProperty(std::boxed::Box<BagFeatureProperty>),
   /// Defines the IntFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_IntFeatureProperty/xfpb:i"))]
   IntFeatureProperty(std::boxed::Box<IntFeatureProperty>),
   /// Defines the StringFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_StringFeatureProperty/xfpb:s"))]
   StringFeatureProperty(std::boxed::Box<StringFeatureProperty>),
   /// Defines the BoolFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_BoolFeatureProperty/xfpb:b"))]
   BoolFeatureProperty(std::boxed::Box<BoolFeatureProperty>),
   /// Defines the DecimalFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d"))]
   DecimalFeatureProperty(std::boxed::Box<DecimalFeatureProperty>),
   /// Defines the RelFeatureProperty Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"))]
   RelFeatureProperty(std::boxed::Box<RelFeatureProperty>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

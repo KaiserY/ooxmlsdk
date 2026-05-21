@@ -478,6 +478,9 @@ fn expand_tuple_wrapper(
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
+      const ELEMENT_NAME: crate::sdk::ElementName =
+        crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
+
       fn read_borrowed<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         start: quick_xml::events::BytesStart<'de>,
@@ -6473,6 +6476,9 @@ fn expand_named_struct(
   };
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
+      const ELEMENT_NAME: crate::sdk::ElementName =
+        crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
+
       fn read_borrowed<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         e: quick_xml::events::BytesStart<'de>,

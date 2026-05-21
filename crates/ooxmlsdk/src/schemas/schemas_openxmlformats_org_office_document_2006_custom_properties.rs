@@ -75,10 +75,8 @@ pub struct CustomDocumentProperty {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomDocumentPropertyChoice {
   /// Vector.
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
   VtVector(std::boxed::Box<crate::schemas::vt::VtVector>),
   /// Array.
-  #[sdk(child(qname = "vt:CT_Array/vt:array"))]
   VtArray(std::boxed::Box<crate::schemas::vt::VtArray>),
   /// Binary Blob.
   #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "xsd:base64Binary/vt:blob"))]
@@ -180,12 +178,10 @@ pub enum CustomDocumentPropertyChoice {
   ))]
   VtoStorage(crate::schemas::vt::VtoStorage),
   /// Binary Versioned Stream.
-  #[sdk(child(qname = "vt:CT_Vstream/vt:vstream"))]
   VtvStreamData(std::boxed::Box<crate::schemas::vt::VtvStreamData>),
   /// Class ID.
   #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Clsid/vt:clsid"))]
   VtClassId(crate::schemas::vt::VtClassId),
   /// Clipboard Data.
-  #[sdk(child(qname = "vt:CT_Cf/vt:cf"))]
   VtClipboardData(std::boxed::Box<crate::schemas::vt::VtClipboardData>),
 }

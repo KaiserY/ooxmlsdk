@@ -416,7 +416,6 @@ pub struct Source {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorChoice {
   /// Name List.
-  #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   NameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Corporate"))]
@@ -425,7 +424,6 @@ pub enum AuthorChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PerformerChoice {
   /// Name List.
-  #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   NameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Corporate"))]
@@ -434,52 +432,36 @@ pub enum PerformerChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorListChoice {
   /// Artist.
-  #[sdk(child(qname = "b:CT_NameType/b:Artist"))]
   Artist(std::boxed::Box<Artist>),
   /// Author.
-  #[sdk(child(qname = "b:CT_NameOrCorporateType/b:Author"))]
   Author(std::boxed::Box<Author>),
   /// Book Author.
-  #[sdk(child(qname = "b:CT_NameType/b:BookAuthor"))]
   BookAuthor(std::boxed::Box<BookAuthor>),
   /// Compiler.
-  #[sdk(child(qname = "b:CT_NameType/b:Compiler"))]
   Compiler(std::boxed::Box<Compiler>),
   /// Composer.
-  #[sdk(child(qname = "b:CT_NameType/b:Composer"))]
   Composer(std::boxed::Box<Composer>),
   /// Conductor.
-  #[sdk(child(qname = "b:CT_NameType/b:Conductor"))]
   Conductor(std::boxed::Box<Conductor>),
   /// Counsel.
-  #[sdk(child(qname = "b:CT_NameType/b:Counsel"))]
   Counsel(std::boxed::Box<Counsel>),
   /// Director.
-  #[sdk(child(qname = "b:CT_NameType/b:Director"))]
   Director(std::boxed::Box<Director>),
   /// Editor.
-  #[sdk(child(qname = "b:CT_NameType/b:Editor"))]
   Editor(std::boxed::Box<Editor>),
   /// Interviewee.
-  #[sdk(child(qname = "b:CT_NameType/b:Interviewee"))]
   Interviewee(std::boxed::Box<Interviewee>),
   /// Interviewer.
-  #[sdk(child(qname = "b:CT_NameType/b:Interviewer"))]
   Interviewer(std::boxed::Box<Interviewer>),
   /// Inventor.
-  #[sdk(child(qname = "b:CT_NameType/b:Inventor"))]
   Inventor(std::boxed::Box<Inventor>),
   /// Performer.
-  #[sdk(child(qname = "b:CT_NameOrCorporateType/b:Performer"))]
   Performer(std::boxed::Box<Performer>),
   /// Producer Name.
-  #[sdk(child(qname = "b:CT_NameType/b:ProducerName"))]
   ProducerName(std::boxed::Box<ProducerName>),
   /// Translator.
-  #[sdk(child(qname = "b:CT_NameType/b:Translator"))]
   Translator(std::boxed::Box<Translator>),
   /// Writer.
-  #[sdk(child(qname = "b:CT_NameType/b:Writer"))]
   Writer(std::boxed::Box<Writer>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -494,7 +476,6 @@ pub enum SourceChoice {
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:AlbumTitle"))]
   AlbumTitle(AlbumTitle),
   /// Contributors List.
-  #[sdk(child(qname = "b:CT_AuthorType/b:Author"))]
   AuthorList(std::boxed::Box<AuthorList>),
   /// Book Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:BookTitle"))]

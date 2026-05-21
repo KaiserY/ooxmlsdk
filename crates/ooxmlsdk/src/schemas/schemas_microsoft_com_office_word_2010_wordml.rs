@@ -1831,166 +1831,108 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunConflictInsertionChoice {
   /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
   /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
   PermStart(std::boxed::Box<crate::schemas::w::PermStart>),
   /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
   PermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
   /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
   BookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
   /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
   BookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
   /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
   CommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
   /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
   CommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
   /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
   MoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
   MoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
   /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
   MoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
   MoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
   /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
   CustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
   /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
   CustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
   /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
   CustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
   /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
   CustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
   CustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
   CustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
   CustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
   CustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
   CustomXmlConflictInsertionRangeStart(std::boxed::Box<CustomXmlConflictInsertionRangeStart>),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
   CustomXmlConflictInsertionRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
   CustomXmlConflictDeletionRangeStart(std::boxed::Box<CustomXmlConflictDeletionRangeStart>),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
   CustomXmlConflictDeletionRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
   /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
   InsertedRun(std::boxed::Box<crate::schemas::w::InsertedRun>),
   /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
   DeletedRun(std::boxed::Box<crate::schemas::w::DeletedRun>),
   /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
   MoveFromRun(std::boxed::Box<crate::schemas::w::MoveFromRun>),
   /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
   MoveToRun(std::boxed::Box<crate::schemas::w::MoveToRun>),
   /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   ContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
   /// Defines the RunConflictInsertion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
   RunConflictInsertion(std::boxed::Box<RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
   RunConflictDeletion(std::boxed::Box<RunConflictDeletion>),
   /// Defines the Paragraph Class.
-  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
   /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
   Box(std::boxed::Box<crate::schemas::m::Box>),
   /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
   BorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
   /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
   Delimiter(std::boxed::Box<crate::schemas::m::Delimiter>),
   /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
   EquationArray(std::boxed::Box<crate::schemas::m::EquationArray>),
   /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
   Fraction(std::boxed::Box<crate::schemas::m::Fraction>),
   /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
   MathFunction(std::boxed::Box<crate::schemas::m::MathFunction>),
   /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
   GroupChar(std::boxed::Box<crate::schemas::m::GroupChar>),
   /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
   LimitLower(std::boxed::Box<crate::schemas::m::LimitLower>),
   /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
   LimitUpper(std::boxed::Box<crate::schemas::m::LimitUpper>),
   /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
   Matrix(std::boxed::Box<crate::schemas::m::Matrix>),
   /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
   Nary(std::boxed::Box<crate::schemas::m::Nary>),
   /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
   Phantom(std::boxed::Box<crate::schemas::m::Phantom>),
   /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
   Radical(std::boxed::Box<crate::schemas::m::Radical>),
   /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
   PreSubSuper(std::boxed::Box<crate::schemas::m::PreSubSuper>),
   /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
@@ -1999,175 +1941,115 @@ pub enum RunConflictInsertionChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunConflictDeletionChoice {
   /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
   /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
   PermStart(std::boxed::Box<crate::schemas::w::PermStart>),
   /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
   PermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
   /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
   BookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
   /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
   BookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
   /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
   CommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
   /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
   CommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
   /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
   MoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
   /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
   MoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
   /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
   MoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
   /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
   MoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
   /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
   CustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
   /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
   CustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
   /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
   CustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
   /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
   CustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
   /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
   CustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
   /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
   CustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
   /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
   CustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
   /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
   CustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
   /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
   CustomXmlConflictInsertionRangeStart(std::boxed::Box<CustomXmlConflictInsertionRangeStart>),
   /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
   CustomXmlConflictInsertionRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
   /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
   CustomXmlConflictDeletionRangeStart(std::boxed::Box<CustomXmlConflictDeletionRangeStart>),
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
   CustomXmlConflictDeletionRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
   /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
   InsertedRun(std::boxed::Box<crate::schemas::w::InsertedRun>),
   /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
   DeletedRun(std::boxed::Box<crate::schemas::w::DeletedRun>),
   /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
   MoveFromRun(std::boxed::Box<crate::schemas::w::MoveFromRun>),
   /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
   MoveToRun(std::boxed::Box<crate::schemas::w::MoveToRun>),
   /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   ContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
   /// Defines the RunConflictInsertion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
   RunConflictInsertion(std::boxed::Box<RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
-  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
   RunConflictDeletion(std::boxed::Box<RunConflictDeletion>),
   /// Defines the Paragraph Class.
-  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   Paragraph(std::boxed::Box<crate::schemas::m::Paragraph>),
   /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
   OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
   /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
   Accent(std::boxed::Box<crate::schemas::m::Accent>),
   /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
   Bar(std::boxed::Box<crate::schemas::m::Bar>),
   /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
   Box(std::boxed::Box<crate::schemas::m::Box>),
   /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
   BorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
   /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
   Delimiter(std::boxed::Box<crate::schemas::m::Delimiter>),
   /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
   EquationArray(std::boxed::Box<crate::schemas::m::EquationArray>),
   /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
   Fraction(std::boxed::Box<crate::schemas::m::Fraction>),
   /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
   MathFunction(std::boxed::Box<crate::schemas::m::MathFunction>),
   /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
   GroupChar(std::boxed::Box<crate::schemas::m::GroupChar>),
   /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
   LimitLower(std::boxed::Box<crate::schemas::m::LimitLower>),
   /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
   LimitUpper(std::boxed::Box<crate::schemas::m::LimitUpper>),
   /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
   Matrix(std::boxed::Box<crate::schemas::m::Matrix>),
   /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
   Nary(std::boxed::Box<crate::schemas::m::Nary>),
   /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
   Phantom(std::boxed::Box<crate::schemas::m::Phantom>),
   /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
   Radical(std::boxed::Box<crate::schemas::m::Radical>),
   /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
   PreSubSuper(std::boxed::Box<crate::schemas::m::PreSubSuper>),
   /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
@@ -2176,112 +2058,82 @@ pub enum RunConflictDeletionChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RgbColorModelHexChoice {
   /// Defines the Tint Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
   Tint(std::boxed::Box<Tint>),
   /// Defines the Shade Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
   Shade(std::boxed::Box<Shade>),
   /// Defines the Alpha Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
   Alpha(std::boxed::Box<Alpha>),
   /// Defines the HueModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod"))]
   HueModulation(std::boxed::Box<HueModulation>),
   /// Defines the Saturation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:sat"))]
   Saturation(std::boxed::Box<Saturation>),
   /// Defines the SaturationOffset Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satOff"))]
   SaturationOffset(std::boxed::Box<SaturationOffset>),
   /// Defines the SaturationModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satMod"))]
   SaturationModulation(std::boxed::Box<SaturationModulation>),
   /// Defines the Luminance Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lum"))]
   Luminance(std::boxed::Box<Luminance>),
   /// Defines the LuminanceOffset Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumOff"))]
   LuminanceOffset(std::boxed::Box<LuminanceOffset>),
   /// Defines the LuminanceModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumMod"))]
   LuminanceModulation(std::boxed::Box<LuminanceModulation>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SchemeColorChoice {
   /// Defines the Tint Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
   Tint(std::boxed::Box<Tint>),
   /// Defines the Shade Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
   Shade(std::boxed::Box<Shade>),
   /// Defines the Alpha Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
   Alpha(std::boxed::Box<Alpha>),
   /// Defines the HueModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod"))]
   HueModulation(std::boxed::Box<HueModulation>),
   /// Defines the Saturation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:sat"))]
   Saturation(std::boxed::Box<Saturation>),
   /// Defines the SaturationOffset Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satOff"))]
   SaturationOffset(std::boxed::Box<SaturationOffset>),
   /// Defines the SaturationModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satMod"))]
   SaturationModulation(std::boxed::Box<SaturationModulation>),
   /// Defines the Luminance Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lum"))]
   Luminance(std::boxed::Box<Luminance>),
   /// Defines the LuminanceOffset Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumOff"))]
   LuminanceOffset(std::boxed::Box<LuminanceOffset>),
   /// Defines the LuminanceModulation Class.
-  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumMod"))]
   LuminanceModulation(std::boxed::Box<LuminanceModulation>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SolidColorFillPropertiesChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientFillPropertiesChoice {
   /// Defines the LinearShadeProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin"))]
   LinearShadeProperties(std::boxed::Box<LinearShadeProperties>),
   /// Defines the PathShadeProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_PathShadeProperties/w14:path"))]
   PathShadeProperties(std::boxed::Box<PathShadeProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GlowChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShadowChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2290,10 +2142,8 @@ pub enum TextOutlineEffectChoice {
   #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),
   /// Defines the GradientFillProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
   GradientFillProperties(std::boxed::Box<GradientFillProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2305,7 +2155,6 @@ pub enum TextOutlineEffectChoice2 {
   #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:bevel"))]
   BevelEmpty,
   /// Defines the LineJoinMiterProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_LineJoinMiterProperties/w14:miter"))]
   LineJoinMiterProperties(std::boxed::Box<LineJoinMiterProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2314,36 +2163,28 @@ pub enum FillTextEffectChoice {
   #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),
   /// Defines the GradientFillProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
   GradientFillProperties(std::boxed::Box<GradientFillProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientStopChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExtrusionColorChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContourColorChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   SchemeColor(std::boxed::Box<SchemeColor>),
 }

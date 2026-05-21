@@ -1275,9 +1275,7 @@ pub struct PivotRow {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleDbPrpopertiesChoice {
   /// Defines the DbTables Class.
-  #[sdk(child(office2013, qname = "x15:CT_DbTables/x15:dbTables"))]
   DbTables(std::boxed::Box<DbTables>),
   /// Defines the DbCommand Class.
-  #[sdk(child(office2013, qname = "x15:CT_DbCommand/x15:dbCommand"))]
   DbCommand(std::boxed::Box<DbCommand>),
 }

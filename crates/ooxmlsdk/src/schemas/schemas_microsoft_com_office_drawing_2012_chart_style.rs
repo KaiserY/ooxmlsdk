@@ -2165,26 +2165,18 @@ pub struct MarkerLayoutProperties {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorStyleChoice {
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorStyleVariationChoice {
   /// Tint.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   Tint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   Shade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
   #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
@@ -2196,67 +2188,46 @@ pub enum ColorStyleVariationChoice {
   #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
   Gray,
   /// Alpha.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
   /// Alpha Offset.
-  #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
   AlphaOffset(std::boxed::Box<crate::schemas::a::AlphaOffset>),
   /// Alpha Modulation.
-  #[sdk(child(qname = "a:CT_PositivePercentage/a:alphaMod"))]
   AlphaModulation(std::boxed::Box<crate::schemas::a::AlphaModulation>),
   /// Hue.
-  #[sdk(child(qname = "a:CT_PositiveFixedAngle/a:hue"))]
   Hue(std::boxed::Box<crate::schemas::a::Hue>),
   /// Hue Offset.
-  #[sdk(child(qname = "a:CT_Angle/a:hueOff"))]
   HueOffset(std::boxed::Box<crate::schemas::a::HueOffset>),
   /// Hue Modulate.
-  #[sdk(child(qname = "a:CT_PositivePercentage/a:hueMod"))]
   HueModulation(std::boxed::Box<crate::schemas::a::HueModulation>),
   /// Saturation.
-  #[sdk(child(qname = "a:CT_Percentage/a:sat"))]
   Saturation(std::boxed::Box<crate::schemas::a::Saturation>),
   /// Saturation Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:satOff"))]
   SaturationOffset(std::boxed::Box<crate::schemas::a::SaturationOffset>),
   /// Saturation Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:satMod"))]
   SaturationModulation(std::boxed::Box<crate::schemas::a::SaturationModulation>),
   /// Luminance.
-  #[sdk(child(qname = "a:CT_Percentage/a:lum"))]
   Luminance(std::boxed::Box<crate::schemas::a::Luminance>),
   /// Luminance Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:lumOff"))]
   LuminanceOffset(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
   /// Luminance Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:lumMod"))]
   LuminanceModulation(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
   /// Red.
-  #[sdk(child(qname = "a:CT_Percentage/a:red"))]
   Red(std::boxed::Box<crate::schemas::a::Red>),
   /// Red Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:redOff"))]
   RedOffset(std::boxed::Box<crate::schemas::a::RedOffset>),
   /// Red Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:redMod"))]
   RedModulation(std::boxed::Box<crate::schemas::a::RedModulation>),
   /// Green.
-  #[sdk(child(qname = "a:CT_Percentage/a:green"))]
   Green(std::boxed::Box<crate::schemas::a::Green>),
   /// Green Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:greenOff"))]
   GreenOffset(std::boxed::Box<crate::schemas::a::GreenOffset>),
   /// Green Modification.
-  #[sdk(child(qname = "a:CT_Percentage/a:greenMod"))]
   GreenModulation(std::boxed::Box<crate::schemas::a::GreenModulation>),
   /// Blue.
-  #[sdk(child(qname = "a:CT_Percentage/a:blue"))]
   Blue(std::boxed::Box<crate::schemas::a::Blue>),
   /// Blue Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:blueOff"))]
   BlueOffset(std::boxed::Box<crate::schemas::a::BlueOffset>),
   /// Blue Modification.
-  #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
   #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
@@ -2268,10 +2239,8 @@ pub enum ColorStyleVariationChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StyleColorChoice {
   /// Tint.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
   Tint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
   Shade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
   #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
@@ -2283,67 +2252,46 @@ pub enum StyleColorChoice {
   #[sdk(empty_child(qname = "a:CT_GrayscaleTransform/a:gray"))]
   Gray,
   /// Alpha.
-  #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
   Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
   /// Alpha Offset.
-  #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
   AlphaOffset(std::boxed::Box<crate::schemas::a::AlphaOffset>),
   /// Alpha Modulation.
-  #[sdk(child(qname = "a:CT_PositivePercentage/a:alphaMod"))]
   AlphaModulation(std::boxed::Box<crate::schemas::a::AlphaModulation>),
   /// Hue.
-  #[sdk(child(qname = "a:CT_PositiveFixedAngle/a:hue"))]
   Hue(std::boxed::Box<crate::schemas::a::Hue>),
   /// Hue Offset.
-  #[sdk(child(qname = "a:CT_Angle/a:hueOff"))]
   HueOffset(std::boxed::Box<crate::schemas::a::HueOffset>),
   /// Hue Modulate.
-  #[sdk(child(qname = "a:CT_PositivePercentage/a:hueMod"))]
   HueModulation(std::boxed::Box<crate::schemas::a::HueModulation>),
   /// Saturation.
-  #[sdk(child(qname = "a:CT_Percentage/a:sat"))]
   Saturation(std::boxed::Box<crate::schemas::a::Saturation>),
   /// Saturation Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:satOff"))]
   SaturationOffset(std::boxed::Box<crate::schemas::a::SaturationOffset>),
   /// Saturation Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:satMod"))]
   SaturationModulation(std::boxed::Box<crate::schemas::a::SaturationModulation>),
   /// Luminance.
-  #[sdk(child(qname = "a:CT_Percentage/a:lum"))]
   Luminance(std::boxed::Box<crate::schemas::a::Luminance>),
   /// Luminance Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:lumOff"))]
   LuminanceOffset(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
   /// Luminance Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:lumMod"))]
   LuminanceModulation(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
   /// Red.
-  #[sdk(child(qname = "a:CT_Percentage/a:red"))]
   Red(std::boxed::Box<crate::schemas::a::Red>),
   /// Red Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:redOff"))]
   RedOffset(std::boxed::Box<crate::schemas::a::RedOffset>),
   /// Red Modulation.
-  #[sdk(child(qname = "a:CT_Percentage/a:redMod"))]
   RedModulation(std::boxed::Box<crate::schemas::a::RedModulation>),
   /// Green.
-  #[sdk(child(qname = "a:CT_Percentage/a:green"))]
   Green(std::boxed::Box<crate::schemas::a::Green>),
   /// Green Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:greenOff"))]
   GreenOffset(std::boxed::Box<crate::schemas::a::GreenOffset>),
   /// Green Modification.
-  #[sdk(child(qname = "a:CT_Percentage/a:greenMod"))]
   GreenModulation(std::boxed::Box<crate::schemas::a::GreenModulation>),
   /// Blue.
-  #[sdk(child(qname = "a:CT_Percentage/a:blue"))]
   Blue(std::boxed::Box<crate::schemas::a::Blue>),
   /// Blue Offset.
-  #[sdk(child(qname = "a:CT_Percentage/a:blueOff"))]
   BlueOffset(std::boxed::Box<crate::schemas::a::BlueOffset>),
   /// Blue Modification.
-  #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
   BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
   #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
@@ -2354,89 +2302,58 @@ pub enum StyleColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineReferenceChoice {
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillReferenceChoice {
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectReferenceChoice {
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
-  #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
-  #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
@@ -2445,28 +2362,21 @@ pub enum ShapePropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
@@ -2475,10 +2385,8 @@ pub enum TextCharacterPropertiesTypeChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice2 {
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2487,7 +2395,6 @@ pub enum TextCharacterPropertiesTypeChoice3 {
   #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
   UnderlineFollowsText,
   /// Underline Stroke.
-  #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
   Underline(std::boxed::Box<crate::schemas::a::Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2496,7 +2403,6 @@ pub enum TextCharacterPropertiesTypeChoice4 {
   #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
   UnderlineFillText,
   /// Underline Fill.
-  #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
   UnderlineFill(std::boxed::Box<crate::schemas::a::UnderlineFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2505,18 +2411,14 @@ pub enum TextBodyPropertiesChoice {
   #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
   NoAutoFit,
   /// Normal AutoFit.
-  #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
   ShapeAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
-  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
-  #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
   FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
 }

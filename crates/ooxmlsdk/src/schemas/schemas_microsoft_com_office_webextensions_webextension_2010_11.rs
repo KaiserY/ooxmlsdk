@@ -179,7 +179,6 @@ pub struct Snapshot {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SnapshotChoice {
-  #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
@@ -187,33 +186,20 @@ pub enum SnapshotChoice {
   /// Alpha Floor Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
   AlphaFloor,
-  #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
-  #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
   AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
-  #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
   AlphaModulationFixed(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
-  #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
   AlphaReplace(std::boxed::Box<crate::schemas::a::AlphaReplace>),
-  #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
   BiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
-  #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   Blur(std::boxed::Box<crate::schemas::a::Blur>),
-  #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
   ColorChange(std::boxed::Box<crate::schemas::a::ColorChange>),
-  #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
   ColorReplacement(std::boxed::Box<crate::schemas::a::ColorReplacement>),
-  #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
   Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
-  #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
   Grayscale,
-  #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
-  #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
   LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
-  #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
 }

@@ -142,21 +142,15 @@ pub struct ExtendedGuide {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }

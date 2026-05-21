@@ -368,6 +368,7 @@ impl Parse for StringSetValues {
 }
 
 enum SdkChoiceVariantKind {
+  TypedChild,
   Child {
     qnames: Vec<String>,
   },

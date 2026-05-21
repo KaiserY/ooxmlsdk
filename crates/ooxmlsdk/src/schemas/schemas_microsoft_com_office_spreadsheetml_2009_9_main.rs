@@ -2331,15 +2331,12 @@ pub enum PivotUserEditChoice {
   #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
   Formula(crate::schemas::xne::Formula),
   /// Defines the PivotEditValue Class.
-  #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
   PivotEditValue(std::boxed::Box<PivotEditValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDataChoice {
   /// Defines the OlapSlicerCache Class.
-  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCache/x14:olap"))]
   OlapSlicerCache(std::boxed::Box<OlapSlicerCache>),
   /// Defines the TabularSlicerCache Class.
-  #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCache/x14:tabular"))]
   TabularSlicerCache(std::boxed::Box<TabularSlicerCache>),
 }

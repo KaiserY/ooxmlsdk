@@ -1636,159 +1636,109 @@ pub struct PivotTableDefinition {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExStreamChoice {
   /// Defines the RevExFuture Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   RevExFuture(std::boxed::Box<RevExFuture>),
   /// Defines the RevExUnsupported Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   RevExUnsupported(std::boxed::Box<RevExUnsupported>),
   /// Defines the RevExTrimmed Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   RevExTrimmed(std::boxed::Box<RevExTrimmed>),
   /// Defines the RevExRowColumn Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   RevExRowColumn(std::boxed::Box<RevExRowColumn>),
   /// Defines the RevExMove Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExMove/xr:xrrm"))]
   RevExMove(std::boxed::Box<RevExMove>),
   /// Defines the RevExChangeCell Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   RevExChangeCell(std::boxed::Box<RevExChangeCell>),
   /// Defines the RevExFormatting Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   RevExFormatting(std::boxed::Box<RevExFormatting>),
   /// Defines the RevExDefinedName Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   RevExDefinedName(std::boxed::Box<RevExDefinedName>),
   /// Defines the RevExDelObj Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   RevExDelObj(std::boxed::Box<RevExDelObj>),
   /// Defines the RevExChgObj Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   RevExChgObj(std::boxed::Box<RevExChgObj>),
   /// Defines the RevExSheetOp Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   RevExSheetOp(std::boxed::Box<RevExSheetOp>),
   /// Defines the RevisionList Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevisionList/xr:xrrList"))]
   RevisionList(std::boxed::Box<RevisionList>),
   /// Defines the RevListAutoExpandRw Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   RevListAutoExpandRw(std::boxed::Box<RevListAutoExpandRw>),
   /// Defines the RevGroup Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevGroup/xr:xrrg"))]
   RevGroup(std::boxed::Box<RevGroup>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StateBasedObjectChoice {
   /// Represents an external link to another workbook..
-  #[sdk(child(office2016, qname = "x:CT_DataValidation/xr:dataValidation"))]
   DataValidation(std::boxed::Box<DataValidation>),
   /// Represents a hyperlink within a cell..
-  #[sdk(child(office2016, qname = "x:CT_Hyperlink/xr:hyperlink"))]
   Hyperlink(std::boxed::Box<Hyperlink>),
   /// Represents a sparkline group of 1 or more sparklines..
-  #[sdk(child(office2016, qname = "x14:CT_SparklineGroup/xr:sparklineGroup"))]
   SparklineGroup(std::boxed::Box<SparklineGroup>),
   /// Represents one comment within a cell..
-  #[sdk(child(office2016, qname = "x:CT_Comments/xr:comments"))]
   Comments(std::boxed::Box<Comments>),
   /// Represents an autofilter..
-  #[sdk(child(office2016, qname = "x:CT_AutoFilter/xr:autoFilter"))]
   AutoFilter(std::boxed::Box<AutoFilter>),
   /// Represents a PivotTable View..
-  #[sdk(child(
-    office2016,
-    qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
-  ))]
   PivotTableDefinition(std::boxed::Box<PivotTableDefinition>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExChgObjChoice {
   /// Defines the RevisionStateLink Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevisionStateLink/xr:link"))]
   RevisionStateLink(std::boxed::Box<RevisionStateLink>),
   /// Defines the RevisionState Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevisionState/xr:body"))]
   RevisionState(std::boxed::Box<RevisionState>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevGroupChoice {
   /// Defines the RevExFuture Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   RevExFuture(std::boxed::Box<RevExFuture>),
   /// Defines the RevExUnsupported Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   RevExUnsupported(std::boxed::Box<RevExUnsupported>),
   /// Defines the RevExTrimmed Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   RevExTrimmed(std::boxed::Box<RevExTrimmed>),
   /// Defines the RevExRowColumn Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   RevExRowColumn(std::boxed::Box<RevExRowColumn>),
   /// Defines the RevExMove Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExMove/xr:xrrm"))]
   RevExMove(std::boxed::Box<RevExMove>),
   /// Defines the RevExChangeCell Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   RevExChangeCell(std::boxed::Box<RevExChangeCell>),
   /// Defines the RevExFormatting Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   RevExFormatting(std::boxed::Box<RevExFormatting>),
   /// Defines the RevExDefinedName Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   RevExDefinedName(std::boxed::Box<RevExDefinedName>),
   /// Defines the RevExDelObj Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   RevExDelObj(std::boxed::Box<RevExDelObj>),
   /// Defines the RevExChgObj Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   RevExChgObj(std::boxed::Box<RevExChgObj>),
   /// Defines the RevExSheetOp Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   RevExSheetOp(std::boxed::Box<RevExSheetOp>),
   /// Defines the RevisionList Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevisionList/xr:xrrList"))]
   RevisionList(std::boxed::Box<RevisionList>),
   /// Defines the RevListAutoExpandRw Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   RevListAutoExpandRw(std::boxed::Box<RevListAutoExpandRw>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionStateChoice {
   /// Defines the RowColVisualOps Class.
-  #[sdk(child(office2016, qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps"))]
   RowColVisualOps(std::boxed::Box<RowColVisualOps>),
   /// Defines the HideUnhideSheet Class.
-  #[sdk(child(office2016, qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet"))]
   HideUnhideSheet(std::boxed::Box<HideUnhideSheet>),
   /// Defines the ShowGridlinesHeadings Class.
-  #[sdk(child(
-    office2016,
-    qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"
-  ))]
   ShowGridlinesHeadings(std::boxed::Box<ShowGridlinesHeadings>),
   /// Defines the FreezePanes Class.
-  #[sdk(child(office2016, qname = "xr:CT_FreezePanes/xr:freezePanes"))]
   FreezePanes(std::boxed::Box<FreezePanes>),
   /// Defines the Outlines Class.
-  #[sdk(child(office2016, qname = "xr:CT_Outlines/xr:outlines"))]
   Outlines(std::boxed::Box<Outlines>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RefMapChoice {
   /// Defines the RefCell Class.
-  #[sdk(child(office2016, qname = "xr:CT_RefCell/xr:ref"))]
   RefCell(std::boxed::Box<RefCell>),
   /// Defines the SheetXluid Class.
-  #[sdk(child(office2016, qname = "xr:CT_SheetXluid/xr:sheetUid"))]
   SheetXluid(std::boxed::Box<SheetXluid>),
   /// Defines the RefOartAnchor Class.
-  #[sdk(child(office2016, qname = "xr:CT_RefOartAnchor/xr:oartAnchor"))]
   RefOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
   #[sdk(empty_child(office2016, qname = "xr:CT_RefFuture/xr:future"))]
   RefFuture,
   /// Defines the RefTest Class.
-  #[sdk(child(office2016, qname = "xr:CT_RefTest/xr:test"))]
   RefTest(std::boxed::Box<RefTest>),
 }

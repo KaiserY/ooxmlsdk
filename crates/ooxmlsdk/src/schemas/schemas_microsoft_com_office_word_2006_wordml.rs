@@ -367,18 +367,13 @@ pub struct SingleDataSourceRecord {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum KeyMapEntryChoice {
   /// Defines the FixedCommandKeyboardCustomization Class.
-  #[sdk(child(qname = "wne:CT_Fci/wne:fci"))]
   FixedCommandKeyboardCustomization(std::boxed::Box<FixedCommandKeyboardCustomization>),
   /// Defines the MacroKeyboardCustomization Class.
-  #[sdk(child(qname = "wne:CT_MacroWll/wne:macro"))]
   MacroKeyboardCustomization(std::boxed::Box<MacroKeyboardCustomization>),
   /// Defines the AllocatedCommandKeyboardCustomization Class.
-  #[sdk(child(qname = "wne:CT_AcdKeymap/wne:acd"))]
   AllocatedCommandKeyboardCustomization(std::boxed::Box<AllocatedCommandKeyboardCustomization>),
   /// Defines the WllMacroKeyboardCustomization Class.
-  #[sdk(child(qname = "wne:CT_MacroWll/wne:wll"))]
   WllMacroKeyboardCustomization(std::boxed::Box<WllMacroKeyboardCustomization>),
   /// Defines the CharacterInsertion Class.
-  #[sdk(child(qname = "wne:CT_LongHexNumber/wne:wch"))]
   CharacterInsertion(std::boxed::Box<CharacterInsertion>),
 }

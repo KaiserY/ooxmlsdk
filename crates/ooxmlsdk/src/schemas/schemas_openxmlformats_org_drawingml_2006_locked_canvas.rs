@@ -33,18 +33,11 @@ pub struct LockedCanvas {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {
-  #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   TextShape(std::boxed::Box<crate::schemas::a::TextShape>),
-  #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
   Shape(std::boxed::Box<crate::schemas::a::Shape>),
-  #[sdk(child(qname = "a:CT_GvmlConnector/a:cxnSp"))]
   ConnectionShape(std::boxed::Box<crate::schemas::a::ConnectionShape>),
-  #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   Picture(std::boxed::Box<crate::schemas::a::Picture>),
-  #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
   GvmlContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
-  #[sdk(child(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame"))]
   GraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
-  #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
   GroupShape(std::boxed::Box<crate::schemas::a::GroupShape>),
 }

@@ -68,12 +68,9 @@ pub enum DiagramAutoBulletChoice {
   #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
-  #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
   AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),
   /// Character Bullet.
-  #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
   CharacterBullet(std::boxed::Box<crate::schemas::a::CharacterBullet>),
   /// Picture Bullet.
-  #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
   PictureBullet(std::boxed::Box<crate::schemas::a::PictureBullet>),
 }

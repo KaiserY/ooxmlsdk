@@ -808,28 +808,21 @@ pub struct DataLabelFieldTableEntry {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
-  #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
-  #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
@@ -838,40 +831,30 @@ pub enum ShapePropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartTextChoice {
   /// Defines the StringReference Class.
-  #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
   StringReference(std::boxed::Box<crate::schemas::c::StringReference>),
   /// Rich Text.
-  #[sdk(child(qname = "a:CT_TextBody/c:rich"))]
   RichText(std::boxed::Box<crate::schemas::c::RichText>),
   /// String Literal.
-  #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
   StringLiteral(std::boxed::Box<crate::schemas::c::StringLiteral>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AxisDataSourceTypeChoice {
   /// Multi Level String Reference.
-  #[sdk(child(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef"))]
   MultiLevelStringReference(std::boxed::Box<crate::schemas::c::MultiLevelStringReference>),
   /// Number Reference.
-  #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
   NumberReference(std::boxed::Box<crate::schemas::c::NumberReference>),
   /// Number Literal.
-  #[sdk(child(qname = "c:CT_NumData/c:numLit"))]
   NumberLiteral(std::boxed::Box<crate::schemas::c::NumberLiteral>),
   /// Defines the StringReference Class.
-  #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
   StringReference(std::boxed::Box<crate::schemas::c::StringReference>),
   /// String Literal.
-  #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
   StringLiteral(std::boxed::Box<crate::schemas::c::StringLiteral>),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -918,7 +901,6 @@ pub struct DataLabelChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelChoice {
-  #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   Delete(std::boxed::Box<crate::schemas::c::Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
   #[sdk(sequence)]

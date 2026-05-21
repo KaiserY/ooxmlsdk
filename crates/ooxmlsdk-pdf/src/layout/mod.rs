@@ -848,6 +848,34 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
   Ok(RootFrameLayout::new(document).format())
 }
 
+pub(crate) fn fixed_pages(setups: Vec<PageSetup>) -> LayoutDocument {
+  let pages = setups
+    .into_iter()
+    .enumerate()
+    .map(|(index, setup)| {
+      let mut page = empty_section_page(setup, 0, index);
+      page.preserve_empty = true;
+      page
+    })
+    .collect();
+
+  LayoutDocument {
+    pages,
+    form_widgets: Vec::new(),
+    follows: Vec::new(),
+    frames: Vec::new(),
+    outline_entries: Vec::new(),
+    page_replays: Vec::new(),
+    page_replay_applications: Vec::new(),
+    backward_moves: Vec::new(),
+    layout_reruns: Vec::new(),
+    page_invalidations: Vec::new(),
+    reflow_executions: Vec::new(),
+    reflow_requests: Vec::new(),
+    restart_plan: None,
+  }
+}
+
 struct RootFrameLayout<'a> {
   document: &'a DocxDocument,
   pages: Vec<Page>,

@@ -286,7 +286,7 @@ pub struct Anchor {
   pub relative_width: Option<crate::schemas::wp14::RelativeWidth>,
   /// Defines the RelativeHeight Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
-  pub wp14_size_rel_v: Option<crate::schemas::wp14::RelativeHeight>,
+  pub wp14_relative_height: Option<crate::schemas::wp14::RelativeHeight>,
 }
 /// Wrapping Polygon Start.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

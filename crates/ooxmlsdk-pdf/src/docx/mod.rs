@@ -5866,11 +5866,11 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .as_ref()
       .and_then(|relative| drawingml_percent_to_ratio(&relative.percentage_width)),
     relative_height_to: anchor
-      .wp14_size_rel_v
+      .wp14_relative_height
       .as_ref()
       .map(|relative| relative_height_reference(relative.relative_from)),
     relative_height_pct: anchor
-      .wp14_size_rel_v
+      .wp14_relative_height
       .as_ref()
       .and_then(|relative| drawingml_percent_to_ratio(&relative.percentage_height)),
     margin_top_pt: margins.top_pt,

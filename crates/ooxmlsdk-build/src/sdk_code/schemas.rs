@@ -341,6 +341,12 @@ fn child_qname_field_rust_name(name: &str) -> String {
   schema_child_field_rust_name(schema_qname_element_name(name))
 }
 
+fn child_qname_prefix(name: &str) -> Option<&str> {
+  schema_qname_element_name(name)
+    .split_once(':')
+    .map(|(prefix, _)| prefix)
+}
+
 fn child_preferred_field_rust_name(
   child: &SchemaTypeChild,
   context: &CodegenContext<'_>,
@@ -353,6 +359,18 @@ fn child_preferred_field_rust_name(
     .type_by_name(child.name.as_str())
     .map(|child_type| schema_child_field_rust_name(child_type.class_name.as_str()))
     .unwrap_or_else(|| child_qname_field_rust_name(child.name.as_str()))
+}
+
+fn child_conflict_field_rust_name(child: &SchemaTypeChild, context: &CodegenContext<'_>) -> String {
+  let Some(child_type) = context.type_by_name(child.name.as_str()) else {
+    return child_qname_field_rust_name(child.name.as_str());
+  };
+
+  if let Some(prefix) = child_qname_prefix(child.name.as_str()) {
+    schema_child_field_rust_name(format!("{prefix}_{}", child_type.class_name).as_str())
+  } else {
+    child_qname_field_rust_name(child.name.as_str())
+  }
 }
 
 pub(crate) fn duplicate_preferred_child_field_names<'a>(
@@ -421,7 +439,7 @@ pub(crate) fn schema_child_field_rust_name_with_context(
 ) -> String {
   let preferred_name = child_preferred_field_rust_name(child, context);
   if child.property_name.is_empty() && duplicate_preferred_names.contains(&preferred_name) {
-    child_qname_field_rust_name(child.name.as_str())
+    child_conflict_field_rust_name(child, context)
   } else {
     preferred_name
   }

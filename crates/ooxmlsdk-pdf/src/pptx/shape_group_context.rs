@@ -1,6 +1,7 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
+use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
@@ -111,10 +112,7 @@ impl PPTShapeGroupContext {
       .application_non_visual_drawing_properties
       .placeholder_shape
     {
-      shape.shape.sub_type = placeholder
-        .r#type
-        .as_ref()
-        .map(|value| format!("{value:?}"));
+      shape.shape.sub_type = placeholder.r#type;
       shape.shape.sub_type_index = placeholder.index;
     }
     if let Some(text_body) = &source.text_body {
@@ -302,7 +300,7 @@ fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProp
       kind: FillKind::None,
     }),
     p::ShapePropertiesChoice2::SolidFill(fill) => Some(FillProperties {
-      kind: FillKind::Solid(import_solid_fill_color(fill).unwrap_or_default()),
+      kind: FillKind::Solid(import_solid_fill_color(fill)?),
     }),
     p::ShapePropertiesChoice2::GroupFill => Some(FillProperties {
       kind: FillKind::Group,
@@ -329,15 +327,8 @@ fn import_line_properties(outline: &a::Outline) -> Option<LineProperties> {
   }
 }
 
-fn import_solid_fill_color(fill: &a::SolidFill) -> Option<String> {
-  match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::RgbColorModelHex(color) => Some(format!("#{}", color.val)),
-    a::SolidFillChoice::SchemeColor(color) => Some(format!("scheme:{:?}", color.val)),
-    a::SolidFillChoice::PresetColor(color) => Some(format!("preset:{:?}", color.val)),
-    a::SolidFillChoice::RgbColorModelPercentage(_)
-    | a::SolidFillChoice::HslColor(_)
-    | a::SolidFillChoice::SystemColor(_) => None,
-  }
+fn import_solid_fill_color(fill: &a::SolidFill) -> Option<Color> {
+  Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)
 }
 
 fn apply_transform_2d(shape: &mut Shape, transform: Option<&a::Transform2D>) {

@@ -4,6 +4,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use crate::docx::PageSetup;
 use crate::units;
 
+use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
 use super::drawingml::shape::Shape;
 use super::import::PowerPointImport;
@@ -79,7 +80,7 @@ pub(crate) struct SlidePersist {
   pub(crate) master_color_map: Option<ColorMap>,
   pub(crate) master_page_index: Option<usize>,
   pub(crate) shapes: Vec<Shape>,
-  pub(crate) background_color: Option<String>,
+  pub(crate) background_color: Option<Color>,
   pub(crate) background_properties: Option<BackgroundProperties>,
   pub(crate) time_node_list: Vec<TimeNode>,
   pub(crate) header_footer: HeaderFooter,
@@ -99,15 +100,22 @@ pub(crate) struct ColorMap {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ColorMapEntry {
-  pub(crate) source: &'static str,
-  pub(crate) target: String,
+  pub(crate) source: a::SchemeColorValues,
+  pub(crate) target: a::ColorSchemeIndexValues,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct BackgroundProperties {
-  pub(crate) fill_properties: FillProperties,
-  pub(crate) color: Option<String>,
-  pub(crate) style_index: Option<u32>,
+  pub(crate) kind: BackgroundKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum BackgroundKind {
+  Properties(FillProperties),
+  StyleReference {
+    style_index: u32,
+    placeholder_color: Option<Color>,
+  },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -228,29 +236,32 @@ impl SlidePersist {
 }
 
 impl ColorMap {
-  pub(crate) fn map_token(&self, token: &str) -> Option<String> {
+  pub(crate) fn map_token(&self, token: a::SchemeColorValues) -> Option<a::ColorSchemeIndexValues> {
     self
       .entries
       .iter()
       .find(|entry| entry.source == token)
-      .map(|entry| entry.target.clone())
+      .map(|entry| entry.target)
   }
 
   pub(crate) fn from_pml(color_map: &p::ColorMap) -> Self {
     Self {
       entries: vec![
-        ColorMapEntry::new("bg1", &color_map.background1),
-        ColorMapEntry::new("tx1", &color_map.text1),
-        ColorMapEntry::new("bg2", &color_map.background2),
-        ColorMapEntry::new("tx2", &color_map.text2),
-        ColorMapEntry::new("accent1", &color_map.accent1),
-        ColorMapEntry::new("accent2", &color_map.accent2),
-        ColorMapEntry::new("accent3", &color_map.accent3),
-        ColorMapEntry::new("accent4", &color_map.accent4),
-        ColorMapEntry::new("accent5", &color_map.accent5),
-        ColorMapEntry::new("accent6", &color_map.accent6),
-        ColorMapEntry::new("hlink", &color_map.hyperlink),
-        ColorMapEntry::new("folHlink", &color_map.followed_hyperlink),
+        ColorMapEntry::new(a::SchemeColorValues::Background1, color_map.background1),
+        ColorMapEntry::new(a::SchemeColorValues::Text1, color_map.text1),
+        ColorMapEntry::new(a::SchemeColorValues::Background2, color_map.background2),
+        ColorMapEntry::new(a::SchemeColorValues::Text2, color_map.text2),
+        ColorMapEntry::new(a::SchemeColorValues::Accent1, color_map.accent1),
+        ColorMapEntry::new(a::SchemeColorValues::Accent2, color_map.accent2),
+        ColorMapEntry::new(a::SchemeColorValues::Accent3, color_map.accent3),
+        ColorMapEntry::new(a::SchemeColorValues::Accent4, color_map.accent4),
+        ColorMapEntry::new(a::SchemeColorValues::Accent5, color_map.accent5),
+        ColorMapEntry::new(a::SchemeColorValues::Accent6, color_map.accent6),
+        ColorMapEntry::new(a::SchemeColorValues::Hyperlink, color_map.hyperlink),
+        ColorMapEntry::new(
+          a::SchemeColorValues::FollowedHyperlink,
+          color_map.followed_hyperlink,
+        ),
       ],
     }
   }
@@ -258,28 +269,28 @@ impl ColorMap {
   pub(crate) fn from_dml_override(color_map: &a::OverrideColorMapping) -> Self {
     Self {
       entries: vec![
-        ColorMapEntry::new("bg1", &color_map.background1),
-        ColorMapEntry::new("tx1", &color_map.text1),
-        ColorMapEntry::new("bg2", &color_map.background2),
-        ColorMapEntry::new("tx2", &color_map.text2),
-        ColorMapEntry::new("accent1", &color_map.accent1),
-        ColorMapEntry::new("accent2", &color_map.accent2),
-        ColorMapEntry::new("accent3", &color_map.accent3),
-        ColorMapEntry::new("accent4", &color_map.accent4),
-        ColorMapEntry::new("accent5", &color_map.accent5),
-        ColorMapEntry::new("accent6", &color_map.accent6),
-        ColorMapEntry::new("hlink", &color_map.hyperlink),
-        ColorMapEntry::new("folHlink", &color_map.followed_hyperlink),
+        ColorMapEntry::new(a::SchemeColorValues::Background1, color_map.background1),
+        ColorMapEntry::new(a::SchemeColorValues::Text1, color_map.text1),
+        ColorMapEntry::new(a::SchemeColorValues::Background2, color_map.background2),
+        ColorMapEntry::new(a::SchemeColorValues::Text2, color_map.text2),
+        ColorMapEntry::new(a::SchemeColorValues::Accent1, color_map.accent1),
+        ColorMapEntry::new(a::SchemeColorValues::Accent2, color_map.accent2),
+        ColorMapEntry::new(a::SchemeColorValues::Accent3, color_map.accent3),
+        ColorMapEntry::new(a::SchemeColorValues::Accent4, color_map.accent4),
+        ColorMapEntry::new(a::SchemeColorValues::Accent5, color_map.accent5),
+        ColorMapEntry::new(a::SchemeColorValues::Accent6, color_map.accent6),
+        ColorMapEntry::new(a::SchemeColorValues::Hyperlink, color_map.hyperlink),
+        ColorMapEntry::new(
+          a::SchemeColorValues::FollowedHyperlink,
+          color_map.followed_hyperlink,
+        ),
       ],
     }
   }
 }
 
 impl ColorMapEntry {
-  fn new(source: &'static str, target: &a::ColorSchemeIndexValues) -> Self {
-    Self {
-      source,
-      target: format!("{target:?}"),
-    }
+  fn new(source: a::SchemeColorValues, target: a::ColorSchemeIndexValues) -> Self {
+    Self { source, target }
   }
 }

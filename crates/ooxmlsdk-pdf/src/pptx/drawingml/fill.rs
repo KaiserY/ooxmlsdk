@@ -1,3 +1,5 @@
+use super::color::Color;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FillProperties {
   pub(crate) kind: FillKind,
@@ -6,6 +8,6 @@ pub(crate) struct FillProperties {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FillKind {
   None,
-  Solid(String),
+  Solid(Color),
   Group,
 }

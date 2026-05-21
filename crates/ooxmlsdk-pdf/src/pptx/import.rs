@@ -1,5 +1,6 @@
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::presentation_part::PresentationPart;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::error::Result;
 
@@ -89,7 +90,10 @@ impl PowerPointImport {
     self.themes.last().expect("theme inserted")
   }
 
-  pub(crate) fn get_scheme_color_token(&self, token: &str) -> Option<String> {
+  pub(crate) fn get_scheme_color_token(
+    &self,
+    token: a::SchemeColorValues,
+  ) -> Option<a::ColorSchemeIndexValues> {
     if let Some(slide) = self
       .actual_slide_persist
       .and_then(|index| self.draw_pages.get(index))
@@ -117,10 +121,28 @@ impl PowerPointImport {
         return Some(mapped);
       }
     }
-    Some(token.to_string())
+    match token {
+      a::SchemeColorValues::Background1 => Some(a::ColorSchemeIndexValues::Light1),
+      a::SchemeColorValues::Text1 => Some(a::ColorSchemeIndexValues::Dark1),
+      a::SchemeColorValues::Background2 => Some(a::ColorSchemeIndexValues::Light2),
+      a::SchemeColorValues::Text2 => Some(a::ColorSchemeIndexValues::Dark2),
+      a::SchemeColorValues::Dark1 => Some(a::ColorSchemeIndexValues::Dark1),
+      a::SchemeColorValues::Light1 => Some(a::ColorSchemeIndexValues::Light1),
+      a::SchemeColorValues::Dark2 => Some(a::ColorSchemeIndexValues::Dark2),
+      a::SchemeColorValues::Light2 => Some(a::ColorSchemeIndexValues::Light2),
+      a::SchemeColorValues::Accent1 => Some(a::ColorSchemeIndexValues::Accent1),
+      a::SchemeColorValues::Accent2 => Some(a::ColorSchemeIndexValues::Accent2),
+      a::SchemeColorValues::Accent3 => Some(a::ColorSchemeIndexValues::Accent3),
+      a::SchemeColorValues::Accent4 => Some(a::ColorSchemeIndexValues::Accent4),
+      a::SchemeColorValues::Accent5 => Some(a::ColorSchemeIndexValues::Accent5),
+      a::SchemeColorValues::Accent6 => Some(a::ColorSchemeIndexValues::Accent6),
+      a::SchemeColorValues::Hyperlink => Some(a::ColorSchemeIndexValues::Hyperlink),
+      a::SchemeColorValues::FollowedHyperlink => Some(a::ColorSchemeIndexValues::FollowedHyperlink),
+      a::SchemeColorValues::PhColor => None,
+    }
   }
 
-  pub(crate) fn get_scheme_color(&self, token: &str) -> Option<String> {
+  pub(crate) fn get_scheme_color(&self, token: a::SchemeColorValues) -> Option<String> {
     // Source: LibreOffice oox/source/ppt/pptimport.cxx
     // getSchemeColor first maps the scheme token using the active slide/layout
     // and master color maps, then resolves the mapped token against the current

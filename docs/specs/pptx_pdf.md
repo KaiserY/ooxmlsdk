@@ -56,6 +56,9 @@ Strict non-negotiables:
 - Do not return placeholder values that look resolved. For example, scheme
   color token mapping is not theme color resolution; `get_scheme_color` must
   not claim to produce a color until theme import has been ported.
+- Do not encode upstream tokens as display-looking strings such as `#RRGGBB`,
+  `scheme:*`, or `preset:*` unless the upstream value is already that concrete
+  representation. Preserve generated SDK enum values through the import model.
 - Do not add tests that lock in temporary fallback output as final behavior.
 - When a branch is not implemented, preserve a typed record or explicit empty
   upstream slot instead of inventing a simpler behavior.
@@ -260,7 +263,7 @@ Required fields:
 | `clr_map` | Effective color mapping |
 | `shapes` | Root `PptShape` tree |
 | `background_color` | Placeholder background color |
-| `background_properties` | Fill properties from `bgPr` or `bgRef` |
+| `background_properties` | `bgPr` fill state or structured `bgRef` style reference |
 | `default_text_style` | Default text list style |
 | `title_text_style` | Title placeholder text style |
 | `body_text_style` | Body placeholder text style |
@@ -443,7 +446,9 @@ Placeholder behavior is a first-class requirement.
 
 `PPTShapeContext::onCreateContext(ph)` must:
 
-1. Set `sub_type` from `p:ph/@type`, defaulting like LibreOffice.
+1. Set `sub_type` from `p:ph/@type` as the generated
+   `p::PlaceholderValues` enum, defaulting like LibreOffice. Do not convert it
+   to `Debug` strings or renderer labels.
 2. Set `sub_type_index` from `p:ph/@idx` unless the value is `SAL_MAX_UINT32`
    equivalent.
 3. When `@type` is missing but `@idx` exists, look up the type from the
@@ -503,6 +508,13 @@ Preserve these decisions:
 
 Keep this logic before rendering. The renderer should never infer placeholder
 semantics from raw XML.
+
+Implementation checkpoint:
+
+- `Shape::finalize_service_name` is the first owner of placeholder-to-service
+  classification. Early branches may stay conservative, but they must use
+  `p::PlaceholderValues` and `ShapeService`; do not add string matching in the
+  display layer or tests.
 
 ---
 
@@ -931,6 +943,9 @@ Implementation checkpoint:
 - `cSld/bg/bgPr` and `cSld/bg/bgRef` must populate `SlidePersist` background
   state during slide-fragment import. `create_background`/display lowering may
   consume that state later, but should not inspect background XML directly.
+  `bgRef` is a style-matrix reference plus placeholder color, not a direct
+  solid fill; preserve it as a structured style reference until theme
+  `fmtScheme/fillStyleLst` resolution is ported from LibreOffice.
 - Master `clrMap` and slide/layout `clrMapOvr` must be stored on
   `SlidePersist` before shape and background conversion needs scheme colors.
   Follow LibreOffice's lookup order: current slide/layout color map first, then
@@ -1037,7 +1052,8 @@ Implementation checkpoint:
   active must already be made by `PresentationFragmentHandler::import_slide`.
 - Background observation may draw a full-page neutral rectangle from
   `SlidePersist::background_properties`. It must only use already imported
-  `bgPr`/`bgRef` state; theme fill-style lookup remains import/model work.
+  direct `bgPr` fill state; `bgRef` must remain invisible until theme
+  fill-style lookup is implemented in the import/model layer.
 - Group output must follow `Shape::children` and carry group transform offset
   state as a temporary approximation of LibreOffice's transformation matrix.
   Do not flatten groups in the display layer to work around missing transform

@@ -4,12 +4,13 @@ use crate::docx::{BorderStyle, RgbColor, TextStyle};
 use crate::layout::{self, PageItem, PdfTextSegmentation, RectItem, TextItem};
 use crate::units;
 
+use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{Shape, ShapeService};
 use super::drawingml::text_body::{TextBody, TextRunKind};
 use super::import::PowerPointImport;
-use super::slide::{BackgroundProperties, SlidePersist};
+use super::slide::{BackgroundKind, BackgroundProperties, SlidePersist};
 
 const DEFAULT_TEXT_LINE_HEIGHT_PT: f32 = 14.0;
 const DEFAULT_TEXT_INSET_PT: f32 = 4.0;
@@ -47,7 +48,10 @@ fn lower_background(
   background: &BackgroundProperties,
   items: &mut Vec<PageItem>,
 ) {
-  let Some(fill_color) = fill_color(&background.fill_properties) else {
+  let BackgroundKind::Properties(fill_properties) = &background.kind else {
+    return;
+  };
+  let Some(fill_color) = fill_color(fill_properties) else {
     return;
   };
   items.push(PageItem::Rect(RectItem {
@@ -200,7 +204,7 @@ fn actual_line_properties(shape: &Shape) -> Option<&LineProperties> {
 
 fn fill_color(fill: &FillProperties) -> Option<RgbColor> {
   match &fill.kind {
-    FillKind::Solid(color) => parse_display_color(color),
+    FillKind::Solid(color) => display_rgb_color(color),
     FillKind::None | FillKind::Group => None,
   }
 }
@@ -209,13 +213,20 @@ fn line_stroke(line: &LineProperties) -> Option<BorderStyle> {
   Some(BorderStyle {
     width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
     spacing_pt: 0.0,
-    color: parse_display_color(line.color.as_deref()?)?,
+    color: display_rgb_color(line.color.as_ref()?)?,
     compound: false,
   })
 }
 
-fn parse_display_color(value: &str) -> Option<RgbColor> {
-  let hex = value.strip_prefix('#')?;
+fn display_rgb_color(color: &Color) -> Option<RgbColor> {
+  match color {
+    Color::RgbHex(hex) => parse_rgb_hex(hex),
+    Color::System(system) => system.last_color.as_deref().and_then(parse_rgb_hex),
+    Color::Scheme(_) | Color::Preset(_) => None,
+  }
+}
+
+fn parse_rgb_hex(hex: &str) -> Option<RgbColor> {
   if hex.len() != 6 {
     return None;
   }

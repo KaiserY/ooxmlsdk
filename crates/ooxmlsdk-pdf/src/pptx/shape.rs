@@ -1,3 +1,5 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+
 use super::drawingml::shape::{Shape, ShapeService};
 use super::slide::{ShapeLocation, SlidePersist};
 
@@ -55,8 +57,8 @@ impl PptShape {
       .find(|shape| shape.sub_type_index == self.shape.sub_type_index)
   }
 
-  pub(crate) fn get_sub_type_text_list_style(&self) -> Option<String> {
-    self.shape.sub_type.clone()
+  pub(crate) fn get_sub_type_text_list_style(&self) -> Option<p::PlaceholderValues> {
+    self.shape.sub_type
   }
 
   pub(crate) fn is_placeholder_candidate(&self) -> bool {

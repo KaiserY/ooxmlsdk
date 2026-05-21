@@ -1,3 +1,5 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+
 use super::fill::FillProperties;
 use super::line::LineProperties;
 use super::shape_properties::EffectProperties;
@@ -16,7 +18,7 @@ pub(crate) struct Shape {
   pub(crate) hidden: bool,
   pub(crate) hidden_master_shape: bool,
   pub(crate) locked: bool,
-  pub(crate) sub_type: Option<String>,
+  pub(crate) sub_type: Option<p::PlaceholderValues>,
   pub(crate) sub_type_index: Option<u32>,
   pub(crate) position: Point,
   pub(crate) size: Size,
@@ -159,7 +161,34 @@ impl Shape {
     }
   }
 
-  pub(crate) fn finalize_service_name(&mut self) {}
+  pub(crate) fn finalize_service_name(&mut self) {
+    if let Some(service_name) = self.placeholder_service_name() {
+      self.service_name = service_name;
+    }
+  }
+
+  fn placeholder_service_name(&self) -> Option<ShapeService> {
+    match self.sub_type? {
+      p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle => {
+        Some(ShapeService::TitleTextShape)
+      }
+      p::PlaceholderValues::SubTitle => Some(ShapeService::SubtitleShape),
+      p::PlaceholderValues::Body | p::PlaceholderValues::Object => {
+        Some(ShapeService::OutlinerShape)
+      }
+      p::PlaceholderValues::DateAndTime => Some(ShapeService::DateTimeShape),
+      p::PlaceholderValues::SlideNumber => Some(ShapeService::SlideNumberShape),
+      p::PlaceholderValues::Footer => Some(ShapeService::FooterShape),
+      p::PlaceholderValues::Header => Some(ShapeService::HeaderShape),
+      p::PlaceholderValues::Chart => Some(ShapeService::ChartShape),
+      p::PlaceholderValues::Table => Some(ShapeService::TableShape),
+      p::PlaceholderValues::Media => Some(ShapeService::MediaShape),
+      p::PlaceholderValues::ClipArt
+      | p::PlaceholderValues::Diagram
+      | p::PlaceholderValues::SlideImage
+      | p::PlaceholderValues::Picture => None,
+    }
+  }
 
   pub(crate) fn finalize_x_shape(&mut self) {}
 

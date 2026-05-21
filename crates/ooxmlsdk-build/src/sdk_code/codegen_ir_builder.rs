@@ -1506,6 +1506,17 @@ fn build_recursive_choice_enum_decl(
       }
     } else {
       track_recursive_choice_leaf(child, &mut used_leaf_names, &mut used_variant_names);
+      if should_flatten_optional_conflict_pair_child_sequence(child) {
+        for sequence_child in &child.children {
+          members.push(build_recursive_choice_leaf_variant_decl(
+            schema_type,
+            schema,
+            context,
+            sequence_child,
+          )?);
+        }
+        continue;
+      }
       members.push(build_recursive_choice_member_decl(
         schema_type,
         schema,
@@ -3092,6 +3103,15 @@ fn build_structured_one_sequence_members(
               )?);
             }
             ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant)
+              if should_flatten_optional_conflict_pair_sequence(sequence_variant) =>
+            {
+              for field in &sequence_variant.fields {
+                enum_members.push(build_single_field_sequence_choice_variant_decl(
+                  field, schema, context,
+                )?);
+              }
+            }
+            ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant)
               if sequence_variant.fields.len() == 1 =>
             {
               enum_members.push(build_single_field_sequence_choice_variant_decl(
@@ -3169,6 +3189,64 @@ fn build_single_field_sequence_choice_variant_decl(
     wire,
     payload: build_child_type_ref_from_name(field.child.name, effective_kind, schema, context)?,
   }))
+}
+
+fn should_flatten_optional_conflict_pair_sequence(
+  sequence_variant: &ResolvedOneSequenceSequenceVariant<'_>,
+) -> bool {
+  const CONFLICT_INS: &str = "w:CT_RunTrackChange/w14:conflictIns";
+  const CONFLICT_DEL: &str = "w:CT_RunTrackChange/w14:conflictDel";
+
+  matches!(
+    sequence_variant.fields.as_slice(),
+    [first, second]
+      if first.optional
+        && !first.repeated
+        && second.optional
+        && !second.repeated
+        && first.child.name == CONFLICT_INS
+        && second.child.name == CONFLICT_DEL
+  )
+}
+
+fn should_flatten_optional_conflict_pair_child_sequence(child: &SchemaTypeChild) -> bool {
+  const CONFLICT_INS: &str = "w:CT_RunTrackChange/w14:conflictIns";
+  const CONFLICT_DEL: &str = "w:CT_RunTrackChange/w14:conflictDel";
+
+  child.kind == SchemaTypeChildKind::Sequence
+    && matches!(
+      child.children.as_slice(),
+      [first, second]
+        if first.kind == SchemaTypeChildKind::Child
+          && (child.optional || first.optional)
+          && !first.repeated
+          && first.name == CONFLICT_INS
+          && second.kind == SchemaTypeChildKind::Child
+          && (child.optional || second.optional)
+          && !second.repeated
+          && second.name == CONFLICT_DEL
+    )
+}
+
+fn should_flatten_optional_conflict_pair_resolved_sequence(
+  child: &ResolvedCompositeChild<'_>,
+) -> bool {
+  const CONFLICT_INS: &str = "w:CT_RunTrackChange/w14:conflictIns";
+  const CONFLICT_DEL: &str = "w:CT_RunTrackChange/w14:conflictDel";
+
+  child.kind == SchemaTypeChildKind::Sequence
+    && matches!(
+      child.children.as_slice(),
+      [first, second]
+        if first.kind == SchemaTypeChildKind::Child
+          && (child.optional || first.optional)
+          && !first.repeated
+          && first.name == CONFLICT_INS
+          && second.kind == SchemaTypeChildKind::Child
+          && (child.optional || second.optional)
+          && !second.repeated
+          && second.name == CONFLICT_DEL
+    )
 }
 
 fn build_single_structured_choice_field_decl(
@@ -3869,6 +3947,17 @@ fn build_generic_children_members(
   for (variant_index, child) in resolved_children.iter().enumerate() {
     match child.kind {
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Sequence => {
+        if should_flatten_optional_conflict_pair_resolved_sequence(child) {
+          for sequence_child in &child.children {
+            enum_members.push(build_mixed_choice_leaf_variant_decl(
+              sequence_child,
+              schema,
+              context,
+            )?);
+          }
+          continue;
+        }
+
         let sequence_leafs = collect_resolved_sequence_leafs_ir(&child.children);
         let sequence_variant = ResolvedOneSequenceSequenceVariant {
           variant_name: format!("Sequence{}", variant_index + 1),
@@ -5994,6 +6083,7 @@ mod tests {
                               particle_id: String::new(),
                               name: "w:CT_RunTrackChange/w14:conflictIns".to_string(),
                               kind: SchemaTypeChildKind::Child,
+                              optional: true,
                               initial_version: "Office2010".to_string(),
                               ..Default::default()
                             },
@@ -6001,6 +6091,7 @@ mod tests {
                               particle_id: String::new(),
                               name: "w:CT_RunTrackChange/w14:conflictDel".to_string(),
                               kind: SchemaTypeChildKind::Child,
+                              optional: true,
                               initial_version: "Office2010".to_string(),
                               ..Default::default()
                             },
@@ -6118,97 +6209,48 @@ mod tests {
         if variant.rust_name == "EgContentRunContent"
           && variant.payload.rust_type == "ParagraphChoice1"
     )));
-    assert!(paragraph_choice.members.iter().any(|member| matches!(
-      member,
-      MemberDecl::Variant(variant)
-        if variant.rust_name == "EgRunLevelElts"
-          && variant.payload.rust_type == "ParagraphChoice2"
-    )));
-
-    let content_run_choice = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "ParagraphChoice1")
-      .unwrap();
-    assert!(content_run_choice.members.iter().any(|member| matches!(
-      member,
-      MemberDecl::Variant(variant)
-        if variant.rust_name == "EgRunLevelElts"
-          && variant.payload.rust_type == "ParagraphChoice2"
-    )));
-
-    let run_level_choice = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "ParagraphChoice2")
-      .unwrap();
-    assert!(!run_level_choice.members.iter().any(|member| matches!(
+    assert!(!paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgRangeMarkupElements"
           && variant.payload.rust_type == "ParagraphChoice3"
     )));
-    assert!(run_level_choice.members.iter().any(|member| matches!(
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "WProofErr"
     )));
-    assert!(run_level_choice.members.iter().any(|member| matches!(
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
-        if variant.rust_name == "Sequence1"
-          && variant.payload.rust_type == "ParagraphSequence1"
+        if variant.rust_name == "W14ConflictIns"
+          && variant.payload.rust_type == "RunConflictInsertion"
     )));
-
-    let conflict_sequence = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "ParagraphSequence1")
-      .unwrap();
-    let conflict_fields = conflict_sequence
-      .members
-      .iter()
-      .filter_map(|member| match member {
-        MemberDecl::Field(field) => Some(field),
-        MemberDecl::Variant(_) => None,
-      })
-      .collect::<Vec<_>>();
-    assert_eq!(conflict_fields.len(), 2);
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "W14ConflictDel"
+          && variant.payload.rust_type == "RunConflictDeletion"
+    )));
     assert!(
-      conflict_fields
+      !ir
+        .types
         .iter()
-        .all(|field| field.cardinality == Cardinality::One)
+        .any(|ty| ty.rust_name == "ParagraphSequence1")
     );
 
-    assert!(!run_level_choice.members.iter().any(|member| matches!(
+    assert!(!paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgMathContent"
           && variant.payload.rust_type == "ParagraphChoice4"
     )));
-    assert!(run_level_choice.members.iter().any(|member| matches!(
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "MR"
           && variant.payload.rust_type == "MathRun"
     )));
-
-    let omath_math_elements_choice = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == "ParagraphChoice5")
-      .unwrap();
-    assert!(
-      omath_math_elements_choice
-        .members
-        .iter()
-        .any(|member| matches!(
-          member,
-          MemberDecl::Variant(variant)
-            if variant.rust_name == "MR"
-              && variant.payload.rust_type == "MathRun"
-        ))
-    );
     assert!(
       ir.types
         .iter()

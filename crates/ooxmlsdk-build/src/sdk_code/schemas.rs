@@ -2170,7 +2170,7 @@ fn gen_choice_variant_tokens(
           && let Some(single_field_tokens) = inline_single_field_sequence_variant_tokens(
             render_context.module,
             render_context.type_graph,
-            &variant_ident,
+            &single_field_sequence_variant_ident(rendered_variant_name, helper_fields[0])?,
             &variant_attrs,
             helper_fields[0],
           )?
@@ -2323,6 +2323,40 @@ fn gen_choice_variant_tokens(
         #variant_ident(#payload_type),
       }])
     }
+  }
+}
+
+fn single_field_sequence_variant_ident(
+  rendered_variant_name: &str,
+  field: &FieldDecl,
+) -> Result<Ident> {
+  if rendered_variant_name == "Sequence"
+    || is_generated_anonymous_variant_name_of_kind(rendered_variant_name, "Sequence")
+  {
+    match &field.wire {
+      FieldWireDecl::Child { qname } | FieldWireDecl::TextChild { qname } => {
+        return Ok(parse_str(&child_variant_rust_name_from_qname(qname))?);
+      }
+      _ => {}
+    }
+  }
+
+  Ok(parse_str(rendered_variant_name)?)
+}
+
+fn child_variant_rust_name_from_qname(qname: &str) -> String {
+  let element_qname = qname.split('/').nth(1).unwrap_or(qname);
+  let mut parts = element_qname.split(':');
+  match (parts.next(), parts.next()) {
+    (Some(prefix), Some(local)) => {
+      format!(
+        "{}{}",
+        prefix.to_upper_camel_case(),
+        local.to_upper_camel_case()
+      )
+    }
+    (Some(local), None) => local.to_upper_camel_case(),
+    _ => element_qname.to_upper_camel_case(),
   }
 }
 
@@ -5530,7 +5564,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence (std :: boxed :: Box < Second >)"
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
     ));
     assert!(!generated.contains("Sequence32"));
   }
@@ -5633,12 +5667,11 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence1 (std :: boxed :: Box < First >)"
+      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
     ));
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence2 (std :: boxed :: Box < Second >)")
-    );
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
+    ));
     assert!(!generated.contains("Sequence32"));
     assert!(!generated.contains("Sequence8"));
   }
@@ -5724,10 +5757,9 @@ mod tests {
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence (std :: boxed :: Box < First >)"
     ));
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence32 (std :: boxed :: Box < Second >)")
-    );
+    assert!(generated.contains(
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
+    ));
   }
 
   #[test]
@@ -6650,9 +6682,10 @@ mod tests {
     assert!(generated.contains("pub fallback_holder_choice : Option < FallbackHolderChoice >"));
     assert!(generated.contains("pub enum FallbackHolderChoice"));
     assert!(generated.contains("TA (std :: boxed :: Box < LeafA >)"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_B/t:b\"))] Sequence (std :: boxed :: Box < LeafB >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:CT_B/t:b\"))] TB (std :: boxed :: Box < LeafB >)")
+    );
     assert!(!generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(!generated.contains("leaf_b"));
   }

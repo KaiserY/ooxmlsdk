@@ -297,7 +297,7 @@ fn deleted_run_flat_choice_parses_upstream_particle_shape() {
 
   let deleted_run = xml.parse::<DeletedRun>().unwrap();
 
-  assert_eq!(deleted_run.deleted_run_choice.len(), 4);
+  assert_eq!(deleted_run.deleted_run_choice.len(), 5);
   assert!(matches!(
     deleted_run.deleted_run_choice[0],
     DeletedRunChoice::WProofErr(_)
@@ -308,13 +308,14 @@ fn deleted_run_flat_choice_parses_upstream_particle_shape() {
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[2],
-    DeletedRunChoice::Sequence {
-      run_conflict_insertion: Some(_),
-      run_conflict_deletion: Some(_)
-    }
+    DeletedRunChoice::W14ConflictIns(_)
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[3],
+    DeletedRunChoice::W14ConflictDel(_)
+  ));
+  assert!(matches!(
+    deleted_run.deleted_run_choice[4],
     DeletedRunChoice::WR(_)
   ));
 }

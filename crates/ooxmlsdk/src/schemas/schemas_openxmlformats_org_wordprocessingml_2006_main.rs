@@ -15814,7 +15814,7 @@ pub enum DrawingChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedMathControlChoice {
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
-  Sequence(std::boxed::Box<RunProperties>),
+  WRPr(std::boxed::Box<RunProperties>),
   /// Defines the DeletedMathControl Class.
   #[sdk(child(qname = "w:CT_MathCtrlDel/w:del"))]
   WDel(std::boxed::Box<DeletedMathControl>),
@@ -15822,7 +15822,7 @@ pub enum InsertedMathControlChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromMathControlChoice {
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
-  Sequence(std::boxed::Box<RunProperties>),
+  WRPr(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   #[sdk(child(qname = "w:CT_MathCtrlIns/w:ins"))]
   WIns(std::boxed::Box<InsertedMathControl>),
@@ -15833,7 +15833,7 @@ pub enum MoveFromMathControlChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToMathControlChoice {
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
-  Sequence(std::boxed::Box<RunProperties>),
+  WRPr(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   #[sdk(child(qname = "w:CT_MathCtrlIns/w:ins"))]
   WIns(std::boxed::Box<InsertedMathControl>),
@@ -15956,16 +15956,12 @@ pub enum CustomXmlRubyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16148,16 +16144,12 @@ pub enum SimpleFieldRubyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16336,16 +16328,10 @@ pub enum HyperlinkRubyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -16673,16 +16659,12 @@ pub enum InsertedRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16862,16 +16844,12 @@ pub enum DeletedRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -17051,16 +17029,12 @@ pub enum MoveFromRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -17240,16 +17214,12 @@ pub enum MoveToRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -17515,16 +17485,12 @@ pub enum CustomXmlBlockChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtBlockChoice {
@@ -17715,16 +17681,12 @@ pub enum ParagraphChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -17993,16 +17955,12 @@ pub enum TableChoice2 {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowChoice {
@@ -18113,16 +18071,12 @@ pub enum TableRowChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRowChoice {
@@ -18233,16 +18187,12 @@ pub enum CustomXmlRowChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRowChoice {
@@ -18436,16 +18386,12 @@ pub enum TableCellChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlCellChoice {
@@ -18556,16 +18502,12 @@ pub enum CustomXmlCellChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtCellChoice {
@@ -18756,16 +18698,12 @@ pub enum CustomXmlRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -18957,16 +18895,12 @@ pub enum SimpleFieldChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -19154,16 +19088,10 @@ pub enum HyperlinkChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -19329,16 +19257,10 @@ pub enum BidirectionalOverrideChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -19504,16 +19426,10 @@ pub enum BidirectionalEmbeddingChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -19682,16 +19598,10 @@ pub enum TextBoxContentChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HeaderChoice {
@@ -19804,16 +19714,10 @@ pub enum HeaderChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FooterChoice {
@@ -19926,16 +19830,10 @@ pub enum FooterChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousTableCellPropertiesChoice {
@@ -20164,16 +20062,10 @@ pub enum RubyContentChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -20330,16 +20222,10 @@ pub enum RubyBaseChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -20579,16 +20465,10 @@ pub enum SdtContentBlockChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunChoice {
@@ -20700,16 +20580,10 @@ pub enum SdtContentRunChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -20876,16 +20750,10 @@ pub enum SdtContentRunRubyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
   #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
@@ -21036,16 +20904,10 @@ pub enum SdtContentCellChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRowChoice {
@@ -21152,16 +21014,10 @@ pub enum SdtContentRowChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellPropertiesChoice {
@@ -21365,16 +21221,12 @@ pub enum FootnoteChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndnoteChoice {
@@ -21491,16 +21343,12 @@ pub enum EndnoteChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DocPartBodyChoice {
@@ -21617,16 +21465,12 @@ pub enum DocPartBodyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BodyChoice {
@@ -21743,16 +21587,12 @@ pub enum BodyChoice {
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
   WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
+  /// Defines the RunConflictInsertion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+  W14ConflictIns(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
+  /// Defines the RunConflictDeletion Class.
+  #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+  W14ConflictDel(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),

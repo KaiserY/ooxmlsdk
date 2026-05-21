@@ -4836,7 +4836,7 @@ pub enum LegendEntryChoice {
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
-  Sequence(std::boxed::Box<TextProperties>),
+  CTxPr(std::boxed::Box<TextProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

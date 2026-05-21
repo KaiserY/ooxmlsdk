@@ -8,7 +8,7 @@ use super::slide::{SlidePersist, SlideSize};
 
 #[derive(Debug)]
 pub(crate) struct PowerPointImport {
-  pub(crate) themes: Vec<ThemeRecord>,
+  pub(crate) themes: Vec<ThemeFragmentRecord>,
   pub(crate) draw_pages: Vec<SlidePersist>,
   pub(crate) master_pages: Vec<SlidePersist>,
   pub(crate) notes_pages: Vec<SlidePersist>,
@@ -19,8 +19,10 @@ pub(crate) struct PowerPointImport {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ThemeRecord {
+pub(crate) struct ThemeFragmentRecord {
   pub(crate) path: String,
+  pub(crate) name: Option<String>,
+  pub(crate) theme_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -53,23 +55,79 @@ impl PowerPointImport {
     Ok(import)
   }
 
-  pub(crate) fn get_current_theme(&self) -> Option<&ThemeRecord> {
+  pub(crate) fn get_current_theme(&self) -> Option<&ThemeFragmentRecord> {
     self.get_current_theme_ptr()
   }
 
-  pub(crate) fn get_current_theme_ptr(&self) -> Option<&ThemeRecord> {
-    self.themes.first()
+  pub(crate) fn get_current_theme_ptr(&self) -> Option<&ThemeFragmentRecord> {
+    self
+      .actual_slide_persist
+      .and_then(|index| self.draw_pages.get(index))
+      .and_then(|slide| slide.theme_path.as_deref())
+      .and_then(|path| self.get_theme(path))
+      .or_else(|| self.themes.first())
+  }
+
+  pub(crate) fn get_theme(&self, path: &str) -> Option<&ThemeFragmentRecord> {
+    self.themes.iter().find(|theme| theme.path == path)
+  }
+
+  pub(crate) fn ensure_theme(
+    &mut self,
+    path: String,
+    name: Option<String>,
+    theme_id: Option<String>,
+  ) -> &ThemeFragmentRecord {
+    if let Some(index) = self.themes.iter().position(|theme| theme.path == path) {
+      return &self.themes[index];
+    }
+    self.themes.push(ThemeFragmentRecord {
+      path,
+      name,
+      theme_id,
+    });
+    self.themes.last().expect("theme inserted")
   }
 
   pub(crate) fn get_scheme_color_token(&self, token: &str) -> Option<String> {
+    if let Some(slide) = self
+      .actual_slide_persist
+      .and_then(|index| self.draw_pages.get(index))
+    {
+      if let Some(mapped) = slide
+        .color_map
+        .as_ref()
+        .and_then(|color_map| color_map.map_token(token))
+      {
+        return Some(mapped);
+      }
+      if let Some(mapped) = slide
+        .master_color_map
+        .as_ref()
+        .and_then(|color_map| color_map.map_token(token))
+      {
+        return Some(mapped);
+      }
+      if let Some(mapped) = slide
+        .master_page_index
+        .and_then(|index| self.master_pages.get(index))
+        .and_then(|master| master.color_map.as_ref())
+        .and_then(|color_map| color_map.map_token(token))
+      {
+        return Some(mapped);
+      }
+    }
     Some(token.to_string())
   }
 
   pub(crate) fn get_scheme_color(&self, token: &str) -> Option<String> {
     // Source: LibreOffice oox/source/ppt/pptimport.cxx
-    // Full implementation must consult the active SlidePersist clrMap,
-    // the master clrMap, then the current theme color scheme.
-    self.get_scheme_color_token(token)
+    // getSchemeColor first maps the scheme token using the active slide/layout
+    // and master color maps, then resolves the mapped token against the current
+    // DrawingML theme. Do not return a token string as if it were a resolved
+    // color; theme color-scheme import must be ported from upstream first.
+    let _mapped_token = self.get_scheme_color_token(token)?;
+    None
   }
 
   pub(crate) fn get_table_styles(&mut self) -> Option<&TableStyleList> {

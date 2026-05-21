@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::presentation_part::PresentationPart;
 use ooxmlsdk::parts::slide_layout_part::SlideLayoutPart;
+use ooxmlsdk::parts::slide_master_part::SlideMasterPart;
 use ooxmlsdk::parts::slide_part::SlidePart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::error::Result;
 
 use super::import::{PowerPointImport, part_path};
-use super::slide::{ShapeLocation, SlidePersist, SlideSize};
+use super::slide::{ColorMap, ShapeLocation, SlidePersist, SlideSize};
 use super::slide_fragment::SlideFragmentHandler;
 
 #[derive(Debug)]
@@ -141,11 +142,15 @@ impl PresentationFragmentHandler {
         .map(str::to_string)
         .unwrap_or_else(|| "<slideMaster>".to_string());
       let mut persist = SlidePersist::new_master(path, self.slide_size);
+      persist.theme_path = self.import_master_theme(package, import, &master_part)?;
       let master = master_part.root_element(package)?;
       persist.shape_location = ShapeLocation::Master;
+      persist.set_color_map(ColorMap::from_pml(&master.color_map));
       let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Master);
       handler.import_common_slide_data(&master.common_slide_data);
-      let persist = handler.finalize_import();
+      let mut persist = handler.finalize_import();
+      persist.create_background(import);
+      persist.create_x_shapes(import);
       import.master_pages.push(persist);
     }
     Ok(())
@@ -220,10 +225,26 @@ impl PresentationFragmentHandler {
       .clone()
       .unwrap_or_else(|| "<slideLayout>".to_string());
     let mut persist = SlidePersist::new_layout(path, self.slide_size);
+    if let Some(master_path) = &master_path
+      && let Some(master_persist) = import
+        .master_pages
+        .iter()
+        .find(|persist| persist.is_master && persist.path == *master_path)
+    {
+      persist.shapes = master_persist.shapes.clone();
+      persist.background_properties = master_persist.background_properties.clone();
+      persist.background_color = master_persist.background_color.clone();
+      persist.master_color_map = master_persist.color_map.clone();
+      persist.color_map = master_persist.color_map.clone();
+      persist.theme_path = master_persist.theme_path.clone();
+    }
     persist.layout_path = layout_path;
     persist.master_path = master_path;
     persist.shape_location = ShapeLocation::Layout;
     let layout = layout_part.root_element(package)?;
+    if let Some(color_map_override) = &layout.color_map_override {
+      persist.apply_color_map_override(color_map_override);
+    }
     let show_master_shapes = layout
       .show_master_shapes
       .as_ref()
@@ -233,9 +254,32 @@ impl PresentationFragmentHandler {
     }
     let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Layout);
     handler.import_common_slide_data(&layout.common_slide_data);
-    let persist = handler.finalize_import();
+    let mut persist = handler.finalize_import();
+    persist.create_background(import);
+    persist.create_x_shapes(import);
     import.master_pages.push(persist);
     Ok(Some(import.master_pages.len() - 1))
+  }
+
+  fn import_master_theme(
+    &self,
+    package: &mut PresentationDocument,
+    import: &mut PowerPointImport,
+    master_part: &SlideMasterPart,
+  ) -> Result<Option<String>> {
+    // Source: LibreOffice PresentationFragmentHandler::importMasterSlides
+    // resolves a master theme fragment and stores/reuses it by path before
+    // importing master shapes.
+    let Some(theme_part) = master_part.theme_part(package) else {
+      return Ok(None);
+    };
+    let path = theme_part
+      .path(package)
+      .map(str::to_string)
+      .unwrap_or_else(|| "<theme>".to_string());
+    let theme = theme_part.root_element(package)?;
+    import.ensure_theme(path.clone(), theme.name.clone(), theme.theme_id.clone());
+    Ok(Some(path))
   }
 
   pub(crate) fn import_slide_names(&self) {}

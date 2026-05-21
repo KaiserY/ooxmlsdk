@@ -30,8 +30,14 @@ Do not evolve PPTX PDF support from a direct `slide.xml -> PDF items` renderer.
 The implementation must first mirror LibreOffice's PPTX import structure, then
 lower the imported model to a fixed-page display list rendered by `krilla`.
 
-The existing text-only path in `crates/ooxmlsdk-pdf/src/pptx.rs` is a bootstrap
-placeholder only. It must be replaced by an upstream-shaped import pipeline.
+The implementation must not add "minimum viable" local models that merely make
+current fixtures render. Every PPTX semantic feature must start from the
+LibreOffice owner function and data structure, even when the first Rust version
+only stores structured state. A partial Rust port is acceptable only when it is
+named and scoped as the same upstream concept, and when missing upstream
+branches remain explicit gaps. Do not replace upstream concepts with simplified
+local equivalents such as "theme path plus RGB map", "text-only slide model",
+or "relationship lookup in display lowering".
 
 Key rule:
 
@@ -40,6 +46,19 @@ Key rule:
    inheritance and placeholder resolution.
 3. Lower that model into a fixed-position page/frame display list.
 4. Render the display list with `krilla`.
+
+Strict non-negotiables:
+
+- Do not implement a local "small" version of a LibreOffice subsystem and later
+  grow it independently. Port the upstream subsystem boundary first.
+- Do not let renderer needs define import data structures. Renderer fallback is
+  only an observer of already imported upstream-shaped state.
+- Do not return placeholder values that look resolved. For example, scheme
+  color token mapping is not theme color resolution; `get_scheme_color` must
+  not claim to produce a color until theme import has been ported.
+- Do not add tests that lock in temporary fallback output as final behavior.
+- When a branch is not implemented, preserve a typed record or explicit empty
+  upstream slot instead of inventing a simpler behavior.
 
 ---
 
@@ -122,8 +141,10 @@ pptx/
     table.rs
 ```
 
-The initial implementation may leave many branches as structured fallbacks, but
-the type and function locations should exist before broad behavior work starts.
+The initial implementation may leave many branches as upstream-shaped structured
+records, but the type and function locations should exist before broad behavior
+work starts. Avoid generic "fallback" records when LibreOffice already has a
+named owner type, context, or method for the same branch.
 
 Keep the same boundary as LibreOffice:
 
@@ -899,12 +920,28 @@ Implementation checkpoint:
 - Layout persists should be cached by `(master_path, layout_path)` in
   `PowerPointImport::master_pages`. Do not replace this with a single master id
   lookup; placeholder inheritance depends on the master+layout pair.
+- Until the full UNO-style master-page binding is replaced by a Rust drawing
+  page model, a layout persist may clone the already imported master shapes
+  and background state before importing layout-local shapes. This mirrors
+  LibreOffice's effective master+layout page order and keeps
+  `master_page_index` useful for early PDF output.
 - Slide fragments may initially record only structural state, but the parser
   must enter through `SlideFragmentHandler::import_common_slide_data` and
   `PPTShapeGroupContext`, not through ad hoc shape-tree loops in `pptx::layout`.
+- `cSld/bg/bgPr` and `cSld/bg/bgRef` must populate `SlidePersist` background
+  state during slide-fragment import. `create_background`/display lowering may
+  consume that state later, but should not inspect background XML directly.
+- Master `clrMap` and slide/layout `clrMapOvr` must be stored on
+  `SlidePersist` before shape and background conversion needs scheme colors.
+  Follow LibreOffice's lookup order: current slide/layout color map first, then
+  the bound master color map, then theme colors.
+- Master theme relationships must be resolved during master import and stored
+  in `PowerPointImport::themes` by theme part path. `SlidePersist::theme_path`
+  should point at the active theme so later scheme color and style matrix
+  resolution does not have to rediscover package relationships in display code.
 - `showMasterSp=false` handling belongs in the layout-fragment/persist path.
-  Early implementations may keep it as a structured slot, but it must not be
-  approximated in the renderer.
+  It must mark inherited master shapes before layout-local shapes are appended,
+  and it must not be approximated in the renderer.
 
 ### Phase 3: Shape Tree
 
@@ -984,24 +1021,40 @@ types as the PPTX model.
 
 Implementation checkpoint:
 
-- During fast bring-up, `pptx::display` may lower `SlidePersist` shapes
-  directly into the current neutral `LayoutDocument`/`PageItem` primitives so
-  imported slides produce visible output early.
+- `pptx::display` is a compatibility observation layer while the drawing-object
+  layer is being ported. It may lower `SlidePersist` state into current neutral
+  `LayoutDocument`/`PageItem` primitives, but it must never become the owner of
+  PPTX semantics.
+- Master and layout persists must still pass through `create_background` and
+  `create_x_shapes` before being stored, matching LibreOffice's import order,
+  even while some branches only preserve structured upstream state.
 - This lowering must consume only the upstream-shaped PPTX model: `SlidePersist`
   order, DrawingML `Shape` bounds, and structured `TextBody` paragraphs/runs.
   It must not inspect package parts, relationship XML, or generated OOXML
   element trees directly.
+- Display lowering may prepend the slide's resolved `master_page_index` persist
+  before slide-local shapes. The decision about which master/layout persist is
+  active must already be made by `PresentationFragmentHandler::import_slide`.
+- Background observation may draw a full-page neutral rectangle from
+  `SlidePersist::background_properties`. It must only use already imported
+  `bgPr`/`bgRef` state; theme fill-style lookup remains import/model work.
 - Group output must follow `Shape::children` and carry group transform offset
   state as a temporary approximation of LibreOffice's transformation matrix.
   Do not flatten groups in the display layer to work around missing transform
   handling.
-- Text fallback may initially use default font and line metrics, but all
+- Basic shape observation may emit neutral rectangle items from already imported
+  `Shape` bounds/fill/line state. It must not inspect `spPr` XML or resolve
+  theme colors in the display layer; unsupported scheme/preset colors should
+  stay invisible until theme resolution is implemented in the import/model path.
+- Text observation may use default font and line metrics only as a temporary
+  PDF bridge, but all
   paragraph/run data required for later LibreOffice-aligned inheritance must be
   preserved before lowering. Do not make PDF text output the only source of
   paragraph level, fields, breaks, or future run properties.
-- Once `SlidePersist::create_x_shapes` is implemented, move display lowering to
+- Once `SlidePersist::create_x_shapes` has a real drawing-object equivalent,
+  move display lowering to
   consume that equivalent drawing-object layer. The early `SlidePersist` ->
-  `PageItem` path is a temporary bridge, not the long-term architecture.
+  `PageItem` path is a compatibility bridge, not an implementation strategy.
 
 ### Phase 6: Fixture Tests and Refinement
 

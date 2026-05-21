@@ -141,6 +141,13 @@ impl Shape {
     self.children.extend(children);
   }
 
+  pub(crate) fn hide_as_master_shape(&mut self) {
+    self.hidden_master_shape = true;
+    for child in &mut self.children {
+      child.hide_as_master_shape();
+    }
+  }
+
   pub(crate) fn create_and_insert(&mut self, import: &PowerPointImport) {
     self.finalize_service_name();
     let _ = self.get_actual_fill_properties(import);

@@ -1,8 +1,10 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::docx::PageSetup;
 use crate::units;
 
+use super::drawingml::fill::FillProperties;
 use super::drawingml::shape::Shape;
 use super::import::PowerPointImport;
 
@@ -90,11 +92,23 @@ pub(crate) struct SlidePersist {
   pub(crate) shape_location: ShapeLocation,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ColorMap;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ColorMap {
+  pub(crate) entries: Vec<ColorMapEntry>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct BackgroundProperties;
+pub(crate) struct ColorMapEntry {
+  pub(crate) source: &'static str,
+  pub(crate) target: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BackgroundProperties {
+  pub(crate) fill_properties: FillProperties,
+  pub(crate) color: Option<String>,
+  pub(crate) style_index: Option<u32>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TimeNode;
@@ -172,9 +186,23 @@ impl SlidePersist {
     self.layout_value_token.clone()
   }
 
+  pub(crate) fn set_color_map(&mut self, color_map: ColorMap) {
+    self.color_map = Some(color_map);
+  }
+
+  pub(crate) fn apply_color_map_override(&mut self, override_map: &p::ColorMapOverride) {
+    match override_map.color_map_override_choice.as_ref() {
+      Some(p::ColorMapOverrideChoice::MasterColorMapping) => {}
+      Some(p::ColorMapOverrideChoice::OverrideColorMapping(mapping)) => {
+        self.color_map = Some(ColorMap::from_dml_override(mapping));
+      }
+      None => {}
+    }
+  }
+
   pub(crate) fn hide_shapes_as_master_shapes(&mut self) {
     for shape in &mut self.shapes {
-      shape.hidden_master_shape = true;
+      shape.hide_as_master_shape();
     }
   }
 
@@ -197,4 +225,61 @@ impl SlidePersist {
   pub(crate) fn apply_text_styles(&mut self, _import: &PowerPointImport) {}
 
   pub(crate) fn create_connector_shape_connection(&mut self) {}
+}
+
+impl ColorMap {
+  pub(crate) fn map_token(&self, token: &str) -> Option<String> {
+    self
+      .entries
+      .iter()
+      .find(|entry| entry.source == token)
+      .map(|entry| entry.target.clone())
+  }
+
+  pub(crate) fn from_pml(color_map: &p::ColorMap) -> Self {
+    Self {
+      entries: vec![
+        ColorMapEntry::new("bg1", &color_map.background1),
+        ColorMapEntry::new("tx1", &color_map.text1),
+        ColorMapEntry::new("bg2", &color_map.background2),
+        ColorMapEntry::new("tx2", &color_map.text2),
+        ColorMapEntry::new("accent1", &color_map.accent1),
+        ColorMapEntry::new("accent2", &color_map.accent2),
+        ColorMapEntry::new("accent3", &color_map.accent3),
+        ColorMapEntry::new("accent4", &color_map.accent4),
+        ColorMapEntry::new("accent5", &color_map.accent5),
+        ColorMapEntry::new("accent6", &color_map.accent6),
+        ColorMapEntry::new("hlink", &color_map.hyperlink),
+        ColorMapEntry::new("folHlink", &color_map.followed_hyperlink),
+      ],
+    }
+  }
+
+  pub(crate) fn from_dml_override(color_map: &a::OverrideColorMapping) -> Self {
+    Self {
+      entries: vec![
+        ColorMapEntry::new("bg1", &color_map.background1),
+        ColorMapEntry::new("tx1", &color_map.text1),
+        ColorMapEntry::new("bg2", &color_map.background2),
+        ColorMapEntry::new("tx2", &color_map.text2),
+        ColorMapEntry::new("accent1", &color_map.accent1),
+        ColorMapEntry::new("accent2", &color_map.accent2),
+        ColorMapEntry::new("accent3", &color_map.accent3),
+        ColorMapEntry::new("accent4", &color_map.accent4),
+        ColorMapEntry::new("accent5", &color_map.accent5),
+        ColorMapEntry::new("accent6", &color_map.accent6),
+        ColorMapEntry::new("hlink", &color_map.hyperlink),
+        ColorMapEntry::new("folHlink", &color_map.followed_hyperlink),
+      ],
+    }
+  }
+}
+
+impl ColorMapEntry {
+  fn new(source: &'static str, target: &a::ColorSchemeIndexValues) -> Self {
+    Self {
+      source,
+      target: format!("{target:?}"),
+    }
+  }
 }

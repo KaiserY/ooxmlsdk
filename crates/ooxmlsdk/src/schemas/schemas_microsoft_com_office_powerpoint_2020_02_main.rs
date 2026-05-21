@@ -10,7 +10,7 @@
 pub struct DesignerTagList {
   /// Defines the DesignerTag Class.
   #[sdk(child(office2021, qname = "p202:CT_DesignerTag/p202:designTag"))]
-  pub p202_design_tag: Vec<DesignerTag>,
+  pub designer_tag: Vec<DesignerTag>,
 }
 /// Defines the DesignerDrawingProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -44,5 +44,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }

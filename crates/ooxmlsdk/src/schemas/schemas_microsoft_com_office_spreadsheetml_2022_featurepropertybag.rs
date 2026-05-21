@@ -19,13 +19,13 @@ pub struct FeaturePropertyBags {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the BagExtensions Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
-  pub xfpb_bag_ext: Vec<BagExtensions>,
+  pub bag_extensions: Vec<BagExtensions>,
   /// Defines the FeaturePropertyBag Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
-  pub xfpb_bag: Vec<FeaturePropertyBag>,
+  pub feature_property_bag: Vec<FeaturePropertyBag>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
-  pub xfpb_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FpbsFeaturePropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -36,13 +36,13 @@ pub struct FpbsFeaturePropertyBags {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the BagExtensions Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
-  pub xfpb_bag_ext: Vec<BagExtensions>,
+  pub bag_extensions: Vec<BagExtensions>,
   /// Defines the FeaturePropertyBag Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
-  pub xfpb_bag: Vec<FeaturePropertyBag>,
+  pub feature_property_bag: Vec<FeaturePropertyBag>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
-  pub xfpb_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the XfComplement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -213,7 +213,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the ArrayFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

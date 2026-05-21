@@ -217,9 +217,9 @@ fn compatibility_mode(package: &mut WordprocessingDocument, main: &MainDocumentP
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
-      settings.w_compat.as_ref().and_then(|compat| {
+      settings.compatibility.as_ref().and_then(|compat| {
         compat
-          .w_compat_setting
+          .compatibility_setting
           .iter()
           .find(|setting| setting.w_name == w::CompatSettingNameValues::CompatibilityMode)
           .and_then(|setting| setting.w_val.as_str().parse::<u16>().ok())
@@ -236,7 +236,7 @@ fn no_column_balance(package: &mut WordprocessingDocument, main: &MainDocumentPa
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
       settings
-        .w_compat
+        .compatibility
         .as_ref()
         .and_then(|compat| compat.no_column_balance.as_ref())
         .map(|value| on_off_only_value(value.val))
@@ -253,7 +253,7 @@ fn split_page_break_and_paragraph_mark(
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
       settings
-        .w_compat
+        .compatibility
         .as_ref()
         .and_then(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
@@ -267,7 +267,7 @@ fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocument
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
       settings
-        .w_default_tab_stop
+        .default_tab_stop
         .as_ref()
         .and_then(|stop| twips_measure_to_points(&stop.val))
     })
@@ -393,8 +393,8 @@ fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<Str
     let Some(cache) = reference.multi_level_string_cache.as_deref() else {
       continue;
     };
-    for level in cache.c_lvl.iter().skip(1) {
-      for point in &level.c_pt {
+    for level in cache.level.iter().skip(1) {
+      for point in &level.string_point {
         push_unique_chart_text(&mut labels, &point.numeric_value);
       }
     }
@@ -404,7 +404,7 @@ fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<Str
 
 fn chart_has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> bool {
   chart_space
-    .c_chart
+    .chart
     .plot_area
     .plot_area_choice2
     .iter()
@@ -419,7 +419,7 @@ fn chart_has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> b
         .and_then(|properties| properties.body_properties.rotation)
         .is_some_and(|rotation| rotation.abs() >= 54_000_000)
         && axis
-          .c_no_multi_lvl_lbl
+          .no_multi_level_labels
           .as_ref()
           .and_then(|labels| labels.val)
           .is_none_or(|value| !value.as_bool())
@@ -433,7 +433,7 @@ fn chart_label_color(chart_space: &c::ChartSpace, theme_colors: &ThemeColors) ->
     .chain(chart_data_labels(chart_space))
     .find_map(|labels| {
       labels
-        .c_d_lbl
+        .data_label
         .iter()
         .find_map(|label| match label.data_label_choice.as_ref()? {
           c::DataLabelChoice::Sequence(sequence) => sequence
@@ -456,7 +456,7 @@ fn chart_visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
   let mut texts = Vec::new();
   let mut series_index = 0usize;
 
-  if let Some(title) = chart_space.c_chart.title.as_deref() {
+  if let Some(title) = chart_space.chart.title.as_deref() {
     chart_push_title_texts(&mut texts, title);
   }
   for title in chart_axis_titles(chart_space) {
@@ -498,7 +498,7 @@ fn chart_visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
 
 fn chart_axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Title> {
   chart_space
-    .c_chart
+    .chart
     .plot_area
     .plot_area_choice2
     .iter()
@@ -523,153 +523,153 @@ struct ChartSeriesRef<'a> {
 
 fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
   let mut series = Vec::new();
-  for choice in &chart_space.c_chart.plot_area.plot_area_choice1 {
+  for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     match choice {
       c::PlotAreaChoice::CAreaChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.area_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CArea3DChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.area_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CLineChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CLine3DChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CStockChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CRadarChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.radar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CScatterChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.scatter_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: None,
           values: None,
-          y_values: ser.c_y_val.as_deref(),
-          x_values: ser.c_x_val.as_deref(),
+          y_values: ser.y_values.as_deref(),
+          x_values: ser.x_values.as_deref(),
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CPieChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CPie3DChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CDoughnutChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CBarChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.bar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CBar3DChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.bar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::COfPieChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
-          category_axis_data: ser.c_cat.as_deref(),
-          values: ser.c_val.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
           y_values: None,
           x_values: None,
           bubble_size: None,
-          data_labels: ser.c_d_lbls.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
       c::PlotAreaChoice::CSurfaceChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.surface_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
           values: ser.values.as_deref(),
@@ -680,7 +680,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
         }));
       }
       c::PlotAreaChoice::CSurface3DChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.surface_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
           values: ser.values.as_deref(),
@@ -691,14 +691,14 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
         }));
       }
       c::PlotAreaChoice::CBubbleChart(chart) => {
-        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+        series.extend(chart.bubble_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: None,
           values: None,
-          y_values: ser.c_y_val.as_deref(),
-          x_values: ser.c_x_val.as_deref(),
-          bubble_size: ser.c_bubble_size.as_deref(),
-          data_labels: ser.c_d_lbls.as_deref(),
+          y_values: ser.y_values.as_deref(),
+          x_values: ser.x_values.as_deref(),
+          bubble_size: ser.bubble_size.as_deref(),
+          data_labels: ser.data_labels.as_deref(),
         }));
       }
     }
@@ -708,27 +708,27 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
 
 fn chart_data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::DataLabels> {
   chart_space
-    .c_chart
+    .chart
     .plot_area
     .plot_area_choice1
     .iter()
     .filter_map(|choice| match choice {
-      c::PlotAreaChoice::CAreaChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CArea3DChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CLineChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CLine3DChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CStockChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CRadarChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CScatterChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CPieChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CPie3DChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CDoughnutChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CBarChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::CBar3DChart(chart) => chart.c_d_lbls.as_deref(),
-      c::PlotAreaChoice::COfPieChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CAreaChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CArea3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CLineChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CLine3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CStockChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CRadarChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CScatterChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CPieChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CPie3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CDoughnutChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CBarChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::CBar3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::COfPieChart(chart) => chart.data_labels.as_deref(),
       c::PlotAreaChoice::CSurfaceChart(_) => None,
       c::PlotAreaChoice::CSurface3DChart(_) => None,
-      c::PlotAreaChoice::CBubbleChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CBubbleChart(chart) => chart.data_labels.as_deref(),
     })
 }
 
@@ -740,14 +740,14 @@ fn chart_text_properties_color(
     .list_style
     .as_deref()
     .and_then(|style| style.default_paragraph_properties.as_deref())
-    .and_then(|paragraph| paragraph.a_def_r_pr.as_deref())
+    .and_then(|paragraph| paragraph.default_run_properties.as_deref())
     .and_then(|run_properties| chart_default_run_properties_color(run_properties, theme_colors))
     .or_else(|| {
       properties
-        .a_p
+        .paragraph
         .iter()
         .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
-        .filter_map(|properties| properties.a_def_r_pr.as_deref())
+        .filter_map(|properties| properties.default_run_properties.as_deref())
         .find_map(|run_properties| chart_default_run_properties_color(run_properties, theme_colors))
     })
 }
@@ -795,7 +795,7 @@ fn chart_push_chart_text(texts: &mut Vec<String>, chart_text: &c::ChartText) {
       chart_push_string_reference_texts(texts, reference)
     }
     Some(c::ChartTextChoice::CStrLit(literal)) => chart_push_string_literal_texts(texts, literal),
-    Some(c::ChartTextChoice::CRich(rich)) => chart_push_rich_texts(texts, &rich.a_p),
+    Some(c::ChartTextChoice::CRich(rich)) => chart_push_rich_texts(texts, &rich.paragraph),
     None => {}
   }
 }
@@ -822,8 +822,8 @@ fn chart_push_category_axis_data_texts(texts: &mut Vec<String>, data: &c::Catego
   match data.category_axis_data_choice.as_ref() {
     Some(c::CategoryAxisDataChoice::CMultiLvlStrRef(reference)) => {
       if let Some(cache) = reference.multi_level_string_cache.as_deref() {
-        for level in &cache.c_lvl {
-          for point in &level.c_pt {
+        for level in &cache.level {
+          for point in &level.string_point {
             push_unique_chart_text(texts, &point.numeric_value);
           }
         }
@@ -869,8 +869,8 @@ fn chart_push_x_values_texts(texts: &mut Vec<String>, values: &c::XValues) {
   match values.x_values_choice.as_ref() {
     Some(c::XValuesChoice::CMultiLvlStrRef(reference)) => {
       if let Some(cache) = reference.multi_level_string_cache.as_deref() {
-        for level in &cache.c_lvl {
-          for point in &level.c_pt {
+        for level in &cache.level {
+          for point in &level.string_point {
             push_unique_chart_text(texts, &point.numeric_value);
           }
         }
@@ -899,7 +899,7 @@ fn chart_push_bubble_size_texts(texts: &mut Vec<String>, values: &c::BubbleSize)
 }
 
 fn chart_push_data_label_texts(texts: &mut Vec<String>, data_labels: &c::DataLabels) {
-  for label in &data_labels.c_d_lbl {
+  for label in &data_labels.data_label {
     if let Some(c::DataLabelChoice::Sequence(sequence)) = label.data_label_choice.as_ref()
       && let Some(chart_text) = sequence.chart_text.as_deref()
     {
@@ -924,13 +924,13 @@ fn chart_push_string_reference_texts(texts: &mut Vec<String>, reference: &c::Str
 }
 
 fn chart_push_string_cache_texts(texts: &mut Vec<String>, cache: &c::StringCache) {
-  for point in &cache.c_pt {
+  for point in &cache.string_point {
     push_unique_chart_text(texts, &point.numeric_value);
   }
 }
 
 fn chart_push_string_literal_texts(texts: &mut Vec<String>, literal: &c::StringLiteral) {
-  for point in &literal.c_pt {
+  for point in &literal.string_point {
     push_unique_chart_text(texts, &point.numeric_value);
   }
 }
@@ -942,13 +942,13 @@ fn chart_push_number_reference_texts(texts: &mut Vec<String>, reference: &c::Num
 }
 
 fn chart_push_numbering_cache_texts(texts: &mut Vec<String>, cache: &c::NumberingCache) {
-  for point in &cache.c_pt {
+  for point in &cache.numeric_point {
     push_unique_chart_text(texts, &point.numeric_value);
   }
 }
 
 fn chart_push_number_literal_texts(texts: &mut Vec<String>, literal: &c::NumberLiteral) {
-  for point in &literal.c_pt {
+  for point in &literal.numeric_point {
     push_unique_chart_text(texts, &point.numeric_value);
   }
 }
@@ -1213,7 +1213,7 @@ fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumen
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
       settings
-        .w_even_and_odd_headers
+        .even_and_odd_headers
         .as_ref()
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
@@ -1594,11 +1594,11 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
     }
   }
 
-  if body.w_sect_pr.is_some() || sections.is_empty() || !current_blocks.is_empty() {
+  if body.section_properties.is_some() || sections.is_empty() || !current_blocks.is_empty() {
     close_section(
       &mut sections,
       &mut current_blocks,
-      body.w_sect_pr.as_deref().cloned(),
+      body.section_properties.as_deref().cloned(),
       &mut previous_properties,
     );
   }
@@ -1682,7 +1682,7 @@ fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
-    .and_then(|properties| properties.w_vanish.as_ref())
+    .and_then(|properties| properties.vanish.as_ref())
     .is_some_and(|vanish| vanish.val.is_none_or(|value| value.as_bool()))
 }
 
@@ -1771,7 +1771,7 @@ fn close_section(
     .unwrap_or_default();
   let title_page = section_properties
     .as_ref()
-    .and_then(|section| section.w_title_pg.as_ref())
+    .and_then(|section| section.title_page.as_ref())
     .map(|title_page| title_page.val.is_none_or(|value| value.as_bool()))
     .unwrap_or(false);
 
@@ -1821,7 +1821,7 @@ fn normalized_section_break(
   };
 
   let kind = section
-    .w_type
+    .section_type
     .as_ref()
     .map(|section_type| match section_type.val {
       w::SectionMarkValues::Continuous => SectionBreakKind::Continuous,
@@ -1856,11 +1856,11 @@ fn normalized_section_break(
 
 fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValues {
   section
-    .w_pg_sz
+    .page_size
     .as_ref()
     .and_then(|size| size.orient)
     .or_else(|| {
-      let size = section.w_pg_sz.as_ref()?;
+      let size = section.page_size.as_ref()?;
       Some(
         if size
           .width
@@ -1883,7 +1883,7 @@ fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValu
 }
 
 fn section_text_rotation_degrees(section: &w::SectionProperties) -> Option<f32> {
-  let direction = section.w_text_direction.as_ref()?.val;
+  let direction = section.text_direction.as_ref()?.val;
   match direction {
     w::TextDirectionValues::TopToBottomRightToLeft
     | w::TextDirectionValues::TopToBottomRightToLeft2010
@@ -1919,17 +1919,17 @@ fn table_cell_text_rotation_degrees(properties: &w::TableCellProperties) -> Opti
 }
 
 fn section_column_count(section: &w::SectionProperties) -> i16 {
-  let Some(columns) = section.w_cols.as_ref() else {
+  let Some(columns) = section.columns.as_ref() else {
     return 1;
   };
-  if !columns.equal_width.is_none_or(|value| value.as_bool()) && !columns.w_col.is_empty() {
-    return (columns.w_col.len() as i16).max(1);
+  if !columns.equal_width.is_none_or(|value| value.as_bool()) && !columns.column.is_empty() {
+    return (columns.column.len() as i16).max(1);
   }
   columns.column_count.unwrap_or(1).max(1)
 }
 
 fn section_columns(section: &w::SectionProperties) -> SectionColumns {
-  let Some(columns) = section.w_cols.as_ref() else {
+  let Some(columns) = section.columns.as_ref() else {
     return SectionColumns::default();
   };
   let equal_width = columns.equal_width.is_none_or(|value| value.as_bool());
@@ -1939,9 +1939,9 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
     .and_then(twips_measure_to_points)
     .filter(|gap| gap.is_finite() && *gap >= 0.0)
     .unwrap_or(DEFAULT_SECTION_COLUMN_GAP_PT);
-  if !equal_width && !columns.w_col.is_empty() {
+  if !equal_width && !columns.column.is_empty() {
     let explicit_widths_pt = columns
-      .w_col
+      .column
       .iter()
       .filter_map(|column| {
         column
@@ -1951,11 +1951,11 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
           .filter(|width| width.is_finite() && *width > 0.0)
       })
       .collect::<Vec<_>>();
-    if explicit_widths_pt.len() == columns.w_col.len() {
+    if explicit_widths_pt.len() == columns.column.len() {
       let explicit_gaps_pt = columns
-        .w_col
+        .column
         .iter()
-        .take(columns.w_col.len().saturating_sub(1))
+        .take(columns.column.len().saturating_sub(1))
         .map(|column| {
           column
             .space
@@ -2247,7 +2247,7 @@ fn footnotes(
   };
   let mut notes = BTreeMap::new();
 
-  for footnote in &footnotes.w_footnote {
+  for footnote in &footnotes.footnote {
     if footnote.id < 1
       || !matches!(
         footnote.r#type,
@@ -2302,7 +2302,7 @@ fn endnotes(
   };
   let mut notes = BTreeMap::new();
 
-  for endnote in &endnotes.w_endnote {
+  for endnote in &endnotes.endnote {
     if endnote.id < 1
       || !matches!(
         endnote.r#type,
@@ -2364,7 +2364,7 @@ fn comment_blocks(
   };
   let mut blocks = Vec::new();
 
-  for comment in &comments.w_comment {
+  for comment in &comments.comment {
     append_note_blocks(
       &mut blocks,
       NoteLabel::new(format!("[{}] ", comment.id), None),
@@ -2468,7 +2468,7 @@ fn table_model(
   env: &mut TableModelEnv<'_>,
   model_context: TableModelContext,
 ) -> Table {
-  let properties = table.w_tbl_pr.as_ref();
+  let properties = table.table_properties.as_ref();
   let table_style_id = properties
     .table_style
     .as_ref()
@@ -2532,8 +2532,8 @@ fn table_model(
         .is_some_and(|placement| matches!(placement.vertical_anchor, FrameVerticalAnchor::Page)));
   Table {
     column_widths_pt: table
-      .w_tbl_grid
-      .w_grid_col
+      .table_grid
+      .grid_column
       .iter()
       .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
       .collect(),
@@ -2796,7 +2796,7 @@ fn table_row_keep_with_next(cells: &[TableCell], nested_table_level: usize) -> b
 
 fn table_row_redline_color(properties: Option<&w::TableRowProperties>) -> Option<RgbColor> {
   let properties = properties?;
-  (properties.w_ins.is_some() || properties.w_del.is_some()).then_some(redline_author_color())
+  (properties.inserted.is_some() || properties.deleted.is_some()).then_some(redline_author_color())
 }
 
 fn table_row_style_for(
@@ -3721,7 +3721,7 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
 }
 
 fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
-  for tab in &tabs.w_tab {
+  for tab in &tabs.tab_stop {
     let Some(position_pt) = signed_twips_measure_to_points(&tab.position)
       .filter(|position| position.is_finite() && *position >= 0.0)
     else {
@@ -5024,11 +5024,11 @@ fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec
     match choice {
       w::SdtPropertiesChoice::WComboBox(combo_box) => {
         kind = Some(FormWidgetKind::ComboBox);
-        entries = sdt_list_item_display_texts(&combo_box.w_list_item);
+        entries = sdt_list_item_display_texts(&combo_box.list_item);
       }
       w::SdtPropertiesChoice::WDropDownList(drop_down) => {
         kind = Some(FormWidgetKind::DropDownList);
-        entries = sdt_list_item_display_texts(&drop_down.w_list_item);
+        entries = sdt_list_item_display_texts(&drop_down.list_item);
       }
       w::SdtPropertiesChoice::WDate(_) => {
         kind = Some(FormWidgetKind::Text);
@@ -5737,14 +5737,14 @@ fn inline_image_impl(
       })
     }
     w::DrawingChoice::WpAnchor(anchor) => {
-      let graphic = anchor.a_graphic.as_ref();
+      let graphic = anchor.graphic.as_ref();
       let extent = anchor.extent.as_ref();
       let properties = drawing_image_properties(&graphic.graphic_data, &styles.theme_colors)?;
       let relationship_id = properties.relationship_id.as_deref()?;
       let resource = images.by_relationship_id.get(relationship_id)?;
       let image_data = image_data_with_effects(resource, &properties);
       let hyperlink_url = anchor
-        .wp_doc_pr
+        .doc_properties
         .hyperlink_on_click
         .as_deref()
         .and_then(|hyperlink| hyperlink.id.as_deref())
@@ -5769,7 +5769,7 @@ fn inline_image_impl(
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
-        alt_text: anchor.wp_doc_pr.description.clone(),
+        alt_text: anchor.doc_properties.description.clone(),
         hyperlink_url,
         placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
@@ -5858,11 +5858,11 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     allow_overlap: anchor.allow_overlap.as_bool(),
     relative_height: anchor.relative_height,
     relative_width_to: anchor
-      .wp14_size_rel_h
+      .relative_width
       .as_ref()
       .map(|relative| relative_width_reference(relative.object_id)),
     relative_width_pct: anchor
-      .wp14_size_rel_h
+      .relative_width
       .as_ref()
       .and_then(|relative| drawingml_percent_to_ratio(&relative.percentage_width)),
     relative_height_to: anchor
@@ -6841,7 +6841,7 @@ fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
 fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => Some(&inline.graphic.graphic_data),
-    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.a_graphic.graphic_data),
+    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.graphic.graphic_data),
   }
 }
 
@@ -7005,7 +7005,7 @@ fn diagram_text_fill_colors_by_model_id(
   }
 
   let mut colors = HashMap::new();
-  for point in &data.point_list.dgm_pt {
+  for point in &data.point_list.point {
     let Some(style_label) = point
       .property_set
       .as_deref()
@@ -7027,7 +7027,7 @@ fn diagram_text_fill_colors_by_style_label(
   theme_colors: &ThemeColors,
 ) -> HashMap<String, RgbColor> {
   let mut colors = HashMap::new();
-  for label in &colors_definition.dgm_style_lbl {
+  for label in &colors_definition.color_transform_style_label {
     let Some(color) = diagram_style_text_fill_color(label, theme_colors) else {
       continue;
     };
@@ -7059,7 +7059,7 @@ fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<Stri
   data
     .data_model_extension_list
     .as_ref()?
-    .a_ext
+    .data_model_extension
     .iter()
     .find_map(
       |extension| match extension.data_model_extension_choice.as_ref()? {
@@ -7149,7 +7149,7 @@ fn drawing_chart_relationship_id(xml: &str) -> Option<String> {
 
 fn chart_kind(chart_space: &c::ChartSpace) -> ChartKind {
   chart_space
-    .c_chart
+    .chart
     .plot_area
     .plot_area_choice1
     .iter()
@@ -7502,14 +7502,14 @@ fn anchor_wrap_polygon_geometry(
     wp::AnchorChoice::WpWrapThrough(through) => through.wrap_polygon.as_ref(),
     _ => return None,
   };
-  let mut points = Vec::with_capacity(polygon.wp_line_to.len() + 2);
+  let mut points = Vec::with_capacity(polygon.line_to.len() + 2);
   points.push(wrap_polygon_point(
     polygon.start_point.x,
     polygon.start_point.y,
     width_pt,
     height_pt,
   ));
-  for point in &polygon.wp_line_to {
+  for point in &polygon.line_to {
     points.push(wrap_polygon_point(point.x, point.y, width_pt, height_pt));
   }
   if points.len() < 3 {
@@ -7559,7 +7559,7 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
         .as_ref()
         .is_some_and(|hidden| hidden.as_bool())
         || anchor
-          .wp_doc_pr
+          .doc_properties
           .hidden
           .as_ref()
           .is_some_and(|hidden| hidden.as_bool())
@@ -10642,7 +10642,7 @@ impl StylesCatalog {
       );
     }
 
-    for style in &styles.w_style {
+    for style in &styles.style {
       let Some(style_id) = &style.style_id else {
         continue;
       };
@@ -10873,7 +10873,7 @@ impl ThemeLineStyles {
         .theme_elements
         .format_scheme
         .line_style_list
-        .a_ln
+        .outline
         .iter()
         .filter_map(|line| line.width.map(|width| units::emu_to_points(width as i64)))
         .collect(),
@@ -11326,7 +11326,7 @@ fn table_style_model(
   );
   model.whole_table.run_overrides =
     run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
-  for conditional in &style.w_tbl_style_pr {
+  for conditional in &style.table_style_properties {
     let mut cell_style = TableCellStyle::default();
     merge_paragraph_format(
       &mut cell_style.paragraph_format,
@@ -11884,7 +11884,7 @@ impl NumberingCatalog {
     let numbering = numbering_part.root_element(package)?;
     let mut catalog = Self::default();
 
-    for picture_bullet in &numbering.w_num_pic_bullet {
+    for picture_bullet in &numbering.numbering_picture_bullet {
       if let Some(image) = numbering_picture_bullet_image(picture_bullet, &numbering_images) {
         catalog
           .picture_bullets
@@ -11892,9 +11892,9 @@ impl NumberingCatalog {
       }
     }
 
-    for abstract_num in &numbering.w_abstract_num {
+    for abstract_num in &numbering.abstract_num {
       let mut entry = AbstractNumbering::default();
-      for level in &abstract_num.w_lvl {
+      for level in &abstract_num.level {
         entry
           .levels
           .insert(level.level_index, numbering_level_model(level));
@@ -11904,9 +11904,9 @@ impl NumberingCatalog {
         .insert(abstract_num.abstract_number_id, entry);
     }
 
-    for num in &numbering.w_num {
+    for num in &numbering.numbering_instance {
       let overrides = num
-        .w_lvl_override
+        .level_override
         .iter()
         .map(|level| {
           (
@@ -12062,7 +12062,7 @@ fn numbering_level_list_tab_stop_pt(level: &w::Level) -> Option<f32> {
     .as_deref()
     .and_then(|properties| properties.tabs.as_ref())
     .and_then(|tabs| {
-      tabs.w_tab.iter().find_map(|tab| {
+      tabs.tab_stop.iter().find_map(|tab| {
         (tab.val == w::TabStopValues::Number)
           .then(|| signed_twips_measure_to_points(&tab.position))
           .flatten()
@@ -12382,7 +12382,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.run_fonts.as_ref(),
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
       Self::Numbering(properties) => properties.run_fonts.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_r_fonts.as_ref(),
+      Self::ParagraphMark(properties) => properties.run_fonts.as_ref(),
     }
   }
 
@@ -12392,7 +12392,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.bold.as_ref(),
       Self::BaseStyle(properties) => properties.bold.as_ref(),
       Self::Numbering(properties) => properties.bold.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_b.as_ref(),
+      Self::ParagraphMark(properties) => properties.bold.as_ref(),
     }
   }
 
@@ -12402,7 +12402,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.italic.as_ref(),
       Self::BaseStyle(properties) => properties.italic.as_ref(),
       Self::Numbering(properties) => properties.italic.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_i.as_ref(),
+      Self::ParagraphMark(properties) => properties.italic.as_ref(),
     }
   }
 
@@ -12412,7 +12412,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.font_size.as_ref(),
       Self::BaseStyle(properties) => properties.font_size.as_ref(),
       Self::Numbering(properties) => properties.font_size.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_sz.as_ref(),
+      Self::ParagraphMark(properties) => properties.font_size.as_ref(),
     }
   }
 
@@ -12422,7 +12422,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.font_size_complex_script.as_ref(),
       Self::BaseStyle(properties) => properties.font_size_complex_script.as_ref(),
       Self::Numbering(properties) => properties.font_size_complex_script.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_sz_cs.as_ref(),
+      Self::ParagraphMark(properties) => properties.font_size_complex_script.as_ref(),
     }
   }
 
@@ -12432,7 +12432,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.color.as_ref(),
       Self::BaseStyle(properties) => properties.color.as_ref(),
       Self::Numbering(properties) => properties.color.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_color.as_ref(),
+      Self::ParagraphMark(properties) => properties.color.as_ref(),
     }
   }
 
@@ -12442,7 +12442,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.underline.as_ref(),
       Self::BaseStyle(properties) => properties.underline.as_ref(),
       Self::Numbering(properties) => properties.underline.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_u.as_ref(),
+      Self::ParagraphMark(properties) => properties.underline.as_ref(),
     }
   }
 
@@ -12452,7 +12452,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.strike.as_ref(),
       Self::BaseStyle(properties) => properties.strike.as_ref(),
       Self::Numbering(properties) => properties.strike.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_strike.as_ref(),
+      Self::ParagraphMark(properties) => properties.strike.as_ref(),
     }
   }
 
@@ -12462,7 +12462,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.double_strike.as_ref(),
       Self::BaseStyle(properties) => properties.double_strike.as_ref(),
       Self::Numbering(properties) => properties.double_strike.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_dstrike.as_ref(),
+      Self::ParagraphMark(properties) => properties.double_strike.as_ref(),
     }
   }
 
@@ -12472,7 +12472,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.caps.as_ref(),
       Self::BaseStyle(properties) => properties.caps.as_ref(),
       Self::Numbering(properties) => properties.caps.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_caps.as_ref(),
+      Self::ParagraphMark(properties) => properties.caps.as_ref(),
     }
   }
 
@@ -12482,7 +12482,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.small_caps.as_ref(),
       Self::BaseStyle(properties) => properties.small_caps.as_ref(),
       Self::Numbering(properties) => properties.small_caps.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_small_caps.as_ref(),
+      Self::ParagraphMark(properties) => properties.small_caps.as_ref(),
     }
   }
 
@@ -12492,7 +12492,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.vanish.as_ref(),
       Self::BaseStyle(properties) => properties.vanish.as_ref(),
       Self::Numbering(properties) => properties.vanish.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_vanish.as_ref(),
+      Self::ParagraphMark(properties) => properties.vanish.as_ref(),
     }
   }
 
@@ -12502,7 +12502,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
       Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
       Self::Numbering(properties) => properties.vertical_text_alignment.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_vert_align.as_ref(),
+      Self::ParagraphMark(properties) => properties.vertical_text_alignment.as_ref(),
     }
   }
 
@@ -12512,14 +12512,14 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.spacing.as_ref(),
       Self::BaseStyle(properties) => properties.spacing.as_ref(),
       Self::Numbering(properties) => properties.spacing.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_spacing.as_ref(),
+      Self::ParagraphMark(properties) => properties.spacing.as_ref(),
     }
   }
 
   fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
     match self {
       Self::Direct(properties) => properties.fill_text_effect.as_deref(),
-      Self::ParagraphMark(properties) => properties.w14_text_fill.as_deref(),
+      Self::ParagraphMark(properties) => properties.fill_text_effect.as_deref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -12527,7 +12527,7 @@ impl<'a> RunProps<'a> {
   fn text_outline(&self) -> Option<&'a w14::TextOutlineEffect> {
     match self {
       Self::Direct(properties) => properties.text_outline_effect.as_deref(),
-      Self::ParagraphMark(properties) => properties.w14_text_outline.as_deref(),
+      Self::ParagraphMark(properties) => properties.text_outline_effect.as_deref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -12535,7 +12535,7 @@ impl<'a> RunProps<'a> {
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
       Self::Direct(properties) => properties.highlight.as_ref(),
-      Self::ParagraphMark(properties) => properties.w_highlight.as_ref(),
+      Self::ParagraphMark(properties) => properties.highlight.as_ref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -12607,7 +12607,7 @@ fn drawingml_percent_to_ratio(value: &DrawingmlPercentageValue) -> Option<f32> {
 fn page_setup(section: &w::SectionProperties) -> PageSetup {
   let mut setup = PageSetup::default();
 
-  if let Some(size) = &section.w_pg_sz {
+  if let Some(size) = &section.page_size {
     if let Some(width) = size
       .width
       .as_ref()
@@ -12624,7 +12624,7 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     }
   }
 
-  if let Some(margin) = &section.w_pg_mar {
+  if let Some(margin) = &section.page_margin {
     if let Some(top) = margin.top.as_ref().and_then(signed_twips_measure_to_twips) {
       setup.top_margin_was_negative = top < 0.0;
       // Source: LibreOffice writerfilter/dmapper/PropertyMap.hxx::SetTopMargin()
@@ -12655,22 +12655,22 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     }
   }
 
-  if let Some(borders) = &section.w_pg_borders {
+  if let Some(borders) = &section.page_borders {
     setup.borders = page_borders_model(borders);
     setup.borders_offset_from_text =
       matches!(borders.offset_from, Some(w::PageBorderOffsetValues::Text));
   }
 
   setup.line_numbering = section
-    .w_ln_num_type
+    .line_number_type
     .as_ref()
     .and_then(line_numbering_model);
   setup.page_number_start = section
-    .w_pg_num_type
+    .page_number_type
     .as_ref()
     .and_then(|page_number| page_number.start);
   setup.doc_grid_line_pitch_pt = section
-    .w_doc_grid
+    .doc_grid
     .as_ref()
     .filter(|grid| {
       matches!(
@@ -12966,7 +12966,7 @@ mod tests {
           shading: Some(shading("EEEEEE")),
           ..Default::default()
         })),
-        w_tbl_style_pr: vec![w::TableStyleProperties {
+        table_style_properties: vec![w::TableStyleProperties {
           r#type: w::TableStyleOverrideValues::FirstRow,
           style_paragraph_properties: Some(Box::new(w::StyleParagraphProperties {
             justification: Some(w::Justification {
@@ -13265,7 +13265,7 @@ mod tests {
     let style = table_style_model(
       &w::Style {
         r#type: Some(w::StyleValues::Table),
-        w_tbl_style_pr: vec![w::TableStyleProperties {
+        table_style_properties: vec![w::TableStyleProperties {
           r#type: w::TableStyleOverrideValues::FirstRow,
           table_style_conditional_formatting_table_row_properties: Some(
             w::TableStyleConditionalFormattingTableRowProperties {
@@ -13336,7 +13336,7 @@ mod tests {
     let style = table_style_model(
       &w::Style {
         r#type: Some(w::StyleValues::Table),
-        w_tbl_style_pr: vec![w::TableStyleProperties {
+        table_style_properties: vec![w::TableStyleProperties {
           r#type: w::TableStyleOverrideValues::WholeTable,
           table_style_conditional_formatting_table_properties: Some(Box::new(
             w::TableStyleConditionalFormattingTableProperties {
@@ -13884,7 +13884,7 @@ mod tests {
         )))),
         w::BodyChoice::WP(Box::new(paragraph())),
       ],
-      w_sect_pr: Some(Box::new(section(
+      section_properties: Some(Box::new(section(
         15840,
         12240,
         w::PageOrientationValues::Landscape,
@@ -13982,8 +13982,8 @@ mod tests {
     break_type: Option<w::SectionMarkValues>,
   ) -> w::SectionProperties {
     w::SectionProperties {
-      w_type: break_type.map(|val| w::SectionType { val }),
-      w_pg_sz: Some(w::PageSize {
+      section_type: break_type.map(|val| w::SectionType { val }),
+      page_size: Some(w::PageSize {
         width: Some(twips(width)),
         height: Some(twips(height)),
         orient: Some(orient),
@@ -13998,8 +13998,8 @@ mod tests {
     column_count: i16,
   ) -> w::SectionProperties {
     w::SectionProperties {
-      w_type: Some(w::SectionType { val: break_type }),
-      w_cols: Some(w::Columns {
+      section_type: Some(w::SectionType { val: break_type }),
+      columns: Some(w::Columns {
         column_count: Some(column_count),
         ..Default::default()
       }),
@@ -14009,10 +14009,10 @@ mod tests {
 
   fn explicit_columns_section(break_type: w::SectionMarkValues) -> w::SectionProperties {
     w::SectionProperties {
-      w_type: Some(w::SectionType { val: break_type }),
-      w_cols: Some(w::Columns {
+      section_type: Some(w::SectionType { val: break_type }),
+      columns: Some(w::Columns {
         equal_width: Some(false.into()),
-        w_col: vec![
+        column: vec![
           w::Column {
             width: Some(twips(1440)),
             space: Some(twips(720)),

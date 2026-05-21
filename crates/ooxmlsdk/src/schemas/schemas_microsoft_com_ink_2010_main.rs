@@ -227,13 +227,13 @@ pub struct ContextNode {
   pub shape_geometry: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ContextNodeProperty Class.
   #[sdk(child(qname = "msink:CT_Property/msink:property"))]
-  pub msink_property: Vec<ContextNodeProperty>,
+  pub context_node_property: Vec<ContextNodeProperty>,
   /// Defines the SourceLink Class.
   #[sdk(child(qname = "msink:CT_CtxLink/msink:sourceLink"))]
-  pub msink_source_link: Vec<SourceLink>,
+  pub source_link: Vec<SourceLink>,
   /// Defines the DestinationLink Class.
   #[sdk(child(qname = "msink:CT_CtxLink/msink:destinationLink"))]
-  pub msink_destination_link: Vec<DestinationLink>,
+  pub destination_link: Vec<DestinationLink>,
 }
 /// Defines the ContextNodeProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

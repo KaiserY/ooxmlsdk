@@ -85,7 +85,7 @@ fn collect_shape_text(shape: &p::Shape, lines: &mut Vec<String>) {
     return;
   };
 
-  for paragraph in &text_body.a_p {
+  for paragraph in &text_body.paragraph {
     let text = paragraph_text(paragraph);
     if !text.is_empty() {
       lines.push(text);

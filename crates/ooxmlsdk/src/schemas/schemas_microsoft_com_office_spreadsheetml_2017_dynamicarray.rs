@@ -28,5 +28,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }

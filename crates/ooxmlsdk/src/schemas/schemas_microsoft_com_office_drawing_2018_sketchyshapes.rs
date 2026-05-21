@@ -21,17 +21,17 @@ pub struct LineSketchStyleProperties {
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,
   /// Defines the LineSketchTypeProperties Class.
   #[sdk(child(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
-  pub ask_type: Option<std::boxed::Box<LineSketchTypeProperties>>,
+  pub line_sketch_type_properties: Option<std::boxed::Box<LineSketchTypeProperties>>,
   /// Defines the LineSketchSeed Class.
   #[sdk(text_child(
     office2021,
     simple_type = "UInt32Value",
     qname = "ask:ST_LineSketchSeed/ask:seed"
   ))]
-  pub ask_seed: Option<LineSketchSeed>,
+  pub line_sketch_seed: Option<LineSketchSeed>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/ask:extLst"))]
-  pub ask_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LineSketchTypeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -54,7 +54,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchStylePropertiesChoice {

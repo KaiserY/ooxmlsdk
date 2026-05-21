@@ -18,9 +18,9 @@ pub(crate) fn layout(
   for (index, worksheet_part) in worksheet_parts.iter().enumerate() {
     let worksheet = worksheet_part.root_element(package)?;
     let mut lines = vec![format!("Sheet {}", index + 1)];
-    for row in &worksheet.x_sheet_data.x_row {
+    for row in &worksheet.sheet_data.row {
       let values = row
-        .x_c
+        .cell
         .iter()
         .map(|cell| cell_text(cell, &shared_strings))
         .collect::<Vec<_>>();
@@ -40,7 +40,13 @@ fn shared_strings(package: &mut SpreadsheetDocument) -> Result<Vec<String>> {
     return Ok(Vec::new());
   };
   let table = shared_string_part.root_element(package)?;
-  Ok(table.x_si.iter().map(shared_string_item_text).collect())
+  Ok(
+    table
+      .shared_string_item
+      .iter()
+      .map(shared_string_item_text)
+      .collect(),
+  )
 }
 
 fn shared_string_item_text(item: &x::SharedStringItem) -> String {
@@ -51,7 +57,7 @@ fn shared_string_item_text(item: &x::SharedStringItem) -> String {
   }
 
   item
-    .x_r
+    .run
     .iter()
     .filter_map(|run| run.text.xml_content.as_deref())
     .collect()
@@ -65,7 +71,7 @@ fn inline_string_text(value: &x::InlineString) -> String {
   }
 
   value
-    .x_r
+    .run
     .iter()
     .filter_map(|run| run.text.xml_content.as_deref())
     .collect()

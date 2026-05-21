@@ -24,7 +24,7 @@ pub struct WordprocessingCanvas {
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpc:extLst"))]
-  pub wpc_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -87,7 +87,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingCanvasChoice {

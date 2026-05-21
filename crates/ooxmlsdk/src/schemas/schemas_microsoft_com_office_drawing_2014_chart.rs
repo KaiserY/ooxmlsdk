@@ -32,7 +32,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -40,13 +40,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the UnsignedIntegerType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -116,7 +116,7 @@ pub struct DLbl {
   pub d_lbl_choice: Option<DLblChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::DLblExtensionList>,
+  pub d_lbl_extension_list: Option<crate::schemas::c::DLblExtensionList>,
 }
 /// Defines the CategoryFilterExceptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -130,7 +130,7 @@ pub struct CategoryFilterExceptions {
     office2016,
     qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"
   ))]
-  pub c16_category_filter_exception: Vec<CategoryFilterException>,
+  pub category_filter_exception: Vec<CategoryFilterException>,
 }
 /// Defines the PivotOptions16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -155,7 +155,7 @@ pub struct ChartDataPointUniqueIdMap {
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"
   ))]
-  pub c16_ptentry: Vec<ChartDataPointUniqueIdMapEntry>,
+  pub chart_data_point_unique_id_map_entry: Vec<ChartDataPointUniqueIdMapEntry>,
 }
 /// Defines the UniqueIdChartUniqueID Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -214,10 +214,10 @@ pub struct NumberDataType {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// Numeric Point.
   #[sdk(child(qname = "c:CT_NumVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::c::NumericPoint>,
+  pub numeric_point: Vec<crate::schemas::c::NumericPoint>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }
 /// Defines the NumFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -239,10 +239,10 @@ pub struct StringDataType {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::c::StringPoint>,
+  pub string_point: Vec<crate::schemas::c::StringPoint>,
   /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::StrDataExtensionList>,
+  pub str_data_extension_list: Option<crate::schemas::c::StrDataExtensionList>,
 }
 /// Defines the StrFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -264,10 +264,10 @@ pub struct MultiLvlStrData {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// Level.
   #[sdk(child(qname = "c:CT_Lvl/c:lvl"))]
-  pub c_lvl: Vec<crate::schemas::c::Level>,
+  pub level: Vec<crate::schemas::c::Level>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }
 /// Defines the MultiLvlStrFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -17,14 +17,14 @@ pub struct CacheVersionInfo {
     simple_type = "StringValue",
     qname = "xsd:string/xxpvi:requiredFeature"
   ))]
-  pub xxpvi_required_feature: Vec<RequiredFeatureXsdstring>,
+  pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastRefreshFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
     qname = "xsd:string/xxpvi:lastRefreshFeature"
   ))]
-  pub xxpvi_last_refresh_feature: Vec<LastRefreshFeatureXsdstring>,
+  pub last_refresh_feature_xsdstring: Vec<LastRefreshFeatureXsdstring>,
 }
 /// Defines the PivotVersionInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -39,14 +39,14 @@ pub struct PivotVersionInfo {
     simple_type = "StringValue",
     qname = "xsd:string/xxpvi:requiredFeature"
   ))]
-  pub xxpvi_required_feature: Vec<RequiredFeatureXsdstring>,
+  pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastUpdateFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
     qname = "xsd:string/xxpvi:lastUpdateFeature"
   ))]
-  pub xxpvi_last_update_feature: Vec<LastUpdateFeatureXsdstring>,
+  pub last_update_feature_xsdstring: Vec<LastUpdateFeatureXsdstring>,
 }
 /// Defines the RequiredFeatureXsdstring Class.
 pub type RequiredFeatureXsdstring = crate::simple_type::StringValue;

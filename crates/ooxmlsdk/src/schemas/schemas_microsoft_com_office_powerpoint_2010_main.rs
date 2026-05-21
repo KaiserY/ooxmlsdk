@@ -84,7 +84,7 @@ pub struct ExtensionListModify {
   pub modify: Option<crate::simple_type::BooleanValue>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the Media Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -301,7 +301,7 @@ pub struct SectionProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SectionOld Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionOld/p14:section"))]
-  pub p14_section: Vec<SectionOld>,
+  pub section_old: Vec<SectionOld>,
 }
 /// Defines the SectionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -310,7 +310,7 @@ pub struct SectionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Section Class.
   #[sdk(child(office2010, qname = "p14:CT_Section/p14:section"))]
-  pub p14_section: Vec<Section>,
+  pub section: Vec<Section>,
 }
 /// Defines the BrowseMode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -371,7 +371,7 @@ pub struct ShowMediaControls {
 pub struct LaserTraceList {
   /// Defines the TracePointList Class.
   #[sdk(child(office2010, qname = "p14:CT_LaserTrace/p14:tracePtLst"))]
-  pub p14_trace_pt_lst: Vec<TracePointList>,
+  pub trace_point_list: Vec<TracePointList>,
 }
 /// Defines the CreationId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -478,10 +478,11 @@ pub struct ApplicationNonVisualDrawingProperties {
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
-  pub p_cust_data_lst: Option<std::boxed::Box<crate::schemas::p::CustomerDataList>>,
+  pub customer_data_list: Option<std::boxed::Box<crate::schemas::p::CustomerDataList>>,
   /// Defines the ApplicationNonVisualDrawingPropertiesExtensionList Class.
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst"))]
-  pub p_ext_lst: Option<crate::schemas::p::ApplicationNonVisualDrawingPropertiesExtensionList>,
+  pub application_non_visual_drawing_properties_extension_list:
+    Option<crate::schemas::p::ApplicationNonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the MediaBookmark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -522,7 +523,7 @@ pub struct MediaFade {
 pub struct MediaBookmarkList {
   /// Defines the MediaBookmark Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaBookmark/p14:bmk"))]
-  pub p14_bmk: Vec<MediaBookmark>,
+  pub media_bookmark: Vec<MediaBookmark>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -531,7 +532,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the SectionOld Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -571,7 +572,7 @@ pub struct SectionSlideIdList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SectionSlideIdListEntry Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionSlideIdListEntry/p14:sldId"))]
-  pub p14_sld_id: Vec<SectionSlideIdListEntry>,
+  pub section_slide_id_list_entry: Vec<SectionSlideIdListEntry>,
 }
 /// Defines the Section Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -615,7 +616,7 @@ pub struct TracePoint {
 pub struct TracePointList {
   /// Defines the TracePoint Class.
   #[sdk(child(office2010, qname = "p14:CT_LaserTracePoint/p14:tracePt"))]
-  pub p14_trace_pt: Vec<TracePoint>,
+  pub trace_point: Vec<TracePoint>,
 }
 /// Defines the TriggerEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

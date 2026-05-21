@@ -51,5 +51,5 @@ pub struct Track {
 pub struct TrackList {
   /// Defines the Track Class.
   #[sdk(child(office2019, qname = "p173:CT_Track/p173:track"))]
-  pub p173_track: Vec<Track>,
+  pub track: Vec<Track>,
 }

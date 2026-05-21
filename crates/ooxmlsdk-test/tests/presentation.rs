@@ -85,14 +85,14 @@ fn presentation_round_trip_from_openxml_part_test() {
     parsed
       .slide_master_id_list
       .as_ref()
-      .map(|list| list.p_sld_master_id.len()),
+      .map(|list| list.slide_master_id.len()),
     Some(1)
   );
   assert_eq!(
     parsed
       .slide_id_list
       .as_ref()
-      .map(|list| list.p_sld_id.len()),
+      .map(|list| list.slide_id.len()),
     Some(2)
   );
   assert_eq!(
@@ -109,7 +109,7 @@ fn presentation_round_trip_from_openxml_part_test() {
     reparsed
       .slide_id_list
       .as_ref()
-      .map(|list| list.p_sld_id.len()),
+      .map(|list| list.slide_id.len()),
     Some(2)
   );
 }

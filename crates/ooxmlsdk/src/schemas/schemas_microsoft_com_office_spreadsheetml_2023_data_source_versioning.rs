@@ -14,21 +14,21 @@ pub struct VersionInfo {
     simple_type = "StringValue",
     qname = "xsd:string/xxdsv:requiredFeature"
   ))]
-  pub xxdsv_required_feature: Vec<RequiredFeatureXsdstring>,
+  pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastRefreshFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
     qname = "xsd:string/xxdsv:lastRefreshFeature"
   ))]
-  pub xxdsv_last_refresh_feature: Vec<LastRefreshFeatureXsdstring>,
+  pub last_refresh_feature_xsdstring: Vec<LastRefreshFeatureXsdstring>,
   /// Defines the LastEditFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
     qname = "xsd:string/xxdsv:lastEditFeature"
   ))]
-  pub xxdsv_last_edit_feature: Vec<LastEditFeatureXsdstring>,
+  pub last_edit_feature_xsdstring: Vec<LastEditFeatureXsdstring>,
 }
 /// Defines the RequiredFeatureXsdstring Class.
 pub type RequiredFeatureXsdstring = crate::simple_type::StringValue;

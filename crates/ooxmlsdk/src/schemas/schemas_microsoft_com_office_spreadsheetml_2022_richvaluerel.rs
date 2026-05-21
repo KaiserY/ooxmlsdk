@@ -13,10 +13,10 @@ pub struct RichValueRels {
     microsoft365,
     qname = "xlrvrel:CT_RichValueRelRelationship/xlrvrel:rel"
   ))]
-  pub xlrvrel_rel: Vec<RichValueRelRelationship>,
+  pub rich_value_rel_relationship: Vec<RichValueRelRelationship>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xlrvrel:extLst"))]
-  pub xlrvrel_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueRelRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -36,5 +36,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }

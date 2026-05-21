@@ -48,10 +48,10 @@ pub struct SlideGuideList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
-  pub p15_guide: Vec<ExtendedGuide>,
+  pub extended_guide: Vec<ExtendedGuide>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
-  pub p15_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the NotesGuideList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -60,10 +60,10 @@ pub struct NotesGuideList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
-  pub p15_guide: Vec<ExtendedGuide>,
+  pub extended_guide: Vec<ExtendedGuide>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
-  pub p15_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ChartTrackingReferenceBased Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -109,7 +109,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the ExtendedGuide Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

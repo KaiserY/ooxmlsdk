@@ -13,7 +13,7 @@ pub struct Properties {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Custom File Property.
   #[sdk(child(qname = "op:CT_Property/op:property"))]
-  pub op_property: Vec<CustomDocumentProperty>,
+  pub custom_document_property: Vec<CustomDocumentProperty>,
 }
 /// Custom File Property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

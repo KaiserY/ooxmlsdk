@@ -24,7 +24,7 @@ pub struct NumberDiagramInfoList {
     office2019,
     qname = "dgm1611:CT_NumberDiagramInfo/dgm1611:autoBuNodeInfo"
   ))]
-  pub dgm1611_auto_bu_node_info: Vec<NumberDiagramInfo>,
+  pub number_diagram_info: Vec<NumberDiagramInfo>,
 }
 /// Defines the DiagramAutoBullet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

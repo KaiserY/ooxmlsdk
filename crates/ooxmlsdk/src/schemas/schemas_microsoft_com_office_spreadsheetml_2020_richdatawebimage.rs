@@ -19,10 +19,10 @@ pub struct WebImagesSupportingRichData {
     office2021,
     qname = "xlrdwi:CT_WebImageSupportingRichData/xlrdwi:webImageSrd"
   ))]
-  pub xlrdwi_web_image_srd: Vec<WebImageSupportingRichData>,
+  pub web_image_supporting_rich_data: Vec<WebImageSupportingRichData>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xlrdwi:extLst"))]
-  pub xlrdwi_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the WebImageSupportingRichData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -60,7 +60,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the AddressWebImageSupportingRichDataRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

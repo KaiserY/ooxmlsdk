@@ -34,5 +34,5 @@ pub struct SchemaReference {
 pub struct SchemaReferences {
   /// Associated XML Schema.
   #[sdk(child(qname = "ds:CT_DatastoreSchemaRef/ds:schemaRef"))]
-  pub ds_schema_ref: Vec<SchemaReference>,
+  pub schema_reference: Vec<SchemaReference>,
 }

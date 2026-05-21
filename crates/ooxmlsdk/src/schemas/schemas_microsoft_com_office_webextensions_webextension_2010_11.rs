@@ -67,7 +67,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the WebExtensionBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -118,7 +118,7 @@ pub struct WebExtensionReferenceList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionStoreReference Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
-  pub we_reference: Vec<WebExtensionStoreReference>,
+  pub web_extension_store_reference: Vec<WebExtensionStoreReference>,
 }
 /// Defines the WebExtensionPropertyBag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -127,7 +127,7 @@ pub struct WebExtensionPropertyBag {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionProperty Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property"))]
-  pub we_property: Vec<WebExtensionProperty>,
+  pub web_extension_property: Vec<WebExtensionProperty>,
 }
 /// Defines the WebExtensionBindingList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -136,7 +136,7 @@ pub struct WebExtensionBindingList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionBinding Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
-  pub we_binding: Vec<WebExtensionBinding>,
+  pub web_extension_binding: Vec<WebExtensionBinding>,
 }
 /// Defines the Snapshot Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -175,7 +175,7 @@ pub struct Snapshot {
   pub snapshot_choice: Vec<SnapshotChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::BlipExtensionList>,
+  pub blip_extension_list: Option<crate::schemas::a::BlipExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SnapshotChoice {

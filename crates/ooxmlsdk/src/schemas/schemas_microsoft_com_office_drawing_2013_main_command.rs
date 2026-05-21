@@ -181,16 +181,17 @@ pub struct GroupCommand {
   pub group_command_choice: Vec<GroupCommandChoice>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2016, qname = "a:CT_GroupShapeProperties/oac:grpSpPr"))]
-  pub oac_grp_sp_pr: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   /// Defines the NonVisualDrawingProps Class.
   #[sdk(child(office2016, qname = "a:CT_NonVisualDrawingProps/oac:cNvPr"))]
-  pub oac_c_nv_pr: Option<std::boxed::Box<NonVisualDrawingProps>>,
+  pub non_visual_drawing_props: Option<std::boxed::Box<NonVisualDrawingProps>>,
   /// Defines the NonVisualGroupDrawingShapeProps Class.
   #[sdk(child(
     office2016,
     qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr"
   ))]
-  pub oac_c_nv_grp_sp_pr: Option<std::boxed::Box<NonVisualGroupDrawingShapeProps>>,
+  pub non_visual_group_drawing_shape_props:
+    Option<std::boxed::Box<NonVisualGroupDrawingShapeProps>>,
 }
 /// Defines the ImgLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -381,13 +382,13 @@ pub struct TextParagraphPropertiesType {
   pub text_paragraph_properties_type_choice4: Option<TextParagraphPropertiesTypeChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<crate::schemas::a::TabStopList>,
+  pub tab_stop_list: Option<crate::schemas::a::TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<crate::schemas::a::DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<crate::schemas::a::DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -469,12 +470,12 @@ pub struct TextBodyProperties {
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the ModifyNonVisualDrawingShapeProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -550,7 +551,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -558,13 +559,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the ResetShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -817,10 +818,10 @@ pub struct GroupShapeProperties {
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the ResetGroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1155,13 +1156,13 @@ pub struct LinePropertiesType {
   pub line_properties_type_choice3: Option<LinePropertiesTypeChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<crate::schemas::a::HeadEnd>,
+  pub head_end: Option<crate::schemas::a::HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<crate::schemas::a::TailEnd>,
+  pub tail_end: Option<crate::schemas::a::TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<crate::schemas::a::LinePropertiesExtensionList>,
 }
 /// Defines the ModifyNonVisualInkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

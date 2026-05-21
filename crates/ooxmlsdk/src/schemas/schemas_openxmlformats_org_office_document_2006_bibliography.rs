@@ -63,7 +63,7 @@ pub struct Sources {
   pub uri: Option<crate::simple_type::StringValue>,
   /// Source.
   #[sdk(child(qname = "b:CT_SourceType/b:Source"))]
-  pub b_source: Vec<Source>,
+  pub source: Vec<Source>,
 }
 /// Person.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -71,13 +71,13 @@ pub struct Sources {
 pub struct Person {
   /// Person's Last, or Family, Name.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Last"))]
-  pub b_last: Vec<Last>,
+  pub last: Vec<Last>,
   /// Person's First, or Given, Name.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:First"))]
-  pub b_first: Vec<First>,
+  pub first: Vec<First>,
   /// Person's Middle, or Other, Name.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Middle"))]
-  pub b_middle: Vec<Middle>,
+  pub middle: Vec<Middle>,
 }
 /// Person's Last, or Family, Name.
 pub type Last = crate::simple_type::StringValue;
@@ -193,7 +193,7 @@ pub type YearAccessed = crate::simple_type::StringValue;
 pub struct NameList {
   /// Person.
   #[sdk(child(qname = "b:CT_PersonType/b:Person"))]
-  pub b_person: Vec<Person>,
+  pub person: Vec<Person>,
 }
 /// Artist.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

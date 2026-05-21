@@ -16,7 +16,7 @@ pub struct RichValueRefreshIntervals {
     office2021,
     qname = "xlrvr:CT_RichValueRefreshInterval/xlrvr:refreshInterval"
   ))]
-  pub xlrvr_refresh_interval: Vec<RichValueRefreshInterval>,
+  pub rich_value_refresh_interval: Vec<RichValueRefreshInterval>,
 }
 /// Defines the RichValueRefreshInterval Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -132,7 +132,10 @@ fn mcsupport_load_process_content() {
   let xml = doc_sample_part("MCExecl.xlsx", "xl/sharedStrings.xml");
 
   let (table, serialized, _) = assert_stable_roundtrip::<SharedStringTable>(&xml);
-  let item = table.x_si.first().expect("expected shared string item");
+  let item = table
+    .shared_string_item
+    .first()
+    .expect("expected shared string item");
   let placeholder = item.w14_placeholder.as_ref().expect("expected placeholder");
   let text = placeholder
     .text

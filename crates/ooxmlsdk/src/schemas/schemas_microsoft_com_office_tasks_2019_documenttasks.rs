@@ -13,10 +13,10 @@ pub struct Tasks {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Task Class.
   #[sdk(child(office2021, qname = "t:CT_Task/t:Task"))]
-  pub t_task: Vec<Task>,
+  pub task: Vec<Task>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
-  pub t_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Task Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -44,7 +44,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "oel:CT_Extension/oel:ext"))]
-  pub oel_ext: Vec<crate::schemas::oel::Extension>,
+  pub extension: Vec<crate::schemas::oel::Extension>,
 }
 /// Defines the TaskAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -63,7 +63,7 @@ pub struct TaskAnchor {
 pub struct TaskHistory {
   /// Defines the TaskHistoryEvent Class.
   #[sdk(child(office2021, qname = "t:CT_TaskHistoryEvent/t:Event"))]
-  pub t_event: Vec<TaskHistoryEvent>,
+  pub task_history_event: Vec<TaskHistoryEvent>,
 }
 /// Defines the TaskHistoryEvent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -99,7 +99,7 @@ pub struct TaskHistoryEvent {
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
-  pub t_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the AttributionTaskUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

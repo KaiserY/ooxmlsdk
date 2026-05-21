@@ -37,10 +37,10 @@ pub struct MsForm {
     simple_type = "StringValue",
     qname = "x:ST_Xstring/xlmsforms:syncedQuestionId"
   ))]
-  pub xlmsforms_synced_question_id: Vec<SyncedQuestionId>,
+  pub synced_question_id: Vec<SyncedQuestionId>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xlmsforms:extLst"))]
-  pub xlmsforms_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SyncedQuestionId Class.
 pub type SyncedQuestionId = crate::simple_type::StringValue;
@@ -51,5 +51,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }

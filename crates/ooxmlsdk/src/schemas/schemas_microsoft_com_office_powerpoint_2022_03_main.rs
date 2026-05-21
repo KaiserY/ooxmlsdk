@@ -10,7 +10,7 @@
 pub struct Reactions {
   /// Defines the Reaction Class.
   #[sdk(child(microsoft365, qname = "p223:CT_Reaction/p223:rxn"))]
-  pub p223_rxn: Vec<Reaction>,
+  pub reaction: Vec<Reaction>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -19,7 +19,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the ReactionInstance Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -45,5 +45,5 @@ pub struct Reaction {
   pub r#type: crate::simple_type::StringValue,
   /// Defines the ReactionInstance Class.
   #[sdk(child(microsoft365, qname = "p223:CT_ReactionInstance/p223:instance"))]
-  pub p223_instance: Vec<ReactionInstance>,
+  pub reaction_instance: Vec<ReactionInstance>,
 }

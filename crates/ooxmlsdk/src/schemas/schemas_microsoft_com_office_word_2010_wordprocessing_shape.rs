@@ -21,13 +21,13 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeProperties/wps:spPr"))]
-  pub wps_sp_pr: std::boxed::Box<ShapeProperties>,
+  pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeStyle/wps:style"))]
-  pub wps_style: Option<std::boxed::Box<ShapeStyle>>,
+  pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wps:extLst"))]
-  pub wps_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
   #[sdk(choice(
     qname = "wps:CT_TextboxInfo/wps:txbx",
     qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"
@@ -35,7 +35,7 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
   #[sdk(child(office2010, qname = "a:CT_TextBodyProperties/wps:bodyPr"))]
-  pub wps_body_pr: std::boxed::Box<TextBodyProperties>,
+  pub text_body_properties: std::boxed::Box<TextBodyProperties>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -44,7 +44,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -137,7 +137,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -145,13 +145,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -278,12 +278,12 @@ pub struct TextBodyProperties {
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice {

@@ -1140,7 +1140,7 @@ pub struct RegroupTable {
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Regroup Entry.
   #[sdk(child(qname = "o:CT_Entry/o:entry"))]
-  pub o_entry: Vec<Entry>,
+  pub entry: Vec<Entry>,
 }
 /// Rule Set.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1151,7 +1151,7 @@ pub struct Rules {
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Rule.
   #[sdk(child(qname = "o:CT_R/o:r"))]
-  pub o_r: Vec<Rule>,
+  pub rule: Vec<Rule>,
 }
 /// Regroup Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1183,7 +1183,7 @@ pub struct Rule {
   pub shape_reference: Option<crate::simple_type::StringValue>,
   /// Shape Reference.
   #[sdk(child(qname = "o:CT_Proxy/o:proxy"))]
-  pub o_proxy: Vec<Proxy>,
+  pub proxy: Vec<Proxy>,
 }
 /// Diagram Relationship Table.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1194,7 +1194,7 @@ pub struct RelationTable {
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Diagram Relationship.
   #[sdk(child(qname = "o:CT_Relation/o:rel"))]
-  pub o_rel: Vec<Relation>,
+  pub relation: Vec<Relation>,
 }
 /// Diagram Relationship.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

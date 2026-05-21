@@ -13,7 +13,7 @@ pub struct CommentsIds {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the CommentId Class.
   #[sdk(child(office2019, qname = "w16cid:CT_CommentId/w16cid:commentId"))]
-  pub w16cid_comment_id: Vec<CommentId>,
+  pub comment_id: Vec<CommentId>,
 }
 /// Defines the CommentId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

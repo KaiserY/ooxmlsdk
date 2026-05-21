@@ -31,7 +31,7 @@ pub struct WordprocessingGroup {
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
-  pub wpg_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -60,7 +60,7 @@ pub struct GroupShape {
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
-  pub wpg_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -132,7 +132,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -176,10 +176,10 @@ pub struct GroupShapeProperties {
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the GraphicFrame Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

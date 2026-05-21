@@ -120,13 +120,13 @@ pub struct HiddenLineProperties {
   pub hidden_line_properties_choice3: Option<HiddenLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<crate::schemas::a::HeadEnd>,
+  pub head_end: Option<crate::schemas::a::HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<crate::schemas::a::TailEnd>,
+  pub tail_end: Option<crate::schemas::a::TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<crate::schemas::a::LinePropertiesExtensionList>,
 }
 /// Defines the HiddenEffectsProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -219,7 +219,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the ContentPartLocks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -668,13 +668,13 @@ pub struct BackgroundRemoval {
     office2010,
     qname = "a14:CT_PictureEffectBackgroundRemovalForegroundMark/a14:foregroundMark"
   ))]
-  pub a14_foreground_mark: Vec<ForegroundMark>,
+  pub foreground_mark: Vec<ForegroundMark>,
   /// Defines the BackgroundMark Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_PictureEffectBackgroundRemovalBackgroundMark/a14:backgroundMark"
   ))]
-  pub a14_background_mark: Vec<BackgroundMark>,
+  pub background_mark: Vec<BackgroundMark>,
 }
 /// Defines the BrightnessContrast Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -772,7 +772,7 @@ pub struct ImageLayer {
   pub embed: Option<crate::simple_type::StringValue>,
   /// Defines the ImageEffect Class.
   #[sdk(child(office2010, qname = "a14:CT_PictureEffect/a14:imgEffect"))]
-  pub a14_img_effect: Vec<ImageEffect>,
+  pub image_effect: Vec<ImageEffect>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

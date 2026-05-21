@@ -13,9 +13,10 @@ use crate::sdk_code::helpers::{
 use crate::sdk_code::schemas::{
   CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
   ResolvedOneSequenceChoiceVariant, ResolvedOneSequenceSequenceVariant,
-  ResolvedOneSequenceStructuredChoice, one_sequence_choice_enum_name,
-  one_sequence_choice_field_name, one_sequence_choice_sequence_struct_name,
-  schema_child_field_rust_name,
+  ResolvedOneSequenceStructuredChoice, duplicate_preferred_child_field_names_with_attrs,
+  one_sequence_choice_enum_name, one_sequence_choice_field_name,
+  one_sequence_choice_sequence_struct_name, schema_child_field_rust_name,
+  schema_child_field_rust_name_with_context,
 };
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
@@ -2475,6 +2476,11 @@ fn build_direct_child_member_decls(
 ) -> Result<Vec<MemberDecl>> {
   let mut members = Vec::new();
   let mut field_name_set = std::collections::HashSet::new();
+  let duplicate_preferred_names = duplicate_preferred_child_field_names_with_attrs(
+    schema_type.attributes.iter(),
+    schema_type.children.iter(),
+    context,
+  );
 
   for child in &schema_type.children {
     if !matches!(
@@ -2485,18 +2491,8 @@ fn build_direct_child_member_decls(
       continue;
     }
 
-    let rust_name = if child.property_name.is_empty() {
-      escape_snake_case(
-        child
-          .name
-          .split('/')
-          .nth(1)
-          .unwrap_or(child.name.as_str())
-          .to_snake_case(),
-      )
-    } else {
-      schema_child_field_rust_name(child.property_name.as_str())
-    };
+    let rust_name =
+      schema_child_field_rust_name_with_context(child, context, &duplicate_preferred_names);
     if !field_name_set.insert(rust_name.clone()) {
       continue;
     }
@@ -2646,18 +2642,13 @@ fn build_single_nested_child_member_decl(
   let child_type = context
     .type_by_name(child.name.as_str())
     .ok_or_else(|| child.name.clone())?;
-  let rust_name = if child.property_name.is_empty() {
-    escape_snake_case(
-      child
-        .name
-        .split('/')
-        .nth(1)
-        .unwrap_or(child.name.as_str())
-        .to_snake_case(),
-    )
-  } else {
-    schema_child_field_rust_name(child.property_name.as_str())
-  };
+  let duplicate_preferred_names = duplicate_preferred_child_field_names_with_attrs(
+    schema_type.attributes.iter(),
+    std::iter::once(child),
+    context,
+  );
+  let rust_name =
+    schema_child_field_rust_name_with_context(child, context, &duplicate_preferred_names);
 
   Ok(Some(FieldDecl {
     rust_name,
@@ -3548,9 +3539,19 @@ fn build_mixed_choice_children_members(
     .position(|child| child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Choice)
     .ok_or_else(|| schema_type.class_name.clone())?;
   let choice_child = &schema_type.children[choice_index];
+  let duplicate_preferred_names = duplicate_preferred_child_field_names_with_attrs(
+    schema_type.attributes.iter(),
+    schema_type.children.iter(),
+    context,
+  );
 
   for child in &schema_type.children[..choice_index] {
-    if let Some(field) = build_direct_child_member_decl_from_schema_child(child, schema, context)? {
+    if let Some(field) = build_direct_child_member_decl_from_schema_child(
+      child,
+      schema,
+      context,
+      &duplicate_preferred_names,
+    )? {
       members.push(MemberDecl::Field(field));
     }
   }
@@ -3663,7 +3664,12 @@ fn build_mixed_choice_children_members(
   });
 
   for child in &schema_type.children[choice_index + 1..] {
-    if let Some(field) = build_direct_child_member_decl_from_schema_child(child, schema, context)? {
+    if let Some(field) = build_direct_child_member_decl_from_schema_child(
+      child,
+      schema,
+      context,
+      &duplicate_preferred_names,
+    )? {
       members.push(MemberDecl::Field(field));
     }
   }
@@ -3675,6 +3681,7 @@ fn build_direct_child_member_decl_from_schema_child(
   child: &crate::sdk_data::sdk_data_model::SchemaTypeChild,
   schema: &Schema,
   context: &CodegenContext<'_>,
+  duplicate_preferred_names: &std::collections::HashSet<String>,
 ) -> Result<Option<FieldDecl>> {
   if !matches!(
     child.kind,
@@ -3683,18 +3690,8 @@ fn build_direct_child_member_decl_from_schema_child(
   ) {
     return Ok(None);
   }
-  let field_name = if child.property_name.is_empty() {
-    escape_snake_case(
-      child
-        .name
-        .split('/')
-        .nth(1)
-        .unwrap_or(child.name.as_str())
-        .to_snake_case(),
-    )
-  } else {
-    schema_child_field_rust_name(child.property_name.as_str())
-  };
+  let field_name =
+    schema_child_field_rust_name_with_context(child, context, duplicate_preferred_names);
   let version = if child.initial_version.is_empty() {
     context
       .type_by_name(child.name.as_str())
@@ -6711,7 +6708,7 @@ mod tests {
         _ => None,
       })
       .unwrap();
-    assert_eq!(field.rust_name, "t_r_pr");
+    assert_eq!(field.rust_name, "run_properties");
     assert_eq!(field.cardinality, Cardinality::Many);
     assert_eq!(
       field.wire,
@@ -7391,7 +7388,7 @@ mod tests {
         _ => None,
       })
       .unwrap();
-    assert_eq!(field.rust_name, "t_r_pr");
+    assert_eq!(field.rust_name, "run_properties");
     assert_eq!(field.cardinality, Cardinality::Many);
   }
 

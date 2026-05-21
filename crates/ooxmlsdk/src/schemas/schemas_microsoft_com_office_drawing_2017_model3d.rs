@@ -42,7 +42,7 @@ pub struct Model3D {
   pub model3_d_choice1: Option<Model3DChoice>,
   /// Ambient light in a scene.
   #[sdk(child(office2019, qname = "am3d:CT_AmbientLight/am3d:ambientLight"))]
-  pub am3d_ambient_light: Option<std::boxed::Box<AmbientLight>>,
+  pub ambient_light: Option<std::boxed::Box<AmbientLight>>,
   #[sdk(choice(
     qname = "am3d:CT_PointLight/am3d:ptLight",
     qname = "am3d:CT_SpotLight/am3d:spotLight",
@@ -214,7 +214,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the PosPoint3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -310,7 +310,7 @@ pub struct Blip {
   pub blip_choice: Vec<BlipChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::BlipExtensionList>,
+  pub blip_extension_list: Option<crate::schemas::a::BlipExtensionList>,
 }
 /// Defines the ColorType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -370,7 +370,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -378,13 +378,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the Model3DCamera Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -406,7 +406,7 @@ pub struct Model3DCamera {
   pub model3_d_camera_choice: Option<Model3DCameraChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]
-  pub am3d_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the Model3DTransform Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -463,7 +463,7 @@ pub struct Model3DExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Model3DExtension Class.
   #[sdk(child(office2019, qname = "am3d:CT_Model3DExtension/am3d:ext"))]
-  pub am3d_ext: Vec<Model3DExtension>,
+  pub model3_d_extension: Vec<Model3DExtension>,
 }
 /// Defines the ObjectViewport Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

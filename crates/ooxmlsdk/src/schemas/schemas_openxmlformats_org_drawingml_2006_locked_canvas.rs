@@ -29,7 +29,7 @@ pub struct LockedCanvas {
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::GvmlGroupShapeExtensionList>,
+  pub gvml_group_shape_extension_list: Option<crate::schemas::a::GvmlGroupShapeExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {

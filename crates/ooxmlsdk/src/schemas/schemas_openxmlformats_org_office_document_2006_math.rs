@@ -257,7 +257,7 @@ pub struct Delimiter {
   pub delimiter_properties: Option<std::boxed::Box<DelimiterProperties>>,
   /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
-  pub m_e: Vec<Base>,
+  pub base: Vec<Base>,
 }
 /// Equation-Array Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -268,7 +268,7 @@ pub struct EquationArray {
   pub equation_array_properties: Option<std::boxed::Box<EquationArrayProperties>>,
   /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
-  pub m_e: Vec<Base>,
+  pub base: Vec<Base>,
 }
 /// Fraction Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -346,7 +346,7 @@ pub struct Matrix {
   pub matrix_properties: Option<std::boxed::Box<MatrixProperties>>,
   /// Matrix Row.
   #[sdk(child(qname = "m:CT_MR/m:mr"))]
-  pub m_mr: Vec<MatrixRow>,
+  pub matrix_row: Vec<MatrixRow>,
 }
 /// n-ary Operator Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -612,10 +612,10 @@ pub struct MathProperties {
   pub math_properties_choice: Option<MathPropertiesChoice>,
   /// Integral Limit Locations.
   #[sdk(child(qname = "m:CT_LimLoc/m:intLim"))]
-  pub m_int_lim: Option<IntegralLimitLocation>,
+  pub integral_limit_location: Option<IntegralLimitLocation>,
   /// n-ary Limit Location.
   #[sdk(child(qname = "m:CT_LimLoc/m:naryLim"))]
-  pub m_nary_lim: Option<NaryLimitLocation>,
+  pub nary_limit_location: Option<NaryLimitLocation>,
 }
 /// Literal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -885,10 +885,10 @@ pub struct RunProperties {
   pub run_properties_choice: Option<RunPropertiesChoice>,
   /// Break.
   #[sdk(child(qname = "m:CT_ManualBreak/m:brk"))]
-  pub m_brk: Option<Break>,
+  pub r#break: Option<Break>,
   /// Align.
   #[sdk(child(qname = "m:CT_OnOff/m:aln"))]
-  pub m_aln: Option<Alignment>,
+  pub alignment: Option<Alignment>,
 }
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1032,7 +1032,7 @@ pub struct Base {
   pub base_choice: Vec<BaseChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Numerator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1104,7 +1104,7 @@ pub struct Numerator {
   pub numerator_choice: Vec<NumeratorChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Denominator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1176,7 +1176,7 @@ pub struct Denominator {
   pub denominator_choice: Vec<DenominatorChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Function Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1248,7 +1248,7 @@ pub struct FunctionName {
   pub function_name_choice: Vec<FunctionNameChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Limit (Lower).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1320,7 +1320,7 @@ pub struct Limit {
   pub limit_choice: Vec<LimitChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Lower limit (n-ary) .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1392,7 +1392,7 @@ pub struct SubArgument {
   pub sub_argument_choice: Vec<SubArgumentChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Upper limit (n-ary).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1464,7 +1464,7 @@ pub struct SuperArgument {
   pub super_argument_choice: Vec<SuperArgumentChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Degree.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1536,7 +1536,7 @@ pub struct Degree {
   pub degree_choice: Vec<DegreeChoice>,
   /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
-  pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
+  pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Position (Bar).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1890,7 +1890,7 @@ pub struct WrapIndent {
 pub struct MatrixColumns {
   /// Matrix Column.
   #[sdk(child(qname = "m:CT_MC/m:mc"))]
-  pub m_mc: Vec<MatrixColumn>,
+  pub matrix_column: Vec<MatrixColumn>,
 }
 /// Matrix Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1930,7 +1930,7 @@ pub struct MatrixProperties {
 pub struct MatrixRow {
   /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
-  pub m_e: Vec<Base>,
+  pub base: Vec<Base>,
 }
 /// n-ary Limit Location.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

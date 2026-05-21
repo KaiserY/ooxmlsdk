@@ -25,73 +25,73 @@ pub struct Macrosheet {
   pub sheet_format_properties: Option<crate::schemas::x::SheetFormatProperties>,
   /// Column Information.
   #[sdk(child(qname = "x:CT_Cols/x:cols"))]
-  pub x_cols: Vec<crate::schemas::x::Columns>,
+  pub columns: Vec<crate::schemas::x::Columns>,
   /// Sheet Data.
   #[sdk(child(qname = "x:CT_SheetData/x:sheetData"))]
-  pub x_sheet_data: std::boxed::Box<crate::schemas::x::SheetData>,
+  pub sheet_data: std::boxed::Box<crate::schemas::x::SheetData>,
   /// Sheet Protection.
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
-  pub x_sheet_protection: Option<crate::schemas::x::SheetProtection>,
+  pub sheet_protection: Option<crate::schemas::x::SheetProtection>,
   /// AutoFilter Settings.
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
-  pub x_auto_filter: Option<std::boxed::Box<crate::schemas::x::AutoFilter>>,
+  pub auto_filter: Option<std::boxed::Box<crate::schemas::x::AutoFilter>>,
   /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
-  pub x_sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
+  pub sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Data Consolidation.
   #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
-  pub x_data_consolidate: Option<std::boxed::Box<crate::schemas::x::DataConsolidate>>,
+  pub data_consolidate: Option<std::boxed::Box<crate::schemas::x::DataConsolidate>>,
   /// Custom Sheet Views.
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
-  pub x_custom_sheet_views: Option<crate::schemas::x::CustomSheetViews>,
+  pub custom_sheet_views: Option<crate::schemas::x::CustomSheetViews>,
   /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
-  pub x_phonetic_pr: Option<crate::schemas::x::PhoneticProperties>,
+  pub phonetic_properties: Option<crate::schemas::x::PhoneticProperties>,
   /// Conditional Formatting.
   #[sdk(child(qname = "x:CT_ConditionalFormatting/x:conditionalFormatting"))]
-  pub x_conditional_formatting: Vec<crate::schemas::x::ConditionalFormatting>,
+  pub conditional_formatting: Vec<crate::schemas::x::ConditionalFormatting>,
   /// Print Options.
   #[sdk(child(qname = "x:CT_PrintOptions/x:printOptions"))]
-  pub x_print_options: Option<crate::schemas::x::PrintOptions>,
+  pub print_options: Option<crate::schemas::x::PrintOptions>,
   /// Page Margins.
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
-  pub x_page_margins: Option<crate::schemas::x::PageMargins>,
+  pub page_margins: Option<crate::schemas::x::PageMargins>,
   /// Page Setup Settings.
   #[sdk(child(qname = "x:CT_PageSetup/x:pageSetup"))]
-  pub x_page_setup: Option<crate::schemas::x::PageSetup>,
+  pub page_setup: Option<crate::schemas::x::PageSetup>,
   /// Header Footer Settings.
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
-  pub x_header_footer: Option<std::boxed::Box<crate::schemas::x::HeaderFooter>>,
+  pub header_footer: Option<std::boxed::Box<crate::schemas::x::HeaderFooter>>,
   /// Horizontal Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:rowBreaks"))]
-  pub x_row_breaks: Option<crate::schemas::x::RowBreaks>,
+  pub row_breaks: Option<crate::schemas::x::RowBreaks>,
   /// Vertical Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:colBreaks"))]
-  pub x_col_breaks: Option<crate::schemas::x::ColumnBreaks>,
+  pub column_breaks: Option<crate::schemas::x::ColumnBreaks>,
   /// Custom Properties.
   #[sdk(child(qname = "x:CT_CustomProperties/x:customProperties"))]
-  pub x_custom_properties: Option<crate::schemas::x::CustomProperties>,
+  pub custom_properties: Option<crate::schemas::x::CustomProperties>,
   /// Drawing.
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
-  pub x_drawing: Option<crate::schemas::x::Drawing>,
+  pub drawing: Option<crate::schemas::x::Drawing>,
   /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
-  pub x_legacy_drawing: Option<crate::schemas::x::LegacyDrawing>,
+  pub legacy_drawing: Option<crate::schemas::x::LegacyDrawing>,
   /// Legacy Drawing Reference in  Header Footer.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
-  pub x_legacy_drawing_hf: Option<crate::schemas::x::LegacyDrawingHeaderFooter>,
+  pub legacy_drawing_header_footer: Option<crate::schemas::x::LegacyDrawingHeaderFooter>,
   /// Defines the Picture Class.
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
-  pub x_picture: Option<crate::schemas::x::Picture>,
+  pub picture: Option<crate::schemas::x::Picture>,
   /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
-  pub x_ole_objects: Option<crate::schemas::x::OleObjects>,
+  pub ole_objects: Option<crate::schemas::x::OleObjects>,
   /// Defines the DrawingHeaderFooter Class.
   #[sdk(child(office2010, qname = "x:CT_DrawingHF/x:drawingHF"))]
-  pub x_drawing_hf: Option<crate::schemas::x::DrawingHeaderFooter>,
+  pub drawing_header_footer: Option<crate::schemas::x::DrawingHeaderFooter>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub x_ext_lst: Option<crate::schemas::x::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Worksheet Sort Map.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -124,7 +124,7 @@ pub struct RowSortMap {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Row.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:row"))]
-  pub xne_row: Vec<RowSortMapItem>,
+  pub row_sort_map_item: Vec<RowSortMapItem>,
 }
 /// Column Sort Map.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -139,7 +139,7 @@ pub struct ColumnSortMap {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Column.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:col"))]
-  pub xne_col: Vec<ColumnSortMapItem>,
+  pub column_sort_map_item: Vec<ColumnSortMapItem>,
 }
 /// Row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

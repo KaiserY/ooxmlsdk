@@ -54,19 +54,19 @@ fn assert_cell_value_text_round_trip(value: &str) {
 fn shared_string_items(
   table: &SharedStringTable,
 ) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringItem> {
-  table.x_si.iter().collect()
+  table.shared_string_item.iter().collect()
 }
 
 fn color_scale_cfvo(
   scale: &ColorScale,
 ) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormatValueObject>{
-  scale.x_cfvo.iter().collect()
+  scale.conditional_format_value_object.iter().collect()
 }
 
 fn color_scale_colors(
   scale: &ColorScale,
 ) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Color> {
-  scale.x_color.iter().collect()
+  scale.color.iter().collect()
 }
 
 #[test]
@@ -75,9 +75,9 @@ fn workbook_round_trip_from_openxml_part_test() {
     assert_stable_roundtrip::<Workbook>(fixtures::SPREADSHEET_WORKBOOK_XML);
 
   assert_eq!(parsed.xml_header, XmlHeaderType::Standalone);
-  assert_eq!(parsed.sheets.x_sheet.len(), 2);
-  assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
-  assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert_eq!(parsed.sheets.sheet.len(), 2);
+  assert_eq!(parsed.sheets.sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(parsed.sheets.sheet[1].name.as_str(), "Sheet2");
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
@@ -85,7 +85,7 @@ fn workbook_round_trip_from_openxml_part_test() {
   assert!(serialized.contains("name=\"Sheet1\""));
   assert!(serialized.contains("name=\"Sheet2\""));
   assert_eq!(reparsed.xml_header, XmlHeaderType::Standalone);
-  assert_eq!(reparsed.sheets.x_sheet.len(), 2);
+  assert_eq!(reparsed.sheets.sheet.len(), 2);
 }
 
 #[test]
@@ -114,9 +114,9 @@ fn workbook_round_trip_from_complex01_part_test() {
       .map(|value| value.as_str()),
     Some("6")
   );
-  assert_eq!(parsed.sheets.x_sheet.len(), 2);
-  assert_eq!(parsed.sheets.x_sheet[0].name.as_str(), "Sheet1");
-  assert_eq!(parsed.sheets.x_sheet[1].name.as_str(), "Sheet2");
+  assert_eq!(parsed.sheets.sheet.len(), 2);
+  assert_eq!(parsed.sheets.sheet[0].name.as_str(), "Sheet1");
+  assert_eq!(parsed.sheets.sheet[1].name.as_str(), "Sheet2");
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );
@@ -128,7 +128,7 @@ fn workbook_round_trip_from_complex01_part_test() {
     xml_other_attr(&reparsed.xml_other_attrs, "mc:Ignorable"),
     Some("x15")
   );
-  assert_eq!(reparsed.sheets.x_sheet.len(), 2);
+  assert_eq!(reparsed.sheets.sheet.len(), 2);
 }
 
 #[test]
@@ -140,9 +140,9 @@ fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_t
   let (parsed, serialized, _) = assert_stable_roundtrip::<Workbook>(&workbook_xml);
 
   let extension = parsed
-    .x_ext_lst
+    .workbook_extension_list
     .as_ref()
-    .and_then(|extension_list| extension_list.x_ext.first())
+    .and_then(|extension_list| extension_list.workbook_extension.first())
     .expect("expected workbook extension");
   let Some(WorkbookExtensionChoice::X14WorkbookPr(workbook_properties)) =
     &extension.workbook_extension_choice
@@ -168,9 +168,9 @@ fn chart_extension_loads_pivot_options_from_m4_conformance_test() {
   let (parsed, serialized, _) = assert_stable_roundtrip::<ChartSpace>(&chart_xml);
 
   let extension = parsed
-    .c_ext_lst
+    .chart_space_extension_list
     .as_ref()
-    .and_then(|extension_list| extension_list.c_ext.first())
+    .and_then(|extension_list| extension_list.chart_space_extension.first())
     .expect("expected chart-space extension");
   let Some(ChartSpaceExtensionChoice::C14PivotOptions(pivot_options)) =
     &extension.chart_space_extension_choice
@@ -201,38 +201,38 @@ fn worksheet_round_trip_from_complex01_part_test() {
       .map(|dimension| dimension.reference.as_str()),
     Some("A1:V19")
   );
-  assert_eq!(parsed.x_sheet_data.x_row.len(), 13);
+  assert_eq!(parsed.sheet_data.row.len(), 13);
   assert_eq!(
-    parsed.x_sheet_data.x_row[0].spans,
+    parsed.sheet_data.row[0].spans,
     Some(vec!["1:22".to_string()])
   );
   assert_eq!(
     parsed
-      .x_hyperlinks
+      .hyperlinks
       .as_ref()
-      .map(|links| links.x_hyperlink.len()),
+      .map(|links| links.hyperlink.len()),
     Some(1)
   );
   assert_eq!(
     parsed
-      .x_table_parts
+      .table_parts
       .as_ref()
       .and_then(|parts| parts.count.as_ref())
       .copied(),
     Some(1)
   );
-  assert!(parsed.x_drawing.is_some());
-  assert!(parsed.x_legacy_drawing.is_some());
+  assert!(parsed.drawing.is_some());
+  assert!(parsed.legacy_drawing.is_some());
   assert_eq!(
     reparsed
-      .x_hyperlinks
+      .hyperlinks
       .as_ref()
-      .map(|links| links.x_hyperlink.len()),
+      .map(|links| links.hyperlink.len()),
     Some(1)
   );
-  assert_eq!(reparsed.x_sheet_data.x_row.len(), 13);
+  assert_eq!(reparsed.sheet_data.row.len(), 13);
   assert_eq!(
-    reparsed.x_sheet_data.x_row[0].spans,
+    reparsed.sheet_data.row[0].spans,
     Some(vec!["1:22".to_string()])
   );
 }
@@ -273,7 +273,10 @@ fn shared_string_table_process_content_preserves_extension_attributes_from_mc_su
 
   let (parsed, serialized, _) = assert_stable_roundtrip::<SharedStringTable>(&shared_strings_xml);
 
-  let item = parsed.x_si.first().expect("expected shared string item");
+  let item = parsed
+    .shared_string_item
+    .first()
+    .expect("expected shared string item");
   assert_eq!(
     xml_other_attr(&item.xml_other_attrs, "mc:Ignorable"),
     Some("w14")
@@ -301,7 +304,7 @@ fn shared_string_table_process_content_preserves_extension_attributes_from_mc_su
   assert_eq!(text.xml_content.as_deref(), Some("ddd"));
   assert!(item.w14_no.is_some());
   assert!(item.text.is_some());
-  assert!(item.x_phonetic_pr.is_some());
+  assert!(item.phonetic_properties.is_some());
 
   assert!(serialized.contains(r#"mc:ProcessContent="w14:placeholder""#));
   assert!(serialized.contains(r#"mc:PreserveAttributes="w14:a w14:b""#));

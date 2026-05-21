@@ -80,7 +80,7 @@ fn main_document_body_child_count(
   document
     .body
     .as_ref()
-    .map(|body| body.body_choice.len() + usize::from(body.w_sect_pr.is_some()))
+    .map(|body| body.body_choice.len() + usize::from(body.section_properties.is_some()))
     .unwrap_or_default()
 }
 
@@ -3988,7 +3988,7 @@ fn create_apis_create_office_document_packages() {
     .set_root_element(
       &mut spreadsheet,
       Worksheet {
-        x_sheet_data: Box::new(SheetData::default()),
+        sheet_data: Box::new(SheetData::default()),
         ..Default::default()
       },
     )
@@ -4002,7 +4002,7 @@ fn create_apis_create_office_document_packages() {
       &mut spreadsheet,
       SpreadsheetWorkbook {
         sheets: Box::new(Sheets {
-          x_sheet: vec![Sheet {
+          sheet: vec![Sheet {
             name: "mySheet".to_string(),
             sheet_id: 1,
             id: worksheet_relationship_id,
@@ -4021,8 +4021,8 @@ fn create_apis_create_office_document_packages() {
   let reopened_workbook = reopened_workbook_part
     .root_element(&mut reopened_spreadsheet)
     .unwrap();
-  assert_eq!(reopened_workbook.sheets.x_sheet.len(), 1);
-  assert_eq!(reopened_workbook.sheets.x_sheet[0].name, "mySheet");
+  assert_eq!(reopened_workbook.sheets.sheet.len(), 1);
+  assert_eq!(reopened_workbook.sheets.sheet[0].name, "mySheet");
   assert_eq!(
     reopened_workbook_part
       .worksheet_parts(&reopened_spreadsheet)
@@ -4050,7 +4050,7 @@ fn create_apis_create_office_document_packages() {
       &mut presentation,
       PmlPresentation {
         slide_id_list: Some(SlideIdList {
-          p_sld_id: vec![SlideId {
+          slide_id: vec![SlideId {
             id: 256,
             relationship_id: slide_relationship_id,
             ..Default::default()
@@ -4073,7 +4073,7 @@ fn create_apis_create_office_document_packages() {
       .slide_id_list
       .as_ref()
       .unwrap()
-      .p_sld_id
+      .slide_id
       .len(),
     1
   );
@@ -4604,7 +4604,7 @@ fn spreadsheet_sheet_relationship_ids_match_workbook_part_relationships() {
     .root_element(&mut package)
     .unwrap()
     .sheets
-    .x_sheet
+    .sheet
     .iter()
     .map(|sheet| sheet.id.as_str().to_string())
     .collect();
@@ -4681,7 +4681,7 @@ fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element
       .chart
       .plot_area
       .plot_area_region
-      .cx_series
+      .series
       .first()
       .map(|series| series.layout_id),
     Some(SeriesLayout::Waterfall)
@@ -4821,13 +4821,13 @@ fn spreadsheet_save_writes_current_state_without_later_mutations() {
   let saved = package.to_package_bytes().unwrap();
 
   let root = workbook_part.root_element_mut(&mut package).unwrap();
-  root.sheets.x_sheet.push(Sheet {
+  root.sheets.sheet.push(Sheet {
     name: "after-save".to_string(),
     sheet_id: 1,
     id: "rIdAfterSave".to_string(),
     ..Default::default()
   });
-  assert_eq!(root.sheets.x_sheet.len(), 1);
+  assert_eq!(root.sheets.sheet.len(), 1);
 
   let saved_workbook_xml = package_entry_data(saved.clone(), "xl/workbook.xml");
   assert!(!String::from_utf8_lossy(&saved_workbook_xml).contains("after-save"));
@@ -4835,7 +4835,7 @@ fn spreadsheet_save_writes_current_state_without_later_mutations() {
   let mut reopened = SpreadsheetDocument::new(Cursor::new(saved)).unwrap();
   let reopened_workbook_part = reopened.workbook_part().unwrap();
   let reopened_root = reopened_workbook_part.root_element(&mut reopened).unwrap();
-  assert!(reopened_root.sheets.x_sheet.is_empty());
+  assert!(reopened_root.sheets.sheet.is_empty());
 }
 
 #[test]
@@ -4868,7 +4868,7 @@ fn package_copy_helpers_round_trip_spreadsheet_and_presentation_documents() {
       .root_element(&mut spreadsheet_copy)
       .unwrap()
       .sheets
-      .x_sheet
+      .sheet
       .is_empty()
   );
   let mut reopened_spreadsheet = SpreadsheetDocument::new(Cursor::new(spreadsheet_bytes)).unwrap();

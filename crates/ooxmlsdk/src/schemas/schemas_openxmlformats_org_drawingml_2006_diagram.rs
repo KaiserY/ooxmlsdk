@@ -899,19 +899,19 @@ pub struct ColorsDefinition {
   pub min_version: Option<crate::simple_type::StringValue>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_CTName/dgm:title"))]
-  pub dgm_title: Vec<ColorDefinitionTitle>,
+  pub color_definition_title: Vec<ColorDefinitionTitle>,
   /// Description.
   #[sdk(child(qname = "dgm:CT_CTDescription/dgm:desc"))]
-  pub dgm_desc: Vec<ColorTransformDescription>,
+  pub color_transform_description: Vec<ColorTransformDescription>,
   /// Color Transform Category List.
   #[sdk(child(qname = "dgm:CT_CTCategories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<ColorTransformCategories>,
+  pub color_transform_categories: Option<ColorTransformCategories>,
   /// Style Label.
   #[sdk(child(qname = "dgm:CT_CTStyleLabel/dgm:styleLbl"))]
-  pub dgm_style_lbl: Vec<ColorTransformStyleLabel>,
+  pub color_transform_style_label: Vec<ColorTransformStyleLabel>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Color Transform Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -928,16 +928,16 @@ pub struct ColorsDefinitionHeader {
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_CTName/dgm:title"))]
-  pub dgm_title: Vec<ColorDefinitionTitle>,
+  pub color_definition_title: Vec<ColorDefinitionTitle>,
   /// Description.
   #[sdk(child(qname = "dgm:CT_CTDescription/dgm:desc"))]
-  pub dgm_desc: Vec<ColorTransformDescription>,
+  pub color_transform_description: Vec<ColorTransformDescription>,
   /// Color Transform Category List.
   #[sdk(child(qname = "dgm:CT_CTCategories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<ColorTransformCategories>,
+  pub color_transform_categories: Option<ColorTransformCategories>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Color Transform Header List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -945,7 +945,7 @@ pub struct ColorsDefinitionHeader {
 pub struct ColorsDefinitionHeaderList {
   /// Color Transform Header.
   #[sdk(child(qname = "dgm:CT_ColorTransformHeader/dgm:colorsDefHdr"))]
-  pub dgm_colors_def_hdr: Vec<ColorsDefinitionHeader>,
+  pub colors_definition_header: Vec<ColorsDefinitionHeader>,
 }
 /// Data Model.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -988,28 +988,28 @@ pub struct LayoutDefinition {
   pub default_style: Option<crate::simple_type::StringValue>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_Name/dgm:title"))]
-  pub dgm_title: Vec<Title>,
+  pub title: Vec<Title>,
   /// Description.
   #[sdk(child(qname = "dgm:CT_Description/dgm:desc"))]
-  pub dgm_desc: Vec<Description>,
+  pub description: Vec<Description>,
   /// Category List.
   #[sdk(child(qname = "dgm:CT_Categories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<CategoryList>,
+  pub category_list: Option<CategoryList>,
   /// Defines the SampleData Class.
   #[sdk(child(qname = "dgm:CT_SampleData/dgm:sampData"))]
-  pub dgm_samp_data: Option<std::boxed::Box<SampleData>>,
+  pub sample_data: Option<std::boxed::Box<SampleData>>,
   /// Defines the StyleData Class.
   #[sdk(child(qname = "dgm:CT_SampleData/dgm:styleData"))]
-  pub dgm_style_data: Option<std::boxed::Box<StyleData>>,
+  pub style_data: Option<std::boxed::Box<StyleData>>,
   /// Defines the ColorData Class.
   #[sdk(child(qname = "dgm:CT_SampleData/dgm:clrData"))]
-  pub dgm_clr_data: Option<std::boxed::Box<ColorData>>,
+  pub color_data: Option<std::boxed::Box<ColorData>>,
   /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
-  pub dgm_layout_node: std::boxed::Box<LayoutNode>,
+  pub layout_node: std::boxed::Box<LayoutNode>,
   /// List of extensions to the CT_DiagramDefintions type..
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<DiagramDefinitionExtensionList>,
+  pub diagram_definition_extension_list: Option<DiagramDefinitionExtensionList>,
 }
 /// Layout Definition Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1029,16 +1029,16 @@ pub struct LayoutDefinitionHeader {
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_Name/dgm:title"))]
-  pub dgm_title: Vec<Title>,
+  pub title: Vec<Title>,
   /// Description.
   #[sdk(child(qname = "dgm:CT_Description/dgm:desc"))]
-  pub dgm_desc: Vec<Description>,
+  pub description: Vec<Description>,
   /// Category List.
   #[sdk(child(qname = "dgm:CT_Categories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<CategoryList>,
+  pub category_list: Option<CategoryList>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Diagram Layout Header List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1046,7 +1046,7 @@ pub struct LayoutDefinitionHeader {
 pub struct LayoutDefinitionHeaderList {
   /// Layout Definition Header.
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionHeader/dgm:layoutDefHdr"))]
-  pub dgm_layout_def_hdr: Vec<LayoutDefinitionHeader>,
+  pub layout_definition_header: Vec<LayoutDefinitionHeader>,
 }
 /// Explicit Relationships to Diagram Parts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1080,22 +1080,22 @@ pub struct StyleDefinition {
   pub min_version: Option<crate::simple_type::StringValue>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_SDName/dgm:title"))]
-  pub dgm_title: Vec<StyleDefinitionTitle>,
+  pub style_definition_title: Vec<StyleDefinitionTitle>,
   /// Style Label Description.
   #[sdk(child(qname = "dgm:CT_SDDescription/dgm:desc"))]
-  pub dgm_desc: Vec<StyleLabelDescription>,
+  pub style_label_description: Vec<StyleLabelDescription>,
   /// Category List.
   #[sdk(child(qname = "dgm:CT_SDCategories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<StyleDisplayCategories>,
+  pub style_display_categories: Option<StyleDisplayCategories>,
   /// 3-D Scene.
   #[sdk(child(qname = "a:CT_Scene3D/dgm:scene3d"))]
-  pub dgm_scene3d: Option<std::boxed::Box<Scene3D>>,
+  pub scene3_d: Option<std::boxed::Box<Scene3D>>,
   /// Style Label.
   #[sdk(child(qname = "dgm:CT_StyleLabel/dgm:styleLbl"))]
-  pub dgm_style_lbl: Vec<StyleLabel>,
+  pub style_label: Vec<StyleLabel>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Style Definition Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1112,16 +1112,16 @@ pub struct StyleDefinitionHeader {
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// Title.
   #[sdk(child(qname = "dgm:CT_SDName/dgm:title"))]
-  pub dgm_title: Vec<StyleDefinitionTitle>,
+  pub style_definition_title: Vec<StyleDefinitionTitle>,
   /// Style Label Description.
   #[sdk(child(qname = "dgm:CT_SDDescription/dgm:desc"))]
-  pub dgm_desc: Vec<StyleLabelDescription>,
+  pub style_label_description: Vec<StyleLabelDescription>,
   /// Category List.
   #[sdk(child(qname = "dgm:CT_SDCategories/dgm:catLst"))]
-  pub dgm_cat_lst: Option<StyleDisplayCategories>,
+  pub style_display_categories: Option<StyleDisplayCategories>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List of Style Definition Headers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1129,7 +1129,7 @@ pub struct StyleDefinitionHeader {
 pub struct StyleDefinitionHeaderList {
   /// Style Definition Header.
   #[sdk(child(qname = "dgm:CT_StyleDefinitionHeader/dgm:styleDefHdr"))]
-  pub dgm_style_def_hdr: Vec<StyleDefinitionHeader>,
+  pub style_definition_header: Vec<StyleDefinitionHeader>,
 }
 /// Color Transform Category.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1294,7 +1294,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Title.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1324,7 +1324,7 @@ pub struct ColorTransformDescription {
 pub struct ColorTransformCategories {
   /// Color Transform Category.
   #[sdk(child(qname = "dgm:CT_CTCategory/dgm:cat"))]
-  pub dgm_cat: Vec<ColorTransformCategory>,
+  pub color_transform_category: Vec<ColorTransformCategory>,
 }
 /// Style Label.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1558,7 +1558,7 @@ pub struct Adjust {
 pub struct AdjustList {
   /// Shape Adjust.
   #[sdk(child(qname = "dgm:CT_Adj/dgm:adj"))]
-  pub dgm_adj: Vec<Adjust>,
+  pub adjust: Vec<Adjust>,
 }
 /// Parameter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1702,10 +1702,10 @@ pub struct Algorithm {
   pub revision: Option<crate::simple_type::UInt32Value>,
   /// Parameter.
   #[sdk(child(qname = "dgm:CT_Parameter/dgm:param"))]
-  pub dgm_param: Vec<Parameter>,
+  pub parameter: Vec<Parameter>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  pub dgm_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1966,7 +1966,7 @@ pub struct PresentationOf {
 pub struct Constraints {
   /// Constraint.
   #[sdk(child(qname = "dgm:CT_Constraint/dgm:constr"))]
-  pub dgm_constr: Vec<Constraint>,
+  pub constraint: Vec<Constraint>,
 }
 /// Rule List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1974,7 +1974,7 @@ pub struct Constraints {
 pub struct RuleList {
   /// Rule.
   #[sdk(child(qname = "dgm:CT_NumericRule/dgm:rule"))]
-  pub dgm_rule: Vec<Rule>,
+  pub rule: Vec<Rule>,
 }
 /// Variable List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2121,10 +2121,10 @@ pub struct Choose {
   pub name: Option<crate::simple_type::StringValue>,
   /// If.
   #[sdk(child(qname = "dgm:CT_When/dgm:if"))]
-  pub dgm_if: Vec<DiagramChooseIf>,
+  pub diagram_choose_if: Vec<DiagramChooseIf>,
   /// Else.
   #[sdk(child(qname = "dgm:CT_Otherwise/dgm:else"))]
-  pub dgm_else: Option<DiagramChooseElse>,
+  pub diagram_choose_else: Option<DiagramChooseElse>,
 }
 /// If.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2289,7 +2289,7 @@ pub struct Description {
 pub struct CategoryList {
   /// Category.
   #[sdk(child(qname = "dgm:CT_Category/dgm:cat"))]
-  pub dgm_cat: Vec<Category>,
+  pub category: Vec<Category>,
 }
 /// Shape Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2487,7 +2487,7 @@ pub struct StyleLabelDescription {
 pub struct StyleDisplayCategories {
   /// Category.
   #[sdk(child(qname = "dgm:CT_SDCategory/dgm:cat"))]
-  pub dgm_cat: Vec<StyleDisplayCategory>,
+  pub style_display_category: Vec<StyleDisplayCategory>,
 }
 /// Style Label.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2518,7 +2518,7 @@ pub struct StyleLabel {
 pub struct PointList {
   /// Point.
   #[sdk(child(qname = "dgm:CT_Pt/dgm:pt"))]
-  pub dgm_pt: Vec<Point>,
+  pub point: Vec<Point>,
 }
 /// Connection List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2526,7 +2526,7 @@ pub struct PointList {
 pub struct ConnectionList {
   /// Connection.
   #[sdk(child(qname = "dgm:CT_Cxn/dgm:cxn"))]
-  pub dgm_cxn: Vec<Connection>,
+  pub connection: Vec<Connection>,
 }
 /// Background Formatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2567,7 +2567,7 @@ pub struct DataModelExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the DataModelExtension Class.
   #[sdk(child(qname = "a:CT_DataModelExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::DataModelExtension>,
+  pub data_model_extension: Vec<crate::schemas::a::DataModelExtension>,
 }
 /// Property Set.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2698,7 +2698,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -2706,13 +2706,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Text Body.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2727,7 +2727,7 @@ pub struct TextBody {
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<crate::schemas::a::Paragraph>,
+  pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the PtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2736,7 +2736,7 @@ pub struct PtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the PtExtension Class.
   #[sdk(child(qname = "a:CT_PtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::PtExtension>,
+  pub pt_extension: Vec<crate::schemas::a::PtExtension>,
 }
 /// Defines the DiagramDefinitionExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2795,7 +2795,7 @@ pub struct DiagramDefinitionExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the DiagramDefinitionExtension Class.
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext"))]
-  pub dgm_ext: Vec<DiagramDefinitionExtension>,
+  pub diagram_definition_extension: Vec<DiagramDefinitionExtension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillColorListChoice {

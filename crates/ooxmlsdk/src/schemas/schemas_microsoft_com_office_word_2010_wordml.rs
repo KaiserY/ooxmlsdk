@@ -1269,7 +1269,7 @@ pub struct TextOutlineEffect {
   pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
   /// Defines the PresetLineDashProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
-  pub w14_prst_dash: Option<PresetLineDashProperties>,
+  pub preset_line_dash_properties: Option<PresetLineDashProperties>,
   #[sdk(choice(
     qname = "w:CT_Empty/w14:round",
     qname = "w:CT_Empty/w14:bevel",
@@ -1372,7 +1372,7 @@ pub struct NumberSpacing {
 pub struct StylisticSets {
   /// Defines the StyleSet Class.
   #[sdk(child(office2010, qname = "w14:CT_StyleSet/w14:styleSet"))]
-  pub w14_style_set: Vec<StyleSet>,
+  pub style_set: Vec<StyleSet>,
 }
 /// Defines the ContextualAlternatives Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1550,7 +1550,7 @@ pub struct FillToRectangle {
 pub struct GradientStopList {
   /// Defines the GradientStop Class.
   #[sdk(child(office2010, qname = "w14:CT_GradientStop/w14:gs"))]
-  pub w14_gs: Vec<GradientStop>,
+  pub gradient_stop: Vec<GradientStop>,
 }
 /// Defines the SphereCoordinates Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1826,7 +1826,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunConflictInsertionChoice {

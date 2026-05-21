@@ -525,7 +525,12 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
 
   let body = first_body(&parsed);
   assert_eq!(body_paragraph_count(body), 2);
-  assert!(body.body_choice.iter().any(|_| body.w_sect_pr.is_some()));
+  assert!(
+    body
+      .body_choice
+      .iter()
+      .any(|_| body.section_properties.is_some())
+  );
 
   let hyperlink_paragraph = body
     .body_choice
@@ -978,8 +983,8 @@ fn comments_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<Comments>(fixtures::WORDPROCESSING_COMMENTS_XML);
 
-  assert_eq!(parsed.w_comment.len(), 1);
-  let comment = parsed.w_comment.first().expect("expected comment");
+  assert_eq!(parsed.comment.len(), 1);
+  let comment = parsed.comment.first().expect("expected comment");
   assert_eq!(comment.id.as_str(), "1");
   assert_eq!(comment.author.as_str(), "Eric White");
   assert_eq!(comment.initials.as_deref(), Some("EW"));
@@ -987,7 +992,7 @@ fn comments_round_trip_from_openxml_part_test() {
   assert!(serialized.contains("<w:comment"));
   assert!(serialized.contains("Eric White"));
   assert!(serialized.contains("This is a comment."));
-  assert_eq!(reparsed.w_comment.len(), 1);
+  assert_eq!(reparsed.comment.len(), 1);
 }
 
 #[test]

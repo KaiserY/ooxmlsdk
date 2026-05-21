@@ -13,8 +13,8 @@ pub struct MultiLvlStrData {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// Level.
   #[sdk(child(qname = "c:CT_Lvl/c:lvl"))]
-  pub c_lvl: Vec<crate::schemas::c::Level>,
+  pub level: Vec<crate::schemas::c::Level>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }

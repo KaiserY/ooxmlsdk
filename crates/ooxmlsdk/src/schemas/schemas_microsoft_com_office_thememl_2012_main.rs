@@ -33,7 +33,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the ThemeVariant Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -68,5 +68,5 @@ pub struct ThemeVariant {
 pub struct ThemeVariantList {
   /// Defines the ThemeVariant Class.
   #[sdk(child(office2013, qname = "thm15:CT_ThemeVariant/thm15:themeVariant"))]
-  pub thm15_theme_variant: Vec<ThemeVariant>,
+  pub theme_variant: Vec<ThemeVariant>,
 }

@@ -680,10 +680,10 @@ pub struct GalleryRegular {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
-  pub mso14_item: Vec<Item>,
+  pub item: Vec<Item>,
   /// Defines the ButtonRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_ButtonRegular/mso14:button"))]
-  pub mso14_button: Vec<ButtonRegular>,
+  pub button_regular: Vec<ButtonRegular>,
 }
 /// Defines the ToggleButtonRegular Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -961,7 +961,7 @@ pub struct SplitButtonRegular {
   pub split_button_regular_choice: Option<SplitButtonRegularChoice>,
   /// Defines the MenuRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuRegular/mso14:menu"))]
-  pub mso14_menu: Option<MenuRegular>,
+  pub menu_regular: Option<MenuRegular>,
 }
 /// Defines the MenuRegular Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1334,7 +1334,7 @@ pub struct SplitButtonWithTitle {
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
   /// Defines the MenuWithTitle Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuWithTitle/mso14:menu"))]
-  pub mso14_menu: Option<MenuWithTitle>,
+  pub menu_with_title: Option<MenuWithTitle>,
 }
 /// Defines the MenuWithTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2358,7 +2358,7 @@ pub struct ComboBox {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
-  pub mso14_item: Vec<Item>,
+  pub item: Vec<Item>,
 }
 /// Defines the DropDownRegular Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2531,10 +2531,10 @@ pub struct DropDownRegular {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
-  pub mso14_item: Vec<Item>,
+  pub item: Vec<Item>,
   /// Defines the ButtonRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_ButtonRegular/mso14:button"))]
-  pub mso14_button: Vec<ButtonRegular>,
+  pub button_regular: Vec<ButtonRegular>,
 }
 /// Defines the Gallery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2756,10 +2756,10 @@ pub struct Gallery {
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
-  pub mso14_item: Vec<Item>,
+  pub item: Vec<Item>,
   /// Defines the ButtonRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_ButtonRegular/mso14:button"))]
-  pub mso14_button: Vec<ButtonRegular>,
+  pub button_regular: Vec<ButtonRegular>,
 }
 /// Defines the Menu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3153,7 +3153,7 @@ pub struct SplitButton {
   pub split_button_choice: Option<SplitButtonChoice>,
   /// Defines the MenuRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuRegular/mso14:menu"))]
-  pub mso14_menu: Option<MenuRegular>,
+  pub menu_regular: Option<MenuRegular>,
 }
 /// Defines the Box Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3510,7 +3510,7 @@ pub struct BackstageSubMenu {
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageMenuGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageMenuGroup/mso14:menuGroup"))]
-  pub mso14_menu_group: Vec<BackstageMenuGroup>,
+  pub backstage_menu_group: Vec<BackstageMenuGroup>,
 }
 /// Defines the BackstageMenuToggleButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3953,7 +3953,7 @@ pub struct BackstageDropDown {
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the ItemBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:item"))]
-  pub mso14_item: Vec<ItemBackstageItem>,
+  pub item_backstage_item: Vec<ItemBackstageItem>,
 }
 /// Defines the RadioGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4034,7 +4034,7 @@ pub struct RadioGroup {
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the RadioButtonBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:radioButton"))]
-  pub mso14_radio_button: Vec<RadioButtonBackstageItem>,
+  pub radio_button_backstage_item: Vec<RadioButtonBackstageItem>,
 }
 /// Defines the BackstageComboBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4119,7 +4119,7 @@ pub struct BackstageComboBox {
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the ItemBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:item"))]
-  pub mso14_item: Vec<ItemBackstageItem>,
+  pub item_backstage_item: Vec<ItemBackstageItem>,
 }
 /// Defines the Hyperlink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4512,10 +4512,10 @@ pub struct BackstageGroup {
   pub backstage_group_choice: Option<BackstageGroupChoice>,
   /// Defines the TopItemsGroupControls Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupControls/mso14:topItems"))]
-  pub mso14_top_items: Option<TopItemsGroupControls>,
+  pub top_items_group_controls: Option<TopItemsGroupControls>,
   /// Defines the BottomItemsGroupControls Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupControls/mso14:bottomItems"))]
-  pub mso14_bottom_items: Option<BottomItemsGroupControls>,
+  pub bottom_items_group_controls: Option<BottomItemsGroupControls>,
 }
 /// Defines the TaskGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4600,7 +4600,7 @@ pub struct TaskGroup {
   pub allowed_task_sizes: Option<TaskSizesValues>,
   /// Defines the TaskGroupCategory Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskGroupCategory/mso14:category"))]
-  pub mso14_category: Vec<TaskGroupCategory>,
+  pub task_group_category: Vec<TaskGroupCategory>,
 }
 /// Defines the MenuRoot Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5140,7 +5140,7 @@ pub struct Group {
   pub group_choice: Vec<GroupChoice>,
   /// Defines the DialogBoxLauncher Class.
   #[sdk(child(office2010, qname = "mso14:CT_DialogLauncher/mso14:dialogBoxLauncher"))]
-  pub mso14_dialog_box_launcher: Option<std::boxed::Box<DialogBoxLauncher>>,
+  pub dialog_box_launcher: Option<std::boxed::Box<DialogBoxLauncher>>,
 }
 /// Defines the ControlCloneQat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5372,7 +5372,7 @@ pub struct Tab {
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the Group Class.
   #[sdk(child(office2010, qname = "mso14:CT_Group/mso14:group"))]
-  pub mso14_group: Vec<Group>,
+  pub group: Vec<Group>,
 }
 /// Defines the TabSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5393,7 +5393,7 @@ pub struct TabSet {
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// Defines the Tab Class.
   #[sdk(child(office2010, qname = "mso14:CT_Tab/mso14:tab"))]
-  pub mso14_tab: Vec<Tab>,
+  pub tab: Vec<Tab>,
 }
 /// Defines the Command Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5434,7 +5434,7 @@ pub struct QuickAccessToolbar {
 pub struct Tabs {
   /// Defines the Tab Class.
   #[sdk(child(office2010, qname = "mso14:CT_Tab/mso14:tab"))]
-  pub mso14_tab: Vec<Tab>,
+  pub tab: Vec<Tab>,
 }
 /// Defines the ContextualTabs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5442,7 +5442,7 @@ pub struct Tabs {
 pub struct ContextualTabs {
   /// Defines the TabSet Class.
   #[sdk(child(office2010, qname = "mso14:CT_TabSet/mso14:tabSet"))]
-  pub mso14_tab_set: Vec<TabSet>,
+  pub tab_set: Vec<TabSet>,
 }
 /// Defines the ContextMenu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5679,7 +5679,7 @@ pub struct BackstagePrimaryMenu {
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageMenuGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageMenuGroup/mso14:menuGroup"))]
-  pub mso14_menu_group: Vec<BackstageMenuGroup>,
+  pub backstage_menu_group: Vec<BackstageMenuGroup>,
 }
 /// Defines the BackstageMenuGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5833,7 +5833,7 @@ pub struct TaskGroupCategory {
   pub get_label: Option<crate::simple_type::StringValue>,
   /// Defines the TaskGroupTask Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskGroupTask/mso14:task"))]
-  pub mso14_task: Vec<TaskGroupTask>,
+  pub task_group_task: Vec<TaskGroupTask>,
 }
 /// Defines the TaskGroupTask Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6009,7 +6009,7 @@ pub struct TaskFormGroupCategory {
   pub get_label: Option<crate::simple_type::StringValue>,
   /// Defines the TaskFormGroupTask Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskFormGroupTask/mso14:task"))]
-  pub mso14_task: Vec<TaskFormGroupTask>,
+  pub task_form_group_task: Vec<TaskFormGroupTask>,
 }
 /// Defines the TaskFormGroupTask Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6114,7 +6114,7 @@ pub struct TaskFormGroupTask {
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroup/mso14:group"))]
-  pub mso14_group: Vec<BackstageGroup>,
+  pub backstage_group: Vec<BackstageGroup>,
 }
 /// Defines the TaskFormGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6177,7 +6177,7 @@ pub struct TaskFormGroup {
   pub allowed_task_sizes: Option<TaskSizesValues>,
   /// Defines the TaskFormGroupCategory Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskFormGroupCategory/mso14:category"))]
-  pub mso14_category: Vec<TaskFormGroupCategory>,
+  pub task_form_group_category: Vec<TaskFormGroupCategory>,
 }
 /// Defines the BackstageGroups Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6426,7 +6426,7 @@ pub struct BackstageFastCommandButton {
 pub struct Commands {
   /// Defines the Command Class.
   #[sdk(child(office2010, qname = "mso14:CT_Command/mso14:command"))]
-  pub mso14_command: Vec<Command>,
+  pub command: Vec<Command>,
 }
 /// Defines the Ribbon Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6469,7 +6469,7 @@ pub struct Backstage {
 pub struct ContextMenus {
   /// Defines the ContextMenu Class.
   #[sdk(child(office2010, qname = "mso14:CT_ContextMenu/mso14:contextMenu"))]
-  pub mso14_context_menu: Vec<ContextMenu>,
+  pub context_menu: Vec<ContextMenu>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonRegularChoice {

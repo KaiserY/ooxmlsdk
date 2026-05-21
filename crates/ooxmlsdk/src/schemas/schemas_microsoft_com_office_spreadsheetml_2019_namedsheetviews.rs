@@ -13,10 +13,10 @@ pub struct NamedSheetViews {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the NamedSheetView Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView"))]
-  pub xnsv_named_sheet_view: Vec<NamedSheetView>,
+  pub named_sheet_view: Vec<NamedSheetView>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
-  pub xnsv_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the NamedSheetView Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -32,10 +32,10 @@ pub struct NamedSheetView {
   pub id: crate::simple_type::StringValue,
   /// Defines the NsvFilter Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter"))]
-  pub xnsv_nsv_filter: Vec<NsvFilter>,
+  pub nsv_filter: Vec<NsvFilter>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
-  pub xnsv_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -44,7 +44,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the NsvFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -63,13 +63,13 @@ pub struct NsvFilter {
   pub table_id: Option<crate::simple_type::UInt32Value>,
   /// Defines the ColumnFilter Class.
   #[sdk(child(office2021, qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter"))]
-  pub xnsv_column_filter: Vec<ColumnFilter>,
+  pub column_filter: Vec<ColumnFilter>,
   /// Defines the SortRules Class.
   #[sdk(child(office2021, qname = "xnsv:CT_SortRules/xnsv:sortRules"))]
-  pub xnsv_sort_rules: Option<std::boxed::Box<SortRules>>,
+  pub sort_rules: Option<std::boxed::Box<SortRules>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
-  pub xnsv_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ColumnFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -88,10 +88,10 @@ pub struct ColumnFilter {
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// Defines the FilterColumn Class.
   #[sdk(child(office2021, qname = "x:CT_FilterColumn/xnsv:filter"))]
-  pub xnsv_filter: Vec<FilterColumn>,
+  pub filter_column: Vec<FilterColumn>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
-  pub xnsv_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SortRules Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -105,10 +105,10 @@ pub struct SortRules {
   pub case_sensitive: Option<crate::simple_type::BooleanValue>,
   /// Defines the SortRule Class.
   #[sdk(child(office2021, qname = "xnsv:CT_SortRule/xnsv:sortRule"))]
-  pub xnsv_sort_rule: Vec<SortRule>,
+  pub sort_rule: Vec<SortRule>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
-  pub xnsv_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

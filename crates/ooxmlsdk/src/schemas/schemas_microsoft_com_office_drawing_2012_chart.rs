@@ -57,7 +57,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -65,13 +65,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the Layout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -239,7 +239,7 @@ pub struct CategoryFilterExceptions {
     office2013,
     qname = "c15:CT_CategoryFilterException/c15:categoryFilterException"
   ))]
-  pub c15_category_filter_exception: Vec<CategoryFilterException>,
+  pub category_filter_exception: Vec<CategoryFilterException>,
 }
 /// Defines the DataLabelFieldTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -247,7 +247,7 @@ pub struct CategoryFilterExceptions {
 pub struct DataLabelFieldTable {
   /// Defines the DataLabelFieldTableEntry Class.
   #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTableEntry/c15:dlblFTEntry"))]
-  pub c15_dlbl_ft_entry: Vec<DataLabelFieldTableEntry>,
+  pub data_label_field_table_entry: Vec<DataLabelFieldTableEntry>,
 }
 /// Defines the ExceptionForSave Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -359,28 +359,28 @@ pub struct BarChartSeries {
   pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::c::Trendline>,
+  pub trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
+  pub error_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the Shape Class.
   #[sdk(child(qname = "c:CT_Shape/c:shape"))]
-  pub c_shape: Option<crate::schemas::c::Shape>,
+  pub shape: Option<crate::schemas::c::Shape>,
   /// Defines the BarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BarSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::BarSerExtensionList>,
+  pub bar_ser_extension_list: Option<crate::schemas::c::BarSerExtensionList>,
 }
 /// Defines the LineChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -406,28 +406,28 @@ pub struct LineChartSeries {
   pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::c::Trendline>,
+  pub trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
+  pub error_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
-  pub c_smooth: Option<crate::schemas::c::Smooth>,
+  pub smooth: Option<crate::schemas::c::Smooth>,
   /// Defines the LineSerExtensionList Class.
   #[sdk(child(qname = "c:CT_LineSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::LineSerExtensionList>,
+  pub line_ser_extension_list: Option<crate::schemas::c::LineSerExtensionList>,
 }
 /// Defines the ScatterChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -450,28 +450,28 @@ pub struct ScatterChartSeries {
   pub marker: Option<std::boxed::Box<crate::schemas::c::Marker>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::c::Trendline>,
+  pub trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
+  pub error_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
-  pub c_x_val: Option<std::boxed::Box<crate::schemas::c::XValues>>,
+  pub x_values: Option<std::boxed::Box<crate::schemas::c::XValues>>,
   /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
-  pub c_y_val: Option<std::boxed::Box<crate::schemas::c::YValues>>,
+  pub y_values: Option<std::boxed::Box<crate::schemas::c::YValues>>,
   /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
-  pub c_smooth: Option<crate::schemas::c::Smooth>,
+  pub smooth: Option<crate::schemas::c::Smooth>,
   /// Defines the ScatterSerExtensionList Class.
   #[sdk(child(qname = "c:CT_ScatterSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::ScatterSerExtensionList>,
+  pub scatter_ser_extension_list: Option<crate::schemas::c::ScatterSerExtensionList>,
 }
 /// Defines the AreaChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -494,25 +494,25 @@ pub struct AreaChartSeries {
   pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::c::Trendline>,
+  pub trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
+  pub error_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the AreaSerExtensionList Class.
   #[sdk(child(qname = "c:CT_AreaSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::AreaSerExtensionList>,
+  pub area_ser_extension_list: Option<crate::schemas::c::AreaSerExtensionList>,
 }
 /// Defines the PieChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -538,19 +538,19 @@ pub struct PieChartSeries {
   pub explosion: Option<crate::schemas::c::Explosion>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the PieSerExtensionList Class.
   #[sdk(child(qname = "c:CT_PieSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::PieSerExtensionList>,
+  pub pie_ser_extension_list: Option<crate::schemas::c::PieSerExtensionList>,
 }
 /// Defines the BubbleChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -576,31 +576,31 @@ pub struct BubbleChartSeries {
   pub invert_if_negative: Option<crate::schemas::c::InvertIfNegative>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::c::Trendline>,
+  pub trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
+  pub error_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
-  pub c_x_val: Option<std::boxed::Box<crate::schemas::c::XValues>>,
+  pub x_values: Option<std::boxed::Box<crate::schemas::c::XValues>>,
   /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
-  pub c_y_val: Option<std::boxed::Box<crate::schemas::c::YValues>>,
+  pub y_values: Option<std::boxed::Box<crate::schemas::c::YValues>>,
   /// Defines the BubbleSize Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:bubbleSize"))]
-  pub c_bubble_size: Option<std::boxed::Box<crate::schemas::c::BubbleSize>>,
+  pub bubble_size: Option<std::boxed::Box<crate::schemas::c::BubbleSize>>,
   /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
-  pub c_bubble3_d: Option<crate::schemas::c::Bubble3D>,
+  pub bubble3_d: Option<crate::schemas::c::Bubble3D>,
   /// Defines the BubbleSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BubbleSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::BubbleSerExtensionList>,
+  pub bubble_ser_extension_list: Option<crate::schemas::c::BubbleSerExtensionList>,
 }
 /// Defines the RadarChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -626,19 +626,19 @@ pub struct RadarChartSeries {
   pub marker: Option<std::boxed::Box<crate::schemas::c::Marker>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
+  pub data_point: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
+  pub data_labels: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the RadarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_RadarSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::RadarSerExtensionList>,
+  pub radar_ser_extension_list: Option<crate::schemas::c::RadarSerExtensionList>,
 }
 /// Defines the SurfaceChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -681,10 +681,10 @@ pub struct DataLabelsRangeChache {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::c::StringPoint>,
+  pub string_point: Vec<crate::schemas::c::StringPoint>,
   /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::StrDataExtensionList>,
+  pub str_data_extension_list: Option<crate::schemas::c::StrDataExtensionList>,
 }
 /// Defines the DataLabelFieldTableCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -695,10 +695,10 @@ pub struct DataLabelFieldTableCache {
   pub point_count: Option<crate::schemas::c::PointCount>,
   /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::c::StringPoint>,
+  pub string_point: Vec<crate::schemas::c::StringPoint>,
   /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::StrDataExtensionList>,
+  pub str_data_extension_list: Option<crate::schemas::c::StrDataExtensionList>,
 }
 /// Defines the Explosion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -752,7 +752,7 @@ pub struct DataLabel {
   pub data_label_choice: Option<DataLabelChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<crate::schemas::c::DLblExtensionList>,
+  pub d_lbl_extension_list: Option<crate::schemas::c::DLblExtensionList>,
 }
 /// Defines the CategoryFilterException Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

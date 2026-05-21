@@ -340,12 +340,12 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
   };
 
   run_properties
-    .w_sz
+    .font_size
     .as_ref()
     .map(|size| size.val.as_str())
     .or_else(|| {
       run_properties
-        .w_sz_cs
+        .font_size_complex_script
         .as_ref()
         .map(|size| size.val.as_str())
     })

@@ -2631,7 +2631,7 @@ pub struct GradientFill {
   pub gradient_fill_choice: Option<GradientFillChoice>,
   /// Tile Rectangle.
   #[sdk(child(qname = "a:CT_RelativeRect/a:tileRect"))]
-  pub a_tile_rect: Option<TileRectangle>,
+  pub tile_rectangle: Option<TileRectangle>,
 }
 /// Defines the BlipFill Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3359,7 +3359,7 @@ pub struct PresetDash {
 pub struct CustomDash {
   /// Dash Stop.
   #[sdk(child(qname = "a:CT_DashStop/a:ds"))]
-  pub a_ds: Vec<DashStop>,
+  pub dash_stop: Vec<DashStop>,
 }
 /// Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3457,10 +3457,10 @@ pub struct Fonts {
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// Font.
   #[sdk(child(qname = "a:CT_SupplementalFont/a:font"))]
-  pub a_font: Vec<SupplementalFont>,
+  pub supplemental_font: Vec<SupplementalFont>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Major Font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3477,10 +3477,10 @@ pub struct MajorFont {
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// Font.
   #[sdk(child(qname = "a:CT_SupplementalFont/a:font"))]
-  pub a_font: Vec<SupplementalFont>,
+  pub supplemental_font: Vec<SupplementalFont>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Minor fonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3497,10 +3497,10 @@ pub struct MinorFont {
   pub complex_script_font: std::boxed::Box<ComplexScriptFont>,
   /// Font.
   #[sdk(child(qname = "a:CT_SupplementalFont/a:font"))]
-  pub a_font: Vec<SupplementalFont>,
+  pub supplemental_font: Vec<SupplementalFont>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FontReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3850,13 +3850,13 @@ pub struct Underline {
   pub underline_choice3: Option<UnderlineChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Defines the Outline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3899,13 +3899,13 @@ pub struct Outline {
   pub outline_choice3: Option<OutlineChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Left Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3948,13 +3948,13 @@ pub struct LeftBorderLineProperties {
   pub left_border_line_properties_choice3: Option<LeftBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Right Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3997,13 +3997,13 @@ pub struct RightBorderLineProperties {
   pub right_border_line_properties_choice3: Option<RightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Top Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4046,13 +4046,13 @@ pub struct TopBorderLineProperties {
   pub top_border_line_properties_choice3: Option<TopBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Bottom Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4095,13 +4095,13 @@ pub struct BottomBorderLineProperties {
   pub bottom_border_line_properties_choice3: Option<BottomBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Top-Left to Bottom-Right Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4147,13 +4147,13 @@ pub struct TopLeftToBottomRightBorderLineProperties {
     Option<TopLeftToBottomRightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Bottom-Left to Top-Right Border Line Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4199,13 +4199,13 @@ pub struct BottomLeftToTopRightBorderLineProperties {
     Option<BottomLeftToTopRightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  pub a_head_end: Option<HeadEnd>,
+  pub head_end: Option<HeadEnd>,
   /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  pub a_tail_end: Option<TailEnd>,
+  pub tail_end: Option<TailEnd>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<LinePropertiesExtensionList>,
+  pub line_properties_extension_list: Option<LinePropertiesExtensionList>,
 }
 /// Underline Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4310,7 +4310,7 @@ pub struct Blip {
   pub blip_choice: Vec<BlipChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<BlipExtensionList>,
+  pub blip_extension_list: Option<BlipExtensionList>,
 }
 /// Theme.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4375,7 +4375,7 @@ pub struct Table {
   pub table_grid: std::boxed::Box<TableGrid>,
   /// Table Row.
   #[sdk(child(qname = "a:CT_TableRow/a:tr"))]
-  pub a_tr: Vec<TableRow>,
+  pub table_row: Vec<TableRow>,
 }
 /// Table Style List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4392,7 +4392,7 @@ pub struct TableStyleList {
   pub default: crate::simple_type::StringValue,
   /// Table Style.
   #[sdk(child(qname = "a:CT_TableStyle/a:tblStyle"))]
-  pub a_tbl_style: Vec<TableStyleEntry>,
+  pub table_style_entry: Vec<TableStyleEntry>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4401,7 +4401,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<Extension>,
+  pub extension: Vec<Extension>,
 }
 /// Audio Start Time.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4483,10 +4483,10 @@ pub struct EffectStyle {
   pub effect_style_choice: Option<EffectStyleChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<Shape3DType>>,
 }
 /// Fill Style List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4508,7 +4508,7 @@ pub struct FillStyleList {
 pub struct LineStyleList {
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Vec<Outline>,
+  pub outline: Vec<Outline>,
 }
 /// Effect Style List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4516,7 +4516,7 @@ pub struct LineStyleList {
 pub struct EffectStyleList {
   /// Effect Style.
   #[sdk(child(qname = "a:CT_EffectStyleItem/a:effectStyle"))]
-  pub a_effect_style: Vec<EffectStyle>,
+  pub effect_style: Vec<EffectStyle>,
 }
 /// Background Fill Style List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5090,7 +5090,7 @@ pub struct TextBody {
   pub list_style: Option<std::boxed::Box<ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<Paragraph>,
+  pub paragraph: Vec<Paragraph>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5198,7 +5198,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<Outline>>,
+  pub outline: Option<std::boxed::Box<Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -5206,13 +5206,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<ShapePropertiesExtensionList>,
 }
 /// Text Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5228,7 +5228,7 @@ pub struct TextShape {
   pub text_shape_choice: Option<TextShapeChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5602,7 +5602,7 @@ pub struct GradientStop {
 pub struct GradientStopList {
   /// Gradient stops.
   #[sdk(child(qname = "a:CT_GradientStop/a:gs"))]
-  pub a_gs: Vec<GradientStop>,
+  pub gradient_stop: Vec<GradientStop>,
 }
 /// Shape Guide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5862,7 +5862,7 @@ pub struct ArcTo {
 pub struct QuadraticBezierCurveTo {
   /// Move end point.
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pt"))]
-  pub a_pt: Vec<Point>,
+  pub point: Vec<Point>,
 }
 /// Draw Cubic Bezier Curve To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5870,7 +5870,7 @@ pub struct QuadraticBezierCurveTo {
 pub struct CubicBezierCurveTo {
   /// Move end point.
   #[sdk(child(qname = "a:CT_AdjPoint2D/a:pt"))]
-  pub a_pt: Vec<Point>,
+  pub point: Vec<Point>,
 }
 /// Shape Path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5910,7 +5910,7 @@ pub struct Path {
 pub struct AdjustValueList {
   /// Shape Guide.
   #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
-  pub a_gd: Vec<ShapeGuide>,
+  pub shape_guide: Vec<ShapeGuide>,
 }
 /// List of Shape Guides.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5918,7 +5918,7 @@ pub struct AdjustValueList {
 pub struct ShapeGuideList {
   /// Shape Guide.
   #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
-  pub a_gd: Vec<ShapeGuide>,
+  pub shape_guide: Vec<ShapeGuide>,
 }
 /// List of Shape Adjust Handles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5936,7 +5936,7 @@ pub struct AdjustHandleList {
 pub struct ConnectionSiteList {
   /// Shape Connection Site.
   #[sdk(child(qname = "a:CT_ConnectionSite/a:cxn"))]
-  pub a_cxn: Vec<ConnectionSite>,
+  pub connection_site: Vec<ConnectionSite>,
 }
 /// Shape Text Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5997,7 +5997,7 @@ pub struct Rectangle {
 pub struct PathList {
   /// Shape Path.
   #[sdk(child(qname = "a:CT_Path2D/a:path"))]
-  pub a_path: Vec<Path>,
+  pub path: Vec<Path>,
 }
 /// Dash Stop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6118,12 +6118,12 @@ pub struct BodyProperties {
   pub body_properties_choice1: Option<BodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub body_properties_choice2: Option<BodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ListStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6447,7 +6447,7 @@ pub struct TableCellProperties {
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Table Cell.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6651,7 +6651,7 @@ pub struct TableProperties {
   pub table_properties_choice3: Option<TablePropertiesChoice3>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Table Grid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6659,7 +6659,7 @@ pub struct TableProperties {
 pub struct TableGrid {
   /// Table Grid Column.
   #[sdk(child(qname = "a:CT_TableCol/a:gridCol"))]
-  pub a_grid_col: Vec<GridColumn>,
+  pub grid_column: Vec<GridColumn>,
 }
 /// Table Row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6671,10 +6671,10 @@ pub struct TableRow {
   pub height: crate::simple_type::CoordinateValue,
   /// Table Cell.
   #[sdk(child(qname = "a:CT_TableCell/a:tc"))]
-  pub a_tc: Vec<TableCell>,
+  pub table_cell: Vec<TableCell>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Left Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6818,7 +6818,7 @@ pub struct TableCellTextStyle {
   pub table_cell_text_style_choice2: Option<TableCellTextStyleChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Table Cell Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6834,7 +6834,7 @@ pub struct TableCellStyle {
   pub table_cell_style_choice: Option<TableCellStyleChoice>,
   /// Cell 3-D.
   #[sdk(child(qname = "a:CT_Cell3D/a:cell3D"))]
-  pub a_cell3_d: Option<std::boxed::Box<Cell3DProperties>>,
+  pub cell3_d_properties: Option<std::boxed::Box<Cell3DProperties>>,
 }
 /// Table Background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7072,13 +7072,13 @@ pub struct ParagraphProperties {
   pub paragraph_properties_choice4: Option<ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Default Paragraph Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7157,13 +7157,13 @@ pub struct DefaultParagraphProperties {
   pub default_paragraph_properties_choice4: Option<DefaultParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 1 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7242,13 +7242,13 @@ pub struct Level1ParagraphProperties {
   pub level1_paragraph_properties_choice4: Option<Level1ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 2 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7327,13 +7327,13 @@ pub struct Level2ParagraphProperties {
   pub level2_paragraph_properties_choice4: Option<Level2ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 3 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7412,13 +7412,13 @@ pub struct Level3ParagraphProperties {
   pub level3_paragraph_properties_choice4: Option<Level3ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 4 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7497,13 +7497,13 @@ pub struct Level4ParagraphProperties {
   pub level4_paragraph_properties_choice4: Option<Level4ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 5 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7582,13 +7582,13 @@ pub struct Level5ParagraphProperties {
   pub level5_paragraph_properties_choice4: Option<Level5ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 6 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7667,13 +7667,13 @@ pub struct Level6ParagraphProperties {
   pub level6_paragraph_properties_choice4: Option<Level6ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 7 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7752,13 +7752,13 @@ pub struct Level7ParagraphProperties {
   pub level7_paragraph_properties_choice4: Option<Level7ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 8 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7837,13 +7837,13 @@ pub struct Level8ParagraphProperties {
   pub level8_paragraph_properties_choice4: Option<Level8ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// List Level 9 Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7922,13 +7922,13 @@ pub struct Level9ParagraphProperties {
   pub level9_paragraph_properties_choice4: Option<Level9ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  pub a_tab_lst: Option<TabStopList>,
+  pub tab_stop_list: Option<TabStopList>,
   /// Default Text Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  pub a_def_r_pr: Option<std::boxed::Box<DefaultRunProperties>>,
+  pub default_run_properties: Option<std::boxed::Box<DefaultRunProperties>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// End Paragraph Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8017,7 +8017,7 @@ pub struct EndParagraphRunProperties {
   pub end_paragraph_run_properties_choice2: Option<EndParagraphRunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  pub a_highlight: Option<std::boxed::Box<Highlight>>,
+  pub highlight: Option<std::boxed::Box<Highlight>>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
@@ -8030,28 +8030,28 @@ pub struct EndParagraphRunProperties {
   pub end_paragraph_run_properties_choice4: Option<EndParagraphRunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  pub a_latin: Option<LatinFont>,
+  pub latin_font: Option<LatinFont>,
   /// East Asian Font.
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  pub a_ea: Option<EastAsianFont>,
+  pub east_asian_font: Option<EastAsianFont>,
   /// Complex Script Font.
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  pub a_cs: Option<ComplexScriptFont>,
+  pub complex_script_font: Option<ComplexScriptFont>,
   /// Defines the SymbolFont Class.
   #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  pub a_sym: Option<SymbolFont>,
+  pub symbol_font: Option<SymbolFont>,
   /// Defines the HyperlinkOnClick Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  pub a_hlink_click: Option<std::boxed::Box<HyperlinkOnClick>>,
+  pub hyperlink_on_click: Option<std::boxed::Box<HyperlinkOnClick>>,
   /// Defines the HyperlinkOnMouseOver Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  pub a_hlink_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
+  pub hyperlink_on_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
   /// Defines the RightToLeft Class.
   #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  pub a_rtl: Option<RightToLeft>,
+  pub right_to_left: Option<RightToLeft>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Text Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8140,7 +8140,7 @@ pub struct RunProperties {
   pub run_properties_choice2: Option<RunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  pub a_highlight: Option<std::boxed::Box<Highlight>>,
+  pub highlight: Option<std::boxed::Box<Highlight>>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
@@ -8153,28 +8153,28 @@ pub struct RunProperties {
   pub run_properties_choice4: Option<RunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  pub a_latin: Option<LatinFont>,
+  pub latin_font: Option<LatinFont>,
   /// East Asian Font.
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  pub a_ea: Option<EastAsianFont>,
+  pub east_asian_font: Option<EastAsianFont>,
   /// Complex Script Font.
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  pub a_cs: Option<ComplexScriptFont>,
+  pub complex_script_font: Option<ComplexScriptFont>,
   /// Defines the SymbolFont Class.
   #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  pub a_sym: Option<SymbolFont>,
+  pub symbol_font: Option<SymbolFont>,
   /// Defines the HyperlinkOnClick Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  pub a_hlink_click: Option<std::boxed::Box<HyperlinkOnClick>>,
+  pub hyperlink_on_click: Option<std::boxed::Box<HyperlinkOnClick>>,
   /// Defines the HyperlinkOnMouseOver Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  pub a_hlink_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
+  pub hyperlink_on_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
   /// Defines the RightToLeft Class.
   #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  pub a_rtl: Option<RightToLeft>,
+  pub right_to_left: Option<RightToLeft>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Default Text Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8263,7 +8263,7 @@ pub struct DefaultRunProperties {
   pub default_run_properties_choice2: Option<DefaultRunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  pub a_highlight: Option<std::boxed::Box<Highlight>>,
+  pub highlight: Option<std::boxed::Box<Highlight>>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
@@ -8276,28 +8276,28 @@ pub struct DefaultRunProperties {
   pub default_run_properties_choice4: Option<DefaultRunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  pub a_latin: Option<LatinFont>,
+  pub latin_font: Option<LatinFont>,
   /// East Asian Font.
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  pub a_ea: Option<EastAsianFont>,
+  pub east_asian_font: Option<EastAsianFont>,
   /// Complex Script Font.
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  pub a_cs: Option<ComplexScriptFont>,
+  pub complex_script_font: Option<ComplexScriptFont>,
   /// Defines the SymbolFont Class.
   #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  pub a_sym: Option<SymbolFont>,
+  pub symbol_font: Option<SymbolFont>,
   /// Defines the HyperlinkOnClick Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  pub a_hlink_click: Option<std::boxed::Box<HyperlinkOnClick>>,
+  pub hyperlink_on_click: Option<std::boxed::Box<HyperlinkOnClick>>,
   /// Defines the HyperlinkOnMouseOver Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  pub a_hlink_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
+  pub hyperlink_on_mouse_over: Option<std::boxed::Box<HyperlinkOnMouseOver>>,
   /// Defines the RightToLeft Class.
   #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  pub a_rtl: Option<RightToLeft>,
+  pub right_to_left: Option<RightToLeft>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Text Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8317,7 +8317,7 @@ pub struct Paragraph {
   pub paragraph_choice: Vec<ParagraphChoice>,
   /// End Paragraph Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:endParaRPr"))]
-  pub a_end_para_r_pr: Option<std::boxed::Box<EndParagraphRunProperties>>,
+  pub end_paragraph_run_properties: Option<std::boxed::Box<EndParagraphRunProperties>>,
 }
 /// Tab Stop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8385,7 +8385,7 @@ pub struct SpaceAfter {
 pub struct TabStopList {
   /// Tab Stop.
   #[sdk(child(qname = "a:CT_TextTabStop/a:tab"))]
-  pub a_tab: Vec<TabStop>,
+  pub tab_stop: Vec<TabStop>,
 }
 /// Defines the Text Class.
 pub type Text = crate::simple_type::StringValue;
@@ -8430,7 +8430,7 @@ pub struct ShapePropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ShapePropertiesExtension Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtension/a:ext"))]
-  pub a_ext: Vec<ShapePropertiesExtension>,
+  pub shape_properties_extension: Vec<ShapePropertiesExtension>,
 }
 /// Non-Visual Properties for a Group Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8471,10 +8471,10 @@ pub struct VisualGroupShapeProperties {
   pub visual_group_shape_properties_choice2: Option<VisualGroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8575,7 +8575,7 @@ pub struct GroupShape {
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<GvmlGroupShapeExtensionList>,
+  pub gvml_group_shape_extension_list: Option<GvmlGroupShapeExtensionList>,
 }
 /// Defines the GvmlGroupShapeExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8584,7 +8584,7 @@ pub struct GvmlGroupShapeExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the GvmlGroupShapeExtension Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtension/a:ext"))]
-  pub a_ext: Vec<GvmlGroupShapeExtension>,
+  pub gvml_group_shape_extension: Vec<GvmlGroupShapeExtension>,
 }
 /// Defines the NonVisualGroupDrawingShapePropsExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8662,7 +8662,7 @@ pub struct NonVisualGroupDrawingShapePropsExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the NonVisualGroupDrawingShapePropsExtension Class.
   #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtension/a:ext"))]
-  pub a_ext: Vec<NonVisualGroupDrawingShapePropsExtension>,
+  pub non_visual_group_drawing_shape_props_extension: Vec<NonVisualGroupDrawingShapePropsExtension>,
 }
 /// Defines the ObjectDefaults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8687,7 +8687,7 @@ pub struct ObjectDefaults {
 pub struct ExtraColorSchemeList {
   /// Extra Color Scheme.
   #[sdk(child(qname = "a:CT_ColorSchemeAndMapping/a:extraClrScheme"))]
-  pub a_extra_clr_scheme: Vec<ExtraColorScheme>,
+  pub extra_color_scheme: Vec<ExtraColorScheme>,
 }
 /// Defines the CustomColorList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8695,7 +8695,7 @@ pub struct ExtraColorSchemeList {
 pub struct CustomColorList {
   /// Custom color.
   #[sdk(child(qname = "a:CT_CustomColor/a:custClr"))]
-  pub a_cust_clr: Vec<CustomColor>,
+  pub custom_color: Vec<CustomColor>,
 }
 /// Defines the OfficeStyleSheetExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8704,7 +8704,7 @@ pub struct OfficeStyleSheetExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the OfficeStyleSheetExtension Class.
   #[sdk(child(qname = "a:CT_OfficeStyleSheetExtension/a:ext"))]
-  pub a_ext: Vec<OfficeStyleSheetExtension>,
+  pub office_style_sheet_extension: Vec<OfficeStyleSheetExtension>,
 }
 /// Defines the HyperlinkOnClick Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8829,7 +8829,7 @@ pub struct NonVisualDrawingPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the NonVisualDrawingPropertiesExtension Class.
   #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtension/a:ext"))]
-  pub a_ext: Vec<NonVisualDrawingPropertiesExtension>,
+  pub non_visual_drawing_properties_extension: Vec<NonVisualDrawingPropertiesExtension>,
 }
 /// Defines the ConnectorLockingExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8838,7 +8838,7 @@ pub struct ConnectorLockingExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ConnectorLockingExtension Class.
   #[sdk(child(qname = "a:CT_ConnectorLockingExtension/a:ext"))]
-  pub a_ext: Vec<ConnectorLockingExtension>,
+  pub connector_locking_extension: Vec<ConnectorLockingExtension>,
 }
 /// Defines the DataModelExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8890,7 +8890,7 @@ pub struct HyperlinkExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the HyperlinkExtension Class.
   #[sdk(child(qname = "a:CT_HyperlinkExtension/a:ext"))]
-  pub a_ext: Vec<HyperlinkExtension>,
+  pub hyperlink_extension: Vec<HyperlinkExtension>,
 }
 /// Defines the LinePropertiesExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8949,7 +8949,7 @@ pub struct LinePropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the LinePropertiesExtension Class.
   #[sdk(child(qname = "a:CT_LinePropertiesExtension/a:ext"))]
-  pub a_ext: Vec<LinePropertiesExtension>,
+  pub line_properties_extension: Vec<LinePropertiesExtension>,
 }
 /// Defines the NonVisualDrawingPropertiesExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9022,7 +9022,7 @@ pub struct NonVisualPicturePropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the NonVisualPicturePropertiesExtension Class.
   #[sdk(child(qname = "a:CT_NonVisualPicturePropertiesExtension/a:ext"))]
-  pub a_ext: Vec<NonVisualPicturePropertiesExtension>,
+  pub non_visual_picture_properties_extension: Vec<NonVisualPicturePropertiesExtension>,
 }
 /// Defines the NonVisualPicturePropertiesExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9052,7 +9052,7 @@ pub struct BlipExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the BlipExtension Class.
   #[sdk(child(qname = "a:CT_BlipExtension/a:ext"))]
-  pub a_ext: Vec<BlipExtension>,
+  pub blip_extension: Vec<BlipExtension>,
 }
 /// Defines the BlipExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -74,7 +74,7 @@ pub struct CommentsEx {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the CommentEx Class.
   #[sdk(child(office2013, qname = "w15:CT_CommentEx/w15:commentEx"))]
-  pub w15_comment_ex: Vec<CommentEx>,
+  pub comment_ex: Vec<CommentEx>,
 }
 /// Defines the People Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -85,7 +85,7 @@ pub struct People {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Person Class.
   #[sdk(child(office2013, qname = "w15:CT_Person/w15:person"))]
-  pub w15_person: Vec<Person>,
+  pub person: Vec<Person>,
 }
 /// Defines the SdtRepeatedSection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

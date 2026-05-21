@@ -13,7 +13,7 @@ pub struct Taskpanes {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the WebExtensionTaskpane Class.
   #[sdk(child(office2013, qname = "wetp:CT_OsfTaskpane/wetp:taskpane"))]
-  pub wetp_taskpane: Vec<WebExtensionTaskpane>,
+  pub web_extension_taskpane: Vec<WebExtensionTaskpane>,
 }
 /// Defines the WebExtensionPartReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -31,7 +31,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the WebExtensionTaskpane Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

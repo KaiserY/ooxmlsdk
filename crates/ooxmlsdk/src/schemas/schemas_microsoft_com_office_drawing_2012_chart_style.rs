@@ -174,10 +174,10 @@ pub struct ColorStyle {
   pub color_style_choice: Vec<ColorStyleChoice>,
   /// Defines the ColorStyleVariation Class.
   #[sdk(child(office2013, qname = "cs:CT_ColorStyleVariation/cs:variation"))]
-  pub cs_variation: Vec<ColorStyleVariation>,
+  pub color_style_variation: Vec<ColorStyleVariation>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/cs:extLst"))]
-  pub cs_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ChartStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -329,7 +329,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the StyleColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -394,7 +394,7 @@ pub struct LineReference {
   pub line_reference_choice: Option<LineReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
-  pub cs_style_clr: Option<StyleColor>,
+  pub style_color: Option<StyleColor>,
 }
 /// Defines the FillReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -417,7 +417,7 @@ pub struct FillReference {
   pub fill_reference_choice: Option<FillReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
-  pub cs_style_clr: Option<StyleColor>,
+  pub style_color: Option<StyleColor>,
 }
 /// Defines the EffectReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -440,7 +440,7 @@ pub struct EffectReference {
   pub effect_reference_choice: Option<EffectReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
-  pub cs_style_clr: Option<StyleColor>,
+  pub style_color: Option<StyleColor>,
 }
 /// Defines the LineWidthScale Class.
 pub type LineWidthScale = crate::simple_type::DoubleValue;
@@ -466,7 +466,7 @@ pub struct FontReference {
   pub font_reference_choice: Option<FontReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
-  pub cs_style_clr: Option<StyleColor>,
+  pub style_color: Option<StyleColor>,
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -496,7 +496,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -504,13 +504,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
+  pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
+  pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the TextCharacterPropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -599,7 +599,7 @@ pub struct TextCharacterPropertiesType {
   pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  pub a_highlight: Option<std::boxed::Box<crate::schemas::a::Highlight>>,
+  pub highlight: Option<std::boxed::Box<crate::schemas::a::Highlight>>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
@@ -612,28 +612,28 @@ pub struct TextCharacterPropertiesType {
   pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  pub a_latin: Option<crate::schemas::a::LatinFont>,
+  pub latin_font: Option<crate::schemas::a::LatinFont>,
   /// East Asian Font.
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  pub a_ea: Option<crate::schemas::a::EastAsianFont>,
+  pub east_asian_font: Option<crate::schemas::a::EastAsianFont>,
   /// Complex Script Font.
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  pub a_cs: Option<crate::schemas::a::ComplexScriptFont>,
+  pub complex_script_font: Option<crate::schemas::a::ComplexScriptFont>,
   /// Defines the SymbolFont Class.
   #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  pub a_sym: Option<crate::schemas::a::SymbolFont>,
+  pub symbol_font: Option<crate::schemas::a::SymbolFont>,
   /// Defines the HyperlinkOnClick Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  pub a_hlink_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
+  pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Defines the HyperlinkOnMouseOver Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  pub a_hlink_mouse_over: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnMouseOver>>,
+  pub hyperlink_on_mouse_over: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnMouseOver>>,
   /// Defines the RightToLeft Class.
   #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  pub a_rtl: Option<crate::schemas::a::RightToLeft>,
+  pub right_to_left: Option<crate::schemas::a::RightToLeft>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -715,12 +715,12 @@ pub struct TextBodyProperties {
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
+  pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the CategoryAxisProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -13,10 +13,10 @@ pub struct PersonList {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Person Class.
   #[sdk(child(office2019, qname = "xltc:CT_Person/xltc:person"))]
-  pub xltc_person: Vec<Person>,
+  pub person: Vec<Person>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
-  pub xltc_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedComments Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -27,10 +27,10 @@ pub struct ThreadedComments {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ThreadedComment Class.
   #[sdk(child(office2019, qname = "xltc:CT_ThreadedComment/xltc:threadedComment"))]
-  pub xltc_threaded_comment: Vec<ThreadedComment>,
+  pub threaded_comment: Vec<ThreadedComment>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
-  pub xltc_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Person Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -61,7 +61,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the ThreadedComment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -113,7 +113,7 @@ pub type ThreadedCommentText = crate::simple_type::StringValue;
 pub struct ThreadedCommentMentions {
   /// Defines the Mention Class.
   #[sdk(child(office2019, qname = "xltc:CT_Mention/xltc:mention"))]
-  pub xltc_mention: Vec<Mention>,
+  pub mention: Vec<Mention>,
 }
 /// Defines the Mention Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

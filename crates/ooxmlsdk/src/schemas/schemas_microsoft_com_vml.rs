@@ -226,7 +226,7 @@ pub struct Path {
 pub struct Formulas {
   /// Single Formula.
   #[sdk(child(qname = "v:CT_F/v:f"))]
-  pub v_f: Vec<Formula>,
+  pub formula: Vec<Formula>,
 }
 /// Defines the ShapeHandles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -234,7 +234,7 @@ pub struct Formulas {
 pub struct ShapeHandles {
   /// Shape Handle.
   #[sdk(child(qname = "v:CT_H/v:h"))]
-  pub v_h: Vec<ShapeHandle>,
+  pub shape_handle: Vec<ShapeHandle>,
 }
 /// Defines the Fill Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -971,7 +971,7 @@ pub struct Shapetype {
   pub shapetype_choice: Vec<ShapetypeChoice>,
   /// Complex.
   #[sdk(child(qname = "o:CT_Complex/o:complex"))]
-  pub o_complex: Option<crate::schemas::o::Complex>,
+  pub complex: Option<crate::schemas::o::Complex>,
 }
 /// Shape Group.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

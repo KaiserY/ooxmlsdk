@@ -19,7 +19,7 @@ pub struct CustomPropertyEditors {
   pub default_property_editor_namespace: DefaultPropertyEditorNamespace,
   /// Defines the CustomPropertyEditor Class.
   #[sdk(child(qname = "cdip:CT_CustomPropertyEditor/cdip:customPropertyEditor"))]
-  pub cdip_custom_property_editor: Vec<CustomPropertyEditor>,
+  pub custom_property_editor: Vec<CustomPropertyEditor>,
 }
 /// Defines the PropertyEditorNamespace Class.
 pub type PropertyEditorNamespace = crate::simple_type::StringValue;

@@ -52,7 +52,7 @@ pub struct FeatureSupport {
 pub struct PivotFieldSubtotals {
   /// Defines the SubtotalPivotItemSubtotal Class.
   #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotal"))]
-  pub xlpcalc_subtotal: Vec<SubtotalPivotItemSubtotal>,
+  pub subtotal_pivot_item_subtotal: Vec<SubtotalPivotItemSubtotal>,
 }
 /// Defines the PivotAreaReferenceSubtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -63,7 +63,7 @@ pub struct PivotFieldSubtotals {
 pub struct PivotAreaReferenceSubtotals {
   /// Defines the PivotSubtotalType Class.
   #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal"))]
-  pub xlpcalc_subtotal: Vec<PivotSubtotalType>,
+  pub pivot_subtotal_type: Vec<PivotSubtotalType>,
 }
 /// Defines the PivotTableSubtotalLineItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -77,7 +77,7 @@ pub struct PivotTableSubtotalLineItems {
     microsoft365,
     qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotalLineItem"
   ))]
-  pub xlpcalc_subtotal_line_item: Vec<SubtotalLineItemPivotItemSubtotal>,
+  pub subtotal_line_item_pivot_item_subtotal: Vec<SubtotalLineItemPivotItemSubtotal>,
 }
 /// Defines the SubtotalPivotItemSubtotal Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

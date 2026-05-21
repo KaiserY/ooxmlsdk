@@ -320,7 +320,7 @@ pub struct ConditionalFormattings {
     office2010,
     qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
   ))]
-  pub x14_conditional_formatting: Vec<ConditionalFormatting>,
+  pub conditional_formatting: Vec<ConditionalFormatting>,
 }
 /// Defines the DataValidations Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -341,7 +341,7 @@ pub struct DataValidations {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the DataValidation Class.
   #[sdk(child(office2010, qname = "x14:CT_DataValidation/x14:dataValidation"))]
-  pub x14_data_validation: Vec<DataValidation>,
+  pub data_validation: Vec<DataValidation>,
 }
 /// Defines the SparklineGroups Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -350,7 +350,7 @@ pub struct SparklineGroups {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SparklineGroup Class.
   #[sdk(child(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
-  pub x14_sparkline_group: Vec<SparklineGroup>,
+  pub sparkline_group: Vec<SparklineGroup>,
 }
 /// Defines the SlicerList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -358,7 +358,7 @@ pub struct SparklineGroups {
 pub struct SlicerList {
   /// Defines the SlicerRef Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerRef/x14:slicer"))]
-  pub x14_slicer: Vec<SlicerRef>,
+  pub slicer_ref: Vec<SlicerRef>,
 }
 /// Defines the ProtectedRanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -366,7 +366,7 @@ pub struct SlicerList {
 pub struct ProtectedRanges {
   /// Defines the ProtectedRange Class.
   #[sdk(child(office2010, qname = "x14:CT_ProtectedRange/x14:protectedRange"))]
-  pub x14_protected_range: Vec<ProtectedRange>,
+  pub protected_range: Vec<ProtectedRange>,
 }
 /// Defines the IgnoredErrors Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -374,10 +374,10 @@ pub struct ProtectedRanges {
 pub struct IgnoredErrors {
   /// Defines the IgnoredError Class.
   #[sdk(child(office2010, qname = "x14:CT_IgnoredError/x14:ignoredError"))]
-  pub x14_ignored_error: Vec<IgnoredError>,
+  pub ignored_error: Vec<IgnoredError>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
-  pub x14_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DefinedNames Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -385,7 +385,7 @@ pub struct IgnoredErrors {
 pub struct DefinedNames {
   /// Defines the DefinedName Class.
   #[sdk(child(office2010, qname = "x14:CT_DefinedName/x14:definedName"))]
-  pub x14_defined_name: Vec<DefinedName>,
+  pub defined_name: Vec<DefinedName>,
 }
 /// Defines the PivotCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -393,7 +393,7 @@ pub struct DefinedNames {
 pub struct PivotCaches {
   /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
-  pub x_pivot_cache: Vec<crate::schemas::x::PivotCache>,
+  pub pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the SlicerCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -401,7 +401,7 @@ pub struct PivotCaches {
 pub struct SlicerCaches {
   /// Defines the SlicerCache Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache"))]
-  pub x14_slicer_cache: Vec<SlicerCache>,
+  pub slicer_cache: Vec<SlicerCache>,
 }
 /// Defines the WorkbookProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -589,7 +589,7 @@ pub struct SlicerStyles {
   pub default_slicer_style: crate::simple_type::StringValue,
   /// Defines the SlicerStyle Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyle/x14:slicerStyle"))]
-  pub x14_slicer_style: Vec<SlicerStyle>,
+  pub slicer_style: Vec<SlicerStyle>,
 }
 /// Defines the DifferentialFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -600,7 +600,7 @@ pub struct DifferentialFormats {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
-  pub x_dxf: Vec<crate::schemas::x::DifferentialFormat>,
+  pub differential_format: Vec<crate::schemas::x::DifferentialFormat>,
 }
 /// Defines the OleItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -668,7 +668,7 @@ pub struct CustomFilters {
   pub and: Option<crate::simple_type::BooleanValue>,
   /// Defines the CustomFilter Class.
   #[sdk(child(office2010, qname = "x14:CT_CustomFilter/x14:customFilter"))]
-  pub x14_custom_filter: Vec<CustomFilter>,
+  pub custom_filter: Vec<CustomFilter>,
 }
 /// Defines the SortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -839,7 +839,7 @@ pub struct Slicers {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Slicer Class.
   #[sdk(child(office2010, qname = "x14:CT_Slicer/x14:slicer"))]
-  pub x14_slicer: Vec<Slicer>,
+  pub slicer: Vec<Slicer>,
 }
 /// Defines the SlicerCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -883,7 +883,7 @@ pub struct ConditionalFormatting {
   pub pivot: Option<crate::simple_type::BooleanValue>,
   /// Defines the ConditionalFormattingRule Class.
   #[sdk(child(office2010, qname = "x14:CT_CfRule/x14:cfRule"))]
-  pub x14_cf_rule: Vec<ConditionalFormattingRule>,
+  pub conditional_formatting_rule: Vec<ConditionalFormattingRule>,
   /// Defines the ReferenceSequence Class.
   #[sdk(text_child(
     office2010,
@@ -891,10 +891,10 @@ pub struct ConditionalFormatting {
     simple_type = "StringValue",
     qname = "xne:ST_Sqref/xne:sqref"
   ))]
-  pub xne_sqref: Option<Vec<crate::simple_type::StringValue>>,
+  pub reference_sequence: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
-  pub x14_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ConditionalFormattingRule Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -946,22 +946,22 @@ pub struct ConditionalFormattingRule {
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
-  pub xne_f: Vec<crate::schemas::xne::Formula>,
+  pub formula: Vec<crate::schemas::xne::Formula>,
   /// Defines the ColorScale Class.
   #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
-  pub x14_color_scale: Option<ColorScale>,
+  pub color_scale: Option<ColorScale>,
   /// Defines the DataBar Class.
   #[sdk(child(office2010, qname = "x14:CT_DataBar/x14:dataBar"))]
-  pub x14_data_bar: Option<std::boxed::Box<DataBar>>,
+  pub data_bar: Option<std::boxed::Box<DataBar>>,
   /// Defines the IconSet Class.
   #[sdk(child(office2010, qname = "x14:CT_IconSet/x14:iconSet"))]
-  pub x14_icon_set: Option<IconSet>,
+  pub icon_set: Option<IconSet>,
   /// Defines the DifferentialType Class.
   #[sdk(child(office2010, qname = "x:CT_Dxf/x14:dxf"))]
-  pub x14_dxf: Option<std::boxed::Box<DifferentialType>>,
+  pub differential_type: Option<std::boxed::Box<DifferentialType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
-  pub x14_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -970,7 +970,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the DataValidation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1429,7 +1429,7 @@ pub struct BarAxisColor {
 pub struct Sparklines {
   /// Defines the Sparkline Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparkline/x14:sparkline"))]
-  pub x14_sparkline: Vec<Sparkline>,
+  pub sparkline: Vec<Sparkline>,
 }
 /// Defines the Sparkline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1492,7 +1492,7 @@ pub struct ArgumentDescriptions {
     office2010,
     qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription"
   ))]
-  pub x14_argument_description: Vec<ArgumentDescription>,
+  pub argument_description: Vec<ArgumentDescription>,
 }
 /// Defines the ArgumentDescription Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1530,7 +1530,7 @@ pub struct TupleSet {
 pub struct TupleSetHeaders {
   /// Defines the TupleSetHeader Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetHeader/x14:header"))]
-  pub x14_header: Vec<TupleSetHeader>,
+  pub tuple_set_header: Vec<TupleSetHeader>,
 }
 /// Defines the TupleSetRows Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1538,7 +1538,7 @@ pub struct TupleSetHeaders {
 pub struct TupleSetRows {
   /// Defines the TupleSetRow Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetRow/x14:row"))]
-  pub x14_row: Vec<TupleSetRow>,
+  pub tuple_set_row: Vec<TupleSetRow>,
 }
 /// Defines the TupleSetHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1557,7 +1557,7 @@ pub struct TupleSetHeader {
 pub struct TupleSetRow {
   /// Defines the TupleSetRowItem Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetRowItem/x14:rowItem"))]
-  pub x14_row_item: Vec<TupleSetRowItem>,
+  pub tuple_set_row_item: Vec<TupleSetRowItem>,
 }
 /// Defines the TupleSetRowItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1587,7 +1587,7 @@ pub struct SetLevels {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the SetLevel Class.
   #[sdk(child(office2010, qname = "x14:CT_SetLevel/x14:setLevel"))]
-  pub x14_set_level: Vec<SetLevel>,
+  pub set_level: Vec<SetLevel>,
 }
 /// Defines the ColorScale Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1595,10 +1595,10 @@ pub struct SetLevels {
 pub struct ColorScale {
   /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
-  pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
+  pub conditional_formatting_value_object: Vec<ConditionalFormattingValueObject>,
   /// Defines the Color Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:color"))]
-  pub x14_color: Vec<Color>,
+  pub color: Vec<Color>,
 }
 /// Defines the DataBar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1633,22 +1633,22 @@ pub struct DataBar {
   pub axis_position: Option<DataBarAxisPositionValues>,
   /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
-  pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
+  pub conditional_formatting_value_object: Vec<ConditionalFormattingValueObject>,
   /// Defines the FillColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:fillColor"))]
-  pub x14_fill_color: Option<FillColor>,
+  pub fill_color: Option<FillColor>,
   /// Defines the BorderColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:borderColor"))]
-  pub x14_border_color: Option<BorderColor>,
+  pub border_color: Option<BorderColor>,
   /// Defines the NegativeFillColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeFillColor"))]
-  pub x14_negative_fill_color: Option<NegativeFillColor>,
+  pub negative_fill_color: Option<NegativeFillColor>,
   /// Defines the NegativeBorderColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeBorderColor"))]
-  pub x14_negative_border_color: Option<NegativeBorderColor>,
+  pub negative_border_color: Option<NegativeBorderColor>,
   /// Defines the BarAxisColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:axisColor"))]
-  pub x14_axis_color: Option<BarAxisColor>,
+  pub bar_axis_color: Option<BarAxisColor>,
 }
 /// Defines the IconSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1671,10 +1671,10 @@ pub struct IconSet {
   pub custom: Option<crate::simple_type::BooleanValue>,
   /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
-  pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
+  pub conditional_formatting_value_object: Vec<ConditionalFormattingValueObject>,
   /// Defines the ConditionalFormattingIcon Class.
   #[sdk(child(office2010, qname = "x14:CT_CfIcon/x14:cfIcon"))]
-  pub x14_cf_icon: Vec<ConditionalFormattingIcon>,
+  pub conditional_formatting_icon: Vec<ConditionalFormattingIcon>,
 }
 /// Defines the DifferentialType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1737,7 +1737,7 @@ pub struct ConditionalFormattingIcon {
 pub struct PivotEdits {
   /// Defines the PivotEdit Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEdit/x14:pivotEdit"))]
-  pub x14_pivot_edit: Vec<PivotEdit>,
+  pub pivot_edit: Vec<PivotEdit>,
 }
 /// Defines the PivotChanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1745,7 +1745,7 @@ pub struct PivotEdits {
 pub struct PivotChanges {
   /// Defines the PivotChange Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotChange/x14:pivotChange"))]
-  pub x14_pivot_change: Vec<PivotChange>,
+  pub pivot_change: Vec<PivotChange>,
 }
 /// Defines the ConditionalFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1756,7 +1756,7 @@ pub struct ConditionalFormats {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the ConditionalFormat Class.
   #[sdk(child(office2010, qname = "x14:CT_ConditionalFormat/x14:conditionalFormat"))]
-  pub x14_conditional_format: Vec<ConditionalFormat>,
+  pub conditional_format: Vec<ConditionalFormat>,
 }
 /// Defines the CalculatedMembers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1767,7 +1767,7 @@ pub struct CalculatedMembers {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Calculated Member.
   #[sdk(child(qname = "x:CT_CalculatedMember/x:calculatedMember"))]
-  pub x_calculated_member: Vec<crate::schemas::x::CalculatedMember>,
+  pub calculated_member: Vec<crate::schemas::x::CalculatedMember>,
 }
 /// Defines the PivotEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1806,7 +1806,7 @@ pub struct TupleItems {
     simple_type = "StringValue",
     qname = "x:ST_Xstring/x14:tupleItem"
   ))]
-  pub x14_tuple_item: Vec<Xstring>,
+  pub xstring: Vec<Xstring>,
 }
 /// Defines the PivotArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1896,7 +1896,7 @@ pub type Xstring = crate::simple_type::StringValue;
 pub struct SlicerStyleElements {
   /// Defines the SlicerStyleElement Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement"))]
-  pub x14_slicer_style_element: Vec<SlicerStyleElement>,
+  pub slicer_style_element: Vec<SlicerStyleElement>,
 }
 /// Defines the DdeValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1910,7 +1910,7 @@ pub struct DdeValues {
   pub columns: Option<crate::simple_type::UInt32Value>,
   /// Value.
   #[sdk(child(qname = "x:CT_DdeValue/x:value"))]
-  pub x_value: Vec<crate::schemas::x::Value>,
+  pub value: Vec<crate::schemas::x::Value>,
 }
 /// Defines the ConditionalFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1946,7 +1946,7 @@ pub struct PivotAreas {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Calculated Item Location.
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
-  pub x_pivot_area: Vec<crate::schemas::x::PivotArea>,
+  pub pivot_area: Vec<crate::schemas::x::PivotArea>,
 }
 /// Defines the SlicerStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2073,10 +2073,10 @@ pub struct ListItem {
 pub struct ListItems {
   /// Defines the ListItem Class.
   #[sdk(child(office2010, qname = "x14:CT_ListItem/x14:item"))]
-  pub x14_item: Vec<ListItem>,
+  pub list_item: Vec<ListItem>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
-  pub x14_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Slicer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2193,7 +2193,7 @@ pub struct OlapSlicerCacheItem {
   pub non_display: Option<crate::simple_type::BooleanValue>,
   /// Defines the OlapSlicerCacheItemParent Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
-  pub x14_p: Vec<OlapSlicerCacheItemParent>,
+  pub olap_slicer_cache_item_parent: Vec<OlapSlicerCacheItemParent>,
 }
 /// Defines the OlapSlicerCacheRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2204,7 +2204,7 @@ pub struct OlapSlicerCacheRange {
   pub start_item: crate::simple_type::UInt32Value,
   /// Defines the OlapSlicerCacheItem Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItem/x14:i"))]
-  pub x14_i: Vec<OlapSlicerCacheItem>,
+  pub olap_slicer_cache_item: Vec<OlapSlicerCacheItem>,
 }
 /// Defines the OlapSlicerCacheRanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2212,7 +2212,7 @@ pub struct OlapSlicerCacheRange {
 pub struct OlapSlicerCacheRanges {
   /// Defines the OlapSlicerCacheRange Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheRange/x14:range"))]
-  pub x14_range: Vec<OlapSlicerCacheRange>,
+  pub olap_slicer_cache_range: Vec<OlapSlicerCacheRange>,
 }
 /// Defines the OlapSlicerCacheLevelData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2246,7 +2246,7 @@ pub struct OlapSlicerCacheLevelsData {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the OlapSlicerCacheLevelData Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheLevelData/x14:level"))]
-  pub x14_level: Vec<OlapSlicerCacheLevelData>,
+  pub olap_slicer_cache_level_data: Vec<OlapSlicerCacheLevelData>,
 }
 /// Defines the OlapSlicerCacheSelections Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2257,7 +2257,7 @@ pub struct OlapSlicerCacheSelections {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the OlapSlicerCacheSelection Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheSelection/x14:selection"))]
-  pub x14_selection: Vec<OlapSlicerCacheSelection>,
+  pub olap_slicer_cache_selection: Vec<OlapSlicerCacheSelection>,
 }
 /// Defines the OlapSlicerCacheSelection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2268,7 +2268,7 @@ pub struct OlapSlicerCacheSelection {
   pub name: crate::simple_type::StringValue,
   /// Defines the OlapSlicerCacheItemParent Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
-  pub x14_p: Vec<OlapSlicerCacheItemParent>,
+  pub olap_slicer_cache_item_parent: Vec<OlapSlicerCacheItemParent>,
 }
 /// Defines the TabularSlicerCacheItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2279,7 +2279,7 @@ pub struct TabularSlicerCacheItems {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the TabularSlicerCacheItem Class.
   #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCacheItem/x14:i"))]
-  pub x14_i: Vec<TabularSlicerCacheItem>,
+  pub tabular_slicer_cache_item: Vec<TabularSlicerCacheItem>,
 }
 /// Defines the TabularSlicerCacheItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2301,7 +2301,7 @@ pub struct TabularSlicerCacheItem {
 pub struct SlicerCachePivotTables {
   /// Defines the SlicerCachePivotTable Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
-  pub x14_pivot_table: Vec<SlicerCachePivotTable>,
+  pub slicer_cache_pivot_table: Vec<SlicerCachePivotTable>,
 }
 /// Defines the SlicerCacheData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2323,7 +2323,7 @@ pub struct SlicerCacheDefinitionExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SlicerCacheDefinitionExtension Class.
   #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::SlicerCacheDefinitionExtension>,
+  pub slicer_cache_definition_extension: Vec<crate::schemas::x::SlicerCacheDefinitionExtension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotUserEditChoice {

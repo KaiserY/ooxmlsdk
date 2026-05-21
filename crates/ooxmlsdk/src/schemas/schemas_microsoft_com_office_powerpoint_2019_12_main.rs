@@ -40,7 +40,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::p::Extension>,
+  pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the AtrbtnTaskAssignUnassignUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -160,7 +160,7 @@ pub struct TaskHistoryEvent {
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "p:CT_ExtensionList/p1912:extLst"))]
-  pub p1912_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TaskHistory Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -168,7 +168,7 @@ pub struct TaskHistoryEvent {
 pub struct TaskHistory {
   /// Defines the TaskHistoryEvent Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskHistoryEvent/p1912:event"))]
-  pub p1912_event: Vec<TaskHistoryEvent>,
+  pub task_history_event: Vec<TaskHistoryEvent>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TaskHistoryEventChoice {

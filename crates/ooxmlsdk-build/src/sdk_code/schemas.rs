@@ -18,7 +18,7 @@ use crate::sdk_code::helpers::{
 };
 use crate::sdk_code::versioning::{common_choice_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
-  Schema, SchemaEnum, SchemaType, SchemaTypeChild, SchemaTypeChildKind,
+  Schema, SchemaEnum, SchemaType, SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind,
 };
 use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
@@ -333,6 +333,96 @@ fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
   }
 }
 
+fn child_qname_field_rust_name(name: &str) -> String {
+  schema_child_field_rust_name(name.split('/').nth(1).unwrap_or(name))
+}
+
+fn child_preferred_field_rust_name(
+  child: &SchemaTypeChild,
+  context: &CodegenContext<'_>,
+) -> String {
+  if !child.property_name.is_empty() {
+    return schema_child_field_rust_name(child.property_name.as_str());
+  }
+
+  context
+    .type_by_name(child.name.as_str())
+    .map(|child_type| schema_child_field_rust_name(child_type.class_name.as_str()))
+    .unwrap_or_else(|| child_qname_field_rust_name(child.name.as_str()))
+}
+
+pub(crate) fn duplicate_preferred_child_field_names<'a>(
+  children: impl IntoIterator<Item = &'a SchemaTypeChild>,
+  context: &CodegenContext<'_>,
+) -> HashSet<String> {
+  let mut counts = HashMap::<String, usize>::new();
+
+  for child in children {
+    if matches!(
+      child.kind,
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+    ) {
+      *counts
+        .entry(child_preferred_field_rust_name(child, context))
+        .or_insert(0) += 1;
+    }
+  }
+
+  counts
+    .into_iter()
+    .filter_map(|(name, count)| (count > 1).then_some(name))
+    .collect()
+}
+
+fn attr_field_rust_name(attr: &SchemaTypeAttribute) -> String {
+  if attr.property_name.is_empty() {
+    escape_snake_case(attr.q_name.to_snake_case())
+  } else {
+    escape_snake_case(attr.property_name.to_snake_case())
+  }
+}
+
+pub(crate) fn duplicate_preferred_child_field_names_with_attrs<'a>(
+  attrs: impl IntoIterator<Item = &'a SchemaTypeAttribute>,
+  children: impl IntoIterator<Item = &'a SchemaTypeChild>,
+  context: &CodegenContext<'_>,
+) -> HashSet<String> {
+  let mut counts = HashMap::<String, usize>::new();
+
+  for attr in attrs {
+    *counts.entry(attr_field_rust_name(attr)).or_insert(0) += 1;
+  }
+
+  for child in children {
+    if matches!(
+      child.kind,
+      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+    ) {
+      *counts
+        .entry(child_preferred_field_rust_name(child, context))
+        .or_insert(0) += 1;
+    }
+  }
+
+  counts
+    .into_iter()
+    .filter_map(|(name, count)| (count > 1).then_some(name))
+    .collect()
+}
+
+pub(crate) fn schema_child_field_rust_name_with_context(
+  child: &SchemaTypeChild,
+  context: &CodegenContext<'_>,
+  duplicate_preferred_names: &HashSet<String>,
+) -> String {
+  let preferred_name = child_preferred_field_rust_name(child, context);
+  if child.property_name.is_empty() && duplicate_preferred_names.contains(&preferred_name) {
+    child_qname_field_rust_name(child.name.as_str())
+  } else {
+    preferred_name
+  }
+}
+
 impl<'a> CodegenContext<'a> {
   pub fn new(schemas: &'a [Schema]) -> Self {
     let mut enum_type_map = HashMap::new();
@@ -478,7 +568,16 @@ impl<'a> CodegenContext<'a> {
           schema_type.name, child.name, child.kind
         )
       })?;
-      let field_name = Cow::Owned(child_field_name(child, child_type));
+      let duplicate_preferred_names = duplicate_preferred_child_field_names_with_attrs(
+        schema_type.attributes.iter(),
+        top_level_content_children(schema_type).iter(),
+        self,
+      );
+      let field_name = Cow::Owned(schema_child_field_rust_name_with_context(
+        child,
+        self,
+        &duplicate_preferred_names,
+      ));
       let property_comments = if child.property_comments.is_empty() {
         Cow::Borrowed(" _")
       } else {
@@ -505,7 +604,7 @@ impl<'a> CodegenContext<'a> {
 
     Ok(ResolvedOneSequenceChild {
       name: particle_name,
-      field_name: Cow::Owned(escape_snake_case(child_type.class_name.to_snake_case())),
+      field_name: Cow::Owned(schema_child_field_rust_name(child_type.class_name.as_str())),
       property_comments: if child_type.summary.is_empty() {
         Cow::Borrowed(" _")
       } else {
@@ -563,9 +662,15 @@ impl<'a> CodegenContext<'a> {
             schema_type.name, child.name, child.kind
           )
         })?;
+        let duplicate_preferred_names =
+          duplicate_preferred_child_field_names(choice_child.children.iter(), self);
         variants.push(ResolvedOneSequenceChild {
           name: child.name.as_str(),
-          field_name: Cow::Owned(child_field_name(child, child_type)),
+          field_name: Cow::Owned(schema_child_field_rust_name_with_context(
+            child,
+            self,
+            &duplicate_preferred_names,
+          )),
           property_comments: if child.property_comments.is_empty() {
             Cow::Borrowed(" _")
           } else {
@@ -3795,16 +3900,6 @@ fn omitted_abstract_helper_type_names(ir: &SchemaModuleDecl) -> HashSet<&str> {
     })
     .filter(|rust_type| helper_type_names.contains(rust_type))
     .collect()
-}
-
-fn child_field_name(child: &SchemaTypeChild, _child_type: &SchemaType) -> String {
-  let raw_name = if child.property_name.is_empty() {
-    child.name.split('/').nth(1).unwrap_or(child.name.as_str())
-  } else {
-    child.property_name.as_str()
-  };
-
-  schema_child_field_rust_name(raw_name)
 }
 
 fn choice_child_display_name<'a>(child: &'a ResolvedOneSequenceChild<'a>) -> &'a str {

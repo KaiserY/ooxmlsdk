@@ -57,7 +57,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::a::Extension>,
+  pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the LiveFeedBackgroundProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -75,7 +75,7 @@ pub struct LiveFeedBackgroundProperties {
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
-  pub alf_ext_lst: Option<OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LiveFeedBackgroundPropertiesChoice {

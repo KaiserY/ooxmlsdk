@@ -56,10 +56,10 @@ pub struct RichValueData {
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValue Class.
   #[sdk(child(office2019, qname = "xlrd:CT_RichValue/xlrd:rv"))]
-  pub xlrd_rv: Vec<RichValue>,
+  pub rich_value: Vec<RichValue>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
-  pub xlrd_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -73,10 +73,10 @@ pub struct RichValueStructures {
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValueStructure Class.
   #[sdk(child(office2019, qname = "xlrd:CT_RichValueStructure/xlrd:s"))]
-  pub xlrd_s: Vec<RichValueStructure>,
+  pub rich_value_structure: Vec<RichValueStructure>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
-  pub xlrd_ext_lst: Option<ExtensionList>,
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -94,7 +94,7 @@ pub struct RichValue {
     simple_type = "StringValue",
     qname = "xlrd:CT_Value/xlrd:v"
   ))]
-  pub xlrd_v: Vec<Value>,
+  pub value: Vec<Value>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -103,7 +103,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the RichValueFallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -126,7 +126,7 @@ pub struct RichValueStructure {
   pub t: crate::simple_type::StringValue,
   /// Defines the Key Class.
   #[sdk(child(office2019, qname = "xlrd:CT_Key/xlrd:k"))]
-  pub xlrd_k: Vec<Key>,
+  pub key: Vec<Key>,
 }
 /// Defines the Key Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -174,7 +174,7 @@ pub struct RevExHeaders {
   pub endpoint_id: crate::simple_type::StringValue,
   /// Defines the RevExHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_RevExHeader/xr:hdr"))]
-  pub xr_hdr: Vec<RevExHeader>,
+  pub rev_ex_header: Vec<RevExHeader>,
 }
 /// Defines the RevExStream Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -466,10 +466,10 @@ pub struct RevExChangeCell {
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
   #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
-  pub xr_c: Vec<RevCell>,
+  pub rev_cell: Vec<RevCell>,
   /// Defines the ChangeCellSubEdit Class.
   #[sdk(child(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse"))]
-  pub xr_ccse: Vec<ChangeCellSubEdit>,
+  pub change_cell_sub_edit: Vec<ChangeCellSubEdit>,
 }
 /// Defines the RevExFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -887,7 +887,7 @@ pub struct ChangeCellSubEdit {
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
   #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
-  pub xr_c: Vec<RevCell>,
+  pub rev_cell: Vec<RevCell>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -896,7 +896,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::x::Extension>,
+  pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the FormulaFormula Class.
 pub type FormulaFormula = crate::simple_type::StringValue;
@@ -1019,7 +1019,7 @@ pub struct Outlines {
   pub is_row: crate::simple_type::BooleanValue,
   /// Defines the Outline Class.
   #[sdk(child(office2016, qname = "xr:CT_Outline/xr:outline"))]
-  pub xr_outline: Vec<Outline>,
+  pub outline: Vec<Outline>,
 }
 /// Defines the Outline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1043,13 +1043,13 @@ pub struct RstType {
   pub text: Option<crate::schemas::x::Text>,
   /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
-  pub x_r: Vec<crate::schemas::x::Run>,
+  pub run: Vec<crate::schemas::x::Run>,
   /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
-  pub x_r_ph: Vec<crate::schemas::x::PhoneticRun>,
+  pub phonetic_run: Vec<crate::schemas::x::PhoneticRun>,
   /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
-  pub x_phonetic_pr: Option<crate::schemas::x::PhoneticProperties>,
+  pub phonetic_properties: Option<crate::schemas::x::PhoneticProperties>,
 }
 /// Defines the RefCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1361,13 +1361,13 @@ pub struct AutoFilter {
   pub reference: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
-  pub x_filter_column: Vec<crate::schemas::x::FilterColumn>,
+  pub filter_column: Vec<crate::schemas::x::FilterColumn>,
   /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
-  pub x_sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
+  pub sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub x_ext_lst: Option<crate::schemas::x::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Represents a PivotTable View..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

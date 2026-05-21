@@ -66,7 +66,7 @@ pub(super) fn paragraph_mark_run_style(
 
   style = styles.character_run_style(
     properties
-      .w_r_style
+      .run_style
       .as_ref()
       .map(|run_style| run_style.val.as_str()),
     style,

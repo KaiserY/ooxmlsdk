@@ -273,16 +273,17 @@ pub struct Anchor {
   pub anchor_choice: Option<AnchorChoice>,
   /// Drawing Object Non-Visual Properties.
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
-  pub wp_doc_pr: std::boxed::Box<DocProperties>,
+  pub doc_properties: std::boxed::Box<DocProperties>,
   /// Defines the NonVisualGraphicFrameDrawingProperties Class.
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr"))]
-  pub wp_c_nv_graphic_frame_pr: Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
+  pub non_visual_graphic_frame_drawing_properties:
+    Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
   /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
-  pub a_graphic: std::boxed::Box<crate::schemas::a::Graphic>,
+  pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
   /// Defines the RelativeWidth Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
-  pub wp14_size_rel_h: Option<crate::schemas::wp14::RelativeWidth>,
+  pub relative_width: Option<crate::schemas::wp14::RelativeWidth>,
   /// Defines the RelativeHeight Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
   pub wp14_size_rel_v: Option<crate::schemas::wp14::RelativeHeight>,
@@ -359,7 +360,7 @@ pub struct WrapPolygon {
   pub start_point: std::boxed::Box<StartPoint>,
   /// Wrapping Polygon Line End Position.
   #[sdk(child(qname = "a:CT_Point2D/wp:lineTo"))]
-  pub wp_line_to: Vec<LineTo>,
+  pub line_to: Vec<LineTo>,
 }
 /// Horizontal Positioning.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

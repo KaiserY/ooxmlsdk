@@ -27,7 +27,7 @@ pub struct AdditionalCharacteristicsInfo {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Single Characteristic.
   #[sdk(child(qname = "ac:CT_Characteristic/ac:characteristic"))]
-  pub ac_characteristic: Vec<Characteristic>,
+  pub characteristic: Vec<Characteristic>,
 }
 /// Single Characteristic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

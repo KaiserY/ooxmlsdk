@@ -13,16 +13,16 @@ pub struct TemplateCommandGroup {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the KeyMapCustomizations Class.
   #[sdk(child(qname = "wne:CT_Keymaps/wne:keymaps"))]
-  pub wne_keymaps: Vec<KeyMapCustomizations>,
+  pub key_map_customizations: Vec<KeyMapCustomizations>,
   /// Defines the MismatchedKeyMapCustomization Class.
   #[sdk(child(qname = "wne:CT_Keymaps/wne:keymapsBad"))]
-  pub wne_keymaps_bad: Vec<MismatchedKeyMapCustomization>,
+  pub mismatched_key_map_customization: Vec<MismatchedKeyMapCustomization>,
   /// Defines the Toolbars Class.
   #[sdk(child(qname = "wne:CT_Toolbars/wne:toolbars"))]
-  pub wne_toolbars: Option<Toolbars>,
+  pub toolbars: Option<Toolbars>,
   /// Defines the AllocatedCommands Class.
   #[sdk(child(qname = "wne:CT_Acds/wne:acds"))]
-  pub wne_acds: Vec<AllocatedCommands>,
+  pub allocated_commands: Vec<AllocatedCommands>,
 }
 /// Defines the Mcds Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -30,7 +30,7 @@ pub struct TemplateCommandGroup {
 pub struct Mcds {
   /// Defines the Mcd Class.
   #[sdk(child(qname = "wne:CT_Mcd/wne:mcd"))]
-  pub wne_mcd: Vec<Mcd>,
+  pub mcd: Vec<Mcd>,
 }
 /// Defines the VbaSuppData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -55,7 +55,7 @@ pub struct MailMergeRecipients {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SingleDataSourceRecord Class.
   #[sdk(child(qname = "wne:CT_HashedRecipientData/wne:recipientData"))]
-  pub wne_recipient_data: Vec<SingleDataSourceRecord>,
+  pub single_data_source_record: Vec<SingleDataSourceRecord>,
 }
 /// Defines the FixedCommandKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -292,7 +292,7 @@ pub struct DocEvents {
 pub struct AllocatedCommandManifest {
   /// Defines the AllocatedCommandManifestEntry Class.
   #[sdk(child(qname = "wne:CT_AcdKeymap/wne:acdEntry"))]
-  pub wne_acd_entry: Vec<AllocatedCommandManifestEntry>,
+  pub allocated_command_manifest_entry: Vec<AllocatedCommandManifestEntry>,
 }
 /// Defines the ToolbarData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -308,7 +308,7 @@ pub struct ToolbarData {
 pub struct KeyMapCustomizations {
   /// Defines the KeyMapEntry Class.
   #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
-  pub wne_keymap: Vec<KeyMapEntry>,
+  pub key_map_entry: Vec<KeyMapEntry>,
 }
 /// Defines the MismatchedKeyMapCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -316,7 +316,7 @@ pub struct KeyMapCustomizations {
 pub struct MismatchedKeyMapCustomization {
   /// Defines the KeyMapEntry Class.
   #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
-  pub wne_keymap: Vec<KeyMapEntry>,
+  pub key_map_entry: Vec<KeyMapEntry>,
 }
 /// Defines the Toolbars Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -324,10 +324,10 @@ pub struct MismatchedKeyMapCustomization {
 pub struct Toolbars {
   /// Defines the AllocatedCommandManifest Class.
   #[sdk(child(qname = "wne:CT_AcdManifest/wne:acdManifest"))]
-  pub wne_acd_manifest: Vec<AllocatedCommandManifest>,
+  pub allocated_command_manifest: Vec<AllocatedCommandManifest>,
   /// Defines the ToolbarData Class.
   #[sdk(child(qname = "wne:CT_Rel/wne:toolbarData"))]
-  pub wne_toolbar_data: Vec<ToolbarData>,
+  pub toolbar_data: Vec<ToolbarData>,
 }
 /// Defines the AllocatedCommands Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -335,7 +335,7 @@ pub struct Toolbars {
 pub struct AllocatedCommands {
   /// Defines the AllocatedCommand Class.
   #[sdk(child(qname = "wne:CT_Acd/wne:acd"))]
-  pub wne_acd: Vec<AllocatedCommand>,
+  pub allocated_command: Vec<AllocatedCommand>,
 }
 /// Defines the RecordIncluded Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

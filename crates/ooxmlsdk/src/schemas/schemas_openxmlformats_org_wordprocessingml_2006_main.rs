@@ -4645,7 +4645,7 @@ pub struct Shading {
 pub struct Tabs {
   /// Custom Tab Stop.
   #[sdk(child(qname = "w:CT_TabStop/w:tab"))]
-  pub w_tab: Vec<TabStop>,
+  pub tab_stop: Vec<TabStop>,
 }
 /// Defines the SpacingBetweenLines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5059,7 +5059,7 @@ pub struct EmbeddedObject {
   pub embedded_object_choice1: Vec<EmbeddedObjectChoice>,
   /// DrawingML Object.
   #[sdk(child(qname = "w:CT_Drawing/w:drawing"))]
-  pub w_drawing: Option<std::boxed::Box<Drawing>>,
+  pub drawing: Option<std::boxed::Box<Drawing>>,
   #[sdk(choice(
     qname = "w:CT_Control/w:control",
     qname = "w:CT_ObjectEmbed/w:objectEmbed",
@@ -5093,10 +5093,10 @@ pub struct Picture {
   pub picture_choice: Vec<PictureChoice>,
   /// Defines the MovieReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:movie"))]
-  pub w_movie: Option<MovieReference>,
+  pub movie_reference: Option<MovieReference>,
   /// Defines the Control Class.
   #[sdk(child(qname = "w:CT_Control/w:control"))]
-  pub w_control: Option<Control>,
+  pub control: Option<Control>,
 }
 /// Complex Field Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7593,10 +7593,10 @@ pub struct Table {
   pub table_choice1: Vec<TableChoice>,
   /// Table Properties.
   #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
-  pub w_tbl_pr: std::boxed::Box<TableProperties>,
+  pub table_properties: std::boxed::Box<TableProperties>,
   /// Table Grid.
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
-  pub w_tbl_grid: std::boxed::Box<TableGrid>,
+  pub table_grid: std::boxed::Box<TableGrid>,
   #[sdk(choice(
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",
@@ -9299,7 +9299,7 @@ pub struct Columns {
   pub separator: Option<crate::simple_type::OnOffValue>,
   /// Single Column Definition.
   #[sdk(child(qname = "w:CT_Column/w:col"))]
-  pub w_col: Vec<Column>,
+  pub column: Vec<Column>,
 }
 /// Defines the VerticalTextAlignmentOnPage Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9332,7 +9332,7 @@ pub struct Recipients {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Data About Single Data Source Record.
   #[sdk(child(qname = "w:CT_RecipientData/w:recipientData"))]
-  pub w_recipient_data: Vec<RecipientData>,
+  pub recipient_data: Vec<RecipientData>,
 }
 /// Rich Text Box Content Container.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9388,7 +9388,7 @@ pub struct Comments {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Comment Content.
   #[sdk(child(qname = "w:CT_Comment/w:comment"))]
-  pub w_comment: Vec<Comment>,
+  pub comment: Vec<Comment>,
 }
 /// Document Footnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9399,7 +9399,7 @@ pub struct Footnotes {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Footnote Content.
   #[sdk(child(qname = "w:CT_FtnEdn/w:footnote"))]
-  pub w_footnote: Vec<Footnote>,
+  pub footnote: Vec<Footnote>,
 }
 /// Document Endnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9410,7 +9410,7 @@ pub struct Endnotes {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Endnote Content.
   #[sdk(child(qname = "w:CT_FtnEdn/w:endnote"))]
-  pub w_endnote: Vec<Endnote>,
+  pub endnote: Vec<Endnote>,
 }
 /// Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9577,250 +9577,250 @@ pub struct Settings {
   pub hide_grammatical_errors: Option<HideGrammaticalErrors>,
   /// Grammar Checking Settings.
   #[sdk(child(qname = "w:CT_WritingStyle/w:activeWritingStyle"))]
-  pub w_active_writing_style: Vec<ActiveWritingStyle>,
+  pub active_writing_style: Vec<ActiveWritingStyle>,
   /// Spelling and Grammatical Checking State.
   #[sdk(child(qname = "w:CT_Proof/w:proofState"))]
-  pub w_proof_state: Option<ProofState>,
+  pub proof_state: Option<ProofState>,
   /// Structured Document Tag Placeholder Text Should be Resaved.
   #[sdk(child(qname = "w:CT_OnOff/w:formsDesign"))]
-  pub w_forms_design: Option<FormsDesign>,
+  pub forms_design: Option<FormsDesign>,
   /// Attached Document Template.
   #[sdk(child(qname = "w:CT_Rel/w:attachedTemplate"))]
-  pub w_attached_template: Option<AttachedTemplate>,
+  pub attached_template: Option<AttachedTemplate>,
   /// Automatically Update Styles From Document Template.
   #[sdk(child(qname = "w:CT_OnOff/w:linkStyles"))]
-  pub w_link_styles: Option<LinkStyles>,
+  pub link_styles: Option<LinkStyles>,
   /// Suggested Filtering for List of Document Styles.
   #[sdk(child(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter"))]
-  pub w_style_pane_format_filter: Option<StylePaneFormatFilter>,
+  pub style_pane_format_filter: Option<StylePaneFormatFilter>,
   /// Suggested Sorting for List of Document Styles.
   #[sdk(child(qname = "w:CT_StylePaneSortMethods/w:stylePaneSortMethod"))]
-  pub w_style_pane_sort_method: Option<StylePaneSortMethods>,
+  pub style_pane_sort_methods: Option<StylePaneSortMethods>,
   /// Document Classification.
   #[sdk(child(qname = "w:CT_DocType/w:documentType"))]
-  pub w_document_type: Option<DocumentType>,
+  pub document_type: Option<DocumentType>,
   /// Mail Merge Settings.
   #[sdk(child(qname = "w:CT_MailMerge/w:mailMerge"))]
-  pub w_mail_merge: Option<std::boxed::Box<MailMerge>>,
+  pub mail_merge: Option<std::boxed::Box<MailMerge>>,
   /// Visibility of Annotation Types.
   #[sdk(child(qname = "w:CT_TrackChangesView/w:revisionView"))]
-  pub w_revision_view: Option<RevisionView>,
+  pub revision_view: Option<RevisionView>,
   /// Track Revisions to Document.
   #[sdk(child(qname = "w:CT_OnOff/w:trackRevisions"))]
-  pub w_track_revisions: Option<TrackRevisions>,
+  pub track_revisions: Option<TrackRevisions>,
   /// Do Not Use Move Syntax When Tracking Revisions.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotTrackMoves"))]
-  pub w_do_not_track_moves: Option<DoNotTrackMoves>,
+  pub do_not_track_moves: Option<DoNotTrackMoves>,
   /// Do Not Track Formatting Revisions When Tracking Revisions.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotTrackFormatting"))]
-  pub w_do_not_track_formatting: Option<DoNotTrackFormatting>,
+  pub do_not_track_formatting: Option<DoNotTrackFormatting>,
   /// Document Editing Restrictions.
   #[sdk(child(qname = "w:CT_DocProtect/w:documentProtection"))]
-  pub w_document_protection: Option<DocumentProtection>,
+  pub document_protection: Option<DocumentProtection>,
   /// Allow Automatic Formatting to Override Formatting Protection Settings.
   #[sdk(child(qname = "w:CT_OnOff/w:autoFormatOverride"))]
-  pub w_auto_format_override: Option<AutoFormatOverride>,
+  pub auto_format_override: Option<AutoFormatOverride>,
   /// Prevent Modification of Themes Part.
   #[sdk(child(qname = "w:CT_OnOff/w:styleLockTheme"))]
-  pub w_style_lock_theme: Option<StyleLockThemesPart>,
+  pub style_lock_themes_part: Option<StyleLockThemesPart>,
   /// Prevent Replacement of Styles Part.
   #[sdk(child(qname = "w:CT_OnOff/w:styleLockQFSet"))]
-  pub w_style_lock_qf_set: Option<StyleLockStylesPart>,
+  pub style_lock_styles_part: Option<StyleLockStylesPart>,
   /// Distance Between Automatic Tab Stops.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:defaultTabStop"))]
-  pub w_default_tab_stop: Option<DefaultTabStop>,
+  pub default_tab_stop: Option<DefaultTabStop>,
   /// Automatically Hyphenate Document Contents When Displayed.
   #[sdk(child(qname = "w:CT_OnOff/w:autoHyphenation"))]
-  pub w_auto_hyphenation: Option<AutoHyphenation>,
+  pub auto_hyphenation: Option<AutoHyphenation>,
   /// Maximum Number of Consecutively Hyphenated Lines.
   #[sdk(child(qname = "w:CT_UnsignedShortNumber/w:consecutiveHyphenLimit"))]
-  pub w_consecutive_hyphen_limit: Option<ConsecutiveHyphenLimit>,
+  pub consecutive_hyphen_limit: Option<ConsecutiveHyphenLimit>,
   /// Hyphenation Zone.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:hyphenationZone"))]
-  pub w_hyphenation_zone: Option<HyphenationZone>,
+  pub hyphenation_zone: Option<HyphenationZone>,
   /// Do Not Hyphenate Words in ALL CAPITAL LETTERS.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotHyphenateCaps"))]
-  pub w_do_not_hyphenate_caps: Option<DoNotHyphenateCaps>,
+  pub do_not_hyphenate_caps: Option<DoNotHyphenateCaps>,
   /// Show E-Mail Message Header.
   #[sdk(child(qname = "w:CT_OnOff/w:showEnvelope"))]
-  pub w_show_envelope: Option<ShowEnvelope>,
+  pub show_envelope: Option<ShowEnvelope>,
   /// Percentage of Document to Use When Generating Summary.
   #[sdk(child(qname = "w:CT_UnsignedInt100/w:summaryLength"))]
-  pub w_summary_length: Option<SummaryLength>,
+  pub summary_length: Option<SummaryLength>,
   /// Paragraph Style Applied to Automatically Generated Paragraphs.
   #[sdk(child(qname = "w:CT_String253/w:clickAndTypeStyle"))]
-  pub w_click_and_type_style: Option<ClickAndTypeStyle>,
+  pub click_and_type_style: Option<ClickAndTypeStyle>,
   /// Default Table Style for Newly Inserted Tables.
   #[sdk(child(qname = "w:CT_String253/w:defaultTableStyle"))]
-  pub w_default_table_style: Option<DefaultTableStyle>,
+  pub default_table_style: Option<DefaultTableStyle>,
   /// Different Even/Odd Page Headers and Footers.
   #[sdk(child(qname = "w:CT_OnOff/w:evenAndOddHeaders"))]
-  pub w_even_and_odd_headers: Option<EvenAndOddHeaders>,
+  pub even_and_odd_headers: Option<EvenAndOddHeaders>,
   /// Reverse Book Fold Printing.
   #[sdk(child(qname = "w:CT_OnOff/w:bookFoldRevPrinting"))]
-  pub w_book_fold_rev_printing: Option<BookFoldReversePrinting>,
+  pub book_fold_reverse_printing: Option<BookFoldReversePrinting>,
   /// Book Fold Printing.
   #[sdk(child(qname = "w:CT_OnOff/w:bookFoldPrinting"))]
-  pub w_book_fold_printing: Option<BookFoldPrinting>,
+  pub book_fold_printing: Option<BookFoldPrinting>,
   /// Number of Pages Per Booklet.
   #[sdk(child(qname = "w:CT_NonNegativeShort/w:bookFoldPrintingSheets"))]
-  pub w_book_fold_printing_sheets: Option<BookFoldPrintingSheets>,
+  pub book_fold_printing_sheets: Option<BookFoldPrintingSheets>,
   /// Drawing Grid Horizontal Grid Unit Size.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalSpacing"))]
-  pub w_drawing_grid_horizontal_spacing: Option<DrawingGridHorizontalSpacing>,
+  pub drawing_grid_horizontal_spacing: Option<DrawingGridHorizontalSpacing>,
   /// Drawing Grid Vertical Grid Unit Size.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalSpacing"))]
-  pub w_drawing_grid_vertical_spacing: Option<DrawingGridVerticalSpacing>,
+  pub drawing_grid_vertical_spacing: Option<DrawingGridVerticalSpacing>,
   /// Distance between Horizontal Gridlines.
   #[sdk(child(qname = "w:CT_UnsignedInt7/w:displayHorizontalDrawingGridEvery"))]
-  pub w_display_horizontal_drawing_grid_every: Option<DisplayHorizontalDrawingGrid>,
+  pub display_horizontal_drawing_grid: Option<DisplayHorizontalDrawingGrid>,
   /// Distance between Vertical Gridlines.
   #[sdk(child(qname = "w:CT_UnsignedInt7/w:displayVerticalDrawingGridEvery"))]
-  pub w_display_vertical_drawing_grid_every: Option<DisplayVerticalDrawingGrid>,
+  pub display_vertical_drawing_grid: Option<DisplayVerticalDrawingGrid>,
   /// Do Not Use Margins for Drawing Grid Origin.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotUseMarginsForDrawingGridOrigin"))]
-  pub w_do_not_use_margins_for_drawing_grid_origin: Option<DoNotUseMarginsForDrawingGridOrigin>,
+  pub do_not_use_margins_for_drawing_grid_origin: Option<DoNotUseMarginsForDrawingGridOrigin>,
   /// Drawing Grid Horizontal Origin Point.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalOrigin"))]
-  pub w_drawing_grid_horizontal_origin: Option<DrawingGridHorizontalOrigin>,
+  pub drawing_grid_horizontal_origin: Option<DrawingGridHorizontalOrigin>,
   /// Drawing Grid Vertical Origin Point.
   #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalOrigin"))]
-  pub w_drawing_grid_vertical_origin: Option<DrawingGridVerticalOrigin>,
+  pub drawing_grid_vertical_origin: Option<DrawingGridVerticalOrigin>,
   /// Do Not Show Visual Indicator For Form Fields.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotShadeFormData"))]
-  pub w_do_not_shade_form_data: Option<DoNotShadeFormData>,
+  pub do_not_shade_form_data: Option<DoNotShadeFormData>,
   /// Never Kern Punctuation Characters.
   #[sdk(child(qname = "w:CT_OnOff/w:noPunctuationKerning"))]
-  pub w_no_punctuation_kerning: Option<NoPunctuationKerning>,
+  pub no_punctuation_kerning: Option<NoPunctuationKerning>,
   /// Character-Level Whitespace Compression.
   #[sdk(child(qname = "w:CT_CharacterSpacing/w:characterSpacingControl"))]
-  pub w_character_spacing_control: Option<CharacterSpacingControl>,
+  pub character_spacing_control: Option<CharacterSpacingControl>,
   /// Print Two Pages Per Sheet.
   #[sdk(child(qname = "w:CT_OnOff/w:printTwoOnOne"))]
-  pub w_print_two_on_one: Option<PrintTwoOnOne>,
+  pub print_two_on_one: Option<PrintTwoOnOne>,
   /// Use Strict Kinsoku Rules for Japanese Text.
   #[sdk(child(qname = "w:CT_OnOff/w:strictFirstAndLastChars"))]
-  pub w_strict_first_and_last_chars: Option<StrictFirstAndLastChars>,
+  pub strict_first_and_last_chars: Option<StrictFirstAndLastChars>,
   /// Custom Set of Characters Which Cannot End a Line.
   #[sdk(child(qname = "w:CT_KinsokuAfter/w:noLineBreaksAfter"))]
-  pub w_no_line_breaks_after: Option<NoLineBreaksAfterKinsoku>,
+  pub no_line_breaks_after_kinsoku: Option<NoLineBreaksAfterKinsoku>,
   /// Custom Set Of Characters Which Cannot Begin A Line.
   #[sdk(child(qname = "w:CT_KinsokuBefore/w:noLineBreaksBefore"))]
-  pub w_no_line_breaks_before: Option<NoLineBreaksBeforeKinsoku>,
+  pub no_line_breaks_before_kinsoku: Option<NoLineBreaksBeforeKinsoku>,
   /// Generate Thumbnail For Document On Save.
   #[sdk(child(qname = "w:CT_OnOff/w:savePreviewPicture"))]
-  pub w_save_preview_picture: Option<SavePreviewPicture>,
+  pub save_preview_picture: Option<SavePreviewPicture>,
   /// Do Not Validate Custom XML Markup Against Schemas.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotValidateAgainstSchema"))]
-  pub w_do_not_validate_against_schema: Option<DoNotValidateAgainstSchema>,
+  pub do_not_validate_against_schema: Option<DoNotValidateAgainstSchema>,
   /// Allow Saving Document As XML File When Custom XML Markup Is Invalid.
   #[sdk(child(qname = "w:CT_OnOff/w:saveInvalidXml"))]
-  pub w_save_invalid_xml: Option<SaveInvalidXml>,
+  pub save_invalid_xml: Option<SaveInvalidXml>,
   /// Ignore Mixed Content When Validating Custom XML Markup.
   #[sdk(child(qname = "w:CT_OnOff/w:ignoreMixedContent"))]
-  pub w_ignore_mixed_content: Option<IgnoreMixedContent>,
+  pub ignore_mixed_content: Option<IgnoreMixedContent>,
   /// Use Custom XML Element Names as Default Placeholder Text.
   #[sdk(child(qname = "w:CT_OnOff/w:alwaysShowPlaceholderText"))]
-  pub w_always_show_placeholder_text: Option<AlwaysShowPlaceholderText>,
+  pub always_show_placeholder_text: Option<AlwaysShowPlaceholderText>,
   /// Do Not Show Visual Indicator For Invalid Custom XML Markup.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotDemarcateInvalidXml"))]
-  pub w_do_not_demarcate_invalid_xml: Option<DoNotDemarcateInvalidXml>,
+  pub do_not_demarcate_invalid_xml: Option<DoNotDemarcateInvalidXml>,
   /// Only Save Custom XML Markup.
   #[sdk(child(qname = "w:CT_OnOff/w:saveXmlDataOnly"))]
-  pub w_save_xml_data_only: Option<SaveXmlDataOnly>,
+  pub save_xml_data_only: Option<SaveXmlDataOnly>,
   /// Save Document as XML File through Custom XSL Transform.
   #[sdk(child(qname = "w:CT_OnOff/w:useXSLTWhenSaving"))]
-  pub w_use_xslt_when_saving: Option<UseXsltWhenSaving>,
+  pub use_xslt_when_saving: Option<UseXsltWhenSaving>,
   /// Custom XSL Transform To Use When Saving As XML File.
   #[sdk(child(qname = "w:CT_SaveThroughXslt/w:saveThroughXslt"))]
-  pub w_save_through_xslt: Option<SaveThroughXslt>,
+  pub save_through_xslt: Option<SaveThroughXslt>,
   /// Show Visual Indicators for Custom XML Markup Start/End Locations.
   #[sdk(child(qname = "w:CT_OnOff/w:showXMLTags"))]
-  pub w_show_xml_tags: Option<ShowXmlTags>,
+  pub show_xml_tags: Option<ShowXmlTags>,
   /// Do Not Mark Custom XML Elements With No Namespace As Invalid.
   #[sdk(child(qname = "w:CT_OnOff/w:alwaysMergeEmptyNamespace"))]
-  pub w_always_merge_empty_namespace: Option<AlwaysMergeEmptyNamespace>,
+  pub always_merge_empty_namespace: Option<AlwaysMergeEmptyNamespace>,
   /// Automatically Recalculate Fields on Open.
   #[sdk(child(qname = "w:CT_OnOff/w:updateFields"))]
-  pub w_update_fields: Option<UpdateFieldsOnOpen>,
+  pub update_fields_on_open: Option<UpdateFieldsOnOpen>,
   /// Default Properties for VML Objects in Header and Footer.
   #[sdk(child(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults"))]
-  pub w_hdr_shape_defaults: Option<HeaderShapeDefaults>,
+  pub header_shape_defaults: Option<HeaderShapeDefaults>,
   /// Document-Wide Footnote Properties.
   #[sdk(child(qname = "w:CT_FtnDocProps/w:footnotePr"))]
-  pub w_footnote_pr: Option<std::boxed::Box<FootnoteDocumentWideProperties>>,
+  pub footnote_document_wide_properties: Option<std::boxed::Box<FootnoteDocumentWideProperties>>,
   /// Document-Wide Endnote Properties.
   #[sdk(child(qname = "w:CT_EdnDocProps/w:endnotePr"))]
-  pub w_endnote_pr: Option<std::boxed::Box<EndnoteDocumentWideProperties>>,
+  pub endnote_document_wide_properties: Option<std::boxed::Box<EndnoteDocumentWideProperties>>,
   /// Compatibility Settings.
   #[sdk(child(qname = "w:CT_Compat/w:compat"))]
-  pub w_compat: Option<std::boxed::Box<Compatibility>>,
+  pub compatibility: Option<std::boxed::Box<Compatibility>>,
   /// Document Variables.
   #[sdk(child(qname = "w:CT_DocVars/w:docVars"))]
-  pub w_doc_vars: Option<DocumentVariables>,
+  pub document_variables: Option<DocumentVariables>,
   /// Listing of All Revision Save ID Values.
   #[sdk(child(qname = "w:CT_DocRsids/w:rsids"))]
-  pub w_rsids: Option<std::boxed::Box<Rsids>>,
+  pub rsids: Option<std::boxed::Box<Rsids>>,
   /// Math Properties.
   #[sdk(child(qname = "m:CT_MathPr/m:mathPr"))]
-  pub m_math_pr: Option<std::boxed::Box<crate::schemas::m::MathProperties>>,
+  pub math_properties: Option<std::boxed::Box<crate::schemas::m::MathProperties>>,
   /// Disable Features Incompatible With Earlier Word Processing Formats.
   #[sdk(child(qname = "w:CT_OnOff/w:uiCompat97To2003"))]
-  pub w_ui_compat97_to2003: Option<UiCompatibleWith97To2003>,
+  pub ui_compatible_with97_to2003: Option<UiCompatibleWith97To2003>,
   /// Attached Custom XML Schema.
   #[sdk(child(qname = "w:CT_String/w:attachedSchema"))]
-  pub w_attached_schema: Vec<AttachedSchema>,
+  pub attached_schema: Vec<AttachedSchema>,
   /// Theme Font Languages.
   #[sdk(child(qname = "w:CT_Language/w:themeFontLang"))]
-  pub w_theme_font_lang: Option<ThemeFontLanguages>,
+  pub theme_font_languages: Option<ThemeFontLanguages>,
   /// Theme Color Mappings.
   #[sdk(child(qname = "w:CT_ColorSchemeMapping/w:clrSchemeMapping"))]
-  pub w_clr_scheme_mapping: Option<ColorSchemeMapping>,
+  pub color_scheme_mapping: Option<ColorSchemeMapping>,
   /// Do Not Include Content in Text Boxes, Footnotes, and Endnotes in Document Statistics.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotIncludeSubdocsInStats"))]
-  pub w_do_not_include_subdocs_in_stats: Option<DoNotIncludeSubdocsInStats>,
+  pub do_not_include_subdocs_in_stats: Option<DoNotIncludeSubdocsInStats>,
   /// Do Not Automatically Compress Images.
   #[sdk(child(qname = "w:CT_OnOff/w:doNotAutoCompressPictures"))]
-  pub w_do_not_auto_compress_pictures: Option<DoNotAutoCompressPictures>,
+  pub do_not_auto_compress_pictures: Option<DoNotAutoCompressPictures>,
   /// Upgrade Document on Open.
   #[sdk(empty_child(qname = "w:CT_Empty/w:forceUpgrade"))]
-  pub w_force_upgrade: Option<()>,
+  pub force_upgrade: Option<()>,
   /// Caption Settings.
   #[sdk(child(qname = "w:CT_Captions/w:captions"))]
-  pub w_captions: Option<std::boxed::Box<Captions>>,
+  pub captions: Option<std::boxed::Box<Captions>>,
   /// Freeze Document Layout.
   #[sdk(child(qname = "w:CT_ReadingModeInkLockDown/w:readModeInkLockDown"))]
-  pub w_read_mode_ink_lock_down: Option<ReadModeInkLockDown>,
+  pub read_mode_ink_lock_down: Option<ReadModeInkLockDown>,
   /// Embedded Custom XML Schema Supplementary Data.
   #[sdk(child(qname = "sl:CT_SchemaLibrary/sl:schemaLibrary"))]
-  pub sl_schema_library: Option<crate::schemas::sl::SchemaLibrary>,
+  pub schema_library: Option<crate::schemas::sl::SchemaLibrary>,
   /// Default Properties for VML Objects in Main Document.
   #[sdk(child(qname = "w:CT_ShapeDefaults/w:shapeDefaults"))]
-  pub w_shape_defaults: Option<ShapeDefaults>,
+  pub shape_defaults: Option<ShapeDefaults>,
   /// Radix Point for Field Code Evaluation.
   #[sdk(child(qname = "w:CT_String/w:decimalSymbol"))]
-  pub w_decimal_symbol: Option<DecimalSymbol>,
+  pub decimal_symbol: Option<DecimalSymbol>,
   /// List Separator for Field Code Evaluation.
   #[sdk(child(qname = "w:CT_String/w:listSeparator"))]
-  pub w_list_separator: Option<ListSeparator>,
+  pub list_separator: Option<ListSeparator>,
   /// Defines the DocumentId Class.
   #[sdk(child(office2010, qname = "w14:CT_LongHexNumber/w14:docId"))]
-  pub w14_doc_id: Option<crate::schemas::w14::DocumentId>,
+  pub document_id: Option<crate::schemas::w14::DocumentId>,
   /// Defines the DiscardImageEditingData Class.
   #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
-  pub w14_discard_image_editing_data: Option<crate::schemas::w14::DiscardImageEditingData>,
+  pub discard_image_editing_data: Option<crate::schemas::w14::DiscardImageEditingData>,
   /// Defines the DefaultImageDpi Class.
   #[sdk(child(office2010, qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
-  pub w14_default_image_dpi: Option<crate::schemas::w14::DefaultImageDpi>,
+  pub default_image_dpi: Option<crate::schemas::w14::DefaultImageDpi>,
   /// Defines the ConflictMode Class.
   #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:conflictMode"))]
-  pub w14_conflict_mode: Option<crate::schemas::w14::ConflictMode>,
+  pub conflict_mode: Option<crate::schemas::w14::ConflictMode>,
   /// Defines the ChartTrackingRefBased Class.
   #[sdk(child(office2013, qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
-  pub w15_chart_tracking_ref_based: Option<crate::schemas::w15::ChartTrackingRefBased>,
+  pub chart_tracking_ref_based: Option<crate::schemas::w15::ChartTrackingRefBased>,
   /// Defines the PersistentDocumentId Class.
   #[sdk(child(office2013, qname = "w15:CT_Guid/w15:docId"))]
-  pub w15_doc_id: Option<crate::schemas::w15::PersistentDocumentId>,
+  pub persistent_document_id: Option<crate::schemas::w15::PersistentDocumentId>,
 }
 /// Web Page Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9885,16 +9885,16 @@ pub struct Numbering {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Picture Numbering Symbol Definition.
   #[sdk(child(qname = "w:CT_NumPicBullet/w:numPicBullet"))]
-  pub w_num_pic_bullet: Vec<NumberingPictureBullet>,
+  pub numbering_picture_bullet: Vec<NumberingPictureBullet>,
   /// Abstract Numbering Definition.
   #[sdk(child(qname = "w:CT_AbstractNum/w:abstractNum"))]
-  pub w_abstract_num: Vec<AbstractNum>,
+  pub abstract_num: Vec<AbstractNum>,
   /// Numbering Definition Instance.
   #[sdk(child(qname = "w:CT_Num/w:num"))]
-  pub w_num: Vec<NumberingInstance>,
+  pub numbering_instance: Vec<NumberingInstance>,
   /// Last Reviewed Abstract Numbering Definition.
   #[sdk(child(qname = "w:CT_DecimalNumber/w:numIdMacAtCleanup"))]
-  pub w_num_id_mac_at_cleanup: Option<NumberingIdMacAtCleanup>,
+  pub numbering_id_mac_at_cleanup: Option<NumberingIdMacAtCleanup>,
 }
 /// Style Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9911,7 +9911,7 @@ pub struct Styles {
   pub latent_styles: Option<LatentStyles>,
   /// Style Definition.
   #[sdk(child(qname = "w:CT_Style/w:style"))]
-  pub w_style: Vec<Style>,
+  pub style: Vec<Style>,
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10301,154 +10301,154 @@ pub struct PreviousRunProperties {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub w_r_style: Vec<RunStyle>,
+  pub run_style: Vec<RunStyle>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub w_r_fonts: Vec<RunFonts>,
+  pub run_fonts: Vec<RunFonts>,
   /// Defines the Bold Class.
   #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub w_b: Vec<Bold>,
+  pub bold: Vec<Bold>,
   /// Defines the BoldComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub w_b_cs: Vec<BoldComplexScript>,
+  pub bold_complex_script: Vec<BoldComplexScript>,
   /// Defines the Italic Class.
   #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub w_i: Vec<Italic>,
+  pub italic: Vec<Italic>,
   /// Defines the ItalicComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub w_i_cs: Vec<ItalicComplexScript>,
+  pub italic_complex_script: Vec<ItalicComplexScript>,
   /// Defines the Caps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub w_caps: Vec<Caps>,
+  pub caps: Vec<Caps>,
   /// Defines the SmallCaps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub w_small_caps: Vec<SmallCaps>,
+  pub small_caps: Vec<SmallCaps>,
   /// Defines the Strike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub w_strike: Vec<Strike>,
+  pub strike: Vec<Strike>,
   /// Defines the DoubleStrike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub w_dstrike: Vec<DoubleStrike>,
+  pub double_strike: Vec<DoubleStrike>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub w_outline: Vec<Outline>,
+  pub outline: Vec<Outline>,
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
   pub w_shadow: Vec<Shadow>,
   /// Defines the Emboss Class.
   #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub w_emboss: Vec<Emboss>,
+  pub emboss: Vec<Emboss>,
   /// Defines the Imprint Class.
   #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub w_imprint: Vec<Imprint>,
+  pub imprint: Vec<Imprint>,
   /// Defines the NoProof Class.
   #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub w_no_proof: Vec<NoProof>,
+  pub no_proof: Vec<NoProof>,
   /// Defines the SnapToGrid Class.
   #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub w_snap_to_grid: Vec<SnapToGrid>,
+  pub snap_to_grid: Vec<SnapToGrid>,
   /// Defines the Vanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub w_vanish: Vec<Vanish>,
+  pub vanish: Vec<Vanish>,
   /// Defines the WebHidden Class.
   #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub w_web_hidden: Vec<WebHidden>,
+  pub web_hidden: Vec<WebHidden>,
   /// Defines the Color Class.
   #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub w_color: Vec<Color>,
+  pub color: Vec<Color>,
   /// Defines the Spacing Class.
   #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub w_spacing: Vec<Spacing>,
+  pub spacing: Vec<Spacing>,
   /// Defines the CharacterScale Class.
   #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub w_w: Vec<CharacterScale>,
+  pub character_scale: Vec<CharacterScale>,
   /// Defines the Kern Class.
   #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub w_kern: Vec<Kern>,
+  pub kern: Vec<Kern>,
   /// Defines the Position Class.
   #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub w_position: Vec<Position>,
+  pub position: Vec<Position>,
   /// Defines the FontSize Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub w_sz: Vec<FontSize>,
+  pub font_size: Vec<FontSize>,
   /// Defines the FontSizeComplexScript Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub w_sz_cs: Vec<FontSizeComplexScript>,
+  pub font_size_complex_script: Vec<FontSizeComplexScript>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub w_highlight: Vec<Highlight>,
+  pub highlight: Vec<Highlight>,
   /// Defines the Underline Class.
   #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub w_u: Vec<Underline>,
+  pub underline: Vec<Underline>,
   /// Defines the TextEffect Class.
   #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub w_effect: Vec<TextEffect>,
+  pub text_effect: Vec<TextEffect>,
   /// Defines the Border Class.
   #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub w_bdr: Vec<Border>,
+  pub border: Vec<Border>,
   /// Defines the Shading Class.
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub w_shd: Vec<Shading>,
+  pub shading: Vec<Shading>,
   /// Defines the FitText Class.
   #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub w_fit_text: Vec<FitText>,
+  pub fit_text: Vec<FitText>,
   /// Defines the VerticalTextAlignment Class.
   #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub w_vert_align: Vec<VerticalTextAlignment>,
+  pub vertical_text_alignment: Vec<VerticalTextAlignment>,
   /// Defines the RightToLeftText Class.
   #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub w_rtl: Vec<RightToLeftText>,
+  pub right_to_left_text: Vec<RightToLeftText>,
   /// Defines the ComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub w_cs: Vec<ComplexScript>,
+  pub complex_script: Vec<ComplexScript>,
   /// Defines the Emphasis Class.
   #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub w_em: Vec<Emphasis>,
+  pub emphasis: Vec<Emphasis>,
   /// Defines the Languages Class.
   #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub w_lang: Vec<Languages>,
+  pub languages: Vec<Languages>,
   /// Defines the EastAsianLayout Class.
   #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub w_east_asian_layout: Vec<EastAsianLayout>,
+  pub east_asian_layout: Vec<EastAsianLayout>,
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub w_spec_vanish: Vec<SpecVanish>,
+  pub spec_vanish: Vec<SpecVanish>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
-  pub w14_glow: Vec<crate::schemas::w14::Glow>,
+  pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
   pub w14_shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
-  pub w14_reflection: Vec<crate::schemas::w14::Reflection>,
+  pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
-  pub w14_text_outline: Vec<crate::schemas::w14::TextOutlineEffect>,
+  pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
-  pub w14_text_fill: Vec<crate::schemas::w14::FillTextEffect>,
+  pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
-  pub w14_scene3d: Vec<crate::schemas::w14::Scene3D>,
+  pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
-  pub w14_props3d: Vec<crate::schemas::w14::Properties3D>,
+  pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
   #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
-  pub w14_ligatures: Vec<crate::schemas::w14::Ligatures>,
+  pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
-  pub w14_num_form: Vec<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
-  pub w14_num_spacing: Vec<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
-  pub w14_stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
-  pub w14_cntxt_alts: Vec<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
 }
 /// Previous Run Properties for the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10476,157 +10476,157 @@ pub struct PreviousParagraphMarkRunProperties {
     Option<PreviousParagraphMarkRunPropertiesChoice>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub w_r_style: Vec<RunStyle>,
+  pub run_style: Vec<RunStyle>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub w_r_fonts: Vec<RunFonts>,
+  pub run_fonts: Vec<RunFonts>,
   /// Defines the Bold Class.
   #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub w_b: Vec<Bold>,
+  pub bold: Vec<Bold>,
   /// Defines the BoldComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub w_b_cs: Vec<BoldComplexScript>,
+  pub bold_complex_script: Vec<BoldComplexScript>,
   /// Defines the Italic Class.
   #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub w_i: Vec<Italic>,
+  pub italic: Vec<Italic>,
   /// Defines the ItalicComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub w_i_cs: Vec<ItalicComplexScript>,
+  pub italic_complex_script: Vec<ItalicComplexScript>,
   /// Defines the Caps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub w_caps: Vec<Caps>,
+  pub caps: Vec<Caps>,
   /// Defines the SmallCaps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub w_small_caps: Vec<SmallCaps>,
+  pub small_caps: Vec<SmallCaps>,
   /// Defines the Strike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub w_strike: Vec<Strike>,
+  pub strike: Vec<Strike>,
   /// Defines the DoubleStrike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub w_dstrike: Vec<DoubleStrike>,
+  pub double_strike: Vec<DoubleStrike>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub w_outline: Vec<Outline>,
+  pub outline: Vec<Outline>,
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
   pub w_shadow: Vec<Shadow>,
   /// Defines the Emboss Class.
   #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub w_emboss: Vec<Emboss>,
+  pub emboss: Vec<Emboss>,
   /// Defines the Imprint Class.
   #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub w_imprint: Vec<Imprint>,
+  pub imprint: Vec<Imprint>,
   /// Defines the NoProof Class.
   #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub w_no_proof: Vec<NoProof>,
+  pub no_proof: Vec<NoProof>,
   /// Defines the SnapToGrid Class.
   #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub w_snap_to_grid: Vec<SnapToGrid>,
+  pub snap_to_grid: Vec<SnapToGrid>,
   /// Defines the Vanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub w_vanish: Vec<Vanish>,
+  pub vanish: Vec<Vanish>,
   /// Defines the WebHidden Class.
   #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub w_web_hidden: Vec<WebHidden>,
+  pub web_hidden: Vec<WebHidden>,
   /// Defines the Color Class.
   #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub w_color: Vec<Color>,
+  pub color: Vec<Color>,
   /// Defines the Spacing Class.
   #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub w_spacing: Vec<Spacing>,
+  pub spacing: Vec<Spacing>,
   /// Defines the CharacterScale Class.
   #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub w_w: Vec<CharacterScale>,
+  pub character_scale: Vec<CharacterScale>,
   /// Defines the Kern Class.
   #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub w_kern: Vec<Kern>,
+  pub kern: Vec<Kern>,
   /// Defines the Position Class.
   #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub w_position: Vec<Position>,
+  pub position: Vec<Position>,
   /// Defines the FontSize Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub w_sz: Vec<FontSize>,
+  pub font_size: Vec<FontSize>,
   /// Defines the FontSizeComplexScript Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub w_sz_cs: Vec<FontSizeComplexScript>,
+  pub font_size_complex_script: Vec<FontSizeComplexScript>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub w_highlight: Vec<Highlight>,
+  pub highlight: Vec<Highlight>,
   /// Defines the Underline Class.
   #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub w_u: Vec<Underline>,
+  pub underline: Vec<Underline>,
   /// Defines the TextEffect Class.
   #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub w_effect: Vec<TextEffect>,
+  pub text_effect: Vec<TextEffect>,
   /// Defines the Border Class.
   #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub w_bdr: Vec<Border>,
+  pub border: Vec<Border>,
   /// Defines the Shading Class.
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub w_shd: Vec<Shading>,
+  pub shading: Vec<Shading>,
   /// Defines the FitText Class.
   #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub w_fit_text: Vec<FitText>,
+  pub fit_text: Vec<FitText>,
   /// Defines the VerticalTextAlignment Class.
   #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub w_vert_align: Vec<VerticalTextAlignment>,
+  pub vertical_text_alignment: Vec<VerticalTextAlignment>,
   /// Defines the RightToLeftText Class.
   #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub w_rtl: Vec<RightToLeftText>,
+  pub right_to_left_text: Vec<RightToLeftText>,
   /// Defines the ComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub w_cs: Vec<ComplexScript>,
+  pub complex_script: Vec<ComplexScript>,
   /// Defines the Emphasis Class.
   #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub w_em: Vec<Emphasis>,
+  pub emphasis: Vec<Emphasis>,
   /// Defines the Languages Class.
   #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub w_lang: Vec<Languages>,
+  pub languages: Vec<Languages>,
   /// Defines the EastAsianLayout Class.
   #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub w_east_asian_layout: Vec<EastAsianLayout>,
+  pub east_asian_layout: Vec<EastAsianLayout>,
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub w_spec_vanish: Vec<SpecVanish>,
+  pub spec_vanish: Vec<SpecVanish>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
-  pub w14_glow: Vec<crate::schemas::w14::Glow>,
+  pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
   pub w14_shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
-  pub w14_reflection: Vec<crate::schemas::w14::Reflection>,
+  pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
-  pub w14_text_outline: Vec<crate::schemas::w14::TextOutlineEffect>,
+  pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
-  pub w14_text_fill: Vec<crate::schemas::w14::FillTextEffect>,
+  pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
-  pub w14_scene3d: Vec<crate::schemas::w14::Scene3D>,
+  pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
-  pub w14_props3d: Vec<crate::schemas::w14::Properties3D>,
+  pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
   #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
-  pub w14_ligatures: Vec<crate::schemas::w14::Ligatures>,
+  pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
-  pub w14_num_form: Vec<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
-  pub w14_num_spacing: Vec<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
-  pub w14_stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
-  pub w14_cntxt_alts: Vec<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
-  pub w_o_math: Vec<OfficeMath>,
+  pub office_math: Vec<OfficeMath>,
 }
 /// Numbering Level Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10740,160 +10740,161 @@ pub struct ParagraphMarkRunProperties {
   pub paragraph_mark_run_properties_choice: Option<ParagraphMarkRunPropertiesChoice>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub w_r_style: Option<RunStyle>,
+  pub run_style: Option<RunStyle>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub w_r_fonts: Option<RunFonts>,
+  pub run_fonts: Option<RunFonts>,
   /// Defines the Bold Class.
   #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub w_b: Option<Bold>,
+  pub bold: Option<Bold>,
   /// Defines the BoldComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub w_b_cs: Option<BoldComplexScript>,
+  pub bold_complex_script: Option<BoldComplexScript>,
   /// Defines the Italic Class.
   #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub w_i: Option<Italic>,
+  pub italic: Option<Italic>,
   /// Defines the ItalicComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub w_i_cs: Option<ItalicComplexScript>,
+  pub italic_complex_script: Option<ItalicComplexScript>,
   /// Defines the Caps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub w_caps: Option<Caps>,
+  pub caps: Option<Caps>,
   /// Defines the SmallCaps Class.
   #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub w_small_caps: Option<SmallCaps>,
+  pub small_caps: Option<SmallCaps>,
   /// Defines the Strike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub w_strike: Option<Strike>,
+  pub strike: Option<Strike>,
   /// Defines the DoubleStrike Class.
   #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub w_dstrike: Option<DoubleStrike>,
+  pub double_strike: Option<DoubleStrike>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub w_outline: Option<Outline>,
+  pub outline: Option<Outline>,
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
   pub w_shadow: Option<Shadow>,
   /// Defines the Emboss Class.
   #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub w_emboss: Option<Emboss>,
+  pub emboss: Option<Emboss>,
   /// Defines the Imprint Class.
   #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub w_imprint: Option<Imprint>,
+  pub imprint: Option<Imprint>,
   /// Defines the NoProof Class.
   #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub w_no_proof: Option<NoProof>,
+  pub no_proof: Option<NoProof>,
   /// Defines the SnapToGrid Class.
   #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub w_snap_to_grid: Option<SnapToGrid>,
+  pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the Vanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub w_vanish: Option<Vanish>,
+  pub vanish: Option<Vanish>,
   /// Defines the WebHidden Class.
   #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub w_web_hidden: Option<WebHidden>,
+  pub web_hidden: Option<WebHidden>,
   /// Defines the Color Class.
   #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub w_color: Option<Color>,
+  pub color: Option<Color>,
   /// Defines the Spacing Class.
   #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub w_spacing: Option<Spacing>,
+  pub spacing: Option<Spacing>,
   /// Defines the CharacterScale Class.
   #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub w_w: Option<CharacterScale>,
+  pub character_scale: Option<CharacterScale>,
   /// Defines the Kern Class.
   #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub w_kern: Option<Kern>,
+  pub kern: Option<Kern>,
   /// Defines the Position Class.
   #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub w_position: Option<Position>,
+  pub position: Option<Position>,
   /// Defines the FontSize Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub w_sz: Option<FontSize>,
+  pub font_size: Option<FontSize>,
   /// Defines the FontSizeComplexScript Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub w_sz_cs: Option<FontSizeComplexScript>,
+  pub font_size_complex_script: Option<FontSizeComplexScript>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub w_highlight: Option<Highlight>,
+  pub highlight: Option<Highlight>,
   /// Defines the Underline Class.
   #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub w_u: Option<Underline>,
+  pub underline: Option<Underline>,
   /// Defines the TextEffect Class.
   #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub w_effect: Option<TextEffect>,
+  pub text_effect: Option<TextEffect>,
   /// Defines the Border Class.
   #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub w_bdr: Option<Border>,
+  pub border: Option<Border>,
   /// Defines the Shading Class.
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub w_shd: Option<Shading>,
+  pub shading: Option<Shading>,
   /// Defines the FitText Class.
   #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub w_fit_text: Option<FitText>,
+  pub fit_text: Option<FitText>,
   /// Defines the VerticalTextAlignment Class.
   #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub w_vert_align: Option<VerticalTextAlignment>,
+  pub vertical_text_alignment: Option<VerticalTextAlignment>,
   /// Defines the RightToLeftText Class.
   #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub w_rtl: Option<RightToLeftText>,
+  pub right_to_left_text: Option<RightToLeftText>,
   /// Defines the ComplexScript Class.
   #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub w_cs: Option<ComplexScript>,
+  pub complex_script: Option<ComplexScript>,
   /// Defines the Emphasis Class.
   #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub w_em: Option<Emphasis>,
+  pub emphasis: Option<Emphasis>,
   /// Defines the Languages Class.
   #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub w_lang: Option<Languages>,
+  pub languages: Option<Languages>,
   /// Defines the EastAsianLayout Class.
   #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub w_east_asian_layout: Option<EastAsianLayout>,
+  pub east_asian_layout: Option<EastAsianLayout>,
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub w_spec_vanish: Option<SpecVanish>,
+  pub spec_vanish: Option<SpecVanish>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
-  pub w14_glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
+  pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
   pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
-  pub w14_reflection: Option<crate::schemas::w14::Reflection>,
+  pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
-  pub w14_text_outline: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
+  pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
   #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
-  pub w14_text_fill: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
+  pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
-  pub w14_scene3d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
+  pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
   #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
-  pub w14_props3d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
+  pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
   #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
-  pub w14_ligatures: Option<crate::schemas::w14::Ligatures>,
+  pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
-  pub w14_num_form: Option<crate::schemas::w14::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
   #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
-  pub w14_num_spacing: Option<crate::schemas::w14::NumberSpacing>,
+  pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
   #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
-  pub w14_stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
+  pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
-  pub w14_cntxt_alts: Option<crate::schemas::w14::ContextualAlternatives>,
+  pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
-  pub w_o_math: Option<OfficeMath>,
+  pub office_math: Option<OfficeMath>,
   /// Revision Information for Run Properties on the Paragraph Mark.
   #[sdk(child(qname = "w:CT_ParaRPrChange/w:rPrChange"))]
-  pub w_r_pr_change: Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
+  pub paragraph_mark_run_properties_change:
+    Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
 }
 /// Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10925,67 +10926,67 @@ pub struct SectionProperties {
   pub section_properties_choice: Vec<SectionPropertiesChoice>,
   /// Defines the FootnoteProperties Class.
   #[sdk(child(qname = "w:CT_FtnProps/w:footnotePr"))]
-  pub w_footnote_pr: Option<std::boxed::Box<FootnoteProperties>>,
+  pub footnote_properties: Option<std::boxed::Box<FootnoteProperties>>,
   /// Defines the EndnoteProperties Class.
   #[sdk(child(qname = "w:CT_EdnProps/w:endnotePr"))]
-  pub w_endnote_pr: Option<std::boxed::Box<EndnoteProperties>>,
+  pub endnote_properties: Option<std::boxed::Box<EndnoteProperties>>,
   /// Defines the SectionType Class.
   #[sdk(child(qname = "w:CT_SectType/w:type"))]
-  pub w_type: Option<SectionType>,
+  pub section_type: Option<SectionType>,
   /// Defines the PageSize Class.
   #[sdk(child(qname = "w:CT_PageSz/w:pgSz"))]
-  pub w_pg_sz: Option<PageSize>,
+  pub page_size: Option<PageSize>,
   /// Defines the PageMargin Class.
   #[sdk(child(qname = "w:CT_PageMar/w:pgMar"))]
-  pub w_pg_mar: Option<PageMargin>,
+  pub page_margin: Option<PageMargin>,
   /// Defines the PaperSource Class.
   #[sdk(child(qname = "w:CT_PaperSource/w:paperSrc"))]
-  pub w_paper_src: Option<PaperSource>,
+  pub paper_source: Option<PaperSource>,
   /// Defines the PageBorders Class.
   #[sdk(child(qname = "w:CT_PageBorders/w:pgBorders"))]
-  pub w_pg_borders: Option<std::boxed::Box<PageBorders>>,
+  pub page_borders: Option<std::boxed::Box<PageBorders>>,
   /// Defines the LineNumberType Class.
   #[sdk(child(qname = "w:CT_LineNumber/w:lnNumType"))]
-  pub w_ln_num_type: Option<LineNumberType>,
+  pub line_number_type: Option<LineNumberType>,
   /// Defines the PageNumberType Class.
   #[sdk(child(qname = "w:CT_PageNumber/w:pgNumType"))]
-  pub w_pg_num_type: Option<PageNumberType>,
+  pub page_number_type: Option<PageNumberType>,
   /// Defines the Columns Class.
   #[sdk(child(qname = "w:CT_Columns/w:cols"))]
-  pub w_cols: Option<Columns>,
+  pub columns: Option<Columns>,
   /// Defines the FormProtection Class.
   #[sdk(child(qname = "w:CT_OnOff/w:formProt"))]
-  pub w_form_prot: Option<FormProtection>,
+  pub form_protection: Option<FormProtection>,
   /// Defines the VerticalTextAlignmentOnPage Class.
   #[sdk(child(qname = "w:CT_VerticalJc/w:vAlign"))]
-  pub w_v_align: Option<VerticalTextAlignmentOnPage>,
+  pub vertical_text_alignment_on_page: Option<VerticalTextAlignmentOnPage>,
   /// Defines the NoEndnote Class.
   #[sdk(child(qname = "w:CT_OnOff/w:noEndnote"))]
-  pub w_no_endnote: Option<NoEndnote>,
+  pub no_endnote: Option<NoEndnote>,
   /// Defines the TitlePage Class.
   #[sdk(child(qname = "w:CT_OnOff/w:titlePg"))]
-  pub w_title_pg: Option<TitlePage>,
+  pub title_page: Option<TitlePage>,
   /// Defines the TextDirection Class.
   #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
-  pub w_text_direction: Option<TextDirection>,
+  pub text_direction: Option<TextDirection>,
   /// Defines the BiDi Class.
   #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
-  pub w_bidi: Option<BiDi>,
+  pub bi_di: Option<BiDi>,
   /// Defines the GutterOnRight Class.
   #[sdk(child(qname = "w:CT_OnOff/w:rtlGutter"))]
-  pub w_rtl_gutter: Option<GutterOnRight>,
+  pub gutter_on_right: Option<GutterOnRight>,
   /// Defines the DocGrid Class.
   #[sdk(child(qname = "w:CT_DocGrid/w:docGrid"))]
-  pub w_doc_grid: Option<DocGrid>,
+  pub doc_grid: Option<DocGrid>,
   /// Defines the PrinterSettingsReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
-  pub w_printer_settings: Option<PrinterSettingsReference>,
+  pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
   #[sdk(child(office2013, qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
-  pub w15_footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
+  pub footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
   /// Revision Information for Section Properties.
   #[sdk(child(qname = "w:CT_SectPrChange/w:sectPrChange"))]
-  pub w_sect_pr_change: Option<std::boxed::Box<SectionPropertiesChange>>,
+  pub section_properties_change: Option<std::boxed::Box<SectionPropertiesChange>>,
 }
 /// Custom Field Data.
 pub type FieldData = crate::simple_type::Base64BinaryValue;
@@ -11067,10 +11068,10 @@ pub struct CheckBox {
   pub check_box_choice: Option<CheckBoxChoice>,
   /// Default Checkbox Form Field State.
   #[sdk(child(qname = "w:CT_OnOff/w:default"))]
-  pub w_default: Option<DefaultCheckBoxFormFieldState>,
+  pub default_check_box_form_field_state: Option<DefaultCheckBoxFormFieldState>,
   /// Checkbox Form Field State.
   #[sdk(child(qname = "w:CT_OnOff/w:checked"))]
-  pub w_checked: Option<Checked>,
+  pub checked: Option<Checked>,
 }
 /// Drop-Down List Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11084,7 +11085,7 @@ pub struct DropDownListFormField {
   pub default_drop_down_list_item_index: Option<DefaultDropDownListItemIndex>,
   /// Drop-Down List Entry.
   #[sdk(child(qname = "w:CT_String255/w:listEntry"))]
-  pub w_list_entry: Vec<ListEntryFormField>,
+  pub list_entry_form_field: Vec<ListEntryFormField>,
 }
 /// Text Box Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11803,7 +11804,7 @@ pub struct CustomXmlProperties {
   pub custom_xml_placeholder: Option<CustomXmlPlaceholder>,
   /// Custom XML Attribute.
   #[sdk(child(qname = "w:CT_XmlAttr/w:attr"))]
-  pub w_attr: Vec<CustomXmlAttribute>,
+  pub custom_xml_attribute: Vec<CustomXmlAttribute>,
 }
 /// Custom XML Attribute.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11951,7 +11952,7 @@ pub struct TableCellProperties {
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   /// Revision Information for Table Cell Properties.
   #[sdk(child(qname = "w:CT_TcPrChange/w:tcPrChange"))]
-  pub w_tc_pr_change: Option<std::boxed::Box<TableCellPropertiesChange>>,
+  pub table_cell_properties_change: Option<std::boxed::Box<TableCellPropertiesChange>>,
 }
 /// Revision Information for Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12086,10 +12087,10 @@ pub struct TableProperties {
 pub struct TableGrid {
   /// Grid Column Definition.
   #[sdk(child(qname = "w:CT_TblGridCol/w:gridCol"))]
-  pub w_grid_col: Vec<GridColumn>,
+  pub grid_column: Vec<GridColumn>,
   /// Revision Information for Table Grid Column Definitions.
   #[sdk(child(qname = "w:CT_TblGridChange/w:tblGridChange"))]
-  pub w_tbl_grid_change: Option<std::boxed::Box<TableGridChange>>,
+  pub table_grid_change: Option<std::boxed::Box<TableGridChange>>,
 }
 /// Footnote Placement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12262,10 +12263,10 @@ pub struct DataSourceObject {
   pub first_row_header: Option<FirstRowHeader>,
   /// External Data Source to Merge Field Mapping.
   #[sdk(child(qname = "w:CT_OdsoFieldMapData/w:fieldMapData"))]
-  pub w_field_map_data: Vec<FieldMapData>,
+  pub field_map_data: Vec<FieldMapData>,
   /// Reference to Inclusion/Exclusion Data for Data Source.
   #[sdk(child(qname = "w:CT_Rel/w:recipientData"))]
-  pub w_recipient_data: Option<RecipientDataReference>,
+  pub recipient_data_reference: Option<RecipientDataReference>,
 }
 /// Single Document Variable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13098,7 +13099,7 @@ pub struct AbstractNum {
   pub numbering_style_link: Option<NumberingStyleLink>,
   /// Numbering Level Definition.
   #[sdk(child(qname = "w:CT_Lvl/w:lvl"))]
-  pub w_lvl: Vec<Level>,
+  pub level: Vec<Level>,
 }
 /// Numbering Definition Instance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13117,7 +13118,7 @@ pub struct NumberingInstance {
   pub abstract_num_id: std::boxed::Box<AbstractNumId>,
   /// Defines the LevelOverride Class.
   #[sdk(child(qname = "w:CT_NumLvl/w:lvlOverride"))]
-  pub w_lvl_override: Vec<LevelOverride>,
+  pub level_override: Vec<LevelOverride>,
 }
 /// Table Style Conditional Formatting Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13539,7 +13540,7 @@ pub struct LatentStyles {
   pub count: Option<crate::simple_type::Int32Value>,
   /// Latent Style Exception.
   #[sdk(child(qname = "w:CT_LsdException/w:lsdException"))]
-  pub w_lsd_exception: Vec<LatentStyleExceptionInfo>,
+  pub latent_style_exception_info: Vec<LatentStyleExceptionInfo>,
 }
 /// Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13624,7 +13625,7 @@ pub struct Style {
   pub style_table_cell_properties: Option<std::boxed::Box<StyleTableCellProperties>>,
   /// Style Conditional Table Formatting Properties.
   #[sdk(child(qname = "w:CT_TblStylePr/w:tblStylePr"))]
-  pub w_tbl_style_pr: Vec<TableStyleProperties>,
+  pub table_style_properties: Vec<TableStyleProperties>,
 }
 /// Properties for a Single Font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13750,7 +13751,7 @@ pub struct DivBorder {
 pub struct DivsChild {
   /// Information About Single HTML div Element.
   #[sdk(child(qname = "w:CT_Div/w:div"))]
-  pub w_div: Vec<Div>,
+  pub div: Vec<Div>,
 }
 /// Defines the Divs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13758,7 +13759,7 @@ pub struct DivsChild {
 pub struct Divs {
   /// Information About Single HTML div Element.
   #[sdk(child(qname = "w:CT_Div/w:div"))]
-  pub w_div: Vec<Div>,
+  pub div: Vec<Div>,
 }
 /// Information About Single HTML div Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13804,7 +13805,7 @@ pub struct Div {
   pub div_border: Option<std::boxed::Box<DivBorder>>,
   /// Child div Elements Contained within Current div.
   #[sdk(child(qname = "w:CT_Divs/w:divsChild"))]
-  pub w_divs_child: Vec<DivsChild>,
+  pub divs_child: Vec<DivsChild>,
 }
 /// Comment Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14033,7 +14034,7 @@ pub struct Caption {
 pub struct AutoCaptions {
   /// Single Automatic Captioning Setting.
   #[sdk(child(qname = "w:CT_AutoCaption/w:autoCaption"))]
-  pub w_auto_caption: Vec<AutoCaption>,
+  pub auto_caption: Vec<AutoCaption>,
 }
 /// Document Background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14198,7 +14199,7 @@ pub struct DocPartBody {
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
   /// Section Properties.
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
-  pub w_sect_pr: Option<std::boxed::Box<SectionProperties>>,
+  pub section_properties: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Defines the Body Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14247,7 +14248,7 @@ pub struct Body {
   pub body_choice: Vec<BodyChoice>,
   /// Section Properties.
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
-  pub w_sect_pr: Option<std::boxed::Box<SectionProperties>>,
+  pub section_properties: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Glossary Document Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14366,13 +14367,13 @@ pub struct TableRowProperties {
   pub table_row_properties_choice1: Vec<TableRowPropertiesChoice>,
   /// Inserted Paragraph.
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
-  pub w_ins: Option<Inserted>,
+  pub inserted: Option<Inserted>,
   /// Deleted Paragraph.
   #[sdk(child(qname = "w:CT_TrackChange/w:del"))]
-  pub w_del: Option<Deleted>,
+  pub deleted: Option<Deleted>,
   /// Revision Information for Table Row Properties.
   #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
-  pub w_tr_pr_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
+  pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
   #[sdk(choice(
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
@@ -14552,7 +14553,7 @@ pub struct Control {
 pub struct PreviousTableGrid {
   /// Grid Column Definition.
   #[sdk(child(qname = "w:CT_TblGridCol/w:gridCol"))]
-  pub w_grid_col: Vec<GridColumn>,
+  pub grid_column: Vec<GridColumn>,
 }
 /// Defines the ObjectEmbed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14639,7 +14640,7 @@ pub struct SdtContentComboBox {
   pub last_value: Option<crate::simple_type::StringValue>,
   /// Combo Box List Item.
   #[sdk(child(qname = "w:CT_SdtListItem/w:listItem"))]
-  pub w_list_item: Vec<ListItem>,
+  pub list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentDate Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14698,7 +14699,7 @@ pub struct SdtContentDropDownList {
   pub last_value: Option<crate::simple_type::StringValue>,
   /// Combo Box List Item.
   #[sdk(child(qname = "w:CT_SdtListItem/w:listItem"))]
-  pub w_list_item: Vec<ListItem>,
+  pub list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15207,7 +15208,7 @@ pub struct FootnoteDocumentWideProperties {
   pub numbering_restart: Option<NumberingRestart>,
   /// Special Footnote List.
   #[sdk(child(qname = "w:CT_FtnEdnSepRef/w:footnote"))]
-  pub w_footnote: Vec<FootnoteSpecialReference>,
+  pub footnote_special_reference: Vec<FootnoteSpecialReference>,
 }
 /// Document-Wide Endnote Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15229,7 +15230,7 @@ pub struct EndnoteDocumentWideProperties {
   pub numbering_restart: Option<NumberingRestart>,
   /// Special Endnote List.
   #[sdk(child(qname = "w:CT_FtnEdnSepRef/w:endnote"))]
-  pub w_endnote: Vec<EndnoteSpecialReference>,
+  pub endnote_special_reference: Vec<EndnoteSpecialReference>,
 }
 /// Compatibility Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15432,7 +15433,7 @@ pub struct Compatibility {
   pub cached_column_balance: Option<CachedColumnBalance>,
   /// Defines the CompatibilitySetting Class.
   #[sdk(child(qname = "w:CT_CompatSetting/w:compatSetting"))]
-  pub w_compat_setting: Vec<CompatibilitySetting>,
+  pub compatibility_setting: Vec<CompatibilitySetting>,
 }
 /// Document Variables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15440,7 +15441,7 @@ pub struct Compatibility {
 pub struct DocumentVariables {
   /// Single Document Variable.
   #[sdk(child(qname = "w:CT_DocVar/w:docVar"))]
-  pub w_doc_var: Vec<DocumentVariable>,
+  pub document_variable: Vec<DocumentVariable>,
 }
 /// Listing of All Revision Save ID Values.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15451,7 +15452,7 @@ pub struct Rsids {
   pub rsid_root: Option<RsidRoot>,
   /// Single Session Revision Save ID.
   #[sdk(child(qname = "w:CT_LongHexNumber/w:rsid"))]
-  pub w_rsid: Vec<Rsid>,
+  pub rsid: Vec<Rsid>,
 }
 /// Theme Color Mappings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15500,10 +15501,10 @@ pub struct ColorSchemeMapping {
 pub struct Captions {
   /// Single Caption Type Definition.
   #[sdk(child(qname = "w:CT_Caption/w:caption"))]
-  pub w_caption: Vec<Caption>,
+  pub caption: Vec<Caption>,
   /// Automatic Captioning Settings.
   #[sdk(child(qname = "w:CT_AutoCaptions/w:autoCaptions"))]
-  pub w_auto_captions: Option<AutoCaptions>,
+  pub auto_captions: Option<AutoCaptions>,
 }
 /// Freeze Document Layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

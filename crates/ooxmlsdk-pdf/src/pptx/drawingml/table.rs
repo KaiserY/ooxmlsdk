@@ -4,7 +4,7 @@ use quick_xml::{Decoder, Reader};
 
 use super::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableProperties {
   pub(crate) style_id: Option<String>,
   pub(crate) first_row: bool,
@@ -17,13 +17,13 @@ pub(crate) struct TableProperties {
   pub(crate) rows: Vec<TableRow>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableRow {
   pub(crate) height: i64,
   pub(crate) cells: Vec<TableCell>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableCell {
   pub(crate) row_span: Option<i32>,
   pub(crate) grid_span: Option<i32>,
@@ -221,6 +221,7 @@ fn open_element(
       *text_body = Some(TextBody {
         has_body_properties: false,
         has_list_style: false,
+        list_style: None,
         paragraphs: Vec::new(),
       });
     }

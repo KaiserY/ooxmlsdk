@@ -7,6 +7,7 @@ use crate::units;
 use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
 use super::drawingml::shape::Shape;
+use super::drawingml::text_list_style::TextListStyle;
 use super::import::PowerPointImport;
 
 // Source: LibreOffice sd/source/filter/eppt/pptx-epptbase.cxx falls back to
@@ -82,6 +83,11 @@ pub(crate) struct SlidePersist {
   pub(crate) shapes: Vec<Shape>,
   pub(crate) background_color: Option<Color>,
   pub(crate) background_properties: Option<BackgroundProperties>,
+  pub(crate) default_text_style: Option<TextListStyle>,
+  pub(crate) title_text_style: Option<TextListStyle>,
+  pub(crate) body_text_style: Option<TextListStyle>,
+  pub(crate) notes_text_style: Option<TextListStyle>,
+  pub(crate) other_text_style: Option<TextListStyle>,
   pub(crate) time_node_list: Vec<TimeNode>,
   pub(crate) header_footer: HeaderFooter,
   pub(crate) layout_value_token: Option<String>,
@@ -178,6 +184,11 @@ impl SlidePersist {
       shapes: Vec::new(),
       background_color: None,
       background_properties: None,
+      default_text_style: None,
+      title_text_style: None,
+      body_text_style: None,
+      notes_text_style: None,
+      other_text_style: None,
       time_node_list: Vec::new(),
       header_footer: HeaderFooter::default(),
       layout_value_token: None,
@@ -196,6 +207,63 @@ impl SlidePersist {
 
   pub(crate) fn set_color_map(&mut self, color_map: ColorMap) {
     self.color_map = Some(color_map);
+  }
+
+  pub(crate) fn set_default_text_style(&mut self, style: Option<TextListStyle>) {
+    self.default_text_style = style;
+  }
+
+  pub(crate) fn set_text_styles(&mut self, styles: &p::TextStyles) {
+    self.title_text_style = styles
+      .title_style
+      .as_ref()
+      .map(|style| TextListStyle::from_pml_title_style(style));
+    self.body_text_style = styles
+      .body_style
+      .as_ref()
+      .map(|style| TextListStyle::from_pml_body_style(style));
+    self.other_text_style = styles
+      .other_style
+      .as_ref()
+      .map(|style| TextListStyle::from_pml_other_style(style));
+  }
+
+  pub(crate) fn get_sub_type_text_list_style(
+    &self,
+    sub_type: Option<p::PlaceholderValues>,
+  ) -> Option<&TextListStyle> {
+    match sub_type {
+      Some(p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle) => {
+        self.title_text_style.as_ref()
+      }
+      Some(
+        p::PlaceholderValues::SubTitle | p::PlaceholderValues::Object | p::PlaceholderValues::Body,
+      ) => {
+        if self.is_notes {
+          self.notes_text_style.as_ref()
+        } else {
+          self.body_text_style.as_ref()
+        }
+      }
+      Some(
+        p::PlaceholderValues::DateAndTime
+        | p::PlaceholderValues::SlideNumber
+        | p::PlaceholderValues::Footer
+        | p::PlaceholderValues::Header
+        | p::PlaceholderValues::Chart
+        | p::PlaceholderValues::Table
+        | p::PlaceholderValues::ClipArt
+        | p::PlaceholderValues::Diagram
+        | p::PlaceholderValues::Media
+        | p::PlaceholderValues::SlideImage
+        | p::PlaceholderValues::Picture,
+      )
+      | None => self
+        .other_text_style
+        .as_ref()
+        .or(self.default_text_style.as_ref()),
+    }
+    .or(self.default_text_style.as_ref())
   }
 
   pub(crate) fn apply_color_map_override(&mut self, override_map: &p::ColorMapOverride) {

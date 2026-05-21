@@ -7,10 +7,12 @@ use super::table::TableProperties;
 use super::text_body::TextBody;
 use super::text_list_style::TextListStyle;
 use crate::pptx::import::PowerPointImport;
+use crate::pptx::slide::ShapeLocation;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Shape {
   pub(crate) service_name: ShapeService,
+  pub(crate) shape_location: Option<ShapeLocation>,
   pub(crate) id: Option<u32>,
   pub(crate) name: Option<String>,
   pub(crate) description: Option<String>,
@@ -29,6 +31,8 @@ pub(crate) struct Shape {
   pub(crate) flip_h: bool,
   pub(crate) flip_v: bool,
   pub(crate) children: Vec<Shape>,
+  pub(crate) referenced: bool,
+  pub(crate) placeholder: Option<Box<Shape>>,
   pub(crate) line_properties: Option<LineProperties>,
   pub(crate) fill_properties: Option<FillProperties>,
   pub(crate) table_properties: Option<TableProperties>,
@@ -121,6 +125,7 @@ impl Shape {
   pub(crate) fn new(service_name: ShapeService) -> Self {
     Self {
       service_name,
+      shape_location: None,
       id: None,
       name: None,
       description: None,
@@ -139,6 +144,8 @@ impl Shape {
       flip_h: false,
       flip_v: false,
       children: Vec::new(),
+      referenced: false,
+      placeholder: None,
       line_properties: None,
       fill_properties: None,
       table_properties: None,
@@ -167,6 +174,14 @@ impl Shape {
     if self.text_body.is_none() {
       self.text_body = reference.text_body.clone();
     }
+  }
+
+  pub(crate) fn set_placeholder(&mut self, placeholder: Shape) {
+    self.placeholder = Some(Box::new(placeholder));
+  }
+
+  pub(crate) fn set_referenced(&mut self, referenced: bool) {
+    self.referenced = referenced;
   }
 
   pub(crate) fn add_shape(&mut self, shape: Shape) {

@@ -1,7 +1,10 @@
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+use super::text_list_style::TextListStyle;
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TextBody {
   pub(crate) has_body_properties: bool,
   pub(crate) has_list_style: bool,
+  pub(crate) list_style: Option<TextListStyle>,
   pub(crate) paragraphs: Vec<TextParagraph>,
 }
 

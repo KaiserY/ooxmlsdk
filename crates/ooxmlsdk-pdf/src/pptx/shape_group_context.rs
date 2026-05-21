@@ -8,7 +8,9 @@ use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContex
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{FrameType, Point, Shape, ShapeService, Size};
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
+use super::drawingml::text_list_style::TextListStyle;
 use super::shape::PptShape;
+use super::shape_context::PPTShapeContext;
 use super::slide::{ShapeLocation, SlidePersist};
 
 #[derive(Debug)]
@@ -50,7 +52,7 @@ impl PPTShapeGroupContext {
 
   fn import_shape_tree_choice(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     choice: &p::ShapeTreeChoice,
   ) -> Option<Shape> {
     match choice {
@@ -74,7 +76,7 @@ impl PPTShapeGroupContext {
 
   fn import_group_shape_choice(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     choice: &p::GroupShapeChoice,
   ) -> Option<Shape> {
     match choice {
@@ -97,7 +99,7 @@ impl PPTShapeGroupContext {
 
   fn import_shape(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     source: &p::Shape,
     service_name: ShapeService,
   ) -> Shape {
@@ -108,26 +110,29 @@ impl PPTShapeGroupContext {
         .non_visual_shape_properties
         .non_visual_drawing_properties,
     );
-    apply_transform_2d(
-      &mut shape.shape,
-      source.shape_properties.transform2_d.as_deref(),
-    );
-    apply_shape_properties(&mut shape.shape, &source.shape_properties);
     if let Some(placeholder) = &source
       .non_visual_shape_properties
       .application_non_visual_drawing_properties
       .placeholder_shape
     {
-      shape.shape.sub_type = placeholder.r#type;
-      shape.shape.sub_type_index = placeholder.index;
+      PPTShapeContext::new(&mut shape).on_create_context(slide_persist, placeholder);
     }
+    apply_transform_2d(
+      &mut shape.shape,
+      source.shape_properties.transform2_d.as_deref(),
+    );
+    apply_shape_properties(&mut shape.shape, &source.shape_properties);
     if let Some(text_body) = &source.text_body {
       shape.shape.set_text_body(import_text_body(text_body));
     }
     shape.into_shape(slide_persist)
   }
 
-  fn import_group_shape(&mut self, slide_persist: &SlidePersist, group: &p::GroupShape) -> Shape {
+  fn import_group_shape(
+    &mut self,
+    slide_persist: &mut SlidePersist,
+    group: &p::GroupShape,
+  ) -> Shape {
     let mut shape = PptShape::new(ShapeService::GroupShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -149,7 +154,7 @@ impl PPTShapeGroupContext {
 
   fn import_graphic_frame(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     frame: &p::GraphicFrame,
   ) -> Shape {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
@@ -173,7 +178,7 @@ impl PPTShapeGroupContext {
 
   fn import_connection_shape(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     source: &p::ConnectionShape,
   ) -> Shape {
     let mut shape = PptShape::new(ShapeService::ConnectorShape, self.shape_location);
@@ -191,7 +196,7 @@ impl PPTShapeGroupContext {
     shape.into_shape(slide_persist)
   }
 
-  fn import_picture(&mut self, slide_persist: &SlidePersist, picture: &p::Picture) -> Shape {
+  fn import_picture(&mut self, slide_persist: &mut SlidePersist, picture: &p::Picture) -> Shape {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -214,7 +219,7 @@ impl PPTShapeGroupContext {
 
   fn import_content_part(
     &mut self,
-    slide_persist: &SlidePersist,
+    slide_persist: &mut SlidePersist,
     content_part: &p::ContentPart,
   ) -> Shape {
     let mut shape = PptShape::new(ShapeService::MediaShape, self.shape_location);
@@ -275,6 +280,10 @@ fn import_text_body(source: &p::TextBody) -> TextBody {
   TextBody {
     has_body_properties: true,
     has_list_style: source.list_style.is_some(),
+    list_style: source
+      .list_style
+      .as_ref()
+      .map(|style| TextListStyle::from_dml_list_style(style)),
     paragraphs: source.paragraph.iter().map(import_text_paragraph).collect(),
   }
 }

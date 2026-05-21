@@ -9,6 +9,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::error::Result;
 
+use super::drawingml::text_list_style::TextListStyle;
 use super::import::{PowerPointImport, part_path};
 use super::slide::{ColorMap, ShapeLocation, SlidePersist, SlideSize};
 use super::slide_fragment::SlideFragmentHandler;
@@ -22,7 +23,7 @@ pub(crate) struct PresentationFragmentHandler {
   slide_id_to_index_map: HashMap<u32, usize>,
   custom_show_list: Vec<CustomShow>,
   section_list: Vec<SlideSection>,
-  default_text_list_style: Option<DefaultTextListStyle>,
+  default_text_list_style: Option<TextListStyle>,
   slide_size: SlideSize,
   notes_size: SlideSize,
   author_list: Vec<CommentAuthor>,
@@ -52,9 +53,6 @@ pub(crate) struct CommentAuthor {
   pub(crate) id: u32,
   pub(crate) name: String,
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct DefaultTextListStyle;
 
 impl PresentationFragmentHandler {
   pub(crate) fn new(
@@ -97,7 +95,10 @@ impl PresentationFragmentHandler {
       slide_id_to_index_map,
       custom_show_list: Vec::new(),
       section_list: Vec::new(),
-      default_text_list_style: None,
+      default_text_list_style: presentation
+        .default_text_style
+        .as_ref()
+        .map(|style| TextListStyle::from_pml_default_text_style(style)),
       slide_size,
       notes_size,
       author_list: Vec::new(),
@@ -146,6 +147,10 @@ impl PresentationFragmentHandler {
       let master = master_part.root_element(package)?;
       persist.shape_location = ShapeLocation::Master;
       persist.set_color_map(ColorMap::from_pml(&master.color_map));
+      persist.set_default_text_style(self.default_text_list_style.clone());
+      if let Some(text_styles) = &master.text_styles {
+        persist.set_text_styles(text_styles);
+      }
       let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Master);
       handler.import_common_slide_data(&master.common_slide_data);
       let mut persist = handler.finalize_import();
@@ -188,6 +193,22 @@ impl PresentationFragmentHandler {
         persist.master_path = master_part.path(package).map(str::to_string);
       }
       persist.master_page_index = self.import_layout_persist(package, import, layout_part)?;
+      if let Some(layout_persist) = persist
+        .master_page_index
+        .and_then(|index| import.master_pages.get(index))
+      {
+        persist.shapes = layout_persist.shapes.clone();
+        persist.background_properties = layout_persist.background_properties.clone();
+        persist.background_color = layout_persist.background_color.clone();
+        persist.master_color_map = layout_persist.color_map.clone();
+        persist.color_map = layout_persist.color_map.clone();
+        persist.default_text_style = layout_persist.default_text_style.clone();
+        persist.title_text_style = layout_persist.title_text_style.clone();
+        persist.body_text_style = layout_persist.body_text_style.clone();
+        persist.notes_text_style = layout_persist.notes_text_style.clone();
+        persist.other_text_style = layout_persist.other_text_style.clone();
+        persist.theme_path = layout_persist.theme_path.clone();
+      }
     }
 
     import.set_actual_slide_persist(Some(import.draw_pages.len()));
@@ -236,6 +257,11 @@ impl PresentationFragmentHandler {
       persist.background_color = master_persist.background_color.clone();
       persist.master_color_map = master_persist.color_map.clone();
       persist.color_map = master_persist.color_map.clone();
+      persist.default_text_style = master_persist.default_text_style.clone();
+      persist.title_text_style = master_persist.title_text_style.clone();
+      persist.body_text_style = master_persist.body_text_style.clone();
+      persist.notes_text_style = master_persist.notes_text_style.clone();
+      persist.other_text_style = master_persist.other_text_style.clone();
       persist.theme_path = master_persist.theme_path.clone();
     }
     persist.layout_path = layout_path;

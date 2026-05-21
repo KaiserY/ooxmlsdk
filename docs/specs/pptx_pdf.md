@@ -1,7 +1,9 @@
 # PPTX PDF Rendering — LibreOffice-Aligned Design
 
-**Status:** design baseline plus Phase 1 skeleton for `ooxmlsdk-pdf` PPTX
-work.
+**Status:** LibreOffice-shaped import skeleton plus early Phase 2/3 structural
+ports for `ooxmlsdk-pdf` PPTX work. The current code is not yet a complete
+PPTX renderer; it is intentionally building the upstream import model before
+expanding visible PDF fidelity.
 
 **Primary source authority:** LibreOffice `../core`, especially:
 
@@ -21,6 +23,102 @@ work.
 `../typst` and `krilla` are implementation references for fixed-position
 frames, transforms, text shaping, image handling, paths, and PDF output. They
 must not drive PPTX semantic design. PPTX import semantics follow LibreOffice.
+
+---
+
+## 0. Current Progress And Calibration
+
+This section records the current implementation state so future work starts
+from the same calibration point.
+
+Approximate maturity:
+
+- Overall PPTX-to-PDF support is still early, roughly 30%-40% of a useful
+  LibreOffice-aligned implementation.
+- The important progress is structural: the import pipeline, persist model,
+  shape tree, background records, color records, graphic-frame records, and
+  table model are now shaped around LibreOffice owner functions.
+- Visible PDF output remains an observation path. It must not become the owner
+  of PPTX semantics.
+
+Already aligned with LibreOffice structure:
+
+- `PowerPointImport -> PresentationFragmentHandler -> SlideFragmentHandler ->
+  PPTShapeGroupContext -> drawingml::Shape -> display` exists as the main
+  pipeline.
+- Master, layout, and slide import order follows the LibreOffice page-import
+  shape. Layout persists are cached by `(master_path, layout_path)`, and early
+  layout import may clone master shape/background state before applying
+  layout-local state.
+- `SlidePersist` is the central state object for slide size, theme path, color
+  maps, background records, shape tree, comments/notes slots, and page identity.
+- `cSld/bg/bgPr` and `cSld/bg/bgRef` are separate model states. `bgRef` is not
+  treated as a direct solid fill.
+- Color import preserves generated SDK enum values for scheme, preset, and
+  system colors. It does not encode unresolved colors as display-looking
+  strings such as `scheme:*`, `preset:*`, or fake `#RRGGBB`.
+- Shape import preserves non-visual metadata, placeholder subtype/index,
+  transform, fill, line, text body, text list style records, picture
+  relationship identity, content-part relationship identity, and grouped
+  children.
+- `graphicFrame` dispatch uses LibreOffice's exact `a:graphicData/@uri` table
+  for presentation OLE, DrawingML diagram, DrawingML chart, Office 2014
+  chartEx, and DrawingML table. Unknown graphicData remains a structured
+  unsupported record.
+- Table graphic data populates a DrawingML table model: table flags, style id,
+  grid columns, rows, cells, span/merge flags, margins, and cell text bodies.
+
+Known structural gaps:
+
+- Theme import is not complete. `get_scheme_color()` intentionally does not
+  return an RGB color until theme color scheme and style-matrix resolution are
+  ported from LibreOffice.
+- Placeholder inheritance has a first structural port: `PPTShapeContext` now
+  applies default subtype handling, index-based subtype inheritance,
+  LibreOffice's priority lookup, `apply_shape_reference`, placeholder storage,
+  and referenced marking.
+- Text-style inheritance has an initial upstream-shaped port:
+  presentation-level `defaultTextStyle`, slide-master `txStyles`, shape
+  `lstStyle`, placeholder `lstStyle`, and shape `master_text_list_style` are
+  now represented with DrawingML paragraph-property slots instead of boolean
+  markers. The next step is to fill in paragraph/run property application
+  against the same style chain.
+- `SlidePersist::create_background`, `SlidePersist::apply_text_styles`, and
+  `SlidePersist::create_connector_shape_connection` are still upstream-shaped
+  slots. `PptShape::set_text_master_styles` now owns the current text-list
+  style chain until the full `apply_text_styles` pass is ported.
+- `Shape::finalize_x_shape`, grab-bag preservation, diagram helper propagation,
+  and advanced frame creation are still upstream-shaped slots.
+- Chart, SmartArt, OLE, media, notes, comments, and VML are not fully imported.
+  They must keep structured identity instead of becoming text or display-only
+  fallbacks.
+- Text layout currently has a temporary display bridge. It must not be expanded
+  into a local PPTX text-layout model outside DrawingML text and placeholder
+  inheritance.
+
+Current simplification risks to keep contained:
+
+- `display.rs` uses temporary text inset and line-height constants only for
+  early observation. Do not promote those constants into PPTX text semantics.
+- Table internals are parsed from `GraphicData::xml_children` because the
+  generated SDK currently exposes the inner table payload as raw XML. Keep this
+  parser confined to `drawingml/table.rs` and replace it with typed SDK import
+  if generated typed children become available.
+- Service-name selection currently covers only the first placeholder-to-service
+  classification. It must be extended from `pptshape.cxx`, not redesigned
+  around renderer item kinds.
+
+Next recommended development priority:
+
+1. Continue text style inheritance by porting paragraph/run property
+   application through `SlidePersist::apply_text_styles` while preserving the
+   current `PptShape::set_text_master_styles` merge order.
+2. Extend placeholder behavior for remaining `pptshape.cxx` service-name,
+   notes, layout, custom-geometry, and hide/replacement branches.
+3. Port theme color scheme and style matrix resolution through
+   `PowerPointImport`, `SlidePersist`, and DrawingML theme structures.
+4. Continue structured imports for chart, SmartArt/diagram, OLE, media, notes,
+   comments, and VML before improving their visible PDF fallbacks.
 
 ---
 
@@ -469,6 +567,22 @@ The fallback subtype mapping must preserve LibreOffice's two-candidate lookup:
 
 Do not implement placeholder inheritance as ad hoc style merging.
 
+Implementation checkpoint:
+
+- `PPTShapeContext` must be called from shape import immediately after
+  non-visual properties and before direct `spPr` import, so inherited shape
+  state is available before direct properties override it.
+- Slide import must carry the effective layout persist's shapes into the slide
+  persist before slide-local shapes are imported; otherwise slide placeholder
+  lookup has no layout/master tree to search.
+- Lookup priority must match LibreOffice `PPTShape::findPlaceholder`: first
+  subtype with same index, first subtype without same index, second subtype
+  with same index, second subtype without same index, then same index.
+- `SAL_MAX_UINT32` placeholder index must skip placeholder lookup and must not
+  be treated as an ordinary index.
+- Referenced placeholder state belongs on the imported model. Do not infer it
+  from display output.
+
 ### 5.9 Service-Name Selection
 
 `PptShape::add_shape` must preserve LibreOffice's service-name decision tree,
@@ -647,6 +761,21 @@ Text import should preserve:
   wrapping, and overflow
 - master text list style application
 - placeholder text style inheritance
+
+Current implementation boundary:
+
+- `TextListStyle` must mirror the generated OpenXML structure:
+  `defPPr` plus `lvl1pPr` through `lvl9pPr`. Do not replace this with a
+  reduced "has style" or "level count" model.
+- `p:defaultTextStyle` belongs to `PresentationFragmentHandler` and is copied
+  into relevant `SlidePersist` instances before shape import.
+- `p:txStyles` belongs to slide-master import and populates
+  `title_text_style`, `body_text_style`, and `other_text_style` on
+  `SlidePersist`.
+- `PptShape::set_text_master_styles` must follow LibreOffice's owner path:
+  subtype/master style first, placeholder master/list style next, current
+  shape `txBody/lstStyle` last. Later paragraph-level application should extend
+  this chain, not bypass it in `display.rs`.
 
 Lowering text to PDF may use the existing text metrics/shaping code and may
 borrow Typst's fixed-frame text item approach. That lowering must not collapse

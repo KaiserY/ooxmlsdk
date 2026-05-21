@@ -881,6 +881,21 @@ Implement:
 - `SlideFragmentHandler` parsing for `cSld`, `spTree`, `bg`, `bgPr`,
   `bgRef`, `clrMap`, and `clrMapOvr`
 
+Implementation checkpoint:
+
+- `PresentationFragmentHandler::import_slide` should resolve the slide layout
+  and master paths before importing the slide fragment, matching LibreOffice's
+  `importSlide` order.
+- Layout persists should be cached by `(master_path, layout_path)` in
+  `PowerPointImport::master_pages`. Do not replace this with a single master id
+  lookup; placeholder inheritance depends on the master+layout pair.
+- Slide fragments may initially record only structural state, but the parser
+  must enter through `SlideFragmentHandler::import_common_slide_data` and
+  `PPTShapeGroupContext`, not through ad hoc shape-tree loops in `pptx::layout`.
+- `showMasterSp=false` handling belongs in the layout-fragment/persist path.
+  Early implementations may keep it as a structured slot, but it must not be
+  approximated in the renderer.
+
 ### Phase 3: Shape Tree
 
 Implement:
@@ -895,6 +910,21 @@ Implement:
 - transform, fill, line, style refs, and text body
 - placeholder lookup and `apply_shape_reference`
 - ext drawing import slots and `fontRef` color propagation
+
+Implementation checkpoint:
+
+- Shape tree traversal should dispatch the generated OOXML variants
+  `Shape`, `GroupShape`, `GraphicFrame`, `ConnectionShape`, `Picture`, and
+  `ContentPart` in `PPTShapeGroupContext`, matching LibreOffice's
+  `PPTShapeGroupContext::onCreateContext` ownership.
+- For every supported branch, preserve non-visual drawing metadata first:
+  `id`, `name`, `descr`, `hidden`, `title`, placeholder subtype, and
+  placeholder index.
+- Unsupported branches should become structured records or empty structured
+  slots. Do not convert them to visible text or drop relationship identity.
+- Group-shape recursion may initially flatten into the slide persist's shape
+  vector, but the code path must stay under `PPTShapeGroupContext`; do not move
+  traversal into PDF lowering.
 
 ### Phase 4: Create XShapes Equivalent
 

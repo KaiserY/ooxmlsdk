@@ -1,5 +1,6 @@
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::slide_part::SlidePart;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use crate::error::Result;
 
@@ -40,17 +41,22 @@ impl SlideFragmentHandler {
     self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
     let slide = slide_part.root_element(package)?;
     self.slide_name = slide.common_slide_data.name.clone();
-    self.on_create_context();
+    self.import_common_slide_data(&slide.common_slide_data);
     Ok(())
+  }
+
+  pub(crate) fn import_common_slide_data(&mut self, common_slide_data: &p::CommonSlideData) {
+    self.slide_name = common_slide_data.name.clone();
+    self.on_create_context(&common_slide_data.shape_tree);
   }
 
   pub(crate) fn finalize_import(self) -> SlidePersist {
     self.slide_persist
   }
 
-  pub(crate) fn on_create_context(&mut self) {
+  pub(crate) fn on_create_context(&mut self, shape_tree: &p::ShapeTree) {
     let mut group_context = PPTShapeGroupContext::new(self.shape_location);
-    group_context.on_create_context(&mut self.slide_persist);
+    group_context.on_create_context(&mut self.slide_persist, shape_tree);
   }
 
   pub(crate) fn on_characters(&mut self, text: &str) {

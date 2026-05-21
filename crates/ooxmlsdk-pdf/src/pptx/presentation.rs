@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::presentation_part::PresentationPart;
+use ooxmlsdk::parts::slide_layout_part::SlideLayoutPart;
 use ooxmlsdk::parts::slide_part::SlidePart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
@@ -140,8 +141,11 @@ impl PresentationFragmentHandler {
         .map(str::to_string)
         .unwrap_or_else(|| "<slideMaster>".to_string());
       let mut persist = SlidePersist::new_master(path, self.slide_size);
-      let _ = master_part.root_element(package)?;
+      let master = master_part.root_element(package)?;
       persist.shape_location = ShapeLocation::Master;
+      let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Master);
+      handler.import_common_slide_data(&master.common_slide_data);
+      let persist = handler.finalize_import();
       import.master_pages.push(persist);
     }
     Ok(())
@@ -178,6 +182,7 @@ impl PresentationFragmentHandler {
       if let Some(master_part) = layout_part.slide_master_part(package) {
         persist.master_path = master_part.path(package).map(str::to_string);
       }
+      persist.master_page_index = self.import_layout_persist(package, import, layout_part)?;
     }
 
     import.set_actual_slide_persist(Some(import.draw_pages.len()));
@@ -189,6 +194,48 @@ impl PresentationFragmentHandler {
     import.draw_pages.push(persist);
     import.set_actual_slide_persist(None);
     Ok(())
+  }
+
+  fn import_layout_persist(
+    &mut self,
+    package: &mut PresentationDocument,
+    import: &mut PowerPointImport,
+    layout_part: SlideLayoutPart,
+  ) -> Result<Option<usize>> {
+    // Source: LibreOffice PresentationFragmentHandler::importSlide checks the
+    // corresponding masterpage+layout pair and reuses an existing persist.
+    let layout_path = layout_part.path(package).map(str::to_string);
+    let master_path = layout_part
+      .slide_master_part(package)
+      .and_then(|master| master.path(package).map(str::to_string));
+    if let Some(index) = import
+      .master_pages
+      .iter()
+      .position(|persist| persist.layout_path == layout_path && persist.master_path == master_path)
+    {
+      return Ok(Some(index));
+    }
+
+    let path = layout_path
+      .clone()
+      .unwrap_or_else(|| "<slideLayout>".to_string());
+    let mut persist = SlidePersist::new_layout(path, self.slide_size);
+    persist.layout_path = layout_path;
+    persist.master_path = master_path;
+    persist.shape_location = ShapeLocation::Layout;
+    let layout = layout_part.root_element(package)?;
+    let show_master_shapes = layout
+      .show_master_shapes
+      .as_ref()
+      .is_none_or(|value| value.as_bool());
+    if !show_master_shapes {
+      persist.hide_shapes_as_master_shapes();
+    }
+    let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Layout);
+    handler.import_common_slide_data(&layout.common_slide_data);
+    let persist = handler.finalize_import();
+    import.master_pages.push(persist);
+    Ok(Some(import.master_pages.len() - 1))
   }
 
   pub(crate) fn import_slide_names(&self) {}

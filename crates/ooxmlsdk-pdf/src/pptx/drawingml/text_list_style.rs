@@ -13,6 +13,18 @@ pub(crate) struct TextListLevelStyle {
   pub(crate) paragraph_properties: TextListLevelParagraphProperties,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum TextListParagraphStyleRef<'a> {
+  Default(&'a a::DefaultParagraphProperties),
+  Level(&'a TextListLevelStyle),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum TextListParagraphStyle {
+  Default(Box<a::DefaultParagraphProperties>),
+  Level(TextListLevelStyle),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TextListLevelParagraphProperties {
   Level1(Box<a::Level1ParagraphProperties>),
@@ -24,6 +36,17 @@ pub(crate) enum TextListLevelParagraphProperties {
   Level7(Box<a::Level7ParagraphProperties>),
   Level8(Box<a::Level8ParagraphProperties>),
   Level9(Box<a::Level9ParagraphProperties>),
+}
+
+impl TextListParagraphStyleRef<'_> {
+  pub(crate) fn to_owned_style(self) -> TextListParagraphStyle {
+    match self {
+      TextListParagraphStyleRef::Default(properties) => {
+        TextListParagraphStyle::Default(Box::new(properties.clone()))
+      }
+      TextListParagraphStyleRef::Level(style) => TextListParagraphStyle::Level(style.clone()),
+    }
+  }
 }
 
 impl TextListStyle {
@@ -184,6 +207,26 @@ impl TextListStyle {
 
   pub(crate) fn is_empty(&self) -> bool {
     self.default_paragraph_properties.is_none() && self.levels.is_empty()
+  }
+
+  pub(crate) fn paragraph_style_for_level(
+    &self,
+    paragraph_level: Option<u8>,
+  ) -> Option<TextListParagraphStyleRef<'_>> {
+    if self.levels.is_empty() {
+      return self
+        .default_paragraph_properties
+        .as_deref()
+        .map(TextListParagraphStyleRef::Default);
+    }
+
+    let requested_level = paragraph_level.unwrap_or(0).saturating_add(1);
+    self
+      .levels
+      .iter()
+      .find(|style| style.level == requested_level)
+      .or_else(|| self.levels.first())
+      .map(TextListParagraphStyleRef::Level)
   }
 }
 

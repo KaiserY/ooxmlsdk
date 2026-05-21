@@ -147,6 +147,8 @@ fn parse_table(xml: &str) -> Option<TableProperties> {
             text: text.into_owned(),
             kind: TextRunKind::Run,
             field_type: None,
+            run_properties: None,
+            field_paragraph_properties: None,
           });
         }
       }
@@ -220,6 +222,8 @@ fn open_element(
     b"txBody" if current_cell.is_some() => {
       *text_body = Some(TextBody {
         has_body_properties: false,
+        has_noninherited_body_properties: false,
+        body_properties: None,
         has_list_style: false,
         list_style: None,
         paragraphs: Vec::new(),
@@ -238,6 +242,10 @@ fn open_element(
     b"p" if text_body.is_some() => {
       *current_paragraph = Some(TextParagraph {
         level: None,
+        paragraph_properties: None,
+        end_paragraph_run_properties: None,
+        master_paragraph_style: None,
+        text_paragraph_style: None,
         runs: Vec::new(),
       });
     }

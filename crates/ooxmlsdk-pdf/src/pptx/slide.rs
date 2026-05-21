@@ -298,7 +298,14 @@ impl SlidePersist {
     self.create_connector_shape_connection();
   }
 
-  pub(crate) fn apply_text_styles(&mut self, _import: &PowerPointImport) {}
+  pub(crate) fn apply_text_styles(&mut self, _import: &PowerPointImport) {
+    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
+    // applyTextStyles prepares paragraph-level master style state before
+    // createAndInsert lowers DrawingML text into drawing objects.
+    for shape in &mut self.shapes {
+      shape.apply_text_styles();
+    }
+  }
 
   pub(crate) fn create_connector_shape_connection(&mut self) {}
 }

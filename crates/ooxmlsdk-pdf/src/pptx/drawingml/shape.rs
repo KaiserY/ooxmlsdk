@@ -283,6 +283,15 @@ impl Shape {
     self.master_text_list_style = Some(style);
   }
 
+  pub(crate) fn apply_text_styles(&mut self) {
+    if let Some(text_body) = &mut self.text_body {
+      text_body.apply_text_styles(self.master_text_list_style.as_ref());
+    }
+    for child in &mut self.children {
+      child.apply_text_styles();
+    }
+  }
+
   pub(crate) fn set_chart_type(&mut self) {
     self.frame_type = FrameType::Chart;
     self.service_name = ShapeService::ChartShape;

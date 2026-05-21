@@ -83,6 +83,18 @@ Known structural gaps:
   now represented with DrawingML paragraph-property slots instead of boolean
   markers. The next step is to fill in paragraph/run property application
   against the same style chain.
+- Text body import now keeps generated SDK `bodyPr`, `pPr`, `rPr`, `fld/pPr`,
+  and `endParaRPr` records for ordinary PPTX shape text. This is intentionally
+  typed data from `ooxmlsdk`; only XMLAny/raw table payloads may stay on the
+  confined raw parser path until generated typed table children are available.
+- Paragraph style lookup now follows the LibreOffice `TextParagraph` owner
+  path: the paragraph level selects the matching text-list level style, and
+  missing/out-of-range levels fall back to the first available level style
+  before any PDF lowering reads it.
+- `SlidePersist::apply_text_styles` now walks the shape tree and lets each
+  `TextBody` cache the selected master/current paragraph list style on each
+  paragraph. This is still structural state; paragraph/run property lowering
+  remains the next LibreOffice port step.
 - `SlidePersist::create_background`, `SlidePersist::apply_text_styles`, and
   `SlidePersist::create_connector_shape_connection` are still upstream-shaped
   slots. `PptShape::set_text_master_styles` now owns the current text-list
@@ -767,6 +779,10 @@ Current implementation boundary:
 - `TextListStyle` must mirror the generated OpenXML structure:
   `defPPr` plus `lvl1pPr` through `lvl9pPr`. Do not replace this with a
   reduced "has style" or "level count" model.
+- `TextBody` must keep the generated `a:BodyProperties`; `TextParagraph` must
+  keep generated `a:ParagraphProperties` and `a:EndParagraphRunProperties`;
+  `TextRun` must keep generated `a:RunProperties` where the SDK exposes them.
+  Do not reparse these with manual XML code.
 - `p:defaultTextStyle` belongs to `PresentationFragmentHandler` and is copied
   into relevant `SlidePersist` instances before shape import.
 - `p:txStyles` belongs to slide-master import and populates
@@ -776,6 +792,11 @@ Current implementation boundary:
   subtype/master style first, placeholder master/list style next, current
   shape `txBody/lstStyle` last. Later paragraph-level application should extend
   this chain, not bypass it in `display.rs`.
+- `TextParagraph::get_paragraph_style` is the owner of level-to-list-style
+  selection, matching LibreOffice's fallback to level 0 when the requested
+  level is unavailable. The renderer must not reimplement this lookup.
+- `SlidePersist::apply_text_styles` must remain the pass that prepares this
+  paragraph style state. Do not move level lookup into the PDF display list.
 
 Lowering text to PDF may use the existing text metrics/shaping code and may
 borrow Typst's fixed-frame text item approach. That lowering must not collapse

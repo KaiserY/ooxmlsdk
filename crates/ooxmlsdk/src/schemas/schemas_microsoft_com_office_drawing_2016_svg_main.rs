@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "asvg:CT_SVGBlip/asvg:svgBlip")]
 pub struct SvgBlip {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
   #[sdk(attr(qname = "r:embed"))]
   pub embed: Option<crate::simple_type::StringValue>,

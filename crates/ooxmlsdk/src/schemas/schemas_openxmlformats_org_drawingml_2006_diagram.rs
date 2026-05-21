@@ -1052,6 +1052,7 @@ pub struct LayoutDefinitionHeaderList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_RelIds/dgm:relIds")]
 pub struct RelationshipIds {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Explicit Relationship to Diagram Data Part
   #[sdk(attr(qname = "r:dm"))]
   pub data_part: crate::simple_type::StringValue,

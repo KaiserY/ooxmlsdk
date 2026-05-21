@@ -1,6 +1,10 @@
 {
   "Types": [
     {
+      "ClassName": "ChartReference",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "DLblsExtension",
       "Children": [
         {

@@ -99,6 +99,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             let mut children = Vec::new();
             if composite_kind == SchemaTypeCompositeKind::OneChoice {
               children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
+            } else if let Some(known_any_children) = gen_known_any_choice_children(ty, &type_map) {
+              children.extend(known_any_children);
             } else if ty.particle.kind == "All" {
               children.extend(ty.children.iter().map(|child| SchemaTypeChild {
                 particle_id: String::new(),
@@ -771,6 +773,74 @@ fn gen_one_choice_children(
     initial_version,
     children: variants,
   }]
+}
+
+fn gen_known_any_choice_children(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> Option<Vec<SchemaTypeChild>> {
+  if schema_type.children.is_empty() || !is_any_only_particle(&schema_type.particle) {
+    return None;
+  }
+
+  let (optional, repeated, initial_version) = any_only_particle_cardinality(&schema_type.particle);
+  let mut variants: Vec<SchemaTypeChild> = schema_type
+    .children
+    .iter()
+    .map(|child| SchemaTypeChild {
+      particle_id: String::new(),
+      name: child.name.clone(),
+      property_name: child.property_name.clone(),
+      property_comments: child.property_comments.clone(),
+      kind: resolve_child_kind(child.name.as_str(), type_map),
+      optional: false,
+      repeated: false,
+      initial_version: String::new(),
+      children: Vec::new(),
+    })
+    .collect();
+  variants.push(SchemaTypeChild {
+    particle_id: String::new(),
+    name: String::new(),
+    property_name: "UnknownXml".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Any,
+    optional: false,
+    repeated: false,
+    initial_version: String::new(),
+    children: Vec::new(),
+  });
+
+  Some(vec![SchemaTypeChild {
+    particle_id: String::new(),
+    name: String::new(),
+    property_name: "children".to_string(),
+    property_comments: String::new(),
+    kind: SchemaTypeChildKind::Choice,
+    optional,
+    repeated,
+    initial_version,
+    children: variants,
+  }])
+}
+
+fn is_any_only_particle(particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle) -> bool {
+  match particle.kind.as_str() {
+    "Any" => true,
+    "Sequence" | "Group" => particle.items.len() == 1 && is_any_only_particle(&particle.items[0]),
+    _ => false,
+  }
+}
+
+fn any_only_particle_cardinality(
+  particle: &crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
+) -> (bool, bool, String) {
+  match particle.kind.as_str() {
+    "Sequence" | "Group" if particle.items.len() == 1 => {
+      any_only_particle_cardinality(&particle.items[0])
+    }
+    _ => particle_cardinality(particle),
+  }
 }
 
 fn collect_one_choice_variants(
@@ -2895,5 +2965,52 @@ mod tests {
         "missing {expected}"
       );
     }
+  }
+
+  #[test]
+  fn actual_repo_models_known_any_children_as_choice_with_any_fallback() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+
+    let graphic_data = schemas
+      .iter()
+      .flat_map(|schema| schema.types.iter())
+      .find(|schema_type| schema_type.name == "a:CT_GraphicalObjectData/a:graphicData")
+      .expect("graphicData schema type");
+    let choice = graphic_data
+      .children
+      .iter()
+      .find(|child| child.kind == SchemaTypeChildKind::Choice)
+      .expect("graphicData choice");
+
+    assert!(choice.repeated);
+    assert!(
+      choice
+        .children
+        .iter()
+        .any(|child| child.name == "a:CT_Table/a:tbl")
+    );
+    assert!(
+      choice
+        .children
+        .iter()
+        .any(|child| child.kind == SchemaTypeChildKind::Any)
+    );
+
+    let variant = schemas
+      .iter()
+      .flat_map(|schema| schema.types.iter())
+      .find(|schema_type| schema_type.name == "vt:CT_Variant/vt:variant")
+      .expect("variant schema type");
+    let variant_choice = variant
+      .children
+      .iter()
+      .find(|child| child.kind == SchemaTypeChildKind::Choice)
+      .expect("variant choice");
+    assert!(
+      !variant_choice.repeated,
+      "ordinary one-choice variants must not become known-any collections"
+    );
   }
 }

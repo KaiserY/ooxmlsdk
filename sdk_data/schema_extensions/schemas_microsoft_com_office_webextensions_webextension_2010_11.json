@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "WebExtension",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

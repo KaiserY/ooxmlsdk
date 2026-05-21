@@ -1,6 +1,10 @@
 {
   "Types": [
     {
+      "ClassName": "Chart",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "ChartSpace",
       "Children": [
         {

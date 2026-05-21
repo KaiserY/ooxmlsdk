@@ -60,6 +60,7 @@ pub struct GvmlContentPart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a14:CT_ShadowObscured/a14:shadowObscured")]
 pub struct ShadowObscured {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,

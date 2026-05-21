@@ -9,6 +9,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "ShadowObscured",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "TextMath",
       "HaveDirectXmlOtherChildren": true
     }

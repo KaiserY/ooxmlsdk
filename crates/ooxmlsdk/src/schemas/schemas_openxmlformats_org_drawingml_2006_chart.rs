@@ -1449,6 +1449,7 @@ pub struct UserShapes {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:chart")]
 pub struct ChartReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Relationship Reference
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,

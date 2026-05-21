@@ -1900,6 +1900,7 @@ pub struct ChartData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_Chart/cx:chart")]
 pub struct Chart {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ChartTitle Class.
   #[sdk(child(office2016, qname = "cx:CT_ChartTitle/cx:title"))]
   pub chart_title: Option<std::boxed::Box<ChartTitle>>,

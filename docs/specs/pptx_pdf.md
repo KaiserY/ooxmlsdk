@@ -787,10 +787,11 @@ For PPTX, unsupported content must keep a typed placeholder record:
 
 | Unsupported area | Required fallback record |
 |------------------|--------------------------|
+| image/picture | blip embed/link relationship ids, bounds, non-visual metadata |
 | chart | frame type, relationship id, bounds, title/text cache if available |
 | SmartArt/diagram | diagram relationship ids, ext drawing ids, model id, bounds |
-| table | DrawingML table grid/cell model, bounds, style ids |
-| media | media relationship id, poster/image relationship, bounds |
+| table | DrawingML table grid/cell model, bounds, style ids, cell text bodies |
+| media/contentPart | content-part/media relationship id, poster/image relationship, bounds |
 | OLE | OLE relationship id, preview relationship, bounds |
 | comments/notes | parsed metadata tied to slide/page identity |
 
@@ -994,12 +995,26 @@ Implementation checkpoint:
   then return to the PPT parent for `PPTShapeGroupContext::import_ext_drawings`.
   Keep chart/table/diagram/OLE/media classification as structured frame state
   even while rendering is fallback-only.
+  The URI dispatch must use LibreOffice's exact URI table for presentation OLE,
+  DrawingML diagram, DrawingML chart, Office 2014 chartEx, and DrawingML table.
+  Do not use substring matching such as `/chart` or `/table`, because unknown
+  graphicData must remain an unsupported structured record rather than being
+  misclassified.
+  For table graphic data, dispatch must populate a DrawingML table model owned
+  by `Shape::table_properties`: table flags, style id, grid columns, rows,
+  cells, merge/span flags, margins, and cell text bodies. This mirrors
+  LibreOffice `table::TableContext`, `TableRowContext`, and
+  `TableCellContext`; rendering may ignore the table temporarily, but the
+  import model must not collapse it to a generic graphic frame.
 - `txBody` must become a DrawingML `TextBody` on the shape model before any
   visible text fallback exists. Preserve paragraph level, run text, line breaks,
   field text, and field type as structured text runs; later style inheritance
   must extend this model rather than reparsing PDF text items.
 - Unsupported branches should become structured records or empty structured
   slots. Do not convert them to visible text or drop relationship identity.
+  `Picture` must preserve blip `r:embed`/`r:link`; `ContentPart` must preserve
+  its `r:id` and transform/non-visual metadata before later media-specific
+  handling is added.
 - Group-shape recursion may initially flatten into the slide persist's shape
   vector only as an early bootstrap. The preferred path is to preserve
   `Shape::children` during `PPTShapeGroupContext` import, matching

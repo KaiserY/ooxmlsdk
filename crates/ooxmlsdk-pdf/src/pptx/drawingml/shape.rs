@@ -32,6 +32,8 @@ pub(crate) struct Shape {
   pub(crate) line_properties: Option<LineProperties>,
   pub(crate) fill_properties: Option<FillProperties>,
   pub(crate) table_properties: Option<TableProperties>,
+  pub(crate) picture: Option<PictureRecord>,
+  pub(crate) content_part: Option<ContentPartRecord>,
   pub(crate) effect_properties: Option<EffectProperties>,
   pub(crate) text_body: Option<TextBody>,
   pub(crate) master_text_list_style: Option<TextListStyle>,
@@ -39,6 +41,7 @@ pub(crate) struct Shape {
   pub(crate) shape_ref_fill_properties: Option<FillProperties>,
   pub(crate) shape_ref_effect_properties: Option<EffectProperties>,
   pub(crate) frame_type: FrameType,
+  pub(crate) graphic_data: Option<GraphicDataRecord>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -86,6 +89,34 @@ pub(crate) enum FrameType {
   Media,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GraphicDataRecord {
+  pub(crate) uri: String,
+  pub(crate) kind: GraphicDataKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PictureRecord {
+  pub(crate) embed_relationship_id: Option<String>,
+  pub(crate) link_relationship_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ContentPartRecord {
+  pub(crate) relationship_id: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum GraphicDataKind {
+  Ole,
+  Diagram,
+  Chart,
+  ChartEx,
+  Table,
+  #[default]
+  Unsupported,
+}
+
 impl Shape {
   pub(crate) fn new(service_name: ShapeService) -> Self {
     Self {
@@ -111,6 +142,8 @@ impl Shape {
       line_properties: None,
       fill_properties: None,
       table_properties: None,
+      picture: None,
+      content_part: None,
       effect_properties: None,
       text_body: None,
       master_text_list_style: None,
@@ -118,6 +151,7 @@ impl Shape {
       shape_ref_fill_properties: None,
       shape_ref_effect_properties: None,
       frame_type: FrameType::Generic,
+      graphic_data: None,
     }
   }
 
@@ -239,6 +273,10 @@ impl Shape {
     self.service_name = ShapeService::ChartShape;
   }
 
+  pub(crate) fn set_chart_ex_type(&mut self) {
+    self.set_chart_type();
+  }
+
   pub(crate) fn set_table_type(&mut self) {
     self.frame_type = FrameType::Table;
     self.service_name = ShapeService::TableShape;
@@ -246,11 +284,33 @@ impl Shape {
 
   pub(crate) fn set_diagram_type(&mut self) {
     self.frame_type = FrameType::Diagram;
+    self.service_name = ShapeService::GroupShape;
   }
 
   pub(crate) fn set_ole_object_type(&mut self) {
     self.frame_type = FrameType::Ole;
     self.service_name = ShapeService::Ole2Shape;
+  }
+
+  pub(crate) fn set_graphic_data(&mut self, uri: String, kind: GraphicDataKind) {
+    self.graphic_data = Some(GraphicDataRecord { uri, kind });
+  }
+
+  pub(crate) fn set_picture(
+    &mut self,
+    embed_relationship_id: Option<String>,
+    link_relationship_id: Option<String>,
+  ) {
+    self.picture = Some(PictureRecord {
+      embed_relationship_id,
+      link_relationship_id,
+    });
+  }
+
+  pub(crate) fn set_content_part(&mut self, relationship_id: String) {
+    self.content_part = Some(ContentPartRecord { relationship_id });
+    self.frame_type = FrameType::Media;
+    self.service_name = ShapeService::MediaShape;
   }
 
   pub(crate) fn clone_fill_properties(&self) -> Option<FillProperties> {

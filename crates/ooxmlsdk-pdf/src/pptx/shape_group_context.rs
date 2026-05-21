@@ -1,3 +1,4 @@
+use ooxmlsdk::schemas::schemas_microsoft_com_office_powerpoint_2010_main as p14;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
@@ -5,7 +6,7 @@ use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
-use super::drawingml::shape::{Point, Shape, ShapeService, Size};
+use super::drawingml::shape::{FrameType, Point, Shape, ShapeService, Size};
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::shape::PptShape;
 use super::slide::{ShapeLocation, SlidePersist};
@@ -64,7 +65,10 @@ impl PPTShapeGroupContext {
         Some(self.import_connection_shape(slide_persist, shape))
       }
       p::ShapeTreeChoice::Picture(picture) => Some(self.import_picture(slide_persist, picture)),
-      p::ShapeTreeChoice::ContentPart(_) | p::ShapeTreeChoice::XmlAny(_) => None,
+      p::ShapeTreeChoice::ContentPart(content_part) => {
+        Some(self.import_content_part(slide_persist, content_part))
+      }
+      p::ShapeTreeChoice::XmlAny(_) => None,
     }
   }
 
@@ -85,7 +89,9 @@ impl PPTShapeGroupContext {
         Some(self.import_connection_shape(slide_persist, shape))
       }
       p::GroupShapeChoice::Picture(picture) => Some(self.import_picture(slide_persist, picture)),
-      p::GroupShapeChoice::ContentPart(_) => None,
+      p::GroupShapeChoice::ContentPart(content_part) => {
+        Some(self.import_content_part(slide_persist, content_part))
+      }
     }
   }
 
@@ -155,7 +161,7 @@ impl PPTShapeGroupContext {
     );
     apply_presentation_transform(&mut shape.shape, &frame.transform);
     GraphicalObjectFrameContext
-      .dispatch_graphic_data(&frame.graphic.graphic_data.uri, &mut shape.shape);
+      .dispatch_graphic_data(&frame.graphic.graphic_data, &mut shape.shape);
     self.graphic_shape = Some(shape);
     self.import_ext_drawings();
     let shape = self
@@ -198,12 +204,36 @@ impl PPTShapeGroupContext {
       picture.shape_properties.transform2_d.as_deref(),
     );
     apply_shape_properties(&mut shape.shape, &picture.shape_properties);
+    if let Some(blip) = picture.blip_fill.blip.as_ref() {
+      shape
+        .shape
+        .set_picture(blip.embed.clone(), blip.link.clone());
+    }
+    shape.into_shape(slide_persist)
+  }
+
+  fn import_content_part(
+    &mut self,
+    slide_persist: &SlidePersist,
+    content_part: &p::ContentPart,
+  ) -> Shape {
+    let mut shape = PptShape::new(ShapeService::MediaShape, self.shape_location);
+    if let Some(properties) = &content_part.non_visual_content_part_properties {
+      apply_p14_non_visual_drawing_properties(
+        &mut shape.shape,
+        &properties.non_visual_drawing_properties,
+      );
+    }
+    apply_p14_transform_2d(&mut shape.shape, content_part.transform2_d.as_deref());
+    shape.shape.set_content_part(content_part.r_id.clone());
     shape.into_shape(slide_persist)
   }
 
   pub(crate) fn import_ext_drawings(&mut self) {
     if let Some(shape) = &mut self.graphic_shape {
-      shape.shape.keep_diagram_drawing();
+      if shape.shape.frame_type == FrameType::Diagram {
+        shape.shape.keep_diagram_drawing();
+      }
     }
   }
 
@@ -213,6 +243,20 @@ impl PPTShapeGroupContext {
 fn apply_non_visual_drawing_properties(
   shape: &mut Shape,
   properties: &p::NonVisualDrawingProperties,
+) {
+  shape.id = Some(properties.id);
+  shape.name = Some(properties.name.clone());
+  shape.description = properties.description.clone();
+  shape.title = properties.title.clone();
+  shape.hidden = properties
+    .hidden
+    .as_ref()
+    .is_some_and(|hidden| hidden.as_bool());
+}
+
+fn apply_p14_non_visual_drawing_properties(
+  shape: &mut Shape,
+  properties: &p14::NonVisualDrawingProperties,
 ) {
   shape.id = Some(properties.id);
   shape.name = Some(properties.name.clone());
@@ -332,6 +376,20 @@ fn import_solid_fill_color(fill: &a::SolidFill) -> Option<Color> {
 }
 
 fn apply_transform_2d(shape: &mut Shape, transform: Option<&a::Transform2D>) {
+  let Some(transform) = transform else {
+    return;
+  };
+  apply_transform_fields(
+    shape,
+    transform.rotation,
+    transform.horizontal_flip.as_ref(),
+    transform.vertical_flip.as_ref(),
+    transform.offset.as_ref(),
+    transform.extents.as_ref(),
+  );
+}
+
+fn apply_p14_transform_2d(shape: &mut Shape, transform: Option<&p14::Transform2D>) {
   let Some(transform) = transform else {
     return;
   };

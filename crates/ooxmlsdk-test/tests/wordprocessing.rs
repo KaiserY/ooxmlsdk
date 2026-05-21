@@ -43,7 +43,7 @@ fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
     .hyperlink_choice
     .iter()
     .find_map(|child| match child {
-      HyperlinkChoice::WR(run) => Some(run.as_ref()),
+      HyperlinkChoice::WRun(run) => Some(run.as_ref()),
       _ => None,
     })
     .expect("expected hyperlink run")
@@ -63,7 +63,7 @@ fn first_text(run: &Run) -> &Text {
     .run_choice
     .iter()
     .find_map(|child| match child {
-      RunChoice::WT(text) => Some(text.as_ref()),
+      RunChoice::Text(text) => Some(text.as_ref()),
       _ => None,
     })
     .expect("expected run text")
@@ -74,7 +74,7 @@ fn run_texts(run: &Run) -> Vec<&Text> {
     .run_choice
     .iter()
     .filter_map(|child| match child {
-      RunChoice::WT(text) => Some(text.as_ref()),
+      RunChoice::Text(text) => Some(text.as_ref()),
       _ => None,
     })
     .collect()
@@ -116,7 +116,7 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
 
     if let Some(hyperlink) = paragraph_choice_hyperlink(child) {
       for hyperlink_child in &hyperlink.hyperlink_choice {
-        if let HyperlinkChoice::WR(run) = hyperlink_child {
+        if let HyperlinkChoice::WRun(run) = hyperlink_child {
           append_run_text(run.as_ref(), &mut text);
         }
       }
@@ -183,7 +183,7 @@ fn paragraph_comment_reference_count(paragraph: &Paragraph) -> usize {
       run
         .run_choice
         .iter()
-        .filter(|run_child| matches!(run_child, RunChoice::WCommentReference(_)))
+        .filter(|run_child| matches!(run_child, RunChoice::CommentReference(_)))
         .count()
     })
     .sum()
@@ -217,7 +217,7 @@ fn body_paragraph_count(body: &Body) -> usize {
 
 fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
   match choice {
-    BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
+    BodyChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
     _ => None,
   }
 }
@@ -225,7 +225,7 @@ fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
 #[cfg(not(feature = "mce"))]
 fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
   match choice {
-    BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
+    BodyChoice::SdtBlock(sdt) => Some(sdt.as_ref()),
     _ => None,
   }
 }
@@ -240,53 +240,53 @@ fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkStart(_))
+  matches!(choice, BodyChoice::BookmarkStart(_))
 }
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkEnd(_))
+  matches!(choice, BodyChoice::BookmarkEnd(_))
 }
 
 fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
   match choice {
-    CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
+    CommentChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
     _ => None,
   }
 }
 
 fn paragraph_choice_run(choice: &ParagraphChoice) -> Option<&Run> {
   match choice {
-    ParagraphChoice::WR(run) => Some(run.as_ref()),
+    ParagraphChoice::WRun(run) => Some(run.as_ref()),
     _ => None,
   }
 }
 
 fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
   match choice {
-    ParagraphChoice::WHyperlink(hyperlink) => Some(hyperlink.as_ref()),
+    ParagraphChoice::Hyperlink(hyperlink) => Some(hyperlink.as_ref()),
     _ => None,
   }
 }
 
 fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WSdt(_))
+  matches!(choice, ParagraphChoice::SdtRun(_))
 }
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkStart(_))
+  matches!(choice, ParagraphChoice::BookmarkStart(_))
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkEnd(_))
+  matches!(choice, ParagraphChoice::BookmarkEnd(_))
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeStart(_))
+  matches!(choice, ParagraphChoice::CommentRangeStart(_))
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeEnd(_))
+  matches!(choice, ParagraphChoice::CommentRangeEnd(_))
 }
 
 #[test]
@@ -300,23 +300,23 @@ fn deleted_run_flat_choice_parses_upstream_particle_shape() {
   assert_eq!(deleted_run.deleted_run_choice.len(), 5);
   assert!(matches!(
     deleted_run.deleted_run_choice[0],
-    DeletedRunChoice::WProofErr(_)
+    DeletedRunChoice::ProofError(_)
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[1],
-    DeletedRunChoice::WBookmarkStart(_)
+    DeletedRunChoice::BookmarkStart(_)
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[2],
-    DeletedRunChoice::W14ConflictIns(_)
+    DeletedRunChoice::RunConflictInsertion(_)
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[3],
-    DeletedRunChoice::W14ConflictDel(_)
+    DeletedRunChoice::RunConflictDeletion(_)
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[4],
-    DeletedRunChoice::WR(_)
+    DeletedRunChoice::WRun(_)
   ));
 }
 
@@ -1021,7 +1021,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let Some(properties) = sdt.sdt_properties.as_ref() else {
     panic!("expected w:sdtPr");
   };
-  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.sdt_properties_choice.first() else {
+  let Some(SdtPropertiesChoice::SdtAlias(alias)) = properties.sdt_properties_choice.first() else {
     panic!("expected sdt alias");
   };
   assert_eq!(alias.val.as_str(), "RichTextContentControl");
@@ -1037,7 +1037,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
           .hyperlink_choice
           .iter()
           .any(|hyperlink_child| match hyperlink_child {
-            HyperlinkChoice::WR(run) => {
+            HyperlinkChoice::WRun(run) => {
               first_text(run.as_ref()).xml_content.as_deref() == Some("EricWhite.com")
             }
             _ => false,

@@ -1276,8 +1276,8 @@ pub struct PivotRow {
 pub enum OleDbPrpopertiesChoice {
   /// Defines the DbTables Class.
   #[sdk(child(office2013, qname = "x15:CT_DbTables/x15:dbTables"))]
-  X15DbTables(std::boxed::Box<DbTables>),
+  DbTables(std::boxed::Box<DbTables>),
   /// Defines the DbCommand Class.
   #[sdk(child(office2013, qname = "x15:CT_DbCommand/x15:dbCommand"))]
-  X15DbCommand(std::boxed::Box<DbCommand>),
+  DbCommand(std::boxed::Box<DbCommand>),
 }

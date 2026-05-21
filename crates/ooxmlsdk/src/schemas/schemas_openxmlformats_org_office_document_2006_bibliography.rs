@@ -417,70 +417,70 @@ pub struct Source {
 pub enum AuthorChoice {
   /// Name List.
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
-  BNameList(std::boxed::Box<NameList>),
+  NameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Corporate"))]
-  BCorporate(Corporate),
+  Corporate(Corporate),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PerformerChoice {
   /// Name List.
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
-  BNameList(std::boxed::Box<NameList>),
+  NameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Corporate"))]
-  BCorporate(Corporate),
+  Corporate(Corporate),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorListChoice {
   /// Artist.
   #[sdk(child(qname = "b:CT_NameType/b:Artist"))]
-  BArtist(std::boxed::Box<Artist>),
+  Artist(std::boxed::Box<Artist>),
   /// Author.
   #[sdk(child(qname = "b:CT_NameOrCorporateType/b:Author"))]
-  BAuthor(std::boxed::Box<Author>),
+  Author(std::boxed::Box<Author>),
   /// Book Author.
   #[sdk(child(qname = "b:CT_NameType/b:BookAuthor"))]
-  BBookAuthor(std::boxed::Box<BookAuthor>),
+  BookAuthor(std::boxed::Box<BookAuthor>),
   /// Compiler.
   #[sdk(child(qname = "b:CT_NameType/b:Compiler"))]
-  BCompiler(std::boxed::Box<Compiler>),
+  Compiler(std::boxed::Box<Compiler>),
   /// Composer.
   #[sdk(child(qname = "b:CT_NameType/b:Composer"))]
-  BComposer(std::boxed::Box<Composer>),
+  Composer(std::boxed::Box<Composer>),
   /// Conductor.
   #[sdk(child(qname = "b:CT_NameType/b:Conductor"))]
-  BConductor(std::boxed::Box<Conductor>),
+  Conductor(std::boxed::Box<Conductor>),
   /// Counsel.
   #[sdk(child(qname = "b:CT_NameType/b:Counsel"))]
-  BCounsel(std::boxed::Box<Counsel>),
+  Counsel(std::boxed::Box<Counsel>),
   /// Director.
   #[sdk(child(qname = "b:CT_NameType/b:Director"))]
-  BDirector(std::boxed::Box<Director>),
+  Director(std::boxed::Box<Director>),
   /// Editor.
   #[sdk(child(qname = "b:CT_NameType/b:Editor"))]
-  BEditor(std::boxed::Box<Editor>),
+  Editor(std::boxed::Box<Editor>),
   /// Interviewee.
   #[sdk(child(qname = "b:CT_NameType/b:Interviewee"))]
-  BInterviewee(std::boxed::Box<Interviewee>),
+  Interviewee(std::boxed::Box<Interviewee>),
   /// Interviewer.
   #[sdk(child(qname = "b:CT_NameType/b:Interviewer"))]
-  BInterviewer(std::boxed::Box<Interviewer>),
+  Interviewer(std::boxed::Box<Interviewer>),
   /// Inventor.
   #[sdk(child(qname = "b:CT_NameType/b:Inventor"))]
-  BInventor(std::boxed::Box<Inventor>),
+  Inventor(std::boxed::Box<Inventor>),
   /// Performer.
   #[sdk(child(qname = "b:CT_NameOrCorporateType/b:Performer"))]
-  BPerformer(std::boxed::Box<Performer>),
+  Performer(std::boxed::Box<Performer>),
   /// Producer Name.
   #[sdk(child(qname = "b:CT_NameType/b:ProducerName"))]
-  BProducerName(std::boxed::Box<ProducerName>),
+  ProducerName(std::boxed::Box<ProducerName>),
   /// Translator.
   #[sdk(child(qname = "b:CT_NameType/b:Translator"))]
-  BTranslator(std::boxed::Box<Translator>),
+  Translator(std::boxed::Box<Translator>),
   /// Writer.
   #[sdk(child(qname = "b:CT_NameType/b:Writer"))]
-  BWriter(std::boxed::Box<Writer>),
+  Writer(std::boxed::Box<Writer>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SourceChoice {
@@ -489,173 +489,173 @@ pub enum SourceChoice {
     simple_type = "StringValue",
     qname = "b:ST_String255/b:AbbreviatedCaseNumber"
   ))]
-  BAbbreviatedCaseNumber(AbbreviatedCaseNumber),
+  AbbreviatedCaseNumber(AbbreviatedCaseNumber),
   /// Album Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:AlbumTitle"))]
-  BAlbumTitle(AlbumTitle),
+  AlbumTitle(AlbumTitle),
   /// Contributors List.
   #[sdk(child(qname = "b:CT_AuthorType/b:Author"))]
-  BAuthor(std::boxed::Box<AuthorList>),
+  AuthorList(std::boxed::Box<AuthorList>),
   /// Book Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:BookTitle"))]
-  BBookTitle(BookTitle),
+  BookTitle(BookTitle),
   /// Broadcaster.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Broadcaster"))]
-  BBroadcaster(Broadcaster),
+  Broadcaster(Broadcaster),
   /// Broadcast Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:BroadcastTitle"))]
-  BBroadcastTitle(BroadcastTitle),
+  BroadcastTitle(BroadcastTitle),
   /// Case Number.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:CaseNumber"))]
-  BCaseNumber(CaseNumber),
+  CaseNumber(CaseNumber),
   /// Chapter Number.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:ChapterNumber"))]
-  BChapterNumber(ChapterNumber),
+  ChapterNumber(ChapterNumber),
   /// City.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:City"))]
-  BCity(City),
+  City(City),
   /// Comments.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Comments"))]
-  BComments(Comments),
+  Comments(Comments),
   /// Conference or Proceedings Name.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:ConferenceName"))]
-  BConferenceName(ConferenceName),
+  ConferenceName(ConferenceName),
   /// Country or Region.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:CountryRegion"))]
-  BCountryRegion(CountryRegion),
+  CountryRegion(CountryRegion),
   /// Court.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Court"))]
-  BCourt(Court),
+  Court(Court),
   /// Day.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Day"))]
-  BDay(Day),
+  Day(Day),
   /// Day Accessed.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:DayAccessed"))]
-  BDayAccessed(DayAccessed),
+  DayAccessed(DayAccessed),
   /// Department.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Department"))]
-  BDepartment(Department),
+  Department(Department),
   /// Distributor.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Distributor"))]
-  BDistributor(Distributor),
+  Distributor(Distributor),
   /// Editor.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Edition"))]
-  BEdition(Edition),
+  Edition(Edition),
   /// GUID.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Guid"))]
-  BGuid(GuidString),
+  GuidString(GuidString),
   /// Institution.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Institution"))]
-  BInstitution(Institution),
+  Institution(Institution),
   /// Internet Site Title.
   #[sdk(text_child(
     simple_type = "StringValue",
     qname = "b:ST_String255/b:InternetSiteTitle"
   ))]
-  BInternetSiteTitle(InternetSiteTitle),
+  InternetSiteTitle(InternetSiteTitle),
   /// Issue.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Issue"))]
-  BIssue(Issue),
+  Issue(Issue),
   /// Journal Name.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:JournalName"))]
-  BJournalName(JournalName),
+  JournalName(JournalName),
   /// Locale ID.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:LCID"))]
-  BLcid(LcId),
+  LcId(LcId),
   /// Medium.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Medium"))]
-  BMedium(Medium),
+  Medium(Medium),
   /// Month.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Month"))]
-  BMonth(Month),
+  Month(Month),
   /// Month Accessed.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:MonthAccessed"))]
-  BMonthAccessed(MonthAccessed),
+  MonthAccessed(MonthAccessed),
   /// Number of Volumes.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:NumberVolumes"))]
-  BNumberVolumes(NumberVolumes),
+  NumberVolumes(NumberVolumes),
   /// Pages.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Pages"))]
-  BPages(Pages),
+  Pages(Pages),
   /// Patent Number.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:PatentNumber"))]
-  BPatentNumber(PatentNumber),
+  PatentNumber(PatentNumber),
   /// Periodical Title.
   #[sdk(text_child(
     simple_type = "StringValue",
     qname = "b:ST_String255/b:PeriodicalTitle"
   ))]
-  BPeriodicalTitle(PeriodicalTitle),
+  PeriodicalTitle(PeriodicalTitle),
   /// Production Company.
   #[sdk(text_child(
     simple_type = "StringValue",
     qname = "b:ST_String255/b:ProductionCompany"
   ))]
-  BProductionCompany(ProductionCompany),
+  ProductionCompany(ProductionCompany),
   /// Publication Title.
   #[sdk(text_child(
     simple_type = "StringValue",
     qname = "b:ST_String255/b:PublicationTitle"
   ))]
-  BPublicationTitle(PublicationTitle),
+  PublicationTitle(PublicationTitle),
   /// Publisher.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Publisher"))]
-  BPublisher(Publisher),
+  Publisher(Publisher),
   /// Recording Number.
   #[sdk(text_child(
     simple_type = "StringValue",
     qname = "b:ST_String255/b:RecordingNumber"
   ))]
-  BRecordingNumber(RecordingNumber),
+  RecordingNumber(RecordingNumber),
   /// Reference Order.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:RefOrder"))]
-  BRefOrder(ReferenceOrder),
+  ReferenceOrder(ReferenceOrder),
   /// Reporter.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Reporter"))]
-  BReporter(Reporter),
+  Reporter(Reporter),
   /// Source Type.
   #[sdk(text_child(qname = "b:ST_SourceType/b:SourceType"))]
-  BSourceType(SourceType),
+  SourceType(SourceType),
   /// Short Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:ShortTitle"))]
-  BShortTitle(ShortTitle),
+  ShortTitle(ShortTitle),
   /// Standard Number.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:StandardNumber"))]
-  BStandardNumber(StandardNumber),
+  StandardNumber(StandardNumber),
   /// State or Province.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:StateProvince"))]
-  BStateProvince(StateProvince),
+  StateProvince(StateProvince),
   /// Station.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Station"))]
-  BStation(Station),
+  Station(Station),
   /// Tag.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Tag"))]
-  BTag(Tag),
+  Tag(Tag),
   /// Theater.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Theater"))]
-  BTheater(Theater),
+  Theater(Theater),
   /// Thesis Type.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:ThesisType"))]
-  BThesisType(ThesisType),
+  ThesisType(ThesisType),
   /// Title.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Title"))]
-  BTitle(Title),
+  Title(Title),
   /// Type.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Type"))]
-  BType(PatentType),
+  PatentType(PatentType),
   /// URL.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:URL"))]
-  BUrl(UrlString),
+  UrlString(UrlString),
   /// Version.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Version"))]
-  BVersion(Version),
+  Version(Version),
   /// Volume.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Volume"))]
-  BVolume(Volume),
+  Volume(Volume),
   /// Year.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:Year"))]
-  BYear(Year),
+  Year(Year),
   /// Year Accessed.
   #[sdk(text_child(simple_type = "StringValue", qname = "b:ST_String255/b:YearAccessed"))]
-  BYearAccessed(YearAccessed),
+  YearAccessed(YearAccessed),
 }

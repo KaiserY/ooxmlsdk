@@ -670,137 +670,137 @@ pub struct Emma {
 pub enum LatticeChoice {
   /// Defines the Arc Class.
   #[sdk(child(qname = "emma:CT_Arc/emma:arc"))]
-  EmmaArc(std::boxed::Box<Arc>),
+  Arc(std::boxed::Box<Arc>),
   /// Defines the Node Class.
   #[sdk(child(qname = "emma:CT_Node/emma:node"))]
-  EmmaNode(std::boxed::Box<Node>),
+  Node(std::boxed::Box<Node>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InterpretationChoice {
   /// Defines the DerivedFrom Class.
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
-  EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(std::boxed::Box<DerivedFrom>),
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
-  EmmaInfo(std::boxed::Box<Info>),
+  Info(std::boxed::Box<Info>),
   /// Defines the Lattice Class.
   #[sdk(child(qname = "emma:CT_Lattice/emma:lattice"))]
-  EmmaLattice(std::boxed::Box<Lattice>),
+  Lattice(std::boxed::Box<Lattice>),
   /// Defines the Literal Class.
   #[sdk(text_child(simple_type = "StringValue", qname = "emma:CT_Literal/emma:literal"))]
-  EmmaLiteral(Literal),
+  Literal(Literal),
   /// Defines the ContextNode Class.
   #[sdk(child(qname = "msink:CT_CtxNode/msink:context"))]
-  MsinkContext(std::boxed::Box<crate::schemas::msink::ContextNode>),
+  ContextNode(std::boxed::Box<crate::schemas::msink::ContextNode>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneOfChoice {
   /// Defines the DerivedFrom Class.
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
-  EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(std::boxed::Box<DerivedFrom>),
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
-  EmmaInfo(std::boxed::Box<Info>),
+  Info(std::boxed::Box<Info>),
   /// Defines the Interpretation Class.
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
-  EmmaInterpretation(std::boxed::Box<Interpretation>),
+  Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
   #[sdk(child(qname = "emma:CT_OneOf/emma:one-of"))]
-  EmmaOneOf(std::boxed::Box<OneOf>),
+  OneOf(std::boxed::Box<OneOf>),
   /// Defines the Group Class.
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
-  EmmaGroup(std::boxed::Box<Group>),
+  Group(std::boxed::Box<Group>),
   /// Defines the Sequence Class.
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
-  EmmaSequence(std::boxed::Box<Sequence>),
+  Sequence(std::boxed::Box<Sequence>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
   /// Defines the DerivedFrom Class.
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
-  EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(std::boxed::Box<DerivedFrom>),
   /// Defines the GroupInfo Class.
   #[sdk(child(qname = "emma:CT_GroupInfo/emma:group-info"))]
-  EmmaGroupInfo(std::boxed::Box<GroupInfo>),
+  GroupInfo(std::boxed::Box<GroupInfo>),
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
-  EmmaInfo(std::boxed::Box<Info>),
+  Info(std::boxed::Box<Info>),
   /// Defines the Interpretation Class.
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
-  EmmaInterpretation(std::boxed::Box<Interpretation>),
+  Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
   #[sdk(child(qname = "emma:CT_OneOf/emma:one-of"))]
-  EmmaOneOf(std::boxed::Box<OneOf>),
+  OneOf(std::boxed::Box<OneOf>),
   /// Defines the Group Class.
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
-  EmmaGroup(std::boxed::Box<Group>),
+  Group(std::boxed::Box<Group>),
   /// Defines the Sequence Class.
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
-  EmmaSequence(std::boxed::Box<Sequence>),
+  Sequence(std::boxed::Box<Sequence>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SequenceChoice {
   /// Defines the DerivedFrom Class.
   #[sdk(child(qname = "emma:CT_DerivedFrom/emma:derived-from"))]
-  EmmaDerivedFrom(std::boxed::Box<DerivedFrom>),
+  DerivedFrom(std::boxed::Box<DerivedFrom>),
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
-  EmmaInfo(std::boxed::Box<Info>),
+  Info(std::boxed::Box<Info>),
   /// Defines the Interpretation Class.
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
-  EmmaInterpretation(std::boxed::Box<Interpretation>),
+  Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
   #[sdk(child(qname = "emma:CT_OneOf/emma:one-of"))]
-  EmmaOneOf(std::boxed::Box<OneOf>),
+  OneOf(std::boxed::Box<OneOf>),
   /// Defines the Group Class.
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
-  EmmaGroup(std::boxed::Box<Group>),
+  Group(std::boxed::Box<Group>),
   /// Defines the Sequence Class.
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
-  EmmaSequence(std::boxed::Box<Sequence>),
+  Sequence(std::boxed::Box<Sequence>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DerivationChoice {
   /// Defines the Interpretation Class.
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
-  EmmaInterpretation(std::boxed::Box<Interpretation>),
+  Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
   #[sdk(child(qname = "emma:CT_OneOf/emma:one-of"))]
-  EmmaOneOf(std::boxed::Box<OneOf>),
+  OneOf(std::boxed::Box<OneOf>),
   /// Defines the Sequence Class.
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
-  EmmaSequence(std::boxed::Box<Sequence>),
+  Sequence(std::boxed::Box<Sequence>),
   /// Defines the Group Class.
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
-  EmmaGroup(std::boxed::Box<Group>),
+  Group(std::boxed::Box<Group>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EmmaChoice {
   /// Defines the Derivation Class.
   #[sdk(child(qname = "emma:CT_Derivation/emma:derivation"))]
-  EmmaDerivation(std::boxed::Box<Derivation>),
+  Derivation(std::boxed::Box<Derivation>),
   /// Defines the Grammar Class.
   #[sdk(child(qname = "emma:CT_Grammar/emma:grammar"))]
-  EmmaGrammar(std::boxed::Box<Grammar>),
+  Grammar(std::boxed::Box<Grammar>),
   /// Defines the Model Class.
   #[sdk(child(qname = "emma:CT_Model/emma:model"))]
-  EmmaModel(std::boxed::Box<Model>),
+  Model(std::boxed::Box<Model>),
   /// Defines the EndPointInfo Class.
   #[sdk(child(qname = "emma:CT_EndPointInfo/emma:endpoint-info"))]
-  EmmaEndpointInfo(std::boxed::Box<EndPointInfo>),
+  EndPointInfo(std::boxed::Box<EndPointInfo>),
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
-  EmmaInfo(std::boxed::Box<Info>),
+  Info(std::boxed::Box<Info>),
   /// Defines the Interpretation Class.
   #[sdk(child(qname = "emma:CT_Interpretation/emma:interpretation"))]
-  EmmaInterpretation(std::boxed::Box<Interpretation>),
+  Interpretation(std::boxed::Box<Interpretation>),
   /// Defines the OneOf Class.
   #[sdk(child(qname = "emma:CT_OneOf/emma:one-of"))]
-  EmmaOneOf(std::boxed::Box<OneOf>),
+  OneOf(std::boxed::Box<OneOf>),
   /// Defines the Group Class.
   #[sdk(child(qname = "emma:CT_Group/emma:group"))]
-  EmmaGroup(std::boxed::Box<Group>),
+  Group(std::boxed::Box<Group>),
   /// Defines the Sequence Class.
   #[sdk(child(qname = "emma:CT_Sequence/emma:sequence"))]
-  EmmaSequence(std::boxed::Box<Sequence>),
+  Sequence(std::boxed::Box<Sequence>),
 }

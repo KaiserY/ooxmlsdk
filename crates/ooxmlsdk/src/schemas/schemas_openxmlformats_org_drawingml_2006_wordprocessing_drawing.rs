@@ -461,55 +461,55 @@ pub type HorizontalAlignment = HorizontalAlignmentValues;
 pub enum AnchorChoice {
   /// No Text Wrapping.
   #[sdk(empty_child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
-  WpWrapNone,
+  WrapNone,
   /// Square Wrapping.
   #[sdk(child(qname = "wp:CT_WrapSquare/wp:wrapSquare"))]
-  WpWrapSquare(std::boxed::Box<WrapSquare>),
+  WrapSquare(std::boxed::Box<WrapSquare>),
   /// Tight Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTight/wp:wrapTight"))]
-  WpWrapTight(std::boxed::Box<WrapTight>),
+  WrapTight(std::boxed::Box<WrapTight>),
   /// Through Wrapping.
   #[sdk(child(qname = "wp:CT_WrapThrough/wp:wrapThrough"))]
-  WpWrapThrough(std::boxed::Box<WrapThrough>),
+  WrapThrough(std::boxed::Box<WrapThrough>),
   /// Top and Bottom Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"))]
-  WpWrapTopAndBottom(std::boxed::Box<WrapTopBottom>),
+  WrapTopBottom(std::boxed::Box<WrapTopBottom>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HorizontalPositionChoice {
   /// Relative Horizontal Alignment.
   #[sdk(text_child(qname = "wp:ST_AlignH/wp:align"))]
-  WpAlign(HorizontalAlignment),
+  HorizontalAlignment(HorizontalAlignment),
   /// Defines the PositionOffset Class.
   #[sdk(text_child(
     simple_type = "Int32Value",
     qname = "wp:ST_PositionOffset/wp:posOffset"
   ))]
-  WpPosOffset(PositionOffset),
+  PositionOffset(PositionOffset),
   /// Defines the PercentagePositionHeightOffset Class.
   #[sdk(text_child(
     office2010,
     simple_type = "DrawingmlPercentageValue",
     qname = "a:ST_Percentage/wp14:pctPosHOffset"
   ))]
-  Wp14PctPosHOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
+  PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VerticalPositionChoice {
   /// Relative Vertical Alignment.
   #[sdk(text_child(qname = "wp:ST_AlignV/wp:align"))]
-  WpAlign(VerticalAlignment),
+  VerticalAlignment(VerticalAlignment),
   /// Defines the PositionOffset Class.
   #[sdk(text_child(
     simple_type = "Int32Value",
     qname = "wp:ST_PositionOffset/wp:posOffset"
   ))]
-  WpPosOffset(PositionOffset),
+  PositionOffset(PositionOffset),
   /// Defines the PercentagePositionVerticalOffset Class.
   #[sdk(text_child(
     office2010,
     simple_type = "DrawingmlPercentageValue",
     qname = "a:ST_Percentage/wp14:pctPosVOffset"
   ))]
-  Wp14PctPosVOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
+  PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
 }

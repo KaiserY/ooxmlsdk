@@ -706,57 +706,57 @@ pub struct NullEventRecord {
 pub enum LaserColorChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowEventRecordListChoice {
   /// Defines the TriggerEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_TriggerEventRecord/p14:triggerEvt"))]
-  P14TriggerEvt(std::boxed::Box<TriggerEventRecord>),
+  TriggerEventRecord(std::boxed::Box<TriggerEventRecord>),
   /// Defines the PlayEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt"))]
-  P14PlayEvt(std::boxed::Box<PlayEventRecord>),
+  PlayEventRecord(std::boxed::Box<PlayEventRecord>),
   /// Defines the StopEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt"))]
-  P14StopEvt(std::boxed::Box<StopEventRecord>),
+  StopEventRecord(std::boxed::Box<StopEventRecord>),
   /// Defines the PauseEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt"))]
-  P14PauseEvt(std::boxed::Box<PauseEventRecord>),
+  PauseEventRecord(std::boxed::Box<PauseEventRecord>),
   /// Defines the ResumeEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt"))]
-  P14ResumeEvt(std::boxed::Box<ResumeEventRecord>),
+  ResumeEventRecord(std::boxed::Box<ResumeEventRecord>),
   /// Defines the SeekEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt"))]
-  P14SeekEvt(std::boxed::Box<SeekEventRecord>),
+  SeekEventRecord(std::boxed::Box<SeekEventRecord>),
   /// Defines the NullEventRecord Class.
   #[sdk(child(office2010, qname = "p14:CT_NullEventRecord/p14:nullEvt"))]
-  P14NullEvt(std::boxed::Box<NullEventRecord>),
+  NullEventRecord(std::boxed::Box<NullEventRecord>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
-  AAudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
+  AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
-  AWavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
+  WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
   #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
-  AAudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
+  AudioFromFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
-  AVideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
+  VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
-  AQuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
+  QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }

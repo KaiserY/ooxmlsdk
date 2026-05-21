@@ -174,32 +174,32 @@ pub struct TaskHistory {
 pub enum TaskHistoryEventChoice {
   /// Defines the AsgnTaskAssignUnassignUser Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskAssignUnassignUser/p1912:asgn"))]
-  P1912Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
+  AsgnTaskAssignUnassignUser(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   /// Defines the UnAsgnTaskAssignUnassignUser Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskAssignUnassignUser/p1912:unAsgn"))]
-  P1912UnAsgn(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
+  UnAsgnTaskAssignUnassignUser(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
   /// Defines the AddEmpty Class.
   #[sdk(empty_child(office2021, qname = "p:CT_Empty/p1912:add"))]
-  P1912Add,
+  AddEmpty,
   /// Defines the TaskTitleEventInfo Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskTitleEventInfo/p1912:title"))]
-  P1912Title(std::boxed::Box<TaskTitleEventInfo>),
+  TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
   /// Defines the TaskScheduleEventInfo Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskScheduleEventInfo/p1912:date"))]
-  P1912Date(std::boxed::Box<TaskScheduleEventInfo>),
+  TaskScheduleEventInfo(std::boxed::Box<TaskScheduleEventInfo>),
   /// Defines the TaskProgressEventInfo Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskProgressEventInfo/p1912:pcntCmplt"))]
-  P1912PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
+  TaskProgressEventInfo(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the TaskPriorityRecord Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskPriorityRecord/p1912:pri"))]
-  P1912Pri(std::boxed::Box<TaskPriorityRecord>),
+  TaskPriorityRecord(std::boxed::Box<TaskPriorityRecord>),
   /// Defines the UnasgnAllEmpty Class.
   #[sdk(empty_child(office2021, qname = "p:CT_Empty/p1912:unasgnAll"))]
-  P1912UnasgnAll,
+  UnasgnAllEmpty,
   /// Defines the TaskUndo Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskUndo/p1912:undo"))]
-  P1912Undo(std::boxed::Box<TaskUndo>),
+  TaskUndo(std::boxed::Box<TaskUndo>),
   /// Defines the TaskUnknownRecord Class.
   #[sdk(empty_child(office2021, qname = "p1912:CT_TaskUnknownRecord/p1912:unknown"))]
-  P1912Unknown,
+  TaskUnknownRecord,
 }

@@ -27,8 +27,8 @@ pub struct PlaceholderTypeAcb {
 pub enum PlaceholderTypeAcbChoice {
   /// Defines the CameoEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p232:cameo"))]
-  P232Cameo,
+  CameoEmpty,
   /// Defines the UnknownEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p232:unknown"))]
-  P232Unknown,
+  UnknownEmpty,
 }

@@ -144,7 +144,7 @@ fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_t
     .as_ref()
     .and_then(|extension_list| extension_list.workbook_extension.first())
     .expect("expected workbook extension");
-  let Some(WorkbookExtensionChoice::X14WorkbookPr(workbook_properties)) =
+  let Some(WorkbookExtensionChoice::X14WorkbookProperties(workbook_properties)) =
     &extension.workbook_extension_choice
   else {
     panic!("expected x14:workbookPr");
@@ -172,7 +172,7 @@ fn chart_extension_loads_pivot_options_from_m4_conformance_test() {
     .as_ref()
     .and_then(|extension_list| extension_list.chart_space_extension.first())
     .expect("expected chart-space extension");
-  let Some(ChartSpaceExtensionChoice::C14PivotOptions(pivot_options)) =
+  let Some(ChartSpaceExtensionChoice::PivotOptions(pivot_options)) =
     &extension.chart_space_extension_choice
   else {
     panic!("expected c14:pivotOptions");
@@ -393,7 +393,7 @@ fn color_scale_round_trip_from_bug_regression_test() {
 fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form() {
   let value = ArrayFeatureProperty {
     k: "sample".to_string(),
-    array_feature_property_choice: vec![ArrayFeaturePropertyChoice::XfpbD(f64::NAN)],
+    array_feature_property_choice: vec![ArrayFeaturePropertyChoice::Xsddouble(f64::NAN)],
   };
 
   let xml = value.to_xml().unwrap();
@@ -401,7 +401,7 @@ fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form()
   assert!(serialized.contains("<xfpb:d>NaN</xfpb:d>"));
 
   let reparsed = serialized.parse::<ArrayFeatureProperty>().unwrap();
-  let Some(ArrayFeaturePropertyChoice::XfpbD(parsed)) =
+  let Some(ArrayFeaturePropertyChoice::Xsddouble(parsed)) =
     reparsed.array_feature_property_choice.first()
   else {
     panic!("expected xfpb:d");

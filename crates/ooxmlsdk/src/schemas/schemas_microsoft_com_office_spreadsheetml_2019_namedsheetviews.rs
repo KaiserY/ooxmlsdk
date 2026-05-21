@@ -245,10 +245,10 @@ pub struct RichSortCondition {
 pub enum FilterColumnChoice {
   /// Filter Criteria.
   #[sdk(child(qname = "x:CT_Filters/x:filters"))]
-  XFilters(std::boxed::Box<crate::schemas::x::Filters>),
+  Filters(std::boxed::Box<crate::schemas::x::Filters>),
   /// Top 10.
   #[sdk(child(qname = "x:CT_Top10/x:top10"))]
-  XTop10(std::boxed::Box<crate::schemas::x::Top10>),
+  Top10(std::boxed::Box<crate::schemas::x::Top10>),
   /// Defines the CustomFilters Class.
   #[sdk(child(office2010, qname = "x14:CT_CustomFilters/x14:customFilters"))]
   X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
@@ -257,10 +257,10 @@ pub enum FilterColumnChoice {
   XCustomFilters(std::boxed::Box<crate::schemas::x::CustomFilters>),
   /// Dynamic Filter.
   #[sdk(child(qname = "x:CT_DynamicFilter/x:dynamicFilter"))]
-  XDynamicFilter(std::boxed::Box<crate::schemas::x::DynamicFilter>),
+  DynamicFilter(std::boxed::Box<crate::schemas::x::DynamicFilter>),
   /// Color Filter Criteria.
   #[sdk(child(qname = "x:CT_ColorFilter/x:colorFilter"))]
-  XColorFilter(std::boxed::Box<crate::schemas::x::ColorFilter>),
+  ColorFilter(std::boxed::Box<crate::schemas::x::ColorFilter>),
   /// Defines the IconFilter Class.
   #[sdk(child(office2010, qname = "x14:CT_IconFilter/x14:iconFilter"))]
   X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
@@ -269,17 +269,17 @@ pub enum FilterColumnChoice {
   XIconFilter(std::boxed::Box<crate::schemas::x::IconFilter>),
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  XExtLst(std::boxed::Box<crate::schemas::x::ExtensionList>),
+  ExtensionList(std::boxed::Box<crate::schemas::x::ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortRuleChoice {
   /// Defines the SortCondition Class.
   #[sdk(child(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
-  XnsvSortCondition(std::boxed::Box<SortCondition>),
+  SortCondition(std::boxed::Box<SortCondition>),
   /// Defines the RichSortCondition Class.
   #[sdk(child(
     office2021,
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
   ))]
-  XnsvRichSortCondition(std::boxed::Box<RichSortCondition>),
+  RichSortCondition(std::boxed::Box<RichSortCondition>),
 }

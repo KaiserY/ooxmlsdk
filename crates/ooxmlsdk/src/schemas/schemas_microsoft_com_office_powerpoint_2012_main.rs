@@ -143,20 +143,20 @@ pub struct ExtendedGuide {
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }

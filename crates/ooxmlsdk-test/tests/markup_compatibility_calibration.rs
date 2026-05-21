@@ -35,7 +35,7 @@ fn first_paragraph(document: &Document) -> &Paragraph {
     .body_choice
     .iter()
     .find_map(|choice| match choice {
-      BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
+      BodyChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
       _ => None,
     })
     .expect("expected paragraph")
@@ -46,7 +46,7 @@ fn first_run(paragraph: &Paragraph) -> &Run {
     .paragraph_choice
     .iter()
     .find_map(|choice| match choice {
-      ParagraphChoice::WR(run) => Some(run.as_ref()),
+      ParagraphChoice::WRun(run) => Some(run.as_ref()),
       _ => None,
     })
     .expect("expected run")

@@ -92,51 +92,51 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingCanvasChoice {
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
-  WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  WordprocessingShape(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
-  PicPic(std::boxed::Box<crate::schemas::pic::Picture>),
+  Picture(std::boxed::Box<crate::schemas::pic::Picture>),
   #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
-  W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
+  ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:wgp"))]
-  WpgWgp(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
+  WordprocessingGroup(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
   /// Defines the GraphicFrameType Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"))]
-  WpcGraphicFrame(std::boxed::Box<GraphicFrameType>),
+  GraphicFrameType(std::boxed::Box<GraphicFrameType>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFormattingChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFormattingChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WholeFormattingChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }

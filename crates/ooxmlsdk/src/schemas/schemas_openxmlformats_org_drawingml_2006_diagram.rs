@@ -2801,335 +2801,335 @@ pub struct DiagramDefinitionExtensionList {
 pub enum FillColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextLineColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextFillColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextEffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForEachChoice {
   /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
-  DgmAlg(std::boxed::Box<Algorithm>),
+  Algorithm(std::boxed::Box<Algorithm>),
   /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
-  DgmShape(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
-  DgmPresOf(std::boxed::Box<PresentationOf>),
+  PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
-  DgmConstrLst(std::boxed::Box<Constraints>),
+  Constraints(std::boxed::Box<Constraints>),
   /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
-  DgmRuleLst(std::boxed::Box<RuleList>),
+  RuleList(std::boxed::Box<RuleList>),
   /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
-  DgmForEach(std::boxed::Box<ForEach>),
+  ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
-  DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  LayoutNode(std::boxed::Box<LayoutNode>),
   /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
-  DgmChoose(std::boxed::Box<Choose>),
+  Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  DgmExtLst(std::boxed::Box<ExtensionList>),
+  ExtensionList(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LayoutNodeChoice {
   /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
-  DgmAlg(std::boxed::Box<Algorithm>),
+  Algorithm(std::boxed::Box<Algorithm>),
   /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
-  DgmShape(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
-  DgmPresOf(std::boxed::Box<PresentationOf>),
+  PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
-  DgmConstrLst(std::boxed::Box<Constraints>),
+  Constraints(std::boxed::Box<Constraints>),
   /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
-  DgmRuleLst(std::boxed::Box<RuleList>),
+  RuleList(std::boxed::Box<RuleList>),
   /// Variable List.
   #[sdk(child(qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst"))]
-  DgmVarLst(std::boxed::Box<VariableList>),
+  VariableList(std::boxed::Box<VariableList>),
   /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
-  DgmForEach(std::boxed::Box<ForEach>),
+  ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
-  DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  LayoutNode(std::boxed::Box<LayoutNode>),
   /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
-  DgmChoose(std::boxed::Box<Choose>),
+  Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  DgmExtLst(std::boxed::Box<ExtensionList>),
+  ExtensionList(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseIfChoice {
   /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
-  DgmAlg(std::boxed::Box<Algorithm>),
+  Algorithm(std::boxed::Box<Algorithm>),
   /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
-  DgmShape(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
-  DgmPresOf(std::boxed::Box<PresentationOf>),
+  PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
-  DgmConstrLst(std::boxed::Box<Constraints>),
+  Constraints(std::boxed::Box<Constraints>),
   /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
-  DgmRuleLst(std::boxed::Box<RuleList>),
+  RuleList(std::boxed::Box<RuleList>),
   /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
-  DgmForEach(std::boxed::Box<ForEach>),
+  ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
-  DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  LayoutNode(std::boxed::Box<LayoutNode>),
   /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
-  DgmChoose(std::boxed::Box<Choose>),
+  Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  DgmExtLst(std::boxed::Box<ExtensionList>),
+  ExtensionList(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramChooseElseChoice {
   /// Algorithm.
   #[sdk(child(qname = "dgm:CT_Algorithm/dgm:alg"))]
-  DgmAlg(std::boxed::Box<Algorithm>),
+  Algorithm(std::boxed::Box<Algorithm>),
   /// Shape.
   #[sdk(child(qname = "dgm:CT_Shape/dgm:shape"))]
-  DgmShape(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Presentation Of.
   #[sdk(child(qname = "dgm:CT_PresentationOf/dgm:presOf"))]
-  DgmPresOf(std::boxed::Box<PresentationOf>),
+  PresentationOf(std::boxed::Box<PresentationOf>),
   /// Constraint List.
   #[sdk(child(qname = "dgm:CT_Constraints/dgm:constrLst"))]
-  DgmConstrLst(std::boxed::Box<Constraints>),
+  Constraints(std::boxed::Box<Constraints>),
   /// Rule List.
   #[sdk(child(qname = "dgm:CT_Rules/dgm:ruleLst"))]
-  DgmRuleLst(std::boxed::Box<RuleList>),
+  RuleList(std::boxed::Box<RuleList>),
   /// For Each.
   #[sdk(child(qname = "dgm:CT_ForEach/dgm:forEach"))]
-  DgmForEach(std::boxed::Box<ForEach>),
+  ForEach(std::boxed::Box<ForEach>),
   /// Layout Node.
   #[sdk(child(qname = "dgm:CT_LayoutNode/dgm:layoutNode"))]
-  DgmLayoutNode(std::boxed::Box<LayoutNode>),
+  LayoutNode(std::boxed::Box<LayoutNode>),
   /// Choose Element.
   #[sdk(child(qname = "dgm:CT_Choose/dgm:choose"))]
-  DgmChoose(std::boxed::Box<Choose>),
+  Choose(std::boxed::Box<Choose>),
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
-  DgmExtLst(std::boxed::Box<ExtensionList>),
+  ExtensionList(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextPropertiesChoice {
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  ASp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
+  Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
-  AFlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WholeChoice {
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramDefinitionExtensionChoice {
@@ -3138,10 +3138,10 @@ pub enum DiagramDefinitionExtensionChoice {
     office2019,
     qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"
   ))]
-  Dgm1611AutoBuNodeInfoLst(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
+  NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
   /// Defines the TextListStyleType Class.
   #[sdk(child(office2019, qname = "a:CT_TextListStyle/dgm1612:lstStyle"))]
-  Dgm1612LstStyle(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
+  TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }

@@ -66,14 +66,14 @@ pub struct NumberDiagramInfo {
 pub enum DiagramAutoBulletChoice {
   /// No Bullet.
   #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone,
+  NoBullet,
   /// Auto-Numbered Bullet.
   #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
-  ABuAutoNum(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),
+  AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),
   /// Character Bullet.
   #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
-  ABuChar(std::boxed::Box<crate::schemas::a::CharacterBullet>),
+  CharacterBullet(std::boxed::Box<crate::schemas::a::CharacterBullet>),
   /// Picture Bullet.
   #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
-  ABuBlip(std::boxed::Box<crate::schemas::a::PictureBullet>),
+  PictureBullet(std::boxed::Box<crate::schemas::a::PictureBullet>),
 }

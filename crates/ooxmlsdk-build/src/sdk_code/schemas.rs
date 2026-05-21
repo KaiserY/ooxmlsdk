@@ -77,6 +77,7 @@ fn sdk_version_markers(version: &str) -> Vec<TokenStream> {
 pub struct ResolvedOneSequenceChild<'a> {
   pub name: &'a str,
   pub field_name: Cow<'a, str>,
+  pub variant_name: Cow<'a, str>,
   pub property_comments: Cow<'a, str>,
   pub version: &'a str,
   pub kind: SchemaTypeChildKind,
@@ -502,6 +503,35 @@ pub(crate) fn schema_choice_variant_name_from_qname(qname: &str) -> String {
   }
 }
 
+pub(crate) fn schema_choice_variant_name_from_field_name(field_name: &str) -> String {
+  field_name
+    .strip_prefix("r#")
+    .unwrap_or(field_name)
+    .to_upper_camel_case()
+}
+
+pub(crate) fn schema_choice_variant_name_from_child(
+  child: &SchemaTypeChild,
+  context: &CodegenContext<'_>,
+) -> String {
+  if !child.property_name.is_empty() {
+    return schema_choice_variant_name_from_field_name(child.property_name.as_str());
+  }
+
+  context
+    .type_by_name(child.name.as_str())
+    .map(|child_type| schema_choice_variant_name_from_field_name(child_type.class_name.as_str()))
+    .unwrap_or_else(|| schema_choice_variant_name_from_qname(child.name.as_str()))
+}
+
+pub(crate) fn schema_choice_variant_conflict_name(prefix: &str, class_name: &str) -> String {
+  format!(
+    "{}{}",
+    prefix.to_upper_camel_case(),
+    class_name.to_upper_camel_case()
+  )
+}
+
 pub(crate) fn schema_choice_variant_qname_prefix(qname: &str) -> Option<&str> {
   schema_qname_element_name(qname).split(':').next()
 }
@@ -541,6 +571,7 @@ pub(crate) fn schema_recursive_choice_display_name(
 pub(crate) fn schema_recursive_choice_variant_name(
   child: &SchemaTypeChild,
   child_index: usize,
+  context: &CodegenContext<'_>,
 ) -> String {
   match child.kind {
     SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
@@ -558,7 +589,7 @@ pub(crate) fn schema_recursive_choice_variant_name(
         child.property_name.to_upper_camel_case()
       }
     }
-    _ => schema_choice_variant_name_from_qname(child.name.as_str()),
+    _ => schema_choice_variant_name_from_child(child, context),
   }
 }
 
@@ -695,6 +726,7 @@ impl<'a> CodegenContext<'a> {
         return Ok(ResolvedOneSequenceChild {
           name: child.name.as_str(),
           field_name,
+          variant_name: Cow::Borrowed("XmlAny"),
           property_comments,
           version: child.initial_version.as_str(),
           kind: child.kind,
@@ -728,6 +760,7 @@ impl<'a> CodegenContext<'a> {
       return Ok(ResolvedOneSequenceChild {
         name: child.name.as_str(),
         field_name,
+        variant_name: Cow::Owned(schema_choice_variant_name_from_child(child, self)),
         property_comments,
         version: schema_item_version(child_type),
         kind: child.kind,
@@ -746,6 +779,9 @@ impl<'a> CodegenContext<'a> {
     Ok(ResolvedOneSequenceChild {
       name: particle_name,
       field_name: Cow::Owned(schema_child_field_rust_name(child_type.class_name.as_str())),
+      variant_name: Cow::Owned(schema_choice_variant_name_from_field_name(
+        child_type.class_name.as_str(),
+      )),
       property_comments: if child_type.summary.is_empty() {
         Cow::Borrowed(" _")
       } else {
@@ -772,6 +808,7 @@ impl<'a> CodegenContext<'a> {
         variants.push(ResolvedOneSequenceChild {
           name: "",
           field_name: Cow::Borrowed(schema_empty_text_child_field_name(child)),
+          variant_name: Cow::Borrowed(schema_empty_text_child_field_name(child)),
           property_comments: Cow::Borrowed(" _"),
           version: child.initial_version.as_str(),
           kind: child.kind,
@@ -782,6 +819,7 @@ impl<'a> CodegenContext<'a> {
         variants.push(ResolvedOneSequenceChild {
           name: "",
           field_name: Cow::Owned(schema_any_child_field_rust_name(child)),
+          variant_name: Cow::Borrowed("XmlAny"),
           property_comments: if child.property_comments.is_empty() {
             Cow::Borrowed(" _")
           } else {
@@ -808,6 +846,7 @@ impl<'a> CodegenContext<'a> {
             self,
             &duplicate_preferred_names,
           )),
+          variant_name: Cow::Owned(schema_choice_variant_name_from_child(child, self)),
           property_comments: if child.property_comments.is_empty() {
             Cow::Borrowed(" _")
           } else {
@@ -1280,7 +1319,8 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       })
       .collect();
 
-    let struct_name_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())?;
+    let struct_name_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())
+      .map_err(|err| format!("type {} struct ident: {err}", type_decl.rust_name))?;
     let schema_type_version = type_decl.version.as_deref().unwrap_or_default();
     let type_attrs = version_cfg.attrs(schema_type_version);
     let field_version_cfg = if type_attrs.is_empty() {
@@ -2055,7 +2095,8 @@ fn gen_choice_type_decl(
   type_graph: &TypeContainmentGraph,
   version_cfg: VersionCfgContext,
 ) -> Result<TokenStream> {
-  let enum_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())?;
+  let enum_ident: Ident = parse_str(&type_decl.rust_name.to_upper_camel_case())
+    .map_err(|err| format!("choice {} enum ident: {err}", type_decl.rust_name))?;
   let type_version = type_decl.version.as_deref().unwrap_or_default();
   let variant_versions: Vec<&str> = type_decl
     .members
@@ -2085,11 +2126,14 @@ fn gen_choice_type_decl(
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
-    variants.extend(gen_choice_variant_tokens(
-      variant,
-      &render_context,
-      quote! {},
-    )?);
+    variants.extend(
+      gen_choice_variant_tokens(variant, &render_context, quote! {}).map_err(|err| {
+        format!(
+          "choice {} variant {}: {err}",
+          type_decl.rust_name, variant.rust_name
+        )
+      })?,
+    );
   }
 
   Ok(quote! {
@@ -2345,7 +2389,8 @@ fn gen_choice_variant_tokens(
     .get(&variant.rust_name)
     .map(String::as_str)
     .unwrap_or(&variant.rust_name);
-  let variant_ident: Ident = parse_str(rendered_variant_name)?;
+  let variant_ident: Ident =
+    parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
   let variant_attrs = module_version_cfg_attrs(&variant.version, render_context.variant_cfg);
   let variant_sdk_version_markers = sdk_version_markers(&variant.version);
   let variant_doc_attrs = choice_variant_doc_attrs(
@@ -2552,14 +2597,18 @@ fn single_field_sequence_variant_ident(
     || is_generated_anonymous_variant_name_of_kind(rendered_variant_name, "Sequence")
   {
     match &field.wire {
-      FieldWireDecl::Child { qname } | FieldWireDecl::TextChild { qname } => {
-        return Ok(parse_str(&schema_choice_variant_name_from_qname(qname))?);
+      FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {
+        return Ok(parse_str(&escape_upper_camel_case(
+          schema_choice_variant_name_from_field_name(field.rust_name.as_str()),
+        ))?);
       }
       _ => {}
     }
   }
 
-  Ok(parse_str(rendered_variant_name)?)
+  Ok(parse_str(&escape_upper_camel_case(
+    rendered_variant_name.to_string(),
+  ))?)
 }
 
 fn inline_sequence_helper_type_decl<'a>(
@@ -4137,9 +4186,9 @@ mod tests {
     assert!(
       generated.contains("# [sdk (empty_child (office2010 , qname = \"w:CT_Empty/w14:noFill\"))]")
     );
-    assert!(generated.contains("W14NoFill ,"));
+    assert!(generated.contains("NoFillEmpty ,"));
     assert!(!generated.contains("pub struct NoFillEmpty"));
-    assert!(!generated.contains("W14NoFill (std :: boxed :: Box < NoFillEmpty >)"));
+    assert!(!generated.contains("NoFillEmpty (std :: boxed :: Box < NoFillEmpty >)"));
   }
 
   #[test]
@@ -5756,7 +5805,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Second (std :: boxed :: Box < Second >)"
     ));
     assert!(!generated.contains("Sequence32"));
   }
@@ -5859,10 +5908,10 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
+      "# [sdk (child (qname = \"t:CT_First/t:first\"))] First (std :: boxed :: Box < First >)"
     ));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Second (std :: boxed :: Box < Second >)"
     ));
     assert!(!generated.contains("Sequence32"));
     assert!(!generated.contains("Sequence8"));
@@ -5950,7 +5999,7 @@ mod tests {
       "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence (std :: boxed :: Box < First >)"
     ));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
+      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Second (std :: boxed :: Box < Second >)"
     ));
   }
 
@@ -6800,9 +6849,9 @@ mod tests {
     assert!(generated.contains("pub mixed_holder_choice : Option < MixedHolderChoice >"));
     assert!(generated.contains("pub trailing_leaf : std :: boxed :: Box < LeafD >"));
     assert!(generated.contains("pub enum MixedHolderChoice"));
-    assert!(generated.contains("TB (std :: boxed :: Box < LeafB >)"));
-    assert!(generated.contains("TC (std :: boxed :: Box < LeafC >)"));
-    assert!(generated.contains("TD (std :: boxed :: Box < LeafD >)"));
+    assert!(generated.contains("LeafB (std :: boxed :: Box < LeafB >)"));
+    assert!(generated.contains("LeafC (std :: boxed :: Box < LeafC >)"));
+    assert!(generated.contains("LeafD (std :: boxed :: Box < LeafD >)"));
   }
 
   #[test]
@@ -6873,11 +6922,8 @@ mod tests {
 
     assert!(generated.contains("pub fallback_holder_choice : Option < FallbackHolderChoice >"));
     assert!(generated.contains("pub enum FallbackHolderChoice"));
-    assert!(generated.contains("TA (std :: boxed :: Box < LeafA >)"));
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:CT_B/t:b\"))] TB (std :: boxed :: Box < LeafB >)")
-    );
+    assert!(generated.contains("A (std :: boxed :: Box < LeafA >)"));
+    assert!(generated.contains("LeafB (std :: boxed :: Box < LeafB >)"));
     assert!(!generated.contains("pub struct FallbackHolderChoiceSequence2"));
     assert!(!generated.contains("leaf_b"));
   }

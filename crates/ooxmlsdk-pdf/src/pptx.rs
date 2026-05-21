@@ -63,8 +63,8 @@ pub(crate) fn layout(
 fn collect_shape_tree_text(tree: &p::ShapeTree, lines: &mut Vec<String>) {
   for choice in &tree.shape_tree_choice {
     match choice {
-      p::ShapeTreeChoice::PSp(shape) => collect_shape_text(shape, lines),
-      p::ShapeTreeChoice::PGrpSp(group) => collect_group_text(group, lines),
+      p::ShapeTreeChoice::Shape(shape) => collect_shape_text(shape, lines),
+      p::ShapeTreeChoice::GroupShape(group) => collect_group_text(group, lines),
       _ => {}
     }
   }
@@ -73,8 +73,8 @@ fn collect_shape_tree_text(tree: &p::ShapeTree, lines: &mut Vec<String>) {
 fn collect_group_text(group: &p::GroupShape, lines: &mut Vec<String>) {
   for choice in &group.group_shape_choice {
     match choice {
-      p::GroupShapeChoice::PSp(shape) => collect_shape_text(shape, lines),
-      p::GroupShapeChoice::PGrpSp(group) => collect_group_text(group, lines),
+      p::GroupShapeChoice::Shape(shape) => collect_shape_text(shape, lines),
+      p::GroupShapeChoice::GroupShape(group) => collect_group_text(group, lines),
       _ => {}
     }
   }
@@ -97,14 +97,14 @@ fn paragraph_text(paragraph: &a::Paragraph) -> String {
   let mut text = String::new();
   for choice in &paragraph.paragraph_choice {
     match choice {
-      a::ParagraphChoice::AR(run) => text.push_str(&run.text),
-      a::ParagraphChoice::ABr(_) => text.push('\n'),
-      a::ParagraphChoice::AFld(field) => {
+      a::ParagraphChoice::Run(run) => text.push_str(&run.text),
+      a::ParagraphChoice::Break(_) => text.push('\n'),
+      a::ParagraphChoice::Field(field) => {
         if let Some(value) = &field.text {
           text.push_str(value);
         }
       }
-      a::ParagraphChoice::A14M(_) => {}
+      a::ParagraphChoice::TextMath(_) => {}
     }
   }
   text

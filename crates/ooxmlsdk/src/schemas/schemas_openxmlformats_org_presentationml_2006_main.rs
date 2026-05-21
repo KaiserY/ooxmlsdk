@@ -4824,342 +4824,342 @@ pub struct PlaceholderExtension {
 pub enum ColorMapOverrideChoice {
   /// Master Color Mapping.
   #[sdk(empty_child(qname = "a:CT_EmptyElement/a:masterClrMapping"))]
-  AMasterClrMapping,
+  MasterColorMapping,
   /// Override Color Mapping.
   #[sdk(child(qname = "a:CT_ColorMapping/a:overrideClrMapping"))]
-  AOverrideClrMapping(std::boxed::Box<crate::schemas::a::OverrideColorMapping>),
+  OverrideColorMapping(std::boxed::Box<crate::schemas::a::OverrideColorMapping>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundPropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundPropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundStyleReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleObjectChoice {
   /// Defines the OleObjectEmbed Class.
   #[sdk(child(qname = "p:CT_OleObjectEmbed/p:embed"))]
-  PEmbed(std::boxed::Box<OleObjectEmbed>),
+  OleObjectEmbed(std::boxed::Box<OleObjectEmbed>),
   /// Defines the OleObjectLink Class.
   #[sdk(child(qname = "p:CT_OleObjectLink/p:link"))]
-  PLink(std::boxed::Box<OleObjectLink>),
+  OleObjectLink(std::boxed::Box<OleObjectLink>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TargetElementChoice {
   /// Slide Target.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldTgt"))]
-  PSldTgt,
+  SlideTarget,
   /// Sound Target.
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt"))]
-  PSndTgt(std::boxed::Box<SoundTarget>),
+  SoundTarget(std::boxed::Box<SoundTarget>),
   /// Shape Target.
   #[sdk(child(qname = "p:CT_TLShapeTargetElement/p:spTgt"))]
-  PSpTgt(std::boxed::Box<ShapeTarget>),
+  ShapeTarget(std::boxed::Box<ShapeTarget>),
   /// Ink Target.
   #[sdk(child(qname = "p:CT_TLSubShapeId/p:inkTgt"))]
-  PInkTgt(std::boxed::Box<InkTarget>),
+  InkTarget(std::boxed::Box<InkTarget>),
   /// Defines the BookmarkTarget Class.
   #[sdk(child(office2010, qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"))]
-  P14BmkTgt(std::boxed::Box<crate::schemas::p14::BookmarkTarget>),
+  BookmarkTarget(std::boxed::Box<crate::schemas::p14::BookmarkTarget>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionChoice {
   /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
-  PTgtEl(std::boxed::Box<TargetElement>),
+  TargetElement(std::boxed::Box<TargetElement>),
   /// Time Node.
   #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
-  PTn(std::boxed::Box<TimeNode>),
+  TimeNode(std::boxed::Box<TimeNode>),
   /// Runtime Node Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
-  PRtn(std::boxed::Box<RuntimeNodeTrigger>),
+  RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndSyncChoice {
   /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
-  PTgtEl(std::boxed::Box<TargetElement>),
+  TargetElement(std::boxed::Box<TargetElement>),
   /// Time Node.
   #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
-  PTn(std::boxed::Box<TimeNode>),
+  TimeNode(std::boxed::Box<TimeNode>),
   /// Runtime Node Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
-  PRtn(std::boxed::Box<RuntimeNodeTrigger>),
+  RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorValueChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PenColorChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ToVariantValueChoice {
   /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
-  PBoolVal(std::boxed::Box<BooleanVariantValue>),
+  BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
   /// Integer.
   #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
-  PIntVal(std::boxed::Box<IntegerVariantValue>),
+  IntegerVariantValue(std::boxed::Box<IntegerVariantValue>),
   /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
-  PFltVal(std::boxed::Box<FloatVariantValue>),
+  FloatVariantValue(std::boxed::Box<FloatVariantValue>),
   /// String Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
-  PStrVal(std::boxed::Box<StringVariantValue>),
+  StringVariantValue(std::boxed::Box<StringVariantValue>),
   /// Color Value.
   #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
-  PClrVal(std::boxed::Box<ColorValue>),
+  ColorValue(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantValueChoice {
   /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
-  PBoolVal(std::boxed::Box<BooleanVariantValue>),
+  BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
   /// Integer.
   #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
-  PIntVal(std::boxed::Box<IntegerVariantValue>),
+  IntegerVariantValue(std::boxed::Box<IntegerVariantValue>),
   /// Float Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
-  PFltVal(std::boxed::Box<FloatVariantValue>),
+  FloatVariantValue(std::boxed::Box<FloatVariantValue>),
   /// String Value.
   #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
-  PStrVal(std::boxed::Box<StringVariantValue>),
+  StringVariantValue(std::boxed::Box<StringVariantValue>),
   /// Color Value.
   #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
-  PClrVal(std::boxed::Box<ColorValue>),
+  ColorValue(std::boxed::Box<ColorValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildSubElementChoice {
   /// Build Diagram.
   #[sdk(child(qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm"))]
-  ABldDgm(std::boxed::Box<crate::schemas::a::BuildDiagram>),
+  BuildDiagram(std::boxed::Box<crate::schemas::a::BuildDiagram>),
   /// Build Chart.
   #[sdk(child(qname = "a:CT_AnimationChartBuildProperties/a:bldChart"))]
-  ABldChart(std::boxed::Box<crate::schemas::a::BuildChart>),
+  BuildChart(std::boxed::Box<crate::schemas::a::BuildChart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildGraphicsChoice {
   /// Build As One.
   #[sdk(empty_child(qname = "p:CT_Empty/p:bldAsOne"))]
-  PBldAsOne,
+  BuildAsOne,
   /// Build Sub Elements.
   #[sdk(child(qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub"))]
-  PBldSub(std::boxed::Box<BuildSubElement>),
+  BuildSubElement(std::boxed::Box<BuildSubElement>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BuildListChoice {
   /// Build Paragraph.
   #[sdk(child(qname = "p:CT_TLBuildParagraph/p:bldP"))]
-  PBldP(std::boxed::Box<BuildParagraph>),
+  BuildParagraph(std::boxed::Box<BuildParagraph>),
   /// Build Diagram.
   #[sdk(child(qname = "p:CT_TLBuildDiagram/p:bldDgm"))]
-  PBldDgm(std::boxed::Box<BuildDiagram>),
+  BuildDiagram(std::boxed::Box<BuildDiagram>),
   /// Build OLE Chart.
   #[sdk(child(qname = "p:CT_TLOleBuildChart/p:bldOleChart"))]
-  PBldOleChart(std::boxed::Box<BuildOleChart>),
+  BuildOleChart(std::boxed::Box<BuildOleChart>),
   /// Build Graphics.
   #[sdk(child(qname = "p:CT_TLGraphicalObjectBuild/p:bldGraphic"))]
-  PBldGraphic(std::boxed::Box<BuildGraphics>),
+  BuildGraphics(std::boxed::Box<BuildGraphics>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ByColorChoice {
   /// RGB.
   #[sdk(child(qname = "p:CT_TLByRgbColorTransform/p:rgb"))]
-  PRgb(std::boxed::Box<RgbColor>),
+  RgbColor(std::boxed::Box<RgbColor>),
   /// HSL.
   #[sdk(child(qname = "p:CT_TLByHslColorTransform/p:hsl"))]
-  PHsl(std::boxed::Box<HslColor>),
+  HslColor(std::boxed::Box<HslColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FromColorChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ToColorChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
-  AAudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
+  AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
-  AWavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
+  WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
   #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
-  AAudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
+  AudioFromFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
-  AVideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
+  VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
-  AQuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
+  QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
-  ATile(std::boxed::Box<crate::schemas::a::Tile>),
+  Tile(std::boxed::Box<crate::schemas::a::Tile>),
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
-  AStretch(std::boxed::Box<crate::schemas::a::Stretch>),
+  Stretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideExtensionChoice {
   /// Defines the LaserTraceList Class.
   #[sdk(child(office2010, qname = "p14:CT_LaserTraceList/p14:laserTraceLst"))]
-  P14LaserTraceLst(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
+  LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
   /// Defines the ShowEventRecordList Class.
   #[sdk(child(office2010, qname = "p14:CT_ShowEventRecordList/p14:showEvtLst"))]
-  P14ShowEvtLst(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
+  ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
   /// Defines the CommentRelationship Class.
   #[sdk(child(office2021, qname = "p188:CT_CommentRelationship/p188:commentRel"))]
-  P188CommentRel(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
+  CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5167,7 +5167,7 @@ pub enum SlideExtensionChoice {
 pub enum CommonSlideDataExtensionChoice {
   /// Defines the CreationId Class.
   #[sdk(child(office2010, qname = "p14:CT_RandomId/p14:creationId"))]
-  P14CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
+  CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5175,13 +5175,13 @@ pub enum CommonSlideDataExtensionChoice {
 pub enum ShowPropertiesExtensionChoice {
   /// Defines the BrowseMode Class.
   #[sdk(child(office2010, qname = "p14:CT_BrowseMode/p14:browseMode"))]
-  P14BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
+  BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
   /// Defines the LaserColor Class.
   #[sdk(child(office2010, qname = "a:CT_Color/p14:laserClr"))]
-  P14LaserClr(std::boxed::Box<crate::schemas::p14::LaserColor>),
+  LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
   /// Defines the ShowMediaControls Class.
   #[sdk(child(office2010, qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls"))]
-  P14ShowMediaCtrls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
+  ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5189,139 +5189,139 @@ pub enum ShowPropertiesExtensionChoice {
 pub enum TransitionChoice {
   /// Defines the BlindsTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:blinds"))]
-  PBlinds(std::boxed::Box<BlindsTransition>),
+  BlindsTransition(std::boxed::Box<BlindsTransition>),
   /// Defines the CheckerTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:checker"))]
-  PChecker(std::boxed::Box<CheckerTransition>),
+  CheckerTransition(std::boxed::Box<CheckerTransition>),
   /// Defines the CircleTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:circle"))]
-  PCircle,
+  CircleTransition,
   /// Defines the DissolveTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:dissolve"))]
-  PDissolve,
+  DissolveTransition,
   /// Defines the CombTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:comb"))]
-  PComb(std::boxed::Box<CombTransition>),
+  CombTransition(std::boxed::Box<CombTransition>),
   /// Defines the CoverTransition Class.
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:cover"))]
-  PCover(std::boxed::Box<CoverTransition>),
+  CoverTransition(std::boxed::Box<CoverTransition>),
   /// Defines the CutTransition Class.
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:cut"))]
-  PCut(std::boxed::Box<CutTransition>),
+  CutTransition(std::boxed::Box<CutTransition>),
   /// Defines the DiamondTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:diamond"))]
-  PDiamond,
+  DiamondTransition,
   /// Defines the FadeTransition Class.
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:fade"))]
-  PFade(std::boxed::Box<FadeTransition>),
+  FadeTransition(std::boxed::Box<FadeTransition>),
   /// Defines the NewsflashTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:newsflash"))]
-  PNewsflash,
+  NewsflashTransition,
   /// Defines the PlusTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:plus"))]
-  PPlus,
+  PlusTransition,
   /// Defines the PullTransition Class.
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:pull"))]
-  PPull(std::boxed::Box<PullTransition>),
+  PullTransition(std::boxed::Box<PullTransition>),
   /// Defines the PushTransition Class.
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:push"))]
-  PPush(std::boxed::Box<PushTransition>),
+  PushTransition(std::boxed::Box<PushTransition>),
   /// Defines the RandomTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:random"))]
-  PRandom,
+  RandomTransition,
   /// Defines the RandomBarTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:randomBar"))]
-  PRandomBar(std::boxed::Box<RandomBarTransition>),
+  RandomBarTransition(std::boxed::Box<RandomBarTransition>),
   /// Defines the SplitTransition Class.
   #[sdk(child(qname = "p:CT_SplitTransition/p:split"))]
-  PSplit(std::boxed::Box<SplitTransition>),
+  SplitTransition(std::boxed::Box<SplitTransition>),
   /// Defines the StripsTransition Class.
   #[sdk(child(qname = "p:CT_CornerDirectionTransition/p:strips"))]
-  PStrips(std::boxed::Box<StripsTransition>),
+  StripsTransition(std::boxed::Box<StripsTransition>),
   /// Defines the WedgeTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:wedge"))]
-  PWedge,
+  WedgeTransition,
   /// Defines the WheelTransition Class.
   #[sdk(child(qname = "p:CT_WheelTransition/p:wheel"))]
-  PWheel(std::boxed::Box<WheelTransition>),
+  WheelTransition(std::boxed::Box<WheelTransition>),
   /// Defines the WipeTransition Class.
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:wipe"))]
-  PWipe(std::boxed::Box<WipeTransition>),
+  WipeTransition(std::boxed::Box<WipeTransition>),
   /// Defines the ZoomTransition Class.
   #[sdk(child(qname = "p:CT_InOutTransition/p:zoom"))]
-  PZoom(std::boxed::Box<ZoomTransition>),
+  ZoomTransition(std::boxed::Box<ZoomTransition>),
   /// Defines the FlashTransition Class.
   #[sdk(empty_child(office2010, qname = "p:CT_Empty/p14:flash"))]
-  P14Flash,
+  FlashTransition,
   #[sdk(child(office2010, qname = "p:CT_SideDirectionTransition/p14:vortex"))]
-  P14Vortex(std::boxed::Box<crate::schemas::p14::VortexTransition>),
+  VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
   #[sdk(child(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:switch"))]
-  P14Switch(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
+  SwitchTransition(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
   #[sdk(child(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:flip"))]
-  P14Flip(std::boxed::Box<crate::schemas::p14::FlipTransition>),
+  FlipTransition(std::boxed::Box<crate::schemas::p14::FlipTransition>),
   #[sdk(child(office2010, qname = "p14:CT_RippleTransition/p14:ripple"))]
-  P14Ripple(std::boxed::Box<crate::schemas::p14::RippleTransition>),
+  RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
   #[sdk(child(office2010, qname = "p14:CT_GlitterTransition/p14:glitter"))]
-  P14Glitter(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
+  GlitterTransition(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
   /// Defines the HoneycombTransition Class.
   #[sdk(empty_child(office2010, qname = "p:CT_Empty/p14:honeycomb"))]
-  P14Honeycomb,
+  HoneycombTransition,
   #[sdk(child(office2010, qname = "p14:CT_PrismTransition/p14:prism"))]
-  P14Prism(std::boxed::Box<crate::schemas::p14::PrismTransition>),
+  PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
   #[sdk(child(office2010, qname = "p:CT_OrientationTransition/p14:doors"))]
-  P14Doors(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
+  DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
   #[sdk(child(office2010, qname = "p:CT_OrientationTransition/p14:window"))]
-  P14Window(std::boxed::Box<crate::schemas::p14::WindowTransition>),
+  WindowTransition(std::boxed::Box<crate::schemas::p14::WindowTransition>),
   #[sdk(child(office2010, qname = "p14:CT_ShredTransition/p14:shred"))]
-  P14Shred(std::boxed::Box<crate::schemas::p14::ShredTransition>),
+  ShredTransition(std::boxed::Box<crate::schemas::p14::ShredTransition>),
   #[sdk(child(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:ferris"))]
-  P14Ferris(std::boxed::Box<crate::schemas::p14::FerrisTransition>),
+  FerrisTransition(std::boxed::Box<crate::schemas::p14::FerrisTransition>),
   #[sdk(child(office2010, qname = "p14:CT_FlyThroughTransition/p14:flythrough"))]
-  P14Flythrough(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
+  FlythroughTransition(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
   #[sdk(child(office2010, qname = "p:CT_InOutTransition/p14:warp"))]
-  P14Warp(std::boxed::Box<crate::schemas::p14::WarpTransition>),
+  WarpTransition(std::boxed::Box<crate::schemas::p14::WarpTransition>),
   #[sdk(child(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:gallery"))]
-  P14Gallery(std::boxed::Box<crate::schemas::p14::GalleryTransition>),
+  GalleryTransition(std::boxed::Box<crate::schemas::p14::GalleryTransition>),
   #[sdk(child(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor"))]
-  P14Conveyor(std::boxed::Box<crate::schemas::p14::ConveyorTransition>),
+  ConveyorTransition(std::boxed::Box<crate::schemas::p14::ConveyorTransition>),
   #[sdk(child(office2010, qname = "p:CT_SideDirectionTransition/p14:pan"))]
-  P14Pan(std::boxed::Box<crate::schemas::p14::PanTransition>),
+  PanTransition(std::boxed::Box<crate::schemas::p14::PanTransition>),
   #[sdk(child(office2010, qname = "p14:CT_RevealTransition/p14:reveal"))]
-  P14Reveal(std::boxed::Box<crate::schemas::p14::RevealTransition>),
+  RevealTransition(std::boxed::Box<crate::schemas::p14::RevealTransition>),
   #[sdk(child(office2010, qname = "p:CT_WheelTransition/p14:wheelReverse"))]
-  P14WheelReverse(std::boxed::Box<crate::schemas::p14::WheelReverseTransition>),
+  WheelReverseTransition(std::boxed::Box<crate::schemas::p14::WheelReverseTransition>),
   #[sdk(child(office2013, qname = "p15:CT_PresetTransition/p15:prstTrans"))]
-  P15PrstTrans(std::boxed::Box<crate::schemas::p15::PresetTransition>),
+  PresetTransition(std::boxed::Box<crate::schemas::p15::PresetTransition>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice {
   /// Background Properties.
   #[sdk(child(qname = "p:CT_BackgroundProperties/p:bgPr"))]
-  PBgPr(std::boxed::Box<BackgroundProperties>),
+  BackgroundProperties(std::boxed::Box<BackgroundProperties>),
   /// Background Style Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/p:bgRef"))]
-  PBgRef(std::boxed::Box<BackgroundStyleReference>),
+  BackgroundStyleReference(std::boxed::Box<BackgroundStyleReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
   /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
-  PSp(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
-  PGrpSp(std::boxed::Box<GroupShape>),
+  GroupShape(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
-  PGraphicFrame(std::boxed::Box<GraphicFrame>),
+  GraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
-  PCxnSp(std::boxed::Box<ConnectionShape>),
+  ConnectionShape(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
-  PPic(std::boxed::Box<Picture>),
+  Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
-  PContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
@@ -5330,76 +5330,76 @@ pub enum ShapeTreeChoice {
 pub enum GroupShapeChoice {
   /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
-  PSp(std::boxed::Box<Shape>),
+  Shape(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
-  PGrpSp(std::boxed::Box<GroupShape>),
+  GroupShape(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
-  PGraphicFrame(std::boxed::Box<GraphicFrame>),
+  GraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
-  PCxnSp(std::boxed::Box<ConnectionShape>),
+  ConnectionShape(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
-  PPic(std::boxed::Box<Picture>),
+  Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
-  PContentPart(std::boxed::Box<ContentPart>),
+  ContentPart(std::boxed::Box<ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTargetChoice {
   /// Background.
   #[sdk(empty_child(qname = "p:CT_Empty/p:bg"))]
-  PBg,
+  BackgroundAnimation,
   /// Subshape.
   #[sdk(child(qname = "p:CT_TLSubShapeId/p:subSp"))]
-  PSubSp(std::boxed::Box<SubShape>),
+  SubShape(std::boxed::Box<SubShape>),
   /// OLE Chart Element.
   #[sdk(child(qname = "p:CT_TLOleChartTargetElement/p:oleChartEl"))]
-  POleChartEl(std::boxed::Box<OleChartElement>),
+  OleChartElement(std::boxed::Box<OleChartElement>),
   /// Text Element.
   #[sdk(child(qname = "p:CT_TLTextTargetElement/p:txEl"))]
-  PTxEl(std::boxed::Box<TextElement>),
+  TextElement(std::boxed::Box<TextElement>),
   /// Graphic Element.
   #[sdk(child(qname = "a:CT_AnimationElementChoice/p:graphicEl"))]
-  PGraphicEl(std::boxed::Box<GraphicElement>),
+  GraphicElement(std::boxed::Box<GraphicElement>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentAuthorExtensionChoice {
   /// Defines the PresenceInfo Class.
   #[sdk(child(office2013, qname = "p15:CT_PresenceInfo/p15:presenceInfo"))]
-  P15PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
+  PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5407,7 +5407,7 @@ pub enum CommentAuthorExtensionChoice {
 pub enum CommentExtensionChoice {
   /// Defines the ThreadingInfo Class.
   #[sdk(child(office2013, qname = "p15:CT_CommentThreading/p15:threadingInfo"))]
-  P15ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
+  ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5415,7 +5415,7 @@ pub enum CommentExtensionChoice {
 pub enum SlideLayoutExtensionChoice {
   /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
-  P15SldGuideLst(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
+  SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5423,7 +5423,7 @@ pub enum SlideLayoutExtensionChoice {
 pub enum SlideMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
-  P15SldGuideLst(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
+  SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5431,7 +5431,7 @@ pub enum SlideMasterExtensionChoice {
 pub enum HandoutMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
-  P15SldGuideLst(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
+  SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5439,7 +5439,7 @@ pub enum HandoutMasterExtensionChoice {
 pub enum NotesMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
-  P15SldGuideLst(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
+  SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5447,10 +5447,10 @@ pub enum NotesMasterExtensionChoice {
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
   /// Defines the Media Class.
   #[sdk(child(office2010, qname = "p14:CT_Media/p14:media"))]
-  P14Media(std::boxed::Box<crate::schemas::p14::Media>),
+  Media(std::boxed::Box<crate::schemas::p14::Media>),
   /// Defines the ModificationId Class.
   #[sdk(child(office2010, qname = "p14:CT_RandomId/p14:modId"))]
-  P14ModId(std::boxed::Box<crate::schemas::p14::ModificationId>),
+  ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5458,109 +5458,109 @@ pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
 pub enum IterateChoice {
   /// Time Absolute.
   #[sdk(child(qname = "p:CT_TLIterateIntervalTime/p:tmAbs"))]
-  PTmAbs(std::boxed::Box<TimeAbsolute>),
+  TimeAbsolute(std::boxed::Box<TimeAbsolute>),
   /// Time Percentage.
   #[sdk(child(qname = "p:CT_TLIterateIntervalPercentage/p:tmPct"))]
-  PTmPct(std::boxed::Box<TimePercentage>),
+  TimePercentage(std::boxed::Box<TimePercentage>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChildTimeNodeListChoice {
   /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
-  PPar(std::boxed::Box<ParallelTimeNode>),
+  ParallelTimeNode(std::boxed::Box<ParallelTimeNode>),
   /// Sequence Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
-  PSeq(std::boxed::Box<SequenceTimeNode>),
+  SequenceTimeNode(std::boxed::Box<SequenceTimeNode>),
   /// Exclusive.
   #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
-  PExcl(std::boxed::Box<ExclusiveTimeNode>),
+  ExclusiveTimeNode(std::boxed::Box<ExclusiveTimeNode>),
   /// Animate.
   #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
-  PAnim(std::boxed::Box<Animate>),
+  Animate(std::boxed::Box<Animate>),
   /// Animate Color Behavior.
   #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
-  PAnimClr(std::boxed::Box<AnimateColor>),
+  AnimateColor(std::boxed::Box<AnimateColor>),
   /// Animate Effect.
   #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
-  PAnimEffect(std::boxed::Box<AnimateEffect>),
+  AnimateEffect(std::boxed::Box<AnimateEffect>),
   /// Animate Motion.
   #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
-  PAnimMotion(std::boxed::Box<AnimateMotion>),
+  AnimateMotion(std::boxed::Box<AnimateMotion>),
   /// Animate Rotation.
   #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
-  PAnimRot(std::boxed::Box<AnimateRotation>),
+  AnimateRotation(std::boxed::Box<AnimateRotation>),
   /// Animate Scale.
   #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
-  PAnimScale(std::boxed::Box<AnimateScale>),
+  AnimateScale(std::boxed::Box<AnimateScale>),
   /// Command.
   #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
-  PCmd(std::boxed::Box<Command>),
+  Command(std::boxed::Box<Command>),
   /// Set Time Node Behavior.
   #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
-  PSet(std::boxed::Box<SetBehavior>),
+  SetBehavior(std::boxed::Box<SetBehavior>),
   /// Audio.
   #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
-  PAudio(std::boxed::Box<Audio>),
+  Audio(std::boxed::Box<Audio>),
   /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
-  PVideo(std::boxed::Box<Video>),
+  Video(std::boxed::Box<Video>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubTimeNodeListChoice {
   /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
-  PPar(std::boxed::Box<ParallelTimeNode>),
+  ParallelTimeNode(std::boxed::Box<ParallelTimeNode>),
   /// Sequence Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
-  PSeq(std::boxed::Box<SequenceTimeNode>),
+  SequenceTimeNode(std::boxed::Box<SequenceTimeNode>),
   /// Exclusive.
   #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
-  PExcl(std::boxed::Box<ExclusiveTimeNode>),
+  ExclusiveTimeNode(std::boxed::Box<ExclusiveTimeNode>),
   /// Animate.
   #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
-  PAnim(std::boxed::Box<Animate>),
+  Animate(std::boxed::Box<Animate>),
   /// Animate Color Behavior.
   #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
-  PAnimClr(std::boxed::Box<AnimateColor>),
+  AnimateColor(std::boxed::Box<AnimateColor>),
   /// Animate Effect.
   #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
-  PAnimEffect(std::boxed::Box<AnimateEffect>),
+  AnimateEffect(std::boxed::Box<AnimateEffect>),
   /// Animate Motion.
   #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
-  PAnimMotion(std::boxed::Box<AnimateMotion>),
+  AnimateMotion(std::boxed::Box<AnimateMotion>),
   /// Animate Rotation.
   #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
-  PAnimRot(std::boxed::Box<AnimateRotation>),
+  AnimateRotation(std::boxed::Box<AnimateRotation>),
   /// Animate Scale.
   #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
-  PAnimScale(std::boxed::Box<AnimateScale>),
+  AnimateScale(std::boxed::Box<AnimateScale>),
   /// Command.
   #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
-  PCmd(std::boxed::Box<Command>),
+  Command(std::boxed::Box<Command>),
   /// Set Time Node Behavior.
   #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
-  PSet(std::boxed::Box<SetBehavior>),
+  SetBehavior(std::boxed::Box<SetBehavior>),
   /// Audio.
   #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
-  PAudio(std::boxed::Box<Audio>),
+  Audio(std::boxed::Box<Audio>),
   /// Video.
   #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
-  PVideo(std::boxed::Box<Video>),
+  Video(std::boxed::Box<Video>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationExtensionChoice {
   /// Defines the SectionProperties Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionProperties/p14:sectionPr"))]
-  P14SectionPr(std::boxed::Box<crate::schemas::p14::SectionProperties>),
+  SectionProperties(std::boxed::Box<crate::schemas::p14::SectionProperties>),
   /// Defines the SectionList Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionList/p14:sectionLst"))]
-  P14SectionLst(std::boxed::Box<crate::schemas::p14::SectionList>),
+  SectionList(std::boxed::Box<crate::schemas::p14::SectionList>),
   /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
-  P15SldGuideLst(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
+  SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   /// Defines the NotesGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst"))]
-  P15NotesGuideLst(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
+  NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5568,58 +5568,58 @@ pub enum PresentationExtensionChoice {
 pub enum HtmlPublishPropertiesChoice {
   /// All Slides.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
-  PSldAll,
+  SlideAll,
   /// Slide Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
-  PSldRg(std::boxed::Box<SlideRange>),
+  SlideRange(std::boxed::Box<SlideRange>),
   /// Custom Show.
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
-  PCustShow(std::boxed::Box<CustomShowReference>),
+  CustomShowReference(std::boxed::Box<CustomShowReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesChoice {
   /// Presenter Slide Show Mode.
   #[sdk(empty_child(qname = "p:CT_Empty/p:present"))]
-  PPresent,
+  PresenterSlideMode,
   /// Browse Slide Show Mode.
   #[sdk(child(qname = "p:CT_ShowInfoBrowse/p:browse"))]
-  PBrowse(std::boxed::Box<BrowseSlideMode>),
+  BrowseSlideMode(std::boxed::Box<BrowseSlideMode>),
   /// Kiosk Slide Show Mode.
   #[sdk(child(qname = "p:CT_ShowInfoKiosk/p:kiosk"))]
-  PKiosk(std::boxed::Box<KioskSlideMode>),
+  KioskSlideMode(std::boxed::Box<KioskSlideMode>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesChoice2 {
   /// All Slides.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
-  PSldAll,
+  SlideAll,
   /// Slide Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
-  PSldRg(std::boxed::Box<SlideRange>),
+  SlideRange(std::boxed::Box<SlideRange>),
   /// Custom Show.
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
-  PCustShow(std::boxed::Box<CustomShowReference>),
+  CustomShowReference(std::boxed::Box<CustomShowReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorMostRecentlyUsedChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationPropertiesExtensionChoice {
@@ -5628,19 +5628,19 @@ pub enum PresentationPropertiesExtensionChoice {
     office2010,
     qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData"
   ))]
-  P14DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
+  DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
   /// Defines the DefaultImageDpi Class.
   #[sdk(child(office2010, qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi"))]
-  P14DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
+  DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
   /// Defines the TextMath Class.
   #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  A14M(crate::schemas::a14::TextMath),
+  TextMath(crate::schemas::a14::TextMath),
   /// Defines the ChartTrackingReferenceBased Class.
   #[sdk(child(
     office2013,
     qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"
   ))]
-  P15ChartTrackingRefBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
+  ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -5648,34 +5648,34 @@ pub enum PresentationPropertiesExtensionChoice {
 pub enum TextElementChoice {
   /// Character Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:charRg"))]
-  PCharRg(std::boxed::Box<CharRange>),
+  CharRange(std::boxed::Box<CharRange>),
   /// Paragraph Text Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:pRg"))]
-  PPRg(std::boxed::Box<ParagraphIndexRange>),
+  ParagraphIndexRange(std::boxed::Box<ParagraphIndexRange>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GraphicElementChoice {
   /// Diagram to Animate.
   #[sdk(child(qname = "a:CT_AnimationDgmElement/a:dgm"))]
-  ADgm(std::boxed::Box<crate::schemas::a::Diagram>),
+  Diagram(std::boxed::Box<crate::schemas::a::Diagram>),
   /// Chart to Animate.
   #[sdk(child(qname = "a:CT_AnimationChartElement/a:chart"))]
-  AChart(std::boxed::Box<crate::schemas::a::Chart>),
+  Chart(std::boxed::Box<crate::schemas::a::Chart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SoundActionChoice {
   /// Start Sound Action.
   #[sdk(child(qname = "p:CT_TransitionStartSoundAction/p:stSnd"))]
-  PStSnd(std::boxed::Box<StartSoundAction>),
+  StartSoundAction(std::boxed::Box<StartSoundAction>),
   /// Stop Sound Action.
   #[sdk(empty_child(qname = "p:CT_Empty/p:endSnd"))]
-  PEndSnd,
+  EndSoundAction,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ControlListChoice {
   /// Embedded Control.
   #[sdk(child(qname = "p:CT_Control/p:control"))]
-  PControl(std::boxed::Box<Control>),
+  Control(std::boxed::Box<Control>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),

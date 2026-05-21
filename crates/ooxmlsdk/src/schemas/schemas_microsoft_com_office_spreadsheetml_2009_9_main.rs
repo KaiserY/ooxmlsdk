@@ -2329,17 +2329,17 @@ pub struct SlicerCacheDefinitionExtensionList {
 pub enum PivotUserEditChoice {
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
-  XneF(crate::schemas::xne::Formula),
+  Formula(crate::schemas::xne::Formula),
   /// Defines the PivotEditValue Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
-  X14EditValue(std::boxed::Box<PivotEditValue>),
+  PivotEditValue(std::boxed::Box<PivotEditValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDataChoice {
   /// Defines the OlapSlicerCache Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCache/x14:olap"))]
-  X14Olap(std::boxed::Box<OlapSlicerCache>),
+  OlapSlicerCache(std::boxed::Box<OlapSlicerCache>),
   /// Defines the TabularSlicerCache Class.
   #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCache/x14:tabular"))]
-  X14Tabular(std::boxed::Box<TabularSlicerCache>),
+  TabularSlicerCache(std::boxed::Box<TabularSlicerCache>),
 }

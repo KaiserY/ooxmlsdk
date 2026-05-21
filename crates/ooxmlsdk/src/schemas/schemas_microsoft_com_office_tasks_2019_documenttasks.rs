@@ -202,35 +202,35 @@ pub struct CommentAnchor {
 pub enum TaskHistoryEventChoice {
   /// Defines the AssignTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Assign"))]
-  TAssign(std::boxed::Box<AssignTaskUser>),
+  AssignTaskUser(std::boxed::Box<AssignTaskUser>),
   /// Defines the UnassignTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Unassign"))]
-  TUnassign(std::boxed::Box<UnassignTaskUser>),
+  UnassignTaskUser(std::boxed::Box<UnassignTaskUser>),
   /// Defines the TaskCreateEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskCreateEventInfo/t:Create"))]
-  TCreate,
+  TaskCreateEventInfo,
   /// Defines the TaskTitleEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskTitleEventInfo/t:SetTitle"))]
-  TSetTitle(std::boxed::Box<TaskTitleEventInfo>),
+  TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
   /// Defines the TaskScheduleEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskScheduleEventInfo/t:Schedule"))]
-  TSchedule(std::boxed::Box<TaskScheduleEventInfo>),
+  TaskScheduleEventInfo(std::boxed::Box<TaskScheduleEventInfo>),
   /// Defines the TaskProgressEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskProgressEventInfo/t:Progress"))]
-  TProgress(std::boxed::Box<TaskProgressEventInfo>),
+  TaskProgressEventInfo(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the TaskPriorityEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskPriorityEventInfo/t:Priority"))]
-  TPriority(std::boxed::Box<TaskPriorityEventInfo>),
+  TaskPriorityEventInfo(std::boxed::Box<TaskPriorityEventInfo>),
   /// Defines the TaskDeleteEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskDeleteEventInfo/t:Delete"))]
-  TDelete,
+  TaskDeleteEventInfo,
   /// Defines the TaskUndeleteEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskUndeleteEventInfo/t:Undelete"))]
-  TUndelete,
+  TaskUndeleteEventInfo,
   /// Defines the TaskUnassignAll Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskUnassignAll/t:UnassignAll"))]
-  TUnassignAll,
+  TaskUnassignAll,
   /// Defines the TaskUndo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUndo/t:Undo"))]
-  TUndo(std::boxed::Box<TaskUndo>),
+  TaskUndo(std::boxed::Box<TaskUndo>),
 }

@@ -34,17 +34,17 @@ pub struct LockedCanvas {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
-  ATxSp(std::boxed::Box<crate::schemas::a::TextShape>),
+  TextShape(std::boxed::Box<crate::schemas::a::TextShape>),
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
-  ASp(std::boxed::Box<crate::schemas::a::Shape>),
+  Shape(std::boxed::Box<crate::schemas::a::Shape>),
   #[sdk(child(qname = "a:CT_GvmlConnector/a:cxnSp"))]
-  ACxnSp(std::boxed::Box<crate::schemas::a::ConnectionShape>),
+  ConnectionShape(std::boxed::Box<crate::schemas::a::ConnectionShape>),
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
-  APic(std::boxed::Box<crate::schemas::a::Picture>),
+  Picture(std::boxed::Box<crate::schemas::a::Picture>),
   #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
-  A14ContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
+  GvmlContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
   #[sdk(child(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame"))]
-  AGraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
+  GraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
-  AGrpSp(std::boxed::Box<crate::schemas::a::GroupShape>),
+  GroupShape(std::boxed::Box<crate::schemas::a::GroupShape>),
 }

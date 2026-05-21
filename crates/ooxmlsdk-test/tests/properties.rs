@@ -189,7 +189,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
 #[test]
 fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
   let value = Variant {
-    variant_choice: Some(VariantChoice::VtR8(f64::INFINITY)),
+    variant_choice: Some(VariantChoice::VtDouble(f64::INFINITY)),
   };
 
   let xml = value.to_xml().unwrap();
@@ -197,7 +197,7 @@ fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
   assert!(serialized.contains("<vt:r8>INF</vt:r8>"));
 
   let reparsed = serialized.parse::<Variant>().unwrap();
-  let Some(VariantChoice::VtR8(parsed)) = reparsed.variant_choice else {
+  let Some(VariantChoice::VtDouble(parsed)) = reparsed.variant_choice else {
     panic!("expected vt:r8");
   };
   assert!(parsed.is_infinite());
@@ -207,7 +207,7 @@ fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
 #[test]
 fn variant_sbyte_text_child_round_trips_as_numeric_value() {
   let value = Variant {
-    variant_choice: Some(VariantChoice::VtI1(-12)),
+    variant_choice: Some(VariantChoice::VtByte(-12)),
   };
 
   let xml = value.to_xml().unwrap();
@@ -215,7 +215,7 @@ fn variant_sbyte_text_child_round_trips_as_numeric_value() {
   assert!(serialized.contains("<vt:i1>-12</vt:i1>"));
 
   let reparsed = serialized.parse::<Variant>().unwrap();
-  let Some(VariantChoice::VtI1(parsed)) = reparsed.variant_choice else {
+  let Some(VariantChoice::VtByte(parsed)) = reparsed.variant_choice else {
     panic!("expected vt:i1");
   };
   assert_eq!(parsed, -12);

@@ -59,22 +59,22 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchStylePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchTypePropertiesChoice {
   /// Defines the LineSketchNoneEmpty Class.
   #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchNone"))]
-  AskLineSketchNone,
+  LineSketchNoneEmpty,
   /// Defines the LineSketchCurvedEmpty Class.
   #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchCurved"))]
-  AskLineSketchCurved,
+  LineSketchCurvedEmpty,
   /// Defines the LineSketchFreehandEmpty Class.
   #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchFreehand"))]
-  AskLineSketchFreehand,
+  LineSketchFreehandEmpty,
   /// Defines the LineSketchScribbleEmpty Class.
   #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchScribble"))]
-  AskLineSketchScribble,
+  LineSketchScribbleEmpty,
 }

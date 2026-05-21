@@ -1624,17 +1624,17 @@ mod tests {
     let mut xml_any_count = 0usize;
 
     for choice in &root.body.as_ref().unwrap().body_choice {
-      let w::BodyChoice::WP(paragraph) = choice else {
+      let w::BodyChoice::Paragraph(paragraph) = choice else {
         continue;
       };
       for choice in &paragraph.paragraph_choice {
-        let w::ParagraphChoice::WR(run) = choice else {
+        let w::ParagraphChoice::WRun(run) = choice else {
           continue;
         };
         for choice in &run.run_choice {
           match choice {
-            w::RunChoice::WDrawing(_) => drawing_count += 1,
-            w::RunChoice::WPict(_) => pict_count += 1,
+            w::RunChoice::Drawing(_) => drawing_count += 1,
+            w::RunChoice::Picture(_) => pict_count += 1,
             w::RunChoice::XmlAny(_) => xml_any_count += 1,
             _ => {}
           }

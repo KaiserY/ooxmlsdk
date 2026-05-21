@@ -385,7 +385,7 @@ fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<Str
     let Some(category_axis_data) = series.category_axis_data else {
       continue;
     };
-    let Some(c::CategoryAxisDataChoice::CMultiLvlStrRef(reference)) =
+    let Some(c::CategoryAxisDataChoice::MultiLevelStringReference(reference)) =
       category_axis_data.category_axis_data_choice.as_ref()
     else {
       continue;
@@ -409,7 +409,7 @@ fn chart_has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> b
     .plot_area_choice2
     .iter()
     .filter_map(|choice| match choice {
-      c::PlotAreaChoice2::CCatAx(axis) => Some(axis.as_ref()),
+      c::PlotAreaChoice2::CategoryAxis(axis) => Some(axis.as_ref()),
       _ => None,
     })
     .any(|axis| {
@@ -440,14 +440,14 @@ fn chart_label_color(chart_space: &c::ChartSpace, theme_colors: &ThemeColors) ->
             .text_properties
             .as_deref()
             .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
-          c::DataLabelChoice::CDelete(_) => None,
+          c::DataLabelChoice::Delete(_) => None,
         })
         .or_else(|| match labels.data_labels_choice.as_ref()? {
           c::DataLabelsChoice::Sequence(sequence) => sequence
             .text_properties
             .as_deref()
             .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
-          c::DataLabelsChoice::CDelete(_) => None,
+          c::DataLabelsChoice::Delete(_) => None,
         })
     })
 }
@@ -503,10 +503,10 @@ fn chart_axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Ti
     .plot_area_choice2
     .iter()
     .filter_map(|choice| match choice {
-      c::PlotAreaChoice2::CValAx(axis) => axis.title.as_deref(),
-      c::PlotAreaChoice2::CCatAx(axis) => axis.title.as_deref(),
-      c::PlotAreaChoice2::CDateAx(axis) => axis.title.as_deref(),
-      c::PlotAreaChoice2::CSerAx(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::ValueAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::CategoryAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::DateAxis(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::SeriesAxis(axis) => axis.title.as_deref(),
     })
 }
 
@@ -525,7 +525,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
   let mut series = Vec::new();
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     match choice {
-      c::PlotAreaChoice::CAreaChart(chart) => {
+      c::PlotAreaChoice::AreaChart(chart) => {
         series.extend(chart.area_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -536,7 +536,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CArea3DChart(chart) => {
+      c::PlotAreaChoice::Area3DChart(chart) => {
         series.extend(chart.area_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -547,7 +547,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CLineChart(chart) => {
+      c::PlotAreaChoice::LineChart(chart) => {
         series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -558,7 +558,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CLine3DChart(chart) => {
+      c::PlotAreaChoice::Line3DChart(chart) => {
         series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -569,7 +569,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CStockChart(chart) => {
+      c::PlotAreaChoice::StockChart(chart) => {
         series.extend(chart.line_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -580,7 +580,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CRadarChart(chart) => {
+      c::PlotAreaChoice::RadarChart(chart) => {
         series.extend(chart.radar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -591,7 +591,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CScatterChart(chart) => {
+      c::PlotAreaChoice::ScatterChart(chart) => {
         series.extend(chart.scatter_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: None,
@@ -602,7 +602,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CPieChart(chart) => {
+      c::PlotAreaChoice::PieChart(chart) => {
         series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -613,7 +613,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CPie3DChart(chart) => {
+      c::PlotAreaChoice::Pie3DChart(chart) => {
         series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -624,7 +624,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CDoughnutChart(chart) => {
+      c::PlotAreaChoice::DoughnutChart(chart) => {
         series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -635,7 +635,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CBarChart(chart) => {
+      c::PlotAreaChoice::BarChart(chart) => {
         series.extend(chart.bar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -646,7 +646,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CBar3DChart(chart) => {
+      c::PlotAreaChoice::Bar3DChart(chart) => {
         series.extend(chart.bar_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -657,7 +657,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::COfPieChart(chart) => {
+      c::PlotAreaChoice::OfPieChart(chart) => {
         series.extend(chart.pie_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -668,7 +668,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: ser.data_labels.as_deref(),
         }));
       }
-      c::PlotAreaChoice::CSurfaceChart(chart) => {
+      c::PlotAreaChoice::SurfaceChart(chart) => {
         series.extend(chart.surface_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -679,7 +679,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: None,
         }));
       }
-      c::PlotAreaChoice::CSurface3DChart(chart) => {
+      c::PlotAreaChoice::Surface3DChart(chart) => {
         series.extend(chart.surface_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: ser.category_axis_data.as_deref(),
@@ -690,7 +690,7 @@ fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
           data_labels: None,
         }));
       }
-      c::PlotAreaChoice::CBubbleChart(chart) => {
+      c::PlotAreaChoice::BubbleChart(chart) => {
         series.extend(chart.bubble_chart_series.iter().map(|ser| ChartSeriesRef {
           series_text: ser.series_text.as_deref(),
           category_axis_data: None,
@@ -713,22 +713,22 @@ fn chart_data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Da
     .plot_area_choice1
     .iter()
     .filter_map(|choice| match choice {
-      c::PlotAreaChoice::CAreaChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CArea3DChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CLineChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CLine3DChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CStockChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CRadarChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CScatterChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CPieChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CPie3DChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CDoughnutChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CBarChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CBar3DChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::COfPieChart(chart) => chart.data_labels.as_deref(),
-      c::PlotAreaChoice::CSurfaceChart(_) => None,
-      c::PlotAreaChoice::CSurface3DChart(_) => None,
-      c::PlotAreaChoice::CBubbleChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::AreaChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::Area3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::LineChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::Line3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::StockChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::RadarChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::ScatterChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::PieChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::Pie3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::DoughnutChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::BarChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::Bar3DChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::OfPieChart(chart) => chart.data_labels.as_deref(),
+      c::PlotAreaChoice::SurfaceChart(_) => None,
+      c::PlotAreaChoice::Surface3DChart(_) => None,
+      c::PlotAreaChoice::BubbleChart(chart) => chart.data_labels.as_deref(),
     })
 }
 
@@ -757,7 +757,7 @@ fn chart_default_run_properties_color(
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
   match run_properties.default_run_properties_choice1.as_ref()? {
-    a::DefaultRunPropertiesChoice::ASolidFill(fill) => {
+    a::DefaultRunPropertiesChoice::SolidFill(fill) => {
       drawingml_solid_fill_color(fill, theme_colors)
     }
     _ => None,
@@ -766,9 +766,9 @@ fn chart_default_run_properties_color(
 
 fn drawingml_solid_fill_color(fill: &a::SolidFill, theme_colors: &ThemeColors) -> Option<RgbColor> {
   match fill.solid_fill_choice.as_ref()? {
-    a::SolidFillChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
-    a::SolidFillChoice::ASchemeClr(color) => resolve_drawingml_scheme_color(color, theme_colors),
-    a::SolidFillChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+    a::SolidFillChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::SolidFillChoice::SchemeColor(color) => resolve_drawingml_scheme_color(color, theme_colors),
+    a::SolidFillChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
     _ => None,
   }
 }
@@ -781,21 +781,23 @@ fn chart_push_title_texts(texts: &mut Vec<String>, title: &c::Title) {
 
 fn chart_push_series_text(texts: &mut Vec<String>, series_text: &c::SeriesText) {
   match series_text.series_text_choice.as_ref() {
-    Some(c::SeriesTextChoice::CStrRef(reference)) => {
+    Some(c::SeriesTextChoice::StringReference(reference)) => {
       chart_push_string_reference_texts(texts, reference);
     }
-    Some(c::SeriesTextChoice::CV(value)) => push_unique_chart_text(texts, value),
+    Some(c::SeriesTextChoice::NumericValue(value)) => push_unique_chart_text(texts, value),
     None => {}
   }
 }
 
 fn chart_push_chart_text(texts: &mut Vec<String>, chart_text: &c::ChartText) {
   match chart_text.chart_text_choice.as_ref() {
-    Some(c::ChartTextChoice::CStrRef(reference)) => {
+    Some(c::ChartTextChoice::StringReference(reference)) => {
       chart_push_string_reference_texts(texts, reference)
     }
-    Some(c::ChartTextChoice::CStrLit(literal)) => chart_push_string_literal_texts(texts, literal),
-    Some(c::ChartTextChoice::CRich(rich)) => chart_push_rich_texts(texts, &rich.paragraph),
+    Some(c::ChartTextChoice::StringLiteral(literal)) => {
+      chart_push_string_literal_texts(texts, literal)
+    }
+    Some(c::ChartTextChoice::RichText(rich)) => chart_push_rich_texts(texts, &rich.paragraph),
     None => {}
   }
 }
@@ -805,13 +807,13 @@ fn chart_push_rich_texts(texts: &mut Vec<String>, paragraphs: &[a::Paragraph]) {
     let mut text = String::new();
     for choice in &paragraph.paragraph_choice {
       match choice {
-        a::ParagraphChoice::AR(run) => text.push_str(&run.text),
-        a::ParagraphChoice::AFld(field) => {
+        a::ParagraphChoice::Run(run) => text.push_str(&run.text),
+        a::ParagraphChoice::Field(field) => {
           if let Some(value) = field.text.as_deref() {
             text.push_str(value);
           }
         }
-        a::ParagraphChoice::ABr(_) | a::ParagraphChoice::A14M(_) => {}
+        a::ParagraphChoice::Break(_) | a::ParagraphChoice::TextMath(_) => {}
       }
     }
     push_unique_chart_text(texts, &text);
@@ -820,7 +822,7 @@ fn chart_push_rich_texts(texts: &mut Vec<String>, paragraphs: &[a::Paragraph]) {
 
 fn chart_push_category_axis_data_texts(texts: &mut Vec<String>, data: &c::CategoryAxisData) {
   match data.category_axis_data_choice.as_ref() {
-    Some(c::CategoryAxisDataChoice::CMultiLvlStrRef(reference)) => {
+    Some(c::CategoryAxisDataChoice::MultiLevelStringReference(reference)) => {
       if let Some(cache) = reference.multi_level_string_cache.as_deref() {
         for level in &cache.level {
           for point in &level.string_point {
@@ -829,16 +831,16 @@ fn chart_push_category_axis_data_texts(texts: &mut Vec<String>, data: &c::Catego
         }
       }
     }
-    Some(c::CategoryAxisDataChoice::CNumRef(reference)) => {
+    Some(c::CategoryAxisDataChoice::NumberReference(reference)) => {
       chart_push_number_reference_texts(texts, reference);
     }
-    Some(c::CategoryAxisDataChoice::CNumLit(literal)) => {
+    Some(c::CategoryAxisDataChoice::NumberLiteral(literal)) => {
       chart_push_number_literal_texts(texts, literal)
     }
-    Some(c::CategoryAxisDataChoice::CStrRef(reference)) => {
+    Some(c::CategoryAxisDataChoice::StringReference(reference)) => {
       chart_push_string_reference_texts(texts, reference);
     }
-    Some(c::CategoryAxisDataChoice::CStrLit(literal)) => {
+    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => {
       chart_push_string_literal_texts(texts, literal)
     }
     None => {}
@@ -847,27 +849,31 @@ fn chart_push_category_axis_data_texts(texts: &mut Vec<String>, data: &c::Catego
 
 fn chart_push_values_texts(texts: &mut Vec<String>, values: &c::Values) {
   match values.values_choice.as_ref() {
-    Some(c::ValuesChoice::CNumRef(reference)) => {
+    Some(c::ValuesChoice::NumberReference(reference)) => {
       chart_push_number_reference_texts(texts, reference)
     }
-    Some(c::ValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    Some(c::ValuesChoice::NumberLiteral(literal)) => {
+      chart_push_number_literal_texts(texts, literal)
+    }
     None => {}
   }
 }
 
 fn chart_push_y_values_texts(texts: &mut Vec<String>, values: &c::YValues) {
   match values.y_values_choice.as_ref() {
-    Some(c::YValuesChoice::CNumRef(reference)) => {
+    Some(c::YValuesChoice::NumberReference(reference)) => {
       chart_push_number_reference_texts(texts, reference)
     }
-    Some(c::YValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    Some(c::YValuesChoice::NumberLiteral(literal)) => {
+      chart_push_number_literal_texts(texts, literal)
+    }
     None => {}
   }
 }
 
 fn chart_push_x_values_texts(texts: &mut Vec<String>, values: &c::XValues) {
   match values.x_values_choice.as_ref() {
-    Some(c::XValuesChoice::CMultiLvlStrRef(reference)) => {
+    Some(c::XValuesChoice::MultiLevelStringReference(reference)) => {
       if let Some(cache) = reference.multi_level_string_cache.as_deref() {
         for level in &cache.level {
           for point in &level.string_point {
@@ -876,24 +882,30 @@ fn chart_push_x_values_texts(texts: &mut Vec<String>, values: &c::XValues) {
         }
       }
     }
-    Some(c::XValuesChoice::CNumRef(reference)) => {
+    Some(c::XValuesChoice::NumberReference(reference)) => {
       chart_push_number_reference_texts(texts, reference)
     }
-    Some(c::XValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
-    Some(c::XValuesChoice::CStrRef(reference)) => {
+    Some(c::XValuesChoice::NumberLiteral(literal)) => {
+      chart_push_number_literal_texts(texts, literal)
+    }
+    Some(c::XValuesChoice::StringReference(reference)) => {
       chart_push_string_reference_texts(texts, reference)
     }
-    Some(c::XValuesChoice::CStrLit(literal)) => chart_push_string_literal_texts(texts, literal),
+    Some(c::XValuesChoice::StringLiteral(literal)) => {
+      chart_push_string_literal_texts(texts, literal)
+    }
     None => {}
   }
 }
 
 fn chart_push_bubble_size_texts(texts: &mut Vec<String>, values: &c::BubbleSize) {
   match values.bubble_size_choice.as_ref() {
-    Some(c::BubbleSizeChoice::CNumRef(reference)) => {
+    Some(c::BubbleSizeChoice::NumberReference(reference)) => {
       chart_push_number_reference_texts(texts, reference)
     }
-    Some(c::BubbleSizeChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    Some(c::BubbleSizeChoice::NumberLiteral(literal)) => {
+      chart_push_number_literal_texts(texts, literal)
+    }
     None => {}
   }
 }
@@ -1310,7 +1322,7 @@ fn sdt_tag(properties: &w::SdtProperties) -> Option<&str> {
     .sdt_properties_choice
     .iter()
     .find_map(|choice| match choice {
-      w::SdtPropertiesChoice::WTag(tag) if !tag.val.is_empty() => Some(tag.val.as_str()),
+      w::SdtPropertiesChoice::Tag(tag) if !tag.val.is_empty() => Some(tag.val.as_str()),
       _ => None,
     })
 }
@@ -1515,7 +1527,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
 
   for choice in &body.body_choice {
     match choice {
-      w::BodyChoice::WP(paragraph) => {
+      w::BodyChoice::Paragraph(paragraph) => {
         let mut model = paragraph_model(
           paragraph,
           styles,
@@ -1564,7 +1576,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           push_body_paragraph(&mut current_blocks, model);
         }
       }
-      w::BodyChoice::WTbl(table) => current_blocks.push(Block::Table(table_model(
+      w::BodyChoice::Table(table) => current_blocks.push(Block::Table(table_model(
         table,
         &mut TableModelEnv {
           styles,
@@ -1579,7 +1591,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           in_header_footer: false,
         },
       ))),
-      w::BodyChoice::WSdt(sdt) => {
+      w::BodyChoice::SdtBlock(sdt) => {
         current_blocks.extend(sdt_block_blocks(
           sdt,
           styles,
@@ -2018,16 +2030,18 @@ fn sdt_block_blocks(
     .sdt_content_block_choice
     .iter()
     .filter_map(|choice| match choice {
-      w::SdtContentBlockChoice::WP(paragraph) => Some(vec![Block::Paragraph(paragraph_model(
-        paragraph.as_ref(),
-        styles,
-        numbering,
-        images,
-        hyperlinks,
-        custom_xml_bindings,
-        form_widget_ids,
-      ))]),
-      w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
+      w::SdtContentBlockChoice::Paragraph(paragraph) => {
+        Some(vec![Block::Paragraph(paragraph_model(
+          paragraph.as_ref(),
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        ))])
+      }
+      w::SdtContentBlockChoice::Table(table) => Some(vec![Block::Table(table_model(
         table.as_ref(),
         &mut TableModelEnv {
           styles,
@@ -2042,7 +2056,7 @@ fn sdt_block_blocks(
           in_header_footer: false,
         },
       ))]),
-      w::SdtContentBlockChoice::WSdt(sdt) => Some(sdt_block_blocks(
+      w::SdtContentBlockChoice::SdtBlock(sdt) => Some(sdt_block_blocks(
         sdt.as_ref(),
         styles,
         numbering,
@@ -2071,7 +2085,7 @@ fn header_blocks(
       .section_properties_choice
       .iter()
       .find_map(|choice| match choice {
-        w::SectionPropertiesChoice::WHeaderReference(reference)
+        w::SectionPropertiesChoice::HeaderReference(reference)
           if reference.r#type == header_type =>
         {
           Some(reference.id.as_str())
@@ -2090,7 +2104,7 @@ fn header_blocks(
       .header_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::HeaderChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model(
+        w::HeaderChoice::Paragraph(paragraph) => Some(Block::Paragraph(paragraph_model(
           paragraph,
           styles,
           &mut numbering,
@@ -2099,7 +2113,7 @@ fn header_blocks(
           custom_xml_bindings,
           form_widget_ids,
         ))),
-        w::HeaderChoice::WTbl(table) => Some(Block::Table(table_model(
+        w::HeaderChoice::Table(table) => Some(Block::Table(table_model(
           table,
           &mut TableModelEnv {
             styles,
@@ -2154,7 +2168,7 @@ fn footer_blocks(
       .section_properties_choice
       .iter()
       .find_map(|choice| match choice {
-        w::SectionPropertiesChoice::WFooterReference(reference)
+        w::SectionPropertiesChoice::FooterReference(reference)
           if reference.r#type == footer_type =>
         {
           Some(reference.id.as_str())
@@ -2173,7 +2187,7 @@ fn footer_blocks(
       .footer_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::FooterChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model(
+        w::FooterChoice::Paragraph(paragraph) => Some(Block::Paragraph(paragraph_model(
           paragraph,
           styles,
           &mut numbering,
@@ -2182,7 +2196,7 @@ fn footer_blocks(
           custom_xml_bindings,
           form_widget_ids,
         ))),
-        w::FooterChoice::WTbl(table) => Some(Block::Table(table_model(
+        w::FooterChoice::Table(table) => Some(Block::Table(table_model(
           table,
           &mut TableModelEnv {
             styles,
@@ -2267,7 +2281,7 @@ fn footnotes(
         .footnote_choice
         .iter()
         .filter_map(|choice| match choice {
-          w::FootnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          w::FootnoteChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
       &mut context,
@@ -2322,7 +2336,7 @@ fn endnotes(
         .endnote_choice
         .iter()
         .filter_map(|choice| match choice {
-          w::EndnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          w::EndnoteChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
       &mut context,
@@ -2372,7 +2386,7 @@ fn comment_blocks(
         .comment_choice
         .iter()
         .filter_map(|choice| match choice {
-          w::CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          w::CommentChoice::Paragraph(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
       &mut context,
@@ -2490,7 +2504,7 @@ fn table_model(
     .table_choice2
     .iter()
     .filter_map(|choice| match choice {
-      w::TableChoice2::WTr(row) => Some(row.as_ref()),
+      w::TableChoice2::TableRow(row) => Some(row.as_ref()),
       _ => None,
     })
     .collect::<Vec<_>>();
@@ -2736,7 +2750,7 @@ fn table_row_model(
     .table_row_choice
     .iter()
     .filter_map(|choice| match choice {
-      w::TableRowChoice::WTc(cell) => Some(cell.as_ref()),
+      w::TableRowChoice::TableCell(cell) => Some(cell.as_ref()),
       _ => None,
     })
     .collect::<Vec<_>>();
@@ -2890,7 +2904,7 @@ fn table_cell_model(
     .iter()
     .fold(Vec::new(), |mut blocks, choice| {
       match choice {
-        w::TableCellChoice::WP(paragraph) => {
+        w::TableCellChoice::Paragraph(paragraph) => {
           let paragraph = paragraph_model_with_base(
             paragraph,
             context.styles,
@@ -2907,7 +2921,7 @@ fn table_cell_model(
           );
           push_cell_paragraph(&mut blocks, paragraph);
         }
-        w::TableCellChoice::WTbl(table) => blocks.push(Block::Table(table_model(
+        w::TableCellChoice::Table(table) => blocks.push(Block::Table(table_model(
           table,
           &mut TableModelEnv {
             styles: context.styles,
@@ -2922,7 +2936,7 @@ fn table_cell_model(
             in_header_footer: false,
           },
         ))),
-        w::TableCellChoice::WSdt(sdt) => blocks.extend(sdt_block_blocks(
+        w::TableCellChoice::SdtBlock(sdt) => blocks.extend(sdt_block_blocks(
           sdt,
           context.styles,
           context.numbering,
@@ -3007,10 +3021,10 @@ fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usi
   let mut grid_after = 0;
   for choice in &properties.table_row_properties_choice1 {
     match choice {
-      w::TableRowPropertiesChoice::WGridBefore(before) => {
+      w::TableRowPropertiesChoice::GridBefore(before) => {
         grid_before = before.val.max(0) as usize;
       }
-      w::TableRowPropertiesChoice::WGridAfter(after) => {
+      w::TableRowPropertiesChoice::GridAfter(after) => {
         grid_after = after.val.max(0) as usize;
       }
       _ => {}
@@ -3027,7 +3041,7 @@ fn table_row_conditional_style(
       .table_row_properties_choice1
       .iter()
       .find_map(|choice| {
-        if let w::TableRowPropertiesChoice::WCnfStyle(style) = choice {
+        if let w::TableRowPropertiesChoice::ConditionalFormatStyle(style) = choice {
           Some(TableConditionalStyleMask::from_cnf_style(style))
         } else {
           None
@@ -3778,7 +3792,7 @@ fn paragraph_inlines(
 
   for choice in &paragraph.paragraph_choice {
     match choice {
-      w::ParagraphChoice::WR(run) => {
+      w::ParagraphChoice::WRun(run) => {
         push_run_or_complex_field(
           run,
           &mut inlines,
@@ -3792,12 +3806,12 @@ fn paragraph_inlines(
           &mut complex_field,
         );
       }
-      w::ParagraphChoice::WFldSimple(field) => {
+      w::ParagraphChoice::SimpleField(field) => {
         push_simple_field(field, &mut inlines, base_style.clone(), &mut inline_context);
       }
-      w::ParagraphChoice::WHyperlink(hyperlink) => {
+      w::ParagraphChoice::Hyperlink(hyperlink) => {
         push_hyperlink_content(
-          hyperlink,
+          hyperlink.as_ref(),
           &mut inlines,
           base_style.clone(),
           None,
@@ -3805,7 +3819,7 @@ fn paragraph_inlines(
           &mut complex_field,
         );
       }
-      w::ParagraphChoice::WIns(inserted) => {
+      w::ParagraphChoice::InsertedRun(inserted) => {
         push_inserted_run(
           inserted,
           &mut inlines,
@@ -3816,7 +3830,7 @@ fn paragraph_inlines(
           None,
         );
       }
-      w::ParagraphChoice::WDel(deleted) => {
+      w::ParagraphChoice::DeletedRun(deleted) => {
         push_deleted_run(
           deleted,
           &mut inlines,
@@ -3827,7 +3841,7 @@ fn paragraph_inlines(
           None,
         );
       }
-      w::ParagraphChoice::WMoveFrom(moved) => {
+      w::ParagraphChoice::MoveFromRun(moved) => {
         push_move_from_run(
           moved,
           &mut inlines,
@@ -3838,7 +3852,7 @@ fn paragraph_inlines(
           None,
         );
       }
-      w::ParagraphChoice::WMoveTo(moved) => {
+      w::ParagraphChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved,
           &mut inlines,
@@ -3849,7 +3863,7 @@ fn paragraph_inlines(
           None,
         );
       }
-      w::ParagraphChoice::WSdt(sdt) => push_sdt_run(
+      w::ParagraphChoice::SdtRun(sdt) => push_sdt_run(
         sdt,
         &mut inlines,
         base_style.clone(),
@@ -3927,7 +3941,7 @@ fn push_run_or_complex_field(
   );
   for choice in &run.run_choice {
     match choice {
-      w::RunChoice::WFldChar(field_char)
+      w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Begin =>
       {
         *state = Some(ComplexFieldState {
@@ -3938,19 +3952,19 @@ fn push_run_or_complex_field(
           hyperlink_url: hyperlink_url.map(ToString::to_string),
         });
       }
-      w::RunChoice::WFldChar(field_char)
+      w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Separate =>
       {
         if let Some(state) = state {
           state.in_result = true;
         }
       }
-      w::RunChoice::WFldChar(field_char)
+      w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::End =>
       {
         flush_closed_complex_field(inlines, state);
       }
-      w::RunChoice::WInstrText(code) => {
+      w::RunChoice::FieldCode(code) => {
         if let Some(state) = state
           && !state.in_result
           && let Some(content) = &code.xml_content
@@ -3982,7 +3996,7 @@ fn run_starts_complex_field(run: &w::Run) -> bool {
   run.run_choice.iter().any(|choice| {
     matches!(
       choice,
-      w::RunChoice::WFldChar(field_char)
+      w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Begin
     )
   })
@@ -4114,7 +4128,7 @@ fn push_hyperlink_content(
     .or_else(|| inherited_url.map(ToString::to_string));
   for item in &hyperlink.hyperlink_choice {
     match item {
-      w::HyperlinkChoice::WR(run) => push_run_or_complex_field(
+      w::HyperlinkChoice::WRun(run) => push_run_or_complex_field(
         run,
         inlines,
         base_style.clone(),
@@ -4126,10 +4140,10 @@ fn push_hyperlink_content(
         hyperlink_url.as_deref(),
         complex_field,
       ),
-      w::HyperlinkChoice::WFldSimple(field) => {
+      w::HyperlinkChoice::SimpleField(field) => {
         push_simple_field(field, inlines, base_style.clone(), context)
       }
-      w::HyperlinkChoice::WHyperlink(nested) => push_hyperlink_content(
+      w::HyperlinkChoice::Hyperlink(nested) => push_hyperlink_content(
         nested,
         inlines,
         base_style.clone(),
@@ -4137,14 +4151,14 @@ fn push_hyperlink_content(
         context,
         complex_field,
       ),
-      w::HyperlinkChoice::WSdt(sdt) => push_sdt_run(
+      w::HyperlinkChoice::SdtRun(sdt) => push_sdt_run(
         sdt,
         inlines,
         base_style.clone(),
         hyperlink_url.as_deref(),
         context,
       ),
-      w::HyperlinkChoice::WIns(inserted) => push_inserted_run(
+      w::HyperlinkChoice::InsertedRun(inserted) => push_inserted_run(
         inserted,
         inlines,
         base_style.clone(),
@@ -4153,7 +4167,7 @@ fn push_hyperlink_content(
         context.hyperlinks,
         hyperlink_url.as_deref(),
       ),
-      w::HyperlinkChoice::WDel(deleted) => push_deleted_run(
+      w::HyperlinkChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
         inlines,
         base_style.clone(),
@@ -4162,7 +4176,7 @@ fn push_hyperlink_content(
         context.hyperlinks,
         hyperlink_url.as_deref(),
       ),
-      w::HyperlinkChoice::WMoveFrom(moved) => push_move_from_run(
+      w::HyperlinkChoice::MoveFromRun(moved) => push_move_from_run(
         moved,
         inlines,
         base_style.clone(),
@@ -4171,7 +4185,7 @@ fn push_hyperlink_content(
         context.hyperlinks,
         hyperlink_url.as_deref(),
       ),
-      w::HyperlinkChoice::WMoveTo(moved) => push_move_to_run(
+      w::HyperlinkChoice::MoveToRun(moved) => push_move_to_run(
         moved,
         inlines,
         base_style.clone(),
@@ -4190,28 +4204,28 @@ fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>
   let mut endnotes = Vec::new();
   for choice in &paragraph.paragraph_choice {
     match choice {
-      w::ParagraphChoice::WR(run) => {
+      w::ParagraphChoice::WRun(run) => {
         collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes)
       }
-      w::ParagraphChoice::WFldSimple(field) => {
+      w::ParagraphChoice::SimpleField(field) => {
         collect_simple_field_note_reference_ids(field, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WHyperlink(hyperlink) => {
+      w::ParagraphChoice::Hyperlink(hyperlink) => {
         collect_hyperlink_note_reference_ids(hyperlink, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WIns(inserted) => {
+      w::ParagraphChoice::InsertedRun(inserted) => {
         collect_inserted_run_note_reference_ids(inserted, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WDel(deleted) => {
+      w::ParagraphChoice::DeletedRun(deleted) => {
         collect_deleted_run_note_reference_ids(deleted, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WMoveFrom(moved) => {
+      w::ParagraphChoice::MoveFromRun(moved) => {
         collect_move_from_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WMoveTo(moved) => {
+      w::ParagraphChoice::MoveToRun(moved) => {
         collect_move_to_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::WSdt(sdt) => {
+      w::ParagraphChoice::SdtRun(sdt) => {
         collect_sdt_run_note_reference_ids(sdt, &mut footnotes, &mut endnotes);
       }
       _ => {}
@@ -4227,10 +4241,10 @@ fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>
 fn collect_run_note_reference_ids(run: &w::Run, footnotes: &mut Vec<i64>, endnotes: &mut Vec<i64>) {
   for choice in &run.run_choice {
     match choice {
-      w::RunChoice::WFootnoteReference(reference) if reference.id > 0 => {
+      w::RunChoice::FootnoteReference(reference) if reference.id > 0 => {
         footnotes.push(reference.id);
       }
-      w::RunChoice::WEndnoteReference(reference) if reference.id > 0 => {
+      w::RunChoice::EndnoteReference(reference) if reference.id > 0 => {
         endnotes.push(reference.id);
       }
       _ => {}
@@ -4245,14 +4259,16 @@ fn collect_simple_field_note_reference_ids(
 ) {
   for choice in &field.simple_field_choice {
     match choice {
-      w::SimpleFieldChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::SimpleFieldChoice::WFldSimple(field) => {
-        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      w::SimpleFieldChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::SimpleFieldChoice::WHyperlink(hyperlink) => {
-        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      w::SimpleFieldChoice::SimpleField(field) => {
+        collect_simple_field_note_reference_ids(field.as_ref(), footnotes, endnotes);
       }
-      w::SimpleFieldChoice::WSdt(sdt) => {
+      w::SimpleFieldChoice::Hyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink.as_ref(), footnotes, endnotes);
+      }
+      w::SimpleFieldChoice::SdtRun(sdt) => {
         collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
       }
       _ => {}
@@ -4267,27 +4283,29 @@ fn collect_hyperlink_note_reference_ids(
 ) {
   for choice in &hyperlink.hyperlink_choice {
     match choice {
-      w::HyperlinkChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::HyperlinkChoice::WFldSimple(field) => {
-        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      w::HyperlinkChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::HyperlinkChoice::WHyperlink(hyperlink) => {
-        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      w::HyperlinkChoice::SimpleField(field) => {
+        collect_simple_field_note_reference_ids(field.as_ref(), footnotes, endnotes);
       }
-      w::HyperlinkChoice::WSdt(sdt) => {
+      w::HyperlinkChoice::Hyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink.as_ref(), footnotes, endnotes);
+      }
+      w::HyperlinkChoice::SdtRun(sdt) => {
         collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
       }
-      w::HyperlinkChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::HyperlinkChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::HyperlinkChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::HyperlinkChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::HyperlinkChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::HyperlinkChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
-      w::HyperlinkChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::HyperlinkChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4304,27 +4322,29 @@ fn collect_sdt_run_note_reference_ids(
   };
   for choice in &content.sdt_content_run_choice {
     match choice {
-      w::SdtContentRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::SdtContentRunChoice::WFldSimple(field) => {
-        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      w::SdtContentRunChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::SdtContentRunChoice::WHyperlink(hyperlink) => {
-        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      w::SdtContentRunChoice::SimpleField(field) => {
+        collect_simple_field_note_reference_ids(field.as_ref(), footnotes, endnotes);
       }
-      w::SdtContentRunChoice::WSdt(sdt) => {
+      w::SdtContentRunChoice::Hyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink.as_ref(), footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::SdtRun(sdt) => {
         collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
       }
-      w::SdtContentRunChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::SdtContentRunChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::SdtContentRunChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::SdtContentRunChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::SdtContentRunChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::SdtContentRunChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
-      w::SdtContentRunChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::SdtContentRunChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4338,18 +4358,20 @@ fn collect_inserted_run_note_reference_ids(
 ) {
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::InsertedRunChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::InsertedRunChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::InsertedRunChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::InsertedRunChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::InsertedRunChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::InsertedRunChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::InsertedRunChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::InsertedRunChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
+      }
+      w::InsertedRunChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4363,18 +4385,20 @@ fn collect_deleted_run_note_reference_ids(
 ) {
   for choice in &deleted.deleted_run_choice {
     match choice {
-      w::DeletedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::DeletedRunChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::DeletedRunChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::DeletedRunChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::DeletedRunChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::DeletedRunChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::DeletedRunChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::DeletedRunChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::DeletedRunChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
+      }
+      w::DeletedRunChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4388,18 +4412,20 @@ fn collect_move_from_run_note_reference_ids(
 ) {
   for choice in &moved.move_from_run_choice {
     match choice {
-      w::MoveFromRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::MoveFromRunChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::MoveFromRunChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::MoveFromRunChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::MoveFromRunChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::MoveFromRunChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::MoveFromRunChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::MoveFromRunChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::MoveFromRunChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
+      }
+      w::MoveFromRunChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4413,18 +4439,20 @@ fn collect_move_to_run_note_reference_ids(
 ) {
   for choice in &moved.move_to_run_choice {
     match choice {
-      w::MoveToRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::MoveToRunChoice::WIns(inserted) => {
-        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      w::MoveToRunChoice::WRun(run) => {
+        collect_run_note_reference_ids(run.as_ref(), footnotes, endnotes)
       }
-      w::MoveToRunChoice::WDel(deleted) => {
-        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      w::MoveToRunChoice::InsertedRun(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted.as_ref(), footnotes, endnotes);
       }
-      w::MoveToRunChoice::WMoveFrom(moved) => {
-        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      w::MoveToRunChoice::DeletedRun(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted.as_ref(), footnotes, endnotes);
       }
-      w::MoveToRunChoice::WMoveTo(moved) => {
-        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      w::MoveToRunChoice::MoveFromRun(moved) => {
+        collect_move_from_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
+      }
+      w::MoveToRunChoice::MoveToRun(moved) => {
+        collect_move_to_run_note_reference_ids(moved.as_ref(), footnotes, endnotes);
       }
       _ => {}
     }
@@ -4444,7 +4472,7 @@ fn push_simple_field(
 
   for choice in &field.simple_field_choice {
     match choice {
-      w::SimpleFieldChoice::WR(run) => push_run(
+      w::SimpleFieldChoice::WRun(run) => push_run(
         run,
         inlines,
         base_style.clone(),
@@ -4453,10 +4481,10 @@ fn push_simple_field(
         context.hyperlinks,
         None,
       ),
-      w::SimpleFieldChoice::WHyperlink(hyperlink) => {
+      w::SimpleFieldChoice::Hyperlink(hyperlink) => {
         let mut complex_field = None;
         push_hyperlink_content(
-          hyperlink,
+          hyperlink.as_ref(),
           inlines,
           base_style.clone(),
           None,
@@ -4465,10 +4493,10 @@ fn push_simple_field(
         );
         flush_unclosed_complex_field(inlines, &mut complex_field);
       }
-      w::SimpleFieldChoice::WFldSimple(field) => {
+      w::SimpleFieldChoice::SimpleField(field) => {
         push_simple_field(field, inlines, base_style.clone(), context);
       }
-      w::SimpleFieldChoice::WSdt(sdt) => {
+      w::SimpleFieldChoice::SdtRun(sdt) => {
         push_sdt_run(sdt, inlines, base_style.clone(), None, context)
       }
       _ => {}
@@ -4500,19 +4528,19 @@ fn push_run(
 
   for choice in &run.run_choice {
     match choice {
-      w::RunChoice::WT(text_node) => {
+      w::RunChoice::Text(text_node) => {
         if let Some(content) = &text_node.xml_content {
           text.push_str(content);
         }
       }
-      w::RunChoice::WDelText(text_node) => {
+      w::RunChoice::DeletedText(text_node) => {
         if let Some(content) = &text_node.xml_content {
           text.push_str(content);
         }
       }
-      w::RunChoice::WTab => text.push('\t'),
-      w::RunChoice::WCr => text.push('\n'),
-      w::RunChoice::WBr(br) => match br.r#type {
+      w::RunChoice::TabChar => text.push('\t'),
+      w::RunChoice::CarriageReturn => text.push('\n'),
+      w::RunChoice::Break(br) => match br.r#type {
         Some(w::BreakValues::Page) => {
           flush_run_text(
             inlines,
@@ -4536,7 +4564,7 @@ fn push_run(
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
       // This is a cached layout artifact from Word, not an author-authored break.
-      w::RunChoice::WLastRenderedPageBreak => {
+      w::RunChoice::LastRenderedPageBreak => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4546,12 +4574,12 @@ fn push_run(
         );
         inlines.push(InlineItem::LastRenderedPageBreak);
       }
-      w::RunChoice::WSym(symbol) => {
+      w::RunChoice::SymbolChar(symbol) => {
         if let Some(symbol) = symbol_text(symbol) {
           text.push(symbol);
         }
       }
-      w::RunChoice::WPgNum => {
+      w::RunChoice::PageNumber => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4566,9 +4594,9 @@ fn push_run(
           hyperlink_url,
         );
       }
-      w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
-      w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
-      w::RunChoice::WFootnoteReference(reference) => {
+      w::RunChoice::NoBreakHyphen => text.push('\u{2011}'),
+      w::RunChoice::SoftHyphen => text.push('\u{00ad}'),
+      w::RunChoice::FootnoteReference(reference) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4583,7 +4611,7 @@ fn push_run(
           Some(note_reference_url("footnote", reference.id)),
         );
       }
-      w::RunChoice::WEndnoteReference(reference) => {
+      w::RunChoice::EndnoteReference(reference) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4598,7 +4626,7 @@ fn push_run(
           Some(note_reference_url("endnote", reference.id)),
         );
       }
-      w::RunChoice::WCommentReference(reference) => {
+      w::RunChoice::CommentReference(reference) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4608,7 +4636,7 @@ fn push_run(
         );
         push_comment_reference(inlines, &reference.id, style.clone());
       }
-      w::RunChoice::WDrawing(drawing) => {
+      w::RunChoice::Drawing(drawing) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4629,7 +4657,7 @@ fn push_run(
           hyperlinks,
         );
       }
-      w::RunChoice::WPict(picture) => {
+      w::RunChoice::Picture(picture) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4650,7 +4678,7 @@ fn push_run(
           hyperlinks,
         );
       }
-      w::RunChoice::WObject(object) => {
+      w::RunChoice::EmbeddedObject(object) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4662,7 +4690,7 @@ fn push_run(
           inlines.push(InlineItem::Image(image));
         }
       }
-      w::RunChoice::WPtab(_) => text.push('\t'),
+      w::RunChoice::PositionalTab(_) => text.push('\t'),
       w::RunChoice::XmlAny(xml) => {
         flush_run_text(
           inlines,
@@ -4681,7 +4709,7 @@ fn push_run(
           hyperlinks,
         );
       }
-      w::RunChoice::WRuby(ruby) => {
+      w::RunChoice::Ruby(ruby) => {
         flush_run_text(
           inlines,
           &mut text,
@@ -4736,19 +4764,19 @@ fn hidden_run_text(run: &w::Run) -> String {
   let mut text = String::new();
   for choice in &run.run_choice {
     match choice {
-      w::RunChoice::WT(text_node) => {
+      w::RunChoice::Text(text_node) => {
         if let Some(content) = &text_node.xml_content {
           text.push_str(content);
         }
       }
-      w::RunChoice::WDelText(text_node) => {
+      w::RunChoice::DeletedText(text_node) => {
         if let Some(content) = &text_node.xml_content {
           text.push_str(content);
         }
       }
-      w::RunChoice::WTab | w::RunChoice::WPtab(_) => text.push('\t'),
-      w::RunChoice::WCr => text.push('\n'),
-      w::RunChoice::WBr(br)
+      w::RunChoice::TabChar | w::RunChoice::PositionalTab(_) => text.push('\t'),
+      w::RunChoice::CarriageReturn => text.push('\n'),
+      w::RunChoice::Break(br)
         if !matches!(
           br.r#type,
           Some(w::BreakValues::Page | w::BreakValues::Column)
@@ -4756,7 +4784,7 @@ fn hidden_run_text(run: &w::Run) -> String {
       {
         text.push('\n');
       }
-      w::RunChoice::WSym(symbol) => {
+      w::RunChoice::SymbolChar(symbol) => {
         if let Some(symbol) = symbol_text(symbol) {
           text.push(symbol);
         }
@@ -4811,7 +4839,7 @@ fn push_ruby_base(
 ) {
   for choice in &ruby.ruby_base.ruby_base_choice {
     match choice {
-      w::RubyBaseChoice::WR(run) => push_run(
+      w::RubyBaseChoice::WRun(run) => push_run(
         run,
         inlines,
         base_style.clone(),
@@ -4820,7 +4848,7 @@ fn push_ruby_base(
         hyperlinks,
         hyperlink_url,
       ),
-      w::RubyBaseChoice::WIns(inserted) => {
+      w::RubyBaseChoice::InsertedRun(inserted) => {
         push_inserted_run(
           inserted,
           inlines,
@@ -4831,7 +4859,7 @@ fn push_ruby_base(
           hyperlink_url,
         );
       }
-      w::RubyBaseChoice::WDel(deleted) => {
+      w::RubyBaseChoice::DeletedRun(deleted) => {
         push_deleted_run(
           deleted,
           inlines,
@@ -4842,7 +4870,7 @@ fn push_ruby_base(
           hyperlink_url,
         );
       }
-      w::RubyBaseChoice::WMoveFrom(moved) => {
+      w::RubyBaseChoice::MoveFromRun(moved) => {
         push_move_from_run(
           moved,
           inlines,
@@ -4853,7 +4881,7 @@ fn push_ruby_base(
           hyperlink_url,
         );
       }
-      w::RubyBaseChoice::WMoveTo(moved) => {
+      w::RubyBaseChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved,
           inlines,
@@ -4915,7 +4943,7 @@ fn push_sdt_run(
   let mut complex_field = None;
   for choice in &content.sdt_content_run_choice {
     match choice {
-      w::SdtContentRunChoice::WR(run) => push_run_or_complex_field(
+      w::SdtContentRunChoice::WRun(run) => push_run_or_complex_field(
         run.as_ref(),
         inlines,
         base_style.clone(),
@@ -4927,13 +4955,13 @@ fn push_sdt_run(
         hyperlink_url,
         &mut complex_field,
       ),
-      w::SdtContentRunChoice::WFldSimple(field) => {
+      w::SdtContentRunChoice::SimpleField(field) => {
         push_simple_field(field.as_ref(), inlines, base_style.clone(), context);
       }
-      w::SdtContentRunChoice::WHyperlink(hyperlink) => {
+      w::SdtContentRunChoice::Hyperlink(hyperlink) => {
         let mut complex_field = None;
         push_hyperlink_content(
-          hyperlink,
+          hyperlink.as_ref(),
           inlines,
           base_style.clone(),
           hyperlink_url,
@@ -4942,14 +4970,14 @@ fn push_sdt_run(
         );
         flush_unclosed_complex_field(inlines, &mut complex_field);
       }
-      w::SdtContentRunChoice::WSdt(sdt) => push_sdt_run(
+      w::SdtContentRunChoice::SdtRun(sdt) => push_sdt_run(
         sdt.as_ref(),
         inlines,
         base_style.clone(),
         hyperlink_url,
         context,
       ),
-      w::SdtContentRunChoice::WIns(inserted) => {
+      w::SdtContentRunChoice::InsertedRun(inserted) => {
         push_inserted_run(
           inserted.as_ref(),
           inlines,
@@ -4960,7 +4988,7 @@ fn push_sdt_run(
           hyperlink_url,
         );
       }
-      w::SdtContentRunChoice::WDel(deleted) => {
+      w::SdtContentRunChoice::DeletedRun(deleted) => {
         push_deleted_run(
           deleted.as_ref(),
           inlines,
@@ -4971,7 +4999,7 @@ fn push_sdt_run(
           hyperlink_url,
         );
       }
-      w::SdtContentRunChoice::WMoveFrom(moved) => {
+      w::SdtContentRunChoice::MoveFromRun(moved) => {
         push_move_from_run(
           moved.as_ref(),
           inlines,
@@ -4982,7 +5010,7 @@ fn push_sdt_run(
           hyperlink_url,
         );
       }
-      w::SdtContentRunChoice::WMoveTo(moved) => {
+      w::SdtContentRunChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved.as_ref(),
           inlines,
@@ -5013,7 +5041,7 @@ fn sdt_showing_placeholder(properties: &w::SdtProperties) -> bool {
   properties
     .sdt_properties_choice
     .iter()
-    .any(|choice| matches!(choice, w::SdtPropertiesChoice::WShowingPlcHdr(_)))
+    .any(|choice| matches!(choice, w::SdtPropertiesChoice::ShowingPlaceholder(_)))
 }
 
 fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec<String>)> {
@@ -5022,21 +5050,21 @@ fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec
   let mut showing_placeholder = false;
   for choice in &properties.sdt_properties_choice {
     match choice {
-      w::SdtPropertiesChoice::WComboBox(combo_box) => {
+      w::SdtPropertiesChoice::SdtContentComboBox(combo_box) => {
         kind = Some(FormWidgetKind::ComboBox);
         entries = sdt_list_item_display_texts(&combo_box.list_item);
       }
-      w::SdtPropertiesChoice::WDropDownList(drop_down) => {
+      w::SdtPropertiesChoice::SdtContentDropDownList(drop_down) => {
         kind = Some(FormWidgetKind::DropDownList);
         entries = sdt_list_item_display_texts(&drop_down.list_item);
       }
-      w::SdtPropertiesChoice::WDate(_) => {
+      w::SdtPropertiesChoice::SdtContentDate(_) => {
         kind = Some(FormWidgetKind::Text);
       }
-      w::SdtPropertiesChoice::WRichText | w::SdtPropertiesChoice::WText(_) => {
+      w::SdtPropertiesChoice::SdtContentRichText | w::SdtPropertiesChoice::SdtContentText(_) => {
         kind = Some(FormWidgetKind::Text);
       }
-      w::SdtPropertiesChoice::WShowingPlcHdr(_) => {
+      w::SdtPropertiesChoice::ShowingPlaceholder(_) => {
         showing_placeholder = true;
       }
       _ => {}
@@ -5152,7 +5180,7 @@ fn push_inserted_run(
   redline_style.color = redline_author_color();
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WR(run) => push_redline_run(
+      w::InsertedRunChoice::WRun(run) => push_redline_run(
         run,
         inlines,
         redline_style.clone(),
@@ -5161,7 +5189,7 @@ fn push_inserted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::InsertedRunChoice::WIns(nested) => {
+      w::InsertedRunChoice::InsertedRun(nested) => {
         push_inserted_run(
           nested,
           inlines,
@@ -5172,7 +5200,7 @@ fn push_inserted_run(
           hyperlink_url,
         );
       }
-      w::InsertedRunChoice::WDel(deleted) => {
+      w::InsertedRunChoice::DeletedRun(deleted) => {
         push_deleted_run(
           deleted,
           inlines,
@@ -5183,7 +5211,7 @@ fn push_inserted_run(
           hyperlink_url,
         );
       }
-      w::InsertedRunChoice::WMoveFrom(moved) => {
+      w::InsertedRunChoice::MoveFromRun(moved) => {
         push_move_from_run(
           moved,
           inlines,
@@ -5194,7 +5222,7 @@ fn push_inserted_run(
           hyperlink_url,
         );
       }
-      w::InsertedRunChoice::WMoveTo(moved) => {
+      w::InsertedRunChoice::MoveToRun(moved) => {
         push_move_to_run(
           moved,
           inlines,
@@ -5222,7 +5250,7 @@ fn push_deleted_run(
   base_style.color = redline_author_color();
   for choice in &deleted.deleted_run_choice {
     match choice {
-      w::DeletedRunChoice::WR(run) => push_run(
+      w::DeletedRunChoice::WRun(run) => push_run(
         run,
         inlines,
         base_style.clone(),
@@ -5231,7 +5259,7 @@ fn push_deleted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::DeletedRunChoice::WIns(inserted) => push_inserted_run(
+      w::DeletedRunChoice::InsertedRun(inserted) => push_inserted_run(
         inserted,
         inlines,
         base_style.clone(),
@@ -5240,7 +5268,7 @@ fn push_deleted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::DeletedRunChoice::WDel(deleted) => push_deleted_run(
+      w::DeletedRunChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
         inlines,
         base_style.clone(),
@@ -5249,7 +5277,7 @@ fn push_deleted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::DeletedRunChoice::WMoveFrom(moved) => push_move_from_run(
+      w::DeletedRunChoice::MoveFromRun(moved) => push_move_from_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5258,7 +5286,7 @@ fn push_deleted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::DeletedRunChoice::WMoveTo(moved) => push_move_to_run(
+      w::DeletedRunChoice::MoveToRun(moved) => push_move_to_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5285,7 +5313,7 @@ fn push_move_from_run(
   base_style.strikethrough = true;
   for choice in &moved.move_from_run_choice {
     match choice {
-      w::MoveFromRunChoice::WR(run) => push_redline_run(
+      w::MoveFromRunChoice::WRun(run) => push_redline_run(
         run,
         inlines,
         base_style.clone(),
@@ -5294,7 +5322,7 @@ fn push_move_from_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveFromRunChoice::WIns(inserted) => push_inserted_run(
+      w::MoveFromRunChoice::InsertedRun(inserted) => push_inserted_run(
         inserted,
         inlines,
         base_style.clone(),
@@ -5303,7 +5331,7 @@ fn push_move_from_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveFromRunChoice::WDel(deleted) => push_deleted_run(
+      w::MoveFromRunChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
         inlines,
         base_style.clone(),
@@ -5312,7 +5340,7 @@ fn push_move_from_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveFromRunChoice::WMoveFrom(moved) => push_move_from_run(
+      w::MoveFromRunChoice::MoveFromRun(moved) => push_move_from_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5321,7 +5349,7 @@ fn push_move_from_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveFromRunChoice::WMoveTo(moved) => push_move_to_run(
+      w::MoveFromRunChoice::MoveToRun(moved) => push_move_to_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5347,7 +5375,7 @@ fn push_move_to_run(
   base_style.color = moved_redline_color();
   for choice in &moved.move_to_run_choice {
     match choice {
-      w::MoveToRunChoice::WR(run) => push_redline_run(
+      w::MoveToRunChoice::WRun(run) => push_redline_run(
         run,
         inlines,
         base_style.clone(),
@@ -5356,7 +5384,7 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::WIns(inserted) => push_inserted_run(
+      w::MoveToRunChoice::InsertedRun(inserted) => push_inserted_run(
         inserted,
         inlines,
         base_style.clone(),
@@ -5365,7 +5393,7 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::WDel(deleted) => push_deleted_run(
+      w::MoveToRunChoice::DeletedRun(deleted) => push_deleted_run(
         deleted,
         inlines,
         base_style.clone(),
@@ -5374,7 +5402,7 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::WMoveFrom(moved) => push_move_from_run(
+      w::MoveToRunChoice::MoveFromRun(moved) => push_move_from_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5383,7 +5411,7 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::WMoveTo(moved) => push_move_to_run(
+      w::MoveToRunChoice::MoveToRun(moved) => push_move_to_run(
         moved,
         inlines,
         base_style.clone(),
@@ -5699,7 +5727,7 @@ fn inline_image_impl(
   }
 
   match drawing.drawing_choice.as_ref()? {
-    w::DrawingChoice::WpInline(inline) => {
+    w::DrawingChoice::Inline(inline) => {
       let properties =
         drawing_image_properties(&inline.graphic.graphic_data, &styles.theme_colors)?;
       let relationship_id = properties.relationship_id.as_deref()?;
@@ -5736,7 +5764,7 @@ fn inline_image_impl(
         placement: ImagePlacement::Inline,
       })
     }
-    w::DrawingChoice::WpAnchor(anchor) => {
+    w::DrawingChoice::Anchor(anchor) => {
       let graphic = anchor.graphic.as_ref();
       let extent = anchor.extent.as_ref();
       let properties = drawing_image_properties(&graphic.graphic_data, &styles.theme_colors)?;
@@ -5915,7 +5943,7 @@ struct ImageWrapMargins {
 fn floating_wrap_margins(anchor: &wp::Anchor) -> ImageWrapMargins {
   if matches!(
     anchor.anchor_choice.as_ref(),
-    Some(wp::AnchorChoice::WpWrapNone)
+    Some(wp::AnchorChoice::WrapNone)
   ) {
     return ImageWrapMargins::default();
   }
@@ -5928,27 +5956,27 @@ fn floating_wrap_margins(anchor: &wp::Anchor) -> ImageWrapMargins {
   };
 
   match anchor.anchor_choice.as_ref() {
-    Some(wp::AnchorChoice::WpWrapSquare(square)) => {
+    Some(wp::AnchorChoice::WrapSquare(square)) => {
       margins.top_pt = optional_emu_to_points(square.distance_from_top).max(margins.top_pt);
       margins.right_pt = optional_emu_to_points(square.distance_from_right).max(margins.right_pt);
       margins.bottom_pt =
         optional_emu_to_points(square.distance_from_bottom).max(margins.bottom_pt);
       margins.left_pt = optional_emu_to_points(square.distance_from_left).max(margins.left_pt);
     }
-    Some(wp::AnchorChoice::WpWrapTight(tight)) => {
+    Some(wp::AnchorChoice::WrapTight(tight)) => {
       margins.right_pt = optional_emu_to_points(tight.distance_from_right).max(margins.right_pt);
       margins.left_pt = optional_emu_to_points(tight.distance_from_left).max(margins.left_pt);
     }
-    Some(wp::AnchorChoice::WpWrapThrough(through)) => {
+    Some(wp::AnchorChoice::WrapThrough(through)) => {
       margins.right_pt = optional_emu_to_points(through.distance_from_right).max(margins.right_pt);
       margins.left_pt = optional_emu_to_points(through.distance_from_left).max(margins.left_pt);
     }
-    Some(wp::AnchorChoice::WpWrapTopAndBottom(top_bottom)) => {
+    Some(wp::AnchorChoice::WrapTopBottom(top_bottom)) => {
       margins.top_pt = optional_emu_to_points(top_bottom.distance_from_top).max(margins.top_pt);
       margins.bottom_pt =
         optional_emu_to_points(top_bottom.distance_from_bottom).max(margins.bottom_pt);
     }
-    Some(wp::AnchorChoice::WpWrapNone) | None => {}
+    Some(wp::AnchorChoice::WrapNone) | None => {}
   }
 
   margins
@@ -5988,9 +6016,11 @@ fn vertical_image_reference(position: &wp::VerticalPosition) -> VerticalImageRef
 
 fn horizontal_position_offset(position: &wp::HorizontalPosition) -> Option<f32> {
   match position.horizontal_position_choice.as_ref()? {
-    wp::HorizontalPositionChoice::WpPosOffset(offset) => Some(units::emu_to_points(*offset as i64)),
-    wp::HorizontalPositionChoice::WpAlign(_)
-    | wp::HorizontalPositionChoice::Wp14PctPosHOffset(_) => None,
+    wp::HorizontalPositionChoice::PositionOffset(offset) => {
+      Some(units::emu_to_points(*offset as i64))
+    }
+    wp::HorizontalPositionChoice::HorizontalAlignment(_)
+    | wp::HorizontalPositionChoice::PercentagePositionHeightOffset(_) => None,
   }
 }
 
@@ -5998,30 +6028,31 @@ fn horizontal_position_alignment(
   position: &wp::HorizontalPosition,
 ) -> Option<HorizontalImageAlignment> {
   match position.horizontal_position_choice.as_ref()? {
-    wp::HorizontalPositionChoice::WpAlign(alignment) => match alignment {
+    wp::HorizontalPositionChoice::HorizontalAlignment(alignment) => match alignment {
       wp::HorizontalAlignmentValues::Left => Some(HorizontalImageAlignment::Left),
       wp::HorizontalAlignmentValues::Center => Some(HorizontalImageAlignment::Center),
       wp::HorizontalAlignmentValues::Right => Some(HorizontalImageAlignment::Right),
       wp::HorizontalAlignmentValues::Inside => Some(HorizontalImageAlignment::Inside),
       wp::HorizontalAlignmentValues::Outside => Some(HorizontalImageAlignment::Outside),
     },
-    wp::HorizontalPositionChoice::WpPosOffset(_)
-    | wp::HorizontalPositionChoice::Wp14PctPosHOffset(_) => None,
+    wp::HorizontalPositionChoice::PositionOffset(_)
+    | wp::HorizontalPositionChoice::PercentagePositionHeightOffset(_) => None,
   }
 }
 
 fn vertical_position_offset(position: &wp::VerticalPosition) -> Option<f32> {
   match position.vertical_position_choice.as_ref()? {
-    wp::VerticalPositionChoice::WpPosOffset(offset) => Some(units::emu_to_points(*offset as i64)),
-    wp::VerticalPositionChoice::WpAlign(_) | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => {
-      None
+    wp::VerticalPositionChoice::PositionOffset(offset) => {
+      Some(units::emu_to_points(*offset as i64))
     }
+    wp::VerticalPositionChoice::VerticalAlignment(_)
+    | wp::VerticalPositionChoice::PercentagePositionVerticalOffset(_) => None,
   }
 }
 
 fn vertical_position_alignment(position: &wp::VerticalPosition) -> Option<VerticalImageAlignment> {
   match position.vertical_position_choice.as_ref()? {
-    wp::VerticalPositionChoice::WpAlign(alignment) => match alignment {
+    wp::VerticalPositionChoice::VerticalAlignment(alignment) => match alignment {
       wp::VerticalAlignmentValues::Top
         if position.relative_from == wp::VerticalRelativePositionValues::Line =>
       {
@@ -6038,29 +6069,27 @@ fn vertical_position_alignment(position: &wp::VerticalPosition) -> Option<Vertic
       wp::VerticalAlignmentValues::Inside => Some(VerticalImageAlignment::Inside),
       wp::VerticalAlignmentValues::Outside => Some(VerticalImageAlignment::Outside),
     },
-    wp::VerticalPositionChoice::WpPosOffset(_)
-    | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => None,
+    wp::VerticalPositionChoice::PositionOffset(_)
+    | wp::VerticalPositionChoice::PercentagePositionVerticalOffset(_) => None,
   }
 }
 
 fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
   match choice {
-    wp::AnchorChoice::WpWrapNone => ImageWrapMode::Through,
-    wp::AnchorChoice::WpWrapSquare(_) => ImageWrapMode::Square,
-    wp::AnchorChoice::WpWrapTight(_) => ImageWrapMode::Tight,
-    wp::AnchorChoice::WpWrapThrough(_) => ImageWrapMode::Square,
-    wp::AnchorChoice::WpWrapTopAndBottom(_) => ImageWrapMode::TopBottom,
+    wp::AnchorChoice::WrapNone => ImageWrapMode::Through,
+    wp::AnchorChoice::WrapSquare(_) => ImageWrapMode::Square,
+    wp::AnchorChoice::WrapTight(_) => ImageWrapMode::Tight,
+    wp::AnchorChoice::WrapThrough(_) => ImageWrapMode::Square,
+    wp::AnchorChoice::WrapTopBottom(_) => ImageWrapMode::TopBottom,
   }
 }
 
 fn image_wrap_side(choice: &wp::AnchorChoice) -> ImageWrapSide {
   match choice {
-    wp::AnchorChoice::WpWrapSquare(square) => wrap_text_side(square.wrap_text),
-    wp::AnchorChoice::WpWrapTight(tight) => wrap_text_side(tight.wrap_text),
-    wp::AnchorChoice::WpWrapThrough(through) => wrap_text_side(through.wrap_text),
-    wp::AnchorChoice::WpWrapNone | wp::AnchorChoice::WpWrapTopAndBottom(_) => {
-      ImageWrapSide::BothSides
-    }
+    wp::AnchorChoice::WrapSquare(square) => wrap_text_side(square.wrap_text),
+    wp::AnchorChoice::WrapTight(tight) => wrap_text_side(tight.wrap_text),
+    wp::AnchorChoice::WrapThrough(through) => wrap_text_side(through.wrap_text),
+    wp::AnchorChoice::WrapNone | wp::AnchorChoice::WrapTopBottom(_) => ImageWrapSide::BothSides,
   }
 }
 
@@ -6093,8 +6122,8 @@ fn push_drawing_textboxes_impl(
   }
 
   let placement = match drawing.drawing_choice.as_ref() {
-    Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
-    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+    Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::Anchor(anchor)) => {
       ImagePlacement::Floating(floating_image_placement(anchor))
     }
     None => return,
@@ -6840,8 +6869,8 @@ fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
 
 fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
   match drawing.drawing_choice.as_ref()? {
-    w::DrawingChoice::WpInline(inline) => Some(&inline.graphic.graphic_data),
-    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.graphic.graphic_data),
+    w::DrawingChoice::Inline(inline) => Some(&inline.graphic.graphic_data),
+    w::DrawingChoice::Anchor(anchor) => Some(&anchor.graphic.graphic_data),
   }
 }
 
@@ -6862,14 +6891,14 @@ fn push_drawing_shapes_impl(
   let is_top_level_picture = drawing_image_properties(graphic_data, &styles.theme_colors).is_some();
 
   let placement = match drawing.drawing_choice.as_ref() {
-    Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
-    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+    Some(w::DrawingChoice::Inline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::Anchor(anchor)) => {
       ImagePlacement::Floating(floating_image_placement(anchor))
     }
     None => return,
   };
 
-  if let Some(w::DrawingChoice::WpAnchor(anchor)) = drawing.drawing_choice.as_ref()
+  if let Some(w::DrawingChoice::Anchor(anchor)) = drawing.drawing_choice.as_ref()
     && let Some(shape) = anchor_wrap_polygon_shape(anchor, placement)
   {
     inlines.push(InlineItem::Shape(shape));
@@ -7046,11 +7075,11 @@ fn diagram_style_text_fill_color(
     .text_fill_color_list_choice
     .iter()
     .find_map(|choice| match choice {
-      dgm::TextFillColorListChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
-      dgm::TextFillColorListChoice::ASchemeClr(color) => {
+      dgm::TextFillColorListChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+      dgm::TextFillColorListChoice::SchemeColor(color) => {
         resolve_drawingml_scheme_color(color, theme_colors)
       }
-      dgm::TextFillColorListChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+      dgm::TextFillColorListChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
       _ => None,
     })
 }
@@ -7063,7 +7092,7 @@ fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<Stri
     .iter()
     .find_map(
       |extension| match extension.data_model_extension_choice.as_ref()? {
-        a::DataModelExtensionChoice::DspDataModelExt(block) => block.rel_id.clone(),
+        a::DataModelExtensionChoice::DataModelExtensionBlock(block) => block.rel_id.clone(),
         _ => None,
       },
     )
@@ -7154,14 +7183,12 @@ fn chart_kind(chart_space: &c::ChartSpace) -> ChartKind {
     .plot_area_choice1
     .iter()
     .find_map(|choice| match choice {
-      c::PlotAreaChoice::CPieChart(_)
-      | c::PlotAreaChoice::CPie3DChart(_)
-      | c::PlotAreaChoice::CDoughnutChart(_)
-      | c::PlotAreaChoice::COfPieChart(_) => Some(ChartKind::Pie),
-      c::PlotAreaChoice::CBarChart(_) | c::PlotAreaChoice::CBar3DChart(_) => Some(ChartKind::Bar),
-      c::PlotAreaChoice::CAreaChart(_) | c::PlotAreaChoice::CArea3DChart(_) => {
-        Some(ChartKind::Area)
-      }
+      c::PlotAreaChoice::PieChart(_)
+      | c::PlotAreaChoice::Pie3DChart(_)
+      | c::PlotAreaChoice::DoughnutChart(_)
+      | c::PlotAreaChoice::OfPieChart(_) => Some(ChartKind::Pie),
+      c::PlotAreaChoice::BarChart(_) | c::PlotAreaChoice::Bar3DChart(_) => Some(ChartKind::Bar),
+      c::PlotAreaChoice::AreaChart(_) | c::PlotAreaChoice::Area3DChart(_) => Some(ChartKind::Area),
       _ => None,
     })
     .unwrap_or(ChartKind::Other)
@@ -7176,12 +7203,12 @@ fn chart_has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
 
 fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {
   match drawing.drawing_choice.as_ref()? {
-    w::DrawingChoice::WpInline(inline) => Some((
+    w::DrawingChoice::Inline(inline) => Some((
       units::emu_to_points(inline.extent.cx),
       units::emu_to_points(inline.extent.cy),
       ImagePlacement::Inline,
     )),
-    w::DrawingChoice::WpAnchor(anchor) => {
+    w::DrawingChoice::Anchor(anchor) => {
       let extent = anchor.extent.as_ref();
       Some((
         units::emu_to_points(extent.cx),
@@ -7194,11 +7221,11 @@ fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32,
 
 fn drawing_extent_size(drawing: &w::Drawing) -> Option<(f32, f32)> {
   match drawing.drawing_choice.as_ref()? {
-    w::DrawingChoice::WpInline(inline) => Some((
+    w::DrawingChoice::Inline(inline) => Some((
       units::emu_to_points(inline.extent.cx),
       units::emu_to_points(inline.extent.cy),
     )),
-    w::DrawingChoice::WpAnchor(anchor) => {
+    w::DrawingChoice::Anchor(anchor) => {
       let extent = anchor.extent.as_ref();
       Some((
         units::emu_to_points(extent.cx),
@@ -7210,8 +7237,8 @@ fn drawing_extent_size(drawing: &w::Drawing) -> Option<(f32, f32)> {
 
 fn drawing_effect_extent(drawing: &w::Drawing) -> DrawingEffectExtent {
   let extent = match drawing.drawing_choice.as_ref() {
-    Some(w::DrawingChoice::WpInline(inline)) => inline.effect_extent.as_ref(),
-    Some(w::DrawingChoice::WpAnchor(anchor)) => anchor.effect_extent.as_ref(),
+    Some(w::DrawingChoice::Inline(inline)) => inline.effect_extent.as_ref(),
+    Some(w::DrawingChoice::Anchor(anchor)) => anchor.effect_extent.as_ref(),
     None => None,
   };
   DrawingEffectExtent {
@@ -7498,8 +7525,8 @@ fn anchor_wrap_polygon_geometry(
   height_pt: f32,
 ) -> Option<InlineShapeGeometry> {
   let polygon = match anchor.anchor_choice.as_ref()? {
-    wp::AnchorChoice::WpWrapTight(tight) => tight.wrap_polygon.as_ref(),
-    wp::AnchorChoice::WpWrapThrough(through) => through.wrap_polygon.as_ref(),
+    wp::AnchorChoice::WrapTight(tight) => tight.wrap_polygon.as_ref(),
+    wp::AnchorChoice::WrapThrough(through) => through.wrap_polygon.as_ref(),
     _ => return None,
   };
   let mut points = Vec::with_capacity(polygon.line_to.len() + 2);
@@ -7548,12 +7575,12 @@ fn drawingml_group_child_placement(placement: ImagePlacement) -> ImagePlacement 
 
 fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
   match drawing.drawing_choice.as_ref() {
-    Some(w::DrawingChoice::WpInline(inline)) => inline
+    Some(w::DrawingChoice::Inline(inline)) => inline
       .doc_properties
       .hidden
       .as_ref()
       .is_some_and(|hidden| hidden.as_bool()),
-    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+    Some(w::DrawingChoice::Anchor(anchor)) => {
       anchor
         .hidden
         .as_ref()
@@ -8454,23 +8481,23 @@ fn push_picture_choice_shapes(
   images: &ImageCatalog,
 ) {
   match choice {
-    w::PictureChoice::VGroup(group) => push_group_shapes(group, inlines, images),
-    w::PictureChoice::VRect(rectangle) => {
+    w::PictureChoice::Group(group) => push_group_shapes(group, inlines, images),
+    w::PictureChoice::Rectangle(rectangle) => {
       if let Some(shape) = vml_rectangle_shape(rectangle, images) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
-    w::PictureChoice::VRoundrect(round_rectangle) => {
+    w::PictureChoice::RoundRectangle(round_rectangle) => {
       if let Some(shape) = vml_round_rectangle_shape(round_rectangle) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
-    w::PictureChoice::VShape(shape) => {
+    w::PictureChoice::Shape(shape) => {
       if let Some(shape) = vml_shape_shape(shape, images) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
-    w::PictureChoice::VPolyline(polyline) => {
+    w::PictureChoice::PolyLine(polyline) => {
       if let Some(shape) = vml_polyline_shape(polyline) {
         inlines.push(InlineItem::Shape(shape));
       }
@@ -8483,8 +8510,8 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
   let transform = VmlGroupTransform::from_group(group);
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines, images),
-      v::GroupChoice::VRect(rectangle) => {
+      v::GroupChoice::Group(group) => push_group_shapes(group, inlines, images),
+      v::GroupChoice::Rectangle(rectangle) => {
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
         });
@@ -8492,7 +8519,7 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
           inlines.push(InlineItem::Shape(shape));
         }
       }
-      v::GroupChoice::VRoundrect(round_rectangle) => {
+      v::GroupChoice::RoundRectangle(round_rectangle) => {
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
         });
@@ -8501,7 +8528,7 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
           inlines.push(InlineItem::Shape(shape));
         }
       }
-      v::GroupChoice::VShape(shape) => {
+      v::GroupChoice::Shape(shape) => {
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
         });
@@ -8509,7 +8536,7 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
           inlines.push(InlineItem::Shape(shape));
         }
       }
-      v::GroupChoice::VPolyline(polyline) => {
+      v::GroupChoice::PolyLine(polyline) => {
         if let Some(shape) = vml_polyline_shape(polyline) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -8597,7 +8624,7 @@ fn vml_shape_has_textbox(shape: &v::Shape) -> bool {
   shape
     .shape_choice
     .iter()
-    .any(|choice| matches!(choice, v::ShapeChoice::VTextbox(_)))
+    .any(|choice| matches!(choice, v::ShapeChoice::TextBox(_)))
 }
 
 fn vml_fontwork_shape_geometry(
@@ -8700,14 +8727,14 @@ fn vml_rectangle_fill_image(
     .rectangle_choice
     .iter()
     .find_map(|choice| match choice {
-      v::RectangleChoice::VFill(fill) => vml_fill_image(fill, rectangle.style.as_deref(), images),
+      v::RectangleChoice::Fill(fill) => vml_fill_image(fill, rectangle.style.as_deref(), images),
       _ => None,
     })
 }
 
 fn vml_shape_fill_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
   shape.shape_choice.iter().find_map(|choice| match choice {
-    v::ShapeChoice::VFill(fill) => vml_fill_image(fill, shape.style.as_deref(), images),
+    v::ShapeChoice::Fill(fill) => vml_fill_image(fill, shape.style.as_deref(), images),
     _ => None,
   })
 }
@@ -8802,7 +8829,7 @@ fn vml_textbox_frame(
     return None;
   }
 
-  let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
+  let Some(v::TextBoxChoice::TextBoxContent(content)) = textbox.text_box_choice.as_ref() else {
     return None;
   };
   let mut style = vml_image_style(shape_style);
@@ -8995,11 +9022,11 @@ fn push_pict_textboxes_impl(
 
 fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Option<InlineImage> {
   match choice {
-    w::PictureChoice::VGroup(group) => group_image(group, images),
-    w::PictureChoice::VImage(image) => image_file_image(image, images),
-    w::PictureChoice::VRect(rectangle) => rectangle_image(rectangle, images),
-    w::PictureChoice::VRoundrect(_) => None,
-    w::PictureChoice::VShape(shape) => shape_image(shape, images),
+    w::PictureChoice::Group(group) => group_image(group, images),
+    w::PictureChoice::ImageFile(image) => image_file_image(image, images),
+    w::PictureChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+    w::PictureChoice::RoundRectangle(_) => None,
+    w::PictureChoice::Shape(shape) => shape_image(shape, images),
     _ => None,
   }
 }
@@ -9009,10 +9036,10 @@ fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> O
     .embedded_object_choice1
     .iter()
     .find_map(|choice| match choice {
-      w::EmbeddedObjectChoice::VGroup(group) => group_image(group, images),
-      w::EmbeddedObjectChoice::VImage(image) => image_file_image(image, images),
-      w::EmbeddedObjectChoice::VRect(rectangle) => rectangle_image(rectangle, images),
-      w::EmbeddedObjectChoice::VShape(shape) => shape_image(shape, images),
+      w::EmbeddedObjectChoice::Group(group) => group_image(group, images),
+      w::EmbeddedObjectChoice::ImageFile(image) => image_file_image(image, images),
+      w::EmbeddedObjectChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+      w::EmbeddedObjectChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })
 }
@@ -9026,18 +9053,18 @@ fn push_picture_choice_textboxes(
   hyperlinks: &HyperlinkCatalog,
 ) {
   match choice {
-    w::PictureChoice::VGroup(group) => {
+    w::PictureChoice::Group(group) => {
       push_group_textboxes(group, inlines, base_style, styles, images, hyperlinks);
     }
-    w::PictureChoice::VImage(image) => {
+    w::PictureChoice::ImageFile(image) => {
       push_image_file_textboxes(image, None, inlines, base_style, styles, images, hyperlinks);
     }
-    w::PictureChoice::VRect(rectangle) => {
+    w::PictureChoice::Rectangle(rectangle) => {
       push_rectangle_textboxes(
         rectangle, None, inlines, base_style, styles, images, hyperlinks,
       );
     }
-    w::PictureChoice::VRoundrect(round_rectangle) => {
+    w::PictureChoice::RoundRectangle(round_rectangle) => {
       push_round_rectangle_textboxes(
         round_rectangle,
         None,
@@ -9048,7 +9075,7 @@ fn push_picture_choice_textboxes(
         hyperlinks,
       );
     }
-    w::PictureChoice::VShape(shape) => {
+    w::PictureChoice::Shape(shape) => {
       push_shape_textboxes(shape, None, inlines, base_style, styles, images, hyperlinks);
     }
     _ => {}
@@ -9057,11 +9084,11 @@ fn push_picture_choice_textboxes(
 
 fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
   group.group_choice.iter().find_map(|choice| match choice {
-    v::GroupChoice::VGroup(group) => group_image(group, images),
-    v::GroupChoice::VImage(image) => image_file_image(image, images),
-    v::GroupChoice::VRect(rectangle) => rectangle_image(rectangle, images),
-    v::GroupChoice::VRoundrect(_) => None,
-    v::GroupChoice::VShape(shape) => shape_image(shape, images),
+    v::GroupChoice::Group(group) => group_image(group, images),
+    v::GroupChoice::ImageFile(image) => image_file_image(image, images),
+    v::GroupChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+    v::GroupChoice::RoundRectangle(_) => None,
+    v::GroupChoice::Shape(shape) => shape_image(shape, images),
     _ => None,
   })
 }
@@ -9077,7 +9104,7 @@ fn push_group_textboxes(
   let transform = VmlGroupTransform::from_group(group);
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::VGroup(group) => {
+      v::GroupChoice::Group(group) => {
         push_group_textboxes(
           group,
           inlines,
@@ -9087,7 +9114,7 @@ fn push_group_textboxes(
           hyperlinks,
         );
       }
-      v::GroupChoice::VImage(image) => {
+      v::GroupChoice::ImageFile(image) => {
         let style = transform.and_then(|transform| transform.child_style(image.style.as_deref()));
         push_image_file_textboxes(
           image,
@@ -9099,7 +9126,7 @@ fn push_group_textboxes(
           hyperlinks,
         );
       }
-      v::GroupChoice::VRect(rectangle) => {
+      v::GroupChoice::Rectangle(rectangle) => {
         let style =
           transform.and_then(|transform| transform.child_style(rectangle.style.as_deref()));
         push_rectangle_textboxes(
@@ -9112,7 +9139,7 @@ fn push_group_textboxes(
           hyperlinks,
         );
       }
-      v::GroupChoice::VRoundrect(round_rectangle) => {
+      v::GroupChoice::RoundRectangle(round_rectangle) => {
         let style =
           transform.and_then(|transform| transform.child_style(round_rectangle.style.as_deref()));
         push_round_rectangle_textboxes(
@@ -9125,7 +9152,7 @@ fn push_group_textboxes(
           hyperlinks,
         );
       }
-      v::GroupChoice::VShape(shape) => {
+      v::GroupChoice::Shape(shape) => {
         let style = transform.and_then(|transform| transform.child_style(shape.style.as_deref()));
         push_shape_textboxes(
           shape,
@@ -9151,7 +9178,7 @@ fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<Inlin
     .image_file_choice
     .iter()
     .find_map(|choice| match choice {
-      v::ImageFileChoice::VImagedata(data) => vml_image_data(
+      v::ImageFileChoice::ImageData(data) => vml_image_data(
         data,
         image.style.as_deref(),
         vml_allow_in_cell(image.allow_in_cell),
@@ -9177,7 +9204,7 @@ fn push_image_file_textboxes(
   }
 
   for choice in &image.image_file_choice {
-    if let v::ImageFileChoice::VTextbox(textbox) = choice {
+    if let v::ImageFileChoice::TextBox(textbox) = choice {
       if let Some(frame) = vml_textbox_frame(
         style,
         vml_allow_in_cell(image.allow_in_cell),
@@ -9210,7 +9237,7 @@ fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<In
     .rectangle_choice
     .iter()
     .find_map(|choice| match choice {
-      v::RectangleChoice::VImagedata(data) => vml_image_data(
+      v::RectangleChoice::ImageData(data) => vml_image_data(
         data,
         rectangle.style.as_deref(),
         vml_allow_in_cell(rectangle.allow_in_cell),
@@ -9236,7 +9263,7 @@ fn push_rectangle_textboxes(
   }
 
   for choice in &rectangle.rectangle_choice {
-    if let v::RectangleChoice::VTextbox(textbox) = choice {
+    if let v::RectangleChoice::TextBox(textbox) = choice {
       if let Some(frame) = vml_textbox_frame(
         style,
         vml_allow_in_cell(rectangle.allow_in_cell),
@@ -9275,7 +9302,7 @@ fn push_round_rectangle_textboxes(
   }
 
   for choice in &round_rectangle.round_rectangle_choice {
-    if let v::RoundRectangleChoice::VTextbox(textbox) = choice {
+    if let v::RoundRectangleChoice::TextBox(textbox) = choice {
       if let Some(frame) = vml_textbox_frame(
         style,
         vml_allow_in_cell(round_rectangle.allow_in_cell),
@@ -9305,7 +9332,7 @@ fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
   }
 
   shape.shape_choice.iter().find_map(|choice| match choice {
-    v::ShapeChoice::VImagedata(data) => vml_image_data(
+    v::ShapeChoice::ImageData(data) => vml_image_data(
       data,
       shape.style.as_deref(),
       vml_allow_in_cell(shape.allow_in_cell),
@@ -9331,7 +9358,7 @@ fn push_shape_textboxes(
   }
 
   for choice in &shape.shape_choice {
-    if let v::ShapeChoice::VTextbox(textbox) = choice {
+    if let v::ShapeChoice::TextBox(textbox) = choice {
       if let Some(frame) = vml_textbox_frame(
         style,
         vml_allow_in_cell(shape.allow_in_cell),
@@ -9374,7 +9401,7 @@ fn push_vml_textbox(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
+  let Some(v::TextBoxChoice::TextBoxContent(content)) = textbox.text_box_choice.as_ref() else {
     return;
   };
   push_textbox_content(content, inlines, base_style, styles, images, hyperlinks);
@@ -9439,7 +9466,7 @@ fn textbox_blocks_with_base(
   let custom_xml_bindings = CustomXmlBindings::default();
   for choice in &content.text_box_content_choice {
     match choice {
-      w::TextBoxContentChoice::WP(paragraph) => {
+      w::TextBoxContentChoice::Paragraph(paragraph) => {
         let paragraph = paragraph_model_with_base(
           paragraph,
           styles,
@@ -9455,7 +9482,7 @@ fn textbox_blocks_with_base(
         );
         blocks.push(Block::Paragraph(paragraph));
       }
-      w::TextBoxContentChoice::WTbl(table) => {
+      w::TextBoxContentChoice::Table(table) => {
         let mut table = table_model(
           table,
           &mut TableModelEnv {
@@ -10030,8 +10057,8 @@ fn drawing_picture_image_properties(
     .blip_fill_choice
     .as_ref()
     .and_then(|choice| match choice {
-      pic::BlipFillChoice::AStretch(stretch) => stretch.fill_rectangle.as_ref(),
-      pic::BlipFillChoice::ATile(_) => None,
+      pic::BlipFillChoice::Stretch(stretch) => stretch.fill_rectangle.as_ref(),
+      pic::BlipFillChoice::Tile(_) => None,
     })
     .map(image_crop_from_fill_rectangle)
     .or_else(|| {
@@ -10061,21 +10088,21 @@ fn drawing_shape_image_properties_from_fragment(
   theme_colors: &ThemeColors,
 ) -> Option<DrawingImageProperties> {
   if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(a::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+    && let Some(a::ShapePropertiesChoice2::BlipFill(blip_fill)) =
       properties.shape_properties_choice2.as_ref()
   {
     return drawing_blip_fill_image_properties(blip_fill, theme_colors);
   }
 
   if let Ok(properties) = pic::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(pic::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+    && let Some(pic::ShapePropertiesChoice2::BlipFill(blip_fill)) =
       properties.shape_properties_choice2.as_ref()
   {
     return drawing_blip_fill_image_properties(blip_fill, theme_colors);
   }
 
   if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes())
-    && let Some(wps::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+    && let Some(wps::ShapePropertiesChoice2::BlipFill(blip_fill)) =
       properties.shape_properties_choice2.as_ref()
   {
     return drawing_blip_fill_image_properties(blip_fill, theme_colors);
@@ -10097,8 +10124,8 @@ fn drawing_blip_fill_image_properties(
     .blip_fill_choice
     .as_ref()
     .and_then(|choice| match choice {
-      a::BlipFillChoice::AStretch(stretch) => stretch.fill_rectangle.as_ref(),
-      a::BlipFillChoice::ATile(_) => None,
+      a::BlipFillChoice::Stretch(stretch) => stretch.fill_rectangle.as_ref(),
+      a::BlipFillChoice::Tile(_) => None,
     })
     .map(image_crop_from_fill_rectangle)
     .or_else(|| {
@@ -10190,8 +10217,8 @@ fn apply_image_effects_from_blip(
 ) {
   for choice in &blip.blip_choice {
     match choice {
-      a::BlipChoice::AGrayscl => properties.effects.grayscale = true,
-      a::BlipChoice::ALum(luminance) => {
+      a::BlipChoice::Grayscale => properties.effects.grayscale = true,
+      a::BlipChoice::LuminanceEffect(luminance) => {
         properties.effects.brightness = luminance
           .brightness
           .as_ref()
@@ -10203,7 +10230,7 @@ fn apply_image_effects_from_blip(
           .and_then(drawingml_percent_to_ratio)
           .map(drawingml_ratio_to_effect_percent);
       }
-      a::BlipChoice::ADuotone(duotone) => {
+      a::BlipChoice::Duotone(duotone) => {
         if let Some(colors) = image_duotone_colors_from_model(duotone, theme_colors) {
           properties.effects.duotone = Some(colors);
         }
@@ -10234,9 +10261,9 @@ fn drawingml_duotone_color(
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
   match choice {
-    a::DuotoneChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
-    a::DuotoneChoice::ASchemeClr(color) => resolve_drawingml_scheme_color(color, theme_colors),
-    a::DuotoneChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+    a::DuotoneChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::DuotoneChoice::SchemeColor(color) => resolve_drawingml_scheme_color(color, theme_colors),
+    a::DuotoneChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
     _ => None,
   }
 }
@@ -10248,31 +10275,31 @@ fn resolve_drawingml_scheme_color(
   let mut resolved = resolve_drawingml_scheme_color_value(color.val, theme_colors)?;
   for transform in &color.scheme_color_choice {
     match transform {
-      a::SchemeColorChoice::ATint(value) => {
+      a::SchemeColorChoice::Tint(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
           resolved = apply_drawingml_tint(resolved, amount);
         }
       }
-      a::SchemeColorChoice::AShade(value) => {
+      a::SchemeColorChoice::Shade(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
           resolved = apply_drawingml_shade(resolved, amount);
         }
       }
-      a::SchemeColorChoice::ASatMod(value) => {
+      a::SchemeColorChoice::SaturationModulation(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
           let mut hsl = HslColor::from_rgb(resolved);
           hsl.apply_saturation_mod(amount);
           resolved = hsl.to_rgb();
         }
       }
-      a::SchemeColorChoice::ALumMod(value) => {
+      a::SchemeColorChoice::LuminanceModulation(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
           let mut hsl = HslColor::from_rgb(resolved);
           hsl.apply_luminance_mod(amount);
           resolved = hsl.to_rgb();
         }
       }
-      a::SchemeColorChoice::ALumOff(value) => {
+      a::SchemeColorChoice::LuminanceOffset(value) => {
         if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
           let mut hsl = HslColor::from_rgb(resolved);
           hsl.apply_luminance_offset(amount);
@@ -10968,74 +10995,74 @@ macro_rules! theme_color_choice_value {
 theme_color_choice_value!(
   dark1_color_value,
   a::Dark1ColorChoice,
-  a::Dark1ColorChoice::ASrgbClr,
-  a::Dark1ColorChoice::ASysClr
+  a::Dark1ColorChoice::RgbColorModelHex,
+  a::Dark1ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   light1_color_value,
   a::Light1ColorChoice,
-  a::Light1ColorChoice::ASrgbClr,
-  a::Light1ColorChoice::ASysClr
+  a::Light1ColorChoice::RgbColorModelHex,
+  a::Light1ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   dark2_color_value,
   a::Dark2ColorChoice,
-  a::Dark2ColorChoice::ASrgbClr,
-  a::Dark2ColorChoice::ASysClr
+  a::Dark2ColorChoice::RgbColorModelHex,
+  a::Dark2ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   light2_color_value,
   a::Light2ColorChoice,
-  a::Light2ColorChoice::ASrgbClr,
-  a::Light2ColorChoice::ASysClr
+  a::Light2ColorChoice::RgbColorModelHex,
+  a::Light2ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent1_color_value,
   a::Accent1ColorChoice,
-  a::Accent1ColorChoice::ASrgbClr,
-  a::Accent1ColorChoice::ASysClr
+  a::Accent1ColorChoice::RgbColorModelHex,
+  a::Accent1ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent2_color_value,
   a::Accent2ColorChoice,
-  a::Accent2ColorChoice::ASrgbClr,
-  a::Accent2ColorChoice::ASysClr
+  a::Accent2ColorChoice::RgbColorModelHex,
+  a::Accent2ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent3_color_value,
   a::Accent3ColorChoice,
-  a::Accent3ColorChoice::ASrgbClr,
-  a::Accent3ColorChoice::ASysClr
+  a::Accent3ColorChoice::RgbColorModelHex,
+  a::Accent3ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent4_color_value,
   a::Accent4ColorChoice,
-  a::Accent4ColorChoice::ASrgbClr,
-  a::Accent4ColorChoice::ASysClr
+  a::Accent4ColorChoice::RgbColorModelHex,
+  a::Accent4ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent5_color_value,
   a::Accent5ColorChoice,
-  a::Accent5ColorChoice::ASrgbClr,
-  a::Accent5ColorChoice::ASysClr
+  a::Accent5ColorChoice::RgbColorModelHex,
+  a::Accent5ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   accent6_color_value,
   a::Accent6ColorChoice,
-  a::Accent6ColorChoice::ASrgbClr,
-  a::Accent6ColorChoice::ASysClr
+  a::Accent6ColorChoice::RgbColorModelHex,
+  a::Accent6ColorChoice::SystemColor
 );
 theme_color_choice_value!(
   hyperlink_color_value,
   a::HyperlinkChoice,
-  a::HyperlinkChoice::ASrgbClr,
-  a::HyperlinkChoice::ASysClr
+  a::HyperlinkChoice::RgbColorModelHex,
+  a::HyperlinkChoice::SystemColor
 );
 theme_color_choice_value!(
   followed_hyperlink_color_value,
   a::FollowedHyperlinkColorChoice,
-  a::FollowedHyperlinkColorChoice::ASrgbClr,
-  a::FollowedHyperlinkColorChoice::ASysClr
+  a::FollowedHyperlinkColorChoice::RgbColorModelHex,
+  a::FollowedHyperlinkColorChoice::SystemColor
 );
 
 pub(super) fn resolve_run_color(color: &w::Color, theme_colors: &ThemeColors) -> Option<RgbColor> {
@@ -11071,9 +11098,11 @@ pub(super) fn resolve_text_fill(
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
   match fill.fill_text_effect_choice.as_ref()? {
-    w14::FillTextEffectChoice::W14NoFill => None,
-    w14::FillTextEffectChoice::W14SolidFill(fill) => resolve_solid_text_fill(fill, theme_colors),
-    w14::FillTextEffectChoice::W14GradFill(_) => None,
+    w14::FillTextEffectChoice::NoFillEmpty => None,
+    w14::FillTextEffectChoice::SolidColorFillProperties(fill) => {
+      resolve_solid_text_fill(fill, theme_colors)
+    }
+    w14::FillTextEffectChoice::GradientFillProperties(_) => None,
   }
 }
 
@@ -11082,11 +11111,11 @@ pub(super) fn resolve_text_outline(
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
   let resolved = match outline.text_outline_effect_choice1.as_ref()? {
-    w14::TextOutlineEffectChoice::W14NoFill => return None,
-    w14::TextOutlineEffectChoice::W14SolidFill(fill) => {
+    w14::TextOutlineEffectChoice::NoFillEmpty => return None,
+    w14::TextOutlineEffectChoice::SolidColorFillProperties(fill) => {
       resolve_solid_text_fill(fill, theme_colors)?
     }
-    w14::TextOutlineEffectChoice::W14GradFill(_) => return None,
+    w14::TextOutlineEffectChoice::GradientFillProperties(_) => return None,
   };
 
   Some(ResolvedColor {
@@ -11100,11 +11129,11 @@ fn resolve_solid_text_fill(
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
   match fill.solid_color_fill_properties_choice.as_ref()? {
-    w14::SolidColorFillPropertiesChoice::W14SrgbClr(color) => Some(ResolvedColor {
+    w14::SolidColorFillPropertiesChoice::RgbColorModelHex(color) => Some(ResolvedColor {
       color: parse_hex_color(color.val.as_str())?,
       opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
     }),
-    w14::SolidColorFillPropertiesChoice::W14SchemeClr(color) => {
+    w14::SolidColorFillPropertiesChoice::SchemeColor(color) => {
       let mut resolved = theme_colors.resolve_word2010(color.val)?;
       resolved = apply_w14_scheme_transforms(resolved, &color.scheme_color_choice);
       Some(ResolvedColor {
@@ -11117,14 +11146,14 @@ fn resolve_solid_text_fill(
 
 fn opacity_from_w14_rgb_transforms(transforms: &[w14::RgbColorModelHexChoice]) -> f32 {
   opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
-    w14::RgbColorModelHexChoice::W14Alpha(value) => Some(value.val),
+    w14::RgbColorModelHexChoice::Alpha(value) => Some(value.val),
     _ => None,
   }))
 }
 
 fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> f32 {
   opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
-    w14::SchemeColorChoice::W14Alpha(value) => Some(value.val),
+    w14::SchemeColorChoice::Alpha(value) => Some(value.val),
     _ => None,
   }))
 }
@@ -11138,16 +11167,16 @@ fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorCh
   let mut hsl = HslColor::from_rgb(color);
   for transform in transforms {
     match transform {
-      w14::SchemeColorChoice::W14Tint(value) => {
+      w14::SchemeColorChoice::Tint(value) => {
         hsl.apply_tint(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
-      w14::SchemeColorChoice::W14Shade(value) => {
+      w14::SchemeColorChoice::Shade(value) => {
         hsl.apply_shade(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
-      w14::SchemeColorChoice::W14LumMod(value) => {
+      w14::SchemeColorChoice::LuminanceModulation(value) => {
         hsl.apply_luminance_mod(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
-      w14::SchemeColorChoice::W14LumOff(value) => {
+      w14::SchemeColorChoice::LuminanceOffset(value) => {
         hsl.apply_luminance_offset(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
       _ => {}
@@ -11479,16 +11508,16 @@ fn direct_table_row_style(properties: Option<&w::TableRowProperties>) -> TableRo
   let mut style = TableRowStyle::default();
   for choice in &properties.table_row_properties_choice1 {
     match choice {
-      w::TableRowPropertiesChoice::WTrHeight(height) => {
+      w::TableRowPropertiesChoice::TableRowHeight(height) => {
         apply_table_row_height(&mut style, height);
       }
-      w::TableRowPropertiesChoice::WTblHeader(header) => {
+      w::TableRowPropertiesChoice::TableHeader(header) => {
         style.repeat_header = Some(on_off_only_value(header.val));
       }
-      w::TableRowPropertiesChoice::WCantSplit(cant_split) => {
+      w::TableRowPropertiesChoice::CantSplit(cant_split) => {
         style.cant_split = Some(on_off_only_value(cant_split.val));
       }
-      w::TableRowPropertiesChoice::WTblCellSpacing(spacing) => {
+      w::TableRowPropertiesChoice::TableCellSpacing(spacing) => {
         style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
       }
       _ => {}
@@ -11503,13 +11532,13 @@ fn style_table_row_style(
   let mut style = TableRowStyle::default();
   for choice in &properties.table_style_conditional_formatting_table_row_properties_choice {
     match choice {
-      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(header) => {
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableHeader(header) => {
         style.repeat_header = Some(on_off_only_value(header.val));
       }
-      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(cant_split) => {
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::CantSplit(cant_split) => {
         style.cant_split = Some(on_off_only_value(cant_split.val));
       }
-      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(spacing) => {
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableCellSpacing(spacing) => {
         style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
       }
       _ => {}
@@ -12075,10 +12104,10 @@ fn numbering_picture_bullet_image(
   images: &ImageCatalog,
 ) -> Option<InlineImage> {
   match picture_bullet.numbering_picture_bullet_choice.as_ref()? {
-    w::NumberingPictureBulletChoice::WPict(picture) => {
+    w::NumberingPictureBulletChoice::PictureBulletBase(picture) => {
       picture_bullet_base_image(picture, images).map(normalize_picture_bullet_image_size)
     }
-    w::NumberingPictureBulletChoice::WDrawing(_) => None,
+    w::NumberingPictureBulletChoice::Drawing(_) => None,
   }
 }
 
@@ -12090,10 +12119,10 @@ fn picture_bullet_base_image(
     .picture_bullet_base_choice
     .iter()
     .find_map(|choice| match choice {
-      w::PictureBulletBaseChoice::VGroup(group) => group_image(group, images),
-      w::PictureBulletBaseChoice::VImage(image) => image_file_image(image, images),
-      w::PictureBulletBaseChoice::VRect(rectangle) => rectangle_image(rectangle, images),
-      w::PictureBulletBaseChoice::VShape(shape) => shape_image(shape, images),
+      w::PictureBulletBaseChoice::Group(group) => group_image(group, images),
+      w::PictureBulletBaseChoice::ImageFile(image) => image_file_image(image, images),
+      w::PictureBulletBaseChoice::Rectangle(rectangle) => rectangle_image(rectangle, images),
+      w::PictureBulletBaseChoice::Shape(shape) => shape_image(shape, images),
       _ => None,
     })
 }
@@ -12869,15 +12898,15 @@ mod tests {
     let mut inlines = Vec::new();
     let run = w::Run {
       run_choice: vec![
-        w::RunChoice::WSym(Box::new(w::SymbolChar {
+        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
           font: Some("Symbol".into()),
           char: Some("F0B7".into()),
         })),
-        w::RunChoice::WSym(Box::new(w::SymbolChar {
+        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
           font: Some("Wingdings".into()),
           char: Some("F0FC".into()),
         })),
-        w::RunChoice::WSym(Box::new(w::SymbolChar {
+        w::RunChoice::SymbolChar(Box::new(w::SymbolChar {
           font: None,
           char: Some("00A9".into()),
         })),
@@ -12941,8 +12970,8 @@ mod tests {
   fn table_row_grid_properties_preserve_skipped_grid_columns() {
     let properties = w::TableRowProperties {
       table_row_properties_choice1: vec![
-        w::TableRowPropertiesChoice::WGridBefore(Box::new(w::GridBefore { val: 1 })),
-        w::TableRowPropertiesChoice::WGridAfter(Box::new(w::GridAfter { val: 2 })),
+        w::TableRowPropertiesChoice::GridBefore(Box::new(w::GridBefore { val: 1 })),
+        w::TableRowPropertiesChoice::GridAfter(Box::new(w::GridAfter { val: 2 })),
       ],
       ..Default::default()
     };
@@ -13270,13 +13299,13 @@ mod tests {
           table_style_conditional_formatting_table_row_properties: Some(
             w::TableStyleConditionalFormattingTableRowProperties {
               table_style_conditional_formatting_table_row_properties_choice: vec![
-                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(Box::new(
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableHeader(Box::new(
                   w::TableHeader { val: None },
                 )),
-                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(Box::new(
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::CantSplit(Box::new(
                   w::CantSplit { val: None },
                 )),
-                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::TableCellSpacing(
                   Box::new(w::TableCellSpacing {
                     width: Some(measurement(240)),
                     r#type: Some(w::TableWidthUnitValues::Dxa),
@@ -13311,10 +13340,10 @@ mod tests {
       &mut first_row,
       &direct_table_row_style(Some(&w::TableRowProperties {
         table_row_properties_choice1: vec![
-          w::TableRowPropertiesChoice::WTblHeader(Box::new(w::TableHeader {
+          w::TableRowPropertiesChoice::TableHeader(Box::new(w::TableHeader {
             val: Some(ooxmlsdk::simple_type::OnOffValue::Off),
           })),
-          w::TableRowPropertiesChoice::WTblCellSpacing(Box::new(w::TableCellSpacing {
+          w::TableRowPropertiesChoice::TableCellSpacing(Box::new(w::TableCellSpacing {
             width: Some(measurement(120)),
             r#type: Some(w::TableWidthUnitValues::Dxa),
           })),
@@ -13416,7 +13445,7 @@ mod tests {
         }),
         ..Default::default()
       })),
-      paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
+      paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
         run_properties: Some(Box::new(w::RunProperties {
           bold: Some(w::Bold {
             val: Some(false.into()),
@@ -13427,7 +13456,7 @@ mod tests {
           }),
           ..Default::default()
         })),
-        run_choice: vec![w::RunChoice::WT(text("Header"))],
+        run_choice: vec![w::RunChoice::Text(text("Header"))],
         ..Default::default()
       }))],
       ..Default::default()
@@ -13488,9 +13517,9 @@ mod tests {
     };
 
     let cell = w::TableCell {
-      table_cell_choice: vec![w::TableCellChoice::WP(Box::new(w::Paragraph {
-        paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
-          run_choice: vec![w::RunChoice::WT(text("Header"))],
+      table_cell_choice: vec![w::TableCellChoice::Paragraph(Box::new(w::Paragraph {
+        paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
+          run_choice: vec![w::RunChoice::Text(text("Header"))],
           ..Default::default()
         }))],
         ..Default::default()
@@ -13572,7 +13601,7 @@ mod tests {
   fn pgnum_runs_emit_dynamic_page_marker() {
     let mut inlines = Vec::new();
     let run = w::Run {
-      run_choice: vec![w::RunChoice::WPgNum],
+      run_choice: vec![w::RunChoice::PageNumber],
       ..Default::default()
     };
 
@@ -13597,8 +13626,8 @@ mod tests {
     let mut inlines = Vec::new();
     let ruby = w::Ruby {
       ruby_base: Box::new(w::RubyBase {
-        ruby_base_choice: vec![w::RubyBaseChoice::WR(Box::new(w::Run {
-          run_choice: vec![w::RunChoice::WT(text("漢"))],
+        ruby_base_choice: vec![w::RubyBaseChoice::WRun(Box::new(w::Run {
+          run_choice: vec![w::RunChoice::Text(text("漢"))],
           ..Default::default()
         }))],
         ..Default::default()
@@ -13607,9 +13636,9 @@ mod tests {
     };
     let run = w::Run {
       run_choice: vec![
-        w::RunChoice::WT(text("Before ")),
-        w::RunChoice::WRuby(Box::new(ruby)),
-        w::RunChoice::WT(text(" after")),
+        w::RunChoice::Text(text("Before ")),
+        w::RunChoice::Ruby(Box::new(ruby)),
+        w::RunChoice::Text(text(" after")),
       ],
       ..Default::default()
     };
@@ -13638,11 +13667,11 @@ mod tests {
       },
     );
     let run = w::Run {
-      run_choice: vec![w::RunChoice::WPict(Box::new(w::Picture {
-        picture_choice: vec![w::PictureChoice::VShape(Box::new(v::Shape {
+      run_choice: vec![w::RunChoice::Picture(Box::new(w::Picture {
+        picture_choice: vec![w::PictureChoice::Shape(Box::new(v::Shape {
           style: Some("width:1in;height:24pt;rotation:90;flip:x y".into()),
           alternate: Some("VML image".into()),
-          shape_choice: vec![v::ShapeChoice::VImagedata(Box::new(v::ImageData {
+          shape_choice: vec![v::ShapeChoice::ImageData(Box::new(v::ImageData {
             relationship_id: Some("rId1".into()),
             crop_left: Some("10%".into()),
             crop_top: Some("13107f".into()),
@@ -13733,15 +13762,15 @@ mod tests {
   #[test]
   fn vml_textboxes_emit_text_content() {
     let run = w::Run {
-      run_choice: vec![w::RunChoice::WPict(Box::new(w::Picture {
-        picture_choice: vec![w::PictureChoice::VShape(Box::new(v::Shape {
-          shape_choice: vec![v::ShapeChoice::VTextbox(Box::new(v::TextBox {
-            text_box_choice: Some(v::TextBoxChoice::WTxbxContent(Box::new(
+      run_choice: vec![w::RunChoice::Picture(Box::new(w::Picture {
+        picture_choice: vec![w::PictureChoice::Shape(Box::new(v::Shape {
+          shape_choice: vec![v::ShapeChoice::TextBox(Box::new(v::TextBox {
+            text_box_choice: Some(v::TextBoxChoice::TextBoxContent(Box::new(
               w::TextBoxContent {
-                text_box_content_choice: vec![w::TextBoxContentChoice::WP(Box::new(
+                text_box_content_choice: vec![w::TextBoxContentChoice::Paragraph(Box::new(
                   w::Paragraph {
-                    paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
-                      run_choice: vec![w::RunChoice::WT(text("Text inside VML box"))],
+                    paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
+                      run_choice: vec![w::RunChoice::Text(text("Text inside VML box"))],
                       ..Default::default()
                     }))],
                     ..Default::default()
@@ -13875,14 +13904,14 @@ mod tests {
   fn body_sections_split_paragraph_and_body_section_properties() {
     let body = w::Body {
       body_choice: vec![
-        w::BodyChoice::WP(Box::new(paragraph())),
-        w::BodyChoice::WP(Box::new(paragraph_with_section(section(
+        w::BodyChoice::Paragraph(Box::new(paragraph())),
+        w::BodyChoice::Paragraph(Box::new(paragraph_with_section(section(
           12240,
           15840,
           w::PageOrientationValues::Portrait,
           None,
         )))),
-        w::BodyChoice::WP(Box::new(paragraph())),
+        w::BodyChoice::Paragraph(Box::new(paragraph())),
       ],
       section_properties: Some(Box::new(section(
         15840,

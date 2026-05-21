@@ -17,7 +17,8 @@ use crate::sdk_code::schemas::{
   one_sequence_choice_enum_name, one_sequence_choice_field_name,
   one_sequence_choice_sequence_struct_name, schema_any_child_field_rust_name,
   schema_attr_field_rust_name, schema_child_field_rust_name_with_context,
-  schema_child_override_field_rust_name, schema_choice_variant_name_from_qname,
+  schema_child_override_field_rust_name, schema_choice_variant_conflict_name,
+  schema_choice_variant_name_from_field_name, schema_choice_variant_name_from_qname,
   schema_choice_variant_qname_prefix, schema_composite_any_variant_name,
   schema_composite_child_variant_name, schema_empty_text_child_field_name,
   schema_mixed_choice_leaf_field_rust_name, schema_qname_element_name,
@@ -52,7 +53,7 @@ fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
 
     let base_name = variant.rust_name.clone();
     let prefix_name = variant_qname_prefix_from_decl(variant)
-      .map(|prefix| format!("{}{}", prefix.to_upper_camel_case(), base_name))
+      .map(|prefix| schema_choice_variant_conflict_name(prefix, &variant.payload.rust_type))
       .filter(|candidate| !candidate.is_empty());
 
     if let Some(candidate) = prefix_name
@@ -182,6 +183,8 @@ fn inline_safe_choice_members(
   if let Some(inlined) =
     safe_pure_choice_wrapper_group_inline_candidate(parent_name, members, choice_members_by_name)
   {
+    let mut inlined = inlined;
+    disambiguate_choice_variant_names(&mut inlined);
     return inlined;
   }
 
@@ -190,7 +193,7 @@ fn inline_safe_choice_members(
   let mut used_start_qnames = std::collections::HashSet::new();
 
   for (index, member) in members.iter().enumerate() {
-    if let Some(candidate) = safe_anonymous_choice_wrapper_inline_candidate(
+    let candidate = safe_anonymous_choice_wrapper_inline_candidate(
       parent_name,
       member,
       members,
@@ -205,37 +208,43 @@ fn inline_safe_choice_members(
         index,
         choice_members_by_name,
       )
-    }) && candidate.iter().all(|variant| {
-      let MemberDecl::Variant(variant) = variant else {
-        return false;
-      };
-      let Some(qnames) = variant_start_qnames(variant) else {
-        return false;
-      };
-      !used_variant_names.contains(variant.rust_name.as_str())
-        && qnames
+    });
+
+    if let Some(mut candidate) = candidate {
+      disambiguate_choice_variant_names(&mut candidate);
+      if candidate.iter().all(|variant| {
+        let MemberDecl::Variant(variant) = variant else {
+          return false;
+        };
+        let Some(qnames) = variant_start_qnames(variant) else {
+          return false;
+        };
+        qnames
           .iter()
           .all(|qname| !used_start_qnames.contains(qname.as_str()))
-    }) {
-      for variant in candidate {
-        if let MemberDecl::Variant(ref variant_decl) = variant {
-          used_variant_names.insert(variant_decl.rust_name.clone());
-          for qname in variant_start_qnames(variant_decl).into_iter().flatten() {
-            used_start_qnames.insert(qname.clone());
+      }) {
+        for variant in candidate {
+          if let MemberDecl::Variant(ref variant_decl) = variant {
+            used_variant_names.insert(variant_decl.rust_name.clone());
+            for qname in variant_start_qnames(variant_decl).into_iter().flatten() {
+              used_start_qnames.insert(qname.clone());
+            }
           }
+          inlined.push(variant);
         }
-        inlined.push(variant);
+        continue;
       }
-    } else {
-      track_member_variant_name_and_child_qnames(
-        member,
-        &mut used_variant_names,
-        &mut used_start_qnames,
-      );
-      inlined.push(member.clone());
     }
+
+    track_member_variant_name_and_child_qnames(
+      member,
+      &mut used_variant_names,
+      &mut used_start_qnames,
+    );
+    inlined.push(member.clone());
   }
 
+  disambiguate_choice_variant_names(&mut inlined);
   inlined
 }
 
@@ -383,15 +392,6 @@ fn safe_anonymous_choice_wrapper_inline_candidate(
     return None;
   }
 
-  let other_variant_names = parent_members
-    .iter()
-    .enumerate()
-    .filter_map(|(index, member)| {
-      (index != member_index)
-        .then_some(member)
-        .and_then(member_variant_name)
-    })
-    .collect::<std::collections::HashSet<_>>();
   let other_start_qnames = parent_members
     .iter()
     .enumerate()
@@ -404,15 +404,22 @@ fn safe_anonymous_choice_wrapper_inline_candidate(
     })
     .collect::<std::collections::HashSet<_>>();
 
-  let mut candidate_variant_names = std::collections::HashSet::new();
-  let mut candidate_start_qnames = std::collections::HashSet::new();
-  for variant in &payload_variants {
-    if other_variant_names.contains(variant.rust_name.as_str())
-      || !candidate_variant_names.insert(variant.rust_name.as_str())
-    {
-      return None;
-    }
+  let mut candidate_members = payload_variants
+    .into_iter()
+    .map(|variant| {
+      let mut variant = variant.clone();
+      variant.version =
+        effective_version(parent_variant.version.as_str(), variant.version.as_str()).to_string();
+      MemberDecl::Variant(variant)
+    })
+    .collect::<Vec<_>>();
+  disambiguate_choice_variant_names(&mut candidate_members);
 
+  let mut candidate_start_qnames = std::collections::HashSet::new();
+  for member in &candidate_members {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
     for qname in variant_start_qnames(variant)? {
       if other_start_qnames.contains(qname.as_str())
         || !candidate_start_qnames.insert(qname.as_str())
@@ -422,17 +429,7 @@ fn safe_anonymous_choice_wrapper_inline_candidate(
     }
   }
 
-  Some(
-    payload_variants
-      .into_iter()
-      .map(|variant| {
-        let mut variant = variant.clone();
-        variant.version =
-          effective_version(parent_variant.version.as_str(), variant.version.as_str()).to_string();
-        MemberDecl::Variant(variant)
-      })
-      .collect(),
-  )
+  Some(candidate_members)
 }
 
 fn is_generic_choice_variant_name(rust_name: &str) -> bool {
@@ -529,15 +526,6 @@ fn safe_pure_child_choice_inline_candidate(
     return None;
   }
 
-  let other_variant_names = parent_members
-    .iter()
-    .enumerate()
-    .filter_map(|(index, member)| {
-      (index != member_index)
-        .then_some(member)
-        .and_then(member_variant_name)
-    })
-    .collect::<std::collections::HashSet<_>>();
   let other_child_qnames = parent_members
     .iter()
     .enumerate()
@@ -550,15 +538,8 @@ fn safe_pure_child_choice_inline_candidate(
     })
     .collect::<std::collections::HashSet<_>>();
 
-  let mut candidate_variant_names = std::collections::HashSet::new();
   let mut candidate_child_qnames = std::collections::HashSet::new();
   for variant in &payload_variants {
-    if other_variant_names.contains(variant.rust_name.as_str())
-      || !candidate_variant_names.insert(variant.rust_name.as_str())
-    {
-      return None;
-    }
-
     for qname in variant_child_qnames(variant)? {
       if other_child_qnames.contains(qname.as_str())
         || !candidate_child_qnames.insert(qname.as_str())
@@ -640,13 +621,6 @@ fn inlineable_choice_payload_variants<'a>(
 
   (!variants.is_empty() && (choice_count == 0 || child_count + choice_count == variants.len()))
     .then_some(variants)
-}
-
-fn member_variant_name(member: &MemberDecl) -> Option<&str> {
-  match member {
-    MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
-    MemberDecl::Field(_) => None,
-  }
 }
 
 fn member_child_qnames(member: &MemberDecl) -> Option<&Vec<String>> {
@@ -1296,7 +1270,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
   let choice_name = format!("{}Choice", schema_type.class_name);
   let mut choice_members = vec![
     MemberDecl::Variant(VariantDecl {
-      rust_name: schema_choice_variant_name_from_qname(&qname),
+      rust_name: schema_choice_variant_name_from_field_name(&field.rust_name),
       docs: field.docs.clone(),
       version: field.version.clone(),
       wire: VariantWireDecl::Child {
@@ -1488,6 +1462,7 @@ fn build_recursive_one_sequence_choice_members(
           ResolvedOneSequenceChild {
             name: "",
             field_name: std::borrow::Cow::Owned(schema_any_child_field_rust_name(child)),
+            variant_name: std::borrow::Cow::Borrowed("XmlAny"),
             property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
               " _"
             } else {
@@ -1771,6 +1746,7 @@ fn build_recursive_choice_leaf_variant_decl(
     ResolvedOneSequenceChild {
       name: "",
       field_name: std::borrow::Cow::Owned(schema_any_child_field_rust_name(child)),
+      variant_name: std::borrow::Cow::Borrowed("XmlAny"),
       property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
         " _"
       } else {
@@ -1799,7 +1775,7 @@ fn build_recursive_choice_sequence_variant_decl(
 ) -> Result<MemberDecl> {
   let sequence_leafs = collect_sequence_leaf_children(&child.children);
   let struct_name = name_allocator.allocate_sequence_name();
-  let variant_name = recursive_choice_variant_name(child, child_index);
+  let variant_name = recursive_choice_variant_name(child, child_index, context);
   let property_comments = format!(
     " Sequence of {}",
     sequence_leafs
@@ -1862,7 +1838,7 @@ fn build_recursive_choice_nested_variant_decl(
     common_choice_version_ir(child.initial_version.as_str(), &nested_versions).to_string();
 
   Ok(MemberDecl::Variant(VariantDecl {
-    rust_name: recursive_choice_variant_name(child, child_index),
+    rust_name: recursive_choice_variant_name(child, child_index, context),
     docs: build_recursive_choice_docs(child),
     version,
     wire: VariantWireDecl::Child {
@@ -2030,8 +2006,12 @@ fn recursive_choice_display_name(child: &SchemaTypeChild, child_index: usize) ->
   schema_recursive_choice_display_name(child, child_index)
 }
 
-fn recursive_choice_variant_name(child: &SchemaTypeChild, child_index: usize) -> String {
-  schema_recursive_choice_variant_name(child, child_index)
+fn recursive_choice_variant_name(
+  child: &SchemaTypeChild,
+  child_index: usize,
+  context: &CodegenContext<'_>,
+) -> String {
+  schema_recursive_choice_variant_name(child, child_index, context)
 }
 
 struct RecursiveChoiceNameAllocator {
@@ -2810,10 +2790,8 @@ fn build_simple_one_choice_variant_decl(
 
   let rust_name = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
     "XmlAny".to_string()
-  } else if variant.name.is_empty() {
-    variant.field_name.to_upper_camel_case()
   } else {
-    schema_choice_variant_name_from_qname(variant.name)
+    variant.variant_name.to_string()
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
@@ -3013,10 +2991,8 @@ fn build_one_sequence_choice_variant_decl(
   Ok(MemberDecl::Variant(VariantDecl {
     rust_name: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
       "XmlAny".to_string()
-    } else if variant.name.is_empty() {
-      variant.field_name.to_upper_camel_case()
     } else {
-      schema_choice_variant_name_from_qname(variant.name)
+      variant.variant_name.to_string()
     },
     docs: variant.property_comments.to_string(),
     version: variant.version.to_string(),
@@ -3203,11 +3179,7 @@ fn build_single_field_sequence_choice_variant_decl(
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
-    rust_name: if field.child.name.is_empty() {
-      field.child.field_name.to_upper_camel_case()
-    } else {
-      schema_choice_variant_name_from_qname(field.child.name)
-    },
+    rust_name: field.child.variant_name.to_string(),
     docs: field.child.property_comments.to_string(),
     version: effective_version(field.child.version, field.initial_version).to_string(),
     wire,
@@ -3319,6 +3291,9 @@ fn apply_sequence_child_overrides<'a>(
 ) {
   if let Some(field_name) = schema_child_override_field_rust_name(schema_child) {
     resolved_child.field_name = std::borrow::Cow::Owned(field_name);
+    resolved_child.variant_name = std::borrow::Cow::Owned(
+      schema_choice_variant_name_from_field_name(schema_child.property_name.as_str()),
+    );
   }
 
   if !schema_child.property_comments.is_empty() {
@@ -3898,6 +3873,14 @@ fn build_mixed_choice_leaf_variant_decl(
   let synthetic_child = ResolvedOneSequenceChild {
     name: child.name,
     field_name: std::borrow::Cow::Owned(schema_mixed_choice_leaf_field_rust_name(child)),
+    variant_name: std::borrow::Cow::Owned(if child.name.is_empty() {
+      schema_choice_variant_name_from_field_name(child.variant_name.as_ref())
+    } else {
+      context
+        .type_by_name(child.name)
+        .map(|child_type| schema_choice_variant_name_from_field_name(&child_type.class_name))
+        .unwrap_or_else(|| schema_choice_variant_name_from_qname(child.name))
+    }),
     property_comments: std::borrow::Cow::Borrowed(" _"),
     version: child.version,
     kind: child.kind,
@@ -4453,7 +4436,10 @@ mod tests {
 
     let variant_names = inlined
       .iter()
-      .filter_map(member_variant_name)
+      .filter_map(|member| match member {
+        MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
+        MemberDecl::Field(_) => None,
+      })
       .collect::<Vec<_>>();
     assert_eq!(variant_names, vec!["TDirect", "TFirst", "Sequence1"]);
     assert!(matches!(
@@ -4524,7 +4510,10 @@ mod tests {
 
     let variant_names = inlined
       .iter()
-      .filter_map(member_variant_name)
+      .filter_map(|member| match member {
+        MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
+        MemberDecl::Field(_) => None,
+      })
       .collect::<Vec<_>>();
     assert_eq!(variant_names, vec!["TFirst", "Choice2"]);
   }
@@ -4616,9 +4605,12 @@ mod tests {
     let variant_names = holder_choice
       .members
       .iter()
-      .filter_map(member_variant_name)
+      .filter_map(|member| match member {
+        MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
+        MemberDecl::Field(_) => None,
+      })
       .collect::<Vec<_>>();
-    assert_eq!(variant_names, vec!["TA", "TB", "TD"]);
+    assert_eq!(variant_names, vec!["A", "B", "D"]);
   }
 
   fn expected_content_structure_from_schema_type(
@@ -5877,7 +5869,7 @@ mod tests {
         _ => None,
       })
       .collect::<Vec<_>>();
-    assert_eq!(variant_names, vec!["Sequence1", "TA"]);
+    assert_eq!(variant_names, vec!["Sequence1", "A"]);
   }
 
   #[test]
@@ -6218,18 +6210,18 @@ mod tests {
     assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
-        if variant.rust_name == "WProofErr"
+        if variant.rust_name == "ProofError"
     )));
     assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
-        if variant.rust_name == "W14ConflictIns"
+        if variant.rust_name == "RunConflictInsertion"
           && variant.payload.rust_type == "RunConflictInsertion"
     )));
     assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
-        if variant.rust_name == "W14ConflictDel"
+        if variant.rust_name == "RunConflictDeletion"
           && variant.payload.rust_type == "RunConflictDeletion"
     )));
     assert!(
@@ -6248,7 +6240,7 @@ mod tests {
     assert!(paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
-        if variant.rust_name == "MR"
+        if variant.rust_name == "MathRun"
           && variant.payload.rust_type == "MathRun"
     )));
     assert!(
@@ -7687,9 +7679,9 @@ mod tests {
       })
       .collect();
     assert_eq!(variants.len(), 3);
-    assert_eq!(variants[0].rust_name, "TB");
-    assert_eq!(variants[1].rust_name, "TC");
-    assert_eq!(variants[2].rust_name, "TD");
+    assert_eq!(variants[0].rust_name, "LeafB");
+    assert_eq!(variants[1].rust_name, "LeafC");
+    assert_eq!(variants[2].rust_name, "LeafD");
   }
 
   #[test]
@@ -7972,7 +7964,7 @@ mod tests {
       })
       .collect();
     assert_eq!(variants.len(), 2);
-    assert_eq!(variants[0].rust_name, "TA");
+    assert_eq!(variants[0].rust_name, "LeafA");
     assert_eq!(variants[1].rust_name, "Sequence2");
     assert!(matches!(variants[1].wire, VariantWireDecl::Sequence { .. }));
 

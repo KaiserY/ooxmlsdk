@@ -491,7 +491,7 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
     body
       .body_choice
       .iter()
-      .filter(|choice| matches!(choice, BodyChoice::WP(_)))
+      .filter(|choice| matches!(choice, BodyChoice::Paragraph(_)))
       .count(),
     2
   );
@@ -584,7 +584,7 @@ fn process_all_parts_uses_process_content_for_ignorable_wrapper() {
     body
       .body_choice
       .iter()
-      .filter(|choice| matches!(choice, BodyChoice::WP(_)))
+      .filter(|choice| matches!(choice, BodyChoice::Paragraph(_)))
       .count(),
     1
   );
@@ -853,7 +853,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .as_mut()
     .and_then(|body| {
       body.body_choice.iter_mut().find_map(|choice| match choice {
-        BodyChoice::WSdt(sdt) => Some(sdt.as_mut()),
+        BodyChoice::SdtBlock(sdt) => Some(sdt.as_mut()),
         _ => None,
       })
     })
@@ -866,7 +866,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
         .sdt_properties_choice
         .iter_mut()
         .find_map(|choice| match choice {
-          SdtPropertiesChoice::WAlias(alias) => Some(alias.as_mut()),
+          SdtPropertiesChoice::SdtAlias(alias) => Some(alias.as_mut()),
           _ => None,
         })
     })
@@ -888,7 +888,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .as_ref()
     .and_then(|body| {
       body.body_choice.iter().find_map(|choice| match choice {
-        BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
+        BodyChoice::SdtBlock(sdt) => Some(sdt.as_ref()),
         _ => None,
       })
     })
@@ -898,7 +898,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
         .sdt_properties_choice
         .iter()
         .find_map(|choice| match choice {
-          SdtPropertiesChoice::WAlias(alias) => Some(alias.as_ref()),
+          SdtPropertiesChoice::SdtAlias(alias) => Some(alias.as_ref()),
           _ => None,
         })
     })
@@ -3954,9 +3954,9 @@ fn create_apis_create_office_document_packages() {
       &mut word,
       Document {
         body: Some(Box::new(Body {
-          body_choice: vec![BodyChoice::WP(Box::new(Paragraph {
-            paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
-              run_choice: vec![RunChoice::WT(Box::new(Text(TextType {
+          body_choice: vec![BodyChoice::Paragraph(Box::new(Paragraph {
+            paragraph_choice: vec![ParagraphChoice::WRun(Box::new(Run {
+              run_choice: vec![RunChoice::Text(Box::new(Text(TextType {
                 xml_content: Some("Hello World!".to_string()),
                 ..Default::default()
               })))],
@@ -4781,9 +4781,9 @@ fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
   let body = root.body.as_mut().unwrap();
   body.body_choice.insert(
     0,
-    BodyChoice::WP(Box::new(Paragraph {
-      paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
-        run_choice: vec![RunChoice::WT(Box::new(Text(TextType {
+    BodyChoice::Paragraph(Box::new(Paragraph {
+      paragraph_choice: vec![ParagraphChoice::WRun(Box::new(Run {
+        run_choice: vec![RunChoice::Text(Box::new(Text(TextType {
           xml_content: Some("Hello World from clone".to_string()),
           ..Default::default()
         })))],

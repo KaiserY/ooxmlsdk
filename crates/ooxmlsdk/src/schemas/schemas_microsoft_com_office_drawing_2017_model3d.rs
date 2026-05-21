@@ -588,95 +588,95 @@ pub struct DirectionalLight {
 pub enum Model3DChoice {
   /// Defines the ObjectViewport Class.
   #[sdk(child(office2019, qname = "am3d:CT_ObjectViewport/am3d:objViewport"))]
-  Am3dObjViewport(std::boxed::Box<ObjectViewport>),
+  ObjectViewport(std::boxed::Box<ObjectViewport>),
   /// Defines the WindowViewport Class.
   #[sdk(child(office2019, qname = "am3d:CT_WindowViewport/am3d:winViewport"))]
-  Am3dWinViewport(std::boxed::Box<WindowViewport>),
+  WindowViewport(std::boxed::Box<WindowViewport>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DChoice2 {
   /// Defines the PointLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_PointLight/am3d:ptLight"))]
-  Am3dPtLight(std::boxed::Box<PointLight>),
+  PointLight(std::boxed::Box<PointLight>),
   /// Defines the SpotLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_SpotLight/am3d:spotLight"))]
-  Am3dSpotLight(std::boxed::Box<SpotLight>),
+  SpotLight(std::boxed::Box<SpotLight>),
   /// Defines the DirectionalLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_DirectionalLight/am3d:dirLight"))]
-  Am3dDirLight(std::boxed::Box<DirectionalLight>),
+  DirectionalLight(std::boxed::Box<DirectionalLight>),
   /// Defines the UnknownLight Class.
   #[sdk(empty_child(office2019, qname = "am3d:CT_UnknownLight/am3d:unkLight"))]
-  Am3dUnkLight,
+  UnknownLight,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
-  AAlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
+  AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling,
+  AlphaCeiling,
   /// Alpha Floor Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor,
+  AlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
-  AAlphaInv(std::boxed::Box<crate::schemas::a::AlphaInverse>),
+  AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
-  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
+  AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
-  AAlphaModFix(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
+  AlphaModulationFixed(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
-  AAlphaRepl(std::boxed::Box<crate::schemas::a::AlphaReplace>),
+  AlphaReplace(std::boxed::Box<crate::schemas::a::AlphaReplace>),
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
-  ABiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
+  BiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
-  ABlur(std::boxed::Box<crate::schemas::a::Blur>),
+  Blur(std::boxed::Box<crate::schemas::a::Blur>),
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
-  AClrChange(std::boxed::Box<crate::schemas::a::ColorChange>),
+  ColorChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
-  AClrRepl(std::boxed::Box<crate::schemas::a::ColorReplacement>),
+  ColorReplacement(std::boxed::Box<crate::schemas::a::ColorReplacement>),
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
-  ADuotone(std::boxed::Box<crate::schemas::a::Duotone>),
+  Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
-  AFillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
+  FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl,
+  Grayscale,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
-  AHsl(std::boxed::Box<crate::schemas::a::Hsl>),
+  Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
-  ALum(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
+  LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
-  ATint(std::boxed::Box<crate::schemas::a::TintEffect>),
+  TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
+  RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
+  RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
+  HslColor(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
+  SystemColor(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
+  SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
+  PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DExtensionChoice {
   /// Defines the EmbeddedAnimation Class.
   #[sdk(child(office2019, qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim"))]
-  A3danimEmbedAnim(std::boxed::Box<crate::schemas::a3danim::EmbeddedAnimation>),
+  EmbeddedAnimation(std::boxed::Box<crate::schemas::a3danim::EmbeddedAnimation>),
   /// Defines the PosterFrame Class.
   #[sdk(child(office2019, qname = "a3danim:CT_PosterFrame/a3danim:posterFrame"))]
-  A3danimPosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
+  PosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }
@@ -684,47 +684,47 @@ pub enum Model3DExtensionChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradientFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DCameraChoice {
   /// Defines the OrthographicProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_OrthographicProjection/am3d:orthographic"))]
-  Am3dOrthographic(std::boxed::Box<OrthographicProjection>),
+  OrthographicProjection(std::boxed::Box<OrthographicProjection>),
   /// Defines the PerspectiveProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_PerspectiveProjection/am3d:perspective"))]
-  Am3dPerspective(std::boxed::Box<PerspectiveProjection>),
+  PerspectiveProjection(std::boxed::Box<PerspectiveProjection>),
 }

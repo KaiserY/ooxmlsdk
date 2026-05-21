@@ -180,40 +180,40 @@ pub struct Snapshot {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SnapshotChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
-  AAlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
+  AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling,
+  AlphaCeiling,
   /// Alpha Floor Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor,
+  AlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
-  AAlphaInv(std::boxed::Box<crate::schemas::a::AlphaInverse>),
+  AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
-  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
+  AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
-  AAlphaModFix(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
+  AlphaModulationFixed(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
-  AAlphaRepl(std::boxed::Box<crate::schemas::a::AlphaReplace>),
+  AlphaReplace(std::boxed::Box<crate::schemas::a::AlphaReplace>),
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
-  ABiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
+  BiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
-  ABlur(std::boxed::Box<crate::schemas::a::Blur>),
+  Blur(std::boxed::Box<crate::schemas::a::Blur>),
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
-  AClrChange(std::boxed::Box<crate::schemas::a::ColorChange>),
+  ColorChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
-  AClrRepl(std::boxed::Box<crate::schemas::a::ColorReplacement>),
+  ColorReplacement(std::boxed::Box<crate::schemas::a::ColorReplacement>),
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
-  ADuotone(std::boxed::Box<crate::schemas::a::Duotone>),
+  Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
-  AFillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
+  FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl,
+  Grayscale,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
-  AHsl(std::boxed::Box<crate::schemas::a::Hsl>),
+  Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
-  ALum(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
+  LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
-  ATint(std::boxed::Box<crate::schemas::a::TintEffect>),
+  TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
 }

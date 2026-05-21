@@ -35,8 +35,8 @@ pub struct Fallback {
 pub enum AlternateContentChoice {
   /// Defines the Choice Class.
   #[sdk(child(qname = "mc:CT_Choice/mc:Choice"))]
-  McChoice(std::boxed::Box<Choice>),
+  Choice(std::boxed::Box<Choice>),
   /// Defines the Fallback Class.
   #[sdk(child(qname = "mc:CT_Fallback/mc:Fallback"))]
-  McFallback(std::boxed::Box<Fallback>),
+  Fallback(std::boxed::Box<Fallback>),
 }

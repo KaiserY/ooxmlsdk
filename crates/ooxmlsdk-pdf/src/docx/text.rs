@@ -285,9 +285,9 @@ fn paragraph_contains_drawing(paragraph: &w::Paragraph) -> bool {
     .paragraph_choice
     .iter()
     .any(|choice| match choice {
-      w::ParagraphChoice::WR(run) => run_contains_drawing(run),
-      w::ParagraphChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
-      w::ParagraphChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      w::ParagraphChoice::WRun(run) => run_contains_drawing(run),
+      w::ParagraphChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
+      w::ParagraphChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
       _ => false,
     })
 }
@@ -297,9 +297,9 @@ fn inserted_run_contains_drawing(inserted: &w::InsertedRun) -> bool {
     .inserted_run_choice
     .iter()
     .any(|choice| match choice {
-      w::InsertedRunChoice::WR(run) => run_contains_drawing(run),
-      w::InsertedRunChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
-      w::InsertedRunChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      w::InsertedRunChoice::WRun(run) => run_contains_drawing(run),
+      w::InsertedRunChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
+      w::InsertedRunChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
       _ => false,
     })
 }
@@ -309,9 +309,9 @@ fn deleted_run_contains_drawing(deleted: &w::DeletedRun) -> bool {
     .deleted_run_choice
     .iter()
     .any(|choice| match choice {
-      w::DeletedRunChoice::WR(run) => run_contains_drawing(run),
-      w::DeletedRunChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
-      w::DeletedRunChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      w::DeletedRunChoice::WRun(run) => run_contains_drawing(run),
+      w::DeletedRunChoice::InsertedRun(inserted) => inserted_run_contains_drawing(inserted),
+      w::DeletedRunChoice::DeletedRun(deleted) => deleted_run_contains_drawing(deleted),
       _ => false,
     })
 }
@@ -320,7 +320,7 @@ fn run_contains_drawing(run: &w::Run) -> bool {
   run
     .run_choice
     .iter()
-    .any(|choice| matches!(choice, w::RunChoice::WDrawing(_)))
+    .any(|choice| matches!(choice, w::RunChoice::Drawing(_)))
 }
 
 fn paragraph_mark_is_inserted(paragraph: &w::Paragraph) -> bool {

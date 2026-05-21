@@ -368,17 +368,17 @@ pub struct SingleDataSourceRecord {
 pub enum KeyMapEntryChoice {
   /// Defines the FixedCommandKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_Fci/wne:fci"))]
-  WneFci(std::boxed::Box<FixedCommandKeyboardCustomization>),
+  FixedCommandKeyboardCustomization(std::boxed::Box<FixedCommandKeyboardCustomization>),
   /// Defines the MacroKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_MacroWll/wne:macro"))]
-  WneMacro(std::boxed::Box<MacroKeyboardCustomization>),
+  MacroKeyboardCustomization(std::boxed::Box<MacroKeyboardCustomization>),
   /// Defines the AllocatedCommandKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_AcdKeymap/wne:acd"))]
-  WneAcd(std::boxed::Box<AllocatedCommandKeyboardCustomization>),
+  AllocatedCommandKeyboardCustomization(std::boxed::Box<AllocatedCommandKeyboardCustomization>),
   /// Defines the WllMacroKeyboardCustomization Class.
   #[sdk(child(qname = "wne:CT_MacroWll/wne:wll"))]
-  WneWll(std::boxed::Box<WllMacroKeyboardCustomization>),
+  WllMacroKeyboardCustomization(std::boxed::Box<WllMacroKeyboardCustomization>),
   /// Defines the CharacterInsertion Class.
   #[sdk(child(qname = "wne:CT_LongHexNumber/wne:wch"))]
-  WneWch(std::boxed::Box<CharacterInsertion>),
+  CharacterInsertion(std::boxed::Box<CharacterInsertion>),
 }

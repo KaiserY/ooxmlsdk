@@ -335,14 +335,14 @@ fn on_off_attribute_accepts_upstream_lexical_forms_and_preserves_lexical_form() 
 #[test]
 fn xml_schema_float_text_children_use_openxml_special_values() {
   let value = Variant {
-    variant_choice: Some(VariantChoice::VtR4(f32::NEG_INFINITY)),
+    variant_choice: Some(VariantChoice::VtFloat(f32::NEG_INFINITY)),
   };
   let xml = value.to_xml().unwrap();
   let serialized = trim_xml_declaration(&xml);
   assert!(serialized.contains("<vt:r4>-INF</vt:r4>"));
 
   let reparsed = serialized.parse::<Variant>().unwrap();
-  let Some(VariantChoice::VtR4(parsed)) = reparsed.variant_choice else {
+  let Some(VariantChoice::VtFloat(parsed)) = reparsed.variant_choice else {
     panic!("expected vt:r4");
   };
   assert!(parsed.is_infinite());

@@ -334,25 +334,25 @@ pub type Xsddouble = crate::simple_type::DoubleValue;
 pub enum FeaturePropertyBagChoice {
   /// Defines the ArrayFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a"))]
-  XfpbA(std::boxed::Box<ArrayFeatureProperty>),
+  ArrayFeatureProperty(std::boxed::Box<ArrayFeatureProperty>),
   /// Defines the BagFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId"))]
-  XfpbBagId(std::boxed::Box<BagFeatureProperty>),
+  BagFeatureProperty(std::boxed::Box<BagFeatureProperty>),
   /// Defines the IntFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_IntFeatureProperty/xfpb:i"))]
-  XfpbI(std::boxed::Box<IntFeatureProperty>),
+  IntFeatureProperty(std::boxed::Box<IntFeatureProperty>),
   /// Defines the StringFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_StringFeatureProperty/xfpb:s"))]
-  XfpbS(std::boxed::Box<StringFeatureProperty>),
+  StringFeatureProperty(std::boxed::Box<StringFeatureProperty>),
   /// Defines the BoolFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_BoolFeatureProperty/xfpb:b"))]
-  XfpbB(std::boxed::Box<BoolFeatureProperty>),
+  BoolFeatureProperty(std::boxed::Box<BoolFeatureProperty>),
   /// Defines the DecimalFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d"))]
-  XfpbD(std::boxed::Box<DecimalFeatureProperty>),
+  DecimalFeatureProperty(std::boxed::Box<DecimalFeatureProperty>),
   /// Defines the RelFeatureProperty Class.
   #[sdk(child(microsoft365, qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"))]
-  XfpbRel(std::boxed::Box<RelFeatureProperty>),
+  RelFeatureProperty(std::boxed::Box<RelFeatureProperty>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArrayFeaturePropertyChoice {
@@ -362,32 +362,32 @@ pub enum ArrayFeaturePropertyChoice {
     simple_type = "UInt32Value",
     qname = "xsd:unsignedInt/xfpb:bagId"
   ))]
-  XfpbBagId(XsdunsignedInt),
+  XsdunsignedInt(XsdunsignedInt),
   /// Defines the Xsdinteger Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "IntegerValue",
     qname = "xsd:integer/xfpb:i"
   ))]
-  XfpbI(Xsdinteger),
+  Xsdinteger(Xsdinteger),
   /// Defines the SXsdstring Class.
   #[sdk(text_child(microsoft365, simple_type = "StringValue", qname = "xsd:string/xfpb:s"))]
-  XfpbS(SXsdstring),
+  SXsdstring(SXsdstring),
   /// Defines the Xsdboolean Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "BooleanValue",
     qname = "xsd:boolean/xfpb:b"
   ))]
-  XfpbB(Xsdboolean),
+  Xsdboolean(Xsdboolean),
   /// Defines the Xsddouble Class.
   #[sdk(text_child(microsoft365, simple_type = "DoubleValue", qname = "xsd:double/xfpb:d"))]
-  XfpbD(Xsddouble),
+  Xsddouble(Xsddouble),
   /// Defines the RelXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
     qname = "xsd:string/xfpb:rel"
   ))]
-  XfpbRel(RelXsdstring),
+  RelXsdstring(RelXsdstring),
 }

@@ -237,24 +237,24 @@ pub struct Comment {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {
   #[sdk(child(office2016, qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
-  PcSldMkLst(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
+  SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
   #[sdk(any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst"))]
-  PcSldLayoutMkLst(crate::schemas::pc::SlideLayoutMonikerList),
+  SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),
   #[sdk(any_child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst"))]
-  PcSldMasterMkLst(crate::schemas::pc::MainMasterMonikerList),
+  MainMasterMonikerList(crate::schemas::pc::MainMasterMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
-  OacDeMkLst(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
+  DeMkLstDrawingElementMonikerList(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
-  OacTxBodyMkLst(crate::schemas::oac::TextBodyMonikerList),
+  TextBodyMonikerList(crate::schemas::oac::TextBodyMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
-  OacTxMkLst(crate::schemas::oac::TextCharRangeMonikerList),
+  TextCharRangeMonikerList(crate::schemas::oac::TextCharRangeMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
-  OacTcMkLst(crate::schemas::oac::TableCellMonikerList),
+  TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
-  OacTrMkLst(crate::schemas::oac::TableRowMonikerList),
+  TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
   #[sdk(any_child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst"))]
-  OacGridColMkLst(crate::schemas::oac::TableColumnMonikerList),
+  TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
   /// Defines the CommentUnknownAnchor Class.
   #[sdk(empty_child(office2021, qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"))]
-  P188UnknownAnchor,
+  CommentUnknownAnchor,
 }

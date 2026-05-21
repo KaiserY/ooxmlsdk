@@ -1,7 +1,8 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
-use super::drawingml::shape::Shape;
-use super::drawingml::shape::ShapeService;
+use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
+use super::drawingml::shape::{Point, Shape, ShapeService, Size};
 use super::shape::PptShape;
 use super::slide::{ShapeLocation, SlidePersist};
 
@@ -97,6 +98,10 @@ impl PPTShapeGroupContext {
         .non_visual_shape_properties
         .non_visual_drawing_properties,
     );
+    apply_transform_2d(
+      &mut shape.shape,
+      source.shape_properties.transform2_d.as_deref(),
+    );
     if let Some(placeholder) = &source
       .non_visual_shape_properties
       .application_non_visual_drawing_properties
@@ -119,6 +124,10 @@ impl PPTShapeGroupContext {
         .non_visual_group_shape_properties
         .non_visual_drawing_properties,
     );
+    apply_group_transform(
+      &mut shape.shape,
+      group.group_shape_properties.transform_group.as_deref(),
+    );
     shape.add_shape(slide_persist);
     self.import_group_shape_choices(slide_persist, &group.group_shape_choice);
   }
@@ -131,6 +140,9 @@ impl PPTShapeGroupContext {
         .non_visual_graphic_frame_properties
         .non_visual_drawing_properties,
     );
+    apply_presentation_transform(&mut shape.shape, &frame.transform);
+    GraphicalObjectFrameContext
+      .dispatch_graphic_data(&frame.graphic.graphic_data.uri, &mut shape.shape);
     self.graphic_shape = Some(shape.clone());
     shape.add_shape(slide_persist);
     self.import_ext_drawings(slide_persist);
@@ -148,6 +160,10 @@ impl PPTShapeGroupContext {
         .non_visual_connection_shape_properties
         .non_visual_drawing_properties,
     );
+    apply_transform_2d(
+      &mut shape.shape,
+      source.shape_properties.transform2_d.as_deref(),
+    );
     shape.add_shape(slide_persist);
   }
 
@@ -158,6 +174,10 @@ impl PPTShapeGroupContext {
       &picture
         .non_visual_picture_properties
         .non_visual_drawing_properties,
+    );
+    apply_transform_2d(
+      &mut shape.shape,
+      picture.shape_properties.transform2_d.as_deref(),
     );
     shape.add_shape(slide_persist);
   }
@@ -183,4 +203,84 @@ fn apply_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
+}
+
+fn apply_transform_2d(shape: &mut Shape, transform: Option<&a::Transform2D>) {
+  let Some(transform) = transform else {
+    return;
+  };
+  apply_transform_fields(
+    shape,
+    transform.rotation,
+    transform.horizontal_flip.as_ref(),
+    transform.vertical_flip.as_ref(),
+    transform.offset.as_ref(),
+    transform.extents.as_ref(),
+  );
+}
+
+fn apply_presentation_transform(shape: &mut Shape, transform: &p::Transform) {
+  apply_transform_fields(
+    shape,
+    transform.rotation,
+    transform.horizontal_flip.as_ref(),
+    transform.vertical_flip.as_ref(),
+    transform.offset.as_ref(),
+    transform.extents.as_ref(),
+  );
+}
+
+fn apply_group_transform(shape: &mut Shape, transform: Option<&a::TransformGroup>) {
+  let Some(transform) = transform else {
+    return;
+  };
+  apply_transform_fields(
+    shape,
+    transform.rotation,
+    transform.horizontal_flip.as_ref(),
+    transform.vertical_flip.as_ref(),
+    transform.offset.as_ref(),
+    transform.extents.as_ref(),
+  );
+  if let Some(offset) = &transform.child_offset {
+    shape.child_position = Point {
+      x: offset.x.to_emu(),
+      y: offset.y.to_emu(),
+    };
+  }
+  if let Some(extents) = &transform.child_extents {
+    shape.child_size = Size {
+      cx: extents.cx.to_emu(),
+      cy: extents.cy.to_emu(),
+    };
+  }
+}
+
+fn apply_transform_fields(
+  shape: &mut Shape,
+  rotation: Option<i32>,
+  horizontal_flip: Option<&ooxmlsdk::simple_type::BooleanValue>,
+  vertical_flip: Option<&ooxmlsdk::simple_type::BooleanValue>,
+  offset: Option<&a::Offset>,
+  extents: Option<&a::Extents>,
+) {
+  if let Some(rotation) = rotation {
+    // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
+    // keeps DrawingML rotation as shape transform state before rendering.
+    shape.rotation = rotation as f32 / 60_000.0;
+  }
+  shape.flip_h = horizontal_flip.is_some_and(|value| value.as_bool());
+  shape.flip_v = vertical_flip.is_some_and(|value| value.as_bool());
+  if let Some(offset) = offset {
+    shape.position = Point {
+      x: offset.x.to_emu(),
+      y: offset.y.to_emu(),
+    };
+  }
+  if let Some(extents) = extents {
+    shape.size = Size {
+      cx: extents.cx.to_emu(),
+      cy: extents.cy.to_emu(),
+    };
+  }
 }

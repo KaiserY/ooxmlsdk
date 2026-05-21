@@ -920,6 +920,14 @@ Implementation checkpoint:
 - For every supported branch, preserve non-visual drawing metadata first:
   `id`, `name`, `descr`, `hidden`, `title`, placeholder subtype, and
   placeholder index.
+- Preserve `a:xfrm` / grouped transform state in the DrawingML shape model:
+  position, size, rotation, horizontal/vertical flip, child offset, and child
+  extents. Do not convert this directly to PDF coordinates during import.
+- `graphicFrame` must enter the generic
+  `drawingml::GraphicalObjectFrameContext` dispatch by `a:graphicData/@uri`,
+  then return to the PPT parent for `PPTShapeGroupContext::import_ext_drawings`.
+  Keep chart/table/diagram/OLE/media classification as structured frame state
+  even while rendering is fallback-only.
 - Unsupported branches should become structured records or empty structured
   slots. Do not convert them to visible text or drop relationship identity.
 - Group-shape recursion may initially flatten into the slide persist's shape

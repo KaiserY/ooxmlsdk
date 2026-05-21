@@ -147,6 +147,9 @@ impl Shape {
     let _ = self.get_actual_line_properties(import);
     let _ = self.get_actual_effect_properties(import);
     self.finalize_x_shape();
+    for child in &mut self.children {
+      child.create_and_insert(import);
+    }
   }
 
   pub(crate) fn finalize_service_name(&mut self) {}

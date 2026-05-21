@@ -1,8 +1,11 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
+use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
+use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{Point, Shape, ShapeService, Size};
+use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::shape::PptShape;
 use super::slide::{ShapeLocation, SlidePersist};
 
@@ -37,60 +40,60 @@ impl PPTShapeGroupContext {
     choices: &[p::ShapeTreeChoice],
   ) {
     for choice in choices {
-      match choice {
-        p::ShapeTreeChoice::Shape(shape) => {
-          self.import_shape(slide_persist, shape, ShapeService::CustomShape);
-        }
-        p::ShapeTreeChoice::GroupShape(group) => {
-          self.import_group_shape(slide_persist, group);
-        }
-        p::ShapeTreeChoice::GraphicFrame(frame) => {
-          self.import_graphic_frame(slide_persist, frame);
-        }
-        p::ShapeTreeChoice::ConnectionShape(shape) => {
-          self.import_connection_shape(slide_persist, shape);
-        }
-        p::ShapeTreeChoice::Picture(picture) => {
-          self.import_picture(slide_persist, picture);
-        }
-        p::ShapeTreeChoice::ContentPart(_) | p::ShapeTreeChoice::XmlAny(_) => {}
+      if let Some(shape) = self.import_shape_tree_choice(slide_persist, choice) {
+        slide_persist.shapes.push(shape);
       }
     }
   }
 
-  fn import_group_shape_choices(
+  fn import_shape_tree_choice(
     &mut self,
-    slide_persist: &mut SlidePersist,
-    choices: &[p::GroupShapeChoice],
-  ) {
-    for choice in choices {
-      match choice {
-        p::GroupShapeChoice::Shape(shape) => {
-          self.import_shape(slide_persist, shape, ShapeService::CustomShape);
-        }
-        p::GroupShapeChoice::GroupShape(group) => {
-          self.import_group_shape(slide_persist, group);
-        }
-        p::GroupShapeChoice::GraphicFrame(frame) => {
-          self.import_graphic_frame(slide_persist, frame);
-        }
-        p::GroupShapeChoice::ConnectionShape(shape) => {
-          self.import_connection_shape(slide_persist, shape);
-        }
-        p::GroupShapeChoice::Picture(picture) => {
-          self.import_picture(slide_persist, picture);
-        }
-        p::GroupShapeChoice::ContentPart(_) => {}
+    slide_persist: &SlidePersist,
+    choice: &p::ShapeTreeChoice,
+  ) -> Option<Shape> {
+    match choice {
+      p::ShapeTreeChoice::Shape(shape) => {
+        Some(self.import_shape(slide_persist, shape, ShapeService::CustomShape))
       }
+      p::ShapeTreeChoice::GroupShape(group) => Some(self.import_group_shape(slide_persist, group)),
+      p::ShapeTreeChoice::GraphicFrame(frame) => {
+        Some(self.import_graphic_frame(slide_persist, frame))
+      }
+      p::ShapeTreeChoice::ConnectionShape(shape) => {
+        Some(self.import_connection_shape(slide_persist, shape))
+      }
+      p::ShapeTreeChoice::Picture(picture) => Some(self.import_picture(slide_persist, picture)),
+      p::ShapeTreeChoice::ContentPart(_) | p::ShapeTreeChoice::XmlAny(_) => None,
+    }
+  }
+
+  fn import_group_shape_choice(
+    &mut self,
+    slide_persist: &SlidePersist,
+    choice: &p::GroupShapeChoice,
+  ) -> Option<Shape> {
+    match choice {
+      p::GroupShapeChoice::Shape(shape) => {
+        Some(self.import_shape(slide_persist, shape, ShapeService::CustomShape))
+      }
+      p::GroupShapeChoice::GroupShape(group) => Some(self.import_group_shape(slide_persist, group)),
+      p::GroupShapeChoice::GraphicFrame(frame) => {
+        Some(self.import_graphic_frame(slide_persist, frame))
+      }
+      p::GroupShapeChoice::ConnectionShape(shape) => {
+        Some(self.import_connection_shape(slide_persist, shape))
+      }
+      p::GroupShapeChoice::Picture(picture) => Some(self.import_picture(slide_persist, picture)),
+      p::GroupShapeChoice::ContentPart(_) => None,
     }
   }
 
   fn import_shape(
     &mut self,
-    slide_persist: &mut SlidePersist,
+    slide_persist: &SlidePersist,
     source: &p::Shape,
     service_name: ShapeService,
-  ) {
+  ) -> Shape {
     let mut shape = PptShape::new(service_name, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -102,6 +105,7 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),
     );
+    apply_shape_properties(&mut shape.shape, &source.shape_properties);
     if let Some(placeholder) = &source
       .non_visual_shape_properties
       .application_non_visual_drawing_properties
@@ -113,10 +117,13 @@ impl PPTShapeGroupContext {
         .map(|value| format!("{value:?}"));
       shape.shape.sub_type_index = placeholder.index;
     }
-    shape.add_shape(slide_persist);
+    if let Some(text_body) = &source.text_body {
+      shape.shape.set_text_body(import_text_body(text_body));
+    }
+    shape.into_shape(slide_persist)
   }
 
-  fn import_group_shape(&mut self, slide_persist: &mut SlidePersist, group: &p::GroupShape) {
+  fn import_group_shape(&mut self, slide_persist: &SlidePersist, group: &p::GroupShape) -> Shape {
     let mut shape = PptShape::new(ShapeService::GroupShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -128,11 +135,19 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       group.group_shape_properties.transform_group.as_deref(),
     );
-    shape.add_shape(slide_persist);
-    self.import_group_shape_choices(slide_persist, &group.group_shape_choice);
+    shape.shape.children = group
+      .group_shape_choice
+      .iter()
+      .filter_map(|choice| self.import_group_shape_choice(slide_persist, choice))
+      .collect();
+    shape.into_shape(slide_persist)
   }
 
-  fn import_graphic_frame(&mut self, slide_persist: &mut SlidePersist, frame: &p::GraphicFrame) {
+  fn import_graphic_frame(
+    &mut self,
+    slide_persist: &SlidePersist,
+    frame: &p::GraphicFrame,
+  ) -> Shape {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -143,16 +158,20 @@ impl PPTShapeGroupContext {
     apply_presentation_transform(&mut shape.shape, &frame.transform);
     GraphicalObjectFrameContext
       .dispatch_graphic_data(&frame.graphic.graphic_data.uri, &mut shape.shape);
-    self.graphic_shape = Some(shape.clone());
-    shape.add_shape(slide_persist);
-    self.import_ext_drawings(slide_persist);
+    self.graphic_shape = Some(shape);
+    self.import_ext_drawings();
+    let shape = self
+      .graphic_shape
+      .take()
+      .unwrap_or_else(|| PptShape::new(ShapeService::GraphicObjectShape, self.shape_location));
+    shape.into_shape(slide_persist)
   }
 
   fn import_connection_shape(
     &mut self,
-    slide_persist: &mut SlidePersist,
+    slide_persist: &SlidePersist,
     source: &p::ConnectionShape,
-  ) {
+  ) -> Shape {
     let mut shape = PptShape::new(ShapeService::ConnectorShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -164,10 +183,11 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),
     );
-    shape.add_shape(slide_persist);
+    apply_shape_properties(&mut shape.shape, &source.shape_properties);
+    shape.into_shape(slide_persist)
   }
 
-  fn import_picture(&mut self, slide_persist: &mut SlidePersist, picture: &p::Picture) {
+  fn import_picture(&mut self, slide_persist: &SlidePersist, picture: &p::Picture) -> Shape {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
@@ -179,10 +199,11 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       picture.shape_properties.transform2_d.as_deref(),
     );
-    shape.add_shape(slide_persist);
+    apply_shape_properties(&mut shape.shape, &picture.shape_properties);
+    shape.into_shape(slide_persist)
   }
 
-  pub(crate) fn import_ext_drawings(&mut self, _slide_persist: &mut SlidePersist) {
+  pub(crate) fn import_ext_drawings(&mut self) {
     if let Some(shape) = &mut self.graphic_shape {
       shape.shape.keep_diagram_drawing();
     }
@@ -203,6 +224,120 @@ fn apply_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
+}
+
+fn import_text_body(source: &p::TextBody) -> TextBody {
+  // Source: LibreOffice oox/source/ppt/pptshapecontext.cxx
+  // txBody creates a DrawingML TextBody and keeps text style inheritance for
+  // later SlidePersist::applyTextStyles / PPTShape::addShape processing.
+  TextBody {
+    has_body_properties: true,
+    has_list_style: source.list_style.is_some(),
+    paragraphs: source.paragraph.iter().map(import_text_paragraph).collect(),
+  }
+}
+
+fn import_text_paragraph(source: &a::Paragraph) -> TextParagraph {
+  let level = source
+    .paragraph_properties
+    .as_ref()
+    .and_then(|properties| properties.level)
+    .map(|level| level as u8);
+  let runs = source
+    .paragraph_choice
+    .iter()
+    .filter_map(import_text_run)
+    .collect();
+  TextParagraph { level, runs }
+}
+
+fn import_text_run(choice: &a::ParagraphChoice) -> Option<TextRun> {
+  match choice {
+    a::ParagraphChoice::Run(run) => Some(TextRun {
+      text: run.text.clone(),
+      kind: TextRunKind::Run,
+      field_type: None,
+    }),
+    a::ParagraphChoice::Break(_) => Some(TextRun {
+      text: "\n".to_string(),
+      kind: TextRunKind::Break,
+      field_type: None,
+    }),
+    a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| TextRun {
+      text: text.clone(),
+      kind: TextRunKind::Field,
+      field_type: field.r#type.clone(),
+    }),
+    a::ParagraphChoice::TextMath(_) => Some(TextRun {
+      text: String::new(),
+      kind: TextRunKind::Math,
+      field_type: None,
+    }),
+  }
+}
+
+fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
+  // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
+  // ShapePropertiesContext owns fill/line/effect state before the PPT shape is
+  // converted to drawing objects.
+  if let Some(fill) = properties
+    .shape_properties_choice2
+    .as_ref()
+    .and_then(import_fill_properties)
+  {
+    shape.fill_properties = Some(fill);
+  }
+  if let Some(line) = properties
+    .outline
+    .as_deref()
+    .and_then(import_line_properties)
+  {
+    shape.line_properties = Some(line);
+  }
+}
+
+fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProperties> {
+  match choice {
+    p::ShapePropertiesChoice2::NoFill(_) => Some(FillProperties {
+      kind: FillKind::None,
+    }),
+    p::ShapePropertiesChoice2::SolidFill(fill) => Some(FillProperties {
+      kind: FillKind::Solid(import_solid_fill_color(fill).unwrap_or_default()),
+    }),
+    p::ShapePropertiesChoice2::GroupFill => Some(FillProperties {
+      kind: FillKind::Group,
+    }),
+    p::ShapePropertiesChoice2::GradientFill(_)
+    | p::ShapePropertiesChoice2::BlipFill(_)
+    | p::ShapePropertiesChoice2::PatternFill(_) => None,
+  }
+}
+
+fn import_line_properties(outline: &a::Outline) -> Option<LineProperties> {
+  match outline.outline_choice1.as_ref() {
+    Some(a::OutlineChoice::NoFill(_)) => None,
+    Some(a::OutlineChoice::SolidFill(fill)) => Some(LineProperties {
+      color: import_solid_fill_color(fill),
+      width_emu: outline.width.map(i64::from),
+    }),
+    Some(a::OutlineChoice::GradientFill(_)) | Some(a::OutlineChoice::PatternFill(_)) | None => {
+      Some(LineProperties {
+        color: None,
+        width_emu: outline.width.map(i64::from),
+      })
+    }
+  }
+}
+
+fn import_solid_fill_color(fill: &a::SolidFill) -> Option<String> {
+  match fill.solid_fill_choice.as_ref()? {
+    a::SolidFillChoice::RgbColorModelHex(color) => Some(format!("#{}", color.val)),
+    a::SolidFillChoice::SchemeColor(color) => Some(format!("scheme:{:?}", color.val)),
+    a::SolidFillChoice::PresetColor(color) => Some(format!("preset:{:?}", color.val)),
+    a::SolidFillChoice::RgbColorModelPercentage(_)
+    | a::SolidFillChoice::HslColor(_)
+    | a::SolidFillChoice::SystemColor(_) => None,
+  }
 }
 
 fn apply_transform_2d(shape: &mut Shape, transform: Option<&a::Transform2D>) {

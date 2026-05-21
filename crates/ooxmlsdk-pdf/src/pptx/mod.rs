@@ -1,3 +1,4 @@
+mod display;
 mod drawingml;
 mod graphic_shape_context;
 mod import;
@@ -13,7 +14,7 @@ mod slide_fragment;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 
 use crate::error::Result;
-use crate::layout::{self, LayoutDocument};
+use crate::layout::LayoutDocument;
 use crate::options::PdfOptions;
 
 use import::PowerPointImport;
@@ -23,11 +24,5 @@ pub(crate) fn layout(
   _options: &PdfOptions,
 ) -> Result<LayoutDocument> {
   let import = PowerPointImport::import_document(package)?;
-  let setups = import
-    .draw_pages
-    .iter()
-    .map(|slide| slide.size.to_page_setup())
-    .collect();
-
-  Ok(layout::fixed_pages(setups))
+  Ok(display::lower_to_layout_document(&import))
 }

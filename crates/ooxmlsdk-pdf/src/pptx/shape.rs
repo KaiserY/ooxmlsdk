@@ -23,12 +23,17 @@ impl PptShape {
     }
   }
 
-  pub(crate) fn add_shape(mut self, slide_persist: &mut SlidePersist) {
+  pub(crate) fn add_shape(self, slide_persist: &mut SlidePersist) {
     // Source: LibreOffice oox/source/ppt/pptshape.cxx
     // PPTShape::addShape selects service names and applies placeholder text
     // styles before generic DrawingML createAndInsert.
+    let shape = self.into_shape(slide_persist);
+    slide_persist.shapes.push(shape);
+  }
+
+  pub(crate) fn into_shape(mut self, slide_persist: &SlidePersist) -> Shape {
     self.set_text_master_styles(slide_persist);
-    slide_persist.shapes.push(self.shape);
+    self.shape
   }
 
   pub(crate) fn find_placeholder<'a>(

@@ -859,11 +859,21 @@ Implementation checkpoint:
   `PageRange`, custom show selection, notes-page import, and `p:sld/@show`
   filtering remain `PresentationFragmentHandler::finalize_import` work, not
   shortcuts in the PDF backend.
-- A helper such as `layout::fixed_pages` is acceptable because it contains no
-  PPTX semantics. It must remain a paint/layout bridge, not an import shortcut.
+- A helper such as `layout::fixed_pages_with_items` is acceptable because it
+  contains no PPTX semantics. It must remain a paint/layout bridge fed by
+  upstream-shaped PPTX state, not an import shortcut.
 - Do not reintroduce `layout::text_pages` for PPTX. Text must enter later
   through `SlideFragmentHandler`, `PPTShapeGroupContext`, `PPTShapeContext`,
   `TextBody`, and `SlidePersist::create_x_shapes`.
+- The first non-blank output path should be `PowerPointImport` ->
+  `SlidePersist` -> DrawingML `Shape`/`TextBody` -> neutral `PageItem`s. The
+  lowering layer may use existing PDF/layout primitives, but it must not parse
+  OOXML, resolve placeholders, or duplicate LibreOffice import decisions.
+- Reusing a shared paint carrier such as `docx::TextStyle` is acceptable only
+  as a temporary layout/PDF bridge. PPTX semantic state must stay in the PPTX
+  model (`Shape`, `TextBody`, future run properties, theme and placeholder
+  records) so it can be replaced with a neutral style carrier during later
+  refactoring without changing import behavior.
 - Dead-code warnings are expected during this phase because LibreOffice-shaped
   fields and methods are intentionally present before every branch consumes
   them. Do not suppress these warnings with `#[allow]`; consume the fields by
@@ -923,16 +933,26 @@ Implementation checkpoint:
 - Preserve `a:xfrm` / grouped transform state in the DrawingML shape model:
   position, size, rotation, horizontal/vertical flip, child offset, and child
   extents. Do not convert this directly to PDF coordinates during import.
+- Preserve basic `spPr` paint state in the DrawingML shape model: `noFill`,
+  `solidFill`, `grpFill`, and `ln` width/color. Unsupported fills and strokes
+  should remain absent or structured placeholders until theme/color resolution
+  is ported; do not invent PDF-only color behavior.
 - `graphicFrame` must enter the generic
   `drawingml::GraphicalObjectFrameContext` dispatch by `a:graphicData/@uri`,
   then return to the PPT parent for `PPTShapeGroupContext::import_ext_drawings`.
   Keep chart/table/diagram/OLE/media classification as structured frame state
   even while rendering is fallback-only.
+- `txBody` must become a DrawingML `TextBody` on the shape model before any
+  visible text fallback exists. Preserve paragraph level, run text, line breaks,
+  field text, and field type as structured text runs; later style inheritance
+  must extend this model rather than reparsing PDF text items.
 - Unsupported branches should become structured records or empty structured
   slots. Do not convert them to visible text or drop relationship identity.
 - Group-shape recursion may initially flatten into the slide persist's shape
-  vector, but the code path must stay under `PPTShapeGroupContext`; do not move
-  traversal into PDF lowering.
+  vector only as an early bootstrap. The preferred path is to preserve
+  `Shape::children` during `PPTShapeGroupContext` import, matching
+  LibreOffice's group shape ownership, and let temporary PDF lowering recurse
+  over that tree.
 
 ### Phase 4: Create XShapes Equivalent
 
@@ -961,6 +981,27 @@ types as the PPTX model.
 - images and crops
 - text boxes
 - links
+
+Implementation checkpoint:
+
+- During fast bring-up, `pptx::display` may lower `SlidePersist` shapes
+  directly into the current neutral `LayoutDocument`/`PageItem` primitives so
+  imported slides produce visible output early.
+- This lowering must consume only the upstream-shaped PPTX model: `SlidePersist`
+  order, DrawingML `Shape` bounds, and structured `TextBody` paragraphs/runs.
+  It must not inspect package parts, relationship XML, or generated OOXML
+  element trees directly.
+- Group output must follow `Shape::children` and carry group transform offset
+  state as a temporary approximation of LibreOffice's transformation matrix.
+  Do not flatten groups in the display layer to work around missing transform
+  handling.
+- Text fallback may initially use default font and line metrics, but all
+  paragraph/run data required for later LibreOffice-aligned inheritance must be
+  preserved before lowering. Do not make PDF text output the only source of
+  paragraph level, fields, breaks, or future run properties.
+- Once `SlidePersist::create_x_shapes` is implemented, move display lowering to
+  consume that equivalent drawing-object layer. The early `SlidePersist` ->
+  `PageItem` path is a temporary bridge, not the long-term architecture.
 
 ### Phase 6: Fixture Tests and Refinement
 

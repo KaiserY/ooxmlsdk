@@ -848,12 +848,15 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
   Ok(RootFrameLayout::new(document).format())
 }
 
-pub(crate) fn fixed_pages(setups: Vec<PageSetup>) -> LayoutDocument {
-  let pages = setups
+pub(crate) fn fixed_pages_with_items(
+  pages_with_items: Vec<(PageSetup, Vec<PageItem>)>,
+) -> LayoutDocument {
+  let pages = pages_with_items
     .into_iter()
     .enumerate()
-    .map(|(index, setup)| {
+    .map(|(index, (setup, items))| {
       let mut page = empty_section_page(setup, 0, index);
+      page.items = items;
       page.preserve_empty = true;
       page
     })

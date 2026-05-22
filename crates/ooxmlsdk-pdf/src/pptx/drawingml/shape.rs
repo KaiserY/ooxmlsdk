@@ -226,6 +226,10 @@ impl Shape {
   pub(crate) fn set_defaults(&mut self) {}
 
   pub(crate) fn apply_shape_reference(&mut self, reference: &Shape) {
+    self.apply_shape_reference_with_text(reference, true);
+  }
+
+  pub(crate) fn apply_shape_reference_with_text(&mut self, reference: &Shape, use_text: bool) {
     // Source: LibreOffice oox/source/drawingml/shape.cxx
     // applyShapeReference copies inherited properties while keeping direct
     // shape properties authoritative.
@@ -233,7 +237,11 @@ impl Shape {
     self.shape_ref_fill_properties = reference.fill_properties.clone();
     self.shape_ref_effect_properties = reference.effect_properties.clone();
     self.custom_shape_properties = reference.custom_shape_properties.clone();
-    self.text_body = reference.text_body.clone();
+    if use_text {
+      self.text_body = reference.text_body.clone();
+    } else {
+      self.text_body = None;
+    }
     self.table_properties = reference.table_properties.clone();
     self.master_text_list_style = reference.master_text_list_style.clone();
     self.position = reference.position;
@@ -351,7 +359,23 @@ impl Shape {
     }
   }
 
-  pub(crate) fn finalize_x_shape(&mut self) {}
+  pub(crate) fn finalize_x_shape(&mut self) {
+    // Source: LibreOffice oox/source/drawingml/shape.cxx createAndInsert.
+    // PowerPoint ignores p:xfrm extents for table shapes and uses the real
+    // DrawingML table grid/row dimensions.
+    if self.service_name == ShapeService::TableShape
+      && let Some(table) = &self.table_properties
+    {
+      let width = table.grid.iter().copied().sum::<i64>();
+      let height = table.rows.iter().map(|row| row.height).sum::<i64>();
+      if width > 0 {
+        self.size.cx = width;
+      }
+      if height > 0 {
+        self.size.cy = height;
+      }
+    }
+  }
 
   pub(crate) fn put_property_to_grab_bag(&self) {}
 

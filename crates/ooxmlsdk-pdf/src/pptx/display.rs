@@ -1,19 +1,27 @@
 use std::sync::Arc;
 
 use crate::docx::{BorderStyle, RgbColor, TextStyle};
-use crate::layout::{self, PageItem, PdfTextSegmentation, RectItem, TextItem};
+use crate::layout::{
+  self, LineItem, LineItemKind, PageItem, PdfTextSegmentation, RectItem, TextItem,
+};
 use crate::units;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{Shape, ShapeService};
-use super::drawingml::text_body::{TextBody, TextRunKind};
+use super::drawingml::table::{TableCell, TableProperties};
+use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
+use super::drawingml::text_list_style::{TextListLevelParagraphProperties, TextListParagraphStyle};
 use super::import::PowerPointImport;
 use super::slide::{BackgroundKind, BackgroundProperties, SlidePersist};
 
-const DEFAULT_TEXT_LINE_HEIGHT_PT: f32 = 14.0;
-const DEFAULT_TEXT_INSET_PT: f32 = 4.0;
+const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
+const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
+const DEFAULT_TEXT_INSET_EMU: i64 = 91_440;
+const DEFAULT_BULLET_INDENT_PT: f32 = 18.0;
+const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 
 pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::LayoutDocument {
   let pages = import
@@ -35,9 +43,6 @@ fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<Pag
     .or_else(|| master_page.and_then(|master_page| master_page.background_properties.as_ref()))
   {
     lower_background(import, slide, background, &mut items);
-  }
-  if let Some(master_page) = master_page {
-    lower_shapes(import, &master_page.shapes, &mut items);
   }
   lower_shapes(import, &slide.shapes, &mut items);
   items
@@ -108,14 +113,133 @@ fn lower_shape(
 
   lower_shape_bounds(import, shape, offset, items);
 
+  if let Some(table) = &shape.table_properties
+    && shape.service_name == ShapeService::TableShape
+  {
+    lower_table(import, shape, offset, table, items);
+  }
+
   if let Some(text_body) = &shape.text_body {
-    lower_text_body(shape, offset, text_body, items);
+    lower_text_body(import, shape, offset, text_body, items);
   }
 
   let child_offset = child_display_offset(shape, offset);
   for child in &shape.children {
     lower_shape(import, child, child_offset, items);
   }
+}
+
+fn lower_table(
+  import: &PowerPointImport,
+  shape: &Shape,
+  offset: DisplayOffset,
+  table: &TableProperties,
+  items: &mut Vec<PageItem>,
+) {
+  // Source: LibreOffice oox/source/drawingml/shape.cxx uses the DrawingML
+  // table grid and row heights as the visible TableShape size.
+  let x0 = units::emu_to_points(offset.x_emu + shape.position.x);
+  let y0 = units::emu_to_points(offset.y_emu + shape.position.y);
+  let table_width = units::emu_to_points(table.grid.iter().copied().sum::<i64>());
+  let table_height = units::emu_to_points(table.rows.iter().map(|row| row.height).sum::<i64>());
+  if table_width <= 0.0 || table_height <= 0.0 {
+    return;
+  }
+
+  let border_color = RgbColor { r: 0, g: 0, b: 0 };
+  items.push(PageItem::Rect(RectItem {
+    x_pt: x0,
+    y_pt: y0,
+    width_pt: table_width,
+    height_pt: table_height,
+    fill_color: None,
+    fill_opacity: 1.0,
+    stroke: Some(BorderStyle {
+      width_pt: DEFAULT_TABLE_BORDER_PT,
+      spacing_pt: 0.0,
+      color: border_color,
+      compound: false,
+    }),
+    stroke_opacity: 1.0,
+  }));
+
+  let mut y = y0;
+  for row in &table.rows {
+    let row_height = units::emu_to_points(row.height);
+    let mut x = x0;
+    let mut grid_index = 0usize;
+    for cell in &row.cells {
+      let span = table_cell_grid_span(cell);
+      let width_emu = if grid_index < table.grid.len() {
+        table.grid[grid_index..table.grid.len().min(grid_index + span)]
+          .iter()
+          .copied()
+          .sum::<i64>()
+      } else {
+        0
+      };
+      let cell_width = units::emu_to_points(width_emu);
+      if !cell.horizontal_merge && !cell.vertical_merge {
+        lower_table_cell(import, cell, x, y, cell_width, row_height, items);
+      }
+      x += cell_width;
+      grid_index = grid_index.saturating_add(span);
+    }
+    y += row_height;
+    push_table_line(items, x0, y, x0 + table_width, y, border_color);
+  }
+
+  let mut x = x0;
+  for width in &table.grid {
+    x += units::emu_to_points(*width);
+    push_table_line(items, x, y0, x, y0 + table_height, border_color);
+  }
+}
+
+fn lower_table_cell(
+  import: &PowerPointImport,
+  cell: &TableCell,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  items: &mut Vec<PageItem>,
+) {
+  if width <= 0.0 || height <= 0.0 {
+    return;
+  }
+  if let Some(text_body) = &cell.text_body {
+    let x = x + units::emu_to_points(i64::from(cell.margins.left));
+    let y = y + units::emu_to_points(i64::from(cell.margins.top));
+    lower_text_body_at(import, x, y, text_body, items);
+  }
+}
+
+fn table_cell_grid_span(cell: &TableCell) -> usize {
+  cell
+    .grid_span
+    .and_then(|span| usize::try_from(span).ok())
+    .filter(|span| *span > 0)
+    .unwrap_or(1)
+}
+
+fn push_table_line(
+  items: &mut Vec<PageItem>,
+  x1_pt: f32,
+  y1_pt: f32,
+  x2_pt: f32,
+  y2_pt: f32,
+  color: RgbColor,
+) {
+  items.push(PageItem::Line(LineItem {
+    x1_pt,
+    y1_pt,
+    x2_pt,
+    y2_pt,
+    width_pt: DEFAULT_TABLE_BORDER_PT,
+    color,
+    kind: LineItemKind::Stroke,
+  }));
 }
 
 fn lower_shape_bounds(
@@ -163,66 +287,576 @@ fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
 }
 
 fn lower_text_body(
+  import: &PowerPointImport,
   shape: &Shape,
   offset: DisplayOffset,
   text_body: &TextBody,
   items: &mut Vec<PageItem>,
 ) {
-  let x_pt = units::emu_to_points(offset.x_emu + shape.position.x) + DEFAULT_TEXT_INSET_PT;
-  let mut y_pt = units::emu_to_points(offset.y_emu + shape.position.y) + DEFAULT_TEXT_INSET_PT;
-  let style = TextStyle {
+  let text_box = text_box_metrics(shape, offset, text_body);
+  lower_text_body_at(import, text_box.x_pt, text_box.y_pt, text_body, items);
+}
+
+fn lower_text_body_at(
+  import: &PowerPointImport,
+  x_pt: f32,
+  y_pt: f32,
+  text_body: &TextBody,
+  items: &mut Vec<PageItem>,
+) {
+  let base_style = TextStyle {
     font_family: Some(Arc::from("Liberation Sans")),
+    font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
     ..TextStyle::default()
   };
 
+  let mut cursor = TextCursor { x_pt, y_pt };
   for paragraph in &text_body.paragraphs {
-    let text = paragraph_text(text_body, paragraph);
-    if text.is_empty() {
-      y_pt += DEFAULT_TEXT_LINE_HEIGHT_PT;
-      continue;
-    }
-
-    items.push(PageItem::Text(TextItem {
-      x_pt,
-      y_pt,
-      line_height_pt: DEFAULT_TEXT_LINE_HEIGHT_PT,
-      text,
-      style: style.clone(),
-      hyperlink_url: None,
-      dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: false,
-      decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-    }));
-    y_pt += DEFAULT_TEXT_LINE_HEIGHT_PT;
+    lower_paragraph(import, paragraph, &base_style, &mut cursor, items);
   }
 }
 
-fn paragraph_text(
-  text_body: &TextBody,
-  paragraph: &super::drawingml::text_body::TextParagraph,
-) -> String {
-  let mut text = String::new();
-  if let Some(level) = paragraph.level {
-    if text_body.has_list_style {
-      for _ in 0..level {
-        text.push_str("  ");
-      }
-    }
+#[derive(Clone, Copy, Debug)]
+struct TextBoxMetrics {
+  x_pt: f32,
+  y_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextCursor {
+  x_pt: f32,
+  y_pt: f32,
+}
+
+fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextBoxMetrics {
+  let body_properties = text_body.body_properties.as_deref();
+  let left_inset = body_properties
+    .and_then(|properties| properties.left_inset)
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
+  let top_inset = body_properties
+    .and_then(|properties| properties.top_inset)
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
+
+  TextBoxMetrics {
+    x_pt: units::emu_to_points(offset.x_emu + shape.position.x) + left_inset,
+    y_pt: units::emu_to_points(offset.y_emu + shape.position.y) + top_inset,
+  }
+}
+
+fn lower_paragraph(
+  import: &PowerPointImport,
+  paragraph: &TextParagraph,
+  base_style: &TextStyle,
+  cursor: &mut TextCursor,
+  items: &mut Vec<PageItem>,
+) {
+  let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+  let paragraph_x = cursor.x_pt + paragraph_style.left_margin_pt + paragraph_style.indent_pt;
+  let mut run_x = paragraph_x;
+  let mut max_line_height = line_height(base_style);
+
+  if let Some(label) = paragraph_style.bullet_label(paragraph) {
+    let mut bullet_style = base_style.clone();
+    paragraph_style.apply_default_run_style(import, &mut bullet_style);
+    max_line_height = max_line_height.max(line_height(&bullet_style));
+    push_text_item(
+      items,
+      run_x - DEFAULT_BULLET_INDENT_PT,
+      cursor.y_pt,
+      label,
+      bullet_style,
+    );
   }
 
   for run in &paragraph.runs {
     match run.kind {
-      TextRunKind::Run | TextRunKind::Field => text.push_str(&run.text),
-      TextRunKind::Break => text.push('\n'),
+      TextRunKind::Run | TextRunKind::Field => {
+        if run.text.is_empty() {
+          continue;
+        }
+        let mut style = base_style.clone();
+        paragraph_style.apply_default_run_style(import, &mut style);
+        apply_run_properties(import, run, &mut style);
+        max_line_height = max_line_height.max(line_height(&style));
+        let text = run_text(run, &style);
+        push_text_item(items, run_x, cursor.y_pt, text.clone(), style.clone());
+        run_x += approximate_text_width_pt(&text, &style);
+      }
+      TextRunKind::Break => {
+        cursor.y_pt += max_line_height;
+        run_x = paragraph_x;
+        max_line_height = line_height(base_style);
+      }
       TextRunKind::Math => {}
     }
   }
-  text
+  cursor.y_pt += max_line_height;
+}
+
+fn push_text_item(items: &mut Vec<PageItem>, x_pt: f32, y_pt: f32, text: String, style: TextStyle) {
+  items.push(PageItem::Text(TextItem {
+    x_pt,
+    y_pt,
+    line_height_pt: line_height(&style),
+    text,
+    style,
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    preserve_text_portion: false,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: PdfTextSegmentation::Portion,
+  }));
+}
+
+fn line_height(style: &TextStyle) -> f32 {
+  style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE
+}
+
+fn approximate_text_width_pt(text: &str, style: &TextStyle) -> f32 {
+  text.chars().count() as f32 * style.font_size_pt * 0.5
+}
+
+fn run_text(run: &TextRun, style: &TextStyle) -> String {
+  if style.uppercase {
+    run.text.to_uppercase()
+  } else {
+    run.text.clone()
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+struct ParagraphDisplayStyle {
+  left_margin_pt: f32,
+  indent_pt: f32,
+  bullet: Option<String>,
+  default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+impl ParagraphDisplayStyle {
+  fn from_paragraph(paragraph: &TextParagraph) -> Self {
+    let mut style = Self::default();
+    if let Some(master_style) = &paragraph.master_paragraph_style {
+      style.apply_text_list_style(master_style);
+    }
+    if let Some(text_style) = &paragraph.text_paragraph_style {
+      style.apply_text_list_style(text_style);
+    }
+    if let Some(properties) = paragraph.paragraph_properties.as_deref() {
+      if let Some(left_margin) = properties.left_margin {
+        style.left_margin_pt = units::emu_to_points(i64::from(left_margin));
+      }
+      if let Some(indent) = properties.indent {
+        style.indent_pt = units::emu_to_points(i64::from(indent));
+      }
+      if let Some(default_run_properties) = &properties.default_run_properties {
+        style.default_run_properties = Some(default_run_properties.clone());
+      }
+      style.bullet = paragraph_properties_bullet(&properties.paragraph_properties_choice4);
+    }
+    style
+  }
+
+  fn apply_text_list_style(&mut self, style: &TextListParagraphStyle) {
+    match style {
+      TextListParagraphStyle::Default(properties) => {
+        self.left_margin_pt = properties
+          .left_margin
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.left_margin_pt);
+        self.indent_pt = properties
+          .indent
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.indent_pt);
+        self.default_run_properties = properties.default_run_properties.clone();
+        self.bullet =
+          default_paragraph_properties_bullet(&properties.default_paragraph_properties_choice4);
+      }
+      TextListParagraphStyle::Level(level) => {
+        self.apply_level_style(&level.paragraph_properties);
+      }
+    }
+  }
+
+  fn apply_level_style(&mut self, properties: &TextListLevelParagraphProperties) {
+    macro_rules! apply_level {
+      ($properties:expr, $bullet_fn:ident, $choice:ident) => {{
+        self.left_margin_pt = $properties
+          .left_margin
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.left_margin_pt);
+        self.indent_pt = $properties
+          .indent
+          .map(|value| units::emu_to_points(i64::from(value)))
+          .unwrap_or(self.indent_pt);
+        self.default_run_properties = $properties.default_run_properties.clone();
+        self.bullet = $bullet_fn(&$properties.$choice);
+      }};
+    }
+
+    match properties {
+      TextListLevelParagraphProperties::Level1(properties) => {
+        apply_level!(
+          properties,
+          level1_paragraph_properties_bullet,
+          level1_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level2(properties) => {
+        apply_level!(
+          properties,
+          level2_paragraph_properties_bullet,
+          level2_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level3(properties) => {
+        apply_level!(
+          properties,
+          level3_paragraph_properties_bullet,
+          level3_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level4(properties) => {
+        apply_level!(
+          properties,
+          level4_paragraph_properties_bullet,
+          level4_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level5(properties) => {
+        apply_level!(
+          properties,
+          level5_paragraph_properties_bullet,
+          level5_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level6(properties) => {
+        apply_level!(
+          properties,
+          level6_paragraph_properties_bullet,
+          level6_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level7(properties) => {
+        apply_level!(
+          properties,
+          level7_paragraph_properties_bullet,
+          level7_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level8(properties) => {
+        apply_level!(
+          properties,
+          level8_paragraph_properties_bullet,
+          level8_paragraph_properties_choice4
+        )
+      }
+      TextListLevelParagraphProperties::Level9(properties) => {
+        apply_level!(
+          properties,
+          level9_paragraph_properties_bullet,
+          level9_paragraph_properties_choice4
+        )
+      }
+    }
+  }
+
+  fn bullet_label(&self, paragraph: &TextParagraph) -> Option<String> {
+    self.bullet.clone().or_else(|| {
+      paragraph
+        .level
+        .filter(|level| *level > 0)
+        .map(|_| "\u{2022}".to_string())
+    })
+  }
+
+  fn apply_default_run_style(&self, import: &PowerPointImport, style: &mut TextStyle) {
+    if let Some(properties) = &self.default_run_properties {
+      apply_default_run_properties(import, properties, style);
+    }
+  }
+}
+
+fn paragraph_properties_bullet(choice: &Option<a::ParagraphPropertiesChoice4>) -> Option<String> {
+  match choice {
+    Some(a::ParagraphPropertiesChoice4::NoBullet) => None,
+    Some(a::ParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(bullet.char.clone()),
+    Some(a::ParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some("1.".to_string()),
+    Some(a::ParagraphPropertiesChoice4::PictureBullet(_)) => Some("\u{2022}".to_string()),
+    None => None,
+  }
+}
+
+macro_rules! bullet_fn {
+  ($name:ident, $choice_ty:ty) => {
+    fn $name(choice: &Option<$choice_ty>) -> Option<String> {
+      match choice {
+        Some(choice) => level_bullet_label(choice),
+        None => None,
+      }
+    }
+  };
+}
+
+fn default_paragraph_properties_bullet(
+  choice: &Option<a::DefaultParagraphPropertiesChoice4>,
+) -> Option<String> {
+  match choice {
+    Some(a::DefaultParagraphPropertiesChoice4::NoBullet) => None,
+    Some(a::DefaultParagraphPropertiesChoice4::CharacterBullet(bullet)) => {
+      Some(bullet.char.clone())
+    }
+    Some(a::DefaultParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some("1.".to_string()),
+    Some(a::DefaultParagraphPropertiesChoice4::PictureBullet(_)) => Some("\u{2022}".to_string()),
+    None => None,
+  }
+}
+
+bullet_fn!(
+  level1_paragraph_properties_bullet,
+  a::Level1ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level2_paragraph_properties_bullet,
+  a::Level2ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level3_paragraph_properties_bullet,
+  a::Level3ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level4_paragraph_properties_bullet,
+  a::Level4ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level5_paragraph_properties_bullet,
+  a::Level5ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level6_paragraph_properties_bullet,
+  a::Level6ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level7_paragraph_properties_bullet,
+  a::Level7ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level8_paragraph_properties_bullet,
+  a::Level8ParagraphPropertiesChoice4
+);
+bullet_fn!(
+  level9_paragraph_properties_bullet,
+  a::Level9ParagraphPropertiesChoice4
+);
+
+trait BulletChoice {
+  fn no_bullet(&self) -> bool;
+  fn character(&self) -> Option<String>;
+  fn auto_numbered(&self) -> bool;
+  fn picture(&self) -> bool;
+}
+
+macro_rules! impl_bullet_choice {
+  ($ty:ty) => {
+    impl BulletChoice for $ty {
+      fn no_bullet(&self) -> bool {
+        matches!(self, Self::NoBullet)
+      }
+
+      fn character(&self) -> Option<String> {
+        match self {
+          Self::CharacterBullet(bullet) => Some(bullet.char.clone()),
+          _ => None,
+        }
+      }
+
+      fn auto_numbered(&self) -> bool {
+        matches!(self, Self::AutoNumberedBullet(_))
+      }
+
+      fn picture(&self) -> bool {
+        matches!(self, Self::PictureBullet(_))
+      }
+    }
+  };
+}
+
+impl_bullet_choice!(a::Level1ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level2ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level3ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level4ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level5ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level6ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level7ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level8ParagraphPropertiesChoice4);
+impl_bullet_choice!(a::Level9ParagraphPropertiesChoice4);
+
+fn level_bullet_label(choice: &impl BulletChoice) -> Option<String> {
+  if choice.no_bullet() {
+    None
+  } else if let Some(character) = choice.character() {
+    Some(character)
+  } else if choice.auto_numbered() {
+    Some("1.".to_string())
+  } else if choice.picture() {
+    Some("\u{2022}".to_string())
+  } else {
+    None
+  }
+}
+
+fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut TextStyle) {
+  let Some(properties) = run.run_properties.as_deref() else {
+    return;
+  };
+  apply_run_common(
+    RunCommon {
+      font_size: properties.font_size,
+      bold: properties.bold.as_ref().map(|value| value.as_bool()),
+      italic: properties.italic.as_ref().map(|value| value.as_bool()),
+      underline: properties.underline,
+      strike: properties.strike,
+      capital: properties.capital,
+      spacing: properties.spacing,
+      baseline: properties.baseline,
+      latin_font: properties.latin_font.as_ref(),
+    },
+    style,
+  );
+  if let Some(fill) = properties.run_properties_choice1.as_ref() {
+    apply_text_fill(import, fill, style);
+  }
+}
+
+fn apply_default_run_properties(
+  import: &PowerPointImport,
+  properties: &a::DefaultRunProperties,
+  style: &mut TextStyle,
+) {
+  apply_run_common(
+    RunCommon {
+      font_size: properties.font_size,
+      bold: properties.bold.as_ref().map(|value| value.as_bool()),
+      italic: properties.italic.as_ref().map(|value| value.as_bool()),
+      underline: properties.underline,
+      strike: properties.strike,
+      capital: properties.capital,
+      spacing: properties.spacing,
+      baseline: properties.baseline,
+      latin_font: properties.latin_font.as_ref(),
+    },
+    style,
+  );
+  if let Some(fill) = properties.default_run_properties_choice1.as_ref() {
+    apply_default_text_fill(import, fill, style);
+  }
+}
+
+struct RunCommon<'a> {
+  font_size: Option<i32>,
+  bold: Option<bool>,
+  italic: Option<bool>,
+  underline: Option<a::TextUnderlineValues>,
+  strike: Option<a::TextStrikeValues>,
+  capital: Option<a::TextCapsValues>,
+  spacing: Option<ooxmlsdk::simple_type::TextPointValue>,
+  baseline: Option<ooxmlsdk::simple_type::DrawingmlPercentageValue>,
+  latin_font: Option<&'a a::LatinFont>,
+}
+
+fn apply_run_common(properties: RunCommon<'_>, style: &mut TextStyle) {
+  if let Some(font_size) = properties.font_size {
+    style.font_size_pt = ooxmlsdk::units::drawingml_text_size_to_points(font_size) as f32;
+  }
+  if let Some(bold) = properties.bold {
+    style.bold = bold;
+  }
+  if let Some(italic) = properties.italic {
+    style.italic = italic;
+  }
+  if let Some(underline) = properties.underline {
+    style.underline = underline != a::TextUnderlineValues::None;
+  }
+  if let Some(strike) = properties.strike {
+    style.strikethrough = strike != a::TextStrikeValues::NoStrike;
+  }
+  if let Some(capital) = properties.capital {
+    style.uppercase = capital == a::TextCapsValues::All;
+    style.small_caps = capital == a::TextCapsValues::Small;
+  }
+  if let Some(spacing) = properties.spacing {
+    style.character_spacing_pt = spacing.to_points() as f32;
+  }
+  if let Some(baseline) = properties.baseline {
+    style.baseline_shift_pt =
+      style.font_size_pt * baseline.as_drawingml_percent() as f32 / 100_000.0;
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .and_then(|font| font.typeface.as_ref())
+    .filter(|typeface| !typeface.is_empty())
+  {
+    style.font_family = Some(Arc::from(typeface.as_str()));
+  }
+}
+
+fn apply_text_fill(
+  import: &PowerPointImport,
+  fill: &a::RunPropertiesChoice,
+  style: &mut TextStyle,
+) {
+  match fill {
+    a::RunPropertiesChoice::NoFill(_) => {
+      style.hidden = true;
+    }
+    a::RunPropertiesChoice::SolidFill(fill) => {
+      if let Some(color) = fill
+        .solid_fill_choice
+        .as_ref()
+        .and_then(Color::from_solid_fill_choice)
+        .and_then(|color| display_paint(import, &color, None))
+      {
+        style.color = color.color;
+        style.opacity = color.opacity;
+      }
+    }
+    a::RunPropertiesChoice::GradientFill(_)
+    | a::RunPropertiesChoice::BlipFill(_)
+    | a::RunPropertiesChoice::PatternFill(_)
+    | a::RunPropertiesChoice::GroupFill => {}
+  }
+}
+
+fn apply_default_text_fill(
+  import: &PowerPointImport,
+  fill: &a::DefaultRunPropertiesChoice,
+  style: &mut TextStyle,
+) {
+  match fill {
+    a::DefaultRunPropertiesChoice::NoFill(_) => {
+      style.hidden = true;
+    }
+    a::DefaultRunPropertiesChoice::SolidFill(fill) => {
+      if let Some(color) = fill
+        .solid_fill_choice
+        .as_ref()
+        .and_then(Color::from_solid_fill_choice)
+        .and_then(|color| display_paint(import, &color, None))
+      {
+        style.color = color.color;
+        style.opacity = color.opacity;
+      }
+    }
+    a::DefaultRunPropertiesChoice::GradientFill(_)
+    | a::DefaultRunPropertiesChoice::BlipFill(_)
+    | a::DefaultRunPropertiesChoice::PatternFill(_)
+    | a::DefaultRunPropertiesChoice::GroupFill => {}
+  }
 }
 
 #[derive(Clone, Copy, Debug)]

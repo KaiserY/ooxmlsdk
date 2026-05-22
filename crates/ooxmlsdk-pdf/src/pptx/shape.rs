@@ -75,6 +75,40 @@ impl PptShape {
     mark_referenced(&mut slide_persist.shapes, &path);
   }
 
+  pub(crate) fn apply_graphic_placeholder_reference(&mut self, slide_persist: &mut SlidePersist) {
+    let Some(sub_type) = self.shape.sub_type else {
+      return;
+    };
+    if !matches!(
+      self.shape_location,
+      ShapeLocation::Slide | ShapeLocation::Layout
+    ) {
+      return;
+    }
+    if self.shape.sub_type_index == Some(SKIP_PLACEHOLDER_INDEX) {
+      return;
+    }
+    let (first, second) = placeholder_candidates(sub_type);
+    let Some(first) = first else {
+      return;
+    };
+    let master_only = self.shape_location == ShapeLocation::Layout;
+    let Some((path, reference)) = find_placeholder_path(
+      &slide_persist.shapes,
+      first,
+      second,
+      self.shape.sub_type_index,
+      master_only,
+    ) else {
+      return;
+    };
+    self
+      .shape
+      .apply_shape_reference_with_text(&reference, false);
+    self.shape.set_placeholder(reference);
+    mark_referenced(&mut slide_persist.shapes, &path);
+  }
+
   pub(crate) fn inherit_placeholder_type_by_index(&mut self, slide_persist: &SlidePersist) {
     if self.shape.sub_type.is_some() || self.shape.sub_type_index == Some(SKIP_PLACEHOLDER_INDEX) {
       return;

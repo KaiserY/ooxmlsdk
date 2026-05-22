@@ -166,6 +166,13 @@ impl PPTShapeGroupContext {
         .non_visual_graphic_frame_properties
         .non_visual_drawing_properties,
     );
+    if let Some(placeholder) = &frame
+      .non_visual_graphic_frame_properties
+      .application_non_visual_drawing_properties
+      .placeholder_shape
+    {
+      apply_graphic_placeholder(&mut shape, slide_persist, placeholder);
+    }
     apply_presentation_transform(&mut shape.shape, &frame.transform);
     GraphicalObjectFrameContext
       .dispatch_graphic_data(&frame.graphic.graphic_data, &mut shape.shape);
@@ -215,6 +222,13 @@ impl PPTShapeGroupContext {
         .non_visual_picture_properties
         .non_visual_drawing_properties,
     );
+    if let Some(placeholder) = &picture
+      .non_visual_picture_properties
+      .application_non_visual_drawing_properties
+      .placeholder_shape
+    {
+      apply_graphic_placeholder(&mut shape, slide_persist, placeholder);
+    }
     apply_transform_2d(
       &mut shape.shape,
       picture.shape_properties.transform2_d.as_deref(),
@@ -257,6 +271,22 @@ impl PPTShapeGroupContext {
   }
 
   pub(crate) fn apply_font_ref_color(&mut self) {}
+}
+
+fn apply_graphic_placeholder(
+  shape: &mut PptShape,
+  slide_persist: &mut SlidePersist,
+  placeholder: &p::PlaceholderShape,
+) {
+  // Source: LibreOffice oox/source/ppt/pptgraphicshapecontext.cxx passes
+  // bUseText=false for graphic placeholders so prompt text is not inherited by
+  // real charts/tables/pictures/media.
+  shape.shape.sub_type = Some(placeholder.r#type.unwrap_or(p::PlaceholderValues::Object));
+  if placeholder.index != Some(u32::MAX) {
+    shape.shape.sub_type_index = placeholder.index;
+    shape.inherit_placeholder_type_by_index(slide_persist);
+  }
+  shape.apply_graphic_placeholder_reference(slide_persist);
 }
 
 fn apply_non_visual_drawing_properties(

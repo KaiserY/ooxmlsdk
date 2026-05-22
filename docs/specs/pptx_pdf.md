@@ -96,15 +96,35 @@ Already structurally aligned:
 - DrawingML table graphic data is imported from typed
   `GraphicDataChoice::Table` / `a::Table`, including flags, style id, grid,
   rows, cells, spans/merges, margins, and cell text bodies.
+- Table shapes follow LibreOffice's `Shape::createAndInsert` tdf#90403 branch:
+  for `TableShape`, visible size comes from the DrawingML table grid column
+  widths and row heights, not from `p:xfrm` extents. The display bridge now
+  paints a basic table grid and lowers typed cell text bodies through the same
+  PPTX text path.
 - `Shape::create_and_insert` is the current owner for actual fill, line, and
   effect state. It caches resolved paint/effect records on `Shape`, including
   direct `grpFill` inheritance from the parent group fill.
 - Placeholder lookup has the first upstream-shaped port: default subtype,
   index-based subtype inheritance, priority lookup, `apply_shape_reference`,
   placeholder storage, and referenced marking.
+- Shape placeholders inherit placeholder text by default, matching
+  `PPTShapeContext`; graphic placeholders use the LibreOffice
+  `PPTGraphicShapeContext` `bUseText=false` branch so charts, tables, pictures,
+  diagrams, media, and similar objects inherit placeholder geometry/properties
+  without copying placeholder prompt text.
 - Text body import is typed: generated `bodyPr`, `pPr`, `rPr`, `fld/pPr`, and
   `endParaRPr` are preserved for shape text and table cell text.
 - `TextParagraph` owns paragraph-level style lookup and fallback to level 0.
+- The temporary display bridge now consumes imported `bodyPr` text insets,
+  paragraph margins/indents, master/text-list default run properties, direct
+  run properties, run solid fills, and typed bullet records when lowering text
+  to PDF items. This is still paint plumbing: the import-side typed text state
+  remains the source of truth.
+- Display lowering must not paint `master_page.shapes` separately when a slide
+  already inherited a layout persist. `PresentationFragmentHandler` clones the
+  layout/master shape tree into the slide persist before slide XML is imported,
+  so an extra display pass over the master/layout page duplicates visible
+  content and breaks LibreOffice z-order expectations.
 
 Known gaps to keep visible:
 
@@ -123,8 +143,17 @@ Known gaps to keep visible:
   background-fill lists, and style refs preserve `phClr`. Color transforms are
   applied after base color resolution, matching LibreOffice's broad
   `Color::getColor` order.
-- Paragraph/run property application is incomplete beyond structural style
-  selection.
+- Paragraph/run property application has a first visible bridge for insets,
+  margins, indents, bullet labels, font size/family, bold/italic,
+  underline/strike, caps, spacing, baseline, and text solid fill. It is still
+  incomplete for exact LibreOffice line breaking, text anchoring, autofit,
+  wrapping, columns, vertical text, paragraph spacing, tabs, field values,
+  bidi/complex-script font fallback, theme font refs, and bullet numbering
+  continuation.
+- Table rendering still lacks table style resolution, cell fills/borders,
+  diagonal borders, row/column banding, merge-aware border suppression,
+  text-fitting expansion, and shadow/effect handling. Do not treat the current
+  grid fallback as final table semantics.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or

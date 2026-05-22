@@ -232,10 +232,20 @@ impl Shape {
   pub(crate) fn apply_shape_reference_with_text(&mut self, reference: &Shape, use_text: bool) {
     // Source: LibreOffice oox/source/drawingml/shape.cxx
     // applyShapeReference copies inherited properties while keeping direct
-    // shape properties authoritative.
-    self.shape_ref_line_properties = reference.line_properties.clone();
-    self.shape_ref_fill_properties = reference.fill_properties.clone();
-    self.shape_ref_effect_properties = reference.effect_properties.clone();
+    // shape properties authoritative. LibreOffice inherits getActual*()
+    // results from placeholders, not just the placeholder's direct properties.
+    self.shape_ref_line_properties = reference
+      .actual_line_properties
+      .clone()
+      .or_else(|| reference.line_properties.clone());
+    self.shape_ref_fill_properties = reference
+      .actual_fill_properties
+      .clone()
+      .or_else(|| reference.fill_properties.clone());
+    self.shape_ref_effect_properties = reference
+      .actual_effect_properties
+      .clone()
+      .or_else(|| reference.effect_properties.clone());
     self.custom_shape_properties = reference.custom_shape_properties.clone();
     if use_text {
       self.text_body = reference.text_body.clone();
@@ -425,13 +435,12 @@ impl Shape {
     &self,
     import: &PowerPointImport,
   ) -> Option<EffectProperties> {
-    self.effect_properties.clone().or_else(|| {
-      self
-        .shape_style_refs
-        .as_ref()
-        .and_then(|refs| import.get_theme_effect_style(refs.effect_reference.index))
-        .or_else(|| self.shape_ref_effect_properties.clone())
-    })
+    let themed = self
+      .shape_style_refs
+      .as_ref()
+      .and_then(|refs| import.get_theme_effect_style(refs.effect_reference.index));
+    let inherited = merge_effect_properties(self.shape_ref_effect_properties.clone(), themed);
+    merge_effect_properties(inherited, self.effect_properties.clone())
   }
 
   pub(crate) fn set_text_body(&mut self, text_body: TextBody) {
@@ -589,6 +598,23 @@ fn merge_line_properties(
       }
       if direct.width_emu.is_some() {
         base.width_emu = direct.width_emu;
+      }
+      Some(base)
+    }
+    (Some(base), None) => Some(base),
+    (None, Some(direct)) => Some(direct),
+    (None, None) => None,
+  }
+}
+
+fn merge_effect_properties(
+  base: Option<EffectProperties>,
+  direct: Option<EffectProperties>,
+) -> Option<EffectProperties> {
+  match (base, direct) {
+    (Some(mut base), Some(direct)) => {
+      if direct.has_effect() {
+        base.merge_from(&direct);
       }
       Some(base)
     }

@@ -10,7 +10,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
-use super::drawingml::shape::{Shape, ShapeService};
+use super::drawingml::shape::{FontStyleReference, Shape, ShapeService};
 use super::drawingml::table::{
   TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
   TableStyleTextProperties,
@@ -864,22 +864,43 @@ fn lower_text_body(
   items: &mut Vec<PageItem>,
 ) {
   let text_box = text_box_metrics(shape, offset, text_body);
-  lower_text_body_at(import, text_box, text_body, items);
-}
-
-fn lower_text_body_at(
-  import: &PowerPointImport,
-  frame: TextFrame,
-  text_body: &TextBody,
-  items: &mut Vec<PageItem>,
-) {
-  lower_text_body_at_with_table_style(import, frame, text_body, None, items);
+  lower_text_body_at_with_font_ref(
+    import,
+    text_box,
+    text_body,
+    shape
+      .shape_style_refs
+      .as_ref()
+      .map(|style| &style.font_reference),
+    items,
+  );
 }
 
 fn lower_text_body_at_with_table_style(
   import: &PowerPointImport,
   frame: TextFrame,
   text_body: &TextBody,
+  table_text_style: Option<&TableStyleTextProperties>,
+  items: &mut Vec<PageItem>,
+) {
+  lower_text_body_at_with_style(import, frame, text_body, None, table_text_style, items);
+}
+
+fn lower_text_body_at_with_font_ref(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  items: &mut Vec<PageItem>,
+) {
+  lower_text_body_at_with_style(import, frame, text_body, font_reference, None, items);
+}
+
+fn lower_text_body_at_with_style(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
   table_text_style: Option<&TableStyleTextProperties>,
   items: &mut Vec<PageItem>,
 ) {
@@ -890,6 +911,9 @@ fn lower_text_body_at_with_table_style(
     rotation_deg: options.rotation_deg,
     ..TextStyle::default()
   };
+  if let Some(font_reference) = font_reference {
+    apply_font_reference_text_style(import, font_reference, &mut base_style);
+  }
   if let Some(table_text_style) = table_text_style {
     apply_table_text_style(import, table_text_style, &mut base_style);
   }
@@ -923,18 +947,33 @@ fn lower_text_body_at_with_table_style(
   }
 }
 
+fn apply_font_reference_text_style(
+  import: &PowerPointImport,
+  reference: &FontStyleReference,
+  style: &mut TextStyle,
+) {
+  if let Some(typeface) = import.get_theme_latin_font(reference.index) {
+    style.font_family = Some(Arc::from(typeface));
+  }
+  if let Some(paint) = reference
+    .placeholder_color
+    .as_ref()
+    .and_then(|color| display_paint(import, color, None))
+  {
+    style.color = paint.color;
+    style.opacity = paint.opacity;
+  }
+}
+
 fn apply_table_text_style(
   import: &PowerPointImport,
   properties: &TableStyleTextProperties,
   style: &mut TextStyle,
 ) {
+  if let Some(font_reference) = &properties.font_reference {
+    apply_font_reference_text_style(import, font_reference, style);
+  }
   if let Some(typeface) = properties.fonts.latin.as_deref() {
-    style.font_family = Some(Arc::from(typeface));
-  } else if let Some(typeface) = properties
-    .font_reference
-    .as_ref()
-    .and_then(|reference| import.get_theme_latin_font(reference.index))
-  {
     style.font_family = Some(Arc::from(typeface));
   }
   if let Some(bold) = properties.bold.and_then(boolean_style_value) {
@@ -942,15 +981,6 @@ fn apply_table_text_style(
   }
   if let Some(italic) = properties.italic.and_then(boolean_style_value) {
     style.italic = italic;
-  }
-  if let Some(paint) = properties
-    .font_reference
-    .as_ref()
-    .and_then(|reference| reference.placeholder_color.as_ref())
-    .and_then(|color| display_paint(import, color, None))
-  {
-    style.color = paint.color;
-    style.opacity = paint.opacity;
   }
   if let Some(paint) = properties
     .color

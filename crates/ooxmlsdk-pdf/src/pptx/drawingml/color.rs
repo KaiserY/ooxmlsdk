@@ -101,6 +101,39 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_glow_choice(choice: &a::GlowChoice) -> Option<Self> {
+    match choice {
+      a::GlowChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::GlowChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::GlowChoice::HslColor(color) => Some(hsl_color(color)),
+      a::GlowChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::GlowChoice::PresetColor(color) => Some(preset_color(color)),
+      a::GlowChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_inner_shadow_choice(choice: &a::InnerShadowChoice) -> Option<Self> {
+    match choice {
+      a::InnerShadowChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::InnerShadowChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::InnerShadowChoice::HslColor(color) => Some(hsl_color(color)),
+      a::InnerShadowChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::InnerShadowChoice::PresetColor(color) => Some(preset_color(color)),
+      a::InnerShadowChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_outer_shadow_choice(choice: &a::OuterShadowChoice) -> Option<Self> {
+    match choice {
+      a::OuterShadowChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::OuterShadowChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::OuterShadowChoice::HslColor(color) => Some(hsl_color(color)),
+      a::OuterShadowChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::OuterShadowChoice::PresetColor(color) => Some(preset_color(color)),
+      a::OuterShadowChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn resolve_rgb<F>(
     &self,
     scheme_resolver: &mut F,

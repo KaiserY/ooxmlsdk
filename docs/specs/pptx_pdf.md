@@ -80,10 +80,14 @@ Already structurally aligned:
   slide or layout color map, master color map, then theme color scheme.
 - Shape actual fill/line/effect resolution now consumes theme style refs from
   `a:style` against the current theme format scheme before applying direct
-  shape properties.
+  shape properties. Effect import preserves outer/inner shadow, glow, softEdge,
+  and unsupported effect-list/DAG names as structural state instead of a boolean
+  marker.
 - Shape style refs preserve both the style-matrix index and placeholder color
   (`phClr`) for fill, line, effect, and font refs. `fontRef` without an
-  explicit color defaults to scheme `tx1`, matching LibreOffice.
+  explicit color defaults to scheme `tx1`, matching LibreOffice. Theme
+  major/minor latin fonts from `a:fontScheme` are available to display lowering
+  for `fontRef`.
 - Background `bgPr` and `bgRef` are separate structured states. `bgRef` is not
   treated as a direct solid fill.
 - Shape import preserves non-visual metadata, placeholder subtype/index,
@@ -103,10 +107,16 @@ Already structurally aligned:
   PPTX text path.
 - `Shape::create_and_insert` is the current owner for actual fill, line, and
   effect state. It caches resolved paint/effect records on `Shape`, including
-  direct `grpFill` inheritance from the parent group fill.
+  direct `grpFill` inheritance from the parent group fill. Actual fill, line,
+  and effect precedence must stay aligned with LibreOffice:
+  reference/placeholder state, theme style ref, then direct shape properties.
 - Placeholder lookup has the first upstream-shaped port: default subtype,
   index-based subtype inheritance, priority lookup, `apply_shape_reference`,
   placeholder storage, and referenced marking.
+- `apply_shape_reference` inherits placeholder actual line/fill/effect state
+  when available, not only direct placeholder properties. Layout/master
+  placeholders often obtain visible paint from theme style refs during
+  `create_and_insert`; copying raw direct properties drops that resolved state.
 - Shape placeholders inherit placeholder text by default, matching
   `PPTShapeContext`; graphic placeholders use the LibreOffice
   `PPTGraphicShapeContext` `bUseText=false` branch so charts, tables, pictures,
@@ -125,7 +135,8 @@ Already structurally aligned:
   run properties, run solid fills, and typed bullet records when lowering text
   to PDF items. It also consumes the structured bodyPr view for normal-autofit
   font scaling, line-height scaling, vertical anchors, body/vertical rotation,
-  basic multi-column flow, and vertical overflow clipping. This is still paint
+  basic multi-column flow, vertical overflow clipping, and shape `fontRef`
+  default text color / major-minor latin font selection. This is still paint
   plumbing: the import-side typed text state remains the source of truth.
 - Table cell `tcPr` import mirrors LibreOffice's `TableCellContext` shape:
   margins, vertical text mode, anchor/anchorCtr, horizontal overflow, direct
@@ -176,8 +187,9 @@ Known gaps to keep visible:
   implementation details.
   Remaining gaps are theme overrides, extra color schemes, and exact parity for
   edge-case system/palette behavior.
-- `Shape::apply_shape_reference` has the explicit `bUseText` branch, but still
-  lacks generic shape-property copy and full custom geometry behavior.
+- `Shape::apply_shape_reference` has the explicit `bUseText` branch and
+  inherits resolved placeholder paint/effect state, but still lacks the full
+  LibreOffice generic shape-property map and custom geometry behavior.
 - Theme style-matrix lookup is structurally present for fill, line, effect, and
   background-fill lists, and style refs preserve `phClr`. Color transforms are
   applied after base color resolution, matching LibreOffice's broad
@@ -535,7 +547,8 @@ Import rules:
   `create_and_insert`.
 - Style refs are not just indexes: preserve `phClr` and transformations for
   substitution into theme style fills/lines/background refs/effects. `fontRef`
-  must default to `tx1` when no color child exists.
+  must default to `tx1` when no color child exists, and must seed text defaults
+  before paragraph and run properties are applied.
 - Preserve and apply color transformations such as `tint`, `shade`, `alpha`,
   `alphaMod`, `lumMod`, `lumOff`, `satMod`, `hueMod`, RGB channel transforms,
   `gray`, `comp`, `inv`, `gamma`, and `invGamma` after resolving the color
@@ -545,14 +558,17 @@ Import rules:
   line state. Do not represent it as missing line properties.
 - Cache actual fill, line, and effect state on `Shape` during
   `create_and_insert`. Display lowering must read those cached fields instead
-  of recomputing reference/direct precedence.
+  of recomputing reference/direct precedence. Do not let direct effect
+  properties short-circuit inherited or theme effect state; LibreOffice uses
+  `assignUsed` in reference, theme, direct order.
 - A preset `line` geometry may select line service for non-connector shapes,
   matching LibreOffice; do not turn geometry into PDF path data in the parser.
 - `apply_shape_reference` must stay aligned with
   `drawingml::Shape::applyShapeReference`: text according to `bUseText`,
   shape properties, actual fill/line/effect state, custom geometry, table
   properties, master text list style, position, size, rotation, flips, hidden,
-  and locked flags.
+  and locked flags. Do not regress actual placeholder paint/effect inheritance
+  back to raw direct placeholder properties.
 
 ---
 
@@ -612,6 +628,13 @@ Line resolution order:
 
 Effects have their own actual-resolution layer. Do not fold effects into fill
 or line.
+
+Effect import belongs to shape properties and theme format-scheme import:
+`spPr/effectLst`, `spPr/effectDag`, and theme `effectStyle` must all lower into
+the same cached effect model. Display should consume the cached actual effect
+state only. Current rendering may still skip painting shadows/glow/soft edges,
+but import must retain their distances, directions, blur/radius, scale, colors,
+and unsupported effect names so later lowering does not need to reparse XML.
 
 Theme style refs from `a:style` are resolved between inherited/reference shape
 properties and direct shape properties. Do not resolve `fillRef`, `lnRef`, or

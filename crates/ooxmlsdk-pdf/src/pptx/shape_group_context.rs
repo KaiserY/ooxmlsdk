@@ -7,6 +7,7 @@ use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{CustomShapeGeometry, FrameType, Point, Shape, ShapeService, Size};
+use super::drawingml::shape_properties::EffectProperties;
 use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
@@ -353,6 +354,9 @@ fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
     .and_then(import_line_properties)
   {
     shape.line_properties = Some(line);
+  }
+  if let Some(effect) = properties.shape_properties_choice3.as_ref() {
+    shape.effect_properties = Some(EffectProperties::from_pml_shape_properties_choice(effect));
   }
 }
 

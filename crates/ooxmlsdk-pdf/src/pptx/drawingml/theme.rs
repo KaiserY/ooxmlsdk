@@ -206,11 +206,7 @@ fn style_at<T>(styles: &[T], index: u32) -> Option<&T> {
 }
 
 fn effect_properties_from_dml(style: &a::EffectStyle) -> EffectProperties {
-  EffectProperties {
-    has_effect: style.effect_style_choice.is_some()
-      || style.scene3_d_type.is_some()
-      || style.shape3_d_type.is_some(),
-  }
+  EffectProperties::from_effect_style(style)
 }
 
 fn color_from_dark1(choice: Option<&a::Dark1ColorChoice>) -> Option<Color> {

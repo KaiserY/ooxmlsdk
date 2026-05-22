@@ -1,6 +1,7 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
 use super::drawingml::shape::{Shape, ShapeService};
+use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::TextListStyle;
 use super::slide::{ShapeLocation, SlidePersist};
 
@@ -13,6 +14,7 @@ pub(crate) struct PptShape {
   pub(crate) shape_location: ShapeLocation,
   pub(crate) referenced: bool,
   pub(crate) placeholder: Option<Box<Shape>>,
+  pub(crate) placeholder_reference_path: Option<Vec<usize>>,
   pub(crate) has_noninherited_shape_properties: bool,
 }
 
@@ -26,6 +28,7 @@ impl PptShape {
       shape_location,
       referenced: false,
       placeholder: None,
+      placeholder_reference_path: None,
       has_noninherited_shape_properties: false,
     }
   }
@@ -40,6 +43,7 @@ impl PptShape {
 
   pub(crate) fn into_shape(mut self, slide_persist: &SlidePersist) -> Shape {
     self.set_text_master_styles(slide_persist);
+    self.apply_empty_placeholder_text(slide_persist);
     self.shape
   }
 
@@ -72,7 +76,7 @@ impl PptShape {
     };
     self.shape.apply_shape_reference(&reference);
     self.shape.set_placeholder(reference);
-    mark_referenced(&mut slide_persist.shapes, &path);
+    self.placeholder_reference_path = Some(path);
   }
 
   pub(crate) fn apply_graphic_placeholder_reference(&mut self, slide_persist: &mut SlidePersist) {
@@ -167,6 +171,77 @@ impl PptShape {
 
   pub(crate) fn set_has_noninherited_shape_properties(&mut self) {
     self.has_noninherited_shape_properties = true;
+  }
+
+  pub(crate) fn mark_empty_placeholder_reference(&self, slide_persist: &mut SlidePersist) {
+    if self.shape_location != ShapeLocation::Slide {
+      return;
+    }
+    if !self
+      .shape
+      .text_body
+      .as_ref()
+      .is_some_and(text_body_is_empty)
+    {
+      return;
+    }
+    if let Some(path) = &self.placeholder_reference_path {
+      mark_referenced(&mut slide_persist.shapes, path);
+    }
+  }
+
+  fn apply_empty_placeholder_text(&mut self, slide_persist: &SlidePersist) {
+    if self.shape_location != ShapeLocation::Slide || slide_persist.is_master {
+      return;
+    }
+    let Some(prompt) = placeholder_prompt_text(self.shape.sub_type, slide_persist.is_notes) else {
+      return;
+    };
+    let Some(text_body) = &mut self.shape.text_body else {
+      return;
+    };
+    if !text_body_is_empty(text_body) {
+      return;
+    }
+    // Source: LibreOffice sd/source/core/sdpage.cxx::GetPresObjText
+    // creates localized prompt text for empty presentation objects.
+    if text_body.paragraphs.is_empty() {
+      text_body.paragraphs.push(TextParagraph::default());
+    }
+    let paragraph = text_body
+      .paragraphs
+      .first_mut()
+      .expect("placeholder text body has a paragraph");
+    paragraph.runs.push(TextRun {
+      text: prompt.to_string(),
+      kind: TextRunKind::Run,
+      hyperlink_url: None,
+      field_type: None,
+      run_properties: None,
+      field_paragraph_properties: None,
+    });
+  }
+}
+
+fn text_body_is_empty(text_body: &TextBody) -> bool {
+  text_body
+    .paragraphs
+    .iter()
+    .flat_map(|paragraph| paragraph.runs.iter())
+    .all(|run| run.text.is_empty())
+}
+
+fn placeholder_prompt_text(
+  sub_type: Option<p::PlaceholderValues>,
+  is_notes: bool,
+) -> Option<&'static str> {
+  match (sub_type?, is_notes) {
+    (p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle, false) => {
+      Some("Click to add Title")
+    }
+    (p::PlaceholderValues::Body | p::PlaceholderValues::Object, false) => Some("Click to add Text"),
+    (p::PlaceholderValues::Body, true) => Some("Click to add Notes"),
+    _ => None,
   }
 }
 

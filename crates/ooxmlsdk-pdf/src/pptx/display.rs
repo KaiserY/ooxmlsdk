@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use crate::docx::{BorderStyle, RgbColor, TextStyle};
 use crate::layout::{
-  self, ImageItem, LineItem, LineItemKind, PageItem, PdfTextSegmentation, RectItem, TextItem,
+  self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
+  TextItem,
 };
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -118,12 +119,13 @@ fn lower_shape(
   offset: DisplayOffset,
   items: &mut Vec<PageItem>,
 ) {
-  if shape.hidden || shape.hidden_master_shape {
+  if shape.hidden || shape.hidden_master_shape || shape.referenced {
     return;
   }
 
   lower_shape_bounds(import, shape, offset, items);
   lower_picture(shape, offset, items);
+  lower_shape_hyperlink(shape, offset, items);
   let _has_structured_media_identity = shape.media.as_ref().is_some_and(|media| {
     !matches!(media.kind, super::drawingml::shape::MediaKind::Unknown)
       || media.embed_relationship_id.is_some()
@@ -241,9 +243,25 @@ fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>
       .clone()
       .or_else(|| shape.title.clone())
       .or_else(|| shape.name.clone()),
-    hyperlink_url: None,
+    hyperlink_url: shape.hyperlink_url.clone(),
     floating: false,
     behind_text: false,
+  }));
+}
+
+fn lower_shape_hyperlink(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
+  let Some(hyperlink_url) = &shape.hyperlink_url else {
+    return;
+  };
+  if shape.service_name == ShapeService::GroupShape || shape.size.cx <= 0 || shape.size.cy <= 0 {
+    return;
+  }
+  items.push(PageItem::LinkArea(LinkAreaItem {
+    x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
+    y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
+    width_pt: units::emu_to_points(shape.size.cx),
+    height_pt: units::emu_to_points(shape.size.cy),
+    hyperlink_url: hyperlink_url.clone(),
   }));
 }
 
@@ -987,6 +1005,7 @@ fn lower_text_body(
       .shape_style_refs
       .as_ref()
       .map(|style| &style.font_reference),
+    shape.hyperlink_url.as_deref(),
     items,
   );
 }
@@ -998,7 +1017,15 @@ fn lower_text_body_at_with_table_style(
   table_text_style: Option<&TableStyleTextProperties>,
   items: &mut Vec<PageItem>,
 ) {
-  lower_text_body_at_with_style(import, frame, text_body, None, table_text_style, items);
+  lower_text_body_at_with_style(
+    import,
+    frame,
+    text_body,
+    None,
+    table_text_style,
+    None,
+    items,
+  );
 }
 
 fn lower_text_body_at_with_font_ref(
@@ -1006,9 +1033,18 @@ fn lower_text_body_at_with_font_ref(
   frame: TextFrame,
   text_body: &TextBody,
   font_reference: Option<&FontStyleReference>,
+  shape_hyperlink_url: Option<&str>,
   items: &mut Vec<PageItem>,
 ) {
-  lower_text_body_at_with_style(import, frame, text_body, font_reference, None, items);
+  lower_text_body_at_with_style(
+    import,
+    frame,
+    text_body,
+    font_reference,
+    None,
+    shape_hyperlink_url,
+    items,
+  );
 }
 
 fn lower_text_body_at_with_style(
@@ -1017,6 +1053,7 @@ fn lower_text_body_at_with_style(
   text_body: &TextBody,
   font_reference: Option<&FontStyleReference>,
   table_text_style: Option<&TableStyleTextProperties>,
+  shape_hyperlink_url: Option<&str>,
   items: &mut Vec<PageItem>,
 ) {
   let options = TextLoweringOptions::from_text_body(text_body);
@@ -1056,6 +1093,7 @@ fn lower_text_body_at_with_style(
       &base_style,
       &options,
       frame,
+      shape_hyperlink_url,
       &mut cursor,
       items,
     );
@@ -1195,6 +1233,7 @@ fn lower_paragraph(
   base_style: &TextStyle,
   options: &TextLoweringOptions,
   frame: TextFrame,
+  shape_hyperlink_url: Option<&str>,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
 ) {
@@ -1220,6 +1259,7 @@ fn lower_paragraph(
       cursor.y_pt,
       label,
       bullet_style,
+      shape_hyperlink_url.map(ToString::to_string),
       options.line_scale,
     );
   }
@@ -1241,6 +1281,10 @@ fn lower_paragraph(
           cursor.y_pt,
           text.clone(),
           style.clone(),
+          run
+            .hyperlink_url
+            .clone()
+            .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
           options.line_scale,
         );
         run_x += approximate_text_width_pt(&text, &style);
@@ -1264,6 +1308,7 @@ fn push_text_item(
   y_pt: f32,
   text: String,
   style: TextStyle,
+  hyperlink_url: Option<String>,
   line_scale: f32,
 ) {
   items.push(PageItem::Text(TextItem {
@@ -1272,7 +1317,7 @@ fn push_text_item(
     line_height_pt: line_height(&style, line_scale),
     text,
     style,
-    hyperlink_url: None,
+    hyperlink_url,
     dynamic_field: None,
     style_ref_keys: Vec::new(),
     style_ref_text: None,
@@ -1280,7 +1325,7 @@ fn push_text_item(
     paragraph_bidi: false,
     preserve_text_portion: false,
     decoration_span_start_x_pt: None,
-    pdf_text_segmentation: PdfTextSegmentation::Portion,
+    pdf_text_segmentation: PdfTextSegmentation::Line,
   }));
 }
 

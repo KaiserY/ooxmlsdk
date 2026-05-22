@@ -7,7 +7,7 @@ use ooxmlsdk::parts::{
   diagram_data_part::DiagramDataPart, diagram_layout_definition_part::DiagramLayoutDefinitionPart,
   diagram_style_part::DiagramStylePart, embedded_object_part::EmbeddedObjectPart,
   embedded_package_part::EmbeddedPackagePart, extended_chart_part::ExtendedChartPart,
-  image_part::ImagePart, presentation_document::PresentationDocument,
+  image_part::ImagePart, presentation_document::PresentationDocument, slide_part::SlidePart,
   theme_override_part::ThemeOverridePart,
 };
 use ooxmlsdk::schemas::{
@@ -134,6 +134,7 @@ pub(crate) struct SlidePersist {
   pub(crate) embedded_object_resources: HashMap<String, BinaryResource>,
   pub(crate) embedded_package_resources: HashMap<String, BinaryResource>,
   pub(crate) media_resources: HashMap<String, MediaResource>,
+  pub(crate) hyperlink_targets: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -913,6 +914,7 @@ impl SlidePersist {
       embedded_object_resources: HashMap::new(),
       embedded_package_resources: HashMap::new(),
       media_resources: HashMap::new(),
+      hyperlink_targets: HashMap::new(),
     }
   }
 
@@ -1007,6 +1009,30 @@ impl SlidePersist {
         relationship.id().to_string(),
         media_resource_from_relationship(package, relationship),
       );
+    }
+  }
+
+  pub(crate) fn import_hyperlink_reference_parts<P>(
+    &mut self,
+    package: &PresentationDocument,
+    part: &P,
+  ) where
+    P: SdkPart,
+  {
+    // Source: LibreOffice oox/source/drawingml/hyperlinkcontext.cxx resolves
+    // a:hlinkClick r:id through the current fragment relationships.
+    for relationship in part.hyperlink_relationships(package) {
+      self.hyperlink_targets.insert(
+        relationship.id().to_string(),
+        relationship.target().to_string(),
+      );
+    }
+    for related_slide in part.related_parts_of_type::<_, SlidePart>(package) {
+      if let Some(target) = related_slide.part().path(package).and_then(slide_anchor) {
+        self
+          .hyperlink_targets
+          .insert(related_slide.relationship_id().to_string(), target);
+      }
     }
   }
 
@@ -1153,6 +1179,7 @@ impl SlidePersist {
     self.embedded_object_resources = reference.embedded_object_resources.clone();
     self.embedded_package_resources = reference.embedded_package_resources.clone();
     self.media_resources = reference.media_resources.clone();
+    self.hyperlink_targets = reference.hyperlink_targets.clone();
     self.comment_authors = reference.comment_authors.clone();
   }
 
@@ -1256,6 +1283,16 @@ impl SlidePersist {
       shape.collect_shape_maps(&mut self.shape_map, &mut self.connector_shape_map);
     }
   }
+}
+
+fn slide_anchor(path: &str) -> Option<String> {
+  let file_name = path.rsplit('/').next()?;
+  let slide_number = file_name
+    .strip_prefix("slide")?
+    .strip_suffix(".xml")?
+    .parse::<u32>()
+    .ok()?;
+  Some(format!("#Slide {slide_number}"))
 }
 
 impl ColorMap {

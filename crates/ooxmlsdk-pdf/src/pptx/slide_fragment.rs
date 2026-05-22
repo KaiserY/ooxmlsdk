@@ -52,6 +52,9 @@ impl SlideFragmentHandler {
       .import_media_reference_parts(package, slide_part);
     self
       .slide_persist
+      .import_hyperlink_reference_parts(package, slide_part);
+    self
+      .slide_persist
       .import_graphic_frame_related_parts(package, slide_part)?;
     self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
     let slide = slide_part.root_element(package)?;
@@ -86,6 +89,9 @@ impl SlideFragmentHandler {
       .import_media_reference_parts(package, notes_part);
     self
       .slide_persist
+      .import_hyperlink_reference_parts(package, notes_part);
+    self
+      .slide_persist
       .import_graphic_frame_related_parts(package, notes_part)?;
     self.slide_persist.drawing.imported = notes_part.vml_drawing_parts(package).next().is_some();
     let notes = notes_part.root_element(package)?;
@@ -117,6 +123,9 @@ impl SlideFragmentHandler {
     self
       .slide_persist
       .import_media_reference_parts(package, notes_master_part);
+    self
+      .slide_persist
+      .import_hyperlink_reference_parts(package, notes_master_part);
     self
       .slide_persist
       .import_graphic_frame_related_parts(package, notes_master_part)?;

@@ -615,6 +615,7 @@ struct PendingFloatingTableFollow {
 pub(crate) enum PageItem {
   Text(TextItem),
   Image(ImageItem),
+  LinkArea(LinkAreaItem),
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
@@ -661,6 +662,15 @@ pub(crate) struct ImageItem {
   pub hyperlink_url: Option<String>,
   pub floating: bool,
   pub behind_text: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct LinkAreaItem {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub hyperlink_url: String,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2230,6 +2240,7 @@ fn line_number_text_metrics_for_items(
     .find_map(|item| match item {
       PageItem::Text(text) => Some((text.y_pt, text.line_height_pt, text.style.font_size_pt)),
       PageItem::Image(_)
+      | PageItem::LinkArea(_)
       | PageItem::Rect(_)
       | PageItem::Fill(_)
       | PageItem::Line(_)
@@ -3282,6 +3293,7 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
     PageItem::Image(_)
+    | PageItem::LinkArea(_)
     | PageItem::Rect(_)
     | PageItem::Fill(_)
     | PageItem::Line(_)
@@ -3305,6 +3317,12 @@ fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
       image.y_pt,
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
+    )),
+    PageItem::LinkArea(link_area) => Some((
+      link_area.x_pt,
+      link_area.y_pt,
+      link_area.x_pt + link_area.width_pt,
+      link_area.y_pt + link_area.height_pt,
     )),
     PageItem::Rect(rect) => Some((
       rect.x_pt,
@@ -3356,6 +3374,7 @@ fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
   match item {
     PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
     PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
+    PageItem::LinkArea(link_area) => (link_area.y_pt, link_area.y_pt + link_area.height_pt),
     PageItem::Rect(rect) => (rect.y_pt, rect.y_pt + rect.height_pt),
     PageItem::Fill(fill) => (fill.y_pt, fill.y_pt + fill.height_pt),
     PageItem::Line(line) => {
@@ -4115,6 +4134,10 @@ fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
     PageItem::Image(image) => {
       image.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
         && image.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::LinkArea(link_area) => {
+      link_area.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && link_area.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
     }
     PageItem::Rect(rect) => {
       rect.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
@@ -6092,6 +6115,10 @@ fn translate_page_item(mut item: PageItem, dx_pt: f32, dy_pt: f32) -> PageItem {
     PageItem::Image(image) => {
       image.x_pt += dx_pt;
       image.y_pt += dy_pt;
+    }
+    PageItem::LinkArea(link_area) => {
+      link_area.x_pt += dx_pt;
+      link_area.y_pt += dy_pt;
     }
     PageItem::Rect(rect) => {
       rect.x_pt += dx_pt;
@@ -9178,6 +9205,9 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
   match item {
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
+    PageItem::LinkArea(link_area) => {
+      link_area.y_pt + link_area.height_pt >= top && link_area.y_pt <= bottom
+    }
     PageItem::Rect(rect) => rect.y_pt + rect.height_pt >= top && rect.y_pt <= bottom,
     PageItem::Fill(_) | PageItem::Line(_) | PageItem::Polyline(_) => true,
   }
@@ -12195,6 +12225,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
+    PageItem::LinkArea(link_area) => Some(link_area.y_pt),
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -12206,6 +12237,7 @@ fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
     PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, &text.style))),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::LinkArea(link_area) => Some((link_area.x_pt, link_area.width_pt)),
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -12217,6 +12249,7 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
   match item {
     PageItem::Text(text) => text.x_pt += offset,
     PageItem::Image(image) => image.x_pt += offset,
+    PageItem::LinkArea(link_area) => link_area.x_pt += offset,
     PageItem::Rect(rect) => rect.x_pt += offset,
     PageItem::Fill(_) => {}
     PageItem::Line(_) => {}
@@ -12233,6 +12266,10 @@ fn shift_item(item: &mut PageItem, dx: f32, dy: f32) {
     PageItem::Image(image) => {
       image.x_pt += dx;
       image.y_pt += dy;
+    }
+    PageItem::LinkArea(link_area) => {
+      link_area.x_pt += dx;
+      link_area.y_pt += dy;
     }
     PageItem::Rect(rect) => {
       rect.x_pt += dx;

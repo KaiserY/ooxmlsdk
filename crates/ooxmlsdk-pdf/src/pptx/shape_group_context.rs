@@ -12,7 +12,7 @@ use super::drawingml::shape::{
   CustomShapeGeometry, FrameType, MediaKind, Point, Shape, ShapeService, Size,
 };
 use super::drawingml::shape_properties::EffectProperties;
-use super::drawingml::text_body::TextBody;
+use super::drawingml::text_body::{TextBody, TextRun};
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
 use super::slide::{ShapeLocation, SlidePersist};
@@ -110,6 +110,7 @@ impl PPTShapeGroupContext {
     let mut shape = PptShape::new(service_name, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
+      slide_persist,
       &source
         .non_visual_shape_properties
         .non_visual_drawing_properties,
@@ -137,8 +138,11 @@ impl PPTShapeGroupContext {
       shape.shape.set_shape_style_refs(style);
     }
     if let Some(text_body) = &source.text_body {
-      shape.shape.set_text_body(TextBody::from_pml(text_body));
+      let mut text_body = TextBody::from_pml(text_body);
+      resolve_text_body_hyperlinks(slide_persist, &mut text_body);
+      shape.shape.set_text_body(text_body);
     }
+    shape.mark_empty_placeholder_reference(slide_persist);
     shape.into_shape(slide_persist)
   }
 
@@ -150,6 +154,7 @@ impl PPTShapeGroupContext {
     let mut shape = PptShape::new(ShapeService::GroupShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
+      slide_persist,
       &group
         .non_visual_group_shape_properties
         .non_visual_drawing_properties,
@@ -174,6 +179,7 @@ impl PPTShapeGroupContext {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
+      slide_persist,
       &frame
         .non_visual_graphic_frame_properties
         .non_visual_drawing_properties,
@@ -208,6 +214,7 @@ impl PPTShapeGroupContext {
     let mut shape = PptShape::new(ShapeService::ConnectorShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
+      slide_persist,
       &source
         .non_visual_connection_shape_properties
         .non_visual_drawing_properties,
@@ -233,6 +240,7 @@ impl PPTShapeGroupContext {
     let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
+      slide_persist,
       &picture
         .non_visual_picture_properties
         .non_visual_drawing_properties,
@@ -327,6 +335,7 @@ fn apply_graphic_placeholder(
 
 fn apply_non_visual_drawing_properties(
   shape: &mut Shape,
+  slide_persist: &SlidePersist,
   properties: &p::NonVisualDrawingProperties,
 ) {
   shape.id = Some(properties.id);
@@ -337,6 +346,10 @@ fn apply_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
+  shape.hyperlink_url = properties
+    .hyperlink_on_click
+    .as_deref()
+    .and_then(|hyperlink| hyperlink_url(slide_persist, hyperlink));
 }
 
 fn apply_connection_shape_properties(
@@ -363,6 +376,40 @@ fn apply_p14_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
+}
+
+fn hyperlink_url(slide_persist: &SlidePersist, hyperlink: &a::HyperlinkOnClick) -> Option<String> {
+  hyperlink
+    .id
+    .as_deref()
+    .and_then(|relationship_id| slide_persist.hyperlink_targets.get(relationship_id))
+    .cloned()
+    .or_else(|| hyperlink.invalid_url.clone())
+    .or_else(|| hyperlink.action.clone().and_then(hyperlink_action_url))
+}
+
+fn hyperlink_action_url(action: String) -> Option<String> {
+  action
+    .strip_prefix("ppaction://hlinkshowjump?jump=")
+    .map(|jump| format!("ooxmlsdk-pdf-action://hlinkshowjump/{jump}"))
+}
+
+fn resolve_text_body_hyperlinks(slide_persist: &SlidePersist, text_body: &mut TextBody) {
+  // Source: LibreOffice oox/source/drawingml/hyperlinkcontext.cxx resolves
+  // a:rPr/a:hlinkClick exactly like shape-level cNvPr/a:hlinkClick.
+  for paragraph in &mut text_body.paragraphs {
+    for run in &mut paragraph.runs {
+      resolve_text_run_hyperlink(slide_persist, run);
+    }
+  }
+}
+
+fn resolve_text_run_hyperlink(slide_persist: &SlidePersist, run: &mut TextRun) {
+  run.hyperlink_url = run
+    .run_properties
+    .as_deref()
+    .and_then(|properties| properties.hyperlink_on_click.as_deref())
+    .and_then(|hyperlink| hyperlink_url(slide_persist, hyperlink));
 }
 
 fn apply_application_media(

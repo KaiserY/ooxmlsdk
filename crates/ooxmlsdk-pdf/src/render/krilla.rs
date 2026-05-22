@@ -25,8 +25,8 @@ use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
 use crate::layout::{
-  FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, OutlineEntry,
-  PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
+  FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem,
+  OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
 };
 use crate::options::PdfOptions;
 use crate::text_metrics::{
@@ -217,6 +217,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             })
         }
         PaintItem::Image(_)
+        | PaintItem::LinkArea(_)
         | PaintItem::Rect(_)
         | PaintItem::Fill(_)
         | PaintItem::Line(_)
@@ -284,6 +285,7 @@ struct DecorationRenderMetadata {
 enum PaintItem {
   Text(PaintText),
   Image(ImageItem),
+  LinkArea(LinkAreaItem),
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
@@ -399,6 +401,7 @@ impl InternalLinkTargets {
             }
           }
           PaintItem::Image(_)
+          | PaintItem::LinkArea(_)
           | PaintItem::Rect(_)
           | PaintItem::Fill(_)
           | PaintItem::Line(_)
@@ -516,6 +519,7 @@ impl PaintDocument {
               ))
             }
             PageItem::Image(image) => PaintItem::Image(image.clone()),
+            PageItem::LinkArea(link_area) => PaintItem::LinkArea(link_area.clone()),
             PageItem::Rect(rect) => PaintItem::Rect(*rect),
             PageItem::Fill(fill) => PaintItem::Fill(*fill),
             PageItem::Line(line) => PaintItem::Line(*line),
@@ -938,6 +942,18 @@ fn draw_paint_item(
       draw_text_item(surface, text, fonts, internal_links, link_annotations);
     }
     PaintItem::Text(_) => {}
+    PaintItem::LinkArea(link_area) => {
+      if let Some(annotation) = link_annotation_for_rect(
+        link_area.x_pt,
+        link_area.y_pt,
+        link_area.width_pt,
+        link_area.height_pt,
+        &link_area.hyperlink_url,
+        internal_links,
+      ) {
+        link_annotations.push(annotation);
+      }
+    }
     PaintItem::Rect(rect) => draw_rect_item(surface, rect),
     PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
     PaintItem::Image(image) => {
@@ -990,6 +1006,12 @@ fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
       image.y_pt,
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
+    )),
+    PaintItem::LinkArea(link_area) => Some((
+      link_area.x_pt,
+      link_area.y_pt,
+      link_area.x_pt + link_area.width_pt,
+      link_area.y_pt + link_area.height_pt,
     )),
     PaintItem::Rect(rect) => Some((
       rect.x_pt,

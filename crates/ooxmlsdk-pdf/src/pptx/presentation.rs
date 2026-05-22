@@ -157,6 +157,7 @@ impl PresentationFragmentHandler {
       persist.theme_path = self.import_master_theme(package, import, &master_part)?;
       persist.import_image_parts(package, &master_part);
       persist.import_media_reference_parts(package, &master_part);
+      persist.import_hyperlink_reference_parts(package, &master_part);
       persist.import_graphic_frame_related_parts(package, &master_part)?;
       let master = master_part.root_element(package)?;
       persist.shape_location = ShapeLocation::Master;
@@ -331,6 +332,7 @@ impl PresentationFragmentHandler {
     }
     persist.import_image_parts(package, &layout_part);
     persist.import_media_reference_parts(package, &layout_part);
+    persist.import_hyperlink_reference_parts(package, &layout_part);
     persist.import_graphic_frame_related_parts(package, &layout_part)?;
     persist.layout_path = layout_path;
     persist.master_path = master_path;

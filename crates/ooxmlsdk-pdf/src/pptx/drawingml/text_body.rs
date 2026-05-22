@@ -58,6 +58,7 @@ pub(crate) struct TextParagraph {
 pub(crate) struct TextRun {
   pub(crate) text: String,
   pub(crate) kind: TextRunKind,
+  pub(crate) hyperlink_url: Option<String>,
   pub(crate) field_type: Option<String>,
   pub(crate) run_properties: Option<Box<a::RunProperties>>,
   pub(crate) field_paragraph_properties: Option<Box<a::ParagraphProperties>>,
@@ -293,6 +294,7 @@ impl TextRun {
       a::ParagraphChoice::Run(run) => Some(Self {
         text: run.text.clone(),
         kind: TextRunKind::Run,
+        hyperlink_url: None,
         field_type: None,
         run_properties: run.run_properties.clone(),
         field_paragraph_properties: None,
@@ -300,6 +302,7 @@ impl TextRun {
       a::ParagraphChoice::Break(line_break) => Some(Self {
         text: "\n".to_string(),
         kind: TextRunKind::Break,
+        hyperlink_url: None,
         field_type: None,
         run_properties: line_break.run_properties.clone(),
         field_paragraph_properties: None,
@@ -307,6 +310,7 @@ impl TextRun {
       a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| Self {
         text: text.clone(),
         kind: TextRunKind::Field,
+        hyperlink_url: None,
         field_type: field.r#type.clone(),
         run_properties: field.run_properties.clone(),
         field_paragraph_properties: field.paragraph_properties.clone(),
@@ -314,6 +318,7 @@ impl TextRun {
       a::ParagraphChoice::TextMath(_) => Some(Self {
         text: String::new(),
         kind: TextRunKind::Math,
+        hyperlink_url: None,
         field_type: None,
         run_properties: None,
         field_paragraph_properties: None,

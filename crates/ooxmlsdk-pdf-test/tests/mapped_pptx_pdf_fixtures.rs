@@ -82,6 +82,17 @@ fn assert_text_object_font_contains(
   );
 }
 
+fn assert_text_font_size(summary: &PdfSummary, expected_text: &str, expected_size: &str) {
+  assert!(
+    summary.text_objects.iter().any(|object| {
+      normalize_space(&object.text).contains(expected_text)
+        && object.scaled_font_size == expected_size
+    }),
+    "missing text {expected_text:?} with font size {expected_size}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
 fn assert_text_absent(summary: &PdfSummary, page_index: usize, unexpected: &str) {
   let text = page_text(summary, page_index);
   assert!(
@@ -1387,4 +1398,168 @@ fn mapped_pptx_smartart_table_list_aligns_child_with_parent() {
     (parent.right - child.right).abs() < 18.0,
     "expected Child 2 right edge to stay close to Parent right edge; parent={parent:?}; child={child:?}"
   );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testAccentProcess
+fn mapped_pptx_smartart_accent_process_preserves_child_text_and_arrow() {
+  let summary = render_summary("pptx/smartart-accent-process.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "c", "d"]);
+  assert_text_top_after(&summary, 0, "b", "a");
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testContinuousBlockProcess
+fn mapped_pptx_smartart_continuous_block_process_preserves_three_blocks() {
+  let summary = render_summary("pptx/smartart-continuous-block-process.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "B", "C"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+  assert_text_left_before(&summary, 0, "A", "B");
+  assert_text_left_before(&summary, 0, "B", "C");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testOrgChart
+fn mapped_pptx_smartart_org_chart_preserves_manager_employee_layout() {
+  let summary = render_summary("pptx/smartart-org-chart.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Manager",
+      "Second para",
+      "Employee",
+      "Employee2",
+      "Manager2",
+      "Assistant",
+    ],
+  );
+  assert_text_fill_color(&summary, "Manager", "#ffffff@ff");
+  assert_text_top_after(&summary, 0, "Employee", "Manager");
+  assert_text_left_before(&summary, 0, "Employee", "Employee2");
+  assert_text_top_after(&summary, 0, "Employee", "Assistant");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCycleMatrix
+fn mapped_pptx_smartart_cycle_matrix_preserves_texts_and_orange_fill() {
+  let summary = render_summary("pptx/smartart-cycle-matrix.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "A1", "A2", "B1", "B2", "C1", "C2-1", "D1", "D2", "C2-2", "C2-3", "C2-4",
+    ],
+  );
+  assert_has_path_fill_color(&summary, "#f79646@ff");
+  assert_text_left_before(&summary, 0, "A2", "B2");
+  assert_text_top_after(&summary, 0, "D2", "A2");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testPictureStrip
+fn mapped_pptx_smartart_picture_strip_preserves_three_bitmap_rows() {
+  let summary = render_summary("pptx/smartart-picture-strip.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Foo Bar", "Baz Blah", "A", "B", "C"]);
+  assert_page_image_count_at_least(&summary, 0, 3);
+  assert_text_top_after(&summary, 0, "B", "A");
+  assert_text_top_after(&summary, 0, "C", "B");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBackground
+fn mapped_pptx_smartart_background_preserves_green_background() {
+  let summary = render_summary("pptx/smartart-background.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Background", "should", "be", "green"]);
+  assert_has_path_fill_color(&summary, "#339933@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBackgroundDrawingmlFallback
+fn mapped_pptx_smartart_background_drawingml_fallback_preserves_green_background() {
+  let summary = render_summary("pptx/smartart-background-drawingml-fallback.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Background", "should", "be", "green"]);
+  assert_has_path_fill_color(&summary, "#339933@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCenterCycle
+fn mapped_pptx_smartart_center_cycle_preserves_center_relationships() {
+  let summary = render_summary("pptx/smartart-center-cycle.pptx");
+  assert_page_contains_in_order(&summary, 0, &["center", "a", "b", "c"]);
+  assert_text_top_after(&summary, 0, "center", "a");
+  assert_text_left_after(&summary, 0, "center", "b");
+  assert_text_left_before(&summary, 0, "center", "c");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testFontSize
+fn mapped_pptx_smartart_font_size_preserves_max_and_shrunk_text() {
+  let summary = render_summary("pptx/smartart-font-size.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 0, &["Max size", "(65 pt)"]);
+  assert_text_font_size(&summary, "Max size", "65.00");
+  assert_page_contains_in_order(&summary, 1, &["Automatically shrinked text"]);
+  assert_text_font_size(&summary, "Automatically shrinked text", "32.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testVerticalBlockList
+fn mapped_pptx_smartart_vertical_block_list_preserves_rotated_block_text() {
+  let summary = render_summary("pptx/smartart-vertical-block-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "x", "y", "z", "empty"]);
+  assert_vertical_text_shape(&summary, 0, "b");
+  assert_text_top_after(&summary, 0, "empty", "a");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testMissingBulletAndIndent
+fn mapped_pptx_smartart_missing_bullet_preserves_child_bullet_indent() {
+  let summary = render_summary("pptx/smartart-missing-bullet.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Bullet no", "Bullet yes"]);
+  assert_text_left_delta_close(
+    &summary,
+    0,
+    "Bullet yes",
+    "Bullet no",
+    309.0 * 72.0 / 2540.0,
+    6.0,
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBulletList
+fn mapped_pptx_smartart_bullet_list_preserves_child_bullets() {
+  let summary = render_summary("pptx/smartart-bullet-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "B", "C"]);
+  assert_text_left_before(&summary, 0, "A", "B");
+  assert_text_left_before(&summary, 0, "B", "C");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testRecursion
+fn mapped_pptx_smartart_recursion_preserves_nested_texts() {
+  let summary = render_summary("pptx/smartart-recursion.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "B1", "C1", "C2", "B2", "C3"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testDataFollow
+fn mapped_pptx_smartart_data_follow_preserves_following_nodes() {
+  let summary = render_summary("pptx/smartart-data-follow.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A1", "B1", "B2", "A2", "C1", "C2"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testOrgChart2
+fn mapped_pptx_smartart_org_chart2_preserves_deep_org_texts() {
+  let summary = render_summary("pptx/smartart-org-chart2.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["A", "B1", "B2", "C3", "C1", "C2", "D1", "D2", "C4"],
+  );
+  assert_text_top_after(&summary, 0, "B1", "A");
+  assert_text_top_after(&summary, 0, "C1", "B1");
 }

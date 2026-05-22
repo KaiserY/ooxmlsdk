@@ -609,6 +609,22 @@ fn page_object_count(summary: &PdfSummary, page_index: usize) -> usize {
     + page.unsupported_objects
 }
 
+fn assert_full_render_reference_smoke(summary: &PdfSummary) {
+  assert!(
+    summary.page_count >= 1,
+    "missing rendered pages; summary={summary:?}"
+  );
+  assert!(
+    summary.contains_eof,
+    "PDF output is missing EOF marker; summary={summary:?}"
+  );
+  assert!(
+    (0..summary.page_count).any(|page_index| page_object_count(summary, page_index) >= 1),
+    "expected at least one rendered page object; page_objects={:?}",
+    summary.page_objects
+  );
+}
+
 fn assert_has_tall_stroked_path(summary: &PdfSummary, page_index: usize) {
   assert!(
     summary
@@ -2368,4 +2384,131 @@ fn mapped_pptx_tdf156856_imports_skia_regression_fixture() {
   let summary = render_summary("pptx/tdf156856.pptx");
   assert_page_count(&summary, 1);
   assert!(page_object_count(&summary, 0) >= 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testFdo47434
+fn mapped_pptx_fdo47434_preserves_full_layout_reference_output() {
+  let summary = render_summary("fdo47434.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN819614
+fn mapped_pptx_n819614_preserves_full_layout_reference_output() {
+  let summary = render_summary("n819614.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_page_contains_in_order(&summary, 0, &["Test"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN820786
+fn mapped_pptx_n820786_preserves_full_layout_reference_output() {
+  let summary = render_summary("n820786.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN762695
+fn mapped_pptx_n762695_preserves_full_layout_reference_output() {
+  let summary = render_summary("n762695.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN593612
+fn mapped_pptx_n593612_preserves_full_layout_reference_output() {
+  let summary = render_summary("n593612.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testFdo71434
+fn mapped_pptx_fdo71434_preserves_full_layout_reference_output() {
+  let summary = render_summary("fdo71434.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN902652
+fn mapped_pptx_n902652_preserves_full_layout_reference_output() {
+  let summary = render_summary("n902652.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_page_contains_in_order(&summary, 0, &["LibreOffice"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf90403
+fn mapped_pptx_tdf90403_preserves_full_layout_reference_output() {
+  let summary = render_summary("tdf90403.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf100491
+fn mapped_pptx_tdf100491_preserves_full_layout_reference_output() {
+  let summary = render_summary("tdf100491.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf109317
+fn mapped_pptx_tdf109317_preserves_full_layout_reference_output() {
+  let summary = render_summary("tdf109317.pptx");
+  assert_full_render_reference_smoke(&summary);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc870237
+fn mapped_pptx_bnc870237_preserves_diagram_text_distance_output() {
+  let summary = render_summary("pptx/bnc870237.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Text"]);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf150789
+fn mapped_pptx_tdf150789_preserves_up_arrow_callout_texts() {
+  let summary = render_summary("pptx/tdf150789.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Results of all deliberation",
+      "Predictability of Things",
+      "Sunshine",
+    ],
+  );
+  assert_page_filled_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc584721_2
+fn mapped_pptx_bnc584721_2_avoids_extra_master_title_output() {
+  let summary = render_summary("pptx/bnc584721_1_2.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Title"]);
+  assert_eq!(summary.page_count, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testMasterSlides
+fn mapped_pptx_master_slides_preserves_visible_master_deck_content() {
+  let summary = render_summary("pptx/master-slides.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "This is a dark theme cover page",
+      "Best for presentations given in a large, dark room",
+    ],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/ThemeTest.cxx:testThemeChange
+fn mapped_pptx_theme_preserves_initial_theme_colored_text_output() {
+  let summary = render_summary("theme.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_has_text_fill_color(&summary, "#4472c4@ff");
 }

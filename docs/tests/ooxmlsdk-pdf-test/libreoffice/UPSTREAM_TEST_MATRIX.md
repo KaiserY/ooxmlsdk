@@ -571,7 +571,7 @@ PPTX bucket counts:
 | `sd/qa/unit/FontEmbeddingTest.cxx` | 2 |
 
 Current local coverage is intentionally small and upstream-assertion focused:
-182 matrix rows are covered by active PPTX PDF tests. They currently span
+197 matrix rows are covered by active PPTX PDF tests. They currently span
 LibreOffice import text/color/fill/line/border/page assertions and layout
 metafile-position assertions.
 `layout-tests.cxx::numberedList` is present as an ignored TDD assertion because
@@ -582,16 +582,16 @@ LibreOffice text-order expectation unchanged.
 
 | Upstream test | Fixture | Upstream source | Status | Rust assertion shape |
 |---|---|---|---|---|
-| `import-tests.cxx::testFdo47434` | `fdo47434.pptx` | `../core/sd/qa/unit/import-tests.cxx:140` | `mapped` | full render reference. |
-| `import-tests.cxx::testN819614` | `n819614.pptx` | `../core/sd/qa/unit/import-tests.cxx:155` | `mapped` | full render reference. |
-| `import-tests.cxx::testN820786` | `n820786.pptx` | `../core/sd/qa/unit/import-tests.cxx:163` | `mapped` | full render reference. |
-| `import-tests.cxx::testN762695` | `n762695.pptx` | `../core/sd/qa/unit/import-tests.cxx:168` | `mapped` | full render reference. |
-| `import-tests.cxx::testN593612` | `n593612.pptx` | `../core/sd/qa/unit/import-tests.cxx:173` | `mapped` | full render reference. |
-| `import-tests.cxx::testFdo71434` | `fdo71434.pptx` | `../core/sd/qa/unit/import-tests.cxx:178` | `mapped` | full render reference. |
-| `import-tests.cxx::testN902652` | `n902652.pptx` | `../core/sd/qa/unit/import-tests.cxx:183` | `mapped` | full render reference. |
-| `import-tests.cxx::testTdf90403` | `tdf90403.pptx` | `../core/sd/qa/unit/import-tests.cxx:188` | `mapped` | full render reference. |
-| `import-tests.cxx::testTdf100491` | `tdf100491.pptx` | `../core/sd/qa/unit/import-tests.cxx:203` | `mapped` | full render reference. |
-| `import-tests.cxx::testTdf109317` | `tdf109317.pptx` | `../core/sd/qa/unit/import-tests.cxx:208` | `mapped` | full render reference. |
+| `import-tests.cxx::testFdo47434` | `fdo47434.pptx` | `../core/sd/qa/unit/import-tests.cxx:140` | `covered` | full render reference. |
+| `import-tests.cxx::testN819614` | `n819614.pptx` | `../core/sd/qa/unit/import-tests.cxx:155` | `covered` | full render reference. |
+| `import-tests.cxx::testN820786` | `n820786.pptx` | `../core/sd/qa/unit/import-tests.cxx:163` | `covered` | full render reference. |
+| `import-tests.cxx::testN762695` | `n762695.pptx` | `../core/sd/qa/unit/import-tests.cxx:168` | `covered` | full render reference. |
+| `import-tests.cxx::testN593612` | `n593612.pptx` | `../core/sd/qa/unit/import-tests.cxx:173` | `covered` | full render reference. |
+| `import-tests.cxx::testFdo71434` | `fdo71434.pptx` | `../core/sd/qa/unit/import-tests.cxx:178` | `covered` | full render reference. |
+| `import-tests.cxx::testN902652` | `n902652.pptx` | `../core/sd/qa/unit/import-tests.cxx:183` | `covered` | full render reference. |
+| `import-tests.cxx::testTdf90403` | `tdf90403.pptx` | `../core/sd/qa/unit/import-tests.cxx:188` | `covered` | full render reference. |
+| `import-tests.cxx::testTdf100491` | `tdf100491.pptx` | `../core/sd/qa/unit/import-tests.cxx:203` | `covered` | full render reference. |
+| `import-tests.cxx::testTdf109317` | `tdf109317.pptx` | `../core/sd/qa/unit/import-tests.cxx:208` | `covered` | full render reference. |
 | `import-tests.cxx::testTdf157216` | `pptx/tdf157216.pptx` | `../core/sd/qa/unit/import-tests.cxx:213` | `covered` | partial visible-output assertion. |
 | `import-tests.cxx::testTableStyle` | `pptx/tdf156718.pptx` | `../core/sd/qa/unit/import-tests.cxx:242` | `covered` | partial visible-output assertion. |
 | `import-tests.cxx::testFreeformShapeGluePoints` | `pptx/tdf156829.pptx` | `../core/sd/qa/unit/import-tests.cxx:311` | `covered` | partial visible-output assertion. |
@@ -665,14 +665,14 @@ LibreOffice text-order expectation unchanged.
 | `import-tests3.cxx::testN778859` | `pptx/n778859.pptx` | `../core/sd/qa/unit/import-tests3.cxx:131` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testPlaceholderPriority` | `ppt/placeholder-priority.pptx` | `../core/sd/qa/unit/import-tests3.cxx:159` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testFdo72998` | `pptx/cshapes.pptx` | `../core/sd/qa/unit/import-tests3.cxx:180` | `covered` | partial visible-output assertion. |
-| `import-tests3.cxx::testBnc870237` | `pptx/bnc870237.pptx` | `../core/sd/qa/unit/import-tests3.cxx:348` | `mapped` | partial visible-output assertion. |
-| `import-tests3.cxx::testTdf150789` | `pptx/tdf150789.pptx` | `../core/sd/qa/unit/import-tests3.cxx:363` | `mapped` | partial visible-output assertion. |
+| `import-tests3.cxx::testBnc870237` | `pptx/bnc870237.pptx` | `../core/sd/qa/unit/import-tests3.cxx:348` | `covered` | partial visible-output assertion. |
+| `import-tests3.cxx::testTdf150789` | `pptx/tdf150789.pptx` | `../core/sd/qa/unit/import-tests3.cxx:363` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testCreationDate` | `fdo71434.pptx` | `../core/sd/qa/unit/import-tests3.cxx:394` | `mapped` | partial visible-output assertion. |
 | `import-tests3.cxx::testMultiColTexts` | `pptx/multicol.pptx` | `../core/sd/qa/unit/import-tests3.cxx:408` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testPredefinedTableStyle` | `pptx/predefined-table-style.pptx` | `../core/sd/qa/unit/import-tests3.cxx:429` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testBnc887225` | `pptx/bnc887225.pptx` | `../core/sd/qa/unit/import-tests3.cxx:455` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testBnc584721_1` | `pptx/bnc584721_1_2.pptx` | `../core/sd/qa/unit/import-tests3.cxx:498` | `covered` | partial visible-output assertion. |
-| `import-tests3.cxx::testBnc584721_2` | `pptx/bnc584721_1_2.pptx` | `../core/sd/qa/unit/import-tests3.cxx:512` | `mapped` | partial visible-output assertion. |
+| `import-tests3.cxx::testBnc584721_2` | `pptx/bnc584721_1_2.pptx` | `../core/sd/qa/unit/import-tests3.cxx:512` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testBnc591147` | `pptx/bnc591147.pptx` | `../core/sd/qa/unit/import-tests3.cxx:522` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testBnc584721_4` | `pptx/bnc584721_4.pptx` | `../core/sd/qa/unit/import-tests3.cxx:555` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testBnc904423` | `pptx/bnc904423.pptx` | `../core/sd/qa/unit/import-tests3.cxx:575` | `covered` | partial visible-output assertion. |
@@ -729,7 +729,7 @@ LibreOffice text-order expectation unchanged.
 | `import-tests4.cxx::testIndentDuplication` | `pptx/formatting-bullet-indent.pptx` | `../core/sd/qa/unit/import-tests4.cxx:867` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::test_srcRect_smallNegBound` | `pptx/tdf153008-srcRect-smallNegBound.pptx` | `../core/sd/qa/unit/import-tests4.cxx:885` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf153012` | `pptx/chart_pt_color_bg1.pptx` | `../core/sd/qa/unit/import-tests4.cxx:904` | `covered` | partial visible-output assertion. |
-| `import-tests4.cxx::testMasterSlides` | `pptx/master-slides.pptx` | `../core/sd/qa/unit/import-tests4.cxx:935` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testMasterSlides` | `pptx/master-slides.pptx` | `../core/sd/qa/unit/import-tests4.cxx:935` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::tdf158512` | `pptx/tdf158512.pptx` | `../core/sd/qa/unit/import-tests4.cxx:1017` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf169524` | `pptx/tdf169524.pptx` | `../core/sd/qa/unit/import-tests4.cxx:1030` | `covered` | partial visible-output assertion. |
 | `import-tests_skia.cxx::testTdf156856` | `pptx/tdf156856.pptx` | `../core/sd/qa/unit/import-tests_skia.cxx:28` | `covered` | partial visible-output assertion. |
@@ -798,7 +798,7 @@ LibreOffice text-order expectation unchanged.
 | `PNGExportTests.cxx::testTdf157793` | `pptx/tdf157793.pptx` | `../core/sd/qa/unit/PNGExportTests.cxx:503` | `mapped` | full page raster assertion. |
 | `PNGExportTests.cxx::testTdf157635` | `pptx/tdf157635.pptx` | `../core/sd/qa/unit/PNGExportTests.cxx:553` | `mapped` | full page raster assertion. |
 | `PNGExportTests.cxx::testTdf113163` | `pptx/tdf113163.pptx` | `../core/sd/qa/unit/PNGExportTests.cxx:603` | `mapped` | full page raster assertion. |
-| `ThemeTest.cxx::testThemeChange` | `theme.pptx` | `../core/sd/qa/unit/ThemeTest.cxx:65` | `mapped` | full theme-render assertion. |
+| `ThemeTest.cxx::testThemeChange` | `theme.pptx` | `../core/sd/qa/unit/ThemeTest.cxx:65` | `covered` | full theme-render assertion. |
 | `ShapeImportExportTest.cxx::testTextDistancesOOXML` | `TextDistancesInsets1.pptx` | `../core/sd/qa/unit/ShapeImportExportTest.cxx:58` | `mapped` | partial text-inset geometry assertion. |
 | `ShapeImportExportTest.cxx::testTextDistancesOOXML_LargerThanTextAreaSpecialCase` | `TextDistancesInsets2.pptx` | `../core/sd/qa/unit/ShapeImportExportTest.cxx:167` | `mapped` | partial text-inset geometry assertion. |
 | `FontEmbeddingTest.cxx::testRoundtripEmbeddedFontsPPTX` | `BoldonseFontEmbedded.pptx` | `../core/sd/qa/unit/FontEmbeddingTest.cxx:34` | `mapped` | full font/PDF-resource assertion. |

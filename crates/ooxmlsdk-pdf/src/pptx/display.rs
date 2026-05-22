@@ -12,6 +12,7 @@ use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::units::DrawingmlPercentageValue;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -105,21 +106,26 @@ fn lower_background(
       stroke: None,
       stroke_opacity: 1.0,
     }));
-  } else if let Some(image) = blip_fill_image_item(
-    import,
-    slide,
-    &fill_properties,
-    0.0,
-    0.0,
-    slide.size.width_pt,
-    slide.size.height_pt,
-    0.0,
-    false,
-    false,
-    None,
-    None,
-  ) {
-    items.push(PageItem::Image(image));
+  } else {
+    items.extend(
+      blip_fill_image_items(
+        import,
+        slide,
+        &fill_properties,
+        0.0,
+        0.0,
+        slide.size.width_pt,
+        slide.size.height_pt,
+        0.0,
+        false,
+        false,
+        false,
+        None,
+        None,
+      )
+      .into_iter()
+      .map(PageItem::Image),
+    );
   }
 }
 
@@ -289,19 +295,52 @@ fn lower_picture(
     resource.content_type.as_deref(),
     &picture.blip_choices,
   );
+  let custom_geometry = shape.custom_shape_properties.geometry.is_some();
+  let (data, content_type, crop, flip_horizontal, flip_vertical) =
+    if custom_geometry && (picture.crop != ImageCrop::default() || shape.flip_h || shape.flip_v) {
+      transform_image_data_to_png(&image_data.data, picture.crop, shape.flip_h, shape.flip_v)
+        .map(|data| {
+          (
+            data,
+            Some("image/png".into()),
+            ImageCrop::default(),
+            false,
+            false,
+          )
+        })
+        .unwrap_or_else(|| {
+          (
+            image_data.data,
+            image_data
+              .content_type
+              .or_else(|| resource.content_type.clone()),
+            picture.crop,
+            shape.flip_h,
+            shape.flip_v,
+          )
+        })
+    } else {
+      (
+        image_data.data,
+        image_data
+          .content_type
+          .or_else(|| resource.content_type.clone()),
+        picture.crop,
+        shape.flip_h,
+        shape.flip_v,
+      )
+    };
   items.push(PageItem::Image(ImageItem {
     x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
     y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
     width_pt: units::emu_to_points(shape.size.cx),
     height_pt: units::emu_to_points(shape.size.cy),
-    crop: picture.crop,
+    crop,
     rotation_deg: shape.rotation,
-    flip_horizontal: shape.flip_h,
-    flip_vertical: shape.flip_v,
-    data: image_data.data,
-    content_type: image_data
-      .content_type
-      .or_else(|| resource.content_type.clone()),
+    flip_horizontal,
+    flip_vertical,
+    data,
+    content_type,
     alt_text: shape
       .description
       .clone()
@@ -1089,36 +1128,40 @@ fn lower_shape_bounds(
   let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
   let width_pt = units::emu_to_points(shape.size.cx);
   let height_pt = units::emu_to_points(shape.size.cy);
-  let fill_image = shape.actual_fill_properties.as_ref().and_then(|fill| {
-    blip_fill_image_item(
-      import,
-      slide,
-      fill,
-      x_pt,
-      y_pt,
-      width_pt,
-      height_pt,
-      shape.rotation,
-      shape.flip_h,
-      shape.flip_v,
-      shape
-        .description
-        .clone()
-        .or_else(|| shape.title.clone())
-        .or_else(|| shape.name.clone()),
-      shape.hyperlink_url.clone(),
-    )
-  });
+  let fill_images = shape
+    .actual_fill_properties
+    .as_ref()
+    .map(|fill| {
+      blip_fill_image_items(
+        import,
+        slide,
+        fill,
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+        shape.rotation,
+        shape.flip_h,
+        shape.flip_v,
+        shape.custom_shape_properties.geometry.is_some(),
+        shape
+          .description
+          .clone()
+          .or_else(|| shape.title.clone())
+          .or_else(|| shape.name.clone()),
+        shape.hyperlink_url.clone(),
+      )
+    })
+    .unwrap_or_default();
   let line = shape
     .actual_line_properties
     .as_ref()
     .and_then(|line| line_stroke(import, line));
-  if fill_paint.is_none() && fill_image.is_none() && line.is_none() {
+  let has_fill_image = !fill_images.is_empty();
+  if fill_paint.is_none() && !has_fill_image && line.is_none() {
     return;
   }
-  if let Some(fill_image) = fill_image {
-    items.push(PageItem::Image(fill_image));
-  }
+  items.extend(fill_images.into_iter().map(PageItem::Image));
   let (stroke, stroke_opacity) = line
     .map(|line| (Some(line.style), line.opacity))
     .unwrap_or((None, 1.0));
@@ -1145,7 +1188,7 @@ fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
   }
 }
 
-fn blip_fill_image_item(
+fn blip_fill_image_items(
   import: &PowerPointImport,
   slide: &SlidePersist,
   fill: &FillProperties,
@@ -1156,25 +1199,22 @@ fn blip_fill_image_item(
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
+  crop_bitmap: bool,
   alt_text: Option<String>,
   hyperlink_url: Option<String>,
-) -> Option<ImageItem> {
-  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
-  // XML_blipFill sets FillBitmap and applies srcRect/fillRect cropping before
-  // setting the bitmap mode. Reuse the existing cropped image primitive for
-  // stretch/source-rectangle cases; tile/repeat needs separate mode lowering.
+) -> Vec<ImageItem> {
   let FillKind::Blip(blip_fill) = &fill.kind else {
-    return None;
+    return Vec::new();
   };
-  if matches!(
-    blip_fill.blip_fill_choice.as_ref(),
-    Some(a::BlipFillChoice::Tile(_))
-  ) {
-    return None;
-  }
-  let blip = blip_fill.blip.as_ref()?;
-  let relationship_id = blip.embed.as_deref()?;
-  let resource = slide.image_resources.get(relationship_id)?;
+  let Some(blip) = blip_fill.blip.as_ref() else {
+    return Vec::new();
+  };
+  let Some(relationship_id) = blip.embed.as_deref() else {
+    return Vec::new();
+  };
+  let Some(resource) = slide.image_resources.get(relationship_id) else {
+    return Vec::new();
+  };
   let image_data = image_data_with_blip_effects(
     import,
     slide,
@@ -1182,24 +1222,204 @@ fn blip_fill_image_item(
     resource.content_type.as_deref(),
     &blip.blip_choice,
   );
-  Some(ImageItem {
+  let content_type = image_data
+    .content_type
+    .clone()
+    .or_else(|| resource.content_type.clone());
+
+  let crop = blip_fill_image_crop(blip_fill);
+  if let Some(a::BlipFillChoice::Tile(tile)) = blip_fill.blip_fill_choice.as_ref() {
+    return tiled_blip_fill_image_items(
+      &image_data.data,
+      content_type,
+      tile,
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      rotation_deg,
+      flip_horizontal,
+      flip_vertical,
+      alt_text,
+      hyperlink_url,
+    );
+  }
+
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // lclGetBitmapMode() defaults missing bitmap mode to XML_tile for MSO.
+  if blip_fill.blip_fill_choice.is_none() {
+    return tiled_blip_fill_image_items(
+      &image_data.data,
+      content_type,
+      &a::Tile::default(),
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      rotation_deg,
+      flip_horizontal,
+      flip_vertical,
+      alt_text,
+      hyperlink_url,
+    );
+  }
+
+  let (data, content_type, crop, flip_horizontal, flip_vertical) = if crop_bitmap
+    && ((blip_fill.source_rectangle.is_some() && crop != ImageCrop::default())
+      || flip_horizontal
+      || flip_vertical)
+  {
+    transform_image_data_to_png(&image_data.data, crop, flip_horizontal, flip_vertical)
+      .map(|data| {
+        (
+          data,
+          Some("image/png".into()),
+          ImageCrop::default(),
+          false,
+          false,
+        )
+      })
+      .unwrap_or((
+        image_data.data,
+        content_type,
+        crop,
+        flip_horizontal,
+        flip_vertical,
+      ))
+  } else {
+    (
+      image_data.data,
+      content_type,
+      crop,
+      flip_horizontal,
+      flip_vertical,
+    )
+  };
+
+  vec![ImageItem {
     x_pt,
     y_pt,
     width_pt,
     height_pt,
-    crop: blip_fill_image_crop(blip_fill),
+    crop,
     rotation_deg,
     flip_horizontal,
     flip_vertical,
-    data: image_data.data,
-    content_type: image_data
-      .content_type
-      .or_else(|| resource.content_type.clone()),
+    data,
+    content_type,
     alt_text,
     hyperlink_url,
     floating: false,
     behind_text: false,
-  })
+  }]
+}
+
+fn tiled_blip_fill_image_items(
+  data: &[u8],
+  content_type: Option<String>,
+  tile: &a::Tile,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+  alt_text: Option<String>,
+  hyperlink_url: Option<String>,
+) -> Vec<ImageItem> {
+  let (mut tile_width_pt, mut tile_height_pt) =
+    image_tile_size_pt(data).unwrap_or((width_pt, height_pt));
+  let scale_x = tile
+    .horizontal_ratio
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(1.0);
+  let scale_y = tile
+    .vertical_ratio
+    .as_ref()
+    .map(|value| value.as_ratio() as f32)
+    .unwrap_or(1.0);
+  tile_width_pt = (tile_width_pt * scale_x).max(1.0).min(width_pt.max(1.0));
+  tile_height_pt = (tile_height_pt * scale_y).max(1.0).min(height_pt.max(1.0));
+  let offset_x_pt = tile
+    .horizontal_offset
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or(0.0);
+  let offset_y_pt = tile
+    .vertical_offset
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or(0.0);
+
+  let mut start_x = x_pt + offset_x_pt % tile_width_pt;
+  while start_x > x_pt {
+    start_x -= tile_width_pt;
+  }
+  let mut start_y = y_pt + offset_y_pt % tile_height_pt;
+  while start_y > y_pt {
+    start_y -= tile_height_pt;
+  }
+
+  let mut images = Vec::new();
+  let mut y = start_y;
+  let mut row = 0usize;
+  while y < y_pt + height_pt && images.len() < 256 {
+    let mut x = start_x;
+    let mut column = 0usize;
+    while x < x_pt + width_pt && images.len() < 256 {
+      let item_x = x.max(x_pt);
+      let item_y = y.max(y_pt);
+      let item_right = (x + tile_width_pt).min(x_pt + width_pt);
+      let item_bottom = (y + tile_height_pt).min(y_pt + height_pt);
+      if item_right > item_x && item_bottom > item_y {
+        let crop = ImageCrop {
+          left: ((item_x - x) / tile_width_pt).max(0.0),
+          top: ((item_y - y) / tile_height_pt).max(0.0),
+          right: ((x + tile_width_pt - item_right) / tile_width_pt).max(0.0),
+          bottom: ((y + tile_height_pt - item_bottom) / tile_height_pt).max(0.0),
+        };
+        let (tile_flip_h, tile_flip_v) = tile_flip(tile.flip, row, column);
+        images.push(ImageItem {
+          x_pt: item_x,
+          y_pt: item_y,
+          width_pt: item_right - item_x,
+          height_pt: item_bottom - item_y,
+          crop,
+          rotation_deg,
+          flip_horizontal: flip_horizontal ^ tile_flip_h,
+          flip_vertical: flip_vertical ^ tile_flip_v,
+          data: data.to_vec(),
+          content_type: content_type.clone(),
+          alt_text: alt_text.clone(),
+          hyperlink_url: hyperlink_url.clone(),
+          floating: false,
+          behind_text: false,
+        });
+      }
+      x += tile_width_pt;
+      column += 1;
+    }
+    y += tile_height_pt;
+    row += 1;
+  }
+  images
+}
+
+fn image_tile_size_pt(data: &[u8]) -> Option<(f32, f32)> {
+  let image = image::load_from_memory(data).ok()?;
+  Some((
+    image.width() as f32 * units::POINTS_PER_CSS_PIXEL,
+    image.height() as f32 * units::POINTS_PER_CSS_PIXEL,
+  ))
+}
+
+fn tile_flip(flip: Option<a::TileFlipValues>, row: usize, column: usize) -> (bool, bool) {
+  match flip.unwrap_or_default() {
+    a::TileFlipValues::None => (false, false),
+    a::TileFlipValues::Horizontal => (column % 2 == 1, false),
+    a::TileFlipValues::Vertical => (false, row % 2 == 1),
+    a::TileFlipValues::HorizontalAndVertical => (column % 2 == 1, row % 2 == 1),
+  }
 }
 
 struct ImportedImageData {
@@ -1412,6 +1632,68 @@ fn apply_image_effects(
   Some(output)
 }
 
+fn transform_image_data_to_png(
+  data: &[u8],
+  crop: ImageCrop,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+) -> Option<Vec<u8>> {
+  let mut image = image::load_from_memory(data).ok()?.to_rgba8();
+  let width = image.width();
+  let height = image.height();
+  if width == 0 || height == 0 {
+    return None;
+  }
+
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // lclCropGraphic rounds the srcRect-derived quotients against bitmap pixels
+  // and creates a cropped bitmap before assigning it as custom-shape fill.
+  let left = ((width as f32) * crop.left)
+    .round()
+    .clamp(0.0, width as f32) as u32;
+  let top = ((height as f32) * crop.top)
+    .round()
+    .clamp(0.0, height as f32) as u32;
+  let right = ((width as f32) * crop.right)
+    .round()
+    .clamp(0.0, width as f32) as u32;
+  let bottom = ((height as f32) * crop.bottom)
+    .round()
+    .clamp(0.0, height as f32) as u32;
+  if left + right >= width || top + bottom >= height {
+    return None;
+  }
+
+  image = image::imageops::crop_imm(
+    &image,
+    left,
+    top,
+    width - left - right,
+    height - top - bottom,
+  )
+  .to_image();
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // lclMirrorGraphic mirrors custom-shape fill bitmaps directly instead of
+  // relying on a shape-level bitmap flip.
+  if flip_horizontal {
+    image = image::imageops::flip_horizontal(&image);
+  }
+  if flip_vertical {
+    image = image::imageops::flip_vertical(&image);
+  }
+  let mut output = Vec::new();
+  let encoder = PngEncoder::new(Cursor::new(&mut output));
+  encoder
+    .write_image(
+      image.as_raw(),
+      image.width(),
+      image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .ok()?;
+  Some(output)
+}
+
 fn channel_within_tolerance(actual: u8, expected: u8, tolerance: u8) -> bool {
   actual.abs_diff(expected) <= tolerance
 }
@@ -1452,53 +1734,44 @@ fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
 }
 
 fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // CropQuotientsFromSrcRect clamps negative srcRect edges to zero before
+  // deriving crop quotients.
+  let left = drawingml_percent_ratio(rect.left.as_ref()).max(0.0);
+  let top = drawingml_percent_ratio(rect.top.as_ref()).max(0.0);
+  let right = drawingml_percent_ratio(rect.right.as_ref()).max(0.0);
+  let bottom = drawingml_percent_ratio(rect.bottom.as_ref()).max(0.0);
+  if left + right >= 1.0 || top + bottom >= 1.0 {
+    return ImageCrop::default();
+  }
   ImageCrop {
-    left: rect
-      .left
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    top: rect
-      .top
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    right: rect
-      .right
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    bottom: rect
-      .bottom
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
+    left,
+    top,
+    right,
+    bottom,
   }
 }
 
 fn image_crop_from_fill_rectangle(rect: &a::FillRectangle) -> ImageCrop {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // CropQuotientsFromFillRect ignores positive fillRect edges and computes
+  // crop quotients from the negative growth denominator.
+  let left = drawingml_percent_ratio(rect.left.as_ref()).min(0.0);
+  let top = drawingml_percent_ratio(rect.top.as_ref()).min(0.0);
+  let right = drawingml_percent_ratio(rect.right.as_ref()).min(0.0);
+  let bottom = drawingml_percent_ratio(rect.bottom.as_ref()).min(0.0);
+  let horizontal_divisor = -1.0 + left + right;
+  let vertical_divisor = -1.0 + top + bottom;
   ImageCrop {
-    left: rect
-      .left
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    top: rect
-      .top
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    right: rect
-      .right
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    bottom: rect
-      .bottom
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
+    left: left / horizontal_divisor,
+    top: top / vertical_divisor,
+    right: right / horizontal_divisor,
+    bottom: bottom / vertical_divisor,
   }
+}
+
+fn drawingml_percent_ratio(value: Option<&DrawingmlPercentageValue>) -> f32 {
+  value.map(|value| value.as_ratio() as f32).unwrap_or(0.0)
 }
 
 fn lower_text_body(

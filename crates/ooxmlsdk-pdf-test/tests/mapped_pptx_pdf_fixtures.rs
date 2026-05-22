@@ -305,6 +305,40 @@ fn assert_rendered_image_centers_include_rgb_close(
   );
 }
 
+fn assert_first_image_relative_rgb_close(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  page_index: usize,
+  relative_x: f32,
+  relative_y: f32,
+  expected_rgb: [u8; 3],
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  let bounds = image_bounds.first().copied().unwrap_or_else(|| {
+    panic!(
+      "missing image bounds on page {page_index}; images={:?}",
+      summary.images
+    )
+  });
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 1200)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let x = bounds.left + bounds.width() * relative_x;
+  let y = bounds.top - bounds.height() * relative_y;
+  let [r, g, b, _] = rendered
+    .sample_pdf_point_rgba(x, y)
+    .unwrap_or_else(|| panic!("missing rendered image sample at PDF point ({x}, {y})"));
+  let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+    + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+    + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+  assert!(
+    diff <= 24,
+    "rendered image relative color at ({relative_x}, {relative_y}) #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}; bounds={bounds:?}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
 fn assert_page_link_target(summary: &PdfSummary, page_index: usize, expected_target: &str) {
   assert!(
     summary.links.iter().any(|link| {
@@ -1477,10 +1511,12 @@ fn mapped_pptx_formatting_bullet_indent_preserves_scaled_indent() {
 fn mapped_pptx_tdf153008_preserves_cropped_bitmap_edge_pixels() {
   let summary = render_summary("pptx/tdf153008-srcRect-smallNegBound.pptx");
   assert_page_image_count_at_least(&summary, 0, 1);
-  assert_rendered_image_centers_include_rgb_close(
+  assert_first_image_relative_rgb_close(
     "pptx/tdf153008-srcRect-smallNegBound.pptx",
     &summary,
     0,
+    0.05,
+    0.5,
     [0, 0, 0],
   );
 }

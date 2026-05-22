@@ -1,6 +1,7 @@
 use ooxmlsdk::schemas::schemas_microsoft_com_office_powerpoint_2010_main as p14;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+use ooxmlsdk::units::DrawingmlPercentageValue;
 
 use crate::docx::ImageCrop;
 
@@ -175,6 +176,14 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       group.group_shape_properties.transform_group.as_deref(),
     );
+    if let Some(fill) = import_group_fill_properties(
+      group
+        .group_shape_properties
+        .group_shape_properties_choice1
+        .as_ref(),
+    ) {
+      shape.shape.fill_properties = Some(fill);
+    }
     shape.shape.children = group
       .group_shape_choice
       .iter()
@@ -543,28 +552,26 @@ fn image_crop_from_source_rectangle(rect: Option<&a::SourceRectangle>) -> ImageC
   let Some(rect) = rect else {
     return ImageCrop::default();
   };
-  ImageCrop {
-    left: rect
-      .left
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    top: rect
-      .top
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    right: rect
-      .right
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
-    bottom: rect
-      .bottom
-      .as_ref()
-      .map(|value| value.as_ratio() as f32)
-      .unwrap_or(0.0),
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // CropQuotientsFromSrcRect clamps negative srcRect edges to zero before
+  // deriving crop quotients.
+  let left = drawingml_percent_ratio(rect.left.as_ref()).max(0.0);
+  let top = drawingml_percent_ratio(rect.top.as_ref()).max(0.0);
+  let right = drawingml_percent_ratio(rect.right.as_ref()).max(0.0);
+  let bottom = drawingml_percent_ratio(rect.bottom.as_ref()).max(0.0);
+  if left + right >= 1.0 || top + bottom >= 1.0 {
+    return ImageCrop::default();
   }
+  ImageCrop {
+    left,
+    top,
+    right,
+    bottom,
+  }
+}
+
+fn drawingml_percent_ratio(value: Option<&DrawingmlPercentageValue>) -> f32 {
+  value.map(|value| value.as_ratio() as f32).unwrap_or(0.0)
 }
 
 fn import_custom_shape_geometry(choice: &p::ShapePropertiesChoice) -> CustomShapeGeometry {
@@ -604,6 +611,37 @@ fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProp
       placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::PatternFill(fill) => Some(FillProperties {
+      kind: FillKind::Pattern(fill.clone()),
+      placeholder_color: None,
+    }),
+  }
+}
+
+fn import_group_fill_properties(
+  choice: Option<&p::GroupShapePropertiesChoice>,
+) -> Option<FillProperties> {
+  match choice? {
+    p::GroupShapePropertiesChoice::NoFill(_) => Some(FillProperties {
+      kind: FillKind::None,
+      placeholder_color: None,
+    }),
+    p::GroupShapePropertiesChoice::SolidFill(fill) => Some(FillProperties {
+      kind: FillKind::Solid(import_solid_fill_color(fill)),
+      placeholder_color: None,
+    }),
+    p::GroupShapePropertiesChoice::GroupFill => Some(FillProperties {
+      kind: FillKind::Group,
+      placeholder_color: None,
+    }),
+    p::GroupShapePropertiesChoice::GradientFill(fill) => Some(FillProperties {
+      kind: FillKind::Gradient(fill.clone()),
+      placeholder_color: None,
+    }),
+    p::GroupShapePropertiesChoice::BlipFill(fill) => Some(FillProperties {
+      kind: FillKind::Blip(fill.clone()),
+      placeholder_color: None,
+    }),
+    p::GroupShapePropertiesChoice::PatternFill(fill) => Some(FillProperties {
       kind: FillKind::Pattern(fill.clone()),
       placeholder_color: None,
     }),

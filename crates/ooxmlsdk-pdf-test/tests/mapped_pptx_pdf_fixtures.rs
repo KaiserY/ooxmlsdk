@@ -326,6 +326,86 @@ fn text_bounds_containing(summary: &PdfSummary, page_index: usize, expected: &st
     })
 }
 
+fn text_char_bounds(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
+  summary
+    .text_chars
+    .iter()
+    .filter(|character| character.page_index == page_index)
+    .find(|character| character.text == expected)
+    .and_then(|character| parse_pdf_rect(&character.bounds).ok())
+    .unwrap_or_else(|| {
+      panic!(
+        "missing text character {expected:?} on page {page_index}; text_chars={:?}",
+        summary.text_chars
+      )
+    })
+}
+
+fn text_anchor_bounds(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
+  if expected.chars().count() == 1 {
+    text_char_bounds(summary, page_index, expected)
+  } else {
+    text_bounds_containing(summary, page_index, expected)
+  }
+}
+
+fn assert_text_left_before(
+  summary: &PdfSummary,
+  page_index: usize,
+  left_text: &str,
+  right_text: &str,
+) {
+  let left = text_anchor_bounds(summary, page_index, left_text);
+  let right = text_anchor_bounds(summary, page_index, right_text);
+  assert!(
+    left.left < right.left,
+    "expected {left_text:?} to be left of {right_text:?}; left={left:?}; right={right:?}"
+  );
+}
+
+fn assert_text_left_after(
+  summary: &PdfSummary,
+  page_index: usize,
+  left_text: &str,
+  right_text: &str,
+) {
+  let left = text_anchor_bounds(summary, page_index, left_text);
+  let right = text_anchor_bounds(summary, page_index, right_text);
+  assert!(
+    left.left > right.left,
+    "expected {left_text:?} to be right of {right_text:?}; left={left:?}; right={right:?}"
+  );
+}
+
+fn assert_text_top_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  first_text: &str,
+  second_text: &str,
+  tolerance_pt: f32,
+) {
+  let first = text_anchor_bounds(summary, page_index, first_text);
+  let second = text_anchor_bounds(summary, page_index, second_text);
+  assert!(
+    (first.top - second.top).abs() <= tolerance_pt,
+    "expected {first_text:?} and {second_text:?} to have close top coordinates; first={first:?}; second={second:?}"
+  );
+}
+
+fn assert_text_top_after(
+  summary: &PdfSummary,
+  page_index: usize,
+  lower_text: &str,
+  upper_text: &str,
+) {
+  let lower = text_anchor_bounds(summary, page_index, lower_text);
+  let upper = text_anchor_bounds(summary, page_index, upper_text);
+  assert!(
+    lower.top < upper.top,
+    "expected {lower_text:?} to be lower than {upper_text:?}; lower={lower:?}; upper={upper:?}"
+  );
+}
+
 fn assert_text_near_libreoffice_metafile_point(
   summary: &PdfSummary,
   page_index: usize,
@@ -1173,4 +1253,138 @@ fn mapped_pptx_tdf153008_preserves_cropped_bitmap_edge_pixels() {
 fn mapped_pptx_chart_pt_color_bg1_preserves_resolved_data_point_fill() {
   let summary = render_summary("pptx/chart_pt_color_bg1.pptx");
   assert_has_path_fill_color(&summary, "#d9d9d9@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBase
+fn mapped_pptx_smartart_base_preserves_text_fill_and_ltr_grid() {
+  let summary = render_summary("pptx/smartart1.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e"]);
+  assert_has_path_fill_color(&summary, "#4f81bd@ff");
+  assert_text_left_before(&summary, 0, "a", "b");
+  assert_text_left_before(&summary, 0, "c", "d");
+  assert_text_top_after(&summary, 0, "c", "a");
+  assert_text_top_after(&summary, 0, "e", "c");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testChildren
+fn mapped_pptx_smartart_children_preserves_nested_texts() {
+  let summary = render_summary("pptx/smartart-children.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "x", "y", "z"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testText
+fn mapped_pptx_smartart_text_preserves_non_empty_child_text() {
+  let summary = render_summary("pptx/smartart-text.pptx");
+  assert_page_contains_in_order(&summary, 0, &["test"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCnt
+fn mapped_pptx_smartart_cnt_preserves_three_visible_text_nodes() {
+  let summary = render_summary("pptx/smartart-cnt.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testDir
+fn mapped_pptx_smartart_dir_preserves_reversed_direction() {
+  let summary = render_summary("pptx/smartart-dir.pptx");
+  assert_page_contains_in_order(&summary, 0, &["first", "second"]);
+  assert_text_left_after(&summary, 0, "first", "second");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf148665
+fn mapped_pptx_smartart_tdf148665_preserves_text_nodes() {
+  let summary = render_summary("pptx/tdf148665.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Fufufu", "Susu", "Sasa Haha"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf148921
+fn mapped_pptx_smartart_tdf148921_keeps_two_visible_shapes() {
+  let summary = render_summary("pptx/tdf148921.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Test"]);
+  assert!(
+    page_path_count(&summary, 0) >= 2,
+    "expected at least two visible shapes; paths={:?}",
+    summary.paths
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testMaxDepth
+fn mapped_pptx_smartart_maxdepth_places_children_on_same_axis() {
+  let summary = render_summary("pptx/smartart-maxdepth.pptx");
+  assert_page_contains_in_order(&summary, 0, &["first", "second"]);
+  assert_text_top_close(&summary, 0, "first", "second", 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testRotation
+fn mapped_pptx_smartart_rotation_preserves_rotated_texts() {
+  let summary = render_summary("pptx/smartart-rotation.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testPyramidOneChild
+fn mapped_pptx_smartart_pyramid_one_child_preserves_child_text() {
+  let summary = render_summary("pptx/smartart-pyramid-1child.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testChevron
+fn mapped_pptx_smartart_chevron_preserves_horizontal_sequence() {
+  let summary = render_summary("pptx/smartart-chevron.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c"]);
+  assert_text_left_before(&summary, 0, "a", "b");
+  assert_text_left_before(&summary, 0, "b", "c");
+  assert_text_top_close(&summary, 0, "a", "b", 8.0);
+  assert_text_top_close(&summary, 0, "b", "c", 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCycle
+fn mapped_pptx_smartart_cycle_preserves_texts_and_connectors() {
+  let summary = render_summary("pptx/smartart-cycle.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 5);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBaseRtoL
+fn mapped_pptx_smartart_base_rtl_preserves_text_fill_and_rtl_grid() {
+  let summary = render_summary("pptx/smartart-rightoleftblockdiagram.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e"]);
+  assert_has_path_fill_color(&summary, "#4f81bd@ff");
+  assert_text_left_after(&summary, 0, "a", "b");
+  assert_text_left_after(&summary, 0, "c", "d");
+  assert_text_top_after(&summary, 0, "c", "a");
+  assert_text_top_after(&summary, 0, "e", "c");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testVerticalBracketList
+fn mapped_pptx_smartart_vertical_bracket_list_preserves_child_text() {
+  let summary = render_summary("pptx/vertical-bracket-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["1", "A"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTableList
+fn mapped_pptx_smartart_table_list_aligns_child_with_parent() {
+  let summary = render_summary("pptx/table-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Parent", "Child 1", "Child 2"]);
+  let parent = text_bounds_containing(&summary, 0, "Parent");
+  let child = text_bounds_containing(&summary, 0, "Child 2");
+  assert!(
+    (parent.right - child.right).abs() < 18.0,
+    "expected Child 2 right edge to stay close to Parent right edge; parent={parent:?}; child={child:?}"
+  );
 }

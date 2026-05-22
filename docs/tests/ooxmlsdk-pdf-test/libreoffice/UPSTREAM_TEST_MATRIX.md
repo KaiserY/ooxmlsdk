@@ -571,7 +571,7 @@ PPTX bucket counts:
 | `sd/qa/unit/FontEmbeddingTest.cxx` | 2 |
 
 Current local coverage is intentionally small and upstream-assertion focused:
-77 matrix rows are covered by active PPTX PDF tests. They currently span
+92 matrix rows are covered by active PPTX PDF tests. They currently span
 LibreOffice import text/color/fill/line/border/page assertions and layout
 metafile-position assertions.
 `layout-tests.cxx::numberedList` is present as an ignored TDD assertion because
@@ -733,24 +733,24 @@ LibreOffice text-order expectation unchanged.
 | `import-tests4.cxx::tdf158512` | `pptx/tdf158512.pptx` | `../core/sd/qa/unit/import-tests4.cxx:1017` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf169524` | `pptx/tdf169524.pptx` | `../core/sd/qa/unit/import-tests4.cxx:1030` | `mapped` | partial visible-output assertion. |
 | `import-tests_skia.cxx::testTdf156856` | `pptx/tdf156856.pptx` | `../core/sd/qa/unit/import-tests_skia.cxx:28` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testBase` | `pptx/smartart1.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:78` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testChildren` | `pptx/smartart-children.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:144` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testText` | `pptx/smartart-text.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:179` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testCnt` | `pptx/smartart-cnt.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:192` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testDir` | `pptx/smartart-dir.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:207` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf148665` | `pptx/tdf148665.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:218` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf148921` | `pptx/tdf148921.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:233` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testMaxDepth` | `pptx/smartart-maxdepth.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:255` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testRotation` | `pptx/smartart-rotation.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:272` | `mapped` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testBase` | `pptx/smartart1.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:78` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testChildren` | `pptx/smartart-children.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:144` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testText` | `pptx/smartart-text.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:179` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testCnt` | `pptx/smartart-cnt.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:192` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testDir` | `pptx/smartart-dir.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:207` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf148665` | `pptx/tdf148665.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:218` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf148921` | `pptx/tdf148921.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:233` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testMaxDepth` | `pptx/smartart-maxdepth.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:255` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testRotation` | `pptx/smartart-rotation.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:272` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testTextAutoRotation` | `pptx/smartart-autoTxRot.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:290` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testPyramidOneChild` | `pptx/smartart-pyramid-1child.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:378` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testChevron` | `pptx/smartart-chevron.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:390` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testCycle` | `pptx/smartart-cycle.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:413` | `mapped` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testPyramidOneChild` | `pptx/smartart-pyramid-1child.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:378` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testChevron` | `pptx/smartart-chevron.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:390` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testCycle` | `pptx/smartart-cycle.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:413` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testMultidirectional` | `pptx/smartart-multidirectional.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:448` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testBaseRtoL` | `pptx/smartart-rightoleftblockdiagram.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:467` | `mapped` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testBaseRtoL` | `pptx/smartart-rightoleftblockdiagram.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:467` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testVerticalBoxList` | `pptx/smartart-vertical-box-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:533` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testVerticalBracketList` | `pptx/vertical-bracket-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:565` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTableList` | `pptx/table-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:578` | `mapped` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testVerticalBracketList` | `pptx/vertical-bracket-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:565` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTableList` | `pptx/table-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:578` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testAccentProcess` | `pptx/smartart-accent-process.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:607` | `mapped` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testContinuousBlockProcess` | `pptx/smartart-continuous-block-process.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:695` | `mapped` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testOrgChart` | `pptx/smartart-org-chart.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:720` | `mapped` | partial visible-output assertion. |

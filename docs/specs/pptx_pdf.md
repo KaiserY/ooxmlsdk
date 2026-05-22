@@ -70,6 +70,16 @@ Already aligned with LibreOffice structure:
 
 Known structural gaps:
 
+- Slide import ordering must be tightened to follow `p:sldIdLst` /
+  `slides_vector` exactly. The current implementation records
+  `slides_vector`, but future work must not rely on package part iteration order
+  as a substitute for LibreOffice's `maSlidesVector` traversal.
+- `actual_slide_persist` must behave like LibreOffice's current
+  `SlidePersist` pointer during fragment import, background creation, shape
+  creation, and color/theme lookup. An index into `draw_pages` is acceptable as
+  an implementation detail only when it already refers to the current imported
+  slide state at the point where `get_scheme_color_token` and
+  `get_current_theme` are called.
 - Theme import is not complete. `get_scheme_color()` intentionally does not
   return an RGB color until theme color scheme and style-matrix resolution are
   ported from LibreOffice.
@@ -77,6 +87,11 @@ Known structural gaps:
   applies default subtype handling, index-based subtype inheritance,
   LibreOffice's priority lookup, `apply_shape_reference`, placeholder storage,
   and referenced marking.
+- `Shape::apply_shape_reference` is still incomplete. LibreOffice copies more
+  than fill/line/effect pointers: text depending on the `bUseText` branch,
+  shape properties, actual fill/line/effect state, custom geometry, table
+  properties, master text list style, size, position, rotation, flips, hidden,
+  and locked flags.
 - Text-style inheritance has an initial upstream-shaped port:
   presentation-level `defaultTextStyle`, slide-master `txStyles`, shape
   `lstStyle`, placeholder `lstStyle`, and shape `master_text_list_style` are
@@ -84,9 +99,9 @@ Known structural gaps:
   markers. The next step is to fill in paragraph/run property application
   against the same style chain.
 - Text body import now keeps generated SDK `bodyPr`, `pPr`, `rPr`, `fld/pPr`,
-  and `endParaRPr` records for ordinary PPTX shape text. This is intentionally
-  typed data from `ooxmlsdk`; only XMLAny/raw table payloads may stay on the
-  confined raw parser path until generated typed table children are available.
+  and `endParaRPr` records for ordinary PPTX shape text and DrawingML table
+  cell text. This is intentionally typed data from `ooxmlsdk`; do not reparse
+  these text bodies with manual XML code.
 - Paragraph style lookup now follows the LibreOffice `TextParagraph` owner
   path: the paragraph level selects the matching text-list level style, and
   missing/out-of-range levels fall back to the first available level style
@@ -112,24 +127,40 @@ Current simplification risks to keep contained:
 
 - `display.rs` uses temporary text inset and line-height constants only for
   early observation. Do not promote those constants into PPTX text semantics.
-- Table internals are parsed from `GraphicData::xml_children` because the
-  generated SDK currently exposes the inner table payload as raw XML. Keep this
-  parser confined to `drawingml/table.rs` and replace it with typed SDK import
-  if generated typed children become available.
+- `display.rs` currently reads `SlidePersist`/`Shape` directly. This is a
+  temporary observation bridge. New PPTX behavior should be implemented in
+  `SlidePersist::create_x_shapes`, `PptShape::add_shape`, and
+  `Shape::create_and_insert` first, then observed by display lowering.
+- Master/layout duplication is currently an early replacement for UNO master
+  page binding. Do not add renderer-side fixes for missing master/layout
+  semantics; carry the missing state through `SlidePersist` and the shape tree.
+- `GraphicData::graphic_data_choice` now exposes typed DrawingML table payloads.
+  Table import must use the `GraphicDataChoice::Table` / `a::Table` SDK model
+  and must not fall back to quick-xml parsing of `xml_children`.
 - Service-name selection currently covers only the first placeholder-to-service
   classification. It must be extended from `pptshape.cxx`, not redesigned
   around renderer item kinds.
+- Reusing DOCX layout/PDF carriers is acceptable only as paint plumbing. Do not
+  let DOCX page, paragraph, section, table, or run models become persistent
+  PPTX semantic state.
 
 Next recommended development priority:
 
-1. Continue text style inheritance by porting paragraph/run property
+1. Tighten the LibreOffice skeleton: import slides by `slides_vector`, make
+   `actual_slide_persist` point at the current slide/layout/notes persist at
+   the same stage LibreOffice does, and keep page-range/custom-show/notes
+   concepts in `PresentationFragmentHandler::finalize_import`.
+2. Complete `Shape::apply_shape_reference` against LibreOffice
+   `drawingml::Shape::applyShapeReference`, including geometry, hidden/locked,
+   table/custom-geometry, and master text-list style state.
+3. Continue text style inheritance by porting paragraph/run property
    application through `SlidePersist::apply_text_styles` while preserving the
    current `PptShape::set_text_master_styles` merge order.
-2. Extend placeholder behavior for remaining `pptshape.cxx` service-name,
+4. Extend placeholder behavior for remaining `pptshape.cxx` service-name,
    notes, layout, custom-geometry, and hide/replacement branches.
-3. Port theme color scheme and style matrix resolution through
+5. Port theme color scheme and style matrix resolution through
    `PowerPointImport`, `SlidePersist`, and DrawingML theme structures.
-4. Continue structured imports for chart, SmartArt/diagram, OLE, media, notes,
+6. Continue structured imports for chart, SmartArt/diagram, OLE, media, notes,
    comments, and VML before improving their visible PDF fallbacks.
 
 ---
@@ -182,8 +213,8 @@ The Rust PPTX PDF path should preserve these LibreOffice stage boundaries:
 ```text
 PowerPointImport::importDocument
   -> PresentationFragmentHandler
-     -> importMasterSlides
      -> finalizeImport
+        -> importMasterSlides
         -> importSlide
            -> SlideFragmentHandler
               -> PPTShapeGroupContext
@@ -214,6 +245,33 @@ responsibilities should remain recognizable:
 | `Shape::createAndInsert` | `Shape::create_and_insert` |
 
 This naming is intentional. It keeps later bug work traceable to upstream.
+
+Skeleton fidelity requirements:
+
+- `PresentationFragmentHandler::finalize_import` owns page selection and slide
+  traversal. It must walk `slides_vector` / `p:sldIdLst` order like
+  LibreOffice's `maSlidesVector`; package part iteration order is not a valid
+  semantic source.
+- Master slides are imported through `import_master_slides` before the first
+  ordinary slide page is imported. Rust may structure the call differently for
+  simplicity, but the observable state must match LibreOffice: master persists
+  and themes exist before slide layout/master binding and placeholder lookup.
+- `PresentationFragmentHandler::import_slide` owns slide-layout resolution,
+  layout-to-master resolution, master+layout cache lookup, slide persist
+  creation, `actual_slide_persist` selection, `SlideFragmentHandler` import,
+  `create_background`, and `create_x_shapes`. None of these decisions belong
+  in PDF display lowering.
+- Layout persists are cached by the pair `(master_path, layout_path)`, not by
+  layout path alone, master id alone, slide id, or theme path.
+- `SlidePersist` must remain the object passed through background creation,
+  shape creation, current theme lookup, color map lookup, placeholder
+  inheritance, comments, notes, and VML slots. Do not split these into renderer
+  convenience records that cannot map back to LibreOffice.
+- `SlidePersist::create_x_shapes` is not optional plumbing. It is the porting
+  boundary equivalent to LibreOffice's UNO shape creation pass. Early Rust
+  versions may store Rust drawing objects instead of UNO objects, but the
+  branch order and ownership must stay traceable to `slidepersist.cxx`,
+  `pptshape.cxx`, and `drawingml/shape.cxx`.
 
 ---
 
@@ -1043,6 +1101,9 @@ Implementation checkpoint:
   `PageRange`, custom show selection, notes-page import, and `p:sld/@show`
   filtering remain `PresentationFragmentHandler::finalize_import` work, not
   shortcuts in the PDF backend.
+- Presentation order means `p:sldIdLst` / `slides_vector` order. Do not use
+  package part iteration order unless it is explicitly proven to be the same
+  and still routed through `slides_vector` lookup.
 - A helper such as `layout::fixed_pages_with_items` is acceptable because it
   contains no PPTX semantics. It must remain a paint/layout bridge fed by
   upstream-shaped PPTX state, not an import shortcut.
@@ -1080,6 +1141,11 @@ Implementation checkpoint:
 - `PresentationFragmentHandler::import_slide` should resolve the slide layout
   and master paths before importing the slide fragment, matching LibreOffice's
   `importSlide` order.
+- `actual_slide_persist` must be active for the persist being imported and
+  shaped before any code can ask `PowerPointImport` for the current theme,
+  scheme color token, VML drawing, chart converter, or table styles. If Rust
+  stores an index instead of a pointer, the index must refer to the same logical
+  persist that LibreOffice would expose through `mpActualSlidePersist`.
 - Layout persists should be cached by `(master_path, layout_path)` in
   `PowerPointImport::master_pages`. Do not replace this with a single master id
   lookup; placeholder inheritance depends on the master+layout pair.
@@ -1108,6 +1174,10 @@ Implementation checkpoint:
 - `showMasterSp=false` handling belongs in the layout-fragment/persist path.
   It must mark inherited master shapes before layout-local shapes are appended,
   and it must not be approximated in the renderer.
+- Slide visibility, page ranges, notes-page import, comment import, custom
+  shows, and slide names are `PresentationFragmentHandler` responsibilities.
+  Keep structured no-op slots there until they are ported; do not spread them
+  into `pptx::display` or the PDF backend.
 
 ### Phase 3: Shape Tree
 
@@ -1156,10 +1226,20 @@ Implementation checkpoint:
   LibreOffice `table::TableContext`, `TableRowContext`, and
   `TableCellContext`; rendering may ignore the table temporarily, but the
   import model must not collapse it to a generic graphic frame.
+  The table payload must come from the typed SDK branch
+  `GraphicDataChoice::Table`. Do not resurrect raw `GraphicData::xml_children`
+  parsing for table cells, table text, or style id.
 - `txBody` must become a DrawingML `TextBody` on the shape model before any
   visible text fallback exists. Preserve paragraph level, run text, line breaks,
   field text, and field type as structured text runs; later style inheritance
   must extend this model rather than reparsing PDF text items.
+- `apply_shape_reference` must copy the same categories of state as
+  LibreOffice `drawingml::Shape::applyShapeReference`: inherited text according
+  to the `bUseText` branch, shape properties, actual fill/line/effect state,
+  custom geometry, table properties, master text list style, position, size,
+  rotation, flips, hidden, and locked flags. Partial ports should leave
+  explicit missing branches rather than silently treating placeholder
+  inheritance as text-style merging.
 - Unsupported branches should become structured records or empty structured
   slots. Do not convert them to visible text or drop relationship identity.
   `Picture` must preserve blip `r:embed`/`r:link`; `ContentPart` must preserve
@@ -1184,6 +1264,21 @@ Rust drawing objects:
 - connectors as structured fallback
 - tables as structured fallback
 - charts/SmartArt as structured fallback
+
+Implementation checkpoint:
+
+- `create_x_shapes` must stay the single pass that applies text styles, calls
+  `PptShape::add_shape` / `Shape::create_and_insert`, records connector shape
+  maps, and later applies connector connections. Avoid adding new visible PPTX
+  behavior only in `display.rs`.
+- `PptShape::add_shape` owns PPT-specific service-name and placeholder
+  decisions; generic `drawingml::Shape::create_and_insert` owns generic shape
+  creation. Keep this split even when Rust stores drawing records instead of
+  UNO `XShape`s.
+- Connector, animation, SmartArt helper, chart, media, and OLE branches may be
+  structured fallback records at first, but the fallback records must be
+  produced by this pass or by earlier import contexts, not invented by the PDF
+  backend.
 
 ### Phase 5: Lowering to PDF Display List
 
@@ -1269,6 +1364,15 @@ Avoid these patterns:
     inheritance.
 11. Replacing unsupported charts, SmartArt, tables, media, or OLE with plain
     text before preserving their relationship metadata and frame classification.
+12. Iterating slide parts from the package and assuming that order is the
+    presentation order without going through `p:sldIdLst`.
+13. Making `actual_slide_persist` a best-effort global that is unset or points
+    at stale state during theme/color/background/shape creation.
+14. Fixing missing master/layout/placeholder behavior by duplicating logic in
+    display lowering.
+15. Adding text, bullet, font, auto-fit, table, image, or connector behavior
+    directly to `display.rs` when the corresponding LibreOffice owner is
+    `SlidePersist`, `PptShape`, `drawingml::Shape`, or a DrawingML context.
 
 ---
 

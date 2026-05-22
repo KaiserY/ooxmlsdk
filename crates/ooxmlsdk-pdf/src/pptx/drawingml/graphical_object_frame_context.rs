@@ -38,8 +38,13 @@ impl GraphicalObjectFrameContext {
       GraphicDataKind::ChartEx => shape.set_chart_ex_type(),
       GraphicDataKind::Table => {
         shape.set_table_type();
-        shape.table_properties =
-          TableProperties::from_graphic_data_xml_children(&graphic_data.xml_children);
+        shape.table_properties = graphic_data.graphic_data_choice.iter().find_map(|choice| {
+          if let a::GraphicDataChoice::Table(table) = choice {
+            Some(TableProperties::from_dml_table(table))
+          } else {
+            None
+          }
+        });
       }
       GraphicDataKind::Unsupported => {}
     }

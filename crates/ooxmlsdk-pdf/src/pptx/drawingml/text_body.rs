@@ -1,4 +1,7 @@
-use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::schemas::{
+  schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_openxmlformats_org_presentationml_2006_main as p,
+};
 
 use super::text_list_style::{TextListParagraphStyle, TextListParagraphStyleRef, TextListStyle};
 
@@ -41,6 +44,43 @@ pub(crate) enum TextRunKind {
 }
 
 impl TextBody {
+  pub(crate) fn from_dml(source: &a::TextBody) -> Self {
+    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
+    // TextBodyContext owns bodyPr, lstStyle, and paragraph import for both
+    // shape text and DrawingML table cell text.
+    Self::from_parts(
+      &source.body_properties,
+      source.list_style.as_deref(),
+      &source.paragraph,
+    )
+  }
+
+  pub(crate) fn from_pml(source: &p::TextBody) -> Self {
+    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
+    // PresentationML p:txBody carries DrawingML bodyPr/lstStyle/a:p
+    // children; import it through the same typed DrawingML paragraph path.
+    Self::from_parts(
+      &source.body_properties,
+      source.list_style.as_deref(),
+      &source.paragraph,
+    )
+  }
+
+  fn from_parts(
+    body_properties: &a::BodyProperties,
+    list_style: Option<&a::ListStyle>,
+    paragraphs: &[a::Paragraph],
+  ) -> Self {
+    Self {
+      has_body_properties: true,
+      has_noninherited_body_properties: has_noninherited_body_properties(body_properties),
+      body_properties: Some(Box::new(body_properties.clone())),
+      has_list_style: list_style.is_some(),
+      list_style: list_style.map(TextListStyle::from_dml_list_style),
+      paragraphs: paragraphs.iter().map(TextParagraph::from_dml).collect(),
+    }
+  }
+
   pub(crate) fn apply_text_styles(&mut self, master_text_list_style: Option<&TextListStyle>) {
     for paragraph in &mut self.paragraphs {
       paragraph.apply_text_styles(master_text_list_style, self.list_style.as_ref());
@@ -49,6 +89,27 @@ impl TextBody {
 }
 
 impl TextParagraph {
+  pub(crate) fn from_dml(source: &a::Paragraph) -> Self {
+    let level = source
+      .paragraph_properties
+      .as_ref()
+      .and_then(|properties| properties.level)
+      .map(|level| level as u8);
+    let runs = source
+      .paragraph_choice
+      .iter()
+      .filter_map(TextRun::from_dml)
+      .collect();
+    Self {
+      level,
+      paragraph_properties: source.paragraph_properties.clone(),
+      end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
+      master_paragraph_style: None,
+      text_paragraph_style: None,
+      runs,
+    }
+  }
+
   pub(crate) fn apply_text_styles(
     &mut self,
     master_text_list_style: Option<&TextListStyle>,
@@ -67,6 +128,41 @@ impl TextParagraph {
     text_list_style: &'a TextListStyle,
   ) -> Option<TextListParagraphStyleRef<'a>> {
     text_list_style.paragraph_style_for_level(self.level)
+  }
+}
+
+impl TextRun {
+  fn from_dml(choice: &a::ParagraphChoice) -> Option<Self> {
+    match choice {
+      a::ParagraphChoice::Run(run) => Some(Self {
+        text: run.text.clone(),
+        kind: TextRunKind::Run,
+        field_type: None,
+        run_properties: run.run_properties.clone(),
+        field_paragraph_properties: None,
+      }),
+      a::ParagraphChoice::Break(line_break) => Some(Self {
+        text: "\n".to_string(),
+        kind: TextRunKind::Break,
+        field_type: None,
+        run_properties: line_break.run_properties.clone(),
+        field_paragraph_properties: None,
+      }),
+      a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| Self {
+        text: text.clone(),
+        kind: TextRunKind::Field,
+        field_type: field.r#type.clone(),
+        run_properties: field.run_properties.clone(),
+        field_paragraph_properties: field.paragraph_properties.clone(),
+      }),
+      a::ParagraphChoice::TextMath(_) => Some(Self {
+        text: String::new(),
+        kind: TextRunKind::Math,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }),
+    }
   }
 }
 

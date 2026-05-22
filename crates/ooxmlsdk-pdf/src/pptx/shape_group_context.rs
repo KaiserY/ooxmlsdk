@@ -7,10 +7,7 @@ use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{FrameType, Point, Shape, ShapeService, Size};
-use super::drawingml::text_body::{
-  TextBody, TextParagraph, TextRun, TextRunKind, has_noninherited_body_properties,
-};
-use super::drawingml::text_list_style::TextListStyle;
+use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
 use super::slide::{ShapeLocation, SlidePersist};
@@ -125,7 +122,7 @@ impl PPTShapeGroupContext {
     );
     apply_shape_properties(&mut shape.shape, &source.shape_properties);
     if let Some(text_body) = &source.text_body {
-      shape.shape.set_text_body(import_text_body(text_body));
+      shape.shape.set_text_body(TextBody::from_pml(text_body));
     }
     shape.into_shape(slide_persist)
   }
@@ -273,77 +270,6 @@ fn apply_p14_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
-}
-
-fn import_text_body(source: &p::TextBody) -> TextBody {
-  // Source: LibreOffice oox/source/ppt/pptshapecontext.cxx
-  // txBody creates a DrawingML TextBody and keeps text style inheritance for
-  // later SlidePersist::applyTextStyles / PPTShape::addShape processing.
-  TextBody {
-    has_body_properties: true,
-    has_noninherited_body_properties: has_noninherited_body_properties(&source.body_properties),
-    body_properties: Some(source.body_properties.clone()),
-    has_list_style: source.list_style.is_some(),
-    list_style: source
-      .list_style
-      .as_ref()
-      .map(|style| TextListStyle::from_dml_list_style(style)),
-    paragraphs: source.paragraph.iter().map(import_text_paragraph).collect(),
-  }
-}
-
-fn import_text_paragraph(source: &a::Paragraph) -> TextParagraph {
-  let level = source
-    .paragraph_properties
-    .as_ref()
-    .and_then(|properties| properties.level)
-    .map(|level| level as u8);
-  let runs = source
-    .paragraph_choice
-    .iter()
-    .filter_map(import_text_run)
-    .collect();
-  TextParagraph {
-    level,
-    paragraph_properties: source.paragraph_properties.clone(),
-    end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
-    master_paragraph_style: None,
-    text_paragraph_style: None,
-    runs,
-  }
-}
-
-fn import_text_run(choice: &a::ParagraphChoice) -> Option<TextRun> {
-  match choice {
-    a::ParagraphChoice::Run(run) => Some(TextRun {
-      text: run.text.clone(),
-      kind: TextRunKind::Run,
-      field_type: None,
-      run_properties: run.run_properties.clone(),
-      field_paragraph_properties: None,
-    }),
-    a::ParagraphChoice::Break(line_break) => Some(TextRun {
-      text: "\n".to_string(),
-      kind: TextRunKind::Break,
-      field_type: None,
-      run_properties: line_break.run_properties.clone(),
-      field_paragraph_properties: None,
-    }),
-    a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| TextRun {
-      text: text.clone(),
-      kind: TextRunKind::Field,
-      field_type: field.r#type.clone(),
-      run_properties: field.run_properties.clone(),
-      field_paragraph_properties: field.paragraph_properties.clone(),
-    }),
-    a::ParagraphChoice::TextMath(_) => Some(TextRun {
-      text: String::new(),
-      kind: TextRunKind::Math,
-      field_type: None,
-      run_properties: None,
-      field_paragraph_properties: None,
-    }),
-  }
 }
 
 fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {

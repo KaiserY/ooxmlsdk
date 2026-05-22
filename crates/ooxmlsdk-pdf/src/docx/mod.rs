@@ -28,6 +28,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
+use ooxmlsdk::sdk::SdkChoice;
 use ooxmlsdk::simple_type::{
   DrawingmlPercentageValue, MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
 };
@@ -5221,7 +5222,11 @@ fn push_drawing_textboxes_impl(
     None => return,
   };
 
-  for child in &graphic_data.xml_children {
+  for child in graphic_data
+    .graphic_data_choice
+    .iter()
+    .filter_map(drawing_graphic_data_choice_xml)
+  {
     let textbox_context = DrawingTextBoxImportContext {
       base_style: base_style.clone(),
       styles,
@@ -5229,7 +5234,7 @@ fn push_drawing_textboxes_impl(
       hyperlinks,
     };
     let text_box_frames = drawingml_textbox_frames_from_xml(
-      child,
+      &child,
       placement,
       DrawingMlGroupTransform::identity(),
       textbox_context,
@@ -5239,7 +5244,7 @@ fn push_drawing_textboxes_impl(
       inlines.extend(text_box_frames.into_iter().map(InlineItem::Shape));
       continue;
     }
-    if let Some(content) = drawing_textbox_content(child) {
+    if let Some(content) = drawing_textbox_content(&child) {
       push_textbox_content(
         &content,
         inlines,
@@ -5248,7 +5253,7 @@ fn push_drawing_textboxes_impl(
         images,
         hyperlinks,
       );
-    } else if let Some(text) = drawing_textbox_text(child) {
+    } else if let Some(text) = drawing_textbox_text(&child) {
       inlines.push(InlineItem::Text(TextRun {
         text,
         style: base_style.clone(),
@@ -5966,6 +5971,12 @@ fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::G
   }
 }
 
+fn drawing_graphic_data_choice_xml(choice: &a::GraphicDataChoice) -> Option<String> {
+  let mut writer = Vec::new();
+  choice.write_xml(&mut writer, "").ok()?;
+  String::from_utf8(writer).ok()
+}
+
 fn push_drawing_shapes_impl(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
@@ -6003,15 +6014,19 @@ fn push_drawing_shapes_impl(
   let transform =
     DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
   let effect_extent = drawing_effect_extent(drawing);
-  for xml in &graphic_data.xml_children {
+  for xml in graphic_data
+    .graphic_data_choice
+    .iter()
+    .filter_map(drawing_graphic_data_choice_xml)
+  {
     if let Some(chart_shapes) =
-      drawing_chart_shapes(drawing, xml, &images.charts_by_relationship_id)
+      drawing_chart_shapes(drawing, &xml, &images.charts_by_relationship_id)
     {
       inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
       continue;
     }
     if let Some(diagram_shapes) = drawing_diagram_shapes(
-      xml,
+      &xml,
       placement,
       transform,
       DrawingShapeImportContext {
@@ -6026,7 +6041,7 @@ fn push_drawing_shapes_impl(
       continue;
     }
     inlines.extend(drawingml_shapes_from_xml(
-      xml,
+      &xml,
       placement,
       transform,
       DrawingShapeImportContext {
@@ -9122,10 +9137,12 @@ fn drawing_image_properties(
   if graphic_data.uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
     return None;
   }
-  graphic_data.xml_children.iter().find_map(|child| {
-    pic::Picture::from_bytes(child.as_bytes())
-      .ok()
-      .and_then(|picture| drawing_picture_image_properties(&picture, theme_colors))
+  graphic_data.graphic_data_choice.iter().find_map(|choice| {
+    if let a::GraphicDataChoice::Picture(picture) = choice {
+      drawing_picture_image_properties(picture, theme_colors)
+    } else {
+      None
+    }
   })
 }
 

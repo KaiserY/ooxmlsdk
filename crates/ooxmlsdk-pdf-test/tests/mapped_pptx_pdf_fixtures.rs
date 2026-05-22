@@ -263,6 +263,25 @@ fn assert_page_link_target(summary: &PdfSummary, page_index: usize, expected_tar
   );
 }
 
+fn assert_page_link_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = summary
+    .links
+    .iter()
+    .filter(|link| link.page_index == page_index)
+    .count()
+    + summary
+      .annotations
+      .iter()
+      .filter(|annotation| annotation.page_index == page_index && annotation.action_uri.is_some())
+      .count();
+  assert!(
+    count >= expected,
+    "expected at least {expected} link annotations on page {page_index}, got {count}; links={:?}; annotations={:?}",
+    summary.links,
+    summary.annotations
+  );
+}
+
 fn assert_page_annotation_uri(summary: &PdfSummary, page_index: usize, expected_uri: &str) {
   assert!(
     summary.annotations.iter().any(|annotation| {
@@ -277,6 +296,24 @@ fn assert_page_annotation_uri(summary: &PdfSummary, page_index: usize, expected_
     "missing annotation URI {expected_uri:?} on page {page_index}; annotations={:?}; raw_pages={:?}",
     summary.annotations,
     summary.raw_pages
+  );
+}
+
+fn assert_text_fill_color_not(summary: &PdfSummary, expected_text: &str, unexpected_color: &str) {
+  let object = summary
+    .text_objects
+    .iter()
+    .find(|object| normalize_space(&object.text).contains(expected_text))
+    .unwrap_or_else(|| {
+      panic!(
+        "missing text object containing {expected_text:?}; text_objects={:?}",
+        summary.text_objects
+      )
+    });
+  assert_ne!(
+    object.fill_color.as_deref(),
+    Some(unexpected_color),
+    "text object {expected_text:?} has unexpected fill color {unexpected_color}; object={object:?}"
   );
 }
 
@@ -560,6 +597,16 @@ fn page_path_count(summary: &PdfSummary, page_index: usize) -> usize {
     .iter()
     .filter(|path| path.page_index == page_index)
     .count()
+}
+
+fn page_object_count(summary: &PdfSummary, page_index: usize) -> usize {
+  let page = &summary.page_objects[page_index];
+  page.text_objects
+    + page.path_objects
+    + page.image_objects
+    + page.shading_objects
+    + page.form_objects
+    + page.unsupported_objects
 }
 
 fn assert_has_tall_stroked_path(summary: &PdfSummary, page_index: usize) {
@@ -2044,4 +2091,147 @@ fn mapped_pptx_tdf146223_preserves_visible_master_slide_text() {
 fn mapped_pptx_tdf144917_preserves_external_shape_hyperlink() {
   let summary = render_summary("pptx/tdf144917.pptx");
   assert_page_annotation_uri(&summary, 0, "http://www.example.com/");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf148965
+fn mapped_pptx_tdf148965_preserves_localized_internal_hyperlinks() {
+  let summary = render_summary("pptx/tdf148965.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 1, &["First", "Third"]);
+  assert_page_link_count_at_least(&summary, 1, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf144918
+fn mapped_pptx_tdf144918_preserves_named_slide_hyperlinks() {
+  let summary = render_summary("pptx/tdf144918.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 1, &["First", "Third"]);
+  assert_page_link_count_at_least(&summary, 1, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testHyperlinkOnImage
+fn mapped_pptx_hyperlink_on_image_preserves_clickable_picture() {
+  let summary = render_summary("pptx/hyperlinkOnImage.pptx");
+  assert_page_count(&summary, 2);
+  assert_page_contains_in_order(&summary, 0, &["First slide"]);
+  assert_page_contains_in_order(&summary, 1, &["Last slide"]);
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_page_image_count_at_least(&summary, 1, 1);
+  assert_page_link_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf141704
+fn mapped_pptx_tdf141704_preserves_shape_hyperlink_actions() {
+  let summary = render_summary("pptx/tdf141704.pptx");
+  assert_page_count(&summary, 7);
+  assert_page_contains_in_order(&summary, 0, &["Go to the last slide"]);
+  assert_page_contains_in_order(&summary, 3, &["http://www.example.com"]);
+  assert_page_contains_in_order(&summary, 5, &["End Show"]);
+  assert_page_annotation_uri(&summary, 3, "http://www.example.com/");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testInternalHyperlink
+fn mapped_pptx_tdf65724_preserves_internal_text_hyperlink() {
+  let summary = render_summary("pptx/tdf65724.pptx");
+  assert_page_count(&summary, 2);
+  assert_page_contains_in_order(&summary, 0, &["Slide1", "goToSlide2"]);
+  assert_page_contains_in_order(&summary, 1, &["Slide2"]);
+  assert_page_link_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN862510_1
+fn mapped_pptx_n862510_1_preserves_baseline_text_run() {
+  let summary = render_summary("pptx/n862510_1.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Turnaround time for", "updates"]);
+  assert_text_top_close(&summary, 0, "Turnaround time for", "updates", 6.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN862510_4
+fn mapped_pptx_n862510_4_preserves_gradient_text_fill() {
+  let summary = render_summary("pptx/n862510_4.pptx");
+  assert_page_contains_in_order(&summary, 0, &["9/10"]);
+  assert_text_fill_color_not(&summary, "9/10", "#000000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN828390_3
+fn mapped_pptx_n828390_3_preserves_registered_mark_text_flow() {
+  let summary = render_summary("pptx/n828390_3.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["SUSE", "Linux Enterprise", "Standard Lifecycle"],
+  );
+  assert_text_top_after(&summary, 0, "Standard Lifecycle", "SUSE");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testN778859
+fn mapped_pptx_n778859_preserves_non_autofit_text_layout() {
+  let summary = render_summary("pptx/n778859.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Content with NO autofit", "too many text", "Adding", "9"],
+  );
+  assert_text_font_size(&summary, "too many text", "18.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testPlaceholderPriority
+fn mapped_pptx_placeholder_priority_preserves_placeholder_order() {
+  let summary = render_summary("ppt/placeholder-priority.pptx");
+  assert_page_contains_in_order(&summary, 0, &["aaa", "bbb"]);
+  assert_text_top_after(&summary, 0, "bbb", "aaa");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testFdo72998
+fn mapped_pptx_cshapes_preserves_custom_shape_geometry_output() {
+  let summary = render_summary("pptx/cshapes.pptx");
+  assert_page_filled_path_count_at_least(&summary, 0, 100);
+  assert_page_stroked_path_count_at_least(&summary, 0, 100);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testMultiColTexts
+fn mapped_pptx_multicol_preserves_multicolumn_slide_text() {
+  let summary = render_summary("pptx/multicol.pptx");
+  assert_page_contains_in_order(&summary, 0, &["slideshape1", "Slideshape2"]);
+  assert_text_font_size(&summary, "slideshape1", "14.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149785
+fn mapped_pptx_tdf149785_imports_single_visible_object() {
+  let summary = render_summary("pptx/tdf149785.pptx");
+  assert_page_count(&summary, 1);
+  assert_eq!(page_object_count(&summary, 0), 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149985
+fn mapped_pptx_tdf149985_imports_single_visible_object() {
+  let summary = render_summary("pptx/tdf149985.pptx");
+  assert_page_count(&summary, 1);
+  assert_eq!(page_object_count(&summary, 0), 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTextAutoRotation
+fn mapped_pptx_smartart_auto_text_rotation_preserves_three_slide_text_sets() {
+  let summary = render_summary("pptx/smartart-autoTxRot.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e", "f"]);
+  assert_page_contains_in_order(&summary, 1, &["a", "b", "c", "d", "e", "f"]);
+  assert_page_contains_in_order(&summary, 2, &["a", "b", "c", "d", "e", "f"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 16);
 }

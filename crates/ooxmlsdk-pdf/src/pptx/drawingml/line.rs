@@ -6,6 +6,7 @@ use super::color::Color;
 pub(crate) struct LineProperties {
   pub(crate) fill: LineFill,
   pub(crate) width_emu: Option<i64>,
+  pub(crate) placeholder_color: Option<Color>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,8 +34,14 @@ impl LineProperties {
       Some(Self {
         fill,
         width_emu: outline.width.map(i64::from),
+        placeholder_color: None,
       })
     }
+  }
+
+  pub(crate) fn with_placeholder_color(mut self, placeholder_color: Option<Color>) -> Self {
+    self.placeholder_color = placeholder_color;
+    self
   }
 }
 

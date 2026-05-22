@@ -108,17 +108,21 @@ Already structurally aligned:
 
 Known gaps to keep visible:
 
-- Theme color scheme and style-matrix resolution are not complete.
-  `get_scheme_color()` may return concrete RGB only when the current theme
-  color record is already a concrete RGB or system `lastClr` with no color
-  transformations; it must not invent RGB for preset, HSL, percentage, or
-  transformed colors.
+- Theme color scheme and style-matrix resolution are structurally present.
+  Color resolution covers RGB, percentage RGB, HSL, preset, system `lastClr`,
+  scheme/theme lookup, placeholder-color fallback, and DrawingML color
+  transformations, including `phClr` substitution for theme style
+  fill/line/background refs, background-color fallback for `phClr`, CRGB-space
+  handling for `scrgbClr` and RGB channel transforms, and fill/line alpha
+  propagation to display opacity.
+  Remaining gaps are theme overrides, extra color schemes, and exact parity for
+  edge-case system/palette behavior.
 - `Shape::apply_shape_reference` still lacks the explicit `bUseText` branch,
   generic shape-property copy, and full custom geometry behavior.
 - Theme style-matrix lookup is structurally present for fill, line, effect, and
   background-fill lists, and style refs preserve `phClr`. Color transforms are
-  preserved on imported RGB/scheme/preset/system colors, but applying those
-  transforms to resolved colors is still incomplete.
+  applied after base color resolution, matching LibreOffice's broad
+  `Color::getColor` order.
 - Paragraph/run property application is incomplete beyond structural style
   selection.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
@@ -455,12 +459,13 @@ Import rules:
   Theme/style-matrix resolution belongs to DrawingML theme code and
   `create_and_insert`.
 - Style refs are not just indexes: preserve `phClr` and transformations for
-  later substitution into theme style fills/lines/effects. `fontRef` must
-  default to `tx1` when no color child exists.
-- Preserve color transformations such as `tint`, `shade`, `alpha`,
+  substitution into theme style fills/lines/background refs/effects. `fontRef`
+  must default to `tx1` when no color child exists.
+- Preserve and apply color transformations such as `tint`, `shade`, `alpha`,
   `alphaMod`, `lumMod`, `lumOff`, `satMod`, `hueMod`, RGB channel transforms,
-  `gray`, `comp`, `inv`, `gamma`, and `invGamma` on the color record. Do not
-  render a transformed color as its untransformed base color.
+  `gray`, `comp`, `inv`, `gamma`, and `invGamma` after resolving the color
+  base. Do not render a transformed color as its untransformed base color, and
+  do not drop resolved alpha before PDF lowering.
 - `ln/noFill` is a real direct line property that suppresses inherited/theme
   line state. Do not represent it as missing line properties.
 - Cache actual fill, line, and effect state on `Shape` during
@@ -557,11 +562,24 @@ Scheme colors resolve through `PowerPointImport` and current `SlidePersist`.
 Do not add a standalone `schemeClr -> RGB` shortcut disconnected from the
 current slide, master, and theme.
 
+Theme style colors that use `phClr` must be resolved with the placeholder color
+from the corresponding style reference. Do not clone theme fill/line/background
+style records and then resolve colors with `None`; that silently drops the
+substitution LibreOffice passes into `Color::getColor`.
+
+Background `phClr` is not only the inline `bgRef` color child. LibreOffice also
+passes the slide/layout/master background color into `createBackground`; use
+that inherited background color as the fallback placeholder when the background
+fill/style contains `phClr`.
+
+Do not treat `scrgbClr` as plain RGB percentages. LibreOffice stores it as CRGB
+and applies RGB channel transforms, `shade`, `tint`, `inv`, `gamma`, and
+`invGamma` in CRGB space before converting back to RGB.
+
 Theme color and format-scheme import are only the first stages. Full
-LibreOffice parity also requires color transformations, placeholder colors,
-theme overrides, extra color schemes, and complete effect semantics. Do not
-treat basic `clrScheme` RGB lookup or style-list lookup as complete theme
-resolution.
+LibreOffice parity still requires theme overrides, extra color schemes, and
+complete effect semantics. Do not treat basic `clrScheme` RGB lookup or
+style-list lookup as complete theme resolution.
 
 ---
 

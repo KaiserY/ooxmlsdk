@@ -34,24 +34,42 @@ fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<Pag
     .as_ref()
     .or_else(|| master_page.and_then(|master_page| master_page.background_properties.as_ref()))
   {
-    lower_background(slide, background, &mut items);
+    lower_background(import, slide, background, &mut items);
   }
   if let Some(master_page) = master_page {
-    lower_shapes(&master_page.shapes, &mut items);
+    lower_shapes(import, &master_page.shapes, &mut items);
   }
-  lower_shapes(&slide.shapes, &mut items);
+  lower_shapes(import, &slide.shapes, &mut items);
   items
 }
 
 fn lower_background(
+  import: &PowerPointImport,
   slide: &SlidePersist,
   background: &BackgroundProperties,
   items: &mut Vec<PageItem>,
 ) {
-  let BackgroundKind::Properties(fill_properties) = &background.kind else {
+  let fill_properties = match &background.kind {
+    BackgroundKind::Properties(fill_properties) => Some(
+      fill_properties
+        .clone()
+        .with_placeholder_color(slide.background_color.clone()),
+    ),
+    BackgroundKind::StyleReference {
+      style_index,
+      placeholder_color,
+    } => import.get_theme_fill_style(*style_index).map(|fill| {
+      fill.with_placeholder_color(
+        placeholder_color
+          .clone()
+          .or_else(|| slide.background_color.clone()),
+      )
+    }),
+  };
+  let Some(fill_properties) = fill_properties else {
     return;
   };
-  let Some(fill_color) = fill_color(fill_properties) else {
+  let Some(fill_paint) = fill_paint(import, &fill_properties) else {
     return;
   };
   items.push(PageItem::Rect(RectItem {
@@ -59,16 +77,16 @@ fn lower_background(
     y_pt: 0.0,
     width_pt: slide.size.width_pt,
     height_pt: slide.size.height_pt,
-    fill_color: Some(fill_color),
-    fill_opacity: 1.0,
+    fill_color: Some(fill_paint.color),
+    fill_opacity: fill_paint.opacity,
     stroke: None,
     stroke_opacity: 1.0,
   }));
 }
 
-fn lower_shapes(shapes: &[Shape], items: &mut Vec<PageItem>) {
+fn lower_shapes(import: &PowerPointImport, shapes: &[Shape], items: &mut Vec<PageItem>) {
   for shape in shapes {
-    lower_shape(shape, DisplayOffset::default(), items);
+    lower_shape(import, shape, DisplayOffset::default(), items);
   }
 }
 
@@ -78,12 +96,17 @@ struct DisplayOffset {
   y_emu: i64,
 }
 
-fn lower_shape(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
+fn lower_shape(
+  import: &PowerPointImport,
+  shape: &Shape,
+  offset: DisplayOffset,
+  items: &mut Vec<PageItem>,
+) {
   if shape.hidden || shape.hidden_master_shape {
     return;
   }
 
-  lower_shape_bounds(shape, offset, items);
+  lower_shape_bounds(import, shape, offset, items);
 
   if let Some(text_body) = &shape.text_body {
     lower_text_body(shape, offset, text_body, items);
@@ -91,30 +114,44 @@ fn lower_shape(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) 
 
   let child_offset = child_display_offset(shape, offset);
   for child in &shape.children {
-    lower_shape(child, child_offset, items);
+    lower_shape(import, child, child_offset, items);
   }
 }
 
-fn lower_shape_bounds(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
+fn lower_shape_bounds(
+  import: &PowerPointImport,
+  shape: &Shape,
+  offset: DisplayOffset,
+  items: &mut Vec<PageItem>,
+) {
   if shape.service_name == ShapeService::GroupShape || shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
 
-  let fill_color = shape.actual_fill_properties.as_ref().and_then(fill_color);
-  let stroke = shape.actual_line_properties.as_ref().and_then(line_stroke);
-  if fill_color.is_none() && stroke.is_none() {
+  let fill_paint = shape
+    .actual_fill_properties
+    .as_ref()
+    .and_then(|fill| fill_paint(import, fill));
+  let line = shape
+    .actual_line_properties
+    .as_ref()
+    .and_then(|line| line_stroke(import, line));
+  if fill_paint.is_none() && line.is_none() {
     return;
   }
+  let (stroke, stroke_opacity) = line
+    .map(|line| (Some(line.style), line.opacity))
+    .unwrap_or((None, 1.0));
 
   items.push(PageItem::Rect(RectItem {
     x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
     y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
     width_pt: units::emu_to_points(shape.size.cx),
     height_pt: units::emu_to_points(shape.size.cy),
-    fill_color,
-    fill_opacity: 1.0,
+    fill_color: fill_paint.map(|fill| fill.color),
+    fill_opacity: fill_paint.map(|fill| fill.opacity).unwrap_or(1.0),
     stroke,
-    stroke_opacity: 1.0,
+    stroke_opacity,
   }));
 }
 
@@ -188,9 +225,23 @@ fn paragraph_text(
   text
 }
 
-fn fill_color(fill: &FillProperties) -> Option<RgbColor> {
+#[derive(Clone, Copy, Debug)]
+struct DisplayPaint {
+  color: RgbColor,
+  opacity: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DisplayStroke {
+  style: BorderStyle,
+  opacity: f32,
+}
+
+fn fill_paint(import: &PowerPointImport, fill: &FillProperties) -> Option<DisplayPaint> {
   match &fill.kind {
-    FillKind::Solid(color) => color.as_ref().and_then(display_rgb_color),
+    FillKind::Solid(color) => color
+      .as_ref()
+      .and_then(|color| display_paint(import, color, fill.placeholder_color.as_ref())),
     FillKind::None
     | FillKind::Group
     | FillKind::Gradient(_)
@@ -199,40 +250,40 @@ fn fill_color(fill: &FillProperties) -> Option<RgbColor> {
   }
 }
 
-fn line_stroke(line: &LineProperties) -> Option<BorderStyle> {
+fn line_stroke(import: &PowerPointImport, line: &LineProperties) -> Option<DisplayStroke> {
   let LineFill::Solid(color) = &line.fill else {
     return None;
   };
-  Some(BorderStyle {
-    width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
-    spacing_pt: 0.0,
-    color: color.as_ref().and_then(display_rgb_color)?,
-    compound: false,
+  let paint = color
+    .as_ref()
+    .and_then(|color| display_paint(import, color, line.placeholder_color.as_ref()))?;
+  Some(DisplayStroke {
+    style: BorderStyle {
+      width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
+      spacing_pt: 0.0,
+      color: paint.color,
+      compound: false,
+    },
+    opacity: paint.opacity,
   })
 }
 
-fn display_rgb_color(color: &Color) -> Option<RgbColor> {
-  match color {
-    Color::RgbHex(color) => {
-      if color.transformations.is_empty() {
-        parse_rgb_hex(&color.value)
-      } else {
-        None
-      }
-    }
-    Color::System(system) => system.last_color.as_deref().and_then(parse_rgb_hex),
-    Color::Scheme(_) | Color::Preset(_) => None,
-  }
+fn display_paint(
+  import: &PowerPointImport,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+) -> Option<DisplayPaint> {
+  let color = import.resolve_color(color, placeholder_color)?;
+  Some(DisplayPaint {
+    color: RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    },
+    opacity: color_opacity(color.alpha),
+  })
 }
 
-fn parse_rgb_hex(hex: &str) -> Option<RgbColor> {
-  if hex.len() != 6 {
-    return None;
-  }
-
-  Some(RgbColor {
-    r: u8::from_str_radix(&hex[0..2], 16).ok()?,
-    g: u8::from_str_radix(&hex[2..4], 16).ok()?,
-    b: u8::from_str_radix(&hex[4..6], 16).ok()?,
-  })
+fn color_opacity(alpha: i32) -> f32 {
+  alpha.clamp(0, 100_000) as f32 / 100_000.0
 }

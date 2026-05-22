@@ -157,12 +157,9 @@ impl PowerPointImport {
     // and master color maps, then resolves the mapped token against the current
     // DrawingML theme. Do not return a token string as if it were a resolved
     // color; theme color-scheme import must be ported from upstream first.
-    match self.get_scheme_color_record(token)? {
-      Color::RgbHex(color) if color.transformations.is_empty() => Some(color.value.clone()),
-      Color::System(system) if system.transformations.is_empty() => system.last_color.clone(),
-      Color::Scheme(_) | Color::Preset(_) => None,
-      Color::RgbHex(_) | Color::System(_) => None,
-    }
+    self
+      .resolve_color(self.get_scheme_color_record(token)?, None)
+      .map(|color| format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b))
   }
 
   pub(crate) fn get_scheme_color_record(&self, token: a::SchemeColorValues) -> Option<&Color> {
@@ -170,6 +167,15 @@ impl PowerPointImport {
     self
       .get_current_theme_ptr()
       .and_then(|theme| theme.color_scheme.get_color(mapped_token))
+  }
+
+  pub(crate) fn resolve_color(
+    &self,
+    color: &Color,
+    placeholder_color: Option<&Color>,
+  ) -> Option<super::drawingml::color::ResolvedColor> {
+    let mut scheme_resolver = |token| self.get_scheme_color_record(token).cloned();
+    color.resolve_rgb(&mut scheme_resolver, placeholder_color)
   }
 
   pub(crate) fn get_theme_fill_style(&self, index: u32) -> Option<FillProperties> {

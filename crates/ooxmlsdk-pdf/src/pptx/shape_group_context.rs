@@ -344,21 +344,27 @@ fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProp
   match choice {
     p::ShapePropertiesChoice2::NoFill(_) => Some(FillProperties {
       kind: FillKind::None,
+      placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::SolidFill(fill) => Some(FillProperties {
       kind: FillKind::Solid(import_solid_fill_color(fill)),
+      placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::GroupFill => Some(FillProperties {
       kind: FillKind::Group,
+      placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::GradientFill(fill) => Some(FillProperties {
       kind: FillKind::Gradient(fill.clone()),
+      placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::BlipFill(fill) => Some(FillProperties {
       kind: FillKind::Blip(fill.clone()),
+      placeholder_color: None,
     }),
     p::ShapePropertiesChoice2::PatternFill(fill) => Some(FillProperties {
       kind: FillKind::Pattern(fill.clone()),
+      placeholder_color: None,
     }),
   }
 }

@@ -366,10 +366,12 @@ impl Shape {
     // getActualFillProperties applies reference/theme/direct properties, then
     // replaces direct grpFill with the parent group fill when one exists.
     let mut actual = self.shape_ref_fill_properties.clone();
-    if let Some(fill_ref) = self
-      .shape_style_refs
-      .as_ref()
-      .and_then(|refs| import.get_theme_fill_style(refs.fill_reference.index))
+    if let Some(style_refs) = &self.shape_style_refs
+      && let Some(fill_ref) = import
+        .get_theme_fill_style(style_refs.fill_reference.index)
+        .map(|fill| {
+          fill.with_placeholder_color(style_refs.fill_reference.placeholder_color.clone())
+        })
     {
       actual = Some(fill_ref);
     }
@@ -386,10 +388,11 @@ impl Shape {
     &self,
     import: &PowerPointImport,
   ) -> Option<LineProperties> {
-    let themed = self
-      .shape_style_refs
-      .as_ref()
-      .and_then(|refs| import.get_theme_line_style(refs.line_reference.index));
+    let themed = self.shape_style_refs.as_ref().and_then(|refs| {
+      import
+        .get_theme_line_style(refs.line_reference.index)
+        .map(|line| line.with_placeholder_color(refs.line_reference.placeholder_color.clone()))
+    });
     let inherited = merge_line_properties(self.shape_ref_line_properties.clone(), themed);
     merge_line_properties(inherited, self.line_properties.clone())
   }
@@ -558,6 +561,7 @@ fn merge_line_properties(
     (Some(mut base), Some(direct)) => {
       if direct.fill != LineFill::Unspecified {
         base.fill = direct.fill;
+        base.placeholder_color = direct.placeholder_color;
       }
       if direct.width_emu.is_some() {
         base.width_emu = direct.width_emu;

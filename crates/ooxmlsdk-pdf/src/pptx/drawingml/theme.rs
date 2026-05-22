@@ -1,6 +1,8 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-use super::color::{Color, preset_color, rgb_hex_color, system_color};
+use super::color::{
+  Color, hsl_color, preset_color, rgb_hex_color, rgb_percent_color, system_color,
+};
 use super::fill::FillProperties;
 use super::line::LineProperties;
 use super::shape_properties::EffectProperties;
@@ -176,100 +178,111 @@ fn effect_properties_from_dml(style: &a::EffectStyle) -> EffectProperties {
 
 fn color_from_dark1(choice: Option<&a::Dark1ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Dark1ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Dark1ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Dark1ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Dark1ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Dark1ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Dark1ColorChoice::RgbColorModelPercentage(_) | a::Dark1ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_light1(choice: Option<&a::Light1ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Light1ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Light1ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Light1ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Light1ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Light1ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Light1ColorChoice::RgbColorModelPercentage(_) | a::Light1ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_dark2(choice: Option<&a::Dark2ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Dark2ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Dark2ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Dark2ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Dark2ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Dark2ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Dark2ColorChoice::RgbColorModelPercentage(_) | a::Dark2ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_light2(choice: Option<&a::Light2ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Light2ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Light2ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Light2ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Light2ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Light2ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Light2ColorChoice::RgbColorModelPercentage(_) | a::Light2ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent1(choice: Option<&a::Accent1ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent1ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent1ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent1ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent1ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent1ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent1ColorChoice::RgbColorModelPercentage(_) | a::Accent1ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent2(choice: Option<&a::Accent2ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent2ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent2ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent2ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent2ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent2ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent2ColorChoice::RgbColorModelPercentage(_) | a::Accent2ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent3(choice: Option<&a::Accent3ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent3ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent3ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent3ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent3ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent3ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent3ColorChoice::RgbColorModelPercentage(_) | a::Accent3ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent4(choice: Option<&a::Accent4ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent4ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent4ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent4ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent4ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent4ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent4ColorChoice::RgbColorModelPercentage(_) | a::Accent4ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent5(choice: Option<&a::Accent5ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent5ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent5ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent5ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent5ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent5ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent5ColorChoice::RgbColorModelPercentage(_) | a::Accent5ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_accent6(choice: Option<&a::Accent6ColorChoice>) -> Option<Color> {
   match choice? {
+    a::Accent6ColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::Accent6ColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::Accent6ColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::Accent6ColorChoice::SystemColor(color) => Some(system_color(color)),
     a::Accent6ColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::Accent6ColorChoice::RgbColorModelPercentage(_) | a::Accent6ColorChoice::HslColor(_) => None,
   }
 }
 
 fn color_from_hyperlink(choice: Option<&a::HyperlinkChoice>) -> Option<Color> {
   match choice? {
+    a::HyperlinkChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
     a::HyperlinkChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::HyperlinkChoice::HslColor(color) => Some(hsl_color(color)),
     a::HyperlinkChoice::SystemColor(color) => Some(system_color(color)),
     a::HyperlinkChoice::PresetColor(color) => Some(preset_color(color)),
-    a::HyperlinkChoice::RgbColorModelPercentage(_) | a::HyperlinkChoice::HslColor(_) => None,
   }
 }
 
@@ -277,10 +290,12 @@ fn color_from_followed_hyperlink(
   choice: Option<&a::FollowedHyperlinkColorChoice>,
 ) -> Option<Color> {
   match choice? {
+    a::FollowedHyperlinkColorChoice::RgbColorModelPercentage(color) => {
+      Some(rgb_percent_color(color))
+    }
     a::FollowedHyperlinkColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+    a::FollowedHyperlinkColorChoice::HslColor(color) => Some(hsl_color(color)),
     a::FollowedHyperlinkColorChoice::SystemColor(color) => Some(system_color(color)),
     a::FollowedHyperlinkColorChoice::PresetColor(color) => Some(preset_color(color)),
-    a::FollowedHyperlinkColorChoice::RgbColorModelPercentage(_)
-    | a::FollowedHyperlinkColorChoice::HslColor(_) => None,
   }
 }

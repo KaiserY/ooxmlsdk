@@ -39,6 +39,12 @@ pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::Lay
 
 fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<PageItem> {
   let mut items = Vec::new();
+  let _has_structured_comment_identity = slide.comments.iter().any(|comment| comment.has_payload())
+    || slide
+      .comment_authors
+      .iter()
+      .any(|author| author.has_payload());
+  let _has_header_footer_identity = slide.header_footer.has_visible_slot();
   let master_page = slide
     .master_page_index
     .and_then(|master_page_index| import.master_pages.get(master_page_index));
@@ -118,6 +124,23 @@ fn lower_shape(
 
   lower_shape_bounds(import, shape, offset, items);
   lower_picture(shape, offset, items);
+  let _has_structured_media_identity = shape.media.as_ref().is_some_and(|media| {
+    !matches!(media.kind, super::drawingml::shape::MediaKind::Unknown)
+      || media.embed_relationship_id.is_some()
+      || media.link_relationship_id.is_some()
+      || media
+        .resource
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+  });
+  let _has_structured_content_part_identity =
+    shape.content_part.as_ref().is_some_and(|content_part| {
+      !content_part.relationship_id.is_empty()
+        || content_part
+          .resource
+          .as_ref()
+          .is_some_and(|resource| resource.has_payload())
+    });
   let _has_structured_graphic_identity = shape
     .graphic_data
     .as_ref()

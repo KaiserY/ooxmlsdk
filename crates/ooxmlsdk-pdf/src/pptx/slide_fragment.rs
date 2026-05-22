@@ -1,3 +1,5 @@
+use ooxmlsdk::parts::notes_master_part::NotesMasterPart;
+use ooxmlsdk::parts::notes_slide_part::NotesSlidePart;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::slide_part::SlidePart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -7,8 +9,11 @@ use crate::error::Result;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
+use super::drawingml::text_list_style::TextListStyle;
 use super::shape_group_context::PPTShapeGroupContext;
-use super::slide::{BackgroundKind, BackgroundProperties, ShapeLocation, SlidePersist};
+use super::slide::{
+  BackgroundKind, BackgroundProperties, ColorMap, HeaderFooter, ShapeLocation, SlidePersist,
+};
 
 #[derive(Debug)]
 pub(crate) struct SlideFragmentHandler {
@@ -44,6 +49,9 @@ impl SlideFragmentHandler {
     self.slide_persist.import_image_parts(package, slide_part);
     self
       .slide_persist
+      .import_media_reference_parts(package, slide_part);
+    self
+      .slide_persist
       .import_graphic_frame_related_parts(package, slide_part)?;
     self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
     let slide = slide_part.root_element(package)?;
@@ -60,6 +68,77 @@ impl SlideFragmentHandler {
     }
     self.slide_name = slide.common_slide_data.name.clone();
     self.import_common_slide_data(&slide.common_slide_data);
+    Ok(())
+  }
+
+  pub(crate) fn import_notes_slide_part(
+    &mut self,
+    package: &mut PresentationDocument,
+    notes_part: &NotesSlidePart,
+  ) -> Result<()> {
+    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx imports
+    // notes as a slide fragment with its own relationship scope and notes-size
+    // page geometry. The notes master is attached by PresentationFragmentHandler
+    // before this method, mirroring SlidePersist::setMasterPersist.
+    self.slide_persist.import_image_parts(package, notes_part);
+    self
+      .slide_persist
+      .import_media_reference_parts(package, notes_part);
+    self
+      .slide_persist
+      .import_graphic_frame_related_parts(package, notes_part)?;
+    self.slide_persist.drawing.imported = notes_part.vml_drawing_parts(package).next().is_some();
+    let notes = notes_part.root_element(package)?;
+    self.slide_persist.show_master_shapes =
+      notes.show_master_shapes.is_none_or(|value| value.as_bool());
+    if !self.slide_persist.show_master_shapes {
+      self.slide_persist.hide_master_location_shapes();
+    }
+    if let Some(color_map_override) = &notes.color_map_override {
+      self
+        .slide_persist
+        .apply_color_map_override(color_map_override);
+    }
+    self.slide_name = notes.common_slide_data.name.clone();
+    self.import_common_slide_data(&notes.common_slide_data);
+    Ok(())
+  }
+
+  pub(crate) fn import_notes_master_part(
+    &mut self,
+    package: &mut PresentationDocument,
+    notes_master_part: &NotesMasterPart,
+  ) -> Result<()> {
+    // Source: LibreOffice imports notesMaster as a master persist before the
+    // notes slide content so placeholder/style lookup uses notes text style.
+    self
+      .slide_persist
+      .import_image_parts(package, notes_master_part);
+    self
+      .slide_persist
+      .import_media_reference_parts(package, notes_master_part);
+    self
+      .slide_persist
+      .import_graphic_frame_related_parts(package, notes_master_part)?;
+    self.slide_persist.drawing.imported = notes_master_part
+      .vml_drawing_parts(package)
+      .next()
+      .is_some();
+    let notes_master = notes_master_part.root_element(package)?;
+    self
+      .slide_persist
+      .set_color_map(ColorMap::from_pml(&notes_master.color_map));
+    self.slide_persist.header_footer = notes_master
+      .header_footer
+      .as_deref()
+      .map(HeaderFooter::from_pml)
+      .unwrap_or_default();
+    self.slide_persist.notes_text_style = notes_master
+      .notes_style
+      .as_ref()
+      .map(|style| TextListStyle::from_pml_notes_style(style));
+    self.slide_name = notes_master.common_slide_data.name.clone();
+    self.import_common_slide_data(&notes_master.common_slide_data);
     Ok(())
   }
 

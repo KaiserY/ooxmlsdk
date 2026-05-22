@@ -619,6 +619,13 @@ chart/SmartArt/OLE rendering is still a conversion gap; the preserved payloads
 are the handoff point for the renderer, not an excuse to parse package
 relationships from display code.
 
+Chart resources are not just `c:chartSpace`. LibreOffice's chart path carries
+the chart drawing fragment, embedded workbook/package, chart-local images,
+theme override, chart style, and chart color style into the converter. Keep
+these children attached to the chart/chartex resource snapshot so later visible
+chart rendering can consume a complete model without reopening relationships or
+losing chart-local theme/style context.
+
 ### Connectors
 
 `cxnSp` import stores structured `stCxn` / `endCxn` endpoint records on the
@@ -803,6 +810,36 @@ Unsupported or incomplete objects must keep structured records:
 
 Visible text from these objects may be used as temporary paint only after the
 structured object identity is preserved.
+
+Media is a DrawingML shape concern, not a display fallback. LibreOffice resolves
+`a:wavAudioFile/@r:embed`, `a:audioFile/@r:link`, `a:videoFile/@r:link`, and
+`p14:media` against the current slide/layout/master relationships while parsing
+the shape. Keep the relationship id, relationship type, package target or
+external target, embedded bytes/content type when available, and contentPart
+identity on the `Shape`/`SlidePersist` model. Do not infer media by inspecting
+poster images in display lowering.
+
+Comments are slide/presentation import state, not display-layer XML recovery.
+LibreOffice reads legacy `ppt/commentAuthors.xml` once at presentation scope,
+imports each slide's legacy comments relationship, and also preserves modern
+PowerPoint 2018 comments/authors. Keep author ids/names/initials, legacy color
+and last-index metadata, modern user/provider ids, comment ids, position,
+created/datetime, status, tags/likes/assignments, task fields, reply counts,
+plain text, and the modern text-body structure on `SlidePersist`. Do not parse
+comment XML manually or resolve comments from display lowering; use the typed
+SDK parts so legacy and modern relationship scopes stay distinct.
+
+Notes are imported as their own slide persists, not as visible slide items.
+LibreOffice imports the visible slide first, then follows the slide-owned
+`notesSlide` relationship when notes import is enabled. The notes slide must use
+`notesSz`, carry `is_notes=true`, keep its own relationship-scoped images,
+media, graphicFrames, VML markers, background, color-map override, and shape
+tree, and link to a notes master persist imported from the notes slide's
+`notesMaster` relationship. Notes masters are master persists with
+`is_notes=true`; they keep their theme, color map, header/footer flags,
+`notesStyle`, background, and placeholder shapes. Do not append notes pages to
+the normal draw-page PDF sequence unless an explicit export mode later asks for
+notes output.
 
 ---
 

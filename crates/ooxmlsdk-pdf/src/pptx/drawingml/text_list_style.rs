@@ -110,6 +110,21 @@ impl TextListStyle {
     })
   }
 
+  pub(crate) fn from_pml_notes_style(source: &p::NotesStyle) -> Self {
+    Self::from_parts(TextListStyleParts {
+      default_paragraph_properties: source.default_paragraph_properties.clone(),
+      level1_paragraph_properties: source.level1_paragraph_properties.clone(),
+      level2_paragraph_properties: source.level2_paragraph_properties.clone(),
+      level3_paragraph_properties: source.level3_paragraph_properties.clone(),
+      level4_paragraph_properties: source.level4_paragraph_properties.clone(),
+      level5_paragraph_properties: source.level5_paragraph_properties.clone(),
+      level6_paragraph_properties: source.level6_paragraph_properties.clone(),
+      level7_paragraph_properties: source.level7_paragraph_properties.clone(),
+      level8_paragraph_properties: source.level8_paragraph_properties.clone(),
+      level9_paragraph_properties: source.level9_paragraph_properties.clone(),
+    })
+  }
+
   pub(crate) fn from_pml_default_text_style(source: &p::DefaultTextStyle) -> Self {
     Self::from_parts(TextListStyleParts {
       default_paragraph_properties: source.default_paragraph_properties.clone(),

@@ -8,7 +8,9 @@ use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
-use super::drawingml::shape::{CustomShapeGeometry, FrameType, Point, Shape, ShapeService, Size};
+use super::drawingml::shape::{
+  CustomShapeGeometry, FrameType, MediaKind, Point, Shape, ShapeService, Size,
+};
 use super::drawingml::shape_properties::EffectProperties;
 use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
@@ -119,6 +121,13 @@ impl PPTShapeGroupContext {
     {
       PPTShapeContext::new(&mut shape).on_create_context(slide_persist, placeholder);
     }
+    apply_application_media(
+      &mut shape.shape,
+      slide_persist,
+      &source
+        .non_visual_shape_properties
+        .application_non_visual_drawing_properties,
+    );
     apply_transform_2d(
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),
@@ -235,6 +244,13 @@ impl PPTShapeGroupContext {
     {
       apply_graphic_placeholder(&mut shape, slide_persist, placeholder);
     }
+    apply_application_media(
+      &mut shape.shape,
+      slide_persist,
+      &picture
+        .non_visual_picture_properties
+        .application_non_visual_drawing_properties,
+    );
     apply_transform_2d(
       &mut shape.shape,
       picture.shape_properties.transform2_d.as_deref(),
@@ -273,6 +289,12 @@ impl PPTShapeGroupContext {
     }
     apply_p14_transform_2d(&mut shape.shape, content_part.transform2_d.as_deref());
     shape.shape.set_content_part(content_part.r_id.clone());
+    shape.shape.set_content_part_resource(
+      slide_persist
+        .media_resources
+        .get(content_part.r_id.as_str())
+        .cloned(),
+    );
     shape.into_shape(slide_persist)
   }
 
@@ -341,6 +363,90 @@ fn apply_p14_non_visual_drawing_properties(
     .hidden
     .as_ref()
     .is_some_and(|hidden| hidden.as_bool());
+}
+
+fn apply_application_media(
+  shape: &mut Shape,
+  slide_persist: &SlidePersist,
+  properties: &p::ApplicationNonVisualDrawingProperties,
+) {
+  // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
+  // stores media stream/package URL/mime from a:wavAudioFile, a:audioFile,
+  // a:videoFile, and p14:media before Shape::finalizeServiceName chooses a
+  // presentation MediaShape.
+  if let Some(choice) = &properties.application_non_visual_drawing_properties_choice {
+    match choice {
+      p::ApplicationNonVisualDrawingPropertiesChoice::WaveAudioFile(audio) => {
+        let relationship_id = audio.embed.clone();
+        shape.set_media(
+          MediaKind::Audio,
+          Some(relationship_id.clone()),
+          None,
+          slide_persist
+            .media_resources
+            .get(relationship_id.as_str())
+            .cloned(),
+        );
+      }
+      p::ApplicationNonVisualDrawingPropertiesChoice::AudioFromFile(audio) => {
+        let relationship_id = audio.link.clone();
+        shape.set_media(
+          MediaKind::Audio,
+          None,
+          Some(relationship_id.clone()),
+          slide_persist
+            .media_resources
+            .get(relationship_id.as_str())
+            .cloned(),
+        );
+      }
+      p::ApplicationNonVisualDrawingPropertiesChoice::VideoFromFile(video) => {
+        let relationship_id = video.link.clone();
+        shape.set_media(
+          MediaKind::Video,
+          None,
+          Some(relationship_id.clone()),
+          slide_persist
+            .media_resources
+            .get(relationship_id.as_str())
+            .cloned(),
+        );
+      }
+      p::ApplicationNonVisualDrawingPropertiesChoice::QuickTimeFromFile(quick_time) => {
+        let relationship_id = quick_time.link.clone();
+        shape.set_media(
+          MediaKind::Video,
+          None,
+          Some(relationship_id.clone()),
+          slide_persist
+            .media_resources
+            .get(relationship_id.as_str())
+            .cloned(),
+        );
+      }
+      p::ApplicationNonVisualDrawingPropertiesChoice::AudioFromCd(_) => {}
+    }
+  }
+
+  if let Some(extension_list) = &properties.application_non_visual_drawing_properties_extension_list
+  {
+    for extension in &extension_list.application_non_visual_drawing_properties_extension {
+      if let Some(p::ApplicationNonVisualDrawingPropertiesExtensionChoice::Media(media)) =
+        &extension.application_non_visual_drawing_properties_extension_choice
+      {
+        let relationship_id = media.embed.as_ref().or(media.link.as_ref()).cloned();
+        shape.set_media(
+          MediaKind::Unknown,
+          media.embed.clone(),
+          media.link.clone(),
+          relationship_id
+            .as_deref()
+            .and_then(|id| slide_persist.media_resources.get(id))
+            .cloned(),
+        );
+      }
+    }
+  }
 }
 
 fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {

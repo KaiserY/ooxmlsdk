@@ -1,14 +1,19 @@
 use std::collections::HashMap;
 
+use ooxmlsdk::common::{MediaDataPart, RelationshipRef};
 use ooxmlsdk::parts::{
-  chart_part::ChartPart, diagram_colors_part::DiagramColorsPart,
+  chart_color_style_part::ChartColorStylePart, chart_drawing_part::ChartDrawingPart,
+  chart_part::ChartPart, chart_style_part::ChartStylePart, diagram_colors_part::DiagramColorsPart,
   diagram_data_part::DiagramDataPart, diagram_layout_definition_part::DiagramLayoutDefinitionPart,
   diagram_style_part::DiagramStylePart, embedded_object_part::EmbeddedObjectPart,
   embedded_package_part::EmbeddedPackagePart, extended_chart_part::ExtendedChartPart,
   image_part::ImagePart, presentation_document::PresentationDocument,
+  theme_override_part::ThemeOverridePart,
 };
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2012_chart_style as cs,
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
+  schemas_microsoft_com_office_powerpoint_2018_8_main as p188,
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
   schemas_openxmlformats_org_drawingml_2006_main as a,
@@ -128,6 +133,7 @@ pub(crate) struct SlidePersist {
   pub(crate) diagram_color_resources: HashMap<String, DiagramColorResource>,
   pub(crate) embedded_object_resources: HashMap<String, BinaryResource>,
   pub(crate) embedded_package_resources: HashMap<String, BinaryResource>,
+  pub(crate) media_resources: HashMap<String, MediaResource>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,12 +146,39 @@ pub(crate) struct ImageResource {
 pub(crate) struct ChartResource {
   pub(crate) path: Option<String>,
   pub(crate) chart_space: c::ChartSpace,
+  pub(crate) drawing: Option<ChartDrawingResource>,
+  pub(crate) embedded_package: Option<BinaryResource>,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) theme_override: Option<ThemeOverrideResource>,
+  pub(crate) style_resources: Vec<ChartStyleResource>,
+  pub(crate) color_style_resources: Vec<ChartColorStyleResource>,
 }
 
 impl ChartResource {
   pub(crate) fn has_payload(&self) -> bool {
     self.path.as_ref().is_some_and(|path| !path.is_empty())
       || structured_resource_present(&self.chart_space)
+      || self
+        .drawing
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || self
+        .embedded_package
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || !self.image_resources.is_empty()
+      || self
+        .theme_override
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || self
+        .style_resources
+        .iter()
+        .any(ChartStyleResource::has_payload)
+      || self
+        .color_style_resources
+        .iter()
+        .any(ChartColorStyleResource::has_payload)
   }
 }
 
@@ -153,12 +186,95 @@ impl ChartResource {
 pub(crate) struct ExtendedChartResource {
   pub(crate) path: Option<String>,
   pub(crate) chart_space: cx::ChartSpace,
+  pub(crate) drawing: Option<ChartDrawingResource>,
+  pub(crate) embedded_package: Option<BinaryResource>,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) theme_override: Option<ThemeOverrideResource>,
+  pub(crate) style_resources: Vec<ChartStyleResource>,
+  pub(crate) color_style_resources: Vec<ChartColorStyleResource>,
 }
 
 impl ExtendedChartResource {
   pub(crate) fn has_payload(&self) -> bool {
     self.path.as_ref().is_some_and(|path| !path.is_empty())
       || structured_resource_present(&self.chart_space)
+      || self
+        .drawing
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || self
+        .embedded_package
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || !self.image_resources.is_empty()
+      || self
+        .theme_override
+        .as_ref()
+        .is_some_and(|resource| resource.has_payload())
+      || self
+        .style_resources
+        .iter()
+        .any(ChartStyleResource::has_payload)
+      || self
+        .color_style_resources
+        .iter()
+        .any(ChartColorStyleResource::has_payload)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ChartDrawingResource {
+  pub(crate) path: Option<String>,
+  pub(crate) user_shapes: c::UserShapes,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+}
+
+impl ChartDrawingResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.user_shapes)
+      || !self.image_resources.is_empty()
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ThemeOverrideResource {
+  pub(crate) path: Option<String>,
+  pub(crate) theme_override: a::ThemeOverride,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+}
+
+impl ThemeOverrideResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.theme_override)
+      || !self.image_resources.is_empty()
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ChartStyleResource {
+  pub(crate) path: Option<String>,
+  pub(crate) style: cs::ChartStyle,
+}
+
+impl ChartStyleResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.style)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ChartColorStyleResource {
+  pub(crate) path: Option<String>,
+  pub(crate) colors: cs::ColorStyle,
+}
+
+impl ChartColorStyleResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.colors)
   }
 }
 
@@ -232,6 +348,25 @@ impl BinaryResource {
   }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MediaResource {
+  pub(crate) relationship_id: String,
+  pub(crate) relationship_type: String,
+  pub(crate) target: String,
+  pub(crate) external: bool,
+  pub(crate) data: Option<BinaryResource>,
+}
+
+impl MediaResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    !self.relationship_id.is_empty()
+      || !self.relationship_type.is_empty()
+      || !self.target.is_empty()
+      || self.external
+      || self.data.as_ref().is_some_and(BinaryResource::has_payload)
+  }
+}
+
 fn binary_resource<P>(package: &PresentationDocument, part: &P) -> Option<BinaryResource>
 where
   P: SdkPart,
@@ -240,6 +375,185 @@ where
     path: part.path(package).map(str::to_string),
     data: part.data_to_vec(package)?,
     content_type: part.content_type(package).map(str::to_string),
+  })
+}
+
+fn binary_resource_from_media_data_part(
+  package: &PresentationDocument,
+  part: &MediaDataPart,
+) -> Option<BinaryResource> {
+  Some(BinaryResource {
+    path: part.path(package).map(str::to_string),
+    data: part.data(package)?.to_vec(),
+    content_type: part.content_type(package).map(str::to_string),
+  })
+}
+
+fn media_data_part_by_id(
+  package: &PresentationDocument,
+  part_id: ooxmlsdk::common::PartId,
+) -> Option<MediaDataPart> {
+  package
+    .media_data_parts()
+    .find(|part| part.part_id() == Some(part_id))
+}
+
+fn media_resource_from_relationship(
+  package: &PresentationDocument,
+  relationship: RelationshipRef<'_>,
+) -> MediaResource {
+  let data = relationship
+    .target_part_id()
+    .and_then(|part_id| media_data_part_by_id(package, part_id))
+    .and_then(|part| binary_resource_from_media_data_part(package, &part));
+  MediaResource {
+    relationship_id: relationship.id().to_string(),
+    relationship_type: relationship.relationship_type().to_string(),
+    target: relationship.target().to_string(),
+    external: data.is_none(),
+    data,
+  }
+}
+
+fn collect_image_resources<P>(
+  package: &PresentationDocument,
+  part: &P,
+) -> HashMap<String, ImageResource>
+where
+  P: SdkPart,
+{
+  part
+    .related_parts_of_type::<_, ImagePart>(package)
+    .filter_map(|related_part| {
+      Some((
+        related_part.relationship_id().to_string(),
+        ImageResource {
+          data: related_part.part().data_to_vec(package)?,
+          content_type: related_part
+            .part()
+            .content_type(package)
+            .map(str::to_string),
+        },
+      ))
+    })
+    .collect()
+}
+
+fn chart_resource(
+  package: &mut PresentationDocument,
+  chart_part: &ChartPart,
+) -> Result<ChartResource> {
+  let drawing_part = chart_part.chart_drawing_part(package);
+  let embedded_package_part = chart_part.embedded_package_part(package);
+  let theme_override_part = chart_part.theme_override_part(package);
+  let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
+  let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
+  let image_resources = collect_image_resources(package, chart_part);
+
+  Ok(ChartResource {
+    path: chart_part.path(package).map(str::to_string),
+    chart_space: chart_part.root_element(package)?.clone(),
+    drawing: drawing_part
+      .as_ref()
+      .map(|part| chart_drawing_resource(package, part))
+      .transpose()?,
+    embedded_package: embedded_package_part
+      .as_ref()
+      .and_then(|part| binary_resource(package, part)),
+    image_resources,
+    theme_override: theme_override_part
+      .as_ref()
+      .map(|part| theme_override_resource(package, part))
+      .transpose()?,
+    style_resources: chart_style_parts
+      .iter()
+      .map(|part| chart_style_resource(package, part))
+      .collect::<Result<Vec<_>>>()?,
+    color_style_resources: chart_color_style_parts
+      .iter()
+      .map(|part| chart_color_style_resource(package, part))
+      .collect::<Result<Vec<_>>>()?,
+  })
+}
+
+fn extended_chart_resource(
+  package: &mut PresentationDocument,
+  chart_part: &ExtendedChartPart,
+) -> Result<ExtendedChartResource> {
+  let drawing_part = chart_part.chart_drawing_part(package);
+  let embedded_package_part = chart_part.embedded_package_part(package);
+  let theme_override_part = chart_part.theme_override_part(package);
+  let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
+  let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
+  let image_resources = collect_image_resources(package, chart_part);
+
+  Ok(ExtendedChartResource {
+    path: chart_part.path(package).map(str::to_string),
+    chart_space: chart_part.root_element(package)?.clone(),
+    drawing: drawing_part
+      .as_ref()
+      .map(|part| chart_drawing_resource(package, part))
+      .transpose()?,
+    embedded_package: embedded_package_part
+      .as_ref()
+      .and_then(|part| binary_resource(package, part)),
+    image_resources,
+    theme_override: theme_override_part
+      .as_ref()
+      .map(|part| theme_override_resource(package, part))
+      .transpose()?,
+    style_resources: chart_style_parts
+      .iter()
+      .map(|part| chart_style_resource(package, part))
+      .collect::<Result<Vec<_>>>()?,
+    color_style_resources: chart_color_style_parts
+      .iter()
+      .map(|part| chart_color_style_resource(package, part))
+      .collect::<Result<Vec<_>>>()?,
+  })
+}
+
+fn chart_drawing_resource(
+  package: &mut PresentationDocument,
+  part: &ChartDrawingPart,
+) -> Result<ChartDrawingResource> {
+  let image_resources = collect_image_resources(package, part);
+  Ok(ChartDrawingResource {
+    path: part.path(package).map(str::to_string),
+    user_shapes: part.root_element(package)?.clone(),
+    image_resources,
+  })
+}
+
+fn theme_override_resource(
+  package: &mut PresentationDocument,
+  part: &ThemeOverridePart,
+) -> Result<ThemeOverrideResource> {
+  let image_resources = collect_image_resources(package, part);
+  Ok(ThemeOverrideResource {
+    path: part.path(package).map(str::to_string),
+    theme_override: part.root_element(package)?.clone(),
+    image_resources,
+  })
+}
+
+fn chart_style_resource(
+  package: &mut PresentationDocument,
+  part: &ChartStylePart,
+) -> Result<ChartStyleResource> {
+  Ok(ChartStyleResource {
+    path: part.path(package).map(str::to_string),
+    style: part.root_element(package)?.clone(),
+  })
+}
+
+fn chart_color_style_resource(
+  package: &mut PresentationDocument,
+  part: &ChartColorStylePart,
+) -> Result<ChartColorStyleResource> {
+  Ok(ChartColorStyleResource {
+    path: part.path(package).map(str::to_string),
+    colors: part.root_element(package)?.clone(),
   })
 }
 
@@ -277,14 +591,223 @@ pub(crate) struct TimeNode;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct HeaderFooter {
-  pub(crate) visible: bool,
+  pub(crate) slide_number: bool,
+  pub(crate) header: bool,
+  pub(crate) footer: bool,
+  pub(crate) date_time: bool,
+}
+
+impl HeaderFooter {
+  pub(crate) fn from_pml(header_footer: &p::HeaderFooter) -> Self {
+    Self {
+      slide_number: header_footer
+        .slide_number
+        .is_some_and(|value| value.as_bool()),
+      header: header_footer.header.is_some_and(|value| value.as_bool()),
+      footer: header_footer.footer.is_some_and(|value| value.as_bool()),
+      date_time: header_footer.date_time.is_some_and(|value| value.as_bool()),
+    }
+  }
+
+  pub(crate) fn has_visible_slot(&self) -> bool {
+    self.slide_number || self.header || self.footer || self.date_time
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SlideCommentSource {
+  Legacy,
+  Modern,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SlideComment {
+  pub(crate) source: SlideCommentSource,
+  pub(crate) id: Option<String>,
+  pub(crate) author_id: String,
+  pub(crate) index: Option<u32>,
+  pub(crate) x_emu: Option<i64>,
+  pub(crate) y_emu: Option<i64>,
+  pub(crate) text: Option<String>,
+  pub(crate) date_time: Option<String>,
+  pub(crate) status: Option<String>,
+  pub(crate) tags: Vec<String>,
+  pub(crate) likes: Vec<String>,
+  pub(crate) assigned_to: Vec<String>,
+  pub(crate) title: Option<String>,
+  pub(crate) complete: Option<i32>,
+  pub(crate) priority: Option<u32>,
+  pub(crate) reply_count: usize,
+  pub(crate) modern_text_body: Option<p188::TextBodyType>,
+}
+
+impl SlideComment {
+  pub(crate) fn from_pml(comment: &p::Comment) -> Self {
+    Self {
+      source: SlideCommentSource::Legacy,
+      id: None,
+      author_id: comment.author_id.to_string(),
+      index: Some(comment.index),
+      x_emu: Some(comment.position.x),
+      y_emu: Some(comment.position.y),
+      text: Some(comment.text.clone()),
+      date_time: comment.date_time.clone(),
+      status: None,
+      tags: Vec::new(),
+      likes: Vec::new(),
+      assigned_to: Vec::new(),
+      title: None,
+      complete: None,
+      priority: None,
+      reply_count: 0,
+      modern_text_body: None,
+    }
+  }
+
+  pub(crate) fn from_modern(comment: &p188::Comment) -> Self {
+    let modern_text_body = comment
+      .text_body_type
+      .as_ref()
+      .map(|text_body| (**text_body).clone());
+    Self {
+      source: SlideCommentSource::Modern,
+      id: Some(comment.id.clone()),
+      author_id: comment.author_id.clone(),
+      index: None,
+      x_emu: comment.point2_d_type.as_ref().map(|position| position.x),
+      y_emu: comment.point2_d_type.as_ref().map(|position| position.y),
+      text: modern_text_body
+        .as_ref()
+        .and_then(|text_body| text_from_dml_paragraphs(&text_body.paragraph)),
+      date_time: Some(comment.created.clone()),
+      status: comment.status.map(|status| format!("{status:?}")),
+      tags: comment.tags.clone().unwrap_or_default(),
+      likes: comment.likes.clone().unwrap_or_default(),
+      assigned_to: comment.assigned_to.clone().unwrap_or_default(),
+      title: comment.title.clone(),
+      complete: comment.complete,
+      priority: comment.priority,
+      reply_count: comment
+        .comment_reply_list
+        .as_ref()
+        .map(|reply_list| reply_list.comment_reply.len())
+        .unwrap_or_default(),
+      modern_text_body,
+    }
+  }
+
+  pub(crate) fn has_payload(&self) -> bool {
+    matches!(
+      self.source,
+      SlideCommentSource::Legacy | SlideCommentSource::Modern
+    ) || self.id.as_ref().is_some_and(|id| !id.is_empty())
+      || !self.author_id.is_empty()
+      || self.index.is_some()
+      || self.x_emu.is_some()
+      || self.y_emu.is_some()
+      || self.text.as_ref().is_some_and(|text| !text.is_empty())
+      || self
+        .date_time
+        .as_ref()
+        .is_some_and(|date_time| !date_time.is_empty())
+      || self
+        .status
+        .as_ref()
+        .is_some_and(|status| !status.is_empty())
+      || !self.tags.is_empty()
+      || !self.likes.is_empty()
+      || !self.assigned_to.is_empty()
+      || self.title.as_ref().is_some_and(|title| !title.is_empty())
+      || self.complete.is_some()
+      || self.priority.is_some()
+      || self.reply_count > 0
+      || self.modern_text_body.is_some()
+  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct SlideComment;
+pub(crate) struct SlideCommentAuthor {
+  pub(crate) source: SlideCommentSource,
+  pub(crate) id: String,
+  pub(crate) name: String,
+  pub(crate) initials: Option<String>,
+  pub(crate) color_index: Option<u32>,
+  pub(crate) last_index: Option<u32>,
+  pub(crate) user_id: Option<String>,
+  pub(crate) provider_id: Option<String>,
+}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct SlideCommentAuthor;
+impl SlideCommentAuthor {
+  pub(crate) fn from_pml(author: &p::CommentAuthor) -> Self {
+    Self {
+      source: SlideCommentSource::Legacy,
+      id: author.id.to_string(),
+      name: author.name.clone(),
+      initials: Some(author.initials.clone()),
+      color_index: Some(author.color_index),
+      last_index: Some(author.last_index),
+      user_id: None,
+      provider_id: None,
+    }
+  }
+
+  pub(crate) fn from_modern(author: &p188::Author) -> Self {
+    Self {
+      source: SlideCommentSource::Modern,
+      id: author.id.clone(),
+      name: author.name.clone(),
+      initials: author.initials.clone(),
+      color_index: None,
+      last_index: None,
+      user_id: Some(author.user_id.clone()),
+      provider_id: Some(author.provider_id.clone()),
+    }
+  }
+
+  pub(crate) fn has_payload(&self) -> bool {
+    matches!(
+      self.source,
+      SlideCommentSource::Legacy | SlideCommentSource::Modern
+    ) || !self.id.is_empty()
+      || !self.name.is_empty()
+      || self
+        .initials
+        .as_ref()
+        .is_some_and(|initials| !initials.is_empty())
+      || self.color_index.is_some()
+      || self.last_index.is_some()
+      || self
+        .user_id
+        .as_ref()
+        .is_some_and(|user_id| !user_id.is_empty())
+      || self
+        .provider_id
+        .as_ref()
+        .is_some_and(|provider_id| !provider_id.is_empty())
+  }
+}
+
+fn text_from_dml_paragraphs(paragraphs: &[a::Paragraph]) -> Option<String> {
+  let mut text = String::new();
+  for (index, paragraph) in paragraphs.iter().enumerate() {
+    if index > 0 {
+      text.push('\n');
+    }
+    for choice in &paragraph.paragraph_choice {
+      match choice {
+        a::ParagraphChoice::Run(run) => text.push_str(&run.text),
+        a::ParagraphChoice::Break(_) => text.push('\n'),
+        a::ParagraphChoice::Field(field) => {
+          if let Some(field_text) = &field.text {
+            text.push_str(field_text);
+          }
+        }
+        a::ParagraphChoice::TextMath(_) => {}
+      }
+    }
+  }
+  if text.is_empty() { None } else { Some(text) }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct VmlDrawing {
@@ -322,6 +845,21 @@ impl SlidePersist {
 
   pub(crate) fn new_layout(path: String, size: SlideSize) -> Self {
     Self::new(path, None, size, false, false, ShapeLocation::Layout)
+  }
+
+  pub(crate) fn new_notes(path: String, relationship_id: Option<String>, size: SlideSize) -> Self {
+    Self::new(
+      path,
+      relationship_id,
+      size,
+      false,
+      true,
+      ShapeLocation::Slide,
+    )
+  }
+
+  pub(crate) fn new_notes_master(path: String, size: SlideSize) -> Self {
+    Self::new(path, None, size, true, true, ShapeLocation::Master)
   }
 
   fn new(
@@ -374,6 +912,7 @@ impl SlidePersist {
       diagram_color_resources: HashMap::new(),
       embedded_object_resources: HashMap::new(),
       embedded_package_resources: HashMap::new(),
+      media_resources: HashMap::new(),
     }
   }
 
@@ -404,6 +943,22 @@ impl SlidePersist {
       .map(|style| TextListStyle::from_pml_other_style(style));
   }
 
+  pub(crate) fn set_comment_authors(&mut self, authors: Vec<SlideCommentAuthor>) {
+    self.comment_authors = authors;
+  }
+
+  pub(crate) fn import_legacy_comments(&mut self, comments: &p::CommentList) {
+    self
+      .comments
+      .extend(comments.comment.iter().map(SlideComment::from_pml));
+  }
+
+  pub(crate) fn import_modern_comments(&mut self, comments: &p188::CommentList) {
+    self
+      .comments
+      .extend(comments.comment.iter().map(SlideComment::from_modern));
+  }
+
   pub(crate) fn import_image_parts<P>(&mut self, package: &PresentationDocument, part: &P)
   where
     P: SdkPart,
@@ -423,6 +978,34 @@ impl SlidePersist {
           data,
           content_type: image_part.content_type(package).map(str::to_string),
         },
+      );
+    }
+  }
+
+  pub(crate) fn import_media_reference_parts<P>(&mut self, package: &PresentationDocument, part: &P)
+  where
+    P: SdkPart,
+  {
+    // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
+    // resolves a:wavAudioFile, a:audioFile, a:videoFile, and p14:media
+    // relationship IDs against the current fragment before shape finalization.
+    for relationship in part.data_part_reference_relationships(package) {
+      self.media_resources.insert(
+        relationship.id().to_string(),
+        media_resource_from_relationship(package, relationship),
+      );
+    }
+    for relationship in part.external_relationships(package).filter(|relationship| {
+      matches!(
+        relationship.relationship_type(),
+        RelationshipRef::AUDIO_REFERENCE_RELATIONSHIP_TYPE
+          | RelationshipRef::MEDIA_REFERENCE_RELATIONSHIP_TYPE
+          | RelationshipRef::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+      )
+    }) {
+      self.media_resources.insert(
+        relationship.id().to_string(),
+        media_resource_from_relationship(package, relationship),
       );
     }
   }
@@ -449,13 +1032,9 @@ impl SlidePersist {
       })
       .collect();
     for (relationship_id, chart_part) in chart_parts {
-      self.chart_resources.insert(
-        relationship_id,
-        ChartResource {
-          path: chart_part.path(package).map(str::to_string),
-          chart_space: chart_part.root_element(package)?.clone(),
-        },
-      );
+      self
+        .chart_resources
+        .insert(relationship_id, chart_resource(package, &chart_part)?);
     }
     let extended_chart_parts: Vec<_> = part
       .related_parts_of_type::<_, ExtendedChartPart>(package)
@@ -469,10 +1048,7 @@ impl SlidePersist {
     for (relationship_id, chart_part) in extended_chart_parts {
       self.extended_chart_resources.insert(
         relationship_id,
-        ExtendedChartResource {
-          path: chart_part.path(package).map(str::to_string),
-          chart_space: chart_part.root_element(package)?.clone(),
-        },
+        extended_chart_resource(package, &chart_part)?,
       );
     }
     let diagram_data_parts: Vec<_> = part
@@ -576,6 +1152,8 @@ impl SlidePersist {
     self.diagram_color_resources = reference.diagram_color_resources.clone();
     self.embedded_object_resources = reference.embedded_object_resources.clone();
     self.embedded_package_resources = reference.embedded_package_resources.clone();
+    self.media_resources = reference.media_resources.clone();
+    self.comment_authors = reference.comment_authors.clone();
   }
 
   pub(crate) fn get_sub_type_text_list_style(

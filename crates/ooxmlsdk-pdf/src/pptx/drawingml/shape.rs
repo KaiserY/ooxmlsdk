@@ -13,7 +13,7 @@ use crate::docx::ImageCrop;
 use crate::pptx::import::PowerPointImport;
 use crate::pptx::slide::{
   BinaryResource, ChartResource, DiagramColorResource, DiagramDataResource, DiagramLayoutResource,
-  DiagramStyleResource, ExtendedChartResource, ImageResource, ShapeLocation,
+  DiagramStyleResource, ExtendedChartResource, ImageResource, MediaResource, ShapeLocation,
 };
 
 #[derive(Clone, Debug)]
@@ -45,6 +45,7 @@ pub(crate) struct Shape {
   pub(crate) custom_shape_properties: CustomShapeProperties,
   pub(crate) table_properties: Option<TableProperties>,
   pub(crate) picture: Option<PictureRecord>,
+  pub(crate) media: Option<MediaRecord>,
   pub(crate) content_part: Option<ContentPartRecord>,
   pub(crate) effect_properties: Option<EffectProperties>,
   pub(crate) text_body: Option<TextBody>,
@@ -150,8 +151,25 @@ pub(crate) struct PictureRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MediaRecord {
+  pub(crate) kind: MediaKind,
+  pub(crate) embed_relationship_id: Option<String>,
+  pub(crate) link_relationship_id: Option<String>,
+  pub(crate) resource: Option<MediaResource>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum MediaKind {
+  Audio,
+  Video,
+  #[default]
+  Unknown,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ContentPartRecord {
   pub(crate) relationship_id: String,
+  pub(crate) resource: Option<MediaResource>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -240,6 +258,7 @@ impl Shape {
       custom_shape_properties: CustomShapeProperties::default(),
       table_properties: None,
       picture: None,
+      media: None,
       content_part: None,
       effect_properties: None,
       text_body: None,
@@ -591,7 +610,33 @@ impl Shape {
   }
 
   pub(crate) fn set_content_part(&mut self, relationship_id: String) {
-    self.content_part = Some(ContentPartRecord { relationship_id });
+    self.content_part = Some(ContentPartRecord {
+      relationship_id,
+      resource: None,
+    });
+    self.frame_type = FrameType::Media;
+    self.service_name = ShapeService::MediaShape;
+  }
+
+  pub(crate) fn set_content_part_resource(&mut self, resource: Option<MediaResource>) {
+    if let Some(content_part) = &mut self.content_part {
+      content_part.resource = resource;
+    }
+  }
+
+  pub(crate) fn set_media(
+    &mut self,
+    kind: MediaKind,
+    embed_relationship_id: Option<String>,
+    link_relationship_id: Option<String>,
+    resource: Option<MediaResource>,
+  ) {
+    self.media = Some(MediaRecord {
+      kind,
+      embed_relationship_id,
+      link_relationship_id,
+      resource,
+    });
     self.frame_type = FrameType::Media;
     self.service_name = ShapeService::MediaShape;
   }

@@ -114,12 +114,25 @@ Already structurally aligned:
   without copying placeholder prompt text.
 - Text body import is typed: generated `bodyPr`, `pPr`, `rPr`, `fld/pPr`, and
   `endParaRPr` are preserved for shape text and table cell text.
+- `bodyPr` now has a LibreOffice-shaped structured view mirroring
+  `TextBodyPropertiesContext`: wrap/overflow, text insets, column count and
+  spacing, text-area rotation, vertical writing mode, anchor/anchorCtr,
+  WordArt/upright markers, and EG_TextAutofit state are captured on
+  `TextBody` before any display lowering.
 - `TextParagraph` owns paragraph-level style lookup and fallback to level 0.
 - The temporary display bridge now consumes imported `bodyPr` text insets,
   paragraph margins/indents, master/text-list default run properties, direct
   run properties, run solid fills, and typed bullet records when lowering text
-  to PDF items. This is still paint plumbing: the import-side typed text state
-  remains the source of truth.
+  to PDF items. It also consumes the structured bodyPr view for normal-autofit
+  font scaling, line-height scaling, vertical anchors, body/vertical rotation,
+  basic multi-column flow, and vertical overflow clipping. This is still paint
+  plumbing: the import-side typed text state remains the source of truth.
+- Table cell `tcPr` import mirrors LibreOffice's `TableCellContext` shape:
+  margins, vertical text mode, anchor/anchorCtr, horizontal overflow, direct
+  fill, and all six border line properties (`lnL`, `lnR`, `lnT`, `lnB`,
+  `lnTlToBr`, `lnBlToTr`) are preserved on `TableCell`; display lowering paints
+  direct solid cell fills and explicit solid cell borders, using the temporary
+  grid fallback only when no cell has direct border properties.
 - Display lowering must not paint `master_page.shapes` separately when a slide
   already inherited a layout persist. `PresentationFragmentHandler` clones the
   layout/master shape tree into the slide persist before slide XML is imported,
@@ -137,8 +150,8 @@ Known gaps to keep visible:
   propagation to display opacity.
   Remaining gaps are theme overrides, extra color schemes, and exact parity for
   edge-case system/palette behavior.
-- `Shape::apply_shape_reference` still lacks the explicit `bUseText` branch,
-  generic shape-property copy, and full custom geometry behavior.
+- `Shape::apply_shape_reference` has the explicit `bUseText` branch, but still
+  lacks generic shape-property copy and full custom geometry behavior.
 - Theme style-matrix lookup is structurally present for fill, line, effect, and
   background-fill lists, and style refs preserve `phClr`. Color transforms are
   applied after base color resolution, matching LibreOffice's broad
@@ -150,10 +163,15 @@ Known gaps to keep visible:
   wrapping, columns, vertical text, paragraph spacing, tabs, field values,
   bidi/complex-script font fallback, theme font refs, and bullet numbering
   continuation.
-- Table rendering still lacks table style resolution, cell fills/borders,
-  diagonal borders, row/column banding, merge-aware border suppression,
-  text-fitting expansion, and shadow/effect handling. Do not treat the current
-  grid fallback as final table semantics.
+- The bodyPr display bridge is intentionally approximate: normal-autofit scale
+  is applied, but shape autofit does not resize shapes yet; vertical/rotated
+  text uses fixed-page text rotation rather than LibreOffice's full writing
+  mode simulation; columns do simple paragraph flow, not full edit-engine line
+  layout.
+- Table rendering still lacks table style resolution, row/column banding,
+  merge-aware border suppression, non-solid fill/line paint, text-fitting
+  expansion, and shadow/effect handling. Do not treat the current grid fallback
+  or direct `tcPr` paint bridge as final table semantics.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or

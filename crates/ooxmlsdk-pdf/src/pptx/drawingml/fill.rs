@@ -79,6 +79,35 @@ impl FillProperties {
     }
   }
 
+  pub(crate) fn from_table_cell_properties_choice(choice: &a::TableCellPropertiesChoice) -> Self {
+    match choice {
+      a::TableCellPropertiesChoice::NoFill(_) => Self {
+        kind: FillKind::None,
+        placeholder_color: None,
+      },
+      a::TableCellPropertiesChoice::SolidFill(fill) => Self {
+        kind: FillKind::Solid(color_from_solid_fill(fill)),
+        placeholder_color: None,
+      },
+      a::TableCellPropertiesChoice::GradientFill(fill) => Self {
+        kind: FillKind::Gradient(fill.clone()),
+        placeholder_color: None,
+      },
+      a::TableCellPropertiesChoice::BlipFill(fill) => Self {
+        kind: FillKind::Blip(fill.clone()),
+        placeholder_color: None,
+      },
+      a::TableCellPropertiesChoice::PatternFill(fill) => Self {
+        kind: FillKind::Pattern(fill.clone()),
+        placeholder_color: None,
+      },
+      a::TableCellPropertiesChoice::GroupFill => Self {
+        kind: FillKind::Group,
+        placeholder_color: None,
+      },
+    }
+  }
+
   pub(crate) fn with_placeholder_color(mut self, placeholder_color: Option<Color>) -> Self {
     self.placeholder_color = placeholder_color;
     self

@@ -10,9 +10,38 @@ pub(crate) struct TextBody {
   pub(crate) has_body_properties: bool,
   pub(crate) has_noninherited_body_properties: bool,
   pub(crate) body_properties: Option<Box<a::BodyProperties>>,
+  pub(crate) display_properties: TextBodyDisplayProperties,
   pub(crate) has_list_style: bool,
   pub(crate) list_style: Option<TextListStyle>,
   pub(crate) paragraphs: Vec<TextParagraph>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct TextBodyDisplayProperties {
+  pub(crate) word_wrap: bool,
+  pub(crate) horizontal_overflow: Option<a::TextHorizontalOverflowValues>,
+  pub(crate) vertical_overflow: Option<a::TextVerticalOverflowValues>,
+  pub(crate) clip_vertical_overflow: bool,
+  pub(crate) column_count: usize,
+  pub(crate) column_spacing_emu: i64,
+  pub(crate) text_area_rotation: Option<i32>,
+  pub(crate) vertical: Option<a::TextVerticalValues>,
+  pub(crate) anchor: a::TextAnchoringTypeValues,
+  pub(crate) anchor_center: bool,
+  pub(crate) from_word_art: bool,
+  pub(crate) upright: bool,
+  pub(crate) auto_fit: TextAutoFit,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TextAutoFit {
+  #[default]
+  None,
+  Normal {
+    font_scale: i32,
+    line_space_reduction: i32,
+  },
+  Shape,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -75,6 +104,7 @@ impl TextBody {
       has_body_properties: true,
       has_noninherited_body_properties: has_noninherited_body_properties(body_properties),
       body_properties: Some(Box::new(body_properties.clone())),
+      display_properties: TextBodyDisplayProperties::from_body_properties(body_properties),
       has_list_style: list_style.is_some(),
       list_style: list_style.map(TextListStyle::from_dml_list_style),
       paragraphs: paragraphs.iter().map(TextParagraph::from_dml).collect(),
@@ -84,6 +114,132 @@ impl TextBody {
   pub(crate) fn apply_text_styles(&mut self, master_text_list_style: Option<&TextListStyle>) {
     for paragraph in &mut self.paragraphs {
       paragraph.apply_text_styles(master_text_list_style, self.list_style.as_ref());
+    }
+  }
+}
+
+impl Default for TextBodyDisplayProperties {
+  fn default() -> Self {
+    Self {
+      word_wrap: true,
+      horizontal_overflow: None,
+      vertical_overflow: None,
+      clip_vertical_overflow: false,
+      column_count: 1,
+      column_spacing_emu: 0,
+      text_area_rotation: None,
+      vertical: None,
+      anchor: a::TextAnchoringTypeValues::Top,
+      anchor_center: false,
+      from_word_art: false,
+      upright: false,
+      auto_fit: TextAutoFit::None,
+    }
+  }
+}
+
+impl TextBodyDisplayProperties {
+  fn from_body_properties(properties: &a::BodyProperties) -> Self {
+    // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
+    // TextBodyPropertiesContext maps CT_TextBodyProperties into a stable text
+    // property bag before any shape is created. Keep these as typed PPTX text
+    // semantics; display lowering may consume only a subset.
+    let mut result = Self {
+      word_wrap: properties
+        .wrap
+        .is_none_or(|wrap| wrap == a::TextWrappingValues::Square),
+      horizontal_overflow: properties.horizontal_overflow,
+      vertical_overflow: properties.vertical_overflow,
+      clip_vertical_overflow: matches!(
+        properties.vertical_overflow,
+        Some(a::TextVerticalOverflowValues::Ellipsis | a::TextVerticalOverflowValues::Clip)
+      ),
+      column_count: properties
+        .column_count
+        .and_then(|count| usize::try_from(count).ok())
+        .filter(|count| *count > 0)
+        .unwrap_or(1),
+      column_spacing_emu: properties
+        .column_spacing
+        .map(|spacing| spacing.to_emu())
+        .unwrap_or_default(),
+      text_area_rotation: properties.rotation,
+      vertical: properties.vertical,
+      anchor: properties.anchor.unwrap_or(a::TextAnchoringTypeValues::Top),
+      anchor_center: properties
+        .anchor_center
+        .is_some_and(|value| value.as_bool()),
+      from_word_art: properties
+        .from_word_art
+        .is_some_and(|value| value.as_bool()),
+      upright: properties.up_right.is_some_and(|value| value.as_bool()),
+      auto_fit: TextAutoFit::None,
+    };
+
+    match properties.body_properties_choice1.as_ref() {
+      Some(a::BodyPropertiesChoice::NoAutoFit) | None => {
+        result.auto_fit = TextAutoFit::None;
+      }
+      Some(a::BodyPropertiesChoice::NormalAutoFit(auto_fit)) => {
+        result.auto_fit = TextAutoFit::Normal {
+          font_scale: auto_fit
+            .font_scale
+            .map(|scale| scale.as_drawingml_percent())
+            .unwrap_or(100_000),
+          line_space_reduction: auto_fit
+            .line_space_reduction
+            .map(|scale| scale.as_drawingml_percent())
+            .unwrap_or(100_000),
+        };
+      }
+      Some(a::BodyPropertiesChoice::ShapeAutoFit(_)) => {
+        if !matches!(
+          result.vertical,
+          Some(
+            a::TextVerticalValues::Vertical
+              | a::TextVerticalValues::EastAsianVetical
+              | a::TextVerticalValues::Vertical270
+              | a::TextVerticalValues::MongolianVertical
+          )
+        ) {
+          result.auto_fit = TextAutoFit::Shape;
+        }
+      }
+    }
+    result
+  }
+
+  pub(crate) fn font_scale(&self) -> f32 {
+    match self.auto_fit {
+      TextAutoFit::Normal { font_scale, .. } => font_scale as f32 / 100_000.0,
+      TextAutoFit::None | TextAutoFit::Shape => 1.0,
+    }
+  }
+
+  pub(crate) fn line_height_scale(&self) -> f32 {
+    match self.auto_fit {
+      TextAutoFit::Normal {
+        line_space_reduction,
+        ..
+      } => (1.0 - line_space_reduction as f32 / 100_000.0).clamp(0.2, 1.0),
+      TextAutoFit::None | TextAutoFit::Shape => 1.0,
+    }
+  }
+
+  pub(crate) fn rotation_degrees(&self) -> f32 {
+    let body_rotation = self
+      .text_area_rotation
+      .map(|rotation| rotation as f32 / 60_000.0)
+      .unwrap_or_default();
+    let vertical_rotation = match self.vertical {
+      Some(a::TextVerticalValues::Vertical | a::TextVerticalValues::EastAsianVetical) => 90.0,
+      Some(a::TextVerticalValues::Vertical270) => 270.0,
+      _ => 0.0,
+    };
+    if self.upright {
+      body_rotation
+    } else {
+      body_rotation + vertical_rotation
     }
   }
 }

@@ -1,5 +1,8 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
+use super::color::Color;
+use super::fill::FillProperties;
+use super::line::{LineFill, LineProperties};
 use super::text_body::TextBody;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -28,7 +31,23 @@ pub(crate) struct TableCell {
   pub(crate) horizontal_merge: bool,
   pub(crate) vertical_merge: bool,
   pub(crate) margins: TableCellMargins,
+  pub(crate) fill_properties: Option<FillProperties>,
+  pub(crate) borders: TableCellBorders,
+  pub(crate) vertical: Option<a::TextVerticalValues>,
+  pub(crate) anchor: a::TextAnchoringTypeValues,
+  pub(crate) anchor_center: bool,
+  pub(crate) horizontal_overflow: a::TextHorizontalOverflowValues,
   pub(crate) text_body: Option<TextBody>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableCellBorders {
+  pub(crate) left: Option<LineProperties>,
+  pub(crate) right: Option<LineProperties>,
+  pub(crate) top: Option<LineProperties>,
+  pub(crate) bottom: Option<LineProperties>,
+  pub(crate) top_left_to_bottom_right: Option<LineProperties>,
+  pub(crate) bottom_left_to_top_right: Option<LineProperties>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -123,6 +142,12 @@ impl TableCell {
       horizontal_merge: source.horizontal_merge.is_some_and(|value| value.as_bool()),
       vertical_merge: source.vertical_merge.is_some_and(|value| value.as_bool()),
       margins: TableCellMargins::default(),
+      fill_properties: None,
+      borders: TableCellBorders::default(),
+      vertical: None,
+      anchor: a::TextAnchoringTypeValues::Top,
+      anchor_center: false,
+      horizontal_overflow: a::TextHorizontalOverflowValues::Clip,
       text_body: source.text_body.as_deref().map(TextBody::from_dml),
     };
     if let Some(properties) = &source.table_cell_properties {
@@ -144,7 +169,176 @@ impl TableCell {
     if let Some(value) = properties.bottom_margin {
       self.margins.bottom = coordinate32_to_i32_emu(value);
     }
+    self.vertical = properties.vertical;
+    self.anchor = properties.anchor.unwrap_or(a::TextAnchoringTypeValues::Top);
+    self.anchor_center = properties
+      .anchor_center
+      .is_some_and(|value| value.as_bool());
+    self.horizontal_overflow = properties
+      .horizontal_overflow
+      .unwrap_or(a::TextHorizontalOverflowValues::Clip);
+    self.fill_properties = properties
+      .table_cell_properties_choice
+      .as_ref()
+      .map(FillProperties::from_table_cell_properties_choice);
+    self.borders = TableCellBorders {
+      left: properties
+        .left_border_line_properties
+        .as_deref()
+        .and_then(left_border_line_properties),
+      right: properties
+        .right_border_line_properties
+        .as_deref()
+        .and_then(right_border_line_properties),
+      top: properties
+        .top_border_line_properties
+        .as_deref()
+        .and_then(top_border_line_properties),
+      bottom: properties
+        .bottom_border_line_properties
+        .as_deref()
+        .and_then(bottom_border_line_properties),
+      top_left_to_bottom_right: properties
+        .top_left_to_bottom_right_border_line_properties
+        .as_deref()
+        .and_then(top_left_to_bottom_right_border_line_properties),
+      bottom_left_to_top_right: properties
+        .bottom_left_to_top_right_border_line_properties
+        .as_deref()
+        .and_then(bottom_left_to_top_right_border_line_properties),
+    };
   }
+}
+
+fn left_border_line_properties(properties: &a::LeftBorderLineProperties) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .left_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::LeftBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::LeftBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::LeftBorderLinePropertiesChoice::GradientFill(fill) => LineFill::Gradient(fill.clone()),
+        a::LeftBorderLinePropertiesChoice::PatternFill(fill) => LineFill::Pattern(fill.clone()),
+      }),
+  )
+}
+
+fn right_border_line_properties(
+  properties: &a::RightBorderLineProperties,
+) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .right_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::RightBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::RightBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::RightBorderLinePropertiesChoice::GradientFill(fill) => LineFill::Gradient(fill.clone()),
+        a::RightBorderLinePropertiesChoice::PatternFill(fill) => LineFill::Pattern(fill.clone()),
+      }),
+  )
+}
+
+fn top_border_line_properties(properties: &a::TopBorderLineProperties) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .top_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::TopBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::TopBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::TopBorderLinePropertiesChoice::GradientFill(fill) => LineFill::Gradient(fill.clone()),
+        a::TopBorderLinePropertiesChoice::PatternFill(fill) => LineFill::Pattern(fill.clone()),
+      }),
+  )
+}
+
+fn bottom_border_line_properties(
+  properties: &a::BottomBorderLineProperties,
+) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .bottom_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::BottomBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::BottomBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::BottomBorderLinePropertiesChoice::GradientFill(fill) => LineFill::Gradient(fill.clone()),
+        a::BottomBorderLinePropertiesChoice::PatternFill(fill) => LineFill::Pattern(fill.clone()),
+      }),
+  )
+}
+
+fn top_left_to_bottom_right_border_line_properties(
+  properties: &a::TopLeftToBottomRightBorderLineProperties,
+) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .top_left_to_bottom_right_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::TopLeftToBottomRightBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::TopLeftToBottomRightBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::TopLeftToBottomRightBorderLinePropertiesChoice::GradientFill(fill) => {
+          LineFill::Gradient(fill.clone())
+        }
+        a::TopLeftToBottomRightBorderLinePropertiesChoice::PatternFill(fill) => {
+          LineFill::Pattern(fill.clone())
+        }
+      }),
+  )
+}
+
+fn bottom_left_to_top_right_border_line_properties(
+  properties: &a::BottomLeftToTopRightBorderLineProperties,
+) -> Option<LineProperties> {
+  table_border_line_properties(
+    properties.width.map(i64::from),
+    properties
+      .bottom_left_to_top_right_border_line_properties_choice1
+      .as_ref()
+      .map(|choice| match choice {
+        a::BottomLeftToTopRightBorderLinePropertiesChoice::NoFill(_) => LineFill::None,
+        a::BottomLeftToTopRightBorderLinePropertiesChoice::SolidFill(fill) => solid_line_fill(fill),
+        a::BottomLeftToTopRightBorderLinePropertiesChoice::GradientFill(fill) => {
+          LineFill::Gradient(fill.clone())
+        }
+        a::BottomLeftToTopRightBorderLinePropertiesChoice::PatternFill(fill) => {
+          LineFill::Pattern(fill.clone())
+        }
+      }),
+  )
+}
+
+fn table_border_line_properties(
+  width_emu: Option<i64>,
+  fill: Option<LineFill>,
+) -> Option<LineProperties> {
+  let fill = fill.unwrap_or(LineFill::Unspecified);
+  if fill == LineFill::Unspecified && width_emu.is_none() {
+    None
+  } else {
+    Some(LineProperties {
+      fill,
+      width_emu,
+      placeholder_color: None,
+    })
+  }
+}
+
+fn solid_line_fill(fill: &a::SolidFill) -> LineFill {
+  LineFill::Solid(
+    fill
+      .solid_fill_choice
+      .as_ref()
+      .and_then(Color::from_solid_fill_choice),
+  )
 }
 
 fn coordinate32_to_i32_emu(value: ooxmlsdk::simple_type::Coordinate32Value) -> i32 {

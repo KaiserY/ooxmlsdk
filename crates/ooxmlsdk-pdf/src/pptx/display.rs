@@ -147,21 +147,24 @@ fn lower_table(
   }
 
   let border_color = RgbColor { r: 0, g: 0, b: 0 };
-  items.push(PageItem::Rect(RectItem {
-    x_pt: x0,
-    y_pt: y0,
-    width_pt: table_width,
-    height_pt: table_height,
-    fill_color: None,
-    fill_opacity: 1.0,
-    stroke: Some(BorderStyle {
-      width_pt: DEFAULT_TABLE_BORDER_PT,
-      spacing_pt: 0.0,
-      color: border_color,
-      compound: false,
-    }),
-    stroke_opacity: 1.0,
-  }));
+  let draw_fallback_grid = !table_has_direct_borders(table);
+  if draw_fallback_grid {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: x0,
+      y_pt: y0,
+      width_pt: table_width,
+      height_pt: table_height,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke: Some(BorderStyle {
+        width_pt: DEFAULT_TABLE_BORDER_PT,
+        spacing_pt: 0.0,
+        color: border_color,
+        compound: false,
+      }),
+      stroke_opacity: 1.0,
+    }));
+  }
 
   let mut y = y0;
   for row in &table.rows {
@@ -186,14 +189,31 @@ fn lower_table(
       grid_index = grid_index.saturating_add(span);
     }
     y += row_height;
-    push_table_line(items, x0, y, x0 + table_width, y, border_color);
+    if draw_fallback_grid {
+      push_table_line(items, x0, y, x0 + table_width, y, border_color);
+    }
   }
 
-  let mut x = x0;
-  for width in &table.grid {
-    x += units::emu_to_points(*width);
-    push_table_line(items, x, y0, x, y0 + table_height, border_color);
+  if draw_fallback_grid {
+    let mut x = x0;
+    for width in &table.grid {
+      x += units::emu_to_points(*width);
+      push_table_line(items, x, y0, x, y0 + table_height, border_color);
+    }
   }
+}
+
+fn table_has_direct_borders(table: &TableProperties) -> bool {
+  table.rows.iter().any(|row| {
+    row.cells.iter().any(|cell| {
+      cell.borders.left.is_some()
+        || cell.borders.right.is_some()
+        || cell.borders.top.is_some()
+        || cell.borders.bottom.is_some()
+        || cell.borders.top_left_to_bottom_right.is_some()
+        || cell.borders.bottom_left_to_top_right.is_some()
+    })
+  })
 }
 
 fn lower_table_cell(
@@ -208,11 +228,119 @@ fn lower_table_cell(
   if width <= 0.0 || height <= 0.0 {
     return;
   }
+  if let Some(fill) = cell
+    .fill_properties
+    .as_ref()
+    .and_then(|fill| fill_paint(import, fill))
+  {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: x,
+      y_pt: y,
+      width_pt: width,
+      height_pt: height,
+      fill_color: Some(fill.color),
+      fill_opacity: fill.opacity,
+      stroke: None,
+      stroke_opacity: 1.0,
+    }));
+  }
+  lower_table_cell_borders(import, cell, x, y, width, height, items);
+
   if let Some(text_body) = &cell.text_body {
+    let mut text_body = text_body.clone();
+    text_body.display_properties.vertical = cell.vertical;
+    text_body.display_properties.anchor = cell.anchor;
+    text_body.display_properties.anchor_center = cell.anchor_center;
+    text_body.display_properties.horizontal_overflow = Some(cell.horizontal_overflow);
     let x = x + units::emu_to_points(i64::from(cell.margins.left));
     let y = y + units::emu_to_points(i64::from(cell.margins.top));
-    lower_text_body_at(import, x, y, text_body, items);
+    lower_text_body_at(
+      import,
+      TextFrame {
+        x_pt: x,
+        y_pt: y,
+        width_pt: (width - units::emu_to_points(i64::from(cell.margins.left + cell.margins.right)))
+          .max(0.0),
+        height_pt: (height
+          - units::emu_to_points(i64::from(cell.margins.top + cell.margins.bottom)))
+        .max(0.0),
+      },
+      &text_body,
+      items,
+    );
   }
+}
+
+fn lower_table_cell_borders(
+  import: &PowerPointImport,
+  cell: &TableCell,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  items: &mut Vec<PageItem>,
+) {
+  push_table_border_line(import, &cell.borders.top, x, y, x + width, y, items);
+  push_table_border_line(
+    import,
+    &cell.borders.bottom,
+    x,
+    y + height,
+    x + width,
+    y + height,
+    items,
+  );
+  push_table_border_line(import, &cell.borders.left, x, y, x, y + height, items);
+  push_table_border_line(
+    import,
+    &cell.borders.right,
+    x + width,
+    y,
+    x + width,
+    y + height,
+    items,
+  );
+  push_table_border_line(
+    import,
+    &cell.borders.top_left_to_bottom_right,
+    x,
+    y,
+    x + width,
+    y + height,
+    items,
+  );
+  push_table_border_line(
+    import,
+    &cell.borders.bottom_left_to_top_right,
+    x,
+    y + height,
+    x + width,
+    y,
+    items,
+  );
+}
+
+fn push_table_border_line(
+  import: &PowerPointImport,
+  line: &Option<LineProperties>,
+  x1_pt: f32,
+  y1_pt: f32,
+  x2_pt: f32,
+  y2_pt: f32,
+  items: &mut Vec<PageItem>,
+) {
+  let Some(stroke) = line.as_ref().and_then(|line| line_stroke(import, line)) else {
+    return;
+  };
+  items.push(PageItem::Line(LineItem {
+    x1_pt,
+    y1_pt,
+    x2_pt,
+    y2_pt,
+    width_pt: stroke.style.width_pt,
+    color: stroke.style.color,
+    kind: LineItemKind::Stroke,
+  }));
 }
 
 fn table_cell_grid_span(cell: &TableCell) -> usize {
@@ -294,41 +422,100 @@ fn lower_text_body(
   items: &mut Vec<PageItem>,
 ) {
   let text_box = text_box_metrics(shape, offset, text_body);
-  lower_text_body_at(import, text_box.x_pt, text_box.y_pt, text_body, items);
+  lower_text_body_at(import, text_box, text_body, items);
 }
 
 fn lower_text_body_at(
   import: &PowerPointImport,
-  x_pt: f32,
-  y_pt: f32,
+  frame: TextFrame,
   text_body: &TextBody,
   items: &mut Vec<PageItem>,
 ) {
+  let options = TextLoweringOptions::from_text_body(text_body);
   let base_style = TextStyle {
     font_family: Some(Arc::from("Liberation Sans")),
-    font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
+    font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT * options.font_scale,
+    rotation_deg: options.rotation_deg,
     ..TextStyle::default()
   };
 
-  let mut cursor = TextCursor { x_pt, y_pt };
+  let estimated_height = estimate_text_body_height(text_body, &base_style, options.line_scale);
+  let y_pt = match text_body.display_properties.anchor {
+    a::TextAnchoringTypeValues::Center => {
+      frame.y_pt + ((frame.height_pt - estimated_height) / 2.0).max(0.0)
+    }
+    a::TextAnchoringTypeValues::Bottom => {
+      frame.y_pt + (frame.height_pt - estimated_height).max(0.0)
+    }
+    a::TextAnchoringTypeValues::Top => frame.y_pt,
+  };
+
+  let mut cursor = TextCursor {
+    x_pt: frame.x_pt,
+    y_pt,
+    column_index: 0,
+  };
   for paragraph in &text_body.paragraphs {
-    lower_paragraph(import, paragraph, &base_style, &mut cursor, items);
+    lower_paragraph(
+      import,
+      paragraph,
+      &base_style,
+      &options,
+      frame,
+      &mut cursor,
+      items,
+    );
   }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct TextBoxMetrics {
+struct TextFrame {
   x_pt: f32,
   y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct TextCursor {
   x_pt: f32,
   y_pt: f32,
+  column_index: usize,
 }
 
-fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextBoxMetrics {
+#[derive(Clone, Copy, Debug)]
+struct TextLoweringOptions {
+  font_scale: f32,
+  line_scale: f32,
+  rotation_deg: f32,
+  column_count: usize,
+  column_spacing_pt: f32,
+  clip_vertical_overflow: bool,
+}
+
+impl TextLoweringOptions {
+  fn from_text_body(text_body: &TextBody) -> Self {
+    Self {
+      font_scale: text_body.display_properties.font_scale(),
+      line_scale: text_body.display_properties.line_height_scale(),
+      rotation_deg: text_body.display_properties.rotation_degrees(),
+      column_count: text_body.display_properties.column_count.max(1),
+      column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
+      clip_vertical_overflow: text_body.display_properties.clip_vertical_overflow,
+    }
+  }
+
+  fn column_width(self, frame: TextFrame) -> f32 {
+    if self.column_count <= 1 {
+      frame.width_pt
+    } else {
+      let total_spacing = self.column_spacing_pt * (self.column_count - 1) as f32;
+      ((frame.width_pt - total_spacing) / self.column_count as f32).max(0.0)
+    }
+  }
+}
+
+fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextFrame {
   let body_properties = text_body.body_properties.as_deref();
   let left_inset = body_properties
     .and_then(|properties| properties.left_inset)
@@ -338,10 +525,20 @@ fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) 
     .and_then(|properties| properties.top_inset)
     .map(|value| units::emu_to_points(value.to_emu()))
     .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
+  let right_inset = body_properties
+    .and_then(|properties| properties.right_inset)
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
+  let bottom_inset = body_properties
+    .and_then(|properties| properties.bottom_inset)
+    .map(|value| units::emu_to_points(value.to_emu()))
+    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
 
-  TextBoxMetrics {
+  TextFrame {
     x_pt: units::emu_to_points(offset.x_emu + shape.position.x) + left_inset,
     y_pt: units::emu_to_points(offset.y_emu + shape.position.y) + top_inset,
+    width_pt: (units::emu_to_points(shape.size.cx) - left_inset - right_inset).max(0.0),
+    height_pt: (units::emu_to_points(shape.size.cy) - top_inset - bottom_inset).max(0.0),
   }
 }
 
@@ -349,24 +546,34 @@ fn lower_paragraph(
   import: &PowerPointImport,
   paragraph: &TextParagraph,
   base_style: &TextStyle,
+  options: &TextLoweringOptions,
+  frame: TextFrame,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
 ) {
   let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+  let column_width = options.column_width(frame);
+  let column_x =
+    frame.x_pt + cursor.column_index as f32 * (column_width + options.column_spacing_pt);
+  cursor.x_pt = column_x;
+  if options.clip_vertical_overflow && cursor.y_pt > frame.y_pt + frame.height_pt {
+    return;
+  }
   let paragraph_x = cursor.x_pt + paragraph_style.left_margin_pt + paragraph_style.indent_pt;
   let mut run_x = paragraph_x;
-  let mut max_line_height = line_height(base_style);
+  let mut max_line_height = line_height(base_style, options.line_scale);
 
   if let Some(label) = paragraph_style.bullet_label(paragraph) {
     let mut bullet_style = base_style.clone();
     paragraph_style.apply_default_run_style(import, &mut bullet_style);
-    max_line_height = max_line_height.max(line_height(&bullet_style));
+    max_line_height = max_line_height.max(line_height(&bullet_style, options.line_scale));
     push_text_item(
       items,
       run_x - DEFAULT_BULLET_INDENT_PT,
       cursor.y_pt,
       label,
       bullet_style,
+      options.line_scale,
     );
   }
 
@@ -379,27 +586,43 @@ fn lower_paragraph(
         let mut style = base_style.clone();
         paragraph_style.apply_default_run_style(import, &mut style);
         apply_run_properties(import, run, &mut style);
-        max_line_height = max_line_height.max(line_height(&style));
+        max_line_height = max_line_height.max(line_height(&style, options.line_scale));
         let text = run_text(run, &style);
-        push_text_item(items, run_x, cursor.y_pt, text.clone(), style.clone());
+        push_text_item(
+          items,
+          run_x,
+          cursor.y_pt,
+          text.clone(),
+          style.clone(),
+          options.line_scale,
+        );
         run_x += approximate_text_width_pt(&text, &style);
       }
       TextRunKind::Break => {
         cursor.y_pt += max_line_height;
+        advance_text_column_if_needed(cursor, frame, *options);
         run_x = paragraph_x;
-        max_line_height = line_height(base_style);
+        max_line_height = line_height(base_style, options.line_scale);
       }
       TextRunKind::Math => {}
     }
   }
   cursor.y_pt += max_line_height;
+  advance_text_column_if_needed(cursor, frame, *options);
 }
 
-fn push_text_item(items: &mut Vec<PageItem>, x_pt: f32, y_pt: f32, text: String, style: TextStyle) {
+fn push_text_item(
+  items: &mut Vec<PageItem>,
+  x_pt: f32,
+  y_pt: f32,
+  text: String,
+  style: TextStyle,
+  line_scale: f32,
+) {
   items.push(PageItem::Text(TextItem {
     x_pt,
     y_pt,
-    line_height_pt: line_height(&style),
+    line_height_pt: line_height(&style, line_scale),
     text,
     style,
     hyperlink_url: None,
@@ -414,8 +637,36 @@ fn push_text_item(items: &mut Vec<PageItem>, x_pt: f32, y_pt: f32, text: String,
   }));
 }
 
-fn line_height(style: &TextStyle) -> f32 {
-  style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE
+fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
+  style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * line_scale
+}
+
+fn estimate_text_body_height(text_body: &TextBody, base_style: &TextStyle, line_scale: f32) -> f32 {
+  let mut lines = 0usize;
+  for paragraph in &text_body.paragraphs {
+    lines += paragraph
+      .runs
+      .iter()
+      .filter(|run| run.kind == TextRunKind::Break)
+      .count()
+      + 1;
+  }
+  lines as f32 * line_height(base_style, line_scale)
+}
+
+fn advance_text_column_if_needed(
+  cursor: &mut TextCursor,
+  frame: TextFrame,
+  options: TextLoweringOptions,
+) {
+  if options.column_count <= 1 || cursor.y_pt <= frame.y_pt + frame.height_pt {
+    return;
+  }
+  if cursor.column_index + 1 >= options.column_count {
+    return;
+  }
+  cursor.column_index += 1;
+  cursor.y_pt = frame.y_pt;
 }
 
 fn approximate_text_width_pt(text: &str, style: &TextStyle) -> f32 {

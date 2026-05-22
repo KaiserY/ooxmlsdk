@@ -11,7 +11,9 @@ use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{Shape, ShapeService};
-use super::drawingml::table::{TableCell, TableProperties};
+use super::drawingml::table::{
+  TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
+};
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::{TextListLevelParagraphProperties, TextListParagraphStyle};
 use super::import::PowerPointImport;
@@ -146,8 +148,12 @@ fn lower_table(
     return;
   }
 
+  let table_style = table
+    .inline_style
+    .as_ref()
+    .or_else(|| import.get_table_style(table.style_id.as_deref()));
   let border_color = RgbColor { r: 0, g: 0, b: 0 };
-  let draw_fallback_grid = !table_has_direct_borders(table);
+  let draw_fallback_grid = table_style.is_none() && !table_has_direct_borders(table);
   if draw_fallback_grid {
     items.push(PageItem::Rect(RectItem {
       x_pt: x0,
@@ -167,7 +173,9 @@ fn lower_table(
   }
 
   let mut y = y0;
-  for row in &table.rows {
+  let max_row = table.rows.len().saturating_sub(1);
+  let max_column = table.grid.len().saturating_sub(1);
+  for (row_index, row) in table.rows.iter().enumerate() {
     let row_height = units::emu_to_points(row.height);
     let mut x = x0;
     let mut grid_index = 0usize;
@@ -183,7 +191,19 @@ fn lower_table(
       };
       let cell_width = units::emu_to_points(width_emu);
       if !cell.horizontal_merge && !cell.vertical_merge {
-        lower_table_cell(import, cell, x, y, cell_width, row_height, items);
+        let style_part = table_style.map(|style| {
+          table_cell_style_part(table, style, grid_index, max_column, row_index, max_row)
+        });
+        lower_table_cell(
+          import,
+          cell,
+          style_part.as_ref(),
+          x,
+          y,
+          cell_width,
+          row_height,
+          items,
+        );
       }
       x += cell_width;
       grid_index = grid_index.saturating_add(span);
@@ -203,6 +223,238 @@ fn lower_table(
   }
 }
 
+fn table_cell_style_part(
+  table: &TableProperties,
+  style: &TableStyle,
+  column: usize,
+  max_column: usize,
+  row: usize,
+  max_row: usize,
+) -> TableStylePart {
+  // Source: LibreOffice tablecell.cxx applies table style parts in a fixed
+  // order: whole table, first/last row/column, horizontal banding, corners,
+  // then vertical banding. Direct tcPr is merged afterwards by the caller.
+  let mut result = TableStylePart::default();
+  merge_style_part(
+    &mut result,
+    &style.whole_table,
+    true,
+    column,
+    max_column,
+    row,
+    max_row,
+  );
+  if table.first_row && row == 0 {
+    merge_style_part(
+      &mut result,
+      &style.first_row,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if table.last_row && row == max_row {
+    merge_style_part(
+      &mut result,
+      &style.last_row,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if table.first_column && column == 0 {
+    merge_style_part(
+      &mut result,
+      &style.first_column,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if table.last_column && column == max_column {
+    merge_style_part(
+      &mut result,
+      &style.last_column,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if table.band_row
+    && (!table.first_row || row != 0)
+    && (!table.last_row || row != max_row)
+    && (!table.first_column || column != 0 || style.first_column.fill_properties.is_none())
+    && (!table.last_column || column != max_column || style.last_column.fill_properties.is_none())
+  {
+    let band = row + usize::from(table.first_row);
+    let part = if band & 1 == 1 {
+      &style.band2_horizontal
+    } else {
+      &style.band1_horizontal
+    };
+    merge_style_part(&mut result, part, false, column, max_column, row, max_row);
+  }
+  if row == 0 && column == 0 {
+    merge_style_part(
+      &mut result,
+      &style.northwest_cell,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if row == max_row && column == 0 {
+    merge_style_part(
+      &mut result,
+      &style.southwest_cell,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if row == 0 && column == max_column {
+    merge_style_part(
+      &mut result,
+      &style.northeast_cell,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if row == max_row && column == max_column {
+    merge_style_part(
+      &mut result,
+      &style.southeast_cell,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
+  }
+  if table.band_column
+    && (!table.first_row || row != 0)
+    && (!table.last_row || row != max_row)
+    && (!table.first_column || column != 0)
+    && (!table.last_column || column != max_column)
+  {
+    let band = column + usize::from(table.first_column);
+    let part = if band & 1 == 1 {
+      &style.band2_vertical
+    } else {
+      &style.band1_vertical
+    };
+    merge_style_part(&mut result, part, false, column, max_column, row, max_row);
+  }
+  result
+}
+
+fn merge_style_part(
+  target: &mut TableStylePart,
+  source: &TableStylePart,
+  whole_table: bool,
+  column: usize,
+  max_column: usize,
+  row: usize,
+  max_row: usize,
+) {
+  if source.fill_properties.is_some() {
+    target.fill_properties = source.fill_properties.clone();
+  }
+  let mut borders = TableCellBorders::default();
+  merge_style_borders(
+    &mut borders,
+    &source.borders,
+    whole_table,
+    column,
+    max_column,
+    row,
+    max_row,
+  );
+  merge_cell_borders_from_style(&mut target.borders, &borders);
+  target.text.merge_from(&source.text);
+}
+
+fn merge_style_borders(
+  target: &mut TableCellBorders,
+  source: &TableStyleBorders,
+  whole_table: bool,
+  column: usize,
+  max_column: usize,
+  row: usize,
+  max_row: usize,
+) {
+  if (!whole_table || column == 0) && source.left.is_some() {
+    target.left = source.left.clone();
+  }
+  if (!whole_table || column >= max_column) && source.right.is_some() {
+    target.right = source.right.clone();
+  }
+  if (!whole_table || row == 0) && source.top.is_some() {
+    target.top = source.top.clone();
+  }
+  if (!whole_table || row >= max_row) && source.bottom.is_some() {
+    target.bottom = source.bottom.clone();
+  }
+  if source.inside_horizontal.is_some() {
+    if row != 0 {
+      target.top = source.inside_horizontal.clone();
+    }
+    if row != max_row {
+      target.bottom = source.inside_horizontal.clone();
+    }
+  }
+  if source.inside_vertical.is_some() {
+    if column != 0 {
+      target.left = source.inside_vertical.clone();
+    }
+    if column != max_column {
+      target.right = source.inside_vertical.clone();
+    }
+  }
+  if source.top_left_to_bottom_right.is_some() {
+    target.top_left_to_bottom_right = source.top_left_to_bottom_right.clone();
+  }
+  if source.bottom_left_to_top_right.is_some() {
+    target.bottom_left_to_top_right = source.bottom_left_to_top_right.clone();
+  }
+}
+
+fn merge_cell_borders_from_style(target: &mut TableStyleBorders, source: &TableCellBorders) {
+  if source.left.is_some() {
+    target.left = source.left.clone();
+  }
+  if source.right.is_some() {
+    target.right = source.right.clone();
+  }
+  if source.top.is_some() {
+    target.top = source.top.clone();
+  }
+  if source.bottom.is_some() {
+    target.bottom = source.bottom.clone();
+  }
+  if source.top_left_to_bottom_right.is_some() {
+    target.top_left_to_bottom_right = source.top_left_to_bottom_right.clone();
+  }
+  if source.bottom_left_to_top_right.is_some() {
+    target.bottom_left_to_top_right = source.bottom_left_to_top_right.clone();
+  }
+}
+
 fn table_has_direct_borders(table: &TableProperties) -> bool {
   table.rows.iter().any(|row| {
     row.cells.iter().any(|cell| {
@@ -219,6 +471,7 @@ fn table_has_direct_borders(table: &TableProperties) -> bool {
 fn lower_table_cell(
   import: &PowerPointImport,
   cell: &TableCell,
+  style_part: Option<&TableStylePart>,
   x: f32,
   y: f32,
   width: f32,
@@ -228,11 +481,11 @@ fn lower_table_cell(
   if width <= 0.0 || height <= 0.0 {
     return;
   }
-  if let Some(fill) = cell
+  let fill_properties = cell
     .fill_properties
     .as_ref()
-    .and_then(|fill| fill_paint(import, fill))
-  {
+    .or_else(|| style_part.and_then(|style| style.fill_properties.as_ref()));
+  if let Some(fill) = fill_properties.and_then(|fill| fill_paint(import, fill)) {
     items.push(PageItem::Rect(RectItem {
       x_pt: x,
       y_pt: y,
@@ -244,7 +497,8 @@ fn lower_table_cell(
       stroke_opacity: 1.0,
     }));
   }
-  lower_table_cell_borders(import, cell, x, y, width, height, items);
+  let borders = table_cell_effective_borders(cell, style_part);
+  lower_table_cell_borders(import, &borders, x, y, width, height, items);
 
   if let Some(text_body) = &cell.text_body {
     let mut text_body = text_body.clone();
@@ -273,27 +527,27 @@ fn lower_table_cell(
 
 fn lower_table_cell_borders(
   import: &PowerPointImport,
-  cell: &TableCell,
+  borders: &TableCellBorders,
   x: f32,
   y: f32,
   width: f32,
   height: f32,
   items: &mut Vec<PageItem>,
 ) {
-  push_table_border_line(import, &cell.borders.top, x, y, x + width, y, items);
+  push_table_border_line(import, &borders.top, x, y, x + width, y, items);
   push_table_border_line(
     import,
-    &cell.borders.bottom,
+    &borders.bottom,
     x,
     y + height,
     x + width,
     y + height,
     items,
   );
-  push_table_border_line(import, &cell.borders.left, x, y, x, y + height, items);
+  push_table_border_line(import, &borders.left, x, y, x, y + height, items);
   push_table_border_line(
     import,
-    &cell.borders.right,
+    &borders.right,
     x + width,
     y,
     x + width,
@@ -302,7 +556,7 @@ fn lower_table_cell_borders(
   );
   push_table_border_line(
     import,
-    &cell.borders.top_left_to_bottom_right,
+    &borders.top_left_to_bottom_right,
     x,
     y,
     x + width,
@@ -311,13 +565,47 @@ fn lower_table_cell_borders(
   );
   push_table_border_line(
     import,
-    &cell.borders.bottom_left_to_top_right,
+    &borders.bottom_left_to_top_right,
     x,
     y + height,
     x + width,
     y,
     items,
   );
+}
+
+fn table_cell_effective_borders(
+  cell: &TableCell,
+  style_part: Option<&TableStylePart>,
+) -> TableCellBorders {
+  let mut borders = TableCellBorders::default();
+  if let Some(style_part) = style_part {
+    borders.left = style_part.borders.left.clone();
+    borders.right = style_part.borders.right.clone();
+    borders.top = style_part.borders.top.clone();
+    borders.bottom = style_part.borders.bottom.clone();
+    borders.top_left_to_bottom_right = style_part.borders.top_left_to_bottom_right.clone();
+    borders.bottom_left_to_top_right = style_part.borders.bottom_left_to_top_right.clone();
+  }
+  if cell.borders.left.is_some() {
+    borders.left = cell.borders.left.clone();
+  }
+  if cell.borders.right.is_some() {
+    borders.right = cell.borders.right.clone();
+  }
+  if cell.borders.top.is_some() {
+    borders.top = cell.borders.top.clone();
+  }
+  if cell.borders.bottom.is_some() {
+    borders.bottom = cell.borders.bottom.clone();
+  }
+  if cell.borders.top_left_to_bottom_right.is_some() {
+    borders.top_left_to_bottom_right = cell.borders.top_left_to_bottom_right.clone();
+  }
+  if cell.borders.bottom_left_to_top_right.is_some() {
+    borders.bottom_left_to_top_right = cell.borders.bottom_left_to_top_right.clone();
+  }
+  borders
 }
 
 fn push_table_border_line(

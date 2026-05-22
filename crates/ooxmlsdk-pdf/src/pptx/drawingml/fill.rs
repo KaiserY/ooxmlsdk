@@ -19,6 +19,35 @@ pub(crate) enum FillKind {
 }
 
 impl FillProperties {
+  pub(crate) fn from_dml_fill_properties(properties: &a::FillProperties) -> Option<Self> {
+    Some(match properties.fill_properties_choice.as_ref()? {
+      a::FillPropertiesChoice::NoFill(_) => Self {
+        kind: FillKind::None,
+        placeholder_color: None,
+      },
+      a::FillPropertiesChoice::SolidFill(fill) => Self {
+        kind: FillKind::Solid(color_from_solid_fill(fill)),
+        placeholder_color: None,
+      },
+      a::FillPropertiesChoice::GradientFill(fill) => Self {
+        kind: FillKind::Gradient(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillPropertiesChoice::BlipFill(fill) => Self {
+        kind: FillKind::Blip(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillPropertiesChoice::PatternFill(fill) => Self {
+        kind: FillKind::Pattern(fill.clone()),
+        placeholder_color: None,
+      },
+      a::FillPropertiesChoice::GroupFill => Self {
+        kind: FillKind::Group,
+        placeholder_color: None,
+      },
+    })
+  }
+
   pub(crate) fn from_fill_style_choice(choice: &a::FillStyleListChoice) -> Self {
     match choice {
       a::FillStyleListChoice::NoFill(_) => Self {

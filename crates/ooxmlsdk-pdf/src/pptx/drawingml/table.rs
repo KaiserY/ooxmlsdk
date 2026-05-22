@@ -8,6 +8,7 @@ use super::text_body::TextBody;
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TableProperties {
   pub(crate) style_id: Option<String>,
+  pub(crate) inline_style: Option<TableStyle>,
   pub(crate) first_row: bool,
   pub(crate) first_column: bool,
   pub(crate) last_row: bool,
@@ -16,6 +17,59 @@ pub(crate) struct TableProperties {
   pub(crate) band_column: bool,
   pub(crate) grid: Vec<i64>,
   pub(crate) rows: Vec<TableRow>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStyleList {
+  pub(crate) path: Option<String>,
+  pub(crate) default_style_id: Option<String>,
+  pub(crate) styles: Vec<TableStyle>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStyle {
+  pub(crate) style_id: Option<String>,
+  pub(crate) style_name: Option<String>,
+  pub(crate) table_background: TableStylePart,
+  pub(crate) whole_table: TableStylePart,
+  pub(crate) band1_horizontal: TableStylePart,
+  pub(crate) band2_horizontal: TableStylePart,
+  pub(crate) band1_vertical: TableStylePart,
+  pub(crate) band2_vertical: TableStylePart,
+  pub(crate) last_column: TableStylePart,
+  pub(crate) first_column: TableStylePart,
+  pub(crate) last_row: TableStylePart,
+  pub(crate) southeast_cell: TableStylePart,
+  pub(crate) southwest_cell: TableStylePart,
+  pub(crate) first_row: TableStylePart,
+  pub(crate) northeast_cell: TableStylePart,
+  pub(crate) northwest_cell: TableStylePart,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStylePart {
+  pub(crate) fill_properties: Option<FillProperties>,
+  pub(crate) borders: TableStyleBorders,
+  pub(crate) text: TableStyleTextProperties,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStyleBorders {
+  pub(crate) left: Option<LineProperties>,
+  pub(crate) right: Option<LineProperties>,
+  pub(crate) top: Option<LineProperties>,
+  pub(crate) bottom: Option<LineProperties>,
+  pub(crate) inside_horizontal: Option<LineProperties>,
+  pub(crate) inside_vertical: Option<LineProperties>,
+  pub(crate) top_left_to_bottom_right: Option<LineProperties>,
+  pub(crate) bottom_left_to_top_right: Option<LineProperties>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStyleTextProperties {
+  pub(crate) bold: Option<a::BooleanStyleValues>,
+  pub(crate) italic: Option<a::BooleanStyleValues>,
+  pub(crate) color: Option<Color>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -62,6 +116,7 @@ impl Default for TableProperties {
   fn default() -> Self {
     Self {
       style_id: None,
+      inline_style: None,
       first_row: false,
       first_column: false,
       last_row: false,
@@ -114,11 +169,468 @@ impl TableProperties {
     self.band_row = properties.band_row.is_some_and(|value| value.as_bool());
     self.band_column = properties.band_column.is_some_and(|value| value.as_bool());
     self.style_id = match &properties.table_properties_choice3 {
-      Some(a::TablePropertiesChoice3::TableStyle(style)) => Some(style.style_id.clone()),
+      Some(a::TablePropertiesChoice3::TableStyle(style)) => {
+        self.inline_style = Some(TableStyle::from_dml_table_style(style));
+        Some(style.style_id.clone())
+      }
       Some(a::TablePropertiesChoice3::TableStyleId(style_id)) => Some(style_id.clone()),
       None => None,
     };
   }
+}
+
+impl TableStyleList {
+  pub(crate) fn from_dml(path: Option<String>, source: &a::TableStyleList) -> Self {
+    Self {
+      path,
+      default_style_id: (!source.default.is_empty()).then(|| source.default.clone()),
+      styles: source
+        .table_style_entry
+        .iter()
+        .map(TableStyle::from_dml_table_style_entry)
+        .collect(),
+    }
+  }
+
+  pub(crate) fn style(&self, style_id: Option<&str>) -> Option<&TableStyle> {
+    let style_id = style_id
+      .filter(|style_id| !style_id.is_empty())
+      .or(self.default_style_id.as_deref())?;
+    self
+      .styles
+      .iter()
+      .find(|style| style.style_id.as_deref() == Some(style_id))
+  }
+}
+
+trait TableStyleSource {
+  fn style_id(&self) -> &str;
+  fn style_name(&self) -> &str;
+  fn table_background(&self) -> Option<&a::TableBackground>;
+  fn whole_table(&self) -> Option<&a::WholeTable>;
+  fn band1_horizontal(&self) -> Option<&a::Band1Horizontal>;
+  fn band2_horizontal(&self) -> Option<&a::Band2Horizontal>;
+  fn band1_vertical(&self) -> Option<&a::Band1Vertical>;
+  fn band2_vertical(&self) -> Option<&a::Band2Vertical>;
+  fn last_column(&self) -> Option<&a::LastColumn>;
+  fn first_column(&self) -> Option<&a::FirstColumn>;
+  fn last_row(&self) -> Option<&a::LastRow>;
+  fn southeast_cell(&self) -> Option<&a::SoutheastCell>;
+  fn southwest_cell(&self) -> Option<&a::SouthwestCell>;
+  fn first_row(&self) -> Option<&a::FirstRow>;
+  fn northeast_cell(&self) -> Option<&a::NortheastCell>;
+  fn northwest_cell(&self) -> Option<&a::NorthwestCell>;
+}
+
+impl TableStyleSource for a::TableStyle {
+  fn style_id(&self) -> &str {
+    &self.style_id
+  }
+
+  fn style_name(&self) -> &str {
+    &self.style_name
+  }
+
+  fn table_background(&self) -> Option<&a::TableBackground> {
+    self.table_background.as_deref()
+  }
+
+  fn whole_table(&self) -> Option<&a::WholeTable> {
+    self.whole_table.as_deref()
+  }
+
+  fn band1_horizontal(&self) -> Option<&a::Band1Horizontal> {
+    self.band1_horizontal.as_deref()
+  }
+
+  fn band2_horizontal(&self) -> Option<&a::Band2Horizontal> {
+    self.band2_horizontal.as_deref()
+  }
+
+  fn band1_vertical(&self) -> Option<&a::Band1Vertical> {
+    self.band1_vertical.as_deref()
+  }
+
+  fn band2_vertical(&self) -> Option<&a::Band2Vertical> {
+    self.band2_vertical.as_deref()
+  }
+
+  fn last_column(&self) -> Option<&a::LastColumn> {
+    self.last_column.as_deref()
+  }
+
+  fn first_column(&self) -> Option<&a::FirstColumn> {
+    self.first_column.as_deref()
+  }
+
+  fn last_row(&self) -> Option<&a::LastRow> {
+    self.last_row.as_deref()
+  }
+
+  fn southeast_cell(&self) -> Option<&a::SoutheastCell> {
+    self.southeast_cell.as_deref()
+  }
+
+  fn southwest_cell(&self) -> Option<&a::SouthwestCell> {
+    self.southwest_cell.as_deref()
+  }
+
+  fn first_row(&self) -> Option<&a::FirstRow> {
+    self.first_row.as_deref()
+  }
+
+  fn northeast_cell(&self) -> Option<&a::NortheastCell> {
+    self.northeast_cell.as_deref()
+  }
+
+  fn northwest_cell(&self) -> Option<&a::NorthwestCell> {
+    self.northwest_cell.as_deref()
+  }
+}
+
+impl TableStyleSource for a::TableStyleEntry {
+  fn style_id(&self) -> &str {
+    &self.style_id
+  }
+
+  fn style_name(&self) -> &str {
+    &self.style_name
+  }
+
+  fn table_background(&self) -> Option<&a::TableBackground> {
+    self.table_background.as_deref()
+  }
+
+  fn whole_table(&self) -> Option<&a::WholeTable> {
+    self.whole_table.as_deref()
+  }
+
+  fn band1_horizontal(&self) -> Option<&a::Band1Horizontal> {
+    self.band1_horizontal.as_deref()
+  }
+
+  fn band2_horizontal(&self) -> Option<&a::Band2Horizontal> {
+    self.band2_horizontal.as_deref()
+  }
+
+  fn band1_vertical(&self) -> Option<&a::Band1Vertical> {
+    self.band1_vertical.as_deref()
+  }
+
+  fn band2_vertical(&self) -> Option<&a::Band2Vertical> {
+    self.band2_vertical.as_deref()
+  }
+
+  fn last_column(&self) -> Option<&a::LastColumn> {
+    self.last_column.as_deref()
+  }
+
+  fn first_column(&self) -> Option<&a::FirstColumn> {
+    self.first_column.as_deref()
+  }
+
+  fn last_row(&self) -> Option<&a::LastRow> {
+    self.last_row.as_deref()
+  }
+
+  fn southeast_cell(&self) -> Option<&a::SoutheastCell> {
+    self.southeast_cell.as_deref()
+  }
+
+  fn southwest_cell(&self) -> Option<&a::SouthwestCell> {
+    self.southwest_cell.as_deref()
+  }
+
+  fn first_row(&self) -> Option<&a::FirstRow> {
+    self.first_row.as_deref()
+  }
+
+  fn northeast_cell(&self) -> Option<&a::NortheastCell> {
+    self.northeast_cell.as_deref()
+  }
+
+  fn northwest_cell(&self) -> Option<&a::NorthwestCell> {
+    self.northwest_cell.as_deref()
+  }
+}
+
+trait TablePartStyleSource {
+  fn table_cell_text_style(&self) -> Option<&a::TableCellTextStyle>;
+  fn table_cell_style(&self) -> Option<&a::TableCellStyle>;
+}
+
+macro_rules! impl_table_part_style_source {
+  ($($ty:ty),+ $(,)?) => {
+    $(
+      impl TablePartStyleSource for $ty {
+        fn table_cell_text_style(&self) -> Option<&a::TableCellTextStyle> {
+          self.table_cell_text_style.as_deref()
+        }
+
+        fn table_cell_style(&self) -> Option<&a::TableCellStyle> {
+          self.table_cell_style.as_deref()
+        }
+      }
+    )+
+  };
+}
+
+impl_table_part_style_source!(
+  a::WholeTable,
+  a::Band1Horizontal,
+  a::Band2Horizontal,
+  a::Band1Vertical,
+  a::Band2Vertical,
+  a::LastColumn,
+  a::FirstColumn,
+  a::LastRow,
+  a::SoutheastCell,
+  a::SouthwestCell,
+  a::FirstRow,
+  a::NortheastCell,
+  a::NorthwestCell,
+);
+
+impl TableStyle {
+  fn from_dml_table_style(source: &a::TableStyle) -> Self {
+    Self::from_style_source(source)
+  }
+
+  fn from_dml_table_style_entry(source: &a::TableStyleEntry) -> Self {
+    Self::from_style_source(source)
+  }
+
+  fn from_style_source(source: &impl TableStyleSource) -> Self {
+    Self {
+      style_id: (!source.style_id().is_empty()).then(|| source.style_id().to_string()),
+      style_name: (!source.style_name().is_empty()).then(|| source.style_name().to_string()),
+      table_background: source
+        .table_background()
+        .map(TableStylePart::from_table_background)
+        .unwrap_or_default(),
+      whole_table: source
+        .whole_table()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      band1_horizontal: source
+        .band1_horizontal()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      band2_horizontal: source
+        .band2_horizontal()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      band1_vertical: source
+        .band1_vertical()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      band2_vertical: source
+        .band2_vertical()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      last_column: source
+        .last_column()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      first_column: source
+        .first_column()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      last_row: source
+        .last_row()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      southeast_cell: source
+        .southeast_cell()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      southwest_cell: source
+        .southwest_cell()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      first_row: source
+        .first_row()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      northeast_cell: source
+        .northeast_cell()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+      northwest_cell: source
+        .northwest_cell()
+        .map(TableStylePart::from_table_part)
+        .unwrap_or_default(),
+    }
+  }
+}
+
+impl TableStylePart {
+  fn from_table_background(source: &a::TableBackground) -> Self {
+    let fill_properties = match source.table_background_choice1.as_ref() {
+      Some(a::TableBackgroundChoice::FillProperties(fill)) => {
+        FillProperties::from_dml_fill_properties(fill)
+      }
+      Some(a::TableBackgroundChoice::FillReference(_)) | None => None,
+    };
+    Self {
+      fill_properties,
+      ..Self::default()
+    }
+  }
+
+  fn from_table_part(source: &impl TablePartStyleSource) -> Self {
+    let text = source
+      .table_cell_text_style()
+      .map(TableStyleTextProperties::from_dml)
+      .unwrap_or_default();
+    let (fill_properties, borders) = source
+      .table_cell_style()
+      .map(table_cell_style_properties)
+      .unwrap_or_default();
+    Self {
+      fill_properties,
+      borders,
+      text,
+    }
+  }
+}
+
+impl TableStyleTextProperties {
+  fn from_dml(source: &a::TableCellTextStyle) -> Self {
+    Self {
+      bold: source.bold,
+      italic: source.italic,
+      color: source
+        .table_cell_text_style_choice2
+        .as_ref()
+        .and_then(table_cell_text_color),
+    }
+  }
+
+  pub(crate) fn merge_from(&mut self, source: &Self) {
+    if source.bold.is_some() {
+      self.bold = source.bold;
+    }
+    if source.italic.is_some() {
+      self.italic = source.italic;
+    }
+    if source.color.is_some() {
+      self.color = source.color.clone();
+    }
+  }
+}
+
+fn table_cell_style_properties(
+  source: &a::TableCellStyle,
+) -> (Option<FillProperties>, TableStyleBorders) {
+  let fill_properties = match source.table_cell_style_choice.as_ref() {
+    Some(a::TableCellStyleChoice::FillProperties(fill)) => {
+      FillProperties::from_dml_fill_properties(fill)
+    }
+    Some(a::TableCellStyleChoice::FillReference(_)) | None => None,
+  };
+  let borders = source
+    .table_cell_borders
+    .as_deref()
+    .map(table_style_borders)
+    .unwrap_or_default();
+  (fill_properties, borders)
+}
+
+fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
+  TableStyleBorders {
+    left: source.left_border.as_deref().and_then(|border| {
+      border
+        .left_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::LeftBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
+          a::LeftBorderChoice::LineReference(_) => None,
+        })
+    }),
+    right: source.right_border.as_deref().and_then(|border| {
+      border
+        .right_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::RightBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
+          a::RightBorderChoice::LineReference(_) => None,
+        })
+    }),
+    top: source.top_border.as_deref().and_then(|border| {
+      border
+        .top_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::TopBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
+          a::TopBorderChoice::LineReference(_) => None,
+        })
+    }),
+    bottom: source.bottom_border.as_deref().and_then(|border| {
+      border
+        .bottom_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::BottomBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
+          a::BottomBorderChoice::LineReference(_) => None,
+        })
+    }),
+    inside_horizontal: source
+      .inside_horizontal_border
+      .as_deref()
+      .and_then(|border| {
+        border
+          .inside_horizontal_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::InsideHorizontalBorderChoice::Outline(outline) => {
+              LineProperties::from_dml_outline(outline)
+            }
+            a::InsideHorizontalBorderChoice::LineReference(_) => None,
+          })
+      }),
+    inside_vertical: source.inside_vertical_border.as_deref().and_then(|border| {
+      border
+        .inside_vertical_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::InsideVerticalBorderChoice::Outline(outline) => {
+            LineProperties::from_dml_outline(outline)
+          }
+          a::InsideVerticalBorderChoice::LineReference(_) => None,
+        })
+    }),
+    top_left_to_bottom_right: source.top_left_to_bottom_right_border.as_deref().and_then(
+      |border| {
+        border
+          .top_left_to_bottom_right_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::TopLeftToBottomRightBorderChoice::Outline(outline) => {
+              LineProperties::from_dml_outline(outline)
+            }
+            a::TopLeftToBottomRightBorderChoice::LineReference(_) => None,
+          })
+      },
+    ),
+    bottom_left_to_top_right: source.top_right_to_bottom_left_border.as_deref().and_then(
+      |border| {
+        border
+          .top_right_to_bottom_left_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::TopRightToBottomLeftBorderChoice::Outline(outline) => {
+              LineProperties::from_dml_outline(outline)
+            }
+            a::TopRightToBottomLeftBorderChoice::LineReference(_) => None,
+          })
+      },
+    ),
+  }
+}
+
+fn table_cell_text_color(choice: &a::TableCellTextStyleChoice2) -> Option<Color> {
+  Color::from_table_cell_text_style_choice(choice)
 }
 
 impl TableRow {

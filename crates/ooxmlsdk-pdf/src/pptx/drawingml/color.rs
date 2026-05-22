@@ -71,6 +71,21 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_table_cell_text_style_choice(
+    choice: &a::TableCellTextStyleChoice2,
+  ) -> Option<Self> {
+    match choice {
+      a::TableCellTextStyleChoice2::RgbColorModelPercentage(color) => {
+        Some(rgb_percent_color(color))
+      }
+      a::TableCellTextStyleChoice2::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::TableCellTextStyleChoice2::HslColor(color) => Some(hsl_color(color)),
+      a::TableCellTextStyleChoice2::SchemeColor(color) => Some(scheme_color(color)),
+      a::TableCellTextStyleChoice2::PresetColor(color) => Some(preset_color(color)),
+      a::TableCellTextStyleChoice2::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_background_style_reference_choice(
     choice: &p::BackgroundStyleReferenceChoice,
   ) -> Option<Self> {

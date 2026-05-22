@@ -133,6 +133,16 @@ Already structurally aligned:
   `lnTlToBr`, `lnBlToTr`) are preserved on `TableCell`; display lowering paints
   direct solid cell fills and explicit solid cell borders, using the temporary
   grid fallback only when no cell has direct border properties.
+- PowerPoint table styles are now structured beyond the style id. The importer
+  loads the presentation `tableStyles` relationship after the main presentation
+  traversal, and inline `a:tableStyle` is preserved on `TableProperties`.
+  `TableStyleList` / `TableStyle` / `TableStylePart` capture default style id,
+  whole-table, first/last row and column, horizontal/vertical banding, corner
+  parts, direct fill, direct outline borders, and table text style color/bold/
+  italic markers. The display bridge applies the LibreOffice `tablecell.cxx`
+  part order for direct solid fills and outline borders: whole table, first/
+  last row and column, horizontal bands, corner cells, vertical bands, then
+  direct `tcPr` overrides.
 - Display lowering must not paint `master_page.shapes` separately when a slide
   already inherited a layout persist. `PresentationFragmentHandler` clones the
   layout/master shape tree into the slide persist before slide XML is imported,
@@ -168,10 +178,13 @@ Known gaps to keep visible:
   text uses fixed-page text rotation rather than LibreOffice's full writing
   mode simulation; columns do simple paragraph flow, not full edit-engine line
   layout.
-- Table rendering still lacks table style resolution, row/column banding,
-  merge-aware border suppression, non-solid fill/line paint, text-fitting
-  expansion, and shadow/effect handling. Do not treat the current grid fallback
-  or direct `tcPr` paint bridge as final table semantics.
+- Table rendering still lacks predefined LibreOffice table style synthesis when
+  a style id has no tableStyles part entry, `fillRef`/`lnRef` theme-style
+  resolution inside table styles, styled table text propagation into paragraph
+  runs, background-fill blending, merge-aware border suppression, non-solid
+  fill/line paint, text-fitting expansion, and shadow/effect handling. Do not
+  treat the current grid fallback or direct style paint bridge as final table
+  semantics.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or

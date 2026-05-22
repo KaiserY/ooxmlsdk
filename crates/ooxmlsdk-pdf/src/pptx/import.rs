@@ -8,6 +8,7 @@ use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape_properties::EffectProperties;
+use super::drawingml::table::{TableStyle, TableStyleList};
 use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use super::presentation::PresentationFragmentHandler;
 use super::slide::{SlidePersist, SlideSize};
@@ -35,11 +36,6 @@ pub(crate) struct ThemeFragmentRecord {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct TableStyleList {
-  pub(crate) path: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ChartConverter;
 
 impl PowerPointImport {
@@ -62,6 +58,7 @@ impl PowerPointImport {
 
     let mut handler = PresentationFragmentHandler::new(package, presentation_part.clone())?;
     handler.finalize_import(package, &mut import)?;
+    import.load_table_style_list(package, &presentation_part)?;
     Ok(import)
   }
 
@@ -199,13 +196,12 @@ impl PowerPointImport {
       .cloned()
   }
 
-  pub(crate) fn get_table_styles(&mut self) -> Option<&TableStyleList> {
-    if self.table_style_list.is_none() {
-      self.table_style_list = Some(TableStyleList {
-        path: self.table_style_list_path.clone(),
-      });
-    }
+  pub(crate) fn get_table_styles(&self) -> Option<&TableStyleList> {
     self.table_style_list.as_ref()
+  }
+
+  pub(crate) fn get_table_style(&self, style_id: Option<&str>) -> Option<&TableStyle> {
+    self.get_table_styles()?.style(style_id)
   }
 
   pub(crate) fn get_vml_drawing(&self) -> Option<()> {
@@ -237,6 +233,25 @@ impl PowerPointImport {
 
   pub(crate) fn default_slide_size() -> SlideSize {
     SlideSize::libreoffice_default()
+  }
+
+  fn load_table_style_list(
+    &mut self,
+    package: &mut PresentationDocument,
+    presentation_part: &PresentationPart,
+  ) -> Result<()> {
+    // Source: LibreOffice PowerPointImport::getTableStyles lazily imports the
+    // tableStyles relationship from the office document. The Rust importer
+    // materializes it once after the presentation traversal so display/model
+    // users can resolve table style IDs without reparsing package state.
+    let Some(table_styles_part) = presentation_part.table_styles_part(package) else {
+      return Ok(());
+    };
+    let path = table_styles_part.path(package).map(str::to_string);
+    let table_style_list = table_styles_part.root_element(package)?;
+    self.table_style_list_path = path.clone();
+    self.table_style_list = Some(TableStyleList::from_dml(path, table_style_list));
+    Ok(())
   }
 }
 

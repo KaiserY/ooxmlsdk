@@ -48,6 +48,24 @@ fn assert_has_stroked_path_color(summary: &PdfSummary, expected: &str) {
   );
 }
 
+fn assert_page_count(summary: &PdfSummary, expected: usize) {
+  assert_eq!(
+    summary.page_count, expected,
+    "page count mismatch; summary={summary:?}"
+  );
+}
+
+fn assert_text_fill_color(summary: &PdfSummary, expected_text: &str, expected_color: &str) {
+  assert!(
+    summary.text_objects.iter().any(
+      |object| normalize_space(&object.text).contains(expected_text)
+        && object.fill_color.as_deref() == Some(expected_color)
+    ),
+    "missing text {expected_text:?} with fill color {expected_color}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
 fn text_bounds_containing(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
   summary
     .text_segments
@@ -80,6 +98,43 @@ fn assert_text_near_libreoffice_metafile_point(
     (bounds.left - expected_left).abs() <= tolerance_pt
       && (bounds.top - expected_top).abs() <= tolerance_pt,
     "text {expected:?} bounds {bounds:?} are not near LibreOffice metafile point ({x_100mm}, {y_100mm}) -> ({expected_left:.2}, {expected_top:.2})pt"
+  );
+}
+
+fn assert_text_y_near_libreoffice_metafile_point(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  y_100mm: f32,
+  tolerance_pt: f32,
+) {
+  let bounds = text_bounds_containing(summary, page_index, expected);
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let expected_top = media_box.top - y_100mm * 72.0 / 2540.0;
+
+  assert!(
+    (bounds.top - expected_top).abs() <= tolerance_pt,
+    "text {expected:?} bounds {bounds:?} are not near LibreOffice metafile y {y_100mm} -> {expected_top:.2}pt"
+  );
+}
+
+fn assert_text_near_libreoffice_relative_metafile_point(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  map_x_100mm: f32,
+  map_y_100mm: f32,
+  text_x_100mm: f32,
+  text_y_100mm: f32,
+  tolerance_pt: f32,
+) {
+  assert_text_near_libreoffice_metafile_point(
+    summary,
+    page_index,
+    expected,
+    map_x_100mm + text_x_100mm,
+    map_y_100mm + text_y_100mm,
+    tolerance_pt,
   );
 }
 
@@ -205,4 +260,106 @@ fn mapped_pptx_table_vertical_text_preserves_cell_text_rotation() {
 fn mapped_pptx_tdf164622_preserves_clip_region() {
   let summary = render_summary("pptx/tdf164622.pptx");
   assert_page_has_clipping_ops(&summary, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/layout-tests.cxx:testTdf128212
+fn mapped_pptx_tdf128212_keeps_rotated_text_at_upstream_metafile_position() {
+  let summary = render_summary("pptx/tdf128212.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Vertical it should be!"]);
+  assert_text_near_libreoffice_relative_metafile_point(
+    &summary,
+    0,
+    "Vertical it should be!",
+    331.0,
+    9420.0,
+    4760.0,
+    -2250.0,
+    48.0,
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/layout-tests.cxx:testTdf148966
+fn mapped_pptx_tdf148966_ignores_break_after_multiline_field() {
+  let summary = render_summary("pptx/tdf148966.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Some multi line hyperlink/field",
+      "text that follows after a",
+      "linebreak",
+    ],
+  );
+  assert_text_y_near_libreoffice_metafile_point(&summary, 0, "linebreak", 5952.0, 48.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/layout-tests.cxx:testTdf128206
+fn mapped_pptx_tdf128206_keeps_arrow_text_at_upstream_metafile_position() {
+  let summary = render_summary("pptx/tdf128206.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a b c d e f g h I j k l m n o p q"]);
+  assert_text_near_libreoffice_relative_metafile_point(
+    &summary,
+    0,
+    "a b c d e f g h I j k l m n o p q",
+    14416.0,
+    1658.0,
+    -11031.0,
+    3617.0,
+    48.0,
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testSmoketest
+fn mapped_pptx_smoketest_preserves_three_imported_pages() {
+  let summary = render_summary("smoketest.pptx");
+  assert_page_count(&summary, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf150770
+fn mapped_pptx_tdf150770_preserves_four_imported_slides() {
+  let summary = render_summary("pptx/tdf150770.pptx");
+  assert_page_count(&summary, 4);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc591147
+fn mapped_pptx_bnc591147_preserves_two_media_slides() {
+  let summary = render_summary("pptx/bnc591147.pptx");
+  assert_page_count(&summary, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf103792
+fn mapped_pptx_tdf103792_keeps_visible_title_placeholder_text() {
+  let summary = render_summary("pptx/tdf103792.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Click to add Title"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf119649
+fn mapped_pptx_tdf119649_splits_colored_text_run_before_closing_parenthesis() {
+  let summary = render_summary("pptx/tdf119649.pptx");
+  assert_page_contains_in_order(&summary, 0, &["default_color(", "colored_text", ")"]);
+  assert_text_fill_color(&summary, "colored_text", "#ce181e@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf103800
+fn mapped_pptx_tdf103800_preserves_red_text_color() {
+  let summary = render_summary("pptx/tdf103800.pptx");
+  assert_page_contains_in_order(&summary, 0, &["test"]);
+  assert_text_fill_color(&summary, "test", "#c00000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf89927
+fn mapped_pptx_tdf89927_preserves_white_text_color() {
+  let summary = render_summary("pptx/tdf89927.pptx");
+  assert_page_contains_in_order(&summary, 0, &["TEST"]);
+  assert_text_fill_color(&summary, "TEST", "#ffffff@ff");
 }

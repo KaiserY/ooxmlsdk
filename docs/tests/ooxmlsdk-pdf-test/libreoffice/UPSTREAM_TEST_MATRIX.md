@@ -1,11 +1,11 @@
-# LibreOffice DOCX -> PDF Upstream Test Matrix
+# LibreOffice DOCX/PPTX -> PDF Upstream Test Matrix
 
 This matrix tracks LibreOffice upstream tests that are useful for calibrating
-`ooxmlsdk-pdf` DOCX -> PDF rendering. The source of truth is the local
+`ooxmlsdk-pdf` DOCX/PPTX -> PDF rendering. The source of truth is the local
 LibreOffice checkout at `../core`.
 
-This is intentionally not a DOCX parser/import matrix. Pure UNO model checks,
-DOCX export XML checks, round-trip checks, editing mechanics, and package/security
+This is intentionally not a DOCX/PPTX parser/import matrix. Pure UNO model checks,
+OOXML export XML checks, round-trip checks, editing mechanics, and package/security
 tests stay out unless the upstream assertion can be faithfully projected to a
 PDF-visible property.
 
@@ -531,3 +531,286 @@ are `deferred`.
 | `uiwriter8.cxx::testTdf131684` and `uiwriter8.cxx::testTdf159026` | `deferred` | These are primarily UI edit/undo workflows; the layout checks are after commands, not source DOCX -> PDF rendering assertions. |
 | `flycnt.cxx::testSplitFlyThenTable` | `deferred` | Upstream only verifies PDF export completion. Keep out of the active migration list until paired with a visible PDF assertion. |
 | `../core/sw/qa/extras/globalfilter/globalfilter.cxx::testTdf143311` | `excluded` | Mixed DOCX/ODT/PDF-UA decorative-artifact test; belongs to tagged PDF/PDF-UA scope. |
+
+## PPTX Migration Scope
+
+The PPTX queue mirrors the DOCX migration policy: migrate source PPTX fixtures
+whose upstream test evidence can be observed in static PDF output. Do not treat
+these as XML parser tests; `ooxmlsdk` owns package/XML correctness. The PDF
+suite should cover the rendered Impress result: slide count, visible text,
+shape/path geometry, fills/strokes, bitmap output, theme-derived colors,
+tables, charts, SmartArt fallback/rendering, media placeholders, notes-visible
+content when exported, links/annotations, and raster differences when primitive
+PDF extraction is not stable enough.
+
+The broad scan found 410 PPTX fixtures under `../core/sd/qa/unit/data`. The
+source-PPTX import/layout/render queue below has 221 unique fixtures and is the
+primary migration list. The `export-tests*.cxx` suites contain another 176
+unique PPTX references, but most are export XML or round-trip checks; keep them
+in `review` until a non-XML visible-output assertion is identified.
+
+| Source bucket | Unique PPTX fixtures | Status | Migration rule |
+|---|---:|---|---|
+| `sd/qa/unit/import-tests.cxx` | 45 | `mapped` | Import assertions for slide-visible shapes, text, tables, charts, media, links, and backgrounds. |
+| `sd/qa/unit/import-tests2.cxx` | 35 | `mapped` | Import assertions; migrate unless the test only checks importer state with no visible projection. |
+| `sd/qa/unit/import-tests3.cxx` | 33 | `mapped` | Import assertions; migrate visible layout/shape/table/text/color cases. |
+| `sd/qa/unit/import-tests4.cxx` | 37 | `mapped` | High-value graphics/effects/crop/theme/master-slide cases; prefer raster/PDF color assertions. |
+| `sd/qa/unit/import-tests_skia.cxx` | 1 | `mapped` | Skia-specific rendered output regression; migrate through raster/PDF visual assertions. |
+| `sd/qa/unit/import-tests-smartart.cxx` | 49 | `mapped` | SmartArt rendered text/geometry/fill/image behavior; use raster snapshots where decomposition is not object-stable. |
+| `sd/qa/unit/layout-tests.cxx` | 12 | `mapped` | LibreOffice layout/metafile assertions; project to PDF text/path/image bounds, object counts, text order, or raster. |
+| `sd/qa/unit/PNGExportTests.cxx` | 4 | `mapped` | Rendered bitmap checks; project to PDFium page/region raster assertions. |
+| `sd/qa/unit/ShapeImportExportTest.cxx` | 3 | `mapped` / `deferred` | Import-side text inset cases are mapped; export XML-only row stays deferred. |
+| `sd/qa/unit/ThemeTest.cxx` | 1 | `mapped` | Theme color/font effects visible in PDF output. |
+| `sd/qa/unit/FontEmbeddingTest.cxx` | 2 | `mapped` | Font availability/embedding affects visible text metrics and PDF font resources. |
+| `sd/qa/unit/export-tests*.cxx` | 176 | `review` | Promote only rows with source PPTX -> visible PDF behavior; keep `parseExport()`/OOXML round-trip checks deferred. |
+| `sd/qa/unit/SlideSectionTest.cxx` | 1 | `deferred` | Slide sections/custom shows are not static PDF rendering. |
+| `sd/qa/unit/activex-controls-tests.cxx` | 13 | `deferred` | ActiveX/control state is mostly importer/UNO behavior; promote only with a visible rendered-control or PDF widget assertion. |
+| `sd/qa/unit/uiimpress.cxx` | 3 | `deferred` | UI/command behavior is not source PPTX -> static PDF output unless a pre-command visible-render assertion exists. |
+
+### PPTX Source Fixture Queue
+
+Copy these fixtures from `../core/sd/qa/unit/data/` into
+`test-data/ooxmlsdk-pdf-test/libreoffice/` as the PPTX migration proceeds. Keep
+the same relative fixture name in the matrix when possible. A row may be
+temporarily skipped at test runtime if a required renderer feature is not yet
+implemented, but it should remain in this queue unless review proves it is
+XML-only, editing-only, slideshow-only, or otherwise not PDF-visible.
+
+```text
+BoldonseFontEmbedded.pptx
+TextDistancesInsets1.pptx
+TextDistancesInsets2.pptx
+TextDistancesInsets3.pptx
+fdo47434.pptx
+fdo71434.pptx
+n593612.pptx
+n759180.pptx
+n762695.pptx
+n819614.pptx
+n820786.pptx
+n902652.pptx
+ppt/placeholder-priority.pptx
+pptx/NumberedList-12ab-ab-34.pptx
+pptx/ShapeLineProperties.pptx
+pptx/altdescription.pptx
+pptx/bnc480256-2.pptx
+pptx/bnc584721_1_2.pptx
+pptx/bnc584721_4.pptx
+pptx/bnc591147.pptx
+pptx/bnc862510_6.pptx
+pptx/bnc862510_7.pptx
+pptx/bnc870237.pptx
+pptx/bnc887225.pptx
+pptx/bnc904423.pptx
+pptx/bnc910045.pptx
+pptx/chart_pt_color_bg1.pptx
+pptx/connectors.pptx
+pptx/crop-position.pptx
+pptx/crop-to-shape.pptx
+pptx/croppedTo0.pptx
+pptx/cshapes.pptx
+pptx/fill-color-list.pptx
+pptx/formatting-bullet-indent.pptx
+pptx/glue_point_leaving_directions.pptx
+pptx/greysscale-graphic.pptx
+pptx/hyperlinkOnImage.pptx
+pptx/loopNoPause.pptx
+pptx/master-slides.pptx
+pptx/mirrored-graphic.pptx
+pptx/multicol.pptx
+pptx/n778859.pptx
+pptx/n80340.pptx
+pptx/n828390_2.pptx
+pptx/n828390_3.pptx
+pptx/n83889.pptx
+pptx/n862510_1.pptx
+pptx/n862510_2.pptx
+pptx/n862510_4.pptx
+pptx/ooxtheme.pptx
+pptx/predefined-table-style.pptx
+pptx/shape-blur-effect.pptx
+pptx/shape-glow-effect.pptx
+pptx/shape-text-glow-effect.pptx
+pptx/smartart-accent-process.pptx
+pptx/smartart-autoTxRot.pptx
+pptx/smartart-autofit-sync.pptx
+pptx/smartart-background-drawingml-fallback.pptx
+pptx/smartart-background.pptx
+pptx/smartart-bullet-list.pptx
+pptx/smartart-center-cycle.pptx
+pptx/smartart-chevron.pptx
+pptx/smartart-children.pptx
+pptx/smartart-cnt.pptx
+pptx/smartart-composite-infer-right.pptx
+pptx/smartart-continuous-block-process.pptx
+pptx/smartart-cycle-matrix.pptx
+pptx/smartart-cycle.pptx
+pptx/smartart-data-follow.pptx
+pptx/smartart-dir.pptx
+pptx/smartart-font-size.pptx
+pptx/smartart-interopgrabbag.pptx
+pptx/smartart-linear-rule-vert.pptx
+pptx/smartart-linear-rule.pptx
+pptx/smartart-maxdepth.pptx
+pptx/smartart-missing-bullet.pptx
+pptx/smartart-multidirectional.pptx
+pptx/smartart-org-chart.pptx
+pptx/smartart-org-chart2.pptx
+pptx/smartart-picture-strip.pptx
+pptx/smartart-pyramid-1child.pptx
+pptx/smartart-recursion.pptx
+pptx/smartart-rightoleftblockdiagram.pptx
+pptx/smartart-rotation.pptx
+pptx/smartart-snake-rows.pptx
+pptx/smartart-tdf134221.pptx
+pptx/smartart-text.pptx
+pptx/smartart-vertical-block-list.pptx
+pptx/smartart-vertical-box-list.pptx
+pptx/smartart1.pptx
+pptx/table-list.pptx
+pptx/tableBorderLineStyle.pptx
+pptx/tablescale.pptx
+pptx/tcPr-vert-roundtrip.pptx
+pptx/tdf100065.pptx
+pptx/tdf100926.pptx
+pptx/tdf103347.pptx
+pptx/tdf103473.pptx
+pptx/tdf103477.pptx
+pptx/tdf103792.pptx
+pptx/tdf103800.pptx
+pptx/tdf103876.pptx
+pptx/tdf104015.pptx
+pptx/tdf104201.pptx
+pptx/tdf104445.pptx
+pptx/tdf104722.pptx
+pptx/tdf105150.pptx
+pptx/tdf106638.pptx
+pptx/tdf109067.pptx
+pptx/tdf109187.pptx
+pptx/tdf112209.pptx
+pptx/tdf113163.pptx
+pptx/tdf113198.pptx
+pptx/tdf114821.pptx
+pptx/tdf114913.pptx
+pptx/tdf115394.pptx
+pptx/tdf118776.pptx
+pptx/tdf119649.pptx
+pptx/tdf120028.pptx
+pptx/tdf123684.pptx
+pptx/tdf127129.pptx
+pptx/tdf127964.pptx
+pptx/tdf128206.pptx
+pptx/tdf128212.pptx
+pptx/tdf128596.pptx
+pptx/tdf128684.pptx
+pptx/tdf129686.pptx
+pptx/tdf131390.pptx
+pptx/tdf131553.pptx
+pptx/tdf132302_SmartArt_rightArrow.pptx
+pptx/tdf134174.pptx
+pptx/tdf134210.pptx
+pptx/tdf135843.pptx
+pptx/tdf135843_insideH.pptx
+pptx/tdf135953_SmartArt_textposition.pptx
+pptx/tdf137367.pptx
+pptx/tdf138148.pptx
+pptx/tdf141704.pptx
+pptx/tdf142590.pptx
+pptx/tdf142645.pptx
+pptx/tdf142913.pptx
+pptx/tdf142915.pptx
+pptx/tdf144092-tableHeight.pptx
+pptx/tdf144616.pptx
+pptx/tdf144917.pptx
+pptx/tdf144918.pptx
+pptx/tdf145528_SmartArt_Matrix.pptx
+pptx/tdf146223.pptx
+pptx/tdf146731.pptx
+pptx/tdf147459.pptx
+pptx/tdf148665.pptx
+pptx/tdf148685.pptx
+pptx/tdf148921.pptx
+pptx/tdf148965.pptx
+pptx/tdf148966.pptx
+pptx/tdf149124.pptx
+pptx/tdf149206.pptx
+pptx/tdf149314.pptx
+pptx/tdf149551_SmartArt_Gear.pptx
+pptx/tdf149551_SmartArt_Pie.pptx
+pptx/tdf149551_SmartArt_Pyramid.pptx
+pptx/tdf149551_SmartArt_Venn.pptx
+pptx/tdf149588_transparentSolidFill.pptx
+pptx/tdf149785.pptx
+pptx/tdf149865.pptx
+pptx/tdf149961-autofitIndentation.pptx
+pptx/tdf149985.pptx
+pptx/tdf150719.pptx
+pptx/tdf150770.pptx
+pptx/tdf150789.pptx
+pptx/tdf151547-transparent-white-text.pptx
+pptx/tdf151767.pptx
+pptx/tdf152070.pptx
+pptx/tdf152186.pptx
+pptx/tdf152434.pptx
+pptx/tdf153008-srcRect-smallNegBound.pptx
+pptx/tdf153036_resizedConnectorL.pptx
+pptx/tdf153466.pptx
+pptx/tdf154363.pptx
+pptx/tdf154858.pptx
+pptx/tdf156718.pptx
+pptx/tdf156808.pptx
+pptx/tdf156829.pptx
+pptx/tdf156856.pptx
+pptx/tdf157216.pptx
+pptx/tdf157285.pptx
+pptx/tdf157529.pptx
+pptx/tdf157635.pptx
+pptx/tdf157793.pptx
+pptx/tdf158512.pptx
+pptx/tdf160490.pptx
+pptx/tdf163239.pptx
+pptx/tdf163852.pptx
+pptx/tdf164622.pptx
+pptx/tdf165321.pptx
+pptx/tdf165341.pptx
+pptx/tdf165732.pptx
+pptx/tdf167214.pptx
+pptx/tdf169524.pptx
+pptx/tdf51340.pptx
+pptx/tdf62255.pptx
+pptx/tdf65724.pptx
+pptx/tdf79007.pptx
+pptx/tdf89064.pptx
+pptx/tdf89449.pptx
+pptx/tdf89927.pptx
+pptx/tdf89928-blackWhiteEffectThreshold.pptx
+pptx/tdf90626.pptx
+pptx/tdf93097.pptx
+pptx/tdf93830.pptx
+pptx/tdf93868.pptx
+pptx/tdf95932.pptx
+pptx/tdf99030.pptx
+pptx/trailing-paragraphs.pptx
+pptx/vertical-bracket-list.pptx
+smoketest.pptx
+strict_ooxml.pptx
+tdf100491.pptx
+tdf109317.pptx
+tdf90403.pptx
+theme.pptx
+```
+
+### PPTX Review And Deferral Rules
+
+| Fixture or source | Status | Reason |
+|---|---|---|
+| `TextDistancesInsets3.pptx` | `deferred` | Used by an export XML round-trip assertion in `ShapeImportExportTest.cxx`; keep out until paired with source-PPTX visible PDF evidence. |
+| `pptx/loopNoPause.pptx` and animation/transition-only rows | `deferred` | Static PDF output does not represent slideshow timing, loop, or transition behavior. |
+| `strict_ooxml.pptx` | `review` | Useful import fixture, but promote only if the assertion is visible PDF output rather than strict-package parsing. |
+| `smoketest.pptx` | `review` | Keep as fixture coverage only when paired with page/text/object output assertions; crash-only import smoke is not enough. |
+| `pptx/altdescription.pptx` | `review` | Alternative text is not normally visible in PDF page content; promote only for tagged PDF/accessibility scope. |
+| `sd/qa/unit/export-tests-ooxml*.cxx` | `review` | Most rows save PPTX and assert exported XML. Promote only non-XML visible rows, e.g. rendered effects, hidden graphics, OLE/EMF fallback, notes/master/footer visibility, or page-level image/color/text output. |
+| `sd/qa/unit/SlideSectionTest.cxx` | `deferred` | Section metadata and custom show behavior are not static PDF rendering. |
+| `sd/qa/unit/activex-controls-tests.cxx` | `deferred` | UNO/control state is not PDF output unless a visible widget/rendered control assertion is defined. |
+| `sd/qa/unit/uiimpress.cxx` | `deferred` | UI command/editor tests are not migrated as active PDF tests; review only source-state assertions that map to static rendered output. |
+| `sd/qa/unit/TextFittingTest.cxx` | `deferred` | The PPTX references are comment-only visual comparison documents, not automated upstream PPTX assertions to port. |

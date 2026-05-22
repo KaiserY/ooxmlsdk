@@ -2235,3 +2235,137 @@ fn mapped_pptx_smartart_auto_text_rotation_preserves_three_slide_text_sets() {
   assert_page_contains_in_order(&summary, 2, &["a", "b", "c", "d", "e", "f"]);
   assert_page_stroked_path_count_at_least(&summary, 0, 16);
 }
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN759180
+fn mapped_pptx_n759180_preserves_small_end_paragraph_font() {
+  let summary = render_summary("n759180.pptx");
+  assert_page_contains_in_order(&summary, 0, &["textrun1", "Textrun2", "Textrun3"]);
+  assert_text_font_size(&summary, ".", "13.00");
+  assert_text_font_size(&summary, "Textrun3", "13.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN862510_2
+fn mapped_pptx_n862510_2_preserves_rotated_smartart_shape_output() {
+  let summary = render_summary("pptx/n862510_2.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf157285
+fn mapped_pptx_tdf157285_preserves_placeholder_heights() {
+  let summary = render_summary("pptx/tdf157285.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Hello"]);
+  assert_page_contains_in_order(&summary, 1, &["Hello"]);
+  assert_any_path_height_close(&summary, 0, 2565.0 * 72.0 / 2540.0, 8.0);
+  assert_any_path_height_close(&summary, 1, 1180.0 * 72.0 / 2540.0, 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testShapeGlowEffectPPTXImpoer
+fn mapped_pptx_shape_glow_effect_preserves_ellipse_output() {
+  let summary = render_summary("pptx/shape-glow-effect.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+  assert_any_path_width_close(&summary, 0, 1979875.0 * 72.0 / 914400.0, 16.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testShapeTextGlowEffectPPTXImport
+fn mapped_pptx_shape_text_glow_effect_preserves_text_and_ellipse() {
+  let summary = render_summary("pptx/shape-text-glow-effect.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Text Glow in Shape"]);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testShapeBlurPPTXImport
+fn mapped_pptx_shape_blur_effect_preserves_shadowed_ellipse_output() {
+  let summary = render_summary("pptx/shape-blur-effect.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+  assert!(page_object_count(&summary, 0) >= 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testHyperlinksOnShapes
+fn mapped_pptx_tdf144616_preserves_shape_hyperlink_annotations() {
+  let summary = render_summary("pptx/tdf144616.pptx");
+  assert_page_count(&summary, 2);
+  assert_page_stroked_path_count_at_least(&summary, 0, 7);
+  assert_page_link_count_at_least(&summary, 0, 7);
+  assert_page_annotation_uri(&summary, 0, "http://www.example.com/");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testCropToZero
+fn mapped_pptx_crop_to_zero_imports_without_losing_picture_shape() {
+  let summary = render_summary("pptx/croppedTo0.pptx");
+  assert_page_count(&summary, 1);
+  assert!(page_object_count(&summary, 0) >= 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149961AutofitIndentation
+fn mapped_pptx_tdf149961_preserves_autofit_indentation_text_flow() {
+  let summary = render_summary("pptx/tdf149961-autofitIndentation.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Autofit", "Autofit"]);
+  assert_text_font_size(&summary, "Autofit", "96.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:tdf158512
+fn mapped_pptx_tdf158512_preserves_unfilled_foreground_shape() {
+  let summary = render_summary("pptx/tdf158512.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_contains_in_order(&summary, 0, &["KKKKKK", "EEEEEEEE", "KKKKKKKK"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf169524
+fn mapped_pptx_tdf169524_preserves_zero_left_margin_paragraph_flow() {
+  let summary = render_summary("pptx/tdf169524.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["KKKKKK", "EEEEEEEE", "AAAAAAAA", "IIIIIIIII", "EEEEEE EEEE"],
+  );
+  assert_text_fill_color(&summary, "EEEEEE EEEE", "#ff0000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testMultidirectional
+fn mapped_pptx_smartart_multidirectional_preserves_bidirectional_arrow_diagram() {
+  let summary = render_summary("pptx/smartart-multidirectional.pptx");
+  assert_page_contains_in_order(&summary, 0, &["a", "b", "c"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testVerticalBoxList
+fn mapped_pptx_smartart_vertical_box_list_preserves_parent_and_child_widths() {
+  let summary = render_summary("pptx/smartart-vertical-box-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["x"]);
+  assert_any_path_width_close(&summary, 0, 11852.0 * 72.0 / 2540.0, 24.0);
+  assert_page_filled_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/layout-tests.cxx:testTdf146731
+fn mapped_pptx_tdf146731_preserves_table_border_primitive_widths() {
+  let summary = render_summary("pptx/tdf146731.pptx");
+  assert_page_has_horizontal_stroked_path(&summary, 0);
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests_skia.cxx:testTdf156856
+fn mapped_pptx_tdf156856_imports_skia_regression_fixture() {
+  let summary = render_summary("pptx/tdf156856.pptx");
+  assert_page_count(&summary, 1);
+  assert!(page_object_count(&summary, 0) >= 1);
+}

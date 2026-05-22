@@ -101,6 +101,28 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_color_from_choice(choice: &a::ColorFromChoice) -> Option<Self> {
+    match choice {
+      a::ColorFromChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ColorFromChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ColorFromChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ColorFromChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ColorFromChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ColorFromChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_color_to_choice(choice: &a::ColorToChoice) -> Option<Self> {
+    match choice {
+      a::ColorToChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ColorToChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ColorToChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ColorToChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ColorToChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ColorToChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_glow_choice(choice: &a::GlowChoice) -> Option<Self> {
     match choice {
       a::GlowChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),

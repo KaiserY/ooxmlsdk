@@ -289,6 +289,7 @@ impl PPTShapeGroupContext {
         blip.embed.clone(),
         blip.link.clone(),
         image_crop_from_source_rectangle(picture.blip_fill.source_rectangle.as_ref()),
+        blip.blip_choice.clone(),
         image_resource,
       );
     }

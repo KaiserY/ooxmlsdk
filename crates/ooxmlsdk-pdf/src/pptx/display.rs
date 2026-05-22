@@ -1,12 +1,16 @@
+use std::io::Cursor;
 use std::sync::Arc;
 
-use crate::docx::{BorderStyle, RgbColor, TextStyle};
+use crate::docx::{BorderStyle, ImageCrop, RgbColor, TextStyle};
 use crate::layout::{
   self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
   TextItem,
 };
+use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
+use image::codecs::png::PngEncoder;
+use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use super::drawingml::color::Color;
@@ -57,7 +61,7 @@ fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<Pag
   {
     lower_background(import, slide, background, &mut items);
   }
-  lower_shapes(import, &slide.shapes, &mut items);
+  lower_shapes(import, slide, &slide.shapes, &mut items);
   items
 }
 
@@ -87,22 +91,36 @@ fn lower_background(
   let Some(fill_properties) = fill_properties else {
     return;
   };
-  let Some(fill_paint) = background_fill_paint(import, slide, &fill_properties) else {
-    return;
-  };
-  if is_default_white_page_background(fill_paint) {
-    return;
+  if let Some(fill_paint) = background_fill_paint(import, slide, &fill_properties) {
+    if is_default_white_page_background(fill_paint) {
+      return;
+    }
+    items.push(PageItem::Rect(RectItem {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: slide.size.width_pt,
+      height_pt: slide.size.height_pt,
+      fill_color: Some(fill_paint.color),
+      fill_opacity: fill_paint.opacity,
+      stroke: None,
+      stroke_opacity: 1.0,
+    }));
+  } else if let Some(image) = blip_fill_image_item(
+    import,
+    slide,
+    &fill_properties,
+    0.0,
+    0.0,
+    slide.size.width_pt,
+    slide.size.height_pt,
+    0.0,
+    false,
+    false,
+    None,
+    None,
+  ) {
+    items.push(PageItem::Image(image));
   }
-  items.push(PageItem::Rect(RectItem {
-    x_pt: 0.0,
-    y_pt: 0.0,
-    width_pt: slide.size.width_pt,
-    height_pt: slide.size.height_pt,
-    fill_color: Some(fill_paint.color),
-    fill_opacity: fill_paint.opacity,
-    stroke: None,
-    stroke_opacity: 1.0,
-  }));
 }
 
 fn is_default_white_page_background(paint: DisplayPaint) -> bool {
@@ -126,9 +144,14 @@ fn background_fill_paint(
   }
 }
 
-fn lower_shapes(import: &PowerPointImport, shapes: &[Shape], items: &mut Vec<PageItem>) {
+fn lower_shapes(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shapes: &[Shape],
+  items: &mut Vec<PageItem>,
+) {
   for shape in shapes {
-    lower_shape(import, shape, DisplayOffset::default(), items);
+    lower_shape(import, slide, shape, DisplayOffset::default(), items);
   }
 }
 
@@ -140,6 +163,7 @@ struct DisplayOffset {
 
 fn lower_shape(
   import: &PowerPointImport,
+  slide: &SlidePersist,
   shape: &Shape,
   offset: DisplayOffset,
   items: &mut Vec<PageItem>,
@@ -148,8 +172,8 @@ fn lower_shape(
     return;
   }
 
-  lower_shape_bounds(import, shape, offset, items);
-  lower_picture(shape, offset, items);
+  lower_shape_bounds(import, slide, shape, offset, items);
+  lower_picture(import, slide, shape, offset, items);
   lower_shape_hyperlink(shape, offset, items);
   let _has_structured_media_identity = shape.media.as_ref().is_some_and(|media| {
     !matches!(media.kind, super::drawingml::shape::MediaKind::Unknown)
@@ -185,7 +209,7 @@ fn lower_shape(
 
   let child_offset = child_display_offset(shape, offset);
   for child in &shape.children {
-    lower_shape(import, child, child_offset, items);
+    lower_shape(import, slide, child, child_offset, items);
   }
 }
 
@@ -240,7 +264,13 @@ fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
       .is_some_and(|resource| resource.has_payload())
 }
 
-fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
+fn lower_picture(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &Shape,
+  offset: DisplayOffset,
+  items: &mut Vec<PageItem>,
+) {
   let Some(picture) = &shape.picture else {
     return;
   };
@@ -252,6 +282,13 @@ fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>
   let Some(resource) = picture.image_resource.as_ref() else {
     return;
   };
+  let image_data = image_data_with_blip_effects(
+    import,
+    slide,
+    &resource.data,
+    resource.content_type.as_deref(),
+    &picture.blip_choices,
+  );
   items.push(PageItem::Image(ImageItem {
     x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
     y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
@@ -261,8 +298,10 @@ fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>
     rotation_deg: shape.rotation,
     flip_horizontal: shape.flip_h,
     flip_vertical: shape.flip_v,
-    data: resource.data.clone(),
-    content_type: resource.content_type.clone(),
+    data: image_data.data,
+    content_type: image_data
+      .content_type
+      .or_else(|| resource.content_type.clone()),
     alt_text: shape
       .description
       .clone()
@@ -1033,6 +1072,7 @@ fn push_table_line(
 
 fn lower_shape_bounds(
   import: &PowerPointImport,
+  slide: &SlidePersist,
   shape: &Shape,
   offset: DisplayOffset,
   items: &mut Vec<PageItem>,
@@ -1045,22 +1085,52 @@ fn lower_shape_bounds(
     .actual_fill_properties
     .as_ref()
     .and_then(|fill| fill_paint(import, fill));
+  let x_pt = units::emu_to_points(offset.x_emu + shape.position.x);
+  let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
+  let width_pt = units::emu_to_points(shape.size.cx);
+  let height_pt = units::emu_to_points(shape.size.cy);
+  let fill_image = shape.actual_fill_properties.as_ref().and_then(|fill| {
+    blip_fill_image_item(
+      import,
+      slide,
+      fill,
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      shape.rotation,
+      shape.flip_h,
+      shape.flip_v,
+      shape
+        .description
+        .clone()
+        .or_else(|| shape.title.clone())
+        .or_else(|| shape.name.clone()),
+      shape.hyperlink_url.clone(),
+    )
+  });
   let line = shape
     .actual_line_properties
     .as_ref()
     .and_then(|line| line_stroke(import, line));
-  if fill_paint.is_none() && line.is_none() {
+  if fill_paint.is_none() && fill_image.is_none() && line.is_none() {
     return;
+  }
+  if let Some(fill_image) = fill_image {
+    items.push(PageItem::Image(fill_image));
   }
   let (stroke, stroke_opacity) = line
     .map(|line| (Some(line.style), line.opacity))
     .unwrap_or((None, 1.0));
+  if fill_paint.is_none() && stroke.is_none() {
+    return;
+  }
 
   items.push(PageItem::Rect(RectItem {
-    x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
-    y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
-    width_pt: units::emu_to_points(shape.size.cx),
-    height_pt: units::emu_to_points(shape.size.cy),
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
     fill_color: fill_paint.map(|fill| fill.color),
     fill_opacity: fill_paint.map(|fill| fill.opacity).unwrap_or(1.0),
     stroke,
@@ -1072,6 +1142,362 @@ fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
   DisplayOffset {
     x_emu: offset.x_emu + shape.position.x - shape.child_position.x,
     y_emu: offset.y_emu + shape.position.y - shape.child_position.y,
+  }
+}
+
+fn blip_fill_image_item(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  fill: &FillProperties,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+  alt_text: Option<String>,
+  hyperlink_url: Option<String>,
+) -> Option<ImageItem> {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // XML_blipFill sets FillBitmap and applies srcRect/fillRect cropping before
+  // setting the bitmap mode. Reuse the existing cropped image primitive for
+  // stretch/source-rectangle cases; tile/repeat needs separate mode lowering.
+  let FillKind::Blip(blip_fill) = &fill.kind else {
+    return None;
+  };
+  if matches!(
+    blip_fill.blip_fill_choice.as_ref(),
+    Some(a::BlipFillChoice::Tile(_))
+  ) {
+    return None;
+  }
+  let blip = blip_fill.blip.as_ref()?;
+  let relationship_id = blip.embed.as_deref()?;
+  let resource = slide.image_resources.get(relationship_id)?;
+  let image_data = image_data_with_blip_effects(
+    import,
+    slide,
+    &resource.data,
+    resource.content_type.as_deref(),
+    &blip.blip_choice,
+  );
+  Some(ImageItem {
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    crop: blip_fill_image_crop(blip_fill),
+    rotation_deg,
+    flip_horizontal,
+    flip_vertical,
+    data: image_data.data,
+    content_type: image_data
+      .content_type
+      .or_else(|| resource.content_type.clone()),
+    alt_text,
+    hyperlink_url,
+    floating: false,
+    behind_text: false,
+  })
+}
+
+struct ImportedImageData {
+  data: Vec<u8>,
+  content_type: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ImageEffects {
+  color_change: Option<ColorChangeEffect>,
+  grayscale: bool,
+  brightness: Option<i32>,
+  contrast: Option<i32>,
+  bilevel_threshold: Option<u8>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ColorChangeEffect {
+  from: RgbColor,
+  to: RgbColor,
+  alpha: u8,
+  tolerance: u8,
+}
+
+fn image_data_with_blip_effects(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  data: &[u8],
+  content_type: Option<&str>,
+  blip_choices: &[a::BlipChoice],
+) -> ImportedImageData {
+  let effects = image_effects_from_blip(import, slide, blip_choices, content_type);
+  if effects == ImageEffects::default() {
+    return ImportedImageData {
+      data: data.to_vec(),
+      content_type: content_type.map(str::to_string),
+    };
+  }
+  let Some(data) = apply_image_effects(data, content_type, effects) else {
+    return ImportedImageData {
+      data: data.to_vec(),
+      content_type: content_type.map(str::to_string),
+    };
+  };
+  ImportedImageData {
+    data,
+    content_type: Some("image/png".into()),
+  }
+}
+
+fn image_effects_from_blip(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  blip_choices: &[a::BlipChoice],
+  content_type: Option<&str>,
+) -> ImageEffects {
+  let mut effects = ImageEffects::default();
+  for choice in blip_choices {
+    match choice {
+      a::BlipChoice::ColorChange(change) => {
+        let Some(from) = change
+          .color_from
+          .color_from_choice
+          .as_ref()
+          .and_then(|choice| resolve_color_from_choice(import, slide, choice))
+        else {
+          continue;
+        };
+        let Some(to) = change
+          .color_to
+          .color_to_choice
+          .as_ref()
+          .and_then(|choice| resolve_color_to_choice(import, slide, choice))
+        else {
+          continue;
+        };
+        if from.r != to.r || from.g != to.g || from.b != to.b || to.alpha < 100_000 {
+          effects.color_change = Some(ColorChangeEffect {
+            from: RgbColor {
+              r: from.r,
+              g: from.g,
+              b: from.b,
+            },
+            to: RgbColor {
+              r: to.r,
+              g: to.g,
+              b: to.b,
+            },
+            alpha: ((to.alpha.clamp(0, 100_000) as u32 * 255 + 50_000) / 100_000) as u8,
+            tolerance: color_change_tolerance(content_type),
+          });
+        }
+      }
+      a::BlipChoice::Grayscale => effects.grayscale = true,
+      a::BlipChoice::LuminanceEffect(luminance) => {
+        effects.brightness = luminance
+          .brightness
+          .as_ref()
+          .map(|value| (value.as_ratio() * 100.0).round() as i32);
+        effects.contrast = luminance
+          .contrast
+          .as_ref()
+          .map(|value| (value.as_ratio() * 100.0).round() as i32);
+      }
+      a::BlipChoice::BiLevel(bilevel) => {
+        // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+        // lclApplyBlackWhiteEffect maps DrawingML's 0..100000 threshold to
+        // BitmapMonochromeFilter's 0..255 luminance threshold.
+        effects.bilevel_threshold = Some(
+          (bilevel.threshold.as_ratio() * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8,
+        );
+      }
+      _ => {}
+    }
+  }
+  effects
+}
+
+fn resolve_color_from_choice(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  choice: &a::ColorFromChoice,
+) -> Option<super::drawingml::color::ResolvedColor> {
+  let color = Color::from_color_from_choice(choice)?;
+  import.resolve_color_for_slide(slide, &color, None)
+}
+
+fn resolve_color_to_choice(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  choice: &a::ColorToChoice,
+) -> Option<super::drawingml::color::ResolvedColor> {
+  let color = Color::from_color_to_choice(choice)?;
+  import.resolve_color_for_slide(slide, &color, None)
+}
+
+fn color_change_tolerance(content_type: Option<&str>) -> u8 {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // lclCheckAndApplyChangeColorTransform uses 9 by default, native JPEG 15,
+  // native PNG/TIFF 1, and native BMP 0.
+  match content_type {
+    Some("image/jpeg" | "image/jpg") => 15,
+    Some("image/png" | "image/tiff" | "image/tif") => 1,
+    Some("image/bmp" | "image/x-bmp") => 0,
+    _ => 9,
+  }
+}
+
+fn apply_image_effects(
+  data: &[u8],
+  content_type: Option<&str>,
+  effects: ImageEffects,
+) -> Option<Vec<u8>> {
+  let raster_data = emf_wmf::decode_metafile_as_jpeg(data, content_type)
+    .ok()
+    .flatten()
+    .unwrap_or_else(|| data.to_vec());
+  let mut image = image::load_from_memory(&raster_data).ok()?.to_rgba8();
+  for pixel in image.pixels_mut() {
+    let [mut r, mut g, mut b, mut a] = pixel.0;
+    if let Some(effect) = effects.color_change {
+      if channel_within_tolerance(r, effect.from.r, effect.tolerance)
+        && channel_within_tolerance(g, effect.from.g, effect.tolerance)
+        && channel_within_tolerance(b, effect.from.b, effect.tolerance)
+      {
+        r = effect.to.r;
+        g = effect.to.g;
+        b = effect.to.b;
+        a = effect.alpha;
+      }
+    }
+    if effects.grayscale {
+      let luminance = image_luminance(r, g, b);
+      r = luminance;
+      g = luminance;
+      b = luminance;
+    }
+    if effects.brightness.is_some() || effects.contrast.is_some() {
+      let brightness = effects.brightness.unwrap_or(0);
+      let contrast = effects.contrast.unwrap_or(0);
+      r = mso_brightness_contrast_component(r, brightness, contrast);
+      g = mso_brightness_contrast_component(g, brightness, contrast);
+      b = mso_brightness_contrast_component(b, brightness, contrast);
+    }
+    if let Some(threshold) = effects.bilevel_threshold {
+      let value = if image_luminance(r, g, b) >= threshold {
+        255
+      } else {
+        0
+      };
+      r = value;
+      g = value;
+      b = value;
+    }
+    pixel.0 = [r, g, b, a];
+  }
+
+  let mut output = Vec::new();
+  let encoder = PngEncoder::new(Cursor::new(&mut output));
+  encoder
+    .write_image(
+      image.as_raw(),
+      image.width(),
+      image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .ok()?;
+  Some(output)
+}
+
+fn channel_within_tolerance(actual: u8, expected: u8, tolerance: u8) -> bool {
+  actual.abs_diff(expected) <= tolerance
+}
+
+fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
+  ((u16::from(b) * 29 + u16::from(g) * 151 + u16::from(r) * 76) >> 8) as u8
+}
+
+fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
+  let contrast = contrast.clamp(-100, 100) as f32;
+  let slope = if contrast >= 0.0 {
+    128.0 / (128.0 - 1.27 * contrast)
+  } else {
+    (128.0 + 1.27 * contrast) / 128.0
+  };
+  let offset = brightness.clamp(-100, 100) as f32 * 2.55;
+  ((f32::from(value) + offset / 2.0 - 128.0) * slope + 128.0 + offset / 2.0)
+    .round()
+    .clamp(0.0, 255.0) as u8
+}
+
+fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
+  blip_fill
+    .blip_fill_choice
+    .as_ref()
+    .and_then(|choice| match choice {
+      a::BlipFillChoice::Stretch(stretch) => stretch.fill_rectangle.as_ref(),
+      a::BlipFillChoice::Tile(_) => None,
+    })
+    .map(image_crop_from_fill_rectangle)
+    .or_else(|| {
+      blip_fill
+        .source_rectangle
+        .as_ref()
+        .map(image_crop_from_source_rectangle)
+    })
+    .unwrap_or_default()
+}
+
+fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
+  ImageCrop {
+    left: rect
+      .left
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    top: rect
+      .top
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    right: rect
+      .right
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    bottom: rect
+      .bottom
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+  }
+}
+
+fn image_crop_from_fill_rectangle(rect: &a::FillRectangle) -> ImageCrop {
+  ImageCrop {
+    left: rect
+      .left
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    top: rect
+      .top
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    right: rect
+      .right
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    bottom: rect
+      .bottom
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
   }
 }
 

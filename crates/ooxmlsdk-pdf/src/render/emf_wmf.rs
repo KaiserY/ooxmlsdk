@@ -8,16 +8,55 @@ const EMF_HEADER_SIZE: usize = 108;
 const EMF_RECORD_HEADER_SIZE: usize = 8;
 const EMR_EOF: u32 = 14;
 const EMR_POLYGON: u32 = 3;
+const EMR_POLYLINE: u32 = 4;
+const EMR_POLYPOLYGON: u32 = 8;
 const EMR_SET_WINDOW_EXT_EX: u32 = 9;
-const EMR_SET_WINDOW_ORG_EX: u32 = 11;
+const EMR_SET_WINDOW_ORG_EX: u32 = 10;
+const EMR_SET_VIEWPORT_EXT_EX: u32 = 11;
+const EMR_SET_VIEWPORT_ORG_EX: u32 = 12;
+const EMR_SAVE_DC: u32 = 33;
+const EMR_RESTORE_DC: u32 = 34;
+const EMR_SET_WORLD_TRANSFORM: u32 = 35;
+const EMR_MODIFY_WORLD_TRANSFORM: u32 = 36;
 const EMR_SELECT_OBJECT: u32 = 37;
+const EMR_CREATE_PEN: u32 = 38;
 const EMR_CREATE_BRUSH_INDIRECT: u32 = 39;
+const EMR_DELETE_OBJECT: u32 = 40;
+const EMR_ELLIPSE: u32 = 42;
+const EMR_RECTANGLE: u32 = 43;
 const EMR_SET_DIBITS_TO_DEVICE: u32 = 80;
 const EMR_STRETCH_DIBITS: u32 = 81;
+const EMR_POLYGON16: u32 = 86;
+const EMR_POLYLINE16: u32 = 87;
+const EMR_POLYPOLYGON16: u32 = 91;
+const EMR_EXT_CREATE_PEN: u32 = 95;
 const EMR_BITMAP_INFO_OFFSET_OFFSET: usize = 48;
 const EMR_BITMAP_INFO_SIZE_OFFSET: usize = 52;
 const EMR_BITMAP_BITS_OFFSET_OFFSET: usize = 56;
 const EMR_BITMAP_BITS_SIZE_OFFSET: usize = 60;
+const ENHMETA_STOCK_OBJECT: u32 = 0x8000_0000;
+const WHITE_BRUSH: u32 = ENHMETA_STOCK_OBJECT | 0;
+const BLACK_BRUSH: u32 = ENHMETA_STOCK_OBJECT | 4;
+const NULL_BRUSH: u32 = ENHMETA_STOCK_OBJECT | 5;
+const WHITE_PEN: u32 = ENHMETA_STOCK_OBJECT | 6;
+const BLACK_PEN: u32 = ENHMETA_STOCK_OBJECT | 7;
+const NULL_PEN: u32 = ENHMETA_STOCK_OBJECT | 8;
+const MWT_IDENTITY: u32 = 1;
+const MWT_LEFTMULTIPLY: u32 = 2;
+const MWT_RIGHTMULTIPLY: u32 = 3;
+const MWT_SET: u32 = 4;
+const EMR_COMMENT: u32 = 70;
+const EMR_COMMENT_EMFPLUS: u32 = 0x2B46_4D45;
+const EMFPLUS_RECORD_FILL_RECTS: u16 = 0x400A;
+const EMFPLUS_RECORD_DRAW_RECTS: u16 = 0x400B;
+const EMFPLUS_RECORD_SET_WORLD_TRANSFORM: u16 = 0x402A;
+const EMFPLUS_RECORD_RESET_WORLD_TRANSFORM: u16 = 0x402B;
+const EMFPLUS_RECORD_MULTIPLY_WORLD_TRANSFORM: u16 = 0x402C;
+const EMFPLUS_RECORD_TRANSLATE_WORLD_TRANSFORM: u16 = 0x402D;
+const EMFPLUS_RECORD_SCALE_WORLD_TRANSFORM: u16 = 0x402E;
+const EMFPLUS_DIRECT_COLOR_FLAG: u16 = 0x8000;
+const EMFPLUS_COMPRESSED_FLAG: u16 = 0x4000;
+const EMFPLUS_POST_MULTIPLY_FLAG: u16 = 0x2000;
 
 // Source: LibreOffice vcl/source/bitmap/dibtools.cxx parses BITMAPINFOHEADER
 // values and keeps DIB scanlines aligned to four bytes.
@@ -114,6 +153,55 @@ struct EmfPoint {
   y: i32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct EmfTransform {
+  m11: f32,
+  m12: f32,
+  m21: f32,
+  m22: f32,
+  dx: f32,
+  dy: f32,
+}
+
+impl EmfTransform {
+  fn identity() -> Self {
+    Self {
+      m11: 1.0,
+      m12: 0.0,
+      m21: 0.0,
+      m22: 1.0,
+      dx: 0.0,
+      dy: 0.0,
+    }
+  }
+
+  fn apply(self, point: EmfPoint) -> (f32, f32) {
+    let x = point.x as f32;
+    let y = point.y as f32;
+    (
+      x * self.m11 + y * self.m21 + self.dx,
+      x * self.m12 + y * self.m22 + self.dy,
+    )
+  }
+
+  fn multiply(self, other: Self) -> Self {
+    Self {
+      m11: self.m11 * other.m11 + self.m12 * other.m21,
+      m12: self.m11 * other.m12 + self.m12 * other.m22,
+      m21: self.m21 * other.m11 + self.m22 * other.m21,
+      m22: self.m21 * other.m12 + self.m22 * other.m22,
+      dx: self.dx * other.m11 + self.dy * other.m21 + other.dx,
+      dy: self.dx * other.m12 + self.dy * other.m22 + other.dy,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EmfPen {
+  color: EmfColor,
+  width: usize,
+}
+
 #[derive(Clone, Debug)]
 struct EmfVectorState {
   width: usize,
@@ -122,8 +210,15 @@ struct EmfVectorState {
   window_org_y: i32,
   window_ext_x: i32,
   window_ext_y: i32,
+  viewport_org_x: i32,
+  viewport_org_y: i32,
+  viewport_ext_x: i32,
+  viewport_ext_y: i32,
+  world_transform: EmfTransform,
   brush_colors: std::collections::HashMap<u32, EmfColor>,
+  pens: std::collections::HashMap<u32, EmfPen>,
   current_brush: Option<EmfColor>,
+  current_pen: Option<EmfPen>,
   rgb: Vec<u8>,
 }
 
@@ -143,19 +238,44 @@ impl EmfVectorState {
       window_org_y: 0,
       window_ext_x: width as i32,
       window_ext_y: height as i32,
+      viewport_org_x: 0,
+      viewport_org_y: 0,
+      viewport_ext_x: width as i32,
+      viewport_ext_y: height as i32,
+      world_transform: EmfTransform::identity(),
       brush_colors: std::collections::HashMap::new(),
+      pens: std::collections::HashMap::new(),
       current_brush: None,
+      current_pen: Some(EmfPen {
+        color: EmfColor { r: 0, g: 0, b: 0 },
+        width: 1,
+      }),
       rgb: vec![255; width * height * RGB_BYTES_PER_PIXEL],
     })
   }
 
   fn map_point(&self, point: EmfPoint) -> (f32, f32) {
-    let scale_x = self.width as f32 / self.window_ext_x.max(1) as f32;
-    let scale_y = self.height as f32 / self.window_ext_y.max(1) as f32;
+    let (x, y) = self.world_transform.apply(point);
+    let scale_x = self.viewport_ext_x as f32 / self.window_ext_x.max(1) as f32;
+    let scale_y = self.viewport_ext_y as f32 / self.window_ext_y.max(1) as f32;
     (
-      (point.x - self.window_org_x) as f32 * scale_x,
-      (point.y - self.window_org_y) as f32 * scale_y,
+      self.viewport_org_x as f32 + (x - self.window_org_x as f32) * scale_x,
+      self.viewport_org_y as f32 + (y - self.window_org_y as f32) * scale_y,
     )
+  }
+
+  fn set_pixel(&mut self, x: i32, y: i32, color: EmfColor) {
+    if x < 0 || y < 0 {
+      return;
+    }
+    let (x, y) = (x as usize, y as usize);
+    if x >= self.width || y >= self.height {
+      return;
+    }
+    let offset = (y * self.width + x) * RGB_BYTES_PER_PIXEL;
+    self.rgb[offset] = color.r;
+    self.rgb[offset + 1] = color.g;
+    self.rgb[offset + 2] = color.b;
   }
 
   fn fill_polygon(&mut self, points: &[EmfPoint]) {
@@ -186,10 +306,131 @@ impl EmfVectorState {
         let start = pair[0].floor().max(0.0) as usize;
         let end = pair[1].ceil().min(self.width as f32) as usize;
         for x in start..end {
-          let offset = (y * self.width + x) * RGB_BYTES_PER_PIXEL;
-          self.rgb[offset] = color.r;
-          self.rgb[offset + 1] = color.g;
-          self.rgb[offset + 2] = color.b;
+          self.set_pixel(x as i32, y as i32, color);
+        }
+      }
+    }
+  }
+
+  fn draw_polyline(&mut self, points: &[EmfPoint], closed: bool) {
+    let Some(pen) = self.current_pen else {
+      return;
+    };
+    if points.len() < 2 {
+      return;
+    }
+    for pair in points.windows(2) {
+      self.draw_line(pair[0], pair[1], pen);
+    }
+    if closed {
+      self.draw_line(points[points.len() - 1], points[0], pen);
+    }
+  }
+
+  fn draw_line(&mut self, a: EmfPoint, b: EmfPoint, pen: EmfPen) {
+    let (x0, y0) = self.map_point(a);
+    let (x1, y1) = self.map_point(b);
+    let mut x0 = x0.round() as i32;
+    let mut y0 = y0.round() as i32;
+    let x1 = x1.round() as i32;
+    let y1 = y1.round() as i32;
+    let dx = (x1 - x0).abs();
+    let sx = if x0 < x1 { 1 } else { -1 };
+    let dy = -(y1 - y0).abs();
+    let sy = if y0 < y1 { 1 } else { -1 };
+    let mut error = dx + dy;
+    loop {
+      self.set_pen_pixel(x0, y0, pen);
+      if x0 == x1 && y0 == y1 {
+        break;
+      }
+      let e2 = 2 * error;
+      if e2 >= dy {
+        error += dy;
+        x0 += sx;
+      }
+      if e2 <= dx {
+        error += dx;
+        y0 += sy;
+      }
+    }
+  }
+
+  fn set_pen_pixel(&mut self, x: i32, y: i32, pen: EmfPen) {
+    let radius = (pen.width.max(1) / 2) as i32;
+    for yy in y - radius..=y + radius {
+      for xx in x - radius..=x + radius {
+        self.set_pixel(xx, yy, pen.color);
+      }
+    }
+  }
+
+  fn fill_rect(&mut self, left: i32, top: i32, right: i32, bottom: i32) {
+    let points = [
+      EmfPoint { x: left, y: top },
+      EmfPoint { x: right, y: top },
+      EmfPoint {
+        x: right,
+        y: bottom,
+      },
+      EmfPoint { x: left, y: bottom },
+    ];
+    self.fill_polygon(&points);
+    self.draw_polyline(&points, true);
+  }
+
+  fn fill_ellipse(&mut self, left: i32, top: i32, right: i32, bottom: i32) {
+    let steps = 72;
+    let cx = (left + right) as f32 / 2.0;
+    let cy = (top + bottom) as f32 / 2.0;
+    let rx = (right - left).abs() as f32 / 2.0;
+    let ry = (bottom - top).abs() as f32 / 2.0;
+    let mut points = Vec::with_capacity(steps);
+    for index in 0..steps {
+      let theta = index as f32 * std::f32::consts::TAU / steps as f32;
+      points.push(EmfPoint {
+        x: (cx + theta.cos() * rx).round() as i32,
+        y: (cy + theta.sin() * ry).round() as i32,
+      });
+    }
+    self.fill_polygon(&points);
+    self.draw_polyline(&points, true);
+  }
+
+  fn select_object(&mut self, object_id: u32) {
+    match object_id {
+      WHITE_BRUSH => {
+        self.current_brush = Some(EmfColor {
+          r: 255,
+          g: 255,
+          b: 255,
+        })
+      }
+      BLACK_BRUSH => self.current_brush = Some(EmfColor { r: 0, g: 0, b: 0 }),
+      NULL_BRUSH => self.current_brush = None,
+      WHITE_PEN => {
+        self.current_pen = Some(EmfPen {
+          color: EmfColor {
+            r: 255,
+            g: 255,
+            b: 255,
+          },
+          width: 1,
+        })
+      }
+      BLACK_PEN => {
+        self.current_pen = Some(EmfPen {
+          color: EmfColor { r: 0, g: 0, b: 0 },
+          width: 1,
+        })
+      }
+      NULL_PEN => self.current_pen = None,
+      _ => {
+        if let Some(brush) = self.brush_colors.get(&object_id).copied() {
+          self.current_brush = Some(brush);
+        }
+        if let Some(pen) = self.pens.get(&object_id).copied() {
+          self.current_pen = Some(pen);
         }
       }
     }
@@ -218,41 +459,122 @@ fn decode_vector_emf_as_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
         state.window_ext_x = read_i32(data, pos + 8)?.abs().max(1);
         state.window_ext_y = read_i32(data, pos + 12)?.abs().max(1);
       }
+      EMR_SET_VIEWPORT_ORG_EX if record_size >= 16 => {
+        state.viewport_org_x = read_i32(data, pos + 8)?;
+        state.viewport_org_y = read_i32(data, pos + 12)?;
+      }
+      EMR_SET_VIEWPORT_EXT_EX if record_size >= 16 => {
+        state.viewport_ext_x = read_i32(data, pos + 8)?;
+        state.viewport_ext_y = read_i32(data, pos + 12)?;
+      }
+      EMR_SAVE_DC => {}
+      EMR_RESTORE_DC => {}
+      EMR_SET_WORLD_TRANSFORM if record_size >= 32 => {
+        state.world_transform = read_xform(data, pos + 8)?;
+      }
+      EMR_MODIFY_WORLD_TRANSFORM if record_size >= 36 => {
+        let transform = read_xform(data, pos + 8)?;
+        let mode = read_u32(data, pos + 32)?;
+        state.world_transform = match mode {
+          MWT_IDENTITY => EmfTransform::identity(),
+          MWT_LEFTMULTIPLY => transform.multiply(state.world_transform),
+          MWT_RIGHTMULTIPLY => state.world_transform.multiply(transform),
+          MWT_SET => transform,
+          _ => state.world_transform,
+        };
+      }
+      EMR_CREATE_PEN if record_size >= 28 => {
+        let object_id = read_u32(data, pos + 8)?;
+        if object_id & ENHMETA_STOCK_OBJECT == 0 {
+          let width = read_i32(data, pos + 16)?.unsigned_abs().max(1) as usize;
+          state.pens.insert(
+            object_id,
+            EmfPen {
+              color: read_color_ref(data, pos + 24)?,
+              width,
+            },
+          );
+        }
+      }
       EMR_CREATE_BRUSH_INDIRECT if record_size >= 24 => {
         let object_id = read_u32(data, pos + 8)?;
-        let color_ref = read_u32(data, pos + 16)?;
-        state.brush_colors.insert(
-          object_id,
-          EmfColor {
-            r: (color_ref & 0xff) as u8,
-            g: ((color_ref >> 8) & 0xff) as u8,
-            b: ((color_ref >> 16) & 0xff) as u8,
-          },
-        );
+        state
+          .brush_colors
+          .insert(object_id, read_color_ref(data, pos + 16)?);
+      }
+      EMR_EXT_CREATE_PEN if record_size >= 56 => {
+        let object_id = read_u32(data, pos + 8)?;
+        if object_id & ENHMETA_STOCK_OBJECT == 0 {
+          let width = read_u32(data, pos + 32)?.max(1) as usize;
+          state.pens.insert(
+            object_id,
+            EmfPen {
+              color: read_color_ref(data, pos + 40)?,
+              width,
+            },
+          );
+        }
       }
       EMR_SELECT_OBJECT if record_size >= 12 => {
+        state.select_object(read_u32(data, pos + 8)?);
+      }
+      EMR_DELETE_OBJECT if record_size >= 12 => {
         let object_id = read_u32(data, pos + 8)?;
-        if let Some(brush) = state.brush_colors.get(&object_id).copied() {
-          state.current_brush = Some(brush);
-        }
+        state.brush_colors.remove(&object_id);
+        state.pens.remove(&object_id);
       }
       EMR_POLYGON if record_size >= 28 => {
-        let count = read_u32(data, pos + 24)? as usize;
-        let points_start = pos + 28;
-        let points_end = points_start
-          .checked_add(count * 8)
-          .ok_or_else(|| "EMF polygon points overflow".to_string())?;
-        if points_end <= pos + record_size {
-          let mut points = Vec::with_capacity(count);
-          for index in 0..count {
-            let point_offset = points_start + index * 8;
-            points.push(EmfPoint {
-              x: read_i32(data, point_offset)?,
-              y: read_i32(data, point_offset + 4)?,
-            });
-          }
+        if let Some(points) = read_points_i32(data, pos + 28, read_u32(data, pos + 24)? as usize) {
           state.fill_polygon(&points);
+          state.draw_polyline(&points, true);
         }
+      }
+      EMR_POLYGON16 if record_size >= 28 => {
+        if let Some(points) = read_points_i16(data, pos + 28, read_u32(data, pos + 24)? as usize) {
+          state.fill_polygon(&points);
+          state.draw_polyline(&points, true);
+        }
+      }
+      EMR_POLYLINE if record_size >= 28 => {
+        if let Some(points) = read_points_i32(data, pos + 28, read_u32(data, pos + 24)? as usize) {
+          state.draw_polyline(&points, false);
+        }
+      }
+      EMR_POLYLINE16 if record_size >= 28 => {
+        if let Some(points) = read_points_i16(data, pos + 28, read_u32(data, pos + 24)? as usize) {
+          state.draw_polyline(&points, false);
+        }
+      }
+      EMR_POLYPOLYGON if record_size >= 36 => {
+        for points in read_poly_polygons_i32(data, pos, record_size)? {
+          state.fill_polygon(&points);
+          state.draw_polyline(&points, true);
+        }
+      }
+      EMR_POLYPOLYGON16 if record_size >= 36 => {
+        for points in read_poly_polygons_i16(data, pos, record_size)? {
+          state.fill_polygon(&points);
+          state.draw_polyline(&points, true);
+        }
+      }
+      EMR_RECTANGLE if record_size >= 24 => {
+        state.fill_rect(
+          read_i32(data, pos + 8)?,
+          read_i32(data, pos + 12)?,
+          read_i32(data, pos + 16)?,
+          read_i32(data, pos + 20)?,
+        );
+      }
+      EMR_ELLIPSE if record_size >= 24 => {
+        state.fill_ellipse(
+          read_i32(data, pos + 8)?,
+          read_i32(data, pos + 12)?,
+          read_i32(data, pos + 16)?,
+          read_i32(data, pos + 20)?,
+        );
+      }
+      EMR_COMMENT if record_size >= 16 => {
+        process_emf_plus_comment(data, pos, record_size, &mut state)?;
       }
       EMR_EOF => break,
       _ => {}
@@ -398,6 +720,266 @@ fn png_to_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
   rgb_to_jpeg(&rgb, rgb.width(), rgb.height())
 }
 
+fn process_emf_plus_comment(
+  data: &[u8],
+  record_offset: usize,
+  record_size: usize,
+  state: &mut EmfVectorState,
+) -> Result<(), String> {
+  // Source: LibreOffice drawinglayer/source/tools/emfphelperdata.cxx consumes
+  // EMR_COMMENT_EMFPLUS chunks as a stream of 12-byte EMF+ record headers.
+  let data_size = read_u32(data, record_offset + 8)? as usize;
+  let comment_identifier = read_u32(data, record_offset + 12)?;
+  if comment_identifier != EMR_COMMENT_EMFPLUS || data_size < 4 {
+    return Ok(());
+  }
+  let mut cursor = record_offset + 16;
+  let end = record_offset
+    .checked_add(12)
+    .and_then(|offset| offset.checked_add(data_size))
+    .map(|end| end.min(record_offset + record_size))
+    .ok_or_else(|| "EMF+ comment range overflows".to_string())?;
+  while cursor + 12 <= end {
+    let record_type = read_u16(data, cursor)?;
+    let flags = read_u16(data, cursor + 2)?;
+    let size = read_u32(data, cursor + 4)? as usize;
+    let payload_size = read_u32(data, cursor + 8)? as usize;
+    if size < 12 || cursor + size > end {
+      break;
+    }
+    let payload = cursor + 12;
+    if payload + payload_size <= cursor + size {
+      process_emf_plus_record(data, payload, payload_size, record_type, flags, state)?;
+    }
+    cursor += size;
+  }
+  Ok(())
+}
+
+fn process_emf_plus_record(
+  data: &[u8],
+  payload: usize,
+  payload_size: usize,
+  record_type: u16,
+  flags: u16,
+  state: &mut EmfVectorState,
+) -> Result<(), String> {
+  match record_type {
+    EMFPLUS_RECORD_FILL_RECTS | EMFPLUS_RECORD_DRAW_RECTS => {
+      let mut cursor = payload;
+      let mut fill = None;
+      if record_type == EMFPLUS_RECORD_FILL_RECTS {
+        if payload_size < 8 {
+          return Ok(());
+        }
+        let brush = read_u32(data, cursor)?;
+        cursor += 4;
+        if flags & EMFPLUS_DIRECT_COLOR_FLAG != 0 {
+          fill = Some(argb_color(brush));
+        }
+      }
+      let count = read_u32(data, cursor)? as usize;
+      cursor += 4;
+      for _ in 0..count {
+        let (left, top, width, height, next) =
+          read_emf_plus_rect(data, cursor, flags & EMFPLUS_COMPRESSED_FLAG != 0)?;
+        cursor = next;
+        let old_brush = state.current_brush;
+        if let Some(color) = fill {
+          state.current_brush = Some(color);
+          state.fill_rect(left, top, left + width, top + height);
+          state.current_brush = old_brush;
+        } else {
+          state.fill_rect(left, top, left + width, top + height);
+        }
+      }
+    }
+    EMFPLUS_RECORD_SET_WORLD_TRANSFORM if payload_size >= 24 => {
+      state.world_transform = read_xform(data, payload)?;
+    }
+    EMFPLUS_RECORD_RESET_WORLD_TRANSFORM => {
+      state.world_transform = EmfTransform::identity();
+    }
+    EMFPLUS_RECORD_MULTIPLY_WORLD_TRANSFORM if payload_size >= 24 => {
+      let transform = read_xform(data, payload)?;
+      state.world_transform = if flags & EMFPLUS_POST_MULTIPLY_FLAG != 0 {
+        state.world_transform.multiply(transform)
+      } else {
+        transform.multiply(state.world_transform)
+      };
+    }
+    EMFPLUS_RECORD_TRANSLATE_WORLD_TRANSFORM if payload_size >= 8 => {
+      let transform = EmfTransform {
+        dx: read_f32(data, payload)?,
+        dy: read_f32(data, payload + 4)?,
+        ..EmfTransform::identity()
+      };
+      state.world_transform = if flags & EMFPLUS_POST_MULTIPLY_FLAG != 0 {
+        state.world_transform.multiply(transform)
+      } else {
+        transform.multiply(state.world_transform)
+      };
+    }
+    EMFPLUS_RECORD_SCALE_WORLD_TRANSFORM if payload_size >= 8 => {
+      let transform = EmfTransform {
+        m11: read_f32(data, payload)?,
+        m22: read_f32(data, payload + 4)?,
+        ..EmfTransform::identity()
+      };
+      state.world_transform = if flags & EMFPLUS_POST_MULTIPLY_FLAG != 0 {
+        state.world_transform.multiply(transform)
+      } else {
+        transform.multiply(state.world_transform)
+      };
+    }
+    _ => {}
+  }
+  Ok(())
+}
+
+fn read_emf_plus_rect(
+  data: &[u8],
+  offset: usize,
+  compressed: bool,
+) -> Result<(i32, i32, i32, i32, usize), String> {
+  if compressed {
+    Ok((
+      i32::from(read_i16(data, offset)?),
+      i32::from(read_i16(data, offset + 2)?),
+      i32::from(read_i16(data, offset + 4)?),
+      i32::from(read_i16(data, offset + 6)?),
+      offset + 8,
+    ))
+  } else {
+    Ok((
+      read_f32(data, offset)?.round() as i32,
+      read_f32(data, offset + 4)?.round() as i32,
+      read_f32(data, offset + 8)?.round() as i32,
+      read_f32(data, offset + 12)?.round() as i32,
+      offset + 16,
+    ))
+  }
+}
+
+fn argb_color(value: u32) -> EmfColor {
+  EmfColor {
+    r: ((value >> 16) & 0xff) as u8,
+    g: ((value >> 8) & 0xff) as u8,
+    b: (value & 0xff) as u8,
+  }
+}
+
+fn read_poly_polygons_i32(
+  data: &[u8],
+  record_offset: usize,
+  record_size: usize,
+) -> Result<Vec<Vec<EmfPoint>>, String> {
+  let polygon_count = read_u32(data, record_offset + 24)? as usize;
+  let total_points = read_u32(data, record_offset + 28)? as usize;
+  let counts_offset = record_offset + 32;
+  let points_offset = counts_offset
+    .checked_add(polygon_count * 4)
+    .ok_or_else(|| "EMF polygon counts overflow".to_string())?;
+  if points_offset > record_offset + record_size {
+    return Ok(Vec::new());
+  }
+  let mut counts = Vec::with_capacity(polygon_count);
+  for index in 0..polygon_count {
+    counts.push(read_u32(data, counts_offset + index * 4)? as usize);
+  }
+  let Some(points) = read_points_i32(data, points_offset, total_points) else {
+    return Ok(Vec::new());
+  };
+  Ok(split_polygons(points, counts))
+}
+
+fn read_poly_polygons_i16(
+  data: &[u8],
+  record_offset: usize,
+  record_size: usize,
+) -> Result<Vec<Vec<EmfPoint>>, String> {
+  let polygon_count = read_u32(data, record_offset + 24)? as usize;
+  let total_points = read_u32(data, record_offset + 28)? as usize;
+  let counts_offset = record_offset + 32;
+  let points_offset = counts_offset
+    .checked_add(polygon_count * 4)
+    .ok_or_else(|| "EMF polygon counts overflow".to_string())?;
+  if points_offset > record_offset + record_size {
+    return Ok(Vec::new());
+  }
+  let mut counts = Vec::with_capacity(polygon_count);
+  for index in 0..polygon_count {
+    counts.push(read_u32(data, counts_offset + index * 4)? as usize);
+  }
+  let Some(points) = read_points_i16(data, points_offset, total_points) else {
+    return Ok(Vec::new());
+  };
+  Ok(split_polygons(points, counts))
+}
+
+fn split_polygons(points: Vec<EmfPoint>, counts: Vec<usize>) -> Vec<Vec<EmfPoint>> {
+  let mut polygons = Vec::with_capacity(counts.len());
+  let mut cursor = 0usize;
+  for count in counts {
+    let end = cursor.saturating_add(count).min(points.len());
+    polygons.push(points[cursor..end].to_vec());
+    cursor = end;
+  }
+  polygons
+}
+
+fn read_points_i32(data: &[u8], offset: usize, count: usize) -> Option<Vec<EmfPoint>> {
+  let end = offset.checked_add(count.checked_mul(8)?)?;
+  if end > data.len() {
+    return None;
+  }
+  let mut points = Vec::with_capacity(count);
+  for index in 0..count {
+    let point_offset = offset + index * 8;
+    points.push(EmfPoint {
+      x: read_i32(data, point_offset).ok()?,
+      y: read_i32(data, point_offset + 4).ok()?,
+    });
+  }
+  Some(points)
+}
+
+fn read_points_i16(data: &[u8], offset: usize, count: usize) -> Option<Vec<EmfPoint>> {
+  let end = offset.checked_add(count.checked_mul(4)?)?;
+  if end > data.len() {
+    return None;
+  }
+  let mut points = Vec::with_capacity(count);
+  for index in 0..count {
+    let point_offset = offset + index * 4;
+    points.push(EmfPoint {
+      x: i32::from(read_i16(data, point_offset).ok()?),
+      y: i32::from(read_i16(data, point_offset + 2).ok()?),
+    });
+  }
+  Some(points)
+}
+
+fn read_color_ref(data: &[u8], offset: usize) -> Result<EmfColor, String> {
+  let color_ref = read_u32(data, offset)?;
+  Ok(EmfColor {
+    r: (color_ref & 0xff) as u8,
+    g: ((color_ref >> 8) & 0xff) as u8,
+    b: ((color_ref >> 16) & 0xff) as u8,
+  })
+}
+
+fn read_xform(data: &[u8], offset: usize) -> Result<EmfTransform, String> {
+  Ok(EmfTransform {
+    m11: read_f32(data, offset)?,
+    m12: read_f32(data, offset + 4)?,
+    m21: read_f32(data, offset + 8)?,
+    m22: read_f32(data, offset + 12)?,
+    dx: read_f32(data, offset + 16)?,
+    dy: read_f32(data, offset + 20)?,
+  })
+}
+
 fn rgb_to_jpeg(rgb: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
   let mut output = Vec::new();
   let encoder = JpegEncoder::new_with_quality(&mut output, JPEG_QUALITY);
@@ -420,6 +1002,13 @@ fn read_u16(data: &[u8], offset: usize) -> Result<u16, String> {
   Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
+fn read_i16(data: &[u8], offset: usize) -> Result<i16, String> {
+  let bytes = data
+    .get(offset..offset + 2)
+    .ok_or_else(|| format!("read past end of buffer at offset {offset}"))?;
+  Ok(i16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
 fn read_u32(data: &[u8], offset: usize) -> Result<u32, String> {
   let bytes = data
     .get(offset..offset + 4)
@@ -432,6 +1021,13 @@ fn read_i32(data: &[u8], offset: usize) -> Result<i32, String> {
     .get(offset..offset + 4)
     .ok_or_else(|| format!("read past end of buffer at offset {offset}"))?;
   Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn read_f32(data: &[u8], offset: usize) -> Result<f32, String> {
+  let bytes = data
+    .get(offset..offset + 4)
+    .ok_or_else(|| format!("read past end of buffer at offset {offset}"))?;
+  Ok(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 #[cfg(test)]

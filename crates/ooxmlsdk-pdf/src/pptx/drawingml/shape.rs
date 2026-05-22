@@ -148,6 +148,7 @@ pub(crate) struct PictureRecord {
   pub(crate) embed_relationship_id: Option<String>,
   pub(crate) link_relationship_id: Option<String>,
   pub(crate) crop: ImageCrop,
+  pub(crate) blip_choices: Vec<a::BlipChoice>,
   pub(crate) image_resource: Option<ImageResource>,
 }
 
@@ -601,12 +602,14 @@ impl Shape {
     embed_relationship_id: Option<String>,
     link_relationship_id: Option<String>,
     crop: ImageCrop,
+    blip_choices: Vec<a::BlipChoice>,
     image_resource: Option<ImageResource>,
   ) {
     self.picture = Some(PictureRecord {
       embed_relationship_id,
       link_relationship_id,
       crop,
+      blip_choices,
       image_resource,
     });
   }

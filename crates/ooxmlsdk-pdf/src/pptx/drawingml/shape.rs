@@ -11,7 +11,10 @@ use super::text_body::TextBody;
 use super::text_list_style::TextListStyle;
 use crate::docx::ImageCrop;
 use crate::pptx::import::PowerPointImport;
-use crate::pptx::slide::{ImageResource, ShapeLocation};
+use crate::pptx::slide::{
+  BinaryResource, ChartResource, DiagramColorResource, DiagramDataResource, DiagramLayoutResource,
+  DiagramStyleResource, ExtendedChartResource, ImageResource, ShapeLocation,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Shape {
@@ -104,10 +107,38 @@ pub(crate) enum FrameType {
   Media,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct GraphicDataRecord {
   pub(crate) uri: String,
   pub(crate) kind: GraphicDataKind,
+  pub(crate) chart_relationship_id: Option<String>,
+  pub(crate) chart_resource: Option<ChartResource>,
+  pub(crate) extended_chart_resource: Option<ExtendedChartResource>,
+  pub(crate) has_inline_chart_space: bool,
+  pub(crate) diagram_relationship_ids: Option<DiagramRelationshipIds>,
+  pub(crate) diagram_data_resource: Option<DiagramDataResource>,
+  pub(crate) diagram_layout_resource: Option<DiagramLayoutResource>,
+  pub(crate) diagram_style_resource: Option<DiagramStyleResource>,
+  pub(crate) diagram_color_resource: Option<DiagramColorResource>,
+  pub(crate) ole_object: Option<OleObjectRecord>,
+  pub(crate) ole_binary_resource: Option<BinaryResource>,
+  pub(crate) embedded_package_resource: Option<BinaryResource>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DiagramRelationshipIds {
+  pub(crate) data_part: String,
+  pub(crate) layout_part: String,
+  pub(crate) style_part: String,
+  pub(crate) color_part: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct OleObjectRecord {
+  pub(crate) relationship_id: Option<String>,
+  pub(crate) name: Option<String>,
+  pub(crate) prog_id: Option<String>,
+  pub(crate) show_as_icon: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -487,8 +518,8 @@ impl Shape {
     self.service_name = ShapeService::Ole2Shape;
   }
 
-  pub(crate) fn set_graphic_data(&mut self, uri: String, kind: GraphicDataKind) {
-    self.graphic_data = Some(GraphicDataRecord { uri, kind });
+  pub(crate) fn set_graphic_data_record(&mut self, record: GraphicDataRecord) {
+    self.graphic_data = Some(record);
   }
 
   pub(crate) fn set_custom_shape_geometry(&mut self, geometry: CustomShapeGeometry) {

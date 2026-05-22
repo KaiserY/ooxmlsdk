@@ -1,11 +1,23 @@
 use std::collections::HashMap;
 
-use ooxmlsdk::parts::{image_part::ImagePart, presentation_document::PresentationDocument};
-use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
-use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+use ooxmlsdk::parts::{
+  chart_part::ChartPart, diagram_colors_part::DiagramColorsPart,
+  diagram_data_part::DiagramDataPart, diagram_layout_definition_part::DiagramLayoutDefinitionPart,
+  diagram_style_part::DiagramStylePart, embedded_object_part::EmbeddedObjectPart,
+  embedded_package_part::EmbeddedPackagePart, extended_chart_part::ExtendedChartPart,
+  image_part::ImagePart, presentation_document::PresentationDocument,
+};
+use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2014_chartex as cx,
+  schemas_openxmlformats_org_drawingml_2006_chart as c,
+  schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+  schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_openxmlformats_org_presentationml_2006_main as p,
+};
 use ooxmlsdk::sdk::SdkPart;
 
 use crate::docx::PageSetup;
+use crate::error::Result;
 use crate::units;
 
 use super::drawingml::color::Color;
@@ -108,12 +120,131 @@ pub(crate) struct SlidePersist {
   pub(crate) connector_connections_applied: bool,
   pub(crate) shape_location: ShapeLocation,
   pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) chart_resources: HashMap<String, ChartResource>,
+  pub(crate) extended_chart_resources: HashMap<String, ExtendedChartResource>,
+  pub(crate) diagram_data_resources: HashMap<String, DiagramDataResource>,
+  pub(crate) diagram_layout_resources: HashMap<String, DiagramLayoutResource>,
+  pub(crate) diagram_style_resources: HashMap<String, DiagramStyleResource>,
+  pub(crate) diagram_color_resources: HashMap<String, DiagramColorResource>,
+  pub(crate) embedded_object_resources: HashMap<String, BinaryResource>,
+  pub(crate) embedded_package_resources: HashMap<String, BinaryResource>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ImageResource {
   pub(crate) data: Vec<u8>,
   pub(crate) content_type: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ChartResource {
+  pub(crate) path: Option<String>,
+  pub(crate) chart_space: c::ChartSpace,
+}
+
+impl ChartResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.chart_space)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ExtendedChartResource {
+  pub(crate) path: Option<String>,
+  pub(crate) chart_space: cx::ChartSpace,
+}
+
+impl ExtendedChartResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.chart_space)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DiagramDataResource {
+  pub(crate) path: Option<String>,
+  pub(crate) model: dgm::DataModelRoot,
+}
+
+impl DiagramDataResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.model)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DiagramLayoutResource {
+  pub(crate) path: Option<String>,
+  pub(crate) layout: dgm::LayoutDefinition,
+}
+
+impl DiagramLayoutResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.layout)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DiagramStyleResource {
+  pub(crate) path: Option<String>,
+  pub(crate) style: dgm::StyleDefinition,
+}
+
+impl DiagramStyleResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.style)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DiagramColorResource {
+  pub(crate) path: Option<String>,
+  pub(crate) colors: dgm::ColorsDefinition,
+}
+
+impl DiagramColorResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.colors)
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BinaryResource {
+  pub(crate) path: Option<String>,
+  pub(crate) data: Vec<u8>,
+  pub(crate) content_type: Option<String>,
+}
+
+impl BinaryResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || !self.data.is_empty()
+      || self
+        .content_type
+        .as_ref()
+        .is_some_and(|kind| !kind.is_empty())
+  }
+}
+
+fn binary_resource<P>(package: &PresentationDocument, part: &P) -> Option<BinaryResource>
+where
+  P: SdkPart,
+{
+  Some(BinaryResource {
+    path: part.path(package).map(str::to_string),
+    data: part.data_to_vec(package)?,
+    content_type: part.content_type(package).map(str::to_string),
+  })
+}
+
+fn structured_resource_present<T>(_root: &T) -> bool {
+  true
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -235,6 +366,14 @@ impl SlidePersist {
       connector_connections_applied: false,
       shape_location,
       image_resources: HashMap::new(),
+      chart_resources: HashMap::new(),
+      extended_chart_resources: HashMap::new(),
+      diagram_data_resources: HashMap::new(),
+      diagram_layout_resources: HashMap::new(),
+      diagram_style_resources: HashMap::new(),
+      diagram_color_resources: HashMap::new(),
+      embedded_object_resources: HashMap::new(),
+      embedded_package_resources: HashMap::new(),
     }
   }
 
@@ -286,6 +425,157 @@ impl SlidePersist {
         },
       );
     }
+  }
+
+  pub(crate) fn import_graphic_frame_related_parts<P>(
+    &mut self,
+    package: &mut PresentationDocument,
+    part: &P,
+  ) -> Result<()>
+  where
+    P: SdkPart,
+  {
+    // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx and
+    // oox/source/ppt/slidefragmenthandler.cxx resolve graphicFrame targets
+    // against the owning fragment. Cache targets here before inherited
+    // master/layout shapes are cloned into another relationship scope.
+    let chart_parts: Vec<_> = part
+      .related_parts_of_type::<_, ChartPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, chart_part) in chart_parts {
+      self.chart_resources.insert(
+        relationship_id,
+        ChartResource {
+          path: chart_part.path(package).map(str::to_string),
+          chart_space: chart_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    let extended_chart_parts: Vec<_> = part
+      .related_parts_of_type::<_, ExtendedChartPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, chart_part) in extended_chart_parts {
+      self.extended_chart_resources.insert(
+        relationship_id,
+        ExtendedChartResource {
+          path: chart_part.path(package).map(str::to_string),
+          chart_space: chart_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    let diagram_data_parts: Vec<_> = part
+      .related_parts_of_type::<_, DiagramDataPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, diagram_part) in diagram_data_parts {
+      self.diagram_data_resources.insert(
+        relationship_id,
+        DiagramDataResource {
+          path: diagram_part.path(package).map(str::to_string),
+          model: diagram_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    let diagram_layout_parts: Vec<_> = part
+      .related_parts_of_type::<_, DiagramLayoutDefinitionPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, diagram_part) in diagram_layout_parts {
+      self.diagram_layout_resources.insert(
+        relationship_id,
+        DiagramLayoutResource {
+          path: diagram_part.path(package).map(str::to_string),
+          layout: diagram_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    let diagram_style_parts: Vec<_> = part
+      .related_parts_of_type::<_, DiagramStylePart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, diagram_part) in diagram_style_parts {
+      self.diagram_style_resources.insert(
+        relationship_id,
+        DiagramStyleResource {
+          path: diagram_part.path(package).map(str::to_string),
+          style: diagram_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    let diagram_color_parts: Vec<_> = part
+      .related_parts_of_type::<_, DiagramColorsPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, diagram_part) in diagram_color_parts {
+      self.diagram_color_resources.insert(
+        relationship_id,
+        DiagramColorResource {
+          path: diagram_part.path(package).map(str::to_string),
+          colors: diagram_part.root_element(package)?.clone(),
+        },
+      );
+    }
+    for related_part in part.related_parts_of_type::<_, EmbeddedObjectPart>(package) {
+      let relationship_id = related_part.relationship_id().to_string();
+      if let Some(resource) = binary_resource(package, related_part.part()) {
+        self
+          .embedded_object_resources
+          .insert(relationship_id, resource);
+      }
+    }
+    for related_part in part.related_parts_of_type::<_, EmbeddedPackagePart>(package) {
+      let relationship_id = related_part.relationship_id().to_string();
+      if let Some(resource) = binary_resource(package, related_part.part()) {
+        self
+          .embedded_package_resources
+          .insert(relationship_id, resource);
+      }
+    }
+    Ok(())
+  }
+
+  pub(crate) fn inherit_related_part_resources_from(&mut self, reference: &SlidePersist) {
+    self.image_resources = reference.image_resources.clone();
+    self.chart_resources = reference.chart_resources.clone();
+    self.extended_chart_resources = reference.extended_chart_resources.clone();
+    self.diagram_data_resources = reference.diagram_data_resources.clone();
+    self.diagram_layout_resources = reference.diagram_layout_resources.clone();
+    self.diagram_style_resources = reference.diagram_style_resources.clone();
+    self.diagram_color_resources = reference.diagram_color_resources.clone();
+    self.embedded_object_resources = reference.embedded_object_resources.clone();
+    self.embedded_package_resources = reference.embedded_package_resources.clone();
   }
 
   pub(crate) fn get_sub_type_text_list_style(

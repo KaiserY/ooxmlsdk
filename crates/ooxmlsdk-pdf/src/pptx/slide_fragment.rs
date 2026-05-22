@@ -42,6 +42,9 @@ impl SlideFragmentHandler {
     // The constructor imports related vmlDrawing/legacyDrawing before XML
     // contexts create shapes; destruction converts and inserts VML drawing.
     self.slide_persist.import_image_parts(package, slide_part);
+    self
+      .slide_persist
+      .import_graphic_frame_related_parts(package, slide_part)?;
     self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
     let slide = slide_part.root_element(package)?;
     self.slide_persist.visible = slide.show.is_none_or(|value| value.as_bool());

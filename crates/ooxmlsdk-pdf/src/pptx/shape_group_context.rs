@@ -177,8 +177,11 @@ impl PPTShapeGroupContext {
       apply_graphic_placeholder(&mut shape, slide_persist, placeholder);
     }
     apply_presentation_transform(&mut shape.shape, &frame.transform);
-    GraphicalObjectFrameContext
-      .dispatch_graphic_data(&frame.graphic.graphic_data, &mut shape.shape);
+    GraphicalObjectFrameContext.dispatch_graphic_data(
+      &frame.graphic.graphic_data,
+      slide_persist,
+      &mut shape.shape,
+    );
     self.graphic_shape = Some(shape);
     self.import_ext_drawings();
     let shape = self

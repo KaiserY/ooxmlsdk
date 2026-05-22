@@ -10,7 +10,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
-use super::drawingml::shape::{FontStyleReference, Shape, ShapeService};
+use super::drawingml::shape::{
+  FontStyleReference, GraphicDataKind, GraphicDataRecord, Shape, ShapeService,
+};
 use super::drawingml::table::{
   TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
   TableStyleTextProperties,
@@ -116,6 +118,10 @@ fn lower_shape(
 
   lower_shape_bounds(import, shape, offset, items);
   lower_picture(shape, offset, items);
+  let _has_structured_graphic_identity = shape
+    .graphic_data
+    .as_ref()
+    .is_some_and(graphic_data_has_structured_identity);
 
   if let Some(table) = &shape.table_properties
     && shape.service_name == ShapeService::TableShape
@@ -131,6 +137,57 @@ fn lower_shape(
   for child in &shape.children {
     lower_shape(import, child, child_offset, items);
   }
+}
+
+fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
+  !record.uri.is_empty()
+    || !matches!(record.kind, GraphicDataKind::Unsupported)
+    || record.chart_relationship_id.is_some()
+    || record
+      .chart_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record
+      .extended_chart_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record.has_inline_chart_space
+    || record.diagram_relationship_ids.as_ref().is_some_and(|ids| {
+      !ids.data_part.is_empty()
+        || !ids.layout_part.is_empty()
+        || !ids.style_part.is_empty()
+        || !ids.color_part.is_empty()
+    })
+    || record
+      .diagram_data_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record
+      .diagram_layout_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record
+      .diagram_style_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record
+      .diagram_color_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record.ole_object.as_ref().is_some_and(|ole| {
+      ole.relationship_id.is_some()
+        || ole.name.is_some()
+        || ole.prog_id.is_some()
+        || ole.show_as_icon
+    })
+    || record
+      .ole_binary_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
+    || record
+      .embedded_package_resource
+      .as_ref()
+      .is_some_and(|resource| resource.has_payload())
 }
 
 fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {

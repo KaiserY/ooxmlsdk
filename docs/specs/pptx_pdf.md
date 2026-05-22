@@ -98,7 +98,9 @@ Already structurally aligned:
   classification.
 - `graphicFrame` URI dispatch uses LibreOffice's exact URI table for
   presentation OLE, DrawingML diagram, DrawingML chart, Office 2014 chartEx,
-  and DrawingML table.
+  and DrawingML table. The model preserves chart `r:id`, inline chart-space
+  presence, diagram `dm/lo/qs/cs` relationship ids, and presentation OLE
+  identity/progId/icon metadata before any visible fallback.
 - DrawingML table graphic data is imported from typed
   `GraphicDataChoice::Table` / `a::Table`, including flags, style id, grid,
   rows, cells, spans/merges, margins, and cell text bodies.
@@ -217,7 +219,9 @@ Known gaps to keep visible:
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or
-  partial ports.
+  partial ports. Chart/diagram/OLE identities are now carried in the shape
+  model, but their relationship target parts are not converted to visible PDF
+  content yet.
 - Embedded picture display is a first bridge: `a:blip/@r:embed` is resolved
   against the fragment that owns the picture before master/layout inheritance,
   then lowered to `ImageItem` with bounds, crop, rotation, flips, content type,
@@ -601,6 +605,20 @@ Table payload must come from typed `GraphicDataChoice::Table` / `a::Table`.
 Do not resurrect quick-xml parsing of `GraphicData::xml_children` for table
 cells, text, style id, or grid.
 
+Chart, chartEx, diagram, and OLE/package targets are relationship-scoped.
+Import them from the owning slide/layout/master part before the shape tree is
+walked, cache them on that `SlidePersist`, and snapshot the resolved resource
+onto `GraphicDataRecord` during `GraphicalObjectFrameContext` dispatch. Do not
+resolve these targets later from the final slide persist by raw `rId`: inherited
+master/layout graphicFrames can collide with slide relationship IDs after
+cloning.
+
+Current PPTX PDF lowering preserves structured graphicFrame identity and target
+payloads for chart, diagram, OLE object, and embedded package records. Visible
+chart/SmartArt/OLE rendering is still a conversion gap; the preserved payloads
+are the handoff point for the renderer, not an excuse to parse package
+relationships from display code.
+
 ### Connectors
 
 `cxnSp` import stores structured `stCxn` / `endCxn` endpoint records on the
@@ -775,11 +793,11 @@ Unsupported or incomplete objects must keep structured records:
 | Area | Preserve before visible fallback |
 |------|----------------------------------|
 | picture | blip embed/link relationship ids, owning-fragment image resource, bounds, crop, non-visual metadata |
-| chart | frame type, relationship id, bounds, text cache if available |
-| SmartArt/diagram | diagram relationship ids, ext drawing ids, model id, bounds |
+| chart | frame type, chart relationship id or inline chart-space marker, bounds, text cache if available |
+| SmartArt/diagram | diagram dm/lo/qs/cs relationship ids, ext drawing ids, model id, bounds |
 | table | table grid/cell model, style ids, cell text bodies |
 | media/contentPart | relationship id, poster/image ids, bounds |
-| OLE | OLE relationship id, preview relationship, bounds |
+| OLE | OLE relationship id, name, progId, icon flag, preview relationship, bounds |
 | comments/notes | parsed metadata tied to slide/page identity |
 | VML/control | drawing lifecycle, control metadata, relationship ids |
 

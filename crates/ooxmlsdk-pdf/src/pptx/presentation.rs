@@ -147,6 +147,7 @@ impl PresentationFragmentHandler {
       let mut persist = SlidePersist::new_master(path, self.slide_size);
       persist.theme_path = self.import_master_theme(package, import, &master_part)?;
       persist.import_image_parts(package, &master_part);
+      persist.import_graphic_frame_related_parts(package, &master_part)?;
       let master = master_part.root_element(package)?;
       persist.shape_location = ShapeLocation::Master;
       persist.set_color_map(ColorMap::from_pml(&master.color_map));
@@ -204,7 +205,7 @@ impl PresentationFragmentHandler {
         persist.notes_text_style = layout_persist.notes_text_style.clone();
         persist.other_text_style = layout_persist.other_text_style.clone();
         persist.theme_path = layout_persist.theme_path.clone();
-        persist.image_resources = layout_persist.image_resources.clone();
+        persist.inherit_related_part_resources_from(layout_persist);
       }
     }
 
@@ -284,9 +285,10 @@ impl PresentationFragmentHandler {
       persist.notes_text_style = master_persist.notes_text_style.clone();
       persist.other_text_style = master_persist.other_text_style.clone();
       persist.theme_path = master_persist.theme_path.clone();
-      persist.image_resources = master_persist.image_resources.clone();
+      persist.inherit_related_part_resources_from(master_persist);
     }
     persist.import_image_parts(package, &layout_part);
+    persist.import_graphic_frame_related_parts(package, &layout_part)?;
     persist.layout_path = layout_path;
     persist.master_path = master_path;
     persist.shape_location = ShapeLocation::Layout;

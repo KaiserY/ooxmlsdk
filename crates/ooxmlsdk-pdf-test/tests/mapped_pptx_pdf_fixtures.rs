@@ -1,5 +1,6 @@
 use ooxmlsdk_pdf_test::{
   PdfBounds, PdfSummary, parse_pdf_rect, pdf_summary_for_fixture, pdfexport_fixture_dir,
+  rendered_page_image_for_fixture,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -129,6 +130,78 @@ fn assert_page_image_count_at_least(summary: &PdfSummary, page_index: usize, exp
   );
 }
 
+fn image_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  summary
+    .images
+    .iter()
+    .filter(|image| image.page_index == page_index)
+    .filter_map(|image| image.bounds.as_deref())
+    .filter_map(|bounds| parse_pdf_rect(bounds).ok())
+    .collect()
+}
+
+fn assert_first_image_top_left_rgb_close(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_rgb: [u8; 3],
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  let bounds = image_bounds.first().copied().unwrap_or_else(|| {
+    panic!(
+      "missing image bounds on page {page_index}; images={:?}",
+      summary.images
+    )
+  });
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 1200)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let x = bounds.left + bounds.width() * 0.05;
+  let y = bounds.top - bounds.height() * 0.05;
+  let [r, g, b, _] = rendered
+    .sample_pdf_point_rgba(x, y)
+    .unwrap_or_else(|| panic!("missing rendered image sample at PDF point ({x}, {y})"));
+  let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+    + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+    + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+  assert!(
+    diff <= 24,
+    "rendered image top-left color #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}; bounds={bounds:?}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
+fn assert_rendered_image_centers_include_rgb_close(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_rgb: [u8; 3],
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert!(
+    !image_bounds.is_empty(),
+    "missing image bounds on page {page_index}; images={:?}",
+    summary.images
+  );
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 1200)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let matched = image_bounds.iter().any(|bounds| {
+    let Some([r, g, b, _]) = rendered.sample_pdf_rect_center_rgba(*bounds) else {
+      return false;
+    };
+    let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+      + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+      + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+    diff <= 24
+  });
+  assert!(
+    matched,
+    "missing rendered image center color close to #{:02x}{:02x}{:02x}; bounds={image_bounds:?}",
+    expected_rgb[0], expected_rgb[1], expected_rgb[2]
+  );
+}
+
 fn assert_page_has_horizontal_stroked_path(summary: &PdfSummary, page_index: usize) {
   assert!(
     summary
@@ -157,6 +230,25 @@ fn assert_text_centered_on_page(
   assert!(
     (text_center - page_center).abs() <= tolerance_pt,
     "text {expected:?} is not centered on page {page_index}; text_bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_any_path_height_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_height_pt: f32,
+  tolerance_pt: f32,
+) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .filter(|path| path.page_index == page_index)
+      .filter_map(|path| path.bounds.as_deref())
+      .filter_map(|bounds| parse_pdf_rect(bounds).ok())
+      .any(|bounds| (bounds.height() - expected_height_pt).abs() <= tolerance_pt),
+    "missing path height close to {expected_height_pt}pt on page {page_index}; paths={:?}",
+    summary.paths
   );
 }
 
@@ -732,4 +824,140 @@ fn mapped_pptx_tdf134210_preserves_bitmap_fill_image() {
 fn mapped_pptx_tdf114821_preserves_outside_chart_data_labels() {
   let summary = render_summary("pptx/tdf114821.pptx");
   assert_page_contains_in_order(&summary, 0, &["90.0", "B"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf148685
+fn mapped_pptx_tdf148685_preserves_underlined_run_color_and_text_runs() {
+  let summary = render_summary("pptx/tdf148685.pptx");
+  assert_page_contains_in_order(&summary, 0, &["TEXT", "TE", "XT"]);
+  assert_text_fill_color(&summary, "TE", "#ff8000@ff");
+  assert_has_stroked_path_color(&summary, "#a1467e@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf128684
+fn mapped_pptx_tdf128684_preserves_vertical_rotated_text() {
+  let summary = render_summary("pptx/tdf128684.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Foo bar foo bar foo bar"]);
+  assert_vertical_text_shape(&summary, 0, "Foo bar foo bar foo bar");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf113198
+fn mapped_pptx_tdf113198_centers_text_in_ellipse() {
+  let summary = render_summary("pptx/tdf113198.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Awesome text in center"]);
+  assert_text_centered_on_page(&summary, 0, "Awesome text in center", 72.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149206
+fn mapped_pptx_tdf149206_exports_cropped_image_with_clip() {
+  let summary = render_summary("pptx/tdf149206.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_page_has_clipping_ops(&summary, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testtdf163852
+fn mapped_pptx_tdf163852_exports_cropped_svg_image_with_clip() {
+  let summary = render_summary("pptx/tdf163852.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_page_has_clipping_ops(&summary, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testCropToShape
+fn mapped_pptx_crop_to_shape_preserves_bitmap_custom_shape_clip() {
+  let summary = render_summary("pptx/crop-to-shape.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_page_has_clipping_ops(&summary, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testMirroredGraphic
+fn mapped_pptx_mirrored_graphic_preserves_top_left_fill_bitmap_color() {
+  let summary = render_summary("pptx/mirrored-graphic.pptx");
+  assert_first_image_top_left_rgb_close(
+    "pptx/mirrored-graphic.pptx",
+    &summary,
+    0,
+    [0x4f, 0x49, 0x55],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf134210CropPosition
+fn mapped_pptx_crop_position_preserves_green_bitmap_crop() {
+  let summary = render_summary("pptx/crop-position.pptx");
+  assert_first_image_top_left_rgb_close("pptx/crop-position.pptx", &summary, 0, [0x81, 0xd4, 0x1a]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testGreysScaleGraphic
+fn mapped_pptx_greysscale_graphic_preserves_grayscale_bitmap_color() {
+  let summary = render_summary("pptx/greysscale-graphic.pptx");
+  assert_first_image_top_left_rgb_close(
+    "pptx/greysscale-graphic.pptx",
+    &summary,
+    0,
+    [0x3c, 0x3c, 0x3c],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf112209
+fn mapped_pptx_tdf112209_preserves_grayscale_fill_bitmap_color() {
+  let summary = render_summary("pptx/tdf112209.pptx");
+  assert_first_image_top_left_rgb_close("pptx/tdf112209.pptx", &summary, 0, [0x84, 0x84, 0x84]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf128596
+fn mapped_pptx_tdf128596_repeats_bitmap_fill() {
+  let summary = render_summary("pptx/tdf128596.pptx");
+  assert_page_image_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf89928BlackWhiteThreshold
+fn mapped_pptx_tdf89928_black_white_threshold_keeps_black_and_white_graphics() {
+  let summary = render_summary("pptx/tdf89928-blackWhiteEffectThreshold.pptx");
+  assert_rendered_image_centers_include_rgb_close(
+    "pptx/tdf89928-blackWhiteEffectThreshold.pptx",
+    &summary,
+    0,
+    [0x00, 0x00, 0x00],
+  );
+  assert_rendered_image_centers_include_rgb_close(
+    "pptx/tdf89928-blackWhiteEffectThreshold.pptx",
+    &summary,
+    0,
+    [0xff, 0xff, 0xff],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf151547TransparentWhiteText
+fn mapped_pptx_tdf151547_preserves_transparent_white_text_color() {
+  let summary = render_summary("pptx/tdf151547-transparent-white-text.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Fully transparent white text"]);
+  assert_text_fill_color(&summary, "Fully transparent white text", "#ffffff@00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149588TransparentSolidFill
+fn mapped_pptx_tdf149588_preserves_transparent_solid_text_fill() {
+  let summary = render_summary("pptx/tdf149588_transparentSolidFill.pptx");
+  assert_page_contains_in_order(&summary, 0, &["EDGE"]);
+  assert_text_fill_color(&summary, "EDGE", "#636363@33");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf144092TableHeight
+fn mapped_pptx_tdf144092_preserves_expanded_table_height() {
+  let summary = render_summary("pptx/tdf144092-tableHeight.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert_any_path_height_close(&summary, 0, 7885.0 * 72.0 / 2540.0, 4.0);
 }

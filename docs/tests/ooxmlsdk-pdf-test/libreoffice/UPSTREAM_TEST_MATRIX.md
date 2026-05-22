@@ -571,7 +571,7 @@ PPTX bucket counts:
 | `sd/qa/unit/FontEmbeddingTest.cxx` | 2 |
 
 Current local coverage is intentionally small and upstream-assertion focused:
-47 matrix rows are covered by active PPTX PDF tests. They currently span
+62 matrix rows are covered by active PPTX PDF tests. They currently span
 LibreOffice import text/color/fill/line/border/page assertions and layout
 metafile-position assertions.
 `layout-tests.cxx::numberedList` is present as an ignored TDD assertion because
@@ -638,7 +638,7 @@ LibreOffice text-order expectation unchanged.
 | `import-tests2.cxx::testTdf99030` | `pptx/tdf99030.pptx` | `../core/sd/qa/unit/import-tests2.cxx:224` | `mapped` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf103473` | `pptx/tdf103473.pptx` | `../core/sd/qa/unit/import-tests2.cxx:267` | `mapped` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf103792` | `pptx/tdf103792.pptx` | `../core/sd/qa/unit/import-tests2.cxx:380` | `covered` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf148685` | `pptx/tdf148685.pptx` | `../core/sd/qa/unit/import-tests2.cxx:397` | `mapped` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf148685` | `pptx/tdf148685.pptx` | `../core/sd/qa/unit/import-tests2.cxx:397` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf103876` | `pptx/tdf103876.pptx` | `../core/sd/qa/unit/import-tests2.cxx:435` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf79007` | `pptx/tdf79007.pptx` | `../core/sd/qa/unit/import-tests2.cxx:454` | `mapped` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf119649` | `pptx/tdf119649.pptx` | `../core/sd/qa/unit/import-tests2.cxx:507` | `covered` | partial visible-output assertion. |
@@ -696,8 +696,8 @@ LibreOffice text-order expectation unchanged.
 | `import-tests3.cxx::testTdf152070` | `pptx/tdf152070.pptx` | `../core/sd/qa/unit/import-tests3.cxx:1114` | `covered` | partial visible-output assertion. |
 | `import-tests3.cxx::testTdf111927` | `pptx/tdf163239.pptx` | `../core/sd/qa/unit/import-tests3.cxx:1143` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf51340` | `pptx/tdf51340.pptx` | `../core/sd/qa/unit/import-tests4.cxx:61` | `covered` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf149206` | `pptx/tdf149206.pptx` | `../core/sd/qa/unit/import-tests4.cxx:164` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testtdf163852` | `pptx/tdf163852.pptx` | `../core/sd/qa/unit/import-tests4.cxx:183` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf149206` | `pptx/tdf149206.pptx` | `../core/sd/qa/unit/import-tests4.cxx:164` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testtdf163852` | `pptx/tdf163852.pptx` | `../core/sd/qa/unit/import-tests4.cxx:183` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf149785` | `pptx/tdf149785.pptx` | `../core/sd/qa/unit/import-tests4.cxx:198` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf149985` | `pptx/tdf149985.pptx` | `../core/sd/qa/unit/import-tests4.cxx:207` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf150770` | `pptx/tdf150770.pptx` | `../core/sd/qa/unit/import-tests4.cxx:228` | `covered` | partial visible-output assertion. |
@@ -705,27 +705,27 @@ LibreOffice text-order expectation unchanged.
 | `import-tests4.cxx::testDescriptionImport` | `pptx/altdescription.pptx` | `../core/sd/qa/unit/import-tests4.cxx:267` | `mapped` | partial tagged-PDF/accessibility assertion. |
 | `import-tests4.cxx::testTdf47365` | `pptx/loopNoPause.pptx` | `../core/sd/qa/unit/import-tests4.cxx:318` | `mapped` | partial slideshow-state assertion; do not turn into a full PDF export test. |
 | `import-tests4.cxx::testOOXTheme` | `pptx/ooxtheme.pptx` | `../core/sd/qa/unit/import-tests4.cxx:358` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testCropToShape` | `pptx/crop-to-shape.pptx` | `../core/sd/qa/unit/import-tests4.cxx:380` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testCropToShape` | `pptx/crop-to-shape.pptx` | `../core/sd/qa/unit/import-tests4.cxx:380` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf127964` | `pptx/tdf127964.pptx` | `../core/sd/qa/unit/import-tests4.cxx:401` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf106638` | `pptx/tdf106638.pptx` | `../core/sd/qa/unit/import-tests4.cxx:437` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf128684` | `pptx/tdf128684.pptx` | `../core/sd/qa/unit/import-tests4.cxx:458` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf113198` | `pptx/tdf113198.pptx` | `../core/sd/qa/unit/import-tests4.cxx:479` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf128684` | `pptx/tdf128684.pptx` | `../core/sd/qa/unit/import-tests4.cxx:458` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf113198` | `pptx/tdf113198.pptx` | `../core/sd/qa/unit/import-tests4.cxx:479` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testShapeGlowEffectPPTXImpoer` | `pptx/shape-glow-effect.pptx` | `../core/sd/qa/unit/import-tests4.cxx:504` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testShapeTextGlowEffectPPTXImport` | `pptx/shape-text-glow-effect.pptx` | `../core/sd/qa/unit/import-tests4.cxx:520` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testShapeBlurPPTXImport` | `pptx/shape-blur-effect.pptx` | `../core/sd/qa/unit/import-tests4.cxx:536` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testMirroredGraphic` | `pptx/mirrored-graphic.pptx` | `../core/sd/qa/unit/import-tests4.cxx:550` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf134210CropPosition` | `pptx/crop-position.pptx` | `../core/sd/qa/unit/import-tests4.cxx:563` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testGreysScaleGraphic` | `pptx/greysscale-graphic.pptx` | `../core/sd/qa/unit/import-tests4.cxx:578` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testMirroredGraphic` | `pptx/mirrored-graphic.pptx` | `../core/sd/qa/unit/import-tests4.cxx:550` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf134210CropPosition` | `pptx/crop-position.pptx` | `../core/sd/qa/unit/import-tests4.cxx:563` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testGreysScaleGraphic` | `pptx/greysscale-graphic.pptx` | `../core/sd/qa/unit/import-tests4.cxx:578` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf103347` | `pptx/tdf103347.pptx` | `../core/sd/qa/unit/import-tests4.cxx:591` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testHyperlinksOnShapes` | `pptx/tdf144616.pptx` | `../core/sd/qa/unit/import-tests4.cxx:609` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf112209` | `pptx/tdf112209.pptx` | `../core/sd/qa/unit/import-tests4.cxx:664` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf128596` | `pptx/tdf128596.pptx` | `../core/sd/qa/unit/import-tests4.cxx:684` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf112209` | `pptx/tdf112209.pptx` | `../core/sd/qa/unit/import-tests4.cxx:664` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf128596` | `pptx/tdf128596.pptx` | `../core/sd/qa/unit/import-tests4.cxx:684` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testCropToZero` | `pptx/croppedTo0.pptx` | `../core/sd/qa/unit/import-tests4.cxx:720` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf144092TableHeight` | `pptx/tdf144092-tableHeight.pptx` | `../core/sd/qa/unit/import-tests4.cxx:727` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf89928BlackWhiteThreshold` | `pptx/tdf89928-blackWhiteEffectThreshold.pptx` | `../core/sd/qa/unit/import-tests4.cxx:740` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf151547TransparentWhiteText` | `pptx/tdf151547-transparent-white-text.pptx` | `../core/sd/qa/unit/import-tests4.cxx:777` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf144092TableHeight` | `pptx/tdf144092-tableHeight.pptx` | `../core/sd/qa/unit/import-tests4.cxx:727` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf89928BlackWhiteThreshold` | `pptx/tdf89928-blackWhiteEffectThreshold.pptx` | `../core/sd/qa/unit/import-tests4.cxx:740` | `covered` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf151547TransparentWhiteText` | `pptx/tdf151547-transparent-white-text.pptx` | `../core/sd/qa/unit/import-tests4.cxx:777` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf149961AutofitIndentation` | `pptx/tdf149961-autofitIndentation.pptx` | `../core/sd/qa/unit/import-tests4.cxx:795` | `mapped` | partial visible-output assertion. |
-| `import-tests4.cxx::testTdf149588TransparentSolidFill` | `pptx/tdf149588_transparentSolidFill.pptx` | `../core/sd/qa/unit/import-tests4.cxx:829` | `mapped` | partial visible-output assertion. |
+| `import-tests4.cxx::testTdf149588TransparentSolidFill` | `pptx/tdf149588_transparentSolidFill.pptx` | `../core/sd/qa/unit/import-tests4.cxx:829` | `covered` | partial visible-output assertion. |
 | `import-tests4.cxx::testIndentDuplication` | `pptx/formatting-bullet-indent.pptx` | `../core/sd/qa/unit/import-tests4.cxx:867` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::test_srcRect_smallNegBound` | `pptx/tdf153008-srcRect-smallNegBound.pptx` | `../core/sd/qa/unit/import-tests4.cxx:885` | `mapped` | partial visible-output assertion. |
 | `import-tests4.cxx::testTdf153012` | `pptx/chart_pt_color_bg1.pptx` | `../core/sd/qa/unit/import-tests4.cxx:904` | `mapped` | partial visible-output assertion. |

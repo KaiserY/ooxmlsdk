@@ -80,6 +80,9 @@ Known structural gaps:
   an implementation detail only when it already refers to the current imported
   slide state at the point where `get_scheme_color_token` and
   `get_current_theme` are called.
+  During the import of a not-yet-pushed slide/layout/master persist, Rust must
+  still expose that same current persist through the import context; a stale or
+  future `draw_pages.len()` index is not equivalent to LibreOffice's pointer.
 - Theme import is not complete. `get_scheme_color()` intentionally does not
   return an RGB color until theme color scheme and style-matrix resolution are
   ported from LibreOffice.
@@ -87,11 +90,11 @@ Known structural gaps:
   applies default subtype handling, index-based subtype inheritance,
   LibreOffice's priority lookup, `apply_shape_reference`, placeholder storage,
   and referenced marking.
-- `Shape::apply_shape_reference` is still incomplete. LibreOffice copies more
-  than fill/line/effect pointers: text depending on the `bUseText` branch,
-  shape properties, actual fill/line/effect state, custom geometry, table
-  properties, master text list style, size, position, rotation, flips, hidden,
-  and locked flags.
+- `Shape::apply_shape_reference` now copies placeholder text, table
+  properties, master text list style, position, size, rotation, flips, hidden,
+  and locked flags in addition to reference fill/line/effect slots. Remaining
+  gaps are the explicit `bUseText` branch, generic shape properties, actual
+  fill/line/effect resolution against inherited state, and custom geometry.
 - Text-style inheritance has an initial upstream-shaped port:
   presentation-level `defaultTextStyle`, slide-master `txStyles`, shape
   `lstStyle`, placeholder `lstStyle`, and shape `master_text_list_style` are
@@ -429,6 +432,9 @@ Required fields:
 | `master_persist` | Resolved master/layout persist |
 | `theme` | Effective theme for this persist |
 | `clr_map` | Effective color mapping |
+| `name` | Slide/page name from `p:cSld/@name` |
+| `visible` | Slide visibility from `p:sld/@show` |
+| `show_master_shapes` | Master-shape visibility from `showMasterSp` |
 | `shapes` | Root `PptShape` tree |
 | `background_color` | Placeholder background color |
 | `background_properties` | `bgPr` fill state or structured `bgRef` style reference |
@@ -438,6 +444,8 @@ Required fields:
 | `notes_text_style` | Notes placeholder text style |
 | `other_text_style` | Other-shape text style |
 | `shape_map` | Shape id/model id map for connectors and hyperlinks |
+| `connector_shape_map` | Connector-only shape map built after shape creation |
+| `connector_connections_applied` | Whether the connector connection pass ran |
 | `time_node_list` | Animation timing tree; may be import-only initially |
 | `header_footer` | Header/footer flags and text |
 | `comments` | Slide comments; may be import-only initially |
@@ -457,11 +465,19 @@ Required methods:
 call `PptShape::add_shape`, build connector maps, then resolve connector
 connections. In Rust, "XShape" creation means creating `PptxDrawShape` or a
 similar intermediate drawing object, not UNO objects.
+The connector map must be built after shape creation/finalization, not during
+raw `cxnSp` import. `cxnSp` import owns only structured endpoint records
+(`stCxn`/`endCxn`) and normal shape state; the later `create_x_shapes` pass owns
+shape-map collection and connection application, matching
+`SlidePersist::createXShapes`.
 
 `SlideFragmentHandler` construction must import a related `vmlDrawing` or
 `legacyDrawing` fragment into `SlidePersist::drawing` when present. Its
 destruction/finalization phase must have an explicit VML conversion/insertion
 slot, even if the first Rust implementation only records unsupported controls.
+If only a fallback marker exists, keep both lifecycle facts: the VML fragment
+was discovered before shape import, and the conversion/insertion slot ran during
+finalization. Do not collapse this into a display-layer boolean.
 
 Required local state:
 
@@ -726,6 +742,7 @@ Required fields:
 | `table_properties` | Table model |
 | `effect_properties` | Shadow/glow/etc. |
 | `shape_style_refs` | Theme style references |
+| `connector_shape_properties` | `stCxn`/`endCxn` endpoint records |
 | `text_body` | DrawingML text body |
 | `master_text_list_style` | Inherited text list style |
 | `shape_ref_line_properties` | Placeholder/reference line props |
@@ -1146,6 +1163,9 @@ Implementation checkpoint:
   scheme color token, VML drawing, chart converter, or table styles. If Rust
   stores an index instead of a pointer, the index must refer to the same logical
   persist that LibreOffice would expose through `mpActualSlidePersist`.
+  If that persist has not yet been appended to `draw_pages` or `master_pages`,
+  keep a temporary current-persist context rather than letting lookup fall back
+  to the first theme or default color mapping.
 - Layout persists should be cached by `(master_path, layout_path)` in
   `PowerPointImport::master_pages`. Do not replace this with a single master id
   lookup; placeholder inheritance depends on the master+layout pair.
@@ -1178,6 +1198,10 @@ Implementation checkpoint:
   shows, and slide names are `PresentationFragmentHandler` responsibilities.
   Keep structured no-op slots there until they are ported; do not spread them
   into `pptx::display` or the PDF backend.
+- `p:sld/@show`, `p:sld/@showMasterSp`, and `p:cSld/@name` must be imported
+  into `SlidePersist` during `SlideFragmentHandler`, before display lowering.
+  Do not treat hidden slides or master-shape visibility as renderer filters;
+  page-range/custom-show selection can decide whether to emit them later.
 
 ### Phase 3: Shape Tree
 
@@ -1210,6 +1234,14 @@ Implementation checkpoint:
   `solidFill`, `grpFill`, and `ln` width/color. Unsupported fills and strokes
   should remain absent or structured placeholders until theme/color resolution
   is ported; do not invent PDF-only color behavior.
+- Preserve `spPr/custGeom` and `spPr/prstGeom` as DrawingML custom-shape
+  properties during import. A preset `line` geometry may select the line-shape
+  service for non-connector shapes, matching LibreOffice, but geometry must not
+  be converted to PDF path data in the parser.
+- Preserve `style/lnRef`, `style/fillRef`, `style/effectRef`, and
+  `style/fontRef` as typed shape style references. Theme/style-matrix
+  resolution belongs to later DrawingML theme code and `create_and_insert`, not
+  to `PPTShapeGroupContext` or display lowering.
 - `graphicFrame` must enter the generic
   `drawingml::GraphicalObjectFrameContext` dispatch by `a:graphicData/@uri`,
   then return to the PPT parent for `PPTShapeGroupContext::import_ext_drawings`.
@@ -1279,6 +1311,10 @@ Implementation checkpoint:
   structured fallback records at first, but the fallback records must be
   produced by this pass or by earlier import contexts, not invented by the PDF
   backend.
+- Connector endpoint metadata belongs on the DrawingML connector shape as
+  structured `stCxn`/`endCxn` records. Do not resolve connector endpoints while
+  parsing the shape tree; LibreOffice waits until `createXShapes`, after the
+  page shape map exists.
 
 ### Phase 5: Lowering to PDF Display List
 

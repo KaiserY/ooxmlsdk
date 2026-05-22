@@ -114,12 +114,13 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
   ) -> Result<()> {
     self.import_master_slides(package, import)?;
-    let slide_parts = self
-      .presentation_part
-      .slide_parts(package)
-      .collect::<Vec<_>>();
-    for (index, slide_part) in slide_parts.iter().enumerate() {
-      self.import_slide(package, import, index, slide_part.clone())?;
+    for (index, slide_ref) in self.slides_vector.clone().into_iter().enumerate() {
+      let Some(slide_part) =
+        self.slide_part_by_relationship_id(package, &slide_ref.relationship_id)
+      else {
+        continue;
+      };
+      self.import_slide(package, import, index, slide_ref, slide_part)?;
     }
     self.import_slide_names();
     self.import_custom_slide_show();
@@ -133,11 +134,11 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
   ) -> Result<()> {
     // Source: LibreOffice PresentationFragmentHandler::importMasterSlides.
-    let master_parts = self
-      .presentation_part
-      .slide_master_parts(package)
-      .collect::<Vec<_>>();
-    for master_part in master_parts {
+    for relationship_id in self.slide_master_vector.clone() {
+      let Some(master_part) = self.slide_master_part_by_relationship_id(package, &relationship_id)
+      else {
+        continue;
+      };
       let path = master_part
         .path(package)
         .map(str::to_string)
@@ -154,8 +155,10 @@ impl PresentationFragmentHandler {
       let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Master);
       handler.import_common_slide_data(&master.common_slide_data);
       let mut persist = handler.finalize_import();
+      import.set_actual_slide_persist_context(Some(&persist));
       persist.create_background(import);
       persist.create_x_shapes(import);
+      import.set_actual_slide_persist_context(None);
       import.master_pages.push(persist);
     }
     Ok(())
@@ -168,6 +171,7 @@ impl PresentationFragmentHandler {
     package: &mut PresentationDocument,
     import: &mut PowerPointImport,
     index: usize,
+    slide_ref: SlideRef,
     slide_part: SlidePart,
   ) -> Result<()> {
     // Source: LibreOffice PresentationFragmentHandler::importSlide.
@@ -175,18 +179,8 @@ impl PresentationFragmentHandler {
       .path(package)
       .map(str::to_string)
       .unwrap_or_else(|| format!("<slide:{index}>"));
-    let relationship_id = self
-      .presentation_part
-      .get_id_of_part(package, &slide_part)
-      .map(str::to_string)
-      .unwrap_or_else(|| {
-        self
-          .slides_vector
-          .get(index)
-          .map(|slide_ref| slide_ref.relationship_id.clone())
-          .unwrap_or_default()
-      });
-    let mut persist = SlidePersist::new_slide(path, relationship_id, self.slide_size);
+    let mut persist =
+      SlidePersist::new_slide(path, slide_ref.relationship_id.clone(), self.slide_size);
     if let Some(layout_part) = slide_part.slide_layout_part(package) {
       persist.layout_path = layout_part.path(package).map(str::to_string);
       if let Some(master_part) = layout_part.slide_master_part(package) {
@@ -211,15 +205,39 @@ impl PresentationFragmentHandler {
       }
     }
 
-    import.set_actual_slide_persist(Some(import.draw_pages.len()));
     let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Slide);
     handler.import_slide_part(package, &slide_part)?;
     let mut persist = handler.finalize_import();
+    import.set_actual_slide_persist(Some(import.draw_pages.len()));
+    import.set_actual_slide_persist_context(Some(&persist));
     persist.create_background(import);
     persist.create_x_shapes(import);
+    import.set_actual_slide_persist_context(None);
     import.draw_pages.push(persist);
     import.set_actual_slide_persist(None);
     Ok(())
+  }
+
+  fn slide_part_by_relationship_id(
+    &self,
+    package: &PresentationDocument,
+    relationship_id: &str,
+  ) -> Option<SlidePart> {
+    self
+      .presentation_part
+      .slide_parts(package)
+      .find(|part| self.presentation_part.get_id_of_part(package, part) == Some(relationship_id))
+  }
+
+  fn slide_master_part_by_relationship_id(
+    &self,
+    package: &PresentationDocument,
+    relationship_id: &str,
+  ) -> Option<SlideMasterPart> {
+    self
+      .presentation_part
+      .slide_master_parts(package)
+      .find(|part| self.presentation_part.get_id_of_part(package, part) == Some(relationship_id))
   }
 
   fn import_layout_persist(
@@ -275,14 +293,17 @@ impl PresentationFragmentHandler {
       .show_master_shapes
       .as_ref()
       .is_none_or(|value| value.as_bool());
+    persist.show_master_shapes = show_master_shapes;
     if !show_master_shapes {
       persist.hide_shapes_as_master_shapes();
     }
     let mut handler = SlideFragmentHandler::new(persist, ShapeLocation::Layout);
     handler.import_common_slide_data(&layout.common_slide_data);
     let mut persist = handler.finalize_import();
+    import.set_actual_slide_persist_context(Some(&persist));
     persist.create_background(import);
     persist.create_x_shapes(import);
+    import.set_actual_slide_persist_context(None);
     import.master_pages.push(persist);
     Ok(Some(import.master_pages.len() - 1))
   }

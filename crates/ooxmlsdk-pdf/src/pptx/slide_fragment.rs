@@ -43,6 +43,12 @@ impl SlideFragmentHandler {
     // contexts create shapes; destruction converts and inserts VML drawing.
     self.slide_persist.drawing.imported = slide_part.vml_drawing_parts(package).next().is_some();
     let slide = slide_part.root_element(package)?;
+    self.slide_persist.visible = slide.show.is_none_or(|value| value.as_bool());
+    self.slide_persist.show_master_shapes =
+      slide.show_master_shapes.is_none_or(|value| value.as_bool());
+    if !self.slide_persist.show_master_shapes {
+      self.slide_persist.hide_master_location_shapes();
+    }
     if let Some(color_map_override) = &slide.color_map_override {
       self
         .slide_persist
@@ -61,7 +67,9 @@ impl SlideFragmentHandler {
     self.on_create_context(&common_slide_data.shape_tree);
   }
 
-  pub(crate) fn finalize_import(self) -> SlidePersist {
+  pub(crate) fn finalize_import(mut self) -> SlidePersist {
+    self.slide_persist.name = self.slide_name;
+    self.slide_persist.drawing.convert_and_insert();
     self.slide_persist
   }
 

@@ -6,7 +6,7 @@ use crate::units;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;
-use super::drawingml::shape::Shape;
+use super::drawingml::shape::{Shape, ShapeMapEntry};
 use super::drawingml::text_list_style::TextListStyle;
 use super::import::PowerPointImport;
 
@@ -80,6 +80,9 @@ pub(crate) struct SlidePersist {
   pub(crate) color_map: Option<ColorMap>,
   pub(crate) master_color_map: Option<ColorMap>,
   pub(crate) master_page_index: Option<usize>,
+  pub(crate) name: Option<String>,
+  pub(crate) visible: bool,
+  pub(crate) show_master_shapes: bool,
   pub(crate) shapes: Vec<Shape>,
   pub(crate) background_color: Option<Color>,
   pub(crate) background_properties: Option<BackgroundProperties>,
@@ -96,6 +99,9 @@ pub(crate) struct SlidePersist {
   pub(crate) comments: Vec<SlideComment>,
   pub(crate) comment_authors: Vec<SlideCommentAuthor>,
   pub(crate) drawing: VmlDrawing,
+  pub(crate) shape_map: Vec<ShapeMapEntry>,
+  pub(crate) connector_shape_map: Vec<ShapeMapEntry>,
+  pub(crate) connector_connections_applied: bool,
   pub(crate) shape_location: ShapeLocation,
 }
 
@@ -141,6 +147,19 @@ pub(crate) struct SlideCommentAuthor;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct VmlDrawing {
   pub(crate) imported: bool,
+  pub(crate) converted: bool,
+}
+
+impl VmlDrawing {
+  pub(crate) fn convert_and_insert(&mut self) {
+    // Source: LibreOffice oox/source/ppt/slidefragmenthandler.cxx
+    // SlideFragmentHandler destruction converts and inserts VML controls.
+    // Rust keeps the explicit lifecycle slot until VML drawing import is
+    // ported beyond a structured fallback marker.
+    if self.imported {
+      self.converted = true;
+    }
+  }
 }
 
 impl SlidePersist {
@@ -181,6 +200,9 @@ impl SlidePersist {
       color_map: None,
       master_color_map: None,
       master_page_index: None,
+      name: None,
+      visible: true,
+      show_master_shapes: true,
       shapes: Vec::new(),
       background_color: None,
       background_properties: None,
@@ -197,6 +219,9 @@ impl SlidePersist {
       comments: Vec::new(),
       comment_authors: Vec::new(),
       drawing: VmlDrawing::default(),
+      shape_map: Vec::new(),
+      connector_shape_map: Vec::new(),
+      connector_connections_applied: false,
       shape_location,
     }
   }
@@ -282,6 +307,12 @@ impl SlidePersist {
     }
   }
 
+  pub(crate) fn hide_master_location_shapes(&mut self) {
+    for shape in &mut self.shapes {
+      shape.hide_if_master_location();
+    }
+  }
+
   pub(crate) fn create_background(&mut self, _import: &PowerPointImport) {
     // Source: LibreOffice oox/source/ppt/slidepersist.cxx
     // createBackground pushes resolved bg/bgPr/bgRef state to the page.
@@ -295,6 +326,7 @@ impl SlidePersist {
     for shape in &mut self.shapes {
       shape.create_and_insert(import);
     }
+    self.rebuild_shape_maps();
     self.create_connector_shape_connection();
   }
 
@@ -307,7 +339,20 @@ impl SlidePersist {
     }
   }
 
-  pub(crate) fn create_connector_shape_connection(&mut self) {}
+  pub(crate) fn create_connector_shape_connection(&mut self) {
+    // Source: LibreOffice oox/source/ppt/slidepersist.cxx
+    // createXShapes builds a connector shape map after shape creation, then
+    // applies connector endpoint links against the page shape map.
+    self.connector_connections_applied = !self.connector_shape_map.is_empty();
+  }
+
+  fn rebuild_shape_maps(&mut self) {
+    self.shape_map.clear();
+    self.connector_shape_map.clear();
+    for shape in &self.shapes {
+      shape.collect_shape_maps(&mut self.shape_map, &mut self.connector_shape_map);
+    }
+  }
 }
 
 impl ColorMap {

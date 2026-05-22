@@ -6,7 +6,7 @@ use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
 use super::drawingml::line::LineProperties;
-use super::drawingml::shape::{FrameType, Point, Shape, ShapeService, Size};
+use super::drawingml::shape::{CustomShapeGeometry, FrameType, Point, Shape, ShapeService, Size};
 use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
@@ -121,6 +121,9 @@ impl PPTShapeGroupContext {
       source.shape_properties.transform2_d.as_deref(),
     );
     apply_shape_properties(&mut shape.shape, &source.shape_properties);
+    if let Some(style) = &source.shape_style {
+      shape.shape.set_shape_style_refs(style);
+    }
     if let Some(text_body) = &source.text_body {
       shape.shape.set_text_body(TextBody::from_pml(text_body));
     }
@@ -187,11 +190,20 @@ impl PPTShapeGroupContext {
         .non_visual_connection_shape_properties
         .non_visual_drawing_properties,
     );
+    apply_connection_shape_properties(
+      &mut shape.shape,
+      &source
+        .non_visual_connection_shape_properties
+        .non_visual_connector_shape_drawing_properties,
+    );
     apply_transform_2d(
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),
     );
     apply_shape_properties(&mut shape.shape, &source.shape_properties);
+    if let Some(style) = &source.shape_style {
+      shape.shape.set_shape_style_refs(style);
+    }
     shape.into_shape(slide_persist)
   }
 
@@ -208,6 +220,9 @@ impl PPTShapeGroupContext {
       picture.shape_properties.transform2_d.as_deref(),
     );
     apply_shape_properties(&mut shape.shape, &picture.shape_properties);
+    if let Some(style) = &picture.shape_style {
+      shape.shape.set_shape_style_refs(style);
+    }
     if let Some(blip) = picture.blip_fill.blip.as_ref() {
       shape
         .shape
@@ -258,6 +273,18 @@ fn apply_non_visual_drawing_properties(
     .is_some_and(|hidden| hidden.as_bool());
 }
 
+fn apply_connection_shape_properties(
+  shape: &mut Shape,
+  properties: &p::NonVisualConnectorShapeDrawingProperties,
+) {
+  if let Some(connection) = &properties.start_connection {
+    shape.add_connector_shape_properties(true, connection.id, connection.index);
+  }
+  if let Some(connection) = &properties.end_connection {
+    shape.add_connector_shape_properties(false, connection.id, connection.index);
+  }
+}
+
 fn apply_p14_non_visual_drawing_properties(
   shape: &mut Shape,
   properties: &p14::NonVisualDrawingProperties,
@@ -276,6 +303,13 @@ fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
   // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
   // ShapePropertiesContext owns fill/line/effect state before the PPT shape is
   // converted to drawing objects.
+  if let Some(geometry) = properties
+    .shape_properties_choice1
+    .as_ref()
+    .map(import_custom_shape_geometry)
+  {
+    shape.set_custom_shape_geometry(geometry);
+  }
   if let Some(fill) = properties
     .shape_properties_choice2
     .as_ref()
@@ -289,6 +323,20 @@ fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
     .and_then(import_line_properties)
   {
     shape.line_properties = Some(line);
+  }
+}
+
+fn import_custom_shape_geometry(choice: &p::ShapePropertiesChoice) -> CustomShapeGeometry {
+  // Source: LibreOffice oox/source/drawingml/shapepropertiescontext.cxx
+  // custGeom/prstGeom populate CustomShapeProperties before createAndInsert;
+  // do not lower preset geometry to PDF path data during import.
+  match choice {
+    p::ShapePropertiesChoice::CustomGeometry(geometry) => {
+      CustomShapeGeometry::Custom(geometry.clone())
+    }
+    p::ShapePropertiesChoice::PresetGeometry(geometry) => {
+      CustomShapeGeometry::Preset(geometry.clone())
+    }
   }
 }
 

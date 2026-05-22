@@ -1,4 +1,7 @@
-use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+use ooxmlsdk::schemas::{
+  schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_openxmlformats_org_presentationml_2006_main as p,
+};
 
 use super::fill::FillProperties;
 use super::line::LineProperties;
@@ -35,6 +38,7 @@ pub(crate) struct Shape {
   pub(crate) placeholder: Option<Box<Shape>>,
   pub(crate) line_properties: Option<LineProperties>,
   pub(crate) fill_properties: Option<FillProperties>,
+  pub(crate) custom_shape_properties: CustomShapeProperties,
   pub(crate) table_properties: Option<TableProperties>,
   pub(crate) picture: Option<PictureRecord>,
   pub(crate) content_part: Option<ContentPartRecord>,
@@ -44,6 +48,8 @@ pub(crate) struct Shape {
   pub(crate) shape_ref_line_properties: Option<LineProperties>,
   pub(crate) shape_ref_fill_properties: Option<FillProperties>,
   pub(crate) shape_ref_effect_properties: Option<EffectProperties>,
+  pub(crate) shape_style_refs: Option<ShapeStyleRefs>,
+  pub(crate) connector_shape_properties: Vec<ConnectorShapeProperties>,
   pub(crate) frame_type: FrameType,
   pub(crate) graphic_data: Option<GraphicDataRecord>,
 }
@@ -66,6 +72,7 @@ pub(crate) enum ShapeService {
   CustomShape,
   GraphicObjectShape,
   GroupShape,
+  LineShape,
   ConnectorShape,
   Ole2Shape,
   TitleTextShape,
@@ -110,6 +117,39 @@ pub(crate) struct ContentPartRecord {
   pub(crate) relationship_id: String,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct CustomShapeProperties {
+  pub(crate) geometry: Option<CustomShapeGeometry>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum CustomShapeGeometry {
+  Custom(std::boxed::Box<a::CustomGeometry>),
+  Preset(std::boxed::Box<a::PresetGeometry>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ShapeStyleRefs {
+  pub(crate) line_reference: std::boxed::Box<a::LineReference>,
+  pub(crate) fill_reference: std::boxed::Box<a::FillReference>,
+  pub(crate) effect_reference: std::boxed::Box<a::EffectReference>,
+  pub(crate) font_reference: std::boxed::Box<a::FontReference>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ConnectorShapeProperties {
+  pub(crate) start_shape: bool,
+  pub(crate) destination_shape_id: u32,
+  pub(crate) destination_glue_id: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ShapeMapEntry {
+  pub(crate) id: u32,
+  pub(crate) service_name: ShapeService,
+  pub(crate) name: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum GraphicDataKind {
   Ole,
@@ -148,6 +188,7 @@ impl Shape {
       placeholder: None,
       line_properties: None,
       fill_properties: None,
+      custom_shape_properties: CustomShapeProperties::default(),
       table_properties: None,
       picture: None,
       content_part: None,
@@ -157,6 +198,8 @@ impl Shape {
       shape_ref_line_properties: None,
       shape_ref_fill_properties: None,
       shape_ref_effect_properties: None,
+      shape_style_refs: None,
+      connector_shape_properties: Vec::new(),
       frame_type: FrameType::Generic,
       graphic_data: None,
     }
@@ -171,9 +214,17 @@ impl Shape {
     self.shape_ref_line_properties = reference.line_properties.clone();
     self.shape_ref_fill_properties = reference.fill_properties.clone();
     self.shape_ref_effect_properties = reference.effect_properties.clone();
-    if self.text_body.is_none() {
-      self.text_body = reference.text_body.clone();
-    }
+    self.custom_shape_properties = reference.custom_shape_properties.clone();
+    self.text_body = reference.text_body.clone();
+    self.table_properties = reference.table_properties.clone();
+    self.master_text_list_style = reference.master_text_list_style.clone();
+    self.position = reference.position;
+    self.size = reference.size;
+    self.rotation = reference.rotation;
+    self.flip_h = reference.flip_h;
+    self.flip_v = reference.flip_v;
+    self.hidden = reference.hidden;
+    self.locked = reference.locked;
   }
 
   pub(crate) fn set_placeholder(&mut self, placeholder: Shape) {
@@ -199,6 +250,15 @@ impl Shape {
     }
   }
 
+  pub(crate) fn hide_if_master_location(&mut self) {
+    if self.shape_location == Some(ShapeLocation::Master) {
+      self.hidden_master_shape = true;
+    }
+    for child in &mut self.children {
+      child.hide_if_master_location();
+    }
+  }
+
   pub(crate) fn create_and_insert(&mut self, import: &PowerPointImport) {
     self.finalize_service_name();
     let _ = self.get_actual_fill_properties(import);
@@ -207,6 +267,27 @@ impl Shape {
     self.finalize_x_shape();
     for child in &mut self.children {
       child.create_and_insert(import);
+    }
+  }
+
+  pub(crate) fn collect_shape_maps(
+    &self,
+    shape_map: &mut Vec<ShapeMapEntry>,
+    connector_shape_map: &mut Vec<ShapeMapEntry>,
+  ) {
+    if let Some(id) = self.id {
+      let entry = ShapeMapEntry {
+        id,
+        service_name: self.service_name,
+        name: self.name.clone(),
+      };
+      shape_map.push(entry.clone());
+      if self.service_name == ShapeService::ConnectorShape {
+        connector_shape_map.push(entry);
+      }
+    }
+    for child in &self.children {
+      child.collect_shape_maps(shape_map, connector_shape_map);
     }
   }
 
@@ -320,6 +401,25 @@ impl Shape {
     self.graphic_data = Some(GraphicDataRecord { uri, kind });
   }
 
+  pub(crate) fn set_custom_shape_geometry(&mut self, geometry: CustomShapeGeometry) {
+    if let CustomShapeGeometry::Preset(preset) = &geometry
+      && preset.preset == a::ShapeTypeValues::Line
+      && self.service_name != ShapeService::ConnectorShape
+    {
+      self.service_name = ShapeService::LineShape;
+    }
+    self.custom_shape_properties.geometry = Some(geometry);
+  }
+
+  pub(crate) fn set_shape_style_refs(&mut self, style: &p::ShapeStyle) {
+    self.shape_style_refs = Some(ShapeStyleRefs {
+      line_reference: style.line_reference.clone(),
+      fill_reference: style.fill_reference.clone(),
+      effect_reference: style.effect_reference.clone(),
+      font_reference: style.font_reference.clone(),
+    });
+  }
+
   pub(crate) fn set_picture(
     &mut self,
     embed_relationship_id: Option<String>,
@@ -335,6 +435,21 @@ impl Shape {
     self.content_part = Some(ContentPartRecord { relationship_id });
     self.frame_type = FrameType::Media;
     self.service_name = ShapeService::MediaShape;
+  }
+
+  pub(crate) fn add_connector_shape_properties(
+    &mut self,
+    start_shape: bool,
+    destination_shape_id: u32,
+    destination_glue_id: u32,
+  ) {
+    self
+      .connector_shape_properties
+      .push(ConnectorShapeProperties {
+        start_shape,
+        destination_shape_id,
+        destination_glue_id,
+      });
   }
 
   pub(crate) fn clone_fill_properties(&self) -> Option<FillProperties> {

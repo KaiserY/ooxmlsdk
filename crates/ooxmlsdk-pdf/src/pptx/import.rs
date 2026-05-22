@@ -14,6 +14,7 @@ pub(crate) struct PowerPointImport {
   pub(crate) master_pages: Vec<SlidePersist>,
   pub(crate) notes_pages: Vec<SlidePersist>,
   pub(crate) actual_slide_persist: Option<usize>,
+  pub(crate) actual_slide_persist_context: Option<Box<SlidePersist>>,
   pub(crate) table_style_list_path: Option<String>,
   pub(crate) table_style_list: Option<TableStyleList>,
   pub(crate) chart_converter: ChartConverter,
@@ -46,6 +47,7 @@ impl PowerPointImport {
       master_pages: Vec::new(),
       notes_pages: Vec::new(),
       actual_slide_persist: None,
+      actual_slide_persist_context: None,
       table_style_list_path: None,
       table_style_list: None,
       chart_converter: ChartConverter,
@@ -62,8 +64,7 @@ impl PowerPointImport {
 
   pub(crate) fn get_current_theme_ptr(&self) -> Option<&ThemeFragmentRecord> {
     self
-      .actual_slide_persist
-      .and_then(|index| self.draw_pages.get(index))
+      .actual_slide_persist_ref()
       .and_then(|slide| slide.theme_path.as_deref())
       .and_then(|path| self.get_theme(path))
       .or_else(|| self.themes.first())
@@ -94,10 +95,7 @@ impl PowerPointImport {
     &self,
     token: a::SchemeColorValues,
   ) -> Option<a::ColorSchemeIndexValues> {
-    if let Some(slide) = self
-      .actual_slide_persist
-      .and_then(|index| self.draw_pages.get(index))
-    {
+    if let Some(slide) = self.actual_slide_persist_ref() {
       if let Some(mapped) = slide
         .color_map
         .as_ref()
@@ -171,6 +169,21 @@ impl PowerPointImport {
 
   pub(crate) fn set_actual_slide_persist(&mut self, index: Option<usize>) {
     self.actual_slide_persist = index;
+    if index.is_none() {
+      self.actual_slide_persist_context = None;
+    }
+  }
+
+  pub(crate) fn set_actual_slide_persist_context(&mut self, persist: Option<&SlidePersist>) {
+    self.actual_slide_persist_context = persist.cloned().map(Box::new);
+  }
+
+  fn actual_slide_persist_ref(&self) -> Option<&SlidePersist> {
+    self.actual_slide_persist_context.as_deref().or_else(|| {
+      self
+        .actual_slide_persist
+        .and_then(|index| self.draw_pages.get(index))
+    })
   }
 
   pub(crate) fn default_slide_size() -> SlideSize {

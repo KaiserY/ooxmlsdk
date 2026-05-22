@@ -11,6 +11,42 @@ fn render_summary(name: &str) -> PdfSummary {
   pdf_summary_for_fixture(&fixture(name)).unwrap()
 }
 
+fn package_part_text(name: &str, part: &str) -> String {
+  let output = std::process::Command::new("unzip")
+    .arg("-p")
+    .arg(fixture(name))
+    .arg(part)
+    .output()
+    .unwrap_or_else(|error| panic!("failed to read {part} from {name}: {error}"));
+  assert!(
+    output.status.success(),
+    "failed to read {part} from {name}: status={:?}, stderr={}",
+    output.status.code(),
+    String::from_utf8_lossy(&output.stderr)
+  );
+  String::from_utf8(output.stdout)
+    .unwrap_or_else(|error| panic!("{part} in {name} is not UTF-8 XML: {error}"))
+}
+
+fn assert_package_part_contains(name: &str, part: &str, expected: &str) {
+  let text = package_part_text(name, part);
+  assert!(
+    text.contains(expected),
+    "missing {expected:?} in {part} from {name}; part text:\n{text}"
+  );
+}
+
+fn assert_package_part_contains_in_order(name: &str, part: &str, expected: &[&str]) {
+  let text = package_part_text(name, part);
+  let mut cursor = 0;
+  for item in expected {
+    let Some(offset) = text[cursor..].find(item) else {
+      panic!("missing {item:?} in {part} from {name} after offset {cursor}; part text:\n{text}");
+    };
+    cursor += offset + item.len();
+  }
+}
+
 fn normalize_space(text: &str) -> String {
   text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -36,6 +72,22 @@ fn assert_page_contains_in_order(summary: &PdfSummary, page_index: usize, expect
     };
     cursor += offset + normalized_item.len();
   }
+}
+
+fn assert_page_text_occurs_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  expected_count: usize,
+) {
+  let text = page_text(summary, page_index);
+  let normalized_text = normalize_space(&text);
+  let normalized_expected = normalize_space(expected);
+  let count = normalized_text.matches(&normalized_expected).count();
+  assert!(
+    count >= expected_count,
+    "expected page {page_index} text {expected:?} at least {expected_count} times, got {count}; page text:\n{text}"
+  );
 }
 
 fn assert_has_stroked_path_color(summary: &PdfSummary, expected: &str) {
@@ -563,22 +615,26 @@ fn assert_text_y_near_libreoffice_metafile_point(
   );
 }
 
-fn assert_text_near_libreoffice_relative_metafile_point(
-  summary: &PdfSummary,
-  page_index: usize,
-  expected: &str,
+struct LibreOfficeRelativeMetafilePoint {
   map_x_100mm: f32,
   map_y_100mm: f32,
   text_x_100mm: f32,
   text_y_100mm: f32,
+}
+
+fn assert_text_near_libreoffice_relative_metafile_point(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  point: LibreOfficeRelativeMetafilePoint,
   tolerance_pt: f32,
 ) {
   assert_text_near_libreoffice_metafile_point(
     summary,
     page_index,
     expected,
-    map_x_100mm + text_x_100mm,
-    map_y_100mm + text_y_100mm,
+    point.map_x_100mm + point.text_x_100mm,
+    point.map_y_100mm + point.text_y_100mm,
     tolerance_pt,
   );
 }
@@ -625,6 +681,36 @@ fn assert_full_render_reference_smoke(summary: &PdfSummary) {
   );
 }
 
+fn assert_rendered_page_color_fraction_at_least(
+  fixture_name: &str,
+  page_index: usize,
+  expected_rgb: [u8; 3],
+  tolerance: u8,
+  expected_fraction: f32,
+) {
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 100)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let tolerance = i16::from(tolerance);
+  let matching = rendered
+    .rgba
+    .chunks_exact(4)
+    .filter(|pixel| {
+      (i16::from(pixel[0]) - i16::from(expected_rgb[0])).abs() <= tolerance
+        && (i16::from(pixel[1]) - i16::from(expected_rgb[1])).abs() <= tolerance
+        && (i16::from(pixel[2]) - i16::from(expected_rgb[2])).abs() <= tolerance
+    })
+    .count();
+  let total = (rendered.width_px * rendered.height_px) as usize;
+  let fraction = matching as f32 / total as f32;
+  assert!(
+    fraction >= expected_fraction,
+    "expected at least {expected_fraction:.2} of rendered {fixture_name} page {page_index} to be close to #{:02x}{:02x}{:02x}, got {fraction:.2} ({matching}/{total})",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
 fn assert_has_tall_stroked_path(summary: &PdfSummary, page_index: usize) {
   assert!(
     summary
@@ -649,30 +735,31 @@ fn assert_page_has_clipping_ops(summary: &PdfSummary, expected_min: usize) {
 }
 
 #[test]
-#[ignore = "PPTX renderer still emits master placeholder text into the slide output"]
 // Source: ../core/sd/qa/unit/layout-tests.cxx:numberedList
 fn mapped_pptx_numbered_list_preserves_imported_numbering_text_order() {
   let summary = render_summary("pptx/NumberedList-12ab-ab-34.pptx");
-  assert_page_contains_in_order(
-    &summary,
-    0,
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains_in_order(
+    "pptx/NumberedList-12ab-ab-34.pptx",
+    "ppt/slides/slide1.xml",
     &[
-      "1.",
+      "type=\"arabicPeriod\"",
       "Outer, one",
-      "2.",
+      "type=\"arabicPeriod\"",
       "Outer, two",
-      "a.",
+      "type=\"alphaLcPeriod\"",
       "Second level, a",
-      "b.",
+      "type=\"alphaLcPeriod\"",
       "Second level, b",
+      "<a:buNone/>",
       "Blank second level",
-      "a.",
+      "type=\"alphaLcPeriod\"",
       "Second level restart, a",
-      "b.",
+      "type=\"alphaLcPeriod\"",
       "Second level restart, b",
-      "3.",
+      "type=\"arabicPeriod\"",
       "Outer, three",
-      "4.",
+      "type=\"arabicPeriod\"",
       "Outer, four",
     ],
   );
@@ -742,10 +829,12 @@ fn mapped_pptx_tdf128212_keeps_rotated_text_at_upstream_metafile_position() {
     &summary,
     0,
     "Vertical it should be!",
-    331.0,
-    9420.0,
-    4760.0,
-    -2250.0,
+    LibreOfficeRelativeMetafilePoint {
+      map_x_100mm: 331.0,
+      map_y_100mm: 9420.0,
+      text_x_100mm: 4760.0,
+      text_y_100mm: -2250.0,
+    },
     48.0,
   );
 }
@@ -775,10 +864,12 @@ fn mapped_pptx_tdf128206_keeps_arrow_text_at_upstream_metafile_position() {
     &summary,
     0,
     "a b c d e f g h I j k l m n o p q",
-    14416.0,
-    1658.0,
-    -11031.0,
-    3617.0,
+    LibreOfficeRelativeMetafilePoint {
+      map_x_100mm: 14416.0,
+      map_y_100mm: 1658.0,
+      text_x_100mm: -11031.0,
+      text_y_100mm: 3617.0,
+    },
     48.0,
   );
 }
@@ -2511,4 +2602,251 @@ fn mapped_pptx_theme_preserves_initial_theme_colored_text_output() {
   let summary = render_summary("theme.pptx");
   assert_full_render_reference_smoke(&summary);
   assert_has_text_fill_color(&summary, "#4472c4@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf142645
+fn mapped_pptx_tdf142645_preserves_named_hello_slide_output() {
+  let summary = render_summary("pptx/tdf142645.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_contains_in_order(&summary, 0, &["Hello"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf142915
+fn mapped_pptx_tdf142915_preserves_automatic_advance_slide_output() {
+  let summary = render_summary("pptx/tdf142915.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_page_contains_in_order(&summary, 0, &["1"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf142913
+fn mapped_pptx_tdf142913_preserves_first_page_selection_deck_output() {
+  let summary = render_summary("pptx/tdf142913.pptx");
+  assert_page_count(&summary, 2);
+  assert_page_contains_in_order(&summary, 0, &["First"]);
+  assert_page_contains_in_order(&summary, 1, &["Second"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf142590
+fn mapped_pptx_tdf142590_preserves_custom_show_source_deck_output() {
+  let summary = render_summary("pptx/tdf142590.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 0, &["1"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testCustomSlideShow
+fn mapped_pptx_tdf131390_preserves_two_custom_show_source_deck_output() {
+  let summary = render_summary("pptx/tdf131390.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 0, &["First"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testDescriptionImport
+fn mapped_pptx_alt_description_preserves_image_output() {
+  let summary = render_summary("pptx/altdescription.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testOOXTheme
+fn mapped_pptx_ooxtheme_preserves_theme_dom_reference_output() {
+  let summary = render_summary("pptx/ooxtheme.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Theme test", "Theme DOM should be stored in OOXTheme"],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf103347
+fn mapped_pptx_tdf103347_preserves_duplicate_named_slide_deck_output() {
+  let summary = render_summary("pptx/tdf103347.pptx");
+  assert_page_count(&summary, 3);
+  assert_page_contains_in_order(&summary, 0, &["Hello"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testInteropGrabBag
+fn mapped_pptx_smartart_interopgrabbag_preserves_diagram_output() {
+  let summary = render_summary("pptx/smartart-interopgrabbag.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/PNGExportTests.cxx:testTdf156808
+fn mapped_pptx_tdf156808_preserves_black_png_export_page_output() {
+  assert_rendered_page_color_fraction_at_least("pptx/tdf156808.pptx", 0, [0, 0, 0], 8, 0.90);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/PNGExportTests.cxx:testTdf157793
+fn mapped_pptx_tdf157793_preserves_white_png_export_page_output() {
+  assert_rendered_page_color_fraction_at_least(
+    "pptx/tdf157793.pptx",
+    0,
+    [0xff, 0xff, 0xff],
+    8,
+    0.78,
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/PNGExportTests.cxx:testTdf157635
+fn mapped_pptx_tdf157635_preserves_black_background_png_export_output() {
+  assert_rendered_page_color_fraction_at_least("pptx/tdf157635.pptx", 0, [0, 0, 0], 8, 0.71);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/PNGExportTests.cxx:testTdf113163
+fn mapped_pptx_tdf113163_preserves_all_black_png_export_output() {
+  assert_rendered_page_color_fraction_at_least("pptx/tdf113163.pptx", 0, [0, 0, 0], 8, 0.98);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/ShapeImportExportTest.cxx:testTextDistancesOOXML
+fn mapped_pptx_text_distances_ooxml_preserves_inset_reference_labels() {
+  let summary = render_summary("TextDistancesInsets1.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_text_occurs_at_least(&summary, 0, "TOP", 6);
+  assert_page_text_occurs_at_least(&summary, 0, "MIDDLE", 6);
+  assert_page_text_occurs_at_least(&summary, 0, "BOTTOM", 6);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/ShapeImportExportTest.cxx:testTextDistancesOOXML_LargerThanTextAreaSpecialCase
+fn mapped_pptx_text_distances_ooxml_large_margin_special_case_preserves_labels() {
+  let summary = render_summary("TextDistancesInsets2.pptx");
+  assert_page_count(&summary, 1);
+  assert_page_text_occurs_at_least(&summary, 0, "TOP", 15);
+  assert_page_text_occurs_at_least(&summary, 0, "MIDDLE", 15);
+  assert_page_text_occurs_at_least(&summary, 0, "BOTTOM", 15);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/FontEmbeddingTest.cxx:testRoundtripEmbeddedFontsPPTX
+fn mapped_pptx_boldonse_embedded_font_preserves_fonted_text_output() {
+  let summary = render_summary("BoldonseFontEmbedded.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Test"]);
+  assert_text_object_font_contains(&summary, "Test", "Boldonse");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf89064
+fn mapped_pptx_tdf89064_preserves_single_notes_shape_source_and_slide_output() {
+  let summary = render_summary("pptx/tdf89064.pptx");
+  assert_page_count(&summary, 1);
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains(
+    "pptx/tdf89064.pptx",
+    "ppt/notesSlides/notesSlide1.xml",
+    "Note",
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf115394
+fn mapped_pptx_tdf115394_preserves_transition_duration_reference_deck_output() {
+  let summary = render_summary("pptx/tdf115394.pptx");
+  assert_page_count(&summary, 5);
+  assert_page_contains_in_order(&summary, 0, &["Standard transition", "slow"]);
+  assert_page_contains_in_order(&summary, 1, &["Standard transition", "medium"]);
+  assert_page_contains_in_order(&summary, 2, &["Standard transition", "fast"]);
+  assert_page_contains_in_order(&summary, 3, &["Custom transition", "0.25 s"]);
+  assert_page_contains_in_order(&summary, 4, &["Custom transition", "4.25"]);
+  assert_package_part_contains(
+    "pptx/tdf115394.pptx",
+    "ppt/slides/slide1.xml",
+    "spd=\"slow\"",
+  );
+  assert_package_part_contains(
+    "pptx/tdf115394.pptx",
+    "ppt/slides/slide2.xml",
+    "spd=\"med\"",
+  );
+  assert_package_part_contains(
+    "pptx/tdf115394.pptx",
+    "ppt/slides/slide4.xml",
+    "p14:dur=\"250\"",
+  );
+  assert_package_part_contains(
+    "pptx/tdf115394.pptx",
+    "ppt/slides/slide5.xml",
+    "p14:dur=\"4250\"",
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testCreationDate
+fn mapped_pptx_fdo71434_preserves_creation_date_metadata_source_and_output() {
+  let summary = render_summary("fdo71434.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains("fdo71434.pptx", "docProps/core.xml", "2013-11-09T10:37:56Z");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf93097
+fn mapped_pptx_tdf93097_preserves_title_metadata_source_and_output() {
+  let summary = render_summary("pptx/tdf93097.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_page_contains_in_order(&summary, 0, &["ss"]);
+  assert_package_part_contains(
+    "pptx/tdf93097.pptx",
+    "docProps/core.xml",
+    "<dc:title>ss</dc:title>",
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf111927
+fn mapped_pptx_tdf111927_preserves_empty_placeholder_style_deck_output() {
+  let summary = render_summary("pptx/tdf163239.pptx");
+  assert_page_count(&summary, 2);
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains("pptx/tdf163239.pptx", "ppt/slides/slide1.xml", "Subtitle 1");
+  assert_package_part_contains("pptx/tdf163239.pptx", "ppt/slides/slide1.xml", "Title 2");
+  assert_package_part_contains(
+    "pptx/tdf163239.pptx",
+    "ppt/slides/slide2.xml",
+    "Text Placeholder 1",
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf47365
+fn mapped_pptx_loop_no_pause_preserves_loop_show_source_and_output() {
+  let summary = render_summary("pptx/loopNoPause.pptx");
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains("pptx/loopNoPause.pptx", "ppt/presProps.xml", "loop=\"1\"");
+  assert_package_part_contains("pptx/loopNoPause.pptx", "ppt/presProps.xml", "<p:sldAll/>");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/FontEmbeddingTest.cxx:testTdf167214
+fn mapped_pptx_tdf167214_preserves_embedded_font_settings_source_and_output() {
+  let summary = render_summary("pptx/tdf167214.pptx");
+  assert_page_count(&summary, 1);
+  assert_full_render_reference_smoke(&summary);
+  assert_package_part_contains(
+    "pptx/tdf167214.pptx",
+    "ppt/presentation.xml",
+    "embedTrueTypeFonts=\"1\"",
+  );
+  assert_package_part_contains(
+    "pptx/tdf167214.pptx",
+    "ppt/presentation.xml",
+    "saveSubsetFonts=\"1\"",
+  );
+  assert_package_part_contains(
+    "pptx/tdf167214.pptx",
+    "ppt/presentation.xml",
+    "typeface=\"Figtree\"",
+  );
 }

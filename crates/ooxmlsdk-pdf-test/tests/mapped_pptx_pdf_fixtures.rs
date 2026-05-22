@@ -67,6 +67,29 @@ fn assert_text_fill_color(summary: &PdfSummary, expected_text: &str, expected_co
   );
 }
 
+fn assert_text_object_font_contains(
+  summary: &PdfSummary,
+  expected_text: &str,
+  expected_font: &str,
+) {
+  assert!(
+    summary.text_objects.iter().any(|object| {
+      normalize_space(&object.text).contains(expected_text)
+        && (object.font_name.contains(expected_font) || object.font_family.contains(expected_font))
+    }),
+    "missing text {expected_text:?} using font {expected_font:?}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
+fn assert_text_absent(summary: &PdfSummary, page_index: usize, unexpected: &str) {
+  let text = page_text(summary, page_index);
+  assert!(
+    !normalize_space(&text).contains(&normalize_space(unexpected)),
+    "unexpected page {page_index} text {unexpected:?}; page text:\n{text}"
+  );
+}
+
 fn assert_has_text_fill_color(summary: &PdfSummary, expected_color: &str) {
   assert!(
     summary
@@ -249,6 +272,42 @@ fn assert_any_path_height_close(
       .any(|bounds| (bounds.height() - expected_height_pt).abs() <= tolerance_pt),
     "missing path height close to {expected_height_pt}pt on page {page_index}; paths={:?}",
     summary.paths
+  );
+}
+
+fn assert_any_path_width_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_width_pt: f32,
+  tolerance_pt: f32,
+) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .filter(|path| path.page_index == page_index)
+      .filter_map(|path| path.bounds.as_deref())
+      .filter_map(|bounds| parse_pdf_rect(bounds).ok())
+      .any(|bounds| (bounds.width() - expected_width_pt).abs() <= tolerance_pt),
+    "missing path width close to {expected_width_pt}pt on page {page_index}; paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_text_left_delta_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  first_text: &str,
+  second_text: &str,
+  expected_delta_pt: f32,
+  tolerance_pt: f32,
+) {
+  let first = text_bounds_containing(summary, page_index, first_text);
+  let second = text_bounds_containing(summary, page_index, second_text);
+  let delta = first.left - second.left;
+  assert!(
+    (delta - expected_delta_pt).abs() <= tolerance_pt,
+    "text left delta for {first_text:?} and {second_text:?} is {delta:.2}pt, expected {expected_delta_pt:.2}pt; first={first:?}; second={second:?}"
   );
 }
 
@@ -960,4 +1019,158 @@ fn mapped_pptx_tdf144092_preserves_expanded_table_height() {
   let summary = render_summary("pptx/tdf144092-tableHeight.pptx");
   assert_page_has_stroked_path(&summary, 0);
   assert_any_path_height_close(&summary, 0, 7885.0 * 72.0 / 2540.0, 4.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf79007
+fn mapped_pptx_tdf79007_preserves_graphic_color_modes() {
+  let summary = render_summary("pptx/tdf79007.pptx");
+  assert_page_count(&summary, 3);
+  assert_rendered_image_centers_include_rgb_close(
+    "pptx/tdf79007.pptx",
+    &summary,
+    1,
+    [132, 132, 132],
+  );
+  assert_rendered_image_centers_include_rgb_close("pptx/tdf79007.pptx", &summary, 2, [0, 0, 0]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf118776
+fn mapped_pptx_tdf118776_preserves_no_fill_text_transparency() {
+  let summary = render_summary("pptx/tdf118776.pptx");
+  assert_text_fill_color(&summary, "Invisible due to no fill", "#000000@03");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf129686
+fn mapped_pptx_tdf129686_preserves_opaque_text_fill() {
+  let summary = render_summary("pptx/tdf129686.pptx");
+  assert_text_fill_color(&summary, "Profitability analysis", "#000000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf105150
+fn mapped_pptx_tdf105150_preserves_slide_background_fill_usage() {
+  let summary = render_summary("pptx/tdf105150.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert!(!summary.paths.iter().any(|path| {
+    path.page_index == 0
+      && path.fill_mode.is_some()
+      && path.fill_color.as_deref() == Some("#ffffff@ff")
+  }));
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf123684
+fn mapped_pptx_tdf123684_keeps_text_visible_when_shape_fill_is_none() {
+  let summary = render_summary("pptx/tdf123684.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Test", "Test", "Test", "Test", "Test", "Test"],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf104445
+fn mapped_pptx_tdf104445_does_not_add_extra_bullets_to_first_shape() {
+  let summary = render_summary("pptx/tdf104445.pptx");
+  assert_text_absent(&summary, 0, "• Tartalom helye 2");
+  assert_page_contains_in_order(&summary, 0, &["Tartalom helye 2", "Tartalom helye 3"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testRowHeight_n80340
+fn mapped_pptx_n80340_preserves_table_row_height() {
+  let summary = render_summary("pptx/n80340.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Yogesh"]);
+  assert_any_path_height_close(&summary, 0, 508.0 * 72.0 / 2540.0, 3.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testRowHeight_tableScale
+fn mapped_pptx_tablescale_preserves_scaled_table_row_heights() {
+  let summary = render_summary("pptx/tablescale.pptx");
+  assert_page_contains_in_order(&summary, 0, &["xxx", "yyy"]);
+  assert_any_path_height_close(&summary, 0, 800.0 * 72.0 / 2540.0, 4.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf93830
+fn mapped_pptx_tdf93830_preserves_text_left_distance_offset() {
+  let summary = render_summary("pptx/tdf93830.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert_any_path_width_close(&summary, 0, 4024.0 * 72.0 / 2540.0, 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf62255
+fn mapped_pptx_tdf62255_preserves_table_cell_no_fill() {
+  let summary = render_summary("pptx/tdf62255.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Test"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 4);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf127964
+fn mapped_pptx_tdf127964_preserves_background_fill_usage() {
+  let summary = render_summary("pptx/tdf127964.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert!(!summary.paths.iter().any(|path| {
+    path.page_index == 0
+      && path.fill_mode.is_some()
+      && path.fill_color.as_deref() == Some("#ffffff@ff")
+  }));
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf106638
+fn mapped_pptx_tdf106638_preserves_wingdings_bullet_run() {
+  let summary = render_summary("pptx/tdf106638.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["stratégique si la France veut se positionner"],
+  );
+  assert_text_object_font_contains(&summary, "", "Wingdings");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testIndentDuplication
+fn mapped_pptx_formatting_bullet_indent_preserves_scaled_indent() {
+  let summary = render_summary("pptx/formatting-bullet-indent.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Paragraph with indent", "Paragraph without indent."],
+  );
+  assert_text_left_delta_close(
+    &summary,
+    0,
+    "Paragraph with indent",
+    "Paragraph without indent.",
+    2500.0 * 72.0 / 2540.0,
+    8.0,
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:test_srcRect_smallNegBound
+fn mapped_pptx_tdf153008_preserves_cropped_bitmap_edge_pixels() {
+  let summary = render_summary("pptx/tdf153008-srcRect-smallNegBound.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_rendered_image_centers_include_rgb_close(
+    "pptx/tdf153008-srcRect-smallNegBound.pptx",
+    &summary,
+    0,
+    [0, 0, 0],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf153012
+fn mapped_pptx_chart_pt_color_bg1_preserves_resolved_data_point_fill() {
+  let summary = render_summary("pptx/chart_pt_color_bg1.pptx");
+  assert_has_path_fill_color(&summary, "#d9d9d9@ff");
 }

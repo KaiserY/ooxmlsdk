@@ -425,18 +425,18 @@ impl Shape {
   }
 
   pub(crate) fn finalize_x_shape(&mut self) {
-    // Source: LibreOffice oox/source/drawingml/shape.cxx createAndInsert.
-    // PowerPoint ignores p:xfrm extents for table shapes and uses the real
-    // DrawingML table grid/row dimensions.
+    // Source: LibreOffice oox/source/drawingml/table/tableproperties.cxx
+    // expands undersized rows to the graphical frame height, while still using
+    // the DrawingML grid/row dimensions when they exceed the frame.
     if self.service_name == ShapeService::TableShape
       && let Some(table) = &self.table_properties
     {
       let width = table.grid.iter().copied().sum::<i64>();
       let height = table.rows.iter().map(|row| row.height).sum::<i64>();
-      if width > 0 {
+      if width > self.size.cx {
         self.size.cx = width;
       }
-      if height > 0 {
+      if height > self.size.cy {
         self.size.cy = height;
       }
     }

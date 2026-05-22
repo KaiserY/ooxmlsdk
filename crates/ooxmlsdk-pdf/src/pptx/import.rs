@@ -151,6 +151,36 @@ impl PowerPointImport {
     }
   }
 
+  pub(crate) fn get_scheme_color_token_for_slide(
+    &self,
+    slide: &SlidePersist,
+    token: a::SchemeColorValues,
+  ) -> Option<a::ColorSchemeIndexValues> {
+    if let Some(mapped) = slide
+      .color_map
+      .as_ref()
+      .and_then(|color_map| color_map.map_token(token))
+    {
+      return Some(mapped);
+    }
+    if let Some(mapped) = slide
+      .master_color_map
+      .as_ref()
+      .and_then(|color_map| color_map.map_token(token))
+    {
+      return Some(mapped);
+    }
+    if let Some(mapped) = slide
+      .master_page_index
+      .and_then(|index| self.master_pages.get(index))
+      .and_then(|master| master.color_map.as_ref())
+      .and_then(|color_map| color_map.map_token(token))
+    {
+      return Some(mapped);
+    }
+    self.get_scheme_color_token(token)
+  }
+
   pub(crate) fn get_scheme_color(&self, token: a::SchemeColorValues) -> Option<String> {
     // Source: LibreOffice oox/source/ppt/pptimport.cxx
     // getSchemeColor first maps the scheme token using the active slide/layout
@@ -169,12 +199,40 @@ impl PowerPointImport {
       .and_then(|theme| theme.color_scheme.get_color(mapped_token))
   }
 
+  pub(crate) fn get_scheme_color_record_for_slide(
+    &self,
+    slide: &SlidePersist,
+    token: a::SchemeColorValues,
+  ) -> Option<&Color> {
+    let mapped_token = self.get_scheme_color_token_for_slide(slide, token)?;
+    slide
+      .theme_path
+      .as_deref()
+      .and_then(|path| self.get_theme(path))
+      .or_else(|| self.get_current_theme_ptr())
+      .and_then(|theme| theme.color_scheme.get_color(mapped_token))
+  }
+
   pub(crate) fn resolve_color(
     &self,
     color: &Color,
     placeholder_color: Option<&Color>,
   ) -> Option<super::drawingml::color::ResolvedColor> {
     let mut scheme_resolver = |token| self.get_scheme_color_record(token).cloned();
+    color.resolve_rgb(&mut scheme_resolver, placeholder_color)
+  }
+
+  pub(crate) fn resolve_color_for_slide(
+    &self,
+    slide: &SlidePersist,
+    color: &Color,
+    placeholder_color: Option<&Color>,
+  ) -> Option<super::drawingml::color::ResolvedColor> {
+    let mut scheme_resolver = |token| {
+      self
+        .get_scheme_color_record_for_slide(slide, token)
+        .cloned()
+    };
     color.resolve_rgb(&mut scheme_resolver, placeholder_color)
   }
 

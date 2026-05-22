@@ -87,9 +87,12 @@ fn lower_background(
   let Some(fill_properties) = fill_properties else {
     return;
   };
-  let Some(fill_paint) = fill_paint(import, &fill_properties) else {
+  let Some(fill_paint) = background_fill_paint(import, slide, &fill_properties) else {
     return;
   };
+  if is_default_white_page_background(fill_paint) {
+    return;
+  }
   items.push(PageItem::Rect(RectItem {
     x_pt: 0.0,
     y_pt: 0.0,
@@ -100,6 +103,27 @@ fn lower_background(
     stroke: None,
     stroke_opacity: 1.0,
   }));
+}
+
+fn is_default_white_page_background(paint: DisplayPaint) -> bool {
+  paint.opacity >= 1.0 && paint.color.r == 255 && paint.color.g == 255 && paint.color.b == 255
+}
+
+fn background_fill_paint(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  fill: &FillProperties,
+) -> Option<DisplayPaint> {
+  match &fill.kind {
+    FillKind::Solid(color) => color.as_ref().and_then(|color| {
+      display_paint_for_slide(import, slide, color, fill.placeholder_color.as_ref())
+    }),
+    FillKind::None
+    | FillKind::Group
+    | FillKind::Gradient(_)
+    | FillKind::Blip(_)
+    | FillKind::Pattern(_) => None,
+  }
 }
 
 fn lower_shapes(import: &PowerPointImport, shapes: &[Shape], items: &mut Vec<PageItem>) {
@@ -278,7 +302,8 @@ fn lower_table(
   let x0 = units::emu_to_points(offset.x_emu + shape.position.x);
   let y0 = units::emu_to_points(offset.y_emu + shape.position.y);
   let table_width = units::emu_to_points(table.grid.iter().copied().sum::<i64>());
-  let table_height = units::emu_to_points(table.rows.iter().map(|row| row.height).sum::<i64>());
+  let row_height_sum = table.rows.iter().map(|row| row.height).sum::<i64>();
+  let table_height = units::emu_to_points(row_height_sum.max(shape.size.cy));
   if table_width <= 0.0 || table_height <= 0.0 {
     return;
   }
@@ -302,13 +327,17 @@ fn lower_table(
   if draw_fallback_grid {
     push_table_line(items, x0, y0, x0 + table_width, y0, border_color);
     push_table_line(items, x0, y0, x0, y0 + table_height, border_color);
+  } else if let Some(style) = table_style
+    && !table_has_visible_direct_borders(table)
+  {
+    lower_table_style_outer_borders(import, style, x0, y0, table_width, table_height, items);
   }
 
   let mut y = y0;
   let max_row = table.rows.len().saturating_sub(1);
   let max_column = table.grid.len().saturating_sub(1);
   for (row_index, row) in table.rows.iter().enumerate() {
-    let row_height = units::emu_to_points(row.height);
+    let row_height = table_row_display_height(row.height, row_height_sum, shape.size.cy);
     let mut x = x0;
     let mut grid_index = 0usize;
     for cell in &row.cells {
@@ -356,6 +385,62 @@ fn lower_table(
       push_table_line(items, x, y0, x, y0 + table_height, border_color);
     }
   }
+}
+
+fn lower_table_style_outer_borders(
+  import: &PowerPointImport,
+  style: &TableStyle,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  items: &mut Vec<PageItem>,
+) {
+  let borders = &style.whole_table.borders;
+  push_table_border_line(
+    import,
+    &table_style_border_line(import, &borders.top, &borders.top_reference),
+    x,
+    y,
+    x + width,
+    y,
+    items,
+  );
+  push_table_border_line(
+    import,
+    &table_style_border_line(import, &borders.bottom, &borders.bottom_reference),
+    x,
+    y + height,
+    x + width,
+    y + height,
+    items,
+  );
+  push_table_border_line(
+    import,
+    &table_style_border_line(import, &borders.left, &borders.left_reference),
+    x,
+    y,
+    x,
+    y + height,
+    items,
+  );
+  push_table_border_line(
+    import,
+    &table_style_border_line(import, &borders.right, &borders.right_reference),
+    x + width,
+    y,
+    x + width,
+    y + height,
+    items,
+  );
+}
+
+fn table_row_display_height(row_height: i64, row_height_sum: i64, shape_height: i64) -> f32 {
+  let row_height = units::emu_to_points(row_height);
+  if row_height_sum <= 0 || shape_height <= row_height_sum {
+    return row_height;
+  }
+  row_height * shape_height as f32 / row_height_sum as f32
 }
 
 fn table_cell_style_part(
@@ -1919,6 +2004,23 @@ fn display_paint(
   placeholder_color: Option<&Color>,
 ) -> Option<DisplayPaint> {
   let color = import.resolve_color(color, placeholder_color)?;
+  Some(DisplayPaint {
+    color: RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    },
+    opacity: color_opacity(color.alpha),
+  })
+}
+
+fn display_paint_for_slide(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  color: &Color,
+  placeholder_color: Option<&Color>,
+) -> Option<DisplayPaint> {
+  let color = import.resolve_color_for_slide(slide, color, placeholder_color)?;
   Some(DisplayPaint {
     color: RgbColor {
       r: color.r,

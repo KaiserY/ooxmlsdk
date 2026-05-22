@@ -133,6 +133,18 @@ impl PPTShapeGroupContext {
       &mut shape.shape,
       source.shape_properties.transform2_d.as_deref(),
     );
+    if source
+      .use_background_fill
+      .is_some_and(|value| value.as_bool())
+    {
+      // Source: LibreOffice oox/source/ppt/pptshapegroupcontext.cxx
+      // imports p:sp@useBgFill as noFill so the style fill reference does not
+      // paint over the slide background.
+      shape.shape.fill_properties = Some(FillProperties {
+        kind: FillKind::None,
+        placeholder_color: None,
+      });
+    }
     apply_shape_properties(&mut shape.shape, &source.shape_properties);
     if let Some(style) = &source.shape_style {
       shape.shape.set_shape_style_refs(style);

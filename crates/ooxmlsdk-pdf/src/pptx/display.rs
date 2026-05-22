@@ -5,6 +5,7 @@ use crate::layout::{
   self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
   TextItem,
 };
+use crate::text_metrics::measure_text;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
@@ -1246,60 +1247,113 @@ fn lower_paragraph(
     return;
   }
   let paragraph_x = cursor.x_pt + paragraph_style.left_margin_pt + paragraph_style.indent_pt;
-  let mut run_x = paragraph_x;
-  let mut max_line_height = line_height(base_style, options.line_scale);
+  let mut segment_start = 0usize;
+  let mut is_first_segment = true;
 
-  if let Some(label) = paragraph_style.bullet_label(paragraph) {
-    let mut bullet_style = base_style.clone();
-    paragraph_style.apply_default_run_style(import, &mut bullet_style);
-    max_line_height = max_line_height.max(line_height(&bullet_style, options.line_scale));
-    push_text_item(
-      items,
-      run_x - DEFAULT_BULLET_INDENT_PT,
-      cursor.y_pt,
-      label,
-      bullet_style,
-      shape_hyperlink_url.map(ToString::to_string),
-      options.line_scale,
+  loop {
+    let segment_end = paragraph.runs[segment_start..]
+      .iter()
+      .position(|run| run.kind == TextRunKind::Break)
+      .map(|offset| segment_start + offset)
+      .unwrap_or(paragraph.runs.len());
+    let line_width = paragraph_run_width(
+      import,
+      &paragraph_style,
+      base_style,
+      &paragraph.runs[segment_start..segment_end],
     );
-  }
+    let mut run_x = aligned_paragraph_x(
+      paragraph_x,
+      column_width,
+      line_width,
+      paragraph_style.alignment,
+    );
+    let mut max_line_height = line_height(base_style, options.line_scale);
 
-  for run in &paragraph.runs {
-    match run.kind {
-      TextRunKind::Run | TextRunKind::Field => {
-        if run.text.is_empty() {
-          continue;
-        }
-        let mut style = base_style.clone();
-        paragraph_style.apply_default_run_style(import, &mut style);
-        apply_run_properties(import, run, &mut style);
-        max_line_height = max_line_height.max(line_height(&style, options.line_scale));
-        let text = run_text(run, &style);
-        push_text_item(
-          items,
-          run_x,
-          cursor.y_pt,
-          text.clone(),
-          style.clone(),
-          run
-            .hyperlink_url
-            .clone()
-            .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
-          options.line_scale,
-        );
-        run_x += approximate_text_width_pt(&text, &style);
-      }
-      TextRunKind::Break => {
-        cursor.y_pt += max_line_height;
-        advance_text_column_if_needed(cursor, frame, *options);
-        run_x = paragraph_x;
-        max_line_height = line_height(base_style, options.line_scale);
-      }
-      TextRunKind::Math => {}
+    if is_first_segment && let Some(label) = paragraph_style.bullet_label(paragraph) {
+      let mut bullet_style = base_style.clone();
+      paragraph_style.apply_default_run_style(import, &mut bullet_style);
+      max_line_height = max_line_height.max(line_height(&bullet_style, options.line_scale));
+      push_text_item(
+        items,
+        run_x - DEFAULT_BULLET_INDENT_PT,
+        cursor.y_pt,
+        label,
+        bullet_style,
+        shape_hyperlink_url.map(ToString::to_string),
+        options.line_scale,
+      );
     }
+
+    for run in &paragraph.runs[segment_start..segment_end] {
+      if !matches!(run.kind, TextRunKind::Run | TextRunKind::Field) || run.text.is_empty() {
+        continue;
+      }
+      let mut style = base_style.clone();
+      paragraph_style.apply_default_run_style(import, &mut style);
+      apply_run_properties(import, run, &mut style);
+      max_line_height = max_line_height.max(line_height(&style, options.line_scale));
+      let text = run_text(run, &style);
+      push_text_item(
+        items,
+        run_x,
+        cursor.y_pt,
+        text.clone(),
+        style.clone(),
+        run
+          .hyperlink_url
+          .clone()
+          .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
+        options.line_scale,
+      );
+      run_x += measure_text(&text, &style);
+    }
+
+    cursor.y_pt += max_line_height;
+    advance_text_column_if_needed(cursor, frame, *options);
+    if segment_end == paragraph.runs.len() {
+      break;
+    }
+    segment_start = segment_end + 1;
+    is_first_segment = false;
   }
-  cursor.y_pt += max_line_height;
-  advance_text_column_if_needed(cursor, frame, *options);
+}
+
+fn paragraph_run_width(
+  import: &PowerPointImport,
+  paragraph_style: &ParagraphDisplayStyle,
+  base_style: &TextStyle,
+  runs: &[TextRun],
+) -> f32 {
+  runs
+    .iter()
+    .filter(|run| matches!(run.kind, TextRunKind::Run | TextRunKind::Field) && !run.text.is_empty())
+    .map(|run| {
+      let mut style = base_style.clone();
+      paragraph_style.apply_default_run_style(import, &mut style);
+      apply_run_properties(import, run, &mut style);
+      measure_text(&run_text(run, &style), &style)
+    })
+    .sum()
+}
+
+fn aligned_paragraph_x(
+  paragraph_x: f32,
+  column_width: f32,
+  line_width: f32,
+  alignment: a::TextAlignmentTypeValues,
+) -> f32 {
+  match alignment {
+    a::TextAlignmentTypeValues::Center => {
+      paragraph_x + ((column_width - line_width) / 2.0).max(0.0)
+    }
+    a::TextAlignmentTypeValues::Right => paragraph_x + (column_width - line_width).max(0.0),
+    a::TextAlignmentTypeValues::Left
+    | a::TextAlignmentTypeValues::Justified
+    | a::TextAlignmentTypeValues::JustifiedLow
+    | a::TextAlignmentTypeValues::Distributed
+    | a::TextAlignmentTypeValues::ThaiDistributed => paragraph_x,
+  }
 }
 
 fn push_text_item(
@@ -1361,10 +1415,6 @@ fn advance_text_column_if_needed(
   cursor.y_pt = frame.y_pt;
 }
 
-fn approximate_text_width_pt(text: &str, style: &TextStyle) -> f32 {
-  text.chars().count() as f32 * style.font_size_pt * 0.5
-}
-
 fn run_text(run: &TextRun, style: &TextStyle) -> String {
   if style.uppercase {
     run.text.to_uppercase()
@@ -1373,12 +1423,25 @@ fn run_text(run: &TextRun, style: &TextStyle) -> String {
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct ParagraphDisplayStyle {
   left_margin_pt: f32,
   indent_pt: f32,
+  alignment: a::TextAlignmentTypeValues,
   bullet: Option<String>,
   default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+impl Default for ParagraphDisplayStyle {
+  fn default() -> Self {
+    Self {
+      left_margin_pt: 0.0,
+      indent_pt: 0.0,
+      alignment: a::TextAlignmentTypeValues::Left,
+      bullet: None,
+      default_run_properties: None,
+    }
+  }
 }
 
 impl ParagraphDisplayStyle {
@@ -1400,6 +1463,9 @@ impl ParagraphDisplayStyle {
       if let Some(default_run_properties) = &properties.default_run_properties {
         style.default_run_properties = Some(default_run_properties.clone());
       }
+      if let Some(alignment) = properties.alignment {
+        style.alignment = alignment;
+      }
       style.bullet = paragraph_properties_bullet(&properties.paragraph_properties_choice4);
     }
     style
@@ -1416,6 +1482,7 @@ impl ParagraphDisplayStyle {
           .indent
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
+        self.alignment = properties.alignment.unwrap_or(self.alignment);
         self.default_run_properties = properties.default_run_properties.clone();
         self.bullet =
           default_paragraph_properties_bullet(&properties.default_paragraph_properties_choice4);
@@ -1437,6 +1504,7 @@ impl ParagraphDisplayStyle {
           .indent
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
+        self.alignment = $properties.alignment.unwrap_or(self.alignment);
         self.default_run_properties = $properties.default_run_properties.clone();
         self.bullet = $bullet_fn(&$properties.$choice);
       }};

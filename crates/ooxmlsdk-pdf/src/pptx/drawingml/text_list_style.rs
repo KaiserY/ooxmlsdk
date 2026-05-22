@@ -212,7 +212,7 @@ impl TextListStyle {
         .iter_mut()
         .find(|existing| existing.level == level_style.level)
       {
-        *existing = level_style.clone();
+        *existing = level_style.clone_preserving_inherited_alignment(existing);
       } else {
         self.levels.push(level_style.clone());
       }
@@ -250,6 +250,56 @@ impl TextListLevelStyle {
     Self {
       level,
       paragraph_properties,
+    }
+  }
+
+  fn clone_preserving_inherited_alignment(&self, inherited: &Self) -> Self {
+    let mut merged = self.clone();
+    if merged.paragraph_properties.alignment().is_none() {
+      merged
+        .paragraph_properties
+        .set_alignment(inherited.paragraph_properties.alignment());
+    }
+    merged
+  }
+}
+
+impl TextListLevelParagraphProperties {
+  fn alignment(&self) -> Option<a::TextAlignmentTypeValues> {
+    macro_rules! alignment {
+      ($properties:expr) => {
+        $properties.alignment
+      };
+    }
+    match self {
+      Self::Level1(properties) => alignment!(properties),
+      Self::Level2(properties) => alignment!(properties),
+      Self::Level3(properties) => alignment!(properties),
+      Self::Level4(properties) => alignment!(properties),
+      Self::Level5(properties) => alignment!(properties),
+      Self::Level6(properties) => alignment!(properties),
+      Self::Level7(properties) => alignment!(properties),
+      Self::Level8(properties) => alignment!(properties),
+      Self::Level9(properties) => alignment!(properties),
+    }
+  }
+
+  fn set_alignment(&mut self, alignment: Option<a::TextAlignmentTypeValues>) {
+    macro_rules! set_alignment {
+      ($properties:expr) => {
+        $properties.alignment = alignment
+      };
+    }
+    match self {
+      Self::Level1(properties) => set_alignment!(properties),
+      Self::Level2(properties) => set_alignment!(properties),
+      Self::Level3(properties) => set_alignment!(properties),
+      Self::Level4(properties) => set_alignment!(properties),
+      Self::Level5(properties) => set_alignment!(properties),
+      Self::Level6(properties) => set_alignment!(properties),
+      Self::Level7(properties) => set_alignment!(properties),
+      Self::Level8(properties) => set_alignment!(properties),
+      Self::Level9(properties) => set_alignment!(properties),
     }
   }
 }

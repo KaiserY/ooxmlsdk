@@ -5,7 +5,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
-use super::drawingml::line::LineProperties;
+use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{CustomShapeGeometry, FrameType, Point, Shape, ShapeService, Size};
 use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
@@ -346,30 +346,39 @@ fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProp
       kind: FillKind::None,
     }),
     p::ShapePropertiesChoice2::SolidFill(fill) => Some(FillProperties {
-      kind: FillKind::Solid(import_solid_fill_color(fill)?),
+      kind: FillKind::Solid(import_solid_fill_color(fill)),
     }),
     p::ShapePropertiesChoice2::GroupFill => Some(FillProperties {
       kind: FillKind::Group,
     }),
-    p::ShapePropertiesChoice2::GradientFill(_)
-    | p::ShapePropertiesChoice2::BlipFill(_)
-    | p::ShapePropertiesChoice2::PatternFill(_) => None,
+    p::ShapePropertiesChoice2::GradientFill(fill) => Some(FillProperties {
+      kind: FillKind::Gradient(fill.clone()),
+    }),
+    p::ShapePropertiesChoice2::BlipFill(fill) => Some(FillProperties {
+      kind: FillKind::Blip(fill.clone()),
+    }),
+    p::ShapePropertiesChoice2::PatternFill(fill) => Some(FillProperties {
+      kind: FillKind::Pattern(fill.clone()),
+    }),
   }
 }
 
 fn import_line_properties(outline: &a::Outline) -> Option<LineProperties> {
-  match outline.outline_choice1.as_ref() {
-    Some(a::OutlineChoice::NoFill(_)) => None,
-    Some(a::OutlineChoice::SolidFill(fill)) => Some(LineProperties {
-      color: import_solid_fill_color(fill),
+  let fill = match outline.outline_choice1.as_ref() {
+    Some(a::OutlineChoice::NoFill(_)) => LineFill::None,
+    Some(a::OutlineChoice::SolidFill(fill)) => LineFill::Solid(import_solid_fill_color(fill)),
+    Some(a::OutlineChoice::GradientFill(fill)) => LineFill::Gradient(fill.clone()),
+    Some(a::OutlineChoice::PatternFill(fill)) => LineFill::Pattern(fill.clone()),
+    None => LineFill::Unspecified,
+  };
+
+  if fill == LineFill::Unspecified && outline.width.is_none() {
+    None
+  } else {
+    Some(LineProperties {
+      fill,
       width_emu: outline.width.map(i64::from),
-    }),
-    Some(a::OutlineChoice::GradientFill(_)) | Some(a::OutlineChoice::PatternFill(_)) | None => {
-      Some(LineProperties {
-        color: None,
-        width_emu: outline.width.map(i64::from),
-      })
-    }
+    })
   }
 }
 

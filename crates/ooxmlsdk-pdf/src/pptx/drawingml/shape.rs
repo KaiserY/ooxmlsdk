@@ -3,8 +3,8 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_presentationml_2006_main as p,
 };
 
-use super::fill::FillProperties;
-use super::line::LineProperties;
+use super::fill::{FillKind, FillProperties};
+use super::line::{LineFill, LineProperties};
 use super::shape_properties::EffectProperties;
 use super::table::TableProperties;
 use super::text_body::TextBody;
@@ -48,6 +48,9 @@ pub(crate) struct Shape {
   pub(crate) shape_ref_line_properties: Option<LineProperties>,
   pub(crate) shape_ref_fill_properties: Option<FillProperties>,
   pub(crate) shape_ref_effect_properties: Option<EffectProperties>,
+  pub(crate) actual_line_properties: Option<LineProperties>,
+  pub(crate) actual_fill_properties: Option<FillProperties>,
+  pub(crate) actual_effect_properties: Option<EffectProperties>,
   pub(crate) shape_style_refs: Option<ShapeStyleRefs>,
   pub(crate) connector_shape_properties: Vec<ConnectorShapeProperties>,
   pub(crate) frame_type: FrameType,
@@ -198,6 +201,9 @@ impl Shape {
       shape_ref_line_properties: None,
       shape_ref_fill_properties: None,
       shape_ref_effect_properties: None,
+      actual_line_properties: None,
+      actual_fill_properties: None,
+      actual_effect_properties: None,
       shape_style_refs: None,
       connector_shape_properties: Vec::new(),
       frame_type: FrameType::Generic,
@@ -260,13 +266,26 @@ impl Shape {
   }
 
   pub(crate) fn create_and_insert(&mut self, import: &PowerPointImport) {
+    self.create_and_insert_with_parent_fill(import, None);
+  }
+
+  fn create_and_insert_with_parent_fill(
+    &mut self,
+    import: &PowerPointImport,
+    parent_fill: Option<&FillProperties>,
+  ) {
     self.finalize_service_name();
-    let _ = self.get_actual_fill_properties(import);
-    let _ = self.get_actual_line_properties(import);
-    let _ = self.get_actual_effect_properties(import);
+    self.actual_fill_properties = self.get_actual_fill_properties(import, parent_fill);
+    self.actual_line_properties = self.get_actual_line_properties(import);
+    self.actual_effect_properties = self.get_actual_effect_properties(import);
     self.finalize_x_shape();
+
+    let child_parent_fill = self
+      .actual_fill_properties
+      .clone()
+      .or_else(|| parent_fill.cloned());
     for child in &mut self.children {
-      child.create_and_insert(import);
+      child.create_and_insert_with_parent_fill(import, child_parent_fill.as_ref());
     }
   }
 
@@ -329,21 +348,29 @@ impl Shape {
   pub(crate) fn get_actual_fill_properties(
     &self,
     _import: &PowerPointImport,
+    parent_fill: Option<&FillProperties>,
   ) -> Option<FillProperties> {
-    self
-      .shape_ref_fill_properties
-      .clone()
-      .or_else(|| self.fill_properties.clone())
+    // Source: LibreOffice oox/source/drawingml/shape.cxx
+    // getActualFillProperties applies reference/theme/direct properties, then
+    // replaces direct grpFill with the parent group fill when one exists.
+    let mut actual = self.shape_ref_fill_properties.clone();
+    if let Some(fill) = &self.fill_properties {
+      actual = match fill.kind {
+        FillKind::Group => parent_fill.cloned().or_else(|| Some(fill.clone())),
+        _ => Some(fill.clone()),
+      };
+    }
+    actual
   }
 
   pub(crate) fn get_actual_line_properties(
     &self,
     _import: &PowerPointImport,
   ) -> Option<LineProperties> {
-    self
-      .shape_ref_line_properties
-      .clone()
-      .or_else(|| self.line_properties.clone())
+    merge_line_properties(
+      self.shape_ref_line_properties.clone(),
+      self.line_properties.clone(),
+    )
   }
 
   pub(crate) fn get_actual_effect_properties(
@@ -351,9 +378,9 @@ impl Shape {
     _import: &PowerPointImport,
   ) -> Option<EffectProperties> {
     self
-      .shape_ref_effect_properties
+      .effect_properties
       .clone()
-      .or_else(|| self.effect_properties.clone())
+      .or_else(|| self.shape_ref_effect_properties.clone())
   }
 
   pub(crate) fn set_text_body(&mut self, text_body: TextBody) {
@@ -463,4 +490,24 @@ impl Shape {
   pub(crate) fn propagate_diagram_helper(&mut self) {}
 
   pub(crate) fn migrate_diagram_helper_to_new_shape(&mut self) {}
+}
+
+fn merge_line_properties(
+  base: Option<LineProperties>,
+  direct: Option<LineProperties>,
+) -> Option<LineProperties> {
+  match (base, direct) {
+    (Some(mut base), Some(direct)) => {
+      if direct.fill != LineFill::Unspecified {
+        base.fill = direct.fill;
+      }
+      if direct.width_emu.is_some() {
+        base.width_emu = direct.width_emu;
+      }
+      Some(base)
+    }
+    (Some(base), None) => Some(base),
+    (None, Some(direct)) => Some(direct),
+    (None, None) => None,
+  }
 }

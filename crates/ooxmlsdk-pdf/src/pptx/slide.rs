@@ -116,12 +116,12 @@ pub(crate) struct ColorMapEntry {
   pub(crate) target: a::ColorSchemeIndexValues,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct BackgroundProperties {
   pub(crate) kind: BackgroundKind,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum BackgroundKind {
   Properties(FillProperties),
   StyleReference {

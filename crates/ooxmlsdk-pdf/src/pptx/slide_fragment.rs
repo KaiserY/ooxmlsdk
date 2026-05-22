@@ -120,11 +120,17 @@ fn import_background_fill(properties: &p::BackgroundProperties) -> Option<FillPr
       kind: FillKind::None,
     }),
     p::BackgroundPropertiesChoice::SolidFill(fill) => Some(FillProperties {
-      kind: FillKind::Solid(import_solid_fill_color(fill)?),
+      kind: FillKind::Solid(import_solid_fill_color(fill)),
     }),
-    p::BackgroundPropertiesChoice::GradientFill(_)
-    | p::BackgroundPropertiesChoice::BlipFill(_)
-    | p::BackgroundPropertiesChoice::PatternFill(_) => None,
+    p::BackgroundPropertiesChoice::GradientFill(fill) => Some(FillProperties {
+      kind: FillKind::Gradient(fill.clone()),
+    }),
+    p::BackgroundPropertiesChoice::BlipFill(fill) => Some(FillProperties {
+      kind: FillKind::Blip(fill.clone()),
+    }),
+    p::BackgroundPropertiesChoice::PatternFill(fill) => Some(FillProperties {
+      kind: FillKind::Pattern(fill.clone()),
+    }),
   }
 }
 

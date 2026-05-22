@@ -6,7 +6,7 @@ use crate::units;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
-use super::drawingml::line::LineProperties;
+use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{Shape, ShapeService};
 use super::drawingml::text_body::{TextBody, TextRunKind};
 use super::import::PowerPointImport;
@@ -100,8 +100,8 @@ fn lower_shape_bounds(shape: &Shape, offset: DisplayOffset, items: &mut Vec<Page
     return;
   }
 
-  let fill_color = actual_fill_properties(shape).and_then(fill_color);
-  let stroke = actual_line_properties(shape).and_then(line_stroke);
+  let fill_color = shape.actual_fill_properties.as_ref().and_then(fill_color);
+  let stroke = shape.actual_line_properties.as_ref().and_then(line_stroke);
   if fill_color.is_none() && stroke.is_none() {
     return;
   }
@@ -188,32 +188,25 @@ fn paragraph_text(
   text
 }
 
-fn actual_fill_properties(shape: &Shape) -> Option<&FillProperties> {
-  shape
-    .fill_properties
-    .as_ref()
-    .or(shape.shape_ref_fill_properties.as_ref())
-}
-
-fn actual_line_properties(shape: &Shape) -> Option<&LineProperties> {
-  shape
-    .line_properties
-    .as_ref()
-    .or(shape.shape_ref_line_properties.as_ref())
-}
-
 fn fill_color(fill: &FillProperties) -> Option<RgbColor> {
   match &fill.kind {
-    FillKind::Solid(color) => display_rgb_color(color),
-    FillKind::None | FillKind::Group => None,
+    FillKind::Solid(color) => color.as_ref().and_then(display_rgb_color),
+    FillKind::None
+    | FillKind::Group
+    | FillKind::Gradient(_)
+    | FillKind::Blip(_)
+    | FillKind::Pattern(_) => None,
   }
 }
 
 fn line_stroke(line: &LineProperties) -> Option<BorderStyle> {
+  let LineFill::Solid(color) = &line.fill else {
+    return None;
+  };
   Some(BorderStyle {
     width_pt: line.width_emu.map(units::emu_to_points).unwrap_or(0.75),
     spacing_pt: 0.0,
-    color: display_rgb_color(line.color.as_ref()?)?,
+    color: color.as_ref().and_then(display_rgb_color)?,
     compound: false,
   })
 }

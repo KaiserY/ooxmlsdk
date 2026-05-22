@@ -158,9 +158,10 @@ impl PowerPointImport {
     // DrawingML theme. Do not return a token string as if it were a resolved
     // color; theme color-scheme import must be ported from upstream first.
     match self.get_scheme_color_record(token)? {
-      Color::RgbHex(hex) => Some(hex.clone()),
-      Color::System(system) => system.last_color.clone(),
+      Color::RgbHex(color) if color.transformations.is_empty() => Some(color.value.clone()),
+      Color::System(system) if system.transformations.is_empty() => system.last_color.clone(),
       Color::Scheme(_) | Color::Preset(_) => None,
+      Color::RgbHex(_) | Color::System(_) => None,
     }
   }
 

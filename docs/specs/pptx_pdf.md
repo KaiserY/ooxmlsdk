@@ -81,6 +81,9 @@ Already structurally aligned:
 - Shape actual fill/line/effect resolution now consumes theme style refs from
   `a:style` against the current theme format scheme before applying direct
   shape properties.
+- Shape style refs preserve both the style-matrix index and placeholder color
+  (`phClr`) for fill, line, effect, and font refs. `fontRef` without an
+  explicit color defaults to scheme `tx1`, matching LibreOffice.
 - Background `bgPr` and `bgRef` are separate structured states. `bgRef` is not
   treated as a direct solid fill.
 - Shape import preserves non-visual metadata, placeholder subtype/index,
@@ -107,13 +110,15 @@ Known gaps to keep visible:
 
 - Theme color scheme and style-matrix resolution are not complete.
   `get_scheme_color()` may return concrete RGB only when the current theme
-  color record is already a concrete RGB or system `lastClr`; it must not
-  invent RGB for preset, HSL, percentage, or transformed colors.
+  color record is already a concrete RGB or system `lastClr` with no color
+  transformations; it must not invent RGB for preset, HSL, percentage, or
+  transformed colors.
 - `Shape::apply_shape_reference` still lacks the explicit `bUseText` branch,
   generic shape-property copy, and full custom geometry behavior.
 - Theme style-matrix lookup is structurally present for fill, line, effect, and
-  background-fill lists, but placeholder color (`phClr`), color transforms,
-  theme overrides, and full effect semantics remain incomplete.
+  background-fill lists, and style refs preserve `phClr`. Color transforms are
+  preserved on imported RGB/scheme/preset/system colors, but applying those
+  transforms to resolved colors is still incomplete.
 - Paragraph/run property application is incomplete beyond structural style
   selection.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
@@ -449,6 +454,13 @@ Import rules:
   `grpFill`, `ln`, `custGeom`, `prstGeom`, and style refs as structured state.
   Theme/style-matrix resolution belongs to DrawingML theme code and
   `create_and_insert`.
+- Style refs are not just indexes: preserve `phClr` and transformations for
+  later substitution into theme style fills/lines/effects. `fontRef` must
+  default to `tx1` when no color child exists.
+- Preserve color transformations such as `tint`, `shade`, `alpha`,
+  `alphaMod`, `lumMod`, `lumOff`, `satMod`, `hueMod`, RGB channel transforms,
+  `gray`, `comp`, `inv`, `gamma`, and `invGamma` on the color record. Do not
+  render a transformed color as its untransformed base color.
 - `ln/noFill` is a real direct line property that suppresses inherited/theme
   line state. Do not represent it as missing line properties.
 - Cache actual fill, line, and effect state on `Shape` during
@@ -525,6 +537,10 @@ Theme style refs from `a:style` are resolved between inherited/reference shape
 properties and direct shape properties. Do not resolve `fillRef`, `lnRef`, or
 `effectRef` in the parser or display layer; they need the current
 `PowerPointImport`/`SlidePersist` theme context.
+
+The style ref placeholder color (`phClr`) must travel with the style ref. It is
+not equivalent to the resolved theme style color, and it should not be dropped
+when the current renderer cannot yet apply substitutions or transformations.
 
 Fill and line import must preserve unresolved structural variants even when the
 current display bridge cannot paint them. Dropping `gradFill`, `blipFill`,

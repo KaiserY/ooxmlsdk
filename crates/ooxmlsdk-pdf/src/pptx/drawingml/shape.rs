@@ -133,10 +133,22 @@ pub(crate) enum CustomShapeGeometry {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ShapeStyleRefs {
-  pub(crate) line_reference: std::boxed::Box<a::LineReference>,
-  pub(crate) fill_reference: std::boxed::Box<a::FillReference>,
-  pub(crate) effect_reference: std::boxed::Box<a::EffectReference>,
-  pub(crate) font_reference: std::boxed::Box<a::FontReference>,
+  pub(crate) line_reference: ShapeStyleReference,
+  pub(crate) fill_reference: ShapeStyleReference,
+  pub(crate) effect_reference: ShapeStyleReference,
+  pub(crate) font_reference: FontStyleReference,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ShapeStyleReference {
+  pub(crate) index: u32,
+  pub(crate) placeholder_color: Option<super::color::Color>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FontStyleReference {
+  pub(crate) index: a::FontCollectionIndexValues,
+  pub(crate) placeholder_color: Option<super::color::Color>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -452,10 +464,44 @@ impl Shape {
 
   pub(crate) fn set_shape_style_refs(&mut self, style: &p::ShapeStyle) {
     self.shape_style_refs = Some(ShapeStyleRefs {
-      line_reference: style.line_reference.clone(),
-      fill_reference: style.fill_reference.clone(),
-      effect_reference: style.effect_reference.clone(),
-      font_reference: style.font_reference.clone(),
+      line_reference: ShapeStyleReference {
+        index: style.line_reference.index,
+        placeholder_color: style
+          .line_reference
+          .line_reference_choice
+          .as_ref()
+          .and_then(super::color::Color::from_line_reference_choice),
+      },
+      fill_reference: ShapeStyleReference {
+        index: style.fill_reference.index,
+        placeholder_color: style
+          .fill_reference
+          .fill_reference_choice
+          .as_ref()
+          .and_then(super::color::Color::from_fill_reference_choice),
+      },
+      effect_reference: ShapeStyleReference {
+        index: style.effect_reference.index,
+        placeholder_color: style
+          .effect_reference
+          .effect_reference_choice
+          .as_ref()
+          .and_then(super::color::Color::from_effect_reference_choice),
+      },
+      font_reference: FontStyleReference {
+        index: style.font_reference.index,
+        placeholder_color: style
+          .font_reference
+          .font_reference_choice
+          .as_ref()
+          .and_then(super::color::Color::from_font_reference_choice)
+          .or_else(|| {
+            Some(super::color::Color::Scheme(super::color::SchemeColor {
+              value: a::SchemeColorValues::Text1,
+              transformations: Vec::new(),
+            }))
+          }),
+      },
     });
   }
 

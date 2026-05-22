@@ -213,7 +213,13 @@ fn line_stroke(line: &LineProperties) -> Option<BorderStyle> {
 
 fn display_rgb_color(color: &Color) -> Option<RgbColor> {
   match color {
-    Color::RgbHex(hex) => parse_rgb_hex(hex),
+    Color::RgbHex(color) => {
+      if color.transformations.is_empty() {
+        parse_rgb_hex(&color.value)
+      } else {
+        None
+      }
+    }
     Color::System(system) => system.last_color.as_deref().and_then(parse_rgb_hex),
     Color::Scheme(_) | Color::Preset(_) => None,
   }

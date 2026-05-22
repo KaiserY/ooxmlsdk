@@ -151,6 +151,23 @@ fn assert_page_stroked_path_count_at_least(
   );
 }
 
+fn assert_page_filled_path_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: usize,
+) {
+  let count = summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index && path.fill_mode.is_some())
+    .count();
+  assert!(
+    count >= expected,
+    "expected at least {expected} filled paths on page {page_index}, got {count}; paths={:?}",
+    summary.paths
+  );
+}
+
 fn assert_page_image_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
   let count = summary
     .images
@@ -233,6 +250,33 @@ fn assert_rendered_image_centers_include_rgb_close(
     matched,
     "missing rendered image center color close to #{:02x}{:02x}{:02x}; bounds={image_bounds:?}",
     expected_rgb[0], expected_rgb[1], expected_rgb[2]
+  );
+}
+
+fn assert_page_link_target(summary: &PdfSummary, page_index: usize, expected_target: &str) {
+  assert!(
+    summary.links.iter().any(|link| {
+      link.page_index == page_index && link.target.as_deref() == Some(expected_target)
+    }),
+    "missing link target {expected_target:?} on page {page_index}; links={:?}",
+    summary.links
+  );
+}
+
+fn assert_page_annotation_uri(summary: &PdfSummary, page_index: usize, expected_uri: &str) {
+  assert!(
+    summary.annotations.iter().any(|annotation| {
+      annotation.page_index == page_index && annotation.action_uri.as_deref() == Some(expected_uri)
+    }) || summary.raw_pages.iter().any(|page| {
+      page.page_index == page_index
+        && page
+          .annotations
+          .iter()
+          .any(|annotation| annotation.action_uri.as_deref() == Some(expected_uri))
+    }),
+    "missing annotation URI {expected_uri:?} on page {page_index}; annotations={:?}; raw_pages={:?}",
+    summary.annotations,
+    summary.raw_pages
   );
 }
 
@@ -1885,4 +1929,119 @@ fn mapped_pptx_tdf114913_preserves_graphic_bullet_height() {
   assert_page_contains_in_order(&summary, 0, &["Test"]);
   assert_page_image_count_at_least(&summary, 0, 1);
   assert_any_path_height_close(&summary, 0, 692.0 * 72.0 / 2540.0, 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf157216
+fn mapped_pptx_tdf157216_preserves_punched_tape_flowchart_shape() {
+  let summary = render_summary("pptx/tdf157216.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Flowchart"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testFreeformShapeGluePoints
+fn mapped_pptx_tdf156829_preserves_freeform_shape_output() {
+  let summary = render_summary("pptx/tdf156829.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert!(page_path_count(&summary, 0) >= 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf154363
+fn mapped_pptx_tdf154363_preserves_flipped_connector_shapes() {
+  let summary = render_summary("pptx/tdf154363.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Flip horizontal", "Flip vertical"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf154858
+fn mapped_pptx_tdf154858_preserves_radial_gradient_shape_visibility() {
+  let summary = render_summary("pptx/tdf154858.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf153466
+fn mapped_pptx_tdf153466_preserves_bitmap_fill_shapes() {
+  let summary = render_summary("pptx/tdf153466.pptx");
+  assert_page_image_count_at_least(&summary, 0, 2);
+  assert_page_has_stroked_path(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf152434
+fn mapped_pptx_tdf152434_preserves_single_picture_object() {
+  let summary = render_summary("pptx/tdf152434.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_eq!(summary.page_objects[0].image_objects, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testConnectors
+fn mapped_pptx_connectors_preserve_connector_lines() {
+  let summary = render_summary("pptx/connectors.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 16);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf153036_resizedConnectorL
+fn mapped_pptx_tdf153036_resized_connector_l_preserves_textbox_and_connector() {
+  let summary = render_summary("pptx/tdf153036_resizedConnectorL.pptx");
+  assert_page_contains_in_order(&summary, 0, &["TextBox"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf149314
+fn mapped_pptx_tdf149314_preserves_internal_slide_hyperlinks() {
+  let summary = render_summary("pptx/tdf149314.pptx");
+  assert_page_link_target(&summary, 0, "#Slide 1");
+  assert_page_link_target(&summary, 0, "#Slide 3");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf149124
+fn mapped_pptx_tdf149124_preserves_standard_connector_output() {
+  let summary = render_summary("pptx/tdf149124.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf89449
+fn mapped_pptx_tdf89449_preserves_curved_straight_and_standard_connectors() {
+  let summary = render_summary("pptx/tdf89449.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 6);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testGluePointLeavingDirections
+fn mapped_pptx_glue_point_leaving_directions_preserves_ellipse_output() {
+  let summary = render_summary("pptx/glue_point_leaving_directions.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf147459
+fn mapped_pptx_tdf147459_preserves_triangle_shape_output() {
+  let summary = render_summary("pptx/tdf147459.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+  assert_page_filled_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf146223
+fn mapped_pptx_tdf146223_preserves_visible_master_slide_text() {
+  let summary = render_summary("pptx/tdf146223.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Title", "Bullet Point 1", "Bullet Point 2"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf144917
+fn mapped_pptx_tdf144917_preserves_external_shape_hyperlink() {
+  let summary = render_summary("pptx/tdf144917.pptx");
+  assert_page_annotation_uri(&summary, 0, "http://www.example.com/");
 }

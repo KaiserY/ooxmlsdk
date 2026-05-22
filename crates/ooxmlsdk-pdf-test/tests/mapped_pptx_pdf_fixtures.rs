@@ -66,6 +66,54 @@ fn assert_text_fill_color(summary: &PdfSummary, expected_text: &str, expected_co
   );
 }
 
+fn assert_has_text_fill_color(summary: &PdfSummary, expected_color: &str) {
+  assert!(
+    summary
+      .text_objects
+      .iter()
+      .any(|object| object.fill_color.as_deref() == Some(expected_color)),
+    "missing text fill color {expected_color}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
+fn assert_has_path_fill_color(summary: &PdfSummary, expected_color: &str) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .any(|path| path.fill_mode.is_some() && path.fill_color.as_deref() == Some(expected_color)),
+    "missing filled path color {expected_color}; paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_page_has_stroked_path(summary: &PdfSummary, page_index: usize) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .any(|path| path.page_index == page_index && path.stroked == Some(true)),
+    "missing stroked path on page {page_index}; paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_page_has_horizontal_stroked_path(summary: &PdfSummary, page_index: usize) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .filter(|path| path.page_index == page_index)
+      .filter(|path| path.stroked == Some(true))
+      .filter_map(|path| path.bounds.as_deref())
+      .filter_map(|bounds| parse_pdf_rect(bounds).ok())
+      .any(|bounds| bounds.width() > 10.0 && bounds.height() <= 3.0),
+    "missing horizontal stroked path on page {page_index}; paths={:?}",
+    summary.paths
+  );
+}
+
 fn text_bounds_containing(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
   summary
     .text_segments
@@ -362,4 +410,130 @@ fn mapped_pptx_tdf89927_preserves_white_text_color() {
   let summary = render_summary("pptx/tdf89927.pptx");
   assert_page_contains_in_order(&summary, 0, &["TEST"]);
   assert_text_fill_color(&summary, "TEST", "#ffffff@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testHyperlinkColor
+fn mapped_pptx_tdf137367_preserves_hyperlink_text_colors() {
+  let summary = render_summary("pptx/tdf137367.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "hyperlink color 1",
+      "hyperlink color 2",
+      "hyperlink color 3",
+    ],
+  );
+  assert_has_text_fill_color(&summary, "#4472c4@ff");
+  assert_has_text_fill_color(&summary, "#ff0000@ff");
+  assert_has_text_fill_color(&summary, "#548235@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testN828390_2
+fn mapped_pptx_n828390_2_preserves_two_line_platform_text() {
+  let summary = render_summary("pptx/n828390_2.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Linux", "Standard Platform"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTdf150719
+fn mapped_pptx_tdf150719_preserves_underlined_text_decoration() {
+  let summary = render_summary("pptx/tdf150719.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Jump", "to", "Slide 2"]);
+  assert_page_has_horizontal_stroked_path(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf103876
+fn mapped_pptx_tdf103876_preserves_placeholder_text_color() {
+  let summary = render_summary("pptx/tdf103876.pptx");
+  assert_has_text_fill_color(&summary, "#ff0000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf104015
+fn mapped_pptx_tdf104015_inherits_master_shape_fill_and_line() {
+  let summary = render_summary("pptx/tdf104015.pptx");
+  assert_has_path_fill_color(&summary, "#ff0000@ff");
+  assert_has_stroked_path_color(&summary, "#0000ff@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf104201
+fn mapped_pptx_tdf104201_uses_group_shape_green_fill() {
+  let summary = render_summary("pptx/tdf104201.pptx");
+  assert_has_path_fill_color(&summary, "#00ff00@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf103477
+fn mapped_pptx_tdf103477_keeps_bullet_text_black() {
+  let summary = render_summary("pptx/tdf103477.pptx");
+  assert_page_contains_in_order(&summary, 0, &["nnnn"]);
+  assert_has_text_fill_color(&summary, "#000000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests.cxx:testTableStyle
+fn mapped_pptx_tdf156718_preserves_table_style_text_and_fill_colors() {
+  let summary = render_summary("pptx/tdf156718.pptx");
+  assert_has_text_fill_color(&summary, "#000000@ff");
+  assert_has_path_fill_color(&summary, "#5b9bd5@ff");
+  assert_page_has_stroked_path(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc584721_1
+fn mapped_pptx_bnc584721_1_preserves_master_title_text() {
+  let summary = render_summary("pptx/bnc584721_1_2.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Click to edit Master title style"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc584721_4
+fn mapped_pptx_bnc584721_4_preserves_black_master_text() {
+  let summary = render_summary("pptx/bnc584721_4.pptx");
+  assert_has_text_fill_color(&summary, "#000000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc904423
+fn mapped_pptx_bnc904423_applies_fill_properties_in_upstream_order() {
+  let summary = render_summary("pptx/bnc904423.pptx");
+  assert_has_path_fill_color(&summary, "#00cc99@ff");
+  assert_has_path_fill_color(&summary, "#3333cc@ff");
+  assert_has_path_fill_color(&summary, "#ff0000@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testShapeLineStyle
+fn mapped_pptx_shape_line_style_applies_line_properties_in_upstream_order() {
+  let summary = render_summary("pptx/ShapeLineProperties.pptx");
+  assert_has_stroked_path_color(&summary, "#ff0000@ff");
+  assert_has_stroked_path_color(&summary, "#3333cc@ff");
+  assert_has_stroked_path_color(&summary, "#7030a0@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc862510_6
+fn mapped_pptx_bnc862510_6_preserves_gray_text_color() {
+  let summary = render_summary("pptx/bnc862510_6.pptx");
+  assert_has_text_fill_color(&summary, "#8b8b8b@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf127129
+fn mapped_pptx_tdf127129_preserves_black_text_and_green_highlight() {
+  let summary = render_summary("pptx/tdf127129.pptx");
+  assert_has_text_fill_color(&summary, "#000000@ff");
+  assert_has_path_fill_color(&summary, "#00ff00@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf151767
+fn mapped_pptx_tdf151767_preserves_table_cell_borders() {
+  let summary = render_summary("pptx/tdf151767.pptx");
+  assert_page_has_stroked_path(&summary, 0);
 }

@@ -305,6 +305,34 @@ fn assert_any_path_width_close(
   );
 }
 
+fn assert_any_image_bounds_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  left_100mm: f32,
+  top_100mm: f32,
+  right_100mm: f32,
+  bottom_100mm: f32,
+  tolerance_pt: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let expected = PdfBounds {
+    left: left_100mm * 72.0 / 2540.0,
+    top: media_box.top - top_100mm * 72.0 / 2540.0,
+    right: right_100mm * 72.0 / 2540.0,
+    bottom: media_box.top - bottom_100mm * 72.0 / 2540.0,
+  };
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert!(
+    image_bounds.iter().any(|bounds| {
+      (bounds.left - expected.left).abs() <= tolerance_pt
+        && (bounds.top - expected.top).abs() <= tolerance_pt
+        && (bounds.right - expected.right).abs() <= tolerance_pt
+        && (bounds.bottom - expected.bottom).abs() <= tolerance_pt
+    }),
+    "missing image bounds close to {expected:?} on page {page_index}; image_bounds={image_bounds:?}"
+  );
+}
+
 fn assert_text_left_delta_close(
   summary: &PdfSummary,
   page_index: usize,
@@ -1713,4 +1741,148 @@ fn mapped_pptx_smartart_tdf132302_right_arrow_preserves_text_area_position() {
     ],
   );
   assert_text_near_libreoffice_metafile_point(&summary, 0, "Topic A", 5078.0, 1257.0, 24.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf157529
+fn mapped_pptx_tdf157529_preserves_fully_transparent_shape_fills() {
+  let summary = render_summary("pptx/tdf157529.pptx");
+  assert_page_contains_in_order(&summary, 0, &["LIBREOFFICE", "Text with 100% transparency"]);
+  assert_has_text_fill_color(&summary, "#000000@00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf160490
+fn mapped_pptx_tdf160490_preserves_placeholder_heights() {
+  let summary = render_summary("pptx/tdf160490.pptx");
+  assert_page_contains_in_order(&summary, 0, &["HELLO", "Set Top, Bottom margin"]);
+  assert_any_path_height_close(&summary, 0, 3726.0 * 72.0 / 2540.0, 8.0);
+  assert_any_path_height_close(&summary, 0, 3365.0 * 72.0 / 2540.0, 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf165321
+fn mapped_pptx_tdf165321_preserves_smartart_child_dimensions() {
+  let summary = render_summary("pptx/tdf165321.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Gestion du changement", "Conditions de succès"],
+  );
+  assert_any_path_height_close(&summary, 0, 3597.0 * 72.0 / 2540.0, 8.0);
+  assert_any_path_width_close(&summary, 0, 6592.0 * 72.0 / 2540.0, 8.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf165341
+fn mapped_pptx_tdf165341_preserves_top_center_text_adjustment() {
+  let summary = render_summary("pptx/tdf165341.pptx");
+  assert_page_contains_in_order(&summary, 0, &["The shape is top", "center"]);
+  assert_text_centered_on_page(&summary, 0, "center", 24.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf152186
+fn mapped_pptx_tdf152186_does_not_render_imported_shadow_effects() {
+  let summary = render_summary("pptx/tdf152186.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 3);
+  assert!(
+    !summary
+      .paths
+      .iter()
+      .any(|path| path.fill_color.as_deref() == Some("#808080@ff")),
+    "unexpected opaque gray shadow-like fill; paths={:?}",
+    summary.paths
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf93868
+fn mapped_pptx_tdf93868_preserves_master_background_fill_usage() {
+  let summary = render_summary("pptx/tdf93868.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Test", "Slide inherits objects from slideMaster"],
+  );
+  assert_page_has_stroked_path(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf95932
+fn mapped_pptx_tdf95932_inherits_green_master_shape_fill() {
+  let summary = render_summary("pptx/tdf95932.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Test inheritance of shape properties", "Test"],
+  );
+  assert_has_path_fill_color(&summary, "#76bf3d@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf99030
+fn mapped_pptx_tdf99030_preserves_master_background_color() {
+  let summary = render_summary("pptx/tdf99030.pptx");
+  assert_has_path_fill_color(&summary, "#676a55@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf103473
+fn mapped_pptx_tdf103473_preserves_picture_geometry() {
+  let summary = render_summary("pptx/tdf103473.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_any_image_bounds_close(&summary, 0, 3629.0, 4431.0, 8353.0, 9155.0, 12.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf109067
+fn mapped_pptx_tdf109067_preserves_diagonal_gradient_shape() {
+  let summary = render_summary("pptx/tdf109067.pptx");
+  assert_page_has_stroked_path(&summary, 0);
+  assert!(summary.page_objects[0].path_objects >= 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf109187
+fn mapped_pptx_tdf109187_preserves_two_gradient_arrow_shapes() {
+  let summary = render_summary("pptx/tdf109187.pptx");
+  assert_page_stroked_path_count_at_least(&summary, 0, 2);
+  assert_any_path_height_close(&summary, 0, 2250.0 * 72.0 / 2540.0, 48.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf100065
+fn mapped_pptx_tdf100065_preserves_group_shape_rotation_text() {
+  let summary = render_summary("pptx/tdf100065.pptx");
+  assert_page_contains_in_order(&summary, 0, &["This is a test"]);
+  assert_page_stroked_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf90626
+fn mapped_pptx_tdf90626_preserves_graphic_bullet_size() {
+  let summary = render_summary("pptx/tdf90626.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Tdf90626", "Test", "Test", "Test", "Test"]);
+  assert_page_image_count_at_least(&summary, 0, 4);
+  assert_any_path_height_close(&summary, 0, 372.0 * 72.0 / 2540.0, 6.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf138148
+fn mapped_pptx_tdf138148_preserves_narrow_graphic_bullet_size() {
+  let summary = render_summary("pptx/tdf138148.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Aaa", "Bbb"]);
+  assert_page_image_count_at_least(&summary, 0, 2);
+  assert_any_path_height_close(&summary, 0, 444.0 * 72.0 / 2540.0, 6.0);
+  assert_any_path_width_close(&summary, 0, 148.0 * 72.0 / 2540.0, 6.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf114913
+fn mapped_pptx_tdf114913_preserves_graphic_bullet_height() {
+  let summary = render_summary("pptx/tdf114913.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Test"]);
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_any_path_height_close(&summary, 0, 692.0 * 72.0 / 2540.0, 8.0);
 }

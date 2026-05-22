@@ -571,7 +571,7 @@ PPTX bucket counts:
 | `sd/qa/unit/FontEmbeddingTest.cxx` | 2 |
 
 Current local coverage is intentionally small and upstream-assertion focused:
-122 matrix rows are covered by active PPTX PDF tests. They currently span
+137 matrix rows are covered by active PPTX PDF tests. They currently span
 LibreOffice import text/color/fill/line/border/page assertions and layout
 metafile-position assertions.
 `layout-tests.cxx::numberedList` is present as an ignored TDD assertion because
@@ -627,16 +627,16 @@ LibreOffice text-order expectation unchanged.
 | `import-tests.cxx::testN862510_4` | `pptx/n862510_4.pptx` | `../core/sd/qa/unit/import-tests.cxx:983` | `mapped` | partial visible-output assertion. |
 | `import-tests.cxx::testN828390_2` | `pptx/n828390_2.pptx` | `../core/sd/qa/unit/import-tests.cxx:1005` | `covered` | partial visible-output assertion. |
 | `import-tests.cxx::testN828390_3` | `pptx/n828390_3.pptx` | `../core/sd/qa/unit/import-tests.cxx:1018` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf157529` | `pptx/tdf157529.pptx` | `../core/sd/qa/unit/import-tests2.cxx:71` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf160490` | `pptx/tdf160490.pptx` | `../core/sd/qa/unit/import-tests2.cxx:96` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf165321` | `pptx/tdf165321.pptx` | `../core/sd/qa/unit/import-tests2.cxx:119` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf165341` | `pptx/tdf165341.pptx` | `../core/sd/qa/unit/import-tests2.cxx:142` | `mapped` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf157529` | `pptx/tdf157529.pptx` | `../core/sd/qa/unit/import-tests2.cxx:71` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf160490` | `pptx/tdf160490.pptx` | `../core/sd/qa/unit/import-tests2.cxx:96` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf165321` | `pptx/tdf165321.pptx` | `../core/sd/qa/unit/import-tests2.cxx:119` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf165341` | `pptx/tdf165341.pptx` | `../core/sd/qa/unit/import-tests2.cxx:142` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf157285` | `pptx/tdf157285.pptx` | `../core/sd/qa/unit/import-tests2.cxx:157` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf152186` | `pptx/tdf152186.pptx` | `../core/sd/qa/unit/import-tests2.cxx:180` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf93868` | `pptx/tdf93868.pptx` | `../core/sd/qa/unit/import-tests2.cxx:195` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf95932` | `pptx/tdf95932.pptx` | `../core/sd/qa/unit/import-tests2.cxx:210` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf99030` | `pptx/tdf99030.pptx` | `../core/sd/qa/unit/import-tests2.cxx:224` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf103473` | `pptx/tdf103473.pptx` | `../core/sd/qa/unit/import-tests2.cxx:267` | `mapped` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf152186` | `pptx/tdf152186.pptx` | `../core/sd/qa/unit/import-tests2.cxx:180` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf93868` | `pptx/tdf93868.pptx` | `../core/sd/qa/unit/import-tests2.cxx:195` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf95932` | `pptx/tdf95932.pptx` | `../core/sd/qa/unit/import-tests2.cxx:210` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf99030` | `pptx/tdf99030.pptx` | `../core/sd/qa/unit/import-tests2.cxx:224` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf103473` | `pptx/tdf103473.pptx` | `../core/sd/qa/unit/import-tests2.cxx:267` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf103792` | `pptx/tdf103792.pptx` | `../core/sd/qa/unit/import-tests2.cxx:380` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf148685` | `pptx/tdf148685.pptx` | `../core/sd/qa/unit/import-tests2.cxx:397` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf103876` | `pptx/tdf103876.pptx` | `../core/sd/qa/unit/import-tests2.cxx:435` | `covered` | partial visible-output assertion. |
@@ -652,14 +652,14 @@ LibreOffice text-order expectation unchanged.
 | `import-tests2.cxx::testTdf104445` | `pptx/tdf104445.pptx` | `../core/sd/qa/unit/import-tests2.cxx:750` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf100926` | `pptx/tdf100926.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1020` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf89064` | `pptx/tdf89064.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1045` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf109067` | `pptx/tdf109067.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1069` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf109187` | `pptx/tdf109187.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1078` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf100065` | `pptx/tdf100065.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1107` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf90626` | `pptx/tdf90626.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1126` | `mapped` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf138148` | `pptx/tdf138148.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1143` | `mapped` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf109067` | `pptx/tdf109067.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1069` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf109187` | `pptx/tdf109187.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1078` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf100065` | `pptx/tdf100065.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1107` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf90626` | `pptx/tdf90626.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1126` | `covered` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf138148` | `pptx/tdf138148.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1143` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf134174` | `pptx/tdf134174.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1181` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf134210` | `pptx/tdf134210.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1196` | `covered` | partial visible-output assertion. |
-| `import-tests2.cxx::testTdf114913` | `pptx/tdf114913.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1211` | `mapped` | partial visible-output assertion. |
+| `import-tests2.cxx::testTdf114913` | `pptx/tdf114913.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1211` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf114821` | `pptx/tdf114821.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1272` | `covered` | partial visible-output assertion. |
 | `import-tests2.cxx::testTdf115394` | `pptx/tdf115394.pptx` | `../core/sd/qa/unit/import-tests2.cxx:1324` | `mapped` | partial visible-output assertion. |
 | `import-tests3.cxx::testN778859` | `pptx/n778859.pptx` | `../core/sd/qa/unit/import-tests3.cxx:131` | `mapped` | partial visible-output assertion. |

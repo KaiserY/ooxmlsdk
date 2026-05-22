@@ -99,6 +99,36 @@ fn assert_page_has_stroked_path(summary: &PdfSummary, page_index: usize) {
   );
 }
 
+fn assert_page_stroked_path_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: usize,
+) {
+  let count = summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index && path.stroked == Some(true))
+    .count();
+  assert!(
+    count >= expected,
+    "expected at least {expected} stroked paths on page {page_index}, got {count}; paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_page_image_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = summary
+    .images
+    .iter()
+    .filter(|image| image.page_index == page_index)
+    .count();
+  assert!(
+    count >= expected,
+    "expected at least {expected} images on page {page_index}, got {count}; images={:?}",
+    summary.images
+  );
+}
+
 fn assert_page_has_horizontal_stroked_path(summary: &PdfSummary, page_index: usize) {
   assert!(
     summary
@@ -111,6 +141,22 @@ fn assert_page_has_horizontal_stroked_path(summary: &PdfSummary, page_index: usi
       .any(|bounds| bounds.width() > 10.0 && bounds.height() <= 3.0),
     "missing horizontal stroked path on page {page_index}; paths={:?}",
     summary.paths
+  );
+}
+
+fn assert_text_centered_on_page(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  tolerance_pt: f32,
+) {
+  let bounds = text_bounds_containing(summary, page_index, expected);
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let text_center = (bounds.left + bounds.right) / 2.0;
+  let page_center = (media_box.left + media_box.right) / 2.0;
+  assert!(
+    (text_center - page_center).abs() <= tolerance_pt,
+    "text {expected:?} is not centered on page {page_index}; text_bounds={bounds:?}; media_box={media_box:?}"
   );
 }
 
@@ -536,4 +582,154 @@ fn mapped_pptx_tdf127129_preserves_black_text_and_green_highlight() {
 fn mapped_pptx_tdf151767_preserves_table_cell_borders() {
   let summary = render_summary("pptx/tdf151767.pptx");
   assert_page_has_stroked_path(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testPredefinedTableStyle
+fn mapped_pptx_predefined_table_style_preserves_cell_fill_colors() {
+  let summary = render_summary("pptx/predefined-table-style.pptx");
+  assert_has_path_fill_color(&summary, "#000000@ff");
+  assert_has_path_fill_color(&summary, "#e7e7e7@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc887225
+fn mapped_pptx_bnc887225_preserves_last_row_and_column_table_fill_colors() {
+  let summary = render_summary("pptx/bnc887225.pptx");
+  assert_has_path_fill_color(&summary, "#5b9bd5@ff");
+  assert_has_path_fill_color(&summary, "#d1deef@ff");
+  assert_has_path_fill_color(&summary, "#e9eff7@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTableBorderLineStyle
+fn mapped_pptx_table_border_line_style_preserves_visible_table_borders() {
+  let summary = render_summary("pptx/tableBorderLineStyle.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "System Dash",
+      "System Dot",
+      "System Dash Dot",
+      "Solid",
+      "No Border",
+    ],
+  );
+  assert_page_stroked_path_count_at_least(&summary, 0, 10);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTableMergedCellsBorderLineStyle
+fn mapped_pptx_tdf149865_preserves_merged_cell_right_border_color() {
+  let summary = render_summary("pptx/tdf149865.pptx");
+  assert_has_stroked_path_color(&summary, "#30ba78@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc862510_7
+fn mapped_pptx_bnc862510_7_centers_title_text() {
+  let summary = render_summary("pptx/bnc862510_7.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Text aligned to center"]);
+  assert_text_centered_on_page(&summary, 0, "Text aligned to center", 36.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBulletSuffix
+fn mapped_pptx_n83889_keeps_bullet_suffix_from_adding_extra_visible_text() {
+  let summary = render_summary("pptx/n83889.pptx");
+  assert_page_contains_in_order(&summary, 0, &["test:", "In test 1", "Second line"]);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc910045
+fn mapped_pptx_bnc910045_preserves_table_style_fill_color() {
+  let summary = render_summary("pptx/bnc910045.pptx");
+  assert_has_path_fill_color(&summary, "#4f81bd@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf165732
+fn mapped_pptx_tdf165732_keeps_clamped_text_inset_labels_visible() {
+  let summary = render_summary("pptx/tdf165732.pptx");
+  assert_page_contains_in_order(&summary, 0, &["0", "1", "2", "5"]);
+  assert_has_path_fill_color(&summary, "#7f7f7f@ff");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf152070
+fn mapped_pptx_tdf152070_preserves_tiled_background_bitmap() {
+  let summary = render_summary("pptx/tdf152070.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf51340
+fn mapped_pptx_tdf51340_preserves_line_spacing_paragraph_text() {
+  let summary = render_summary("pptx/tdf51340.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Spacing is set on master slide",
+      "Spacing is set on slide layout",
+      "Direct formatting overrides master slide spacing",
+      "Direct formatting overrides slide layout spacing",
+    ],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf120028
+fn mapped_pptx_tdf120028_preserves_four_column_text_content() {
+  let summary = render_summary("pptx/tdf120028.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Aaaaaaa aaaaa",
+      "Bbbbbb bbbbbbbb bbbbbbbb",
+      "Ccccccccc ccc cccccc",
+      "Dddddd dddddd",
+      "Lll l llllll lllll",
+    ],
+  );
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf100926
+fn mapped_pptx_tdf100926_preserves_vertical_and_horizontal_table_text() {
+  let summary = render_summary("pptx/tdf100926.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Top to Bottom vertical text",
+      "Bottom to Top vertical text",
+      "Horizontal text",
+    ],
+  );
+  assert_vertical_text_shape(&summary, 0, "Top to Bottom vertical text");
+  assert_vertical_text_shape(&summary, 0, "Bottom to Top vertical text");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf134174
+fn mapped_pptx_tdf134174_preserves_bitmap_fill_image() {
+  let summary = render_summary("pptx/tdf134174.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf134210
+fn mapped_pptx_tdf134210_preserves_bitmap_fill_image() {
+  let summary = render_summary("pptx/tdf134210.pptx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf114821
+fn mapped_pptx_tdf114821_preserves_outside_chart_data_labels() {
+  let summary = render_summary("pptx/tdf114821.pptx");
+  assert_page_contains_in_order(&summary, 0, &["90.0", "B"]);
 }

@@ -2,6 +2,8 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_powerpoint_2010_main as p14;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
+use crate::docx::ImageCrop;
+
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
@@ -239,9 +241,17 @@ impl PPTShapeGroupContext {
       shape.shape.set_shape_style_refs(style);
     }
     if let Some(blip) = picture.blip_fill.blip.as_ref() {
-      shape
-        .shape
-        .set_picture(blip.embed.clone(), blip.link.clone());
+      let image_resource = blip
+        .embed
+        .as_deref()
+        .and_then(|relationship_id| slide_persist.image_resources.get(relationship_id))
+        .cloned();
+      shape.shape.set_picture(
+        blip.embed.clone(),
+        blip.link.clone(),
+        image_crop_from_source_rectangle(picture.blip_fill.source_rectangle.as_ref()),
+        image_resource,
+      );
     }
     shape.into_shape(slide_persist)
   }
@@ -357,6 +367,34 @@ fn apply_shape_properties(shape: &mut Shape, properties: &p::ShapeProperties) {
   }
   if let Some(effect) = properties.shape_properties_choice3.as_ref() {
     shape.effect_properties = Some(EffectProperties::from_pml_shape_properties_choice(effect));
+  }
+}
+
+fn image_crop_from_source_rectangle(rect: Option<&a::SourceRectangle>) -> ImageCrop {
+  let Some(rect) = rect else {
+    return ImageCrop::default();
+  };
+  ImageCrop {
+    left: rect
+      .left
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    top: rect
+      .top
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    right: rect
+      .right
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
+    bottom: rect
+      .bottom
+      .as_ref()
+      .map(|value| value.as_ratio() as f32)
+      .unwrap_or(0.0),
   }
 }
 

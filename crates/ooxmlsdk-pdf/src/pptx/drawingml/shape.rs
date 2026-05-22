@@ -9,8 +9,9 @@ use super::shape_properties::EffectProperties;
 use super::table::TableProperties;
 use super::text_body::TextBody;
 use super::text_list_style::TextListStyle;
+use crate::docx::ImageCrop;
 use crate::pptx::import::PowerPointImport;
-use crate::pptx::slide::ShapeLocation;
+use crate::pptx::slide::{ImageResource, ShapeLocation};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Shape {
@@ -109,10 +110,12 @@ pub(crate) struct GraphicDataRecord {
   pub(crate) kind: GraphicDataKind,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PictureRecord {
   pub(crate) embed_relationship_id: Option<String>,
   pub(crate) link_relationship_id: Option<String>,
+  pub(crate) crop: ImageCrop,
+  pub(crate) image_resource: Option<ImageResource>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -545,10 +548,14 @@ impl Shape {
     &mut self,
     embed_relationship_id: Option<String>,
     link_relationship_id: Option<String>,
+    crop: ImageCrop,
+    image_resource: Option<ImageResource>,
   ) {
     self.picture = Some(PictureRecord {
       embed_relationship_id,
       link_relationship_id,
+      crop,
+      image_resource,
     });
   }
 

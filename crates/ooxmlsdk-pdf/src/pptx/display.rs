@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::docx::{BorderStyle, RgbColor, TextStyle};
 use crate::layout::{
-  self, LineItem, LineItemKind, PageItem, PdfTextSegmentation, RectItem, TextItem,
+  self, ImageItem, LineItem, LineItemKind, PageItem, PdfTextSegmentation, RectItem, TextItem,
 };
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -115,6 +115,7 @@ fn lower_shape(
   }
 
   lower_shape_bounds(import, shape, offset, items);
+  lower_picture(shape, offset, items);
 
   if let Some(table) = &shape.table_properties
     && shape.service_name == ShapeService::TableShape
@@ -130,6 +131,40 @@ fn lower_shape(
   for child in &shape.children {
     lower_shape(import, child, child_offset, items);
   }
+}
+
+fn lower_picture(shape: &Shape, offset: DisplayOffset, items: &mut Vec<PageItem>) {
+  let Some(picture) = &shape.picture else {
+    return;
+  };
+  if shape.size.cx <= 0 || shape.size.cy <= 0 {
+    return;
+  }
+  let _embed_relationship_id = picture.embed_relationship_id.as_deref();
+  let _link_relationship_id = picture.link_relationship_id.as_deref();
+  let Some(resource) = picture.image_resource.as_ref() else {
+    return;
+  };
+  items.push(PageItem::Image(ImageItem {
+    x_pt: units::emu_to_points(offset.x_emu + shape.position.x),
+    y_pt: units::emu_to_points(offset.y_emu + shape.position.y),
+    width_pt: units::emu_to_points(shape.size.cx),
+    height_pt: units::emu_to_points(shape.size.cy),
+    crop: picture.crop,
+    rotation_deg: shape.rotation,
+    flip_horizontal: shape.flip_h,
+    flip_vertical: shape.flip_v,
+    data: resource.data.clone(),
+    content_type: resource.content_type.clone(),
+    alt_text: shape
+      .description
+      .clone()
+      .or_else(|| shape.title.clone())
+      .or_else(|| shape.name.clone()),
+    hyperlink_url: None,
+    floating: false,
+    behind_text: false,
+  }));
 }
 
 fn lower_table(

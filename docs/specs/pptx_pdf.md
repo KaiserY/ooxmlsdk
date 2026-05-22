@@ -92,8 +92,10 @@ Already structurally aligned:
   treated as a direct solid fill.
 - Shape import preserves non-visual metadata, placeholder subtype/index,
   transforms, structured fill/line records, typed geometry, shape style refs,
-  text bodies, picture and content-part relationship identity, grouped
-  children, connector endpoints, and graphic-frame classification.
+  text bodies, picture relationship identity and embedded image bytes from the
+  owning slide/layout/master relationship context, content-part relationship
+  identity, grouped children, connector endpoints, and graphic-frame
+  classification.
 - `graphicFrame` URI dispatch uses LibreOffice's exact URI table for
   presentation OLE, DrawingML diagram, DrawingML chart, Office 2014 chartEx,
   and DrawingML table.
@@ -216,6 +218,12 @@ Known gaps to keep visible:
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or
   partial ports.
+- Embedded picture display is a first bridge: `a:blip/@r:embed` is resolved
+  against the fragment that owns the picture before master/layout inheritance,
+  then lowered to `ImageItem` with bounds, crop, rotation, flips, content type,
+  and alt text. Linked images are intentionally not fetched; keep their
+  relationship identity as structured state until LibreOffice's linked graphic
+  lifecycle is ported.
 - `display.rs` is an observation bridge. Do not add new PPTX semantic behavior
   there when the LibreOffice owner is `SlidePersist`, `PptShape`,
   `drawingml::Shape`, or a DrawingML context.
@@ -766,7 +774,7 @@ Unsupported or incomplete objects must keep structured records:
 
 | Area | Preserve before visible fallback |
 |------|----------------------------------|
-| picture | blip embed/link relationship ids, bounds, non-visual metadata |
+| picture | blip embed/link relationship ids, owning-fragment image resource, bounds, crop, non-visual metadata |
 | chart | frame type, relationship id, bounds, text cache if available |
 | SmartArt/diagram | diagram relationship ids, ext drawing ids, model id, bounds |
 | table | table grid/cell model, style ids, cell text bodies |

@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+
+use ooxmlsdk::parts::{image_part::ImagePart, presentation_document::PresentationDocument};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
+use ooxmlsdk::sdk::SdkPart;
 
 use crate::docx::PageSetup;
 use crate::units;
@@ -103,6 +107,13 @@ pub(crate) struct SlidePersist {
   pub(crate) connector_shape_map: Vec<ShapeMapEntry>,
   pub(crate) connector_connections_applied: bool,
   pub(crate) shape_location: ShapeLocation,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ImageResource {
+  pub(crate) data: Vec<u8>,
+  pub(crate) content_type: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -223,6 +234,7 @@ impl SlidePersist {
       connector_shape_map: Vec::new(),
       connector_connections_applied: false,
       shape_location,
+      image_resources: HashMap::new(),
     }
   }
 
@@ -251,6 +263,29 @@ impl SlidePersist {
       .other_style
       .as_ref()
       .map(|style| TextListStyle::from_pml_other_style(style));
+  }
+
+  pub(crate) fn import_image_parts<P>(&mut self, package: &PresentationDocument, part: &P)
+  where
+    P: SdkPart,
+  {
+    // Source: LibreOffice oox/source/drawingml/blipcontext.cxx resolves blip
+    // embed IDs against the current fragment's relationships, so cache image
+    // bytes on the owning slide/layout/master persist before display lowering.
+    for related_part in part.related_parts_of_type::<_, ImagePart>(package) {
+      let relationship_id = related_part.relationship_id().to_string();
+      let image_part = related_part.part();
+      let Some(data) = image_part.data_to_vec(package) else {
+        continue;
+      };
+      self.image_resources.insert(
+        relationship_id,
+        ImageResource {
+          data,
+          content_type: image_part.content_type(package).map(str::to_string),
+        },
+      );
+    }
   }
 
   pub(crate) fn get_sub_type_text_list_style(

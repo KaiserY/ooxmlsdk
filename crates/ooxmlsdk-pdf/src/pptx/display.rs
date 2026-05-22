@@ -17,7 +17,7 @@ use super::drawingml::shape::{
 };
 use super::drawingml::table::{
   TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
-  TableStyleTextProperties,
+  TableStyleTextProperties, predefined_table_style,
 };
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::{TextListLevelParagraphProperties, TextListParagraphStyle};
@@ -283,32 +283,25 @@ fn lower_table(
     return;
   }
 
-  let table_style = table
+  let package_table_style = table
     .inline_style
     .as_ref()
     .or_else(|| import.get_table_style(table.style_id.as_deref()));
+  let predefined_table_style = if package_table_style.is_none() {
+    predefined_table_style(table.style_id.as_deref())
+  } else {
+    None
+  };
+  let table_style = package_table_style.or(predefined_table_style.as_ref());
   let table_background = table_style.and_then(|style| {
     table_style_part_fill(import, &style.table_background)
       .and_then(|fill| fill_paint(import, &fill))
   });
   let border_color = RgbColor { r: 0, g: 0, b: 0 };
-  let draw_fallback_grid = table_style.is_none() && !table_has_direct_borders(table);
+  let draw_fallback_grid = table_style.is_none() && !table_has_visible_direct_borders(table);
   if draw_fallback_grid {
-    items.push(PageItem::Rect(RectItem {
-      x_pt: x0,
-      y_pt: y0,
-      width_pt: table_width,
-      height_pt: table_height,
-      fill_color: None,
-      fill_opacity: 1.0,
-      stroke: Some(BorderStyle {
-        width_pt: DEFAULT_TABLE_BORDER_PT,
-        spacing_pt: 0.0,
-        color: border_color,
-        compound: false,
-      }),
-      stroke_opacity: 1.0,
-    }));
+    push_table_line(items, x0, y0, x0 + table_width, y0, border_color);
+    push_table_line(items, x0, y0, x0, y0 + table_height, border_color);
   }
 
   let mut y = y0;
@@ -685,17 +678,24 @@ fn merge_cell_borders_from_style(target: &mut TableStyleBorders, source: &TableC
   }
 }
 
-fn table_has_direct_borders(table: &TableProperties) -> bool {
+fn table_has_visible_direct_borders(table: &TableProperties) -> bool {
   table.rows.iter().any(|row| {
     row.cells.iter().any(|cell| {
-      cell.borders.left.is_some()
-        || cell.borders.right.is_some()
-        || cell.borders.top.is_some()
-        || cell.borders.bottom.is_some()
-        || cell.borders.top_left_to_bottom_right.is_some()
-        || cell.borders.bottom_left_to_top_right.is_some()
+      table_border_line_is_visible(&cell.borders.left)
+        || table_border_line_is_visible(&cell.borders.right)
+        || table_border_line_is_visible(&cell.borders.top)
+        || table_border_line_is_visible(&cell.borders.bottom)
+        || table_border_line_is_visible(&cell.borders.top_left_to_bottom_right)
+        || table_border_line_is_visible(&cell.borders.bottom_left_to_top_right)
     })
   })
+}
+
+fn table_border_line_is_visible(line: &Option<LineProperties>) -> bool {
+  matches!(
+    line.as_ref().map(|line| &line.fill),
+    Some(LineFill::Solid(_) | LineFill::Gradient(_) | LineFill::Pattern(_))
+  )
 }
 
 fn lower_table_cell(

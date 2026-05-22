@@ -1,7 +1,7 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
-use super::color::Color;
-use super::fill::FillProperties;
+use super::color::{Color, ColorTransformation, ColorTransformationKind, SchemeColor};
+use super::fill::{FillKind, FillProperties};
 use super::line::{LineFill, LineProperties};
 use super::shape::{FontStyleReference, ShapeStyleReference};
 use super::text_body::TextBody;
@@ -221,6 +221,206 @@ impl TableStyleList {
       .iter()
       .find(|style| style.style_id.as_deref() == Some(style_id))
   }
+}
+
+pub(crate) fn predefined_table_style(style_id: Option<&str>) -> Option<TableStyle> {
+  let style_id = style_id?;
+  let (style_name, accent) = match style_id {
+    // Source: LibreOffice oox/source/drawingml/table/predefined-table-styles.cxx.
+    "{9D7B26C5-4107-4FEC-AEDC-1716B250A1EF}" => ("Light-Style-1", a::SchemeColorValues::Text1),
+    "{3B4B98B0-60AC-42C2-AFA5-B58CD77FA1E5}" => ("Light-Style-1", a::SchemeColorValues::Accent1),
+    "{0E3FDE45-AF77-4B5C-9715-49D594BDF05E}" => ("Light-Style-1", a::SchemeColorValues::Accent2),
+    "{C083E6E3-FA7D-4D7B-A595-EF9225AFEA82}" => ("Light-Style-1", a::SchemeColorValues::Accent3),
+    "{D27102A9-8310-4765-A935-A1911B00CA55}" => ("Light-Style-1", a::SchemeColorValues::Accent4),
+    "{5FD0F851-EC5A-4D38-B0AD-8093EC10F338}" => ("Light-Style-1", a::SchemeColorValues::Accent5),
+    "{68D230F3-CF80-4859-8CE7-A43EE81993B5}" => ("Light-Style-1", a::SchemeColorValues::Accent6),
+    // Source: LibreOffice oox/source/drawingml/table/predefined-table-styles.cxx.
+    "{073A0DAA-6AF3-43AB-8588-CEC1D06C72B9}" => ("Medium-Style-2", a::SchemeColorValues::Dark1),
+    "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}" => ("Medium-Style-2", a::SchemeColorValues::Accent1),
+    "{21E4AEA4-8DFA-4A89-87EB-49C32662AFE0}" => ("Medium-Style-2", a::SchemeColorValues::Accent2),
+    "{F5AB1C69-6EDB-4FF4-983F-18BD219EF322}" => ("Medium-Style-2", a::SchemeColorValues::Accent3),
+    "{00A15C55-8517-42AA-B614-E9B94910E393}" => ("Medium-Style-2", a::SchemeColorValues::Accent4),
+    "{7DF18680-E054-41AD-8BC1-D1AEF772440D}" => ("Medium-Style-2", a::SchemeColorValues::Accent5),
+    "{93296810-A885-4BE3-A3E7-6D5BEEA58F35}" => ("Medium-Style-2", a::SchemeColorValues::Accent6),
+    _ => return None,
+  };
+
+  match style_name {
+    "Light-Style-1" => Some(light_style_1(style_id, style_name, accent)),
+    "Medium-Style-2" => Some(medium_style_2(style_id, style_name, accent)),
+    _ => None,
+  }
+}
+
+fn light_style_1(style_id: &str, style_name: &str, accent: a::SchemeColorValues) -> TableStyle {
+  let accent_fill = solid_scheme_fill(accent, None);
+  let accent_line = solid_scheme_line(accent);
+
+  TableStyle {
+    style_id: Some(style_id.to_string()),
+    style_name: Some(style_name.to_string()),
+    whole_table: TableStylePart {
+      borders: TableStyleBorders {
+        top: Some(accent_line.clone()),
+        bottom: Some(accent_line.clone()),
+        ..TableStyleBorders::default()
+      },
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Text1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    first_row: TableStylePart {
+      borders: TableStyleBorders {
+        bottom: Some(accent_line.clone()),
+        ..TableStyleBorders::default()
+      },
+      text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
+        color: Some(scheme_color(a::SchemeColorValues::Text1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    last_row: TableStylePart {
+      borders: TableStyleBorders {
+        top: Some(accent_line),
+        ..TableStyleBorders::default()
+      },
+      ..TableStylePart::default()
+    },
+    first_column: TableStylePart {
+      text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    last_column: TableStylePart {
+      text: TableStyleTextProperties {
+        bold: Some(a::BooleanStyleValues::On),
+        color: Some(scheme_color(a::SchemeColorValues::Text1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    band1_horizontal: TableStylePart {
+      fill_properties: Some(accent_fill.clone()),
+      ..TableStylePart::default()
+    },
+    band1_vertical: TableStylePart {
+      fill_properties: Some(accent_fill),
+      ..TableStylePart::default()
+    },
+    ..TableStyle::default()
+  }
+}
+
+fn medium_style_2(style_id: &str, style_name: &str, accent: a::SchemeColorValues) -> TableStyle {
+  let accent_fill = solid_scheme_fill(accent, None);
+  let accent_tint_20 = solid_scheme_fill(accent, Some(20_000));
+  let accent_tint_40 = solid_scheme_fill(accent, Some(40_000));
+  let light1_line = solid_scheme_line(a::SchemeColorValues::Light1);
+
+  TableStyle {
+    style_id: Some(style_id.to_string()),
+    style_name: Some(style_name.to_string()),
+    whole_table: TableStylePart {
+      fill_properties: Some(accent_tint_20),
+      borders: TableStyleBorders {
+        left: Some(light1_line.clone()),
+        right: Some(light1_line.clone()),
+        top: Some(light1_line.clone()),
+        bottom: Some(light1_line.clone()),
+        inside_horizontal: Some(light1_line.clone()),
+        inside_vertical: Some(light1_line.clone()),
+        ..TableStyleBorders::default()
+      },
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Dark1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    first_row: TableStylePart {
+      fill_properties: Some(accent_fill.clone()),
+      borders: TableStyleBorders {
+        bottom: Some(light1_line.clone()),
+        ..TableStyleBorders::default()
+      },
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    last_row: TableStylePart {
+      fill_properties: Some(accent_fill.clone()),
+      borders: TableStyleBorders {
+        top: Some(light1_line),
+        ..TableStyleBorders::default()
+      },
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    first_column: TableStylePart {
+      fill_properties: Some(accent_fill.clone()),
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    last_column: TableStylePart {
+      fill_properties: Some(accent_fill.clone()),
+      text: TableStyleTextProperties {
+        color: Some(scheme_color(a::SchemeColorValues::Light1, None)),
+        ..TableStyleTextProperties::default()
+      },
+      ..TableStylePart::default()
+    },
+    band1_horizontal: TableStylePart {
+      fill_properties: Some(accent_tint_40.clone()),
+      ..TableStylePart::default()
+    },
+    band1_vertical: TableStylePart {
+      fill_properties: Some(accent_tint_40),
+      ..TableStylePart::default()
+    },
+    ..TableStyle::default()
+  }
+}
+
+fn solid_scheme_fill(value: a::SchemeColorValues, tint: Option<i32>) -> FillProperties {
+  FillProperties {
+    kind: FillKind::Solid(Some(scheme_color(value, tint))),
+    placeholder_color: None,
+  }
+}
+
+fn solid_scheme_line(value: a::SchemeColorValues) -> LineProperties {
+  LineProperties {
+    fill: LineFill::Solid(Some(scheme_color(value, None))),
+    width_emu: None,
+    placeholder_color: None,
+  }
+}
+
+fn scheme_color(value: a::SchemeColorValues, tint: Option<i32>) -> Color {
+  Color::Scheme(SchemeColor {
+    value,
+    transformations: tint
+      .map(|value| ColorTransformation {
+        kind: ColorTransformationKind::Tint,
+        value: Some(value),
+      })
+      .into_iter()
+      .collect(),
+  })
 }
 
 trait TableStyleSource {

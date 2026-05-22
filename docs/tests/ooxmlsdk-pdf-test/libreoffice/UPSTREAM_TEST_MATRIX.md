@@ -549,6 +549,19 @@ primary migration list. The `export-tests*.cxx` suites contain another 176
 unique PPTX references, but most are export XML or round-trip checks; keep them
 in `review` until a non-XML visible-output assertion is identified.
 
+Current PPTX migration progress:
+
+- 28 anchor fixtures have been copied from `../core/sd/qa/unit/data/` into
+  `test-data/ooxmlsdk-pdf-test/libreoffice/`.
+- 2 upstream-backed PPTX PDF assertions are covered locally:
+  `layout-tests.cxx::testTdf168010_PPTX` and
+  `layout-tests.cxx::testBnc480256`.
+- `layout-tests.cxx::numberedList` is present as an ignored TDD assertion
+  because the current PPTX renderer still emits master placeholder text into
+  the slide output; keep the LibreOffice text-order expectation unchanged.
+- Remaining copied anchor fixtures are staged for follow-up assertion ports;
+  do not derive expected values from current Rust output.
+
 | Source bucket | Unique PPTX fixtures | Status | Migration rule |
 |---|---:|---|---|
 | `sd/qa/unit/import-tests.cxx` | 45 | `mapped` | Import assertions for slide-visible shapes, text, tables, charts, media, links, and backgrounds. |

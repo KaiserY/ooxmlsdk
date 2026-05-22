@@ -1,13 +1,14 @@
 # ooxmlsdk-pdf-test fixtures
 
-This directory contains DOCX fixtures used by `crates/ooxmlsdk-pdf-test` for
-upstream-aligned PDF export assertions.
+This directory contains DOCX/PPTX fixtures used by `crates/ooxmlsdk-pdf-test`
+for upstream-aligned PDF export assertions.
 
-`ooxmlsdk-pdf-test` assumes these DOCX files are valid test inputs. DOCX
+`ooxmlsdk-pdf-test` assumes these OOXML files are valid test inputs. OOXML
 package/schema/relationship round-trip behavior is covered by
-`crates/ooxmlsdk-test`; this directory is only for `docx -> pdf` behavior.
+`crates/ooxmlsdk-test`; this directory is only for `docx -> pdf` and
+`pptx -> pdf` behavior.
 
-Fixtures in this directory should come from LibreOffice DOCX -> visible PDF
+Fixtures in this directory should come from LibreOffice OOXML -> visible PDF
 coverage, paired with an existing upstream assertion. Prefer strict
 `../core/vcl/qa/cppunit/pdfexport/data/` fixtures when available, then scattered
 Writer/SVX/OoXML tests that export or assert visible page output. Avoid adding
@@ -67,6 +68,38 @@ These supplemental DOCX fixtures are not native `pdfexport` cases. They come
 from other LibreOffice subsystems, but each one asserts a final visible-output
 property that can be checked directly on the generated PDF without depending on
 Writer's internal document model.
+
+Mapped visible-output PPTX fixtures:
+
+- `pptx/NumberedList-12ab-ab-34.pptx`: copied from
+  `../core/sd/qa/unit/data/pptx/NumberedList-12ab-ab-34.pptx`; source test
+  `../core/sd/qa/unit/layout-tests.cxx::numberedList`.
+- `pptx/bnc480256-2.pptx`: copied from
+  `../core/sd/qa/unit/data/pptx/bnc480256-2.pptx`; source test
+  `../core/sd/qa/unit/layout-tests.cxx::testBnc480256`.
+- `pptx/trailing-paragraphs.pptx`: copied from
+  `../core/sd/qa/unit/data/pptx/trailing-paragraphs.pptx`; source test
+  `../core/sd/qa/unit/layout-tests.cxx::testTdf168010_PPTX`.
+- `pptx/tdf104722.pptx`, `pptx/tdf135843.pptx`,
+  `pptx/tdf128212.pptx`, `pptx/tdf146731.pptx`,
+  `pptx/tdf135843_insideH.pptx`, `pptx/tdf148966.pptx`,
+  `pptx/tcPr-vert-roundtrip.pptx`, `pptx/tdf164622.pptx`, and
+  `pptx/tdf128206.pptx`: copied from `../core/sd/qa/unit/data/pptx/`;
+  source tests are the matching PPTX rows in
+  `../core/sd/qa/unit/layout-tests.cxx`.
+- `pptx/tdf156808.pptx`, `pptx/tdf157793.pptx`,
+  `pptx/tdf157635.pptx`, and `pptx/tdf113163.pptx`: copied from
+  `../core/sd/qa/unit/data/pptx/`; source tests are the matching PPTX rows in
+  `../core/sd/qa/unit/PNGExportTests.cxx`.
+- `TextDistancesInsets1.pptx` and `TextDistancesInsets2.pptx`: copied from
+  `../core/sd/qa/unit/data/`; source tests
+  `../core/sd/qa/unit/ShapeImportExportTest.cxx::testTextDistancesOOXML` and
+  `::testTextDistancesOOXML_LargerThanTextAreaSpecialCase`.
+- `fdo47434.pptx`, `n819614.pptx`, `n820786.pptx`, `n762695.pptx`,
+  `n593612.pptx`, `fdo71434.pptx`, `n902652.pptx`, `tdf90403.pptx`,
+  `tdf100491.pptx`, and `tdf109317.pptx`: copied from
+  `../core/sd/qa/unit/data/`; source tests are
+  `../core/sd/qa/unit/import-tests.cxx::testDocumentLayout` rows.
 
 Mapped visible-output fixtures:
 

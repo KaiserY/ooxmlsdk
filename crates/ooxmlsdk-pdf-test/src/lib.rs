@@ -1,9 +1,9 @@
 //! PDF export test helpers for `ooxmlsdk-pdf`.
 //!
 //! This crate is intentionally separate from the runtime PDF converter. It
-//! renders checked-in DOCX fixtures through `ooxmlsdk-pdf` and exposes PDFium-
-//! based summaries for tests that mirror upstream LibreOffice `pdfexport`
-//! assertions.
+//! renders checked-in DOCX/PPTX fixtures through `ooxmlsdk-pdf` and exposes
+//! PDFium-based summaries for tests that mirror upstream LibreOffice PDF,
+//! layout, and render assertions.
 
 pub mod pdf_extract;
 pub mod render;
@@ -44,7 +44,7 @@ pub fn pdfexport_fixture_dir() -> PathBuf {
 
 pub fn pdfexport_fixtures() -> Vec<PathBuf> {
   let mut fixtures = Vec::new();
-  collect_word_documents(&pdfexport_fixture_dir(), &mut fixtures);
+  collect_office_documents(&pdfexport_fixture_dir(), &mut fixtures);
   fixtures.sort();
   fixtures
 }
@@ -85,7 +85,7 @@ pub fn workspace_relative_path(path: &Path) -> String {
     .replace('\\', "/")
 }
 
-fn collect_word_documents(root: &Path, fixtures: &mut Vec<PathBuf>) {
+fn collect_office_documents(root: &Path, fixtures: &mut Vec<PathBuf>) {
   if !root.exists() {
     return;
   }
@@ -97,15 +97,15 @@ fn collect_word_documents(root: &Path, fixtures: &mut Vec<PathBuf>) {
     .filter(|entry| entry.file_type().is_file())
   {
     let path = entry.into_path();
-    if is_word_document(&path) {
+    if is_pdf_fixture_document(&path) {
       fixtures.push(path);
     }
   }
 }
 
-fn is_word_document(path: &Path) -> bool {
+fn is_pdf_fixture_document(path: &Path) -> bool {
   matches!(
     path.extension().and_then(|extension| extension.to_str()),
-    Some("docx" | "docm" | "dotx" | "dotm")
+    Some("docx" | "docm" | "dotx" | "dotm" | "pptx" | "pptm" | "ppsx" | "ppsm")
   )
 }

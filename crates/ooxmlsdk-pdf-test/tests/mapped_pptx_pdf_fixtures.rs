@@ -1563,3 +1563,154 @@ fn mapped_pptx_smartart_org_chart2_preserves_deep_org_texts() {
   assert_text_top_after(&summary, 0, "B1", "A");
   assert_text_top_after(&summary, 0, "C1", "B1");
 }
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf131553
+fn mapped_pptx_smartart_tdf131553_preserves_embedded_formula_object() {
+  let summary = render_summary("pptx/tdf131553.pptx");
+  assert_page_contains_in_order(&summary, 0, &["𝐴=", "𝜋", "𝑟^2"]);
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testFillColorList
+fn mapped_pptx_smartart_fill_color_list_preserves_red_fill_and_short_height() {
+  let summary = render_summary("pptx/fill-color-list.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "B", "C"]);
+  assert_has_path_fill_color(&summary, "#c0504d@ff");
+  assert_any_path_height_close(&summary, 0, 2239.0 * 72.0 / 2540.0, 6.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf134221
+fn mapped_pptx_smartart_tdf134221_preserves_negative_upper_text_inset() {
+  let summary = render_summary("pptx/smartart-tdf134221.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "C", "B"]);
+  assert_text_top_after(&summary, 0, "B", "A");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testLinearRule
+fn mapped_pptx_smartart_linear_rule_preserves_large_background_arrow() {
+  let summary = render_summary("pptx/smartart-linear-rule.pptx");
+  assert_page_contains_in_order(&summary, 0, &["A", "B", "C"]);
+  assert_any_path_width_close(&summary, 0, 19867.0 * 72.0 / 2540.0, 24.0);
+  assert_any_path_height_close(&summary, 0, 10092.0 * 72.0 / 2540.0, 24.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testLinearRuleVert
+fn mapped_pptx_smartart_linear_rule_vert_preserves_first_item_height() {
+  let summary = render_summary("pptx/smartart-linear-rule-vert.pptx");
+  assert_page_contains_in_order(&summary, 0, &["P1", "P2", "P3"]);
+  assert_any_path_height_close(&summary, 0, 2020.0 * 72.0 / 2540.0, 6.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testAutofitSync
+fn mapped_pptx_smartart_autofit_sync_preserves_scaled_text_groups() {
+  let summary = render_summary("pptx/smartart-autofit-sync.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["A", "B", "C", "A1", "A2", "B1", "B2", "C1", "A3", "B20"],
+  );
+  assert_text_font_size(&summary, "A1", "56.00");
+  assert_text_font_size(&summary, "B1", "56.00");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testSnakeRows
+fn mapped_pptx_smartart_snake_rows_preserves_two_row_layout() {
+  let summary = render_summary("pptx/smartart-snake-rows.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Parent 3", "Child 3", "Child 2", "Child 5", "Child 6", "Child 1",
+    ],
+  );
+  assert_text_top_close(&summary, 0, "Parent 3", "Child 3", 12.0);
+  assert_text_top_after(&summary, 0, "Parent 4", "Parent 3");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCompositeInferRight
+fn mapped_pptx_smartart_composite_infer_right_keeps_text_right_of_image() {
+  let summary = render_summary("pptx/smartart-composite-infer-right.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Parent", "Child 1", "Child 2"]);
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_text_left_after(&summary, 0, "Child 1", "Parent");
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf149551Pie
+fn mapped_pptx_smartart_tdf149551_pie_preserves_text_anchor_position() {
+  let summary = render_summary("pptx/tdf149551_SmartArt_Pie.pptx");
+  assert_page_contains_in_order(&summary, 0, &["1 a b c", "2 a b c", "3 a b c"]);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "1 a b c", 12658.0, 5073.0, 20.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf149551Pyramid
+fn mapped_pptx_smartart_tdf149551_pyramid_preserves_text_anchor_position() {
+  let summary = render_summary("pptx/tdf149551_SmartArt_Pyramid.pptx");
+  assert_page_contains_in_order(&summary, 0, &["1 a b c", "2 a b c", "3 a b c"]);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "1 a b c", 9368.0, 2699.0, 20.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf149551Venn
+fn mapped_pptx_smartart_tdf149551_venn_preserves_text_anchor_position() {
+  let summary = render_summary("pptx/tdf149551_SmartArt_Venn.pptx");
+  assert_page_contains_in_order(&summary, 0, &["1 a b c", "2 a b c", "3 a b c"]);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "1 a b c", 10333.0, 3395.0, 20.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf149551Gear
+fn mapped_pptx_smartart_tdf149551_gear_preserves_text_anchor_position() {
+  let summary = render_summary("pptx/tdf149551_SmartArt_Gear.pptx");
+  assert_page_contains_in_order(&summary, 0, &["One", "Two", "Three"]);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "One", 6605.0, 5787.0, 20.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf145528Matrix
+fn mapped_pptx_smartart_tdf145528_matrix_preserves_text_positions() {
+  let summary = render_summary("pptx/tdf145528_SmartArt_Matrix.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Writer", "Calc", "Impress", "Draw"]);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "Writer", 4001.0, 9999.0, 24.0);
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "Calc", 12001.0, 1999.0, 24.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf135953TextPosition
+fn mapped_pptx_smartart_tdf135953_preserves_rotated_text_area_position() {
+  let summary = render_summary("pptx/tdf135953_SmartArt_textposition.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["left shape", "left text", "right shape", "right text"],
+  );
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "left shape", 3339.0, -1544.0, 24.0);
+}
+
+#[test]
+// Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf132302RightArrow
+fn mapped_pptx_smartart_tdf132302_right_arrow_preserves_text_area_position() {
+  let summary = render_summary("pptx/tdf132302_SmartArt_rightArrow.pptx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "Topic A",
+      "Detail One",
+      "Detail Two",
+      "Topic B",
+      "Detail Three",
+      "Detail Four",
+    ],
+  );
+  assert_text_near_libreoffice_metafile_point(&summary, 0, "Topic A", 5078.0, 1257.0, 24.0);
+}

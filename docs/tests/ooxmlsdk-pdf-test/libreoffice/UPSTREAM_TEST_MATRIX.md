@@ -571,7 +571,7 @@ PPTX bucket counts:
 | `sd/qa/unit/FontEmbeddingTest.cxx` | 2 |
 
 Current local coverage is intentionally small and upstream-assertion focused:
-107 matrix rows are covered by active PPTX PDF tests. They currently span
+122 matrix rows are covered by active PPTX PDF tests. They currently span
 LibreOffice import text/color/fill/line/border/page assertions and layout
 metafile-position assertions.
 `layout-tests.cxx::numberedList` is present as an ignored TDD assertion because
@@ -767,21 +767,21 @@ LibreOffice text-order expectation unchanged.
 | `import-tests-smartart.cxx::testRecursion` | `pptx/smartart-recursion.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1249` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testDataFollow` | `pptx/smartart-data-follow.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1290` | `covered` | partial visible-output assertion. |
 | `import-tests-smartart.cxx::testOrgChart2` | `pptx/smartart-org-chart2.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1331` | `covered` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf131553` | `pptx/tdf131553.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1370` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testFillColorList` | `pptx/fill-color-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1382` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf134221` | `pptx/smartart-tdf134221.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1414` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testLinearRule` | `pptx/smartart-linear-rule.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1427` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testLinearRuleVert` | `pptx/smartart-linear-rule-vert.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1462` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testAutofitSync` | `pptx/smartart-autofit-sync.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1480` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testSnakeRows` | `pptx/smartart-snake-rows.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1517` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testCompositeInferRight` | `pptx/smartart-composite-infer-right.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1541` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf149551Pie` | `pptx/tdf149551_SmartArt_Pie.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1561` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf149551Pyramid` | `pptx/tdf149551_SmartArt_Pyramid.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1582` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf149551Venn` | `pptx/tdf149551_SmartArt_Venn.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1603` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf149551Gear` | `pptx/tdf149551_SmartArt_Gear.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1624` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf145528Matrix` | `pptx/tdf145528_SmartArt_Matrix.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1645` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf135953TextPosition` | `pptx/tdf135953_SmartArt_textposition.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1676` | `mapped` | partial visible-output assertion. |
-| `import-tests-smartart.cxx::testTdf132302RightArrow` | `pptx/tdf132302_SmartArt_rightArrow.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1699` | `mapped` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf131553` | `pptx/tdf131553.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1370` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testFillColorList` | `pptx/fill-color-list.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1382` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf134221` | `pptx/smartart-tdf134221.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1414` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testLinearRule` | `pptx/smartart-linear-rule.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1427` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testLinearRuleVert` | `pptx/smartart-linear-rule-vert.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1462` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testAutofitSync` | `pptx/smartart-autofit-sync.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1480` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testSnakeRows` | `pptx/smartart-snake-rows.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1517` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testCompositeInferRight` | `pptx/smartart-composite-infer-right.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1541` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf149551Pie` | `pptx/tdf149551_SmartArt_Pie.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1561` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf149551Pyramid` | `pptx/tdf149551_SmartArt_Pyramid.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1582` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf149551Venn` | `pptx/tdf149551_SmartArt_Venn.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1603` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf149551Gear` | `pptx/tdf149551_SmartArt_Gear.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1624` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf145528Matrix` | `pptx/tdf145528_SmartArt_Matrix.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1645` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf135953TextPosition` | `pptx/tdf135953_SmartArt_textposition.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1676` | `covered` | partial visible-output assertion. |
+| `import-tests-smartart.cxx::testTdf132302RightArrow` | `pptx/tdf132302_SmartArt_rightArrow.pptx` | `../core/sd/qa/unit/import-tests-smartart.cxx:1699` | `covered` | partial visible-output assertion. |
 | `layout-tests.cxx::testTdf104722` | `pptx/tdf104722.pptx` | `../core/sd/qa/unit/layout-tests.cxx:36` | `covered` | partial metafile/PDF primitive assertion. |
 | `layout-tests.cxx::testTdf135843` | `pptx/tdf135843.pptx` | `../core/sd/qa/unit/layout-tests.cxx:49` | `covered` | partial metafile/PDF primitive assertion. |
 | `layout-tests.cxx::testTdf128212` | `pptx/tdf128212.pptx` | `../core/sd/qa/unit/layout-tests.cxx:103` | `covered` | partial metafile/PDF primitive assertion. |

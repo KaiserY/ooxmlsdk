@@ -13,6 +13,7 @@ use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{Shape, ShapeService};
 use super::drawingml::table::{
   TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
+  TableStyleTextProperties,
 };
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::{TextListLevelParagraphProperties, TextListParagraphStyle};
@@ -152,6 +153,10 @@ fn lower_table(
     .inline_style
     .as_ref()
     .or_else(|| import.get_table_style(table.style_id.as_deref()));
+  let table_background = table_style.and_then(|style| {
+    table_style_part_fill(import, &style.table_background)
+      .and_then(|fill| fill_paint(import, &fill))
+  });
   let border_color = RgbColor { r: 0, g: 0, b: 0 };
   let draw_fallback_grid = table_style.is_none() && !table_has_direct_borders(table);
   if draw_fallback_grid {
@@ -192,12 +197,15 @@ fn lower_table(
       let cell_width = units::emu_to_points(width_emu);
       if !cell.horizontal_merge && !cell.vertical_merge {
         let style_part = table_style.map(|style| {
-          table_cell_style_part(table, style, grid_index, max_column, row_index, max_row)
+          table_cell_style_part(
+            import, table, style, grid_index, max_column, row_index, max_row,
+          )
         });
         lower_table_cell(
           import,
           cell,
           style_part.as_ref(),
+          table_background,
           x,
           y,
           cell_width,
@@ -224,6 +232,7 @@ fn lower_table(
 }
 
 fn table_cell_style_part(
+  import: &PowerPointImport,
   table: &TableProperties,
   style: &TableStyle,
   column: usize,
@@ -236,6 +245,7 @@ fn table_cell_style_part(
   // then vertical banding. Direct tcPr is merged afterwards by the caller.
   let mut result = TableStylePart::default();
   merge_style_part(
+    import,
     &mut result,
     &style.whole_table,
     true,
@@ -246,6 +256,7 @@ fn table_cell_style_part(
   );
   if table.first_row && row == 0 {
     merge_style_part(
+      import,
       &mut result,
       &style.first_row,
       false,
@@ -257,6 +268,7 @@ fn table_cell_style_part(
   }
   if table.last_row && row == max_row {
     merge_style_part(
+      import,
       &mut result,
       &style.last_row,
       false,
@@ -268,6 +280,7 @@ fn table_cell_style_part(
   }
   if table.first_column && column == 0 {
     merge_style_part(
+      import,
       &mut result,
       &style.first_column,
       false,
@@ -279,6 +292,7 @@ fn table_cell_style_part(
   }
   if table.last_column && column == max_column {
     merge_style_part(
+      import,
       &mut result,
       &style.last_column,
       false,
@@ -291,8 +305,10 @@ fn table_cell_style_part(
   if table.band_row
     && (!table.first_row || row != 0)
     && (!table.last_row || row != max_row)
-    && (!table.first_column || column != 0 || style.first_column.fill_properties.is_none())
-    && (!table.last_column || column != max_column || style.last_column.fill_properties.is_none())
+    && (!table.first_column || column != 0 || !table_style_part_has_fill(&style.first_column))
+    && (!table.last_column
+      || column != max_column
+      || !table_style_part_has_fill(&style.last_column))
   {
     let band = row + usize::from(table.first_row);
     let part = if band & 1 == 1 {
@@ -300,10 +316,20 @@ fn table_cell_style_part(
     } else {
       &style.band1_horizontal
     };
-    merge_style_part(&mut result, part, false, column, max_column, row, max_row);
+    merge_style_part(
+      import,
+      &mut result,
+      part,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
   }
   if row == 0 && column == 0 {
     merge_style_part(
+      import,
       &mut result,
       &style.northwest_cell,
       false,
@@ -315,6 +341,7 @@ fn table_cell_style_part(
   }
   if row == max_row && column == 0 {
     merge_style_part(
+      import,
       &mut result,
       &style.southwest_cell,
       false,
@@ -326,6 +353,7 @@ fn table_cell_style_part(
   }
   if row == 0 && column == max_column {
     merge_style_part(
+      import,
       &mut result,
       &style.northeast_cell,
       false,
@@ -337,6 +365,7 @@ fn table_cell_style_part(
   }
   if row == max_row && column == max_column {
     merge_style_part(
+      import,
       &mut result,
       &style.southeast_cell,
       false,
@@ -358,12 +387,22 @@ fn table_cell_style_part(
     } else {
       &style.band1_vertical
     };
-    merge_style_part(&mut result, part, false, column, max_column, row, max_row);
+    merge_style_part(
+      import,
+      &mut result,
+      part,
+      false,
+      column,
+      max_column,
+      row,
+      max_row,
+    );
   }
   result
 }
 
 fn merge_style_part(
+  import: &PowerPointImport,
   target: &mut TableStylePart,
   source: &TableStylePart,
   whole_table: bool,
@@ -372,11 +411,12 @@ fn merge_style_part(
   row: usize,
   max_row: usize,
 ) {
-  if source.fill_properties.is_some() {
-    target.fill_properties = source.fill_properties.clone();
+  if let Some(fill) = table_style_part_fill(import, source) {
+    target.fill_properties = Some(fill);
   }
   let mut borders = TableCellBorders::default();
   merge_style_borders(
+    import,
     &mut borders,
     &source.borders,
     whole_table,
@@ -389,7 +429,25 @@ fn merge_style_part(
   target.text.merge_from(&source.text);
 }
 
+fn table_style_part_has_fill(part: &TableStylePart) -> bool {
+  part.fill_properties.is_some() || part.fill_reference.is_some()
+}
+
+fn table_style_part_fill(
+  import: &PowerPointImport,
+  part: &TableStylePart,
+) -> Option<FillProperties> {
+  part.fill_properties.clone().or_else(|| {
+    part.fill_reference.as_ref().and_then(|reference| {
+      import
+        .get_theme_fill_style(reference.index)
+        .map(|fill| fill.with_placeholder_color(reference.placeholder_color.clone()))
+    })
+  })
+}
+
 fn merge_style_borders(
+  import: &PowerPointImport,
   target: &mut TableCellBorders,
   source: &TableStyleBorders,
   whole_table: bool,
@@ -398,40 +456,78 @@ fn merge_style_borders(
   row: usize,
   max_row: usize,
 ) {
-  if (!whole_table || column == 0) && source.left.is_some() {
-    target.left = source.left.clone();
+  if (!whole_table || column == 0)
+    && let Some(line) = table_style_border_line(import, &source.left, &source.left_reference)
+  {
+    target.left = Some(line);
   }
-  if (!whole_table || column >= max_column) && source.right.is_some() {
-    target.right = source.right.clone();
+  if (!whole_table || column >= max_column)
+    && let Some(line) = table_style_border_line(import, &source.right, &source.right_reference)
+  {
+    target.right = Some(line);
   }
-  if (!whole_table || row == 0) && source.top.is_some() {
-    target.top = source.top.clone();
+  if (!whole_table || row == 0)
+    && let Some(line) = table_style_border_line(import, &source.top, &source.top_reference)
+  {
+    target.top = Some(line);
   }
-  if (!whole_table || row >= max_row) && source.bottom.is_some() {
-    target.bottom = source.bottom.clone();
+  if (!whole_table || row >= max_row)
+    && let Some(line) = table_style_border_line(import, &source.bottom, &source.bottom_reference)
+  {
+    target.bottom = Some(line);
   }
-  if source.inside_horizontal.is_some() {
+  if let Some(line) = table_style_border_line(
+    import,
+    &source.inside_horizontal,
+    &source.inside_horizontal_reference,
+  ) {
     if row != 0 {
-      target.top = source.inside_horizontal.clone();
+      target.top = Some(line.clone());
     }
     if row != max_row {
-      target.bottom = source.inside_horizontal.clone();
+      target.bottom = Some(line);
     }
   }
-  if source.inside_vertical.is_some() {
+  if let Some(line) = table_style_border_line(
+    import,
+    &source.inside_vertical,
+    &source.inside_vertical_reference,
+  ) {
     if column != 0 {
-      target.left = source.inside_vertical.clone();
+      target.left = Some(line.clone());
     }
     if column != max_column {
-      target.right = source.inside_vertical.clone();
+      target.right = Some(line);
     }
   }
-  if source.top_left_to_bottom_right.is_some() {
-    target.top_left_to_bottom_right = source.top_left_to_bottom_right.clone();
+  if let Some(line) = table_style_border_line(
+    import,
+    &source.top_left_to_bottom_right,
+    &source.top_left_to_bottom_right_reference,
+  ) {
+    target.top_left_to_bottom_right = Some(line);
   }
-  if source.bottom_left_to_top_right.is_some() {
-    target.bottom_left_to_top_right = source.bottom_left_to_top_right.clone();
+  if let Some(line) = table_style_border_line(
+    import,
+    &source.bottom_left_to_top_right,
+    &source.bottom_left_to_top_right_reference,
+  ) {
+    target.bottom_left_to_top_right = Some(line);
   }
+}
+
+fn table_style_border_line(
+  import: &PowerPointImport,
+  direct: &Option<LineProperties>,
+  reference: &Option<super::drawingml::shape::ShapeStyleReference>,
+) -> Option<LineProperties> {
+  direct.clone().or_else(|| {
+    reference.as_ref().and_then(|reference| {
+      import
+        .get_theme_line_style(reference.index)
+        .map(|line| line.with_placeholder_color(reference.placeholder_color.clone()))
+    })
+  })
 }
 
 fn merge_cell_borders_from_style(target: &mut TableStyleBorders, source: &TableCellBorders) {
@@ -472,6 +568,7 @@ fn lower_table_cell(
   import: &PowerPointImport,
   cell: &TableCell,
   style_part: Option<&TableStylePart>,
+  table_background: Option<DisplayPaint>,
   x: f32,
   y: f32,
   width: f32,
@@ -481,11 +578,8 @@ fn lower_table_cell(
   if width <= 0.0 || height <= 0.0 {
     return;
   }
-  let fill_properties = cell
-    .fill_properties
-    .as_ref()
-    .or_else(|| style_part.and_then(|style| style.fill_properties.as_ref()));
-  if let Some(fill) = fill_properties.and_then(|fill| fill_paint(import, fill)) {
+  let fill = table_cell_fill_paint(import, cell, style_part, table_background);
+  if let Some(fill) = fill {
     items.push(PageItem::Rect(RectItem {
       x_pt: x,
       y_pt: y,
@@ -508,7 +602,7 @@ fn lower_table_cell(
     text_body.display_properties.horizontal_overflow = Some(cell.horizontal_overflow);
     let x = x + units::emu_to_points(i64::from(cell.margins.left));
     let y = y + units::emu_to_points(i64::from(cell.margins.top));
-    lower_text_body_at(
+    lower_text_body_at_with_table_style(
       import,
       TextFrame {
         x_pt: x,
@@ -520,9 +614,69 @@ fn lower_table_cell(
         .max(0.0),
       },
       &text_body,
+      style_part.map(|style| &style.text),
       items,
     );
   }
+}
+
+fn table_cell_fill_paint(
+  import: &PowerPointImport,
+  cell: &TableCell,
+  style_part: Option<&TableStylePart>,
+  table_background: Option<DisplayPaint>,
+) -> Option<DisplayPaint> {
+  let cell_fill = cell
+    .fill_properties
+    .as_ref()
+    .map(|fill| fill_paint(import, fill))
+    .unwrap_or_else(|| {
+      style_part
+        .and_then(|style| style.fill_properties.as_ref())
+        .and_then(|fill| fill_paint(import, fill))
+    });
+  match (table_background, cell_fill) {
+    (Some(background), Some(cell)) => Some(blend_table_cell_fill(background, cell)),
+    (Some(background), None) => Some(background),
+    (None, Some(cell)) => Some(cell),
+    (None, None) => None,
+  }
+}
+
+fn blend_table_cell_fill(background: DisplayPaint, cell: DisplayPaint) -> DisplayPaint {
+  // Source: LibreOffice tablecell.cxx blends table background and cell fill
+  // through basegfx::interpolate(bg, cell, 1 - cellTransparency).
+  let cell_weight = cell.opacity.clamp(0.0, 1.0);
+  let background_weight = 1.0 - cell_weight;
+  DisplayPaint {
+    color: RgbColor {
+      r: blend_channel(
+        background.color.r,
+        cell.color.r,
+        background_weight,
+        cell_weight,
+      ),
+      g: blend_channel(
+        background.color.g,
+        cell.color.g,
+        background_weight,
+        cell_weight,
+      ),
+      b: blend_channel(
+        background.color.b,
+        cell.color.b,
+        background_weight,
+        cell_weight,
+      ),
+    },
+    opacity: background.opacity.max(cell.opacity).clamp(0.0, 1.0),
+  }
+}
+
+fn blend_channel(background: u8, cell: u8, background_weight: f32, cell_weight: f32) -> u8 {
+  (f32::from(background) * background_weight + f32::from(cell) * cell_weight)
+    .round()
+    .clamp(0.0, 255.0) as u8
 }
 
 fn lower_table_cell_borders(
@@ -719,13 +873,26 @@ fn lower_text_body_at(
   text_body: &TextBody,
   items: &mut Vec<PageItem>,
 ) {
+  lower_text_body_at_with_table_style(import, frame, text_body, None, items);
+}
+
+fn lower_text_body_at_with_table_style(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  table_text_style: Option<&TableStyleTextProperties>,
+  items: &mut Vec<PageItem>,
+) {
   let options = TextLoweringOptions::from_text_body(text_body);
-  let base_style = TextStyle {
+  let mut base_style = TextStyle {
     font_family: Some(Arc::from("Liberation Sans")),
     font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT * options.font_scale,
     rotation_deg: options.rotation_deg,
     ..TextStyle::default()
   };
+  if let Some(table_text_style) = table_text_style {
+    apply_table_text_style(import, table_text_style, &mut base_style);
+  }
 
   let estimated_height = estimate_text_body_height(text_body, &base_style, options.line_scale);
   let y_pt = match text_body.display_properties.anchor {
@@ -753,6 +920,53 @@ fn lower_text_body_at(
       &mut cursor,
       items,
     );
+  }
+}
+
+fn apply_table_text_style(
+  import: &PowerPointImport,
+  properties: &TableStyleTextProperties,
+  style: &mut TextStyle,
+) {
+  if let Some(typeface) = properties.fonts.latin.as_deref() {
+    style.font_family = Some(Arc::from(typeface));
+  } else if let Some(typeface) = properties
+    .font_reference
+    .as_ref()
+    .and_then(|reference| import.get_theme_latin_font(reference.index))
+  {
+    style.font_family = Some(Arc::from(typeface));
+  }
+  if let Some(bold) = properties.bold.and_then(boolean_style_value) {
+    style.bold = bold;
+  }
+  if let Some(italic) = properties.italic.and_then(boolean_style_value) {
+    style.italic = italic;
+  }
+  if let Some(paint) = properties
+    .font_reference
+    .as_ref()
+    .and_then(|reference| reference.placeholder_color.as_ref())
+    .and_then(|color| display_paint(import, color, None))
+  {
+    style.color = paint.color;
+    style.opacity = paint.opacity;
+  }
+  if let Some(paint) = properties
+    .color
+    .as_ref()
+    .and_then(|color| display_paint(import, color, None))
+  {
+    style.color = paint.color;
+    style.opacity = paint.opacity;
+  }
+}
+
+fn boolean_style_value(value: a::BooleanStyleValues) -> Option<bool> {
+  match value {
+    a::BooleanStyleValues::On => Some(true),
+    a::BooleanStyleValues::Off => Some(false),
+    a::BooleanStyleValues::Default => None,
   }
 }
 

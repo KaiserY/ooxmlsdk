@@ -606,16 +606,17 @@ fn apply_transformations(color: &mut ResolvedColor, transformations: &[ColorTran
       ColorTransformationKind::BlueOff => color.b = off_crgb_channel(color.b, value),
       ColorTransformationKind::Alpha => color.alpha = clamp_percent(value),
       ColorTransformationKind::AlphaMod => {
-        color.alpha =
-          ((color.alpha as i64 * i64::from(value)) / i64::from(COLOR_PERCENT_MAX)) as i32;
+        color.alpha = mod_value(color.alpha, value, COLOR_PERCENT_MAX);
       }
-      ColorTransformationKind::AlphaOff => color.alpha = clamp_percent(color.alpha + value),
+      ColorTransformationKind::AlphaOff => {
+        color.alpha = offset_value(color.alpha, value, COLOR_PERCENT_MAX)
+      }
       ColorTransformationKind::Shade => apply_shade(color, value),
       ColorTransformationKind::Tint => apply_tint(color, value),
       ColorTransformationKind::Gray => apply_gray(color),
       ColorTransformationKind::Comp => {
         let (h, s, l) = rgb_to_hsl(*color);
-        set_rgb_preserve_alpha(color, hsl_to_rgb((h + 10_800_000) % (360 * 60_000), s, l));
+        set_rgb_preserve_alpha(color, hsl_to_rgb(wrap_hue(h, 180 * 60_000), s, l));
       }
       ColorTransformationKind::Inv => {
         apply_inverse(color);
@@ -641,13 +642,13 @@ fn apply_hsl_transform(color: &mut ResolvedColor, kind: ColorTransformationKind,
   match kind {
     ColorTransformationKind::Hue => h = value.rem_euclid(360 * 60_000),
     ColorTransformationKind::HueMod => h = mod_value(h, value, 360 * 60_000),
-    ColorTransformationKind::HueOff => h = (h + value).rem_euclid(360 * 60_000),
+    ColorTransformationKind::HueOff => h = wrap_hue(h, value),
     ColorTransformationKind::Sat => s = clamp_percent(value),
     ColorTransformationKind::SatMod => s = mod_value(s, value, COLOR_PERCENT_MAX),
-    ColorTransformationKind::SatOff => s = clamp_percent(s + value),
+    ColorTransformationKind::SatOff => s = offset_value(s, value, COLOR_PERCENT_MAX),
     ColorTransformationKind::Lum => l = clamp_percent(value),
     ColorTransformationKind::LumMod => l = mod_value(l, value, COLOR_PERCENT_MAX),
-    ColorTransformationKind::LumOff => l = clamp_percent(l + value),
+    ColorTransformationKind::LumOff => l = offset_value(l, value, COLOR_PERCENT_MAX),
     _ => {}
   }
   if l == 0 || l == COLOR_PERCENT_MAX {
@@ -734,18 +735,31 @@ fn mod_crgb_channel(channel: u8, value: i32) -> u8 {
 }
 
 fn off_crgb_channel(channel: u8, value: i32) -> u8 {
-  crgb_percent_to_channel(channel_to_crgb_percent(channel) + value)
+  crgb_percent_to_channel(offset_value(
+    channel_to_crgb_percent(channel),
+    value,
+    COLOR_PERCENT_MAX,
+  ))
 }
 
 fn tint_crgb_channel(channel: u8, value: i32) -> u8 {
   let channel = channel_to_crgb_percent(channel);
-  crgb_percent_to_channel(
-    COLOR_PERCENT_MAX - ((COLOR_PERCENT_MAX - channel) * value) / COLOR_PERCENT_MAX,
-  )
+  let tinted = i64::from(COLOR_PERCENT_MAX)
+    - (i64::from(COLOR_PERCENT_MAX - channel) * i64::from(value)) / i64::from(COLOR_PERCENT_MAX);
+  crgb_percent_to_channel(tinted.clamp(0, i64::from(COLOR_PERCENT_MAX)) as i32)
 }
 
 fn mod_value(value: i32, modifier: i32, max: i32) -> i32 {
-  ((i64::from(value) * i64::from(modifier) / i64::from(COLOR_PERCENT_MAX)) as i32).clamp(0, max)
+  (i64::from(value) * i64::from(modifier) / i64::from(COLOR_PERCENT_MAX)).clamp(0, i64::from(max))
+    as i32
+}
+
+fn offset_value(value: i32, offset: i32, max: i32) -> i32 {
+  (i64::from(value) + i64::from(offset)).clamp(0, i64::from(max)) as i32
+}
+
+fn wrap_hue(value: i32, offset: i32) -> i32 {
+  (i64::from(value) + i64::from(offset)).rem_euclid(i64::from(360 * 60_000)) as i32
 }
 
 fn clamp_percent(value: i32) -> i32 {

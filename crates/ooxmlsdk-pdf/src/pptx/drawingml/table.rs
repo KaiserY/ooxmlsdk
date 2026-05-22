@@ -3,6 +3,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use super::color::Color;
 use super::fill::FillProperties;
 use super::line::{LineFill, LineProperties};
+use super::shape::{FontStyleReference, ShapeStyleReference};
 use super::text_body::TextBody;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,6 +50,7 @@ pub(crate) struct TableStyle {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TableStylePart {
   pub(crate) fill_properties: Option<FillProperties>,
+  pub(crate) fill_reference: Option<ShapeStyleReference>,
   pub(crate) borders: TableStyleBorders,
   pub(crate) text: TableStyleTextProperties,
 }
@@ -56,20 +58,38 @@ pub(crate) struct TableStylePart {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TableStyleBorders {
   pub(crate) left: Option<LineProperties>,
+  pub(crate) left_reference: Option<ShapeStyleReference>,
   pub(crate) right: Option<LineProperties>,
+  pub(crate) right_reference: Option<ShapeStyleReference>,
   pub(crate) top: Option<LineProperties>,
+  pub(crate) top_reference: Option<ShapeStyleReference>,
   pub(crate) bottom: Option<LineProperties>,
+  pub(crate) bottom_reference: Option<ShapeStyleReference>,
   pub(crate) inside_horizontal: Option<LineProperties>,
+  pub(crate) inside_horizontal_reference: Option<ShapeStyleReference>,
   pub(crate) inside_vertical: Option<LineProperties>,
+  pub(crate) inside_vertical_reference: Option<ShapeStyleReference>,
   pub(crate) top_left_to_bottom_right: Option<LineProperties>,
+  pub(crate) top_left_to_bottom_right_reference: Option<ShapeStyleReference>,
   pub(crate) bottom_left_to_top_right: Option<LineProperties>,
+  pub(crate) bottom_left_to_top_right_reference: Option<ShapeStyleReference>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TableStyleTextProperties {
   pub(crate) bold: Option<a::BooleanStyleValues>,
   pub(crate) italic: Option<a::BooleanStyleValues>,
+  pub(crate) fonts: TableStyleTextFonts,
+  pub(crate) font_reference: Option<FontStyleReference>,
   pub(crate) color: Option<Color>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct TableStyleTextFonts {
+  pub(crate) latin: Option<String>,
+  pub(crate) east_asian: Option<String>,
+  pub(crate) complex_script: Option<String>,
+  pub(crate) symbol: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -466,14 +486,18 @@ impl TableStyle {
 
 impl TableStylePart {
   fn from_table_background(source: &a::TableBackground) -> Self {
-    let fill_properties = match source.table_background_choice1.as_ref() {
+    let (fill_properties, fill_reference) = match source.table_background_choice1.as_ref() {
       Some(a::TableBackgroundChoice::FillProperties(fill)) => {
-        FillProperties::from_dml_fill_properties(fill)
+        (FillProperties::from_dml_fill_properties(fill), None)
       }
-      Some(a::TableBackgroundChoice::FillReference(_)) | None => None,
+      Some(a::TableBackgroundChoice::FillReference(reference)) => {
+        (None, Some(fill_style_reference(reference)))
+      }
+      None => (None, None),
     };
     Self {
       fill_properties,
+      fill_reference,
       ..Self::default()
     }
   }
@@ -483,12 +507,13 @@ impl TableStylePart {
       .table_cell_text_style()
       .map(TableStyleTextProperties::from_dml)
       .unwrap_or_default();
-    let (fill_properties, borders) = source
+    let (fill_properties, fill_reference, borders) = source
       .table_cell_style()
       .map(table_cell_style_properties)
       .unwrap_or_default();
     Self {
       fill_properties,
+      fill_reference,
       borders,
       text,
     }
@@ -497,9 +522,13 @@ impl TableStylePart {
 
 impl TableStyleTextProperties {
   fn from_dml(source: &a::TableCellTextStyle) -> Self {
+    let (fonts, font_reference) =
+      table_cell_text_font(source.table_cell_text_style_choice1.as_ref());
     Self {
       bold: source.bold,
       italic: source.italic,
+      fonts,
+      font_reference,
       color: source
         .table_cell_text_style_choice2
         .as_ref()
@@ -514,27 +543,89 @@ impl TableStyleTextProperties {
     if source.italic.is_some() {
       self.italic = source.italic;
     }
+    self.fonts.merge_from(&source.fonts);
+    if source.font_reference.is_some() {
+      self.font_reference = source.font_reference.clone();
+    }
     if source.color.is_some() {
       self.color = source.color.clone();
     }
   }
 }
 
+impl TableStyleTextFonts {
+  fn from_fonts(source: &a::Fonts) -> Self {
+    Self {
+      latin: text_font_typeface(&source.latin_font.typeface),
+      east_asian: text_font_typeface(&source.east_asian_font.typeface),
+      complex_script: text_font_typeface(&source.complex_script_font.typeface),
+      symbol: None,
+    }
+  }
+
+  fn merge_from(&mut self, source: &Self) {
+    if source.latin.is_some() {
+      self.latin = source.latin.clone();
+    }
+    if source.east_asian.is_some() {
+      self.east_asian = source.east_asian.clone();
+    }
+    if source.complex_script.is_some() {
+      self.complex_script = source.complex_script.clone();
+    }
+    if source.symbol.is_some() {
+      self.symbol = source.symbol.clone();
+    }
+  }
+}
+
+fn table_cell_text_font(
+  choice: Option<&a::TableCellTextStyleChoice>,
+) -> (TableStyleTextFonts, Option<FontStyleReference>) {
+  match choice {
+    Some(a::TableCellTextStyleChoice::Fonts(fonts)) => {
+      (TableStyleTextFonts::from_fonts(fonts), None)
+    }
+    Some(a::TableCellTextStyleChoice::FontReference(reference)) => (
+      TableStyleTextFonts::default(),
+      Some(FontStyleReference {
+        index: reference.index,
+        placeholder_color: reference
+          .font_reference_choice
+          .as_ref()
+          .and_then(Color::from_font_reference_choice),
+      }),
+    ),
+    None => (TableStyleTextFonts::default(), None),
+  }
+}
+
+fn text_font_typeface(typeface: &Option<String>) -> Option<String> {
+  typeface.as_ref().filter(|value| !value.is_empty()).cloned()
+}
+
 fn table_cell_style_properties(
   source: &a::TableCellStyle,
-) -> (Option<FillProperties>, TableStyleBorders) {
-  let fill_properties = match source.table_cell_style_choice.as_ref() {
+) -> (
+  Option<FillProperties>,
+  Option<ShapeStyleReference>,
+  TableStyleBorders,
+) {
+  let (fill_properties, fill_reference) = match source.table_cell_style_choice.as_ref() {
     Some(a::TableCellStyleChoice::FillProperties(fill)) => {
-      FillProperties::from_dml_fill_properties(fill)
+      (FillProperties::from_dml_fill_properties(fill), None)
     }
-    Some(a::TableCellStyleChoice::FillReference(_)) | None => None,
+    Some(a::TableCellStyleChoice::FillReference(reference)) => {
+      (None, Some(fill_style_reference(reference)))
+    }
+    None => (None, None),
   };
   let borders = source
     .table_cell_borders
     .as_deref()
     .map(table_style_borders)
     .unwrap_or_default();
-  (fill_properties, borders)
+  (fill_properties, fill_reference, borders)
 }
 
 fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
@@ -548,6 +639,15 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
           a::LeftBorderChoice::LineReference(_) => None,
         })
     }),
+    left_reference: source.left_border.as_deref().and_then(|border| {
+      border
+        .left_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::LeftBorderChoice::LineReference(reference) => Some(line_style_reference(reference)),
+          a::LeftBorderChoice::Outline(_) => None,
+        })
+    }),
     right: source.right_border.as_deref().and_then(|border| {
       border
         .right_border_choice
@@ -555,6 +655,15 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
         .and_then(|choice| match choice {
           a::RightBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
           a::RightBorderChoice::LineReference(_) => None,
+        })
+    }),
+    right_reference: source.right_border.as_deref().and_then(|border| {
+      border
+        .right_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::RightBorderChoice::LineReference(reference) => Some(line_style_reference(reference)),
+          a::RightBorderChoice::Outline(_) => None,
         })
     }),
     top: source.top_border.as_deref().and_then(|border| {
@@ -566,6 +675,15 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
           a::TopBorderChoice::LineReference(_) => None,
         })
     }),
+    top_reference: source.top_border.as_deref().and_then(|border| {
+      border
+        .top_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::TopBorderChoice::LineReference(reference) => Some(line_style_reference(reference)),
+          a::TopBorderChoice::Outline(_) => None,
+        })
+    }),
     bottom: source.bottom_border.as_deref().and_then(|border| {
       border
         .bottom_border_choice
@@ -573,6 +691,15 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
         .and_then(|choice| match choice {
           a::BottomBorderChoice::Outline(outline) => LineProperties::from_dml_outline(outline),
           a::BottomBorderChoice::LineReference(_) => None,
+        })
+    }),
+    bottom_reference: source.bottom_border.as_deref().and_then(|border| {
+      border
+        .bottom_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::BottomBorderChoice::LineReference(reference) => Some(line_style_reference(reference)),
+          a::BottomBorderChoice::Outline(_) => None,
         })
     }),
     inside_horizontal: source
@@ -589,6 +716,20 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
             a::InsideHorizontalBorderChoice::LineReference(_) => None,
           })
       }),
+    inside_horizontal_reference: source
+      .inside_horizontal_border
+      .as_deref()
+      .and_then(|border| {
+        border
+          .inside_horizontal_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::InsideHorizontalBorderChoice::LineReference(reference) => {
+              Some(line_style_reference(reference))
+            }
+            a::InsideHorizontalBorderChoice::Outline(_) => None,
+          })
+      }),
     inside_vertical: source.inside_vertical_border.as_deref().and_then(|border| {
       border
         .inside_vertical_border_choice
@@ -598,6 +739,17 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
             LineProperties::from_dml_outline(outline)
           }
           a::InsideVerticalBorderChoice::LineReference(_) => None,
+        })
+    }),
+    inside_vertical_reference: source.inside_vertical_border.as_deref().and_then(|border| {
+      border
+        .inside_vertical_border_choice
+        .as_ref()
+        .and_then(|choice| match choice {
+          a::InsideVerticalBorderChoice::LineReference(reference) => {
+            Some(line_style_reference(reference))
+          }
+          a::InsideVerticalBorderChoice::Outline(_) => None,
         })
     }),
     top_left_to_bottom_right: source.top_left_to_bottom_right_border.as_deref().and_then(
@@ -610,6 +762,19 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
               LineProperties::from_dml_outline(outline)
             }
             a::TopLeftToBottomRightBorderChoice::LineReference(_) => None,
+          })
+      },
+    ),
+    top_left_to_bottom_right_reference: source.top_left_to_bottom_right_border.as_deref().and_then(
+      |border| {
+        border
+          .top_left_to_bottom_right_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::TopLeftToBottomRightBorderChoice::LineReference(reference) => {
+              Some(line_style_reference(reference))
+            }
+            a::TopLeftToBottomRightBorderChoice::Outline(_) => None,
           })
       },
     ),
@@ -626,6 +791,39 @@ fn table_style_borders(source: &a::TableCellBorders) -> TableStyleBorders {
           })
       },
     ),
+    bottom_left_to_top_right_reference: source.top_right_to_bottom_left_border.as_deref().and_then(
+      |border| {
+        border
+          .top_right_to_bottom_left_border_choice
+          .as_ref()
+          .and_then(|choice| match choice {
+            a::TopRightToBottomLeftBorderChoice::LineReference(reference) => {
+              Some(line_style_reference(reference))
+            }
+            a::TopRightToBottomLeftBorderChoice::Outline(_) => None,
+          })
+      },
+    ),
+  }
+}
+
+fn fill_style_reference(reference: &a::FillReference) -> ShapeStyleReference {
+  ShapeStyleReference {
+    index: reference.index,
+    placeholder_color: reference
+      .fill_reference_choice
+      .as_ref()
+      .and_then(Color::from_fill_reference_choice),
+  }
+}
+
+fn line_style_reference(reference: &a::LineReference) -> ShapeStyleReference {
+  ShapeStyleReference {
+    index: reference.index,
+    placeholder_color: reference
+      .line_reference_choice
+      .as_ref()
+      .and_then(Color::from_line_reference_choice),
   }
 }
 

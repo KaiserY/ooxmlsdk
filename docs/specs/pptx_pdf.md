@@ -138,11 +138,23 @@ Already structurally aligned:
   traversal, and inline `a:tableStyle` is preserved on `TableProperties`.
   `TableStyleList` / `TableStyle` / `TableStylePart` capture default style id,
   whole-table, first/last row and column, horizontal/vertical banding, corner
-  parts, direct fill, direct outline borders, and table text style color/bold/
-  italic markers. The display bridge applies the LibreOffice `tablecell.cxx`
-  part order for direct solid fills and outline borders: whole table, first/
-  last row and column, horizontal bands, corner cells, vertical bands, then
-  direct `tcPr` overrides.
+  parts, direct fill, direct outline borders, `fillRef`/`lnRef` style-matrix
+  references with `phClr`, and table text style font/fontRef plus
+  color/bold/italic markers. The
+  display bridge applies the LibreOffice `tablecell.cxx` part order for direct
+  or theme-referenced solid fills, outline borders, and table text
+  font/color/bold/italic defaults: whole table, first/last row and column,
+  horizontal bands, corner cells, vertical bands, then direct `tcPr` and
+  paragraph/run overrides. `tcTxStyle` must seed the cell text character
+  defaults before paragraph `defRPr` and direct run properties, matching
+  LibreOffice's `applyTableStylePart` path. Direct `tcTxStyle/font` latin
+  typefaces and `fontRef` major/minor latin theme fonts are applied in the
+  temporary display bridge; east Asian, complex-script, and symbol fonts stay
+  preserved for the full text-engine port. Table background fill is consumed per
+  cell, not as an independent painted rectangle: the display bridge blends the
+  table background solid color with the final cell solid fill using the cell
+  fill opacity, mirroring LibreOffice's `basegfx::interpolate(bg, cell, 1 -
+  transparency)` handoff.
 - Display lowering must not paint `master_page.shapes` separately when a slide
   already inherited a layout persist. `PresentationFragmentHandler` clones the
   layout/master shape tree into the slide persist before slide XML is imported,
@@ -157,7 +169,11 @@ Known gaps to keep visible:
   transformations, including `phClr` substitution for theme style
   fill/line/background refs, background-color fallback for `phClr`, CRGB-space
   handling for `scrgbClr` and RGB channel transforms, and fill/line alpha
-  propagation to display opacity.
+  propagation to display opacity. Color transform arithmetic must use widened
+  intermediates for CRGB tint/shade/mod/off, HSL offsets, and alpha mod/off;
+  real LibreOffice presentation fixtures use large DrawingML percentage values
+  and debug/release overflow differences here are rendering bugs, not harmless
+  implementation details.
   Remaining gaps are theme overrides, extra color schemes, and exact parity for
   edge-case system/palette behavior.
 - `Shape::apply_shape_reference` has the explicit `bUseText` branch, but still
@@ -179,12 +195,11 @@ Known gaps to keep visible:
   mode simulation; columns do simple paragraph flow, not full edit-engine line
   layout.
 - Table rendering still lacks predefined LibreOffice table style synthesis when
-  a style id has no tableStyles part entry, `fillRef`/`lnRef` theme-style
-  resolution inside table styles, styled table text propagation into paragraph
-  runs, background-fill blending, merge-aware border suppression, non-solid
-  fill/line paint, text-fitting expansion, and shadow/effect handling. Do not
-  treat the current grid fallback or direct style paint bridge as final table
-  semantics.
+  a style id has no tableStyles part entry, full `tcTxStyle` east Asian /
+  complex-script / symbol font application, merge-aware border suppression,
+  non-solid fill/line paint, exact alpha/transparent background edge behavior,
+  text-fitting expansion, and shadow/effect handling. Do not treat the current
+  grid fallback or direct/theme style paint bridge as final table semantics.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
   `Shape::finalize_x_shape`, grab bags, diagram helper propagation, chart,
   SmartArt, OLE, media, notes, comments, and VML remain structured slots or

@@ -33,6 +33,17 @@ pub(crate) struct ThemeFormatScheme {
   pub(crate) effect_styles: Vec<EffectProperties>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ThemeFontScheme {
+  pub(crate) name: String,
+  pub(crate) major_latin: Option<String>,
+  pub(crate) minor_latin: Option<String>,
+  pub(crate) major_east_asian: Option<String>,
+  pub(crate) minor_east_asian: Option<String>,
+  pub(crate) major_complex_script: Option<String>,
+  pub(crate) minor_complex_script: Option<String>,
+}
+
 impl ThemeColorScheme {
   pub(crate) fn from_dml(scheme: &a::ColorScheme) -> Self {
     Self {
@@ -152,10 +163,36 @@ impl ThemeFormatScheme {
   }
 }
 
+impl ThemeFontScheme {
+  pub(crate) fn from_dml(scheme: &a::FontScheme) -> Self {
+    Self {
+      name: scheme.name.clone(),
+      major_latin: text_font_typeface(&scheme.major_font.latin_font.typeface),
+      minor_latin: text_font_typeface(&scheme.minor_font.latin_font.typeface),
+      major_east_asian: text_font_typeface(&scheme.major_font.east_asian_font.typeface),
+      minor_east_asian: text_font_typeface(&scheme.minor_font.east_asian_font.typeface),
+      major_complex_script: text_font_typeface(&scheme.major_font.complex_script_font.typeface),
+      minor_complex_script: text_font_typeface(&scheme.minor_font.complex_script_font.typeface),
+    }
+  }
+
+  pub(crate) fn latin_font(&self, index: a::FontCollectionIndexValues) -> Option<&str> {
+    match index {
+      a::FontCollectionIndexValues::Major => self.major_latin.as_deref(),
+      a::FontCollectionIndexValues::Minor => self.minor_latin.as_deref(),
+      a::FontCollectionIndexValues::None => None,
+    }
+  }
+}
+
 impl ThemeColorEntry {
   fn new(token: a::ColorSchemeIndexValues, color: Option<Color>) -> Self {
     Self { token, color }
   }
+}
+
+fn text_font_typeface(typeface: &Option<String>) -> Option<String> {
+  typeface.as_ref().filter(|value| !value.is_empty()).cloned()
 }
 
 fn style_at<T>(styles: &[T], index: u32) -> Option<&T> {

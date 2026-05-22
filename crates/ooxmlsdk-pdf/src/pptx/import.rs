@@ -9,7 +9,7 @@ use super::drawingml::fill::FillProperties;
 use super::drawingml::line::LineProperties;
 use super::drawingml::shape_properties::EffectProperties;
 use super::drawingml::table::{TableStyle, TableStyleList};
-use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
+use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
 use super::presentation::PresentationFragmentHandler;
 use super::slide::{SlidePersist, SlideSize};
 
@@ -32,6 +32,7 @@ pub(crate) struct ThemeFragmentRecord {
   pub(crate) name: Option<String>,
   pub(crate) theme_id: Option<String>,
   pub(crate) color_scheme: ThemeColorScheme,
+  pub(crate) font_scheme: ThemeFontScheme,
   pub(crate) format_scheme: ThemeFormatScheme,
 }
 
@@ -84,6 +85,7 @@ impl PowerPointImport {
     name: Option<String>,
     theme_id: Option<String>,
     color_scheme: ThemeColorScheme,
+    font_scheme: ThemeFontScheme,
     format_scheme: ThemeFormatScheme,
   ) -> &ThemeFragmentRecord {
     if let Some(index) = self.themes.iter().position(|theme| theme.path == path) {
@@ -94,6 +96,7 @@ impl PowerPointImport {
       name,
       theme_id,
       color_scheme,
+      font_scheme,
       format_scheme,
     });
     self.themes.last().expect("theme inserted")
@@ -194,6 +197,12 @@ impl PowerPointImport {
       .get_current_theme_ptr()
       .and_then(|theme| theme.format_scheme.get_effect_style(index))
       .cloned()
+  }
+
+  pub(crate) fn get_theme_latin_font(&self, index: a::FontCollectionIndexValues) -> Option<&str> {
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.font_scheme.latin_font(index))
   }
 
   pub(crate) fn get_table_styles(&self) -> Option<&TableStyleList> {

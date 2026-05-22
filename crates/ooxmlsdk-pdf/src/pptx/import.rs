@@ -4,6 +4,11 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
 use crate::error::Result;
 
+use super::drawingml::color::Color;
+use super::drawingml::fill::FillProperties;
+use super::drawingml::line::LineProperties;
+use super::drawingml::shape_properties::EffectProperties;
+use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use super::presentation::PresentationFragmentHandler;
 use super::slide::{SlidePersist, SlideSize};
 
@@ -20,11 +25,13 @@ pub(crate) struct PowerPointImport {
   pub(crate) chart_converter: ChartConverter,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ThemeFragmentRecord {
   pub(crate) path: String,
   pub(crate) name: Option<String>,
   pub(crate) theme_id: Option<String>,
+  pub(crate) color_scheme: ThemeColorScheme,
+  pub(crate) format_scheme: ThemeFormatScheme,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -79,6 +86,8 @@ impl PowerPointImport {
     path: String,
     name: Option<String>,
     theme_id: Option<String>,
+    color_scheme: ThemeColorScheme,
+    format_scheme: ThemeFormatScheme,
   ) -> &ThemeFragmentRecord {
     if let Some(index) = self.themes.iter().position(|theme| theme.path == path) {
       return &self.themes[index];
@@ -87,6 +96,8 @@ impl PowerPointImport {
       path,
       name,
       theme_id,
+      color_scheme,
+      format_scheme,
     });
     self.themes.last().expect("theme inserted")
   }
@@ -146,8 +157,39 @@ impl PowerPointImport {
     // and master color maps, then resolves the mapped token against the current
     // DrawingML theme. Do not return a token string as if it were a resolved
     // color; theme color-scheme import must be ported from upstream first.
-    let _mapped_token = self.get_scheme_color_token(token)?;
-    None
+    match self.get_scheme_color_record(token)? {
+      Color::RgbHex(hex) => Some(hex.clone()),
+      Color::System(system) => system.last_color.clone(),
+      Color::Scheme(_) | Color::Preset(_) => None,
+    }
+  }
+
+  pub(crate) fn get_scheme_color_record(&self, token: a::SchemeColorValues) -> Option<&Color> {
+    let mapped_token = self.get_scheme_color_token(token)?;
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.color_scheme.get_color(mapped_token))
+  }
+
+  pub(crate) fn get_theme_fill_style(&self, index: u32) -> Option<FillProperties> {
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.format_scheme.get_fill_style(index))
+      .cloned()
+  }
+
+  pub(crate) fn get_theme_line_style(&self, index: u32) -> Option<LineProperties> {
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.format_scheme.get_line_style(index))
+      .cloned()
+  }
+
+  pub(crate) fn get_theme_effect_style(&self, index: u32) -> Option<EffectProperties> {
+    self
+      .get_current_theme_ptr()
+      .and_then(|theme| theme.format_scheme.get_effect_style(index))
+      .cloned()
   }
 
   pub(crate) fn get_table_styles(&mut self) -> Option<&TableStyleList> {

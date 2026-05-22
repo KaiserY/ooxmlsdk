@@ -10,6 +10,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use crate::error::Result;
 
 use super::drawingml::text_list_style::TextListStyle;
+use super::drawingml::theme::{ThemeColorScheme, ThemeFormatScheme};
 use super::import::{PowerPointImport, part_path};
 use super::slide::{ColorMap, ShapeLocation, SlidePersist, SlideSize};
 use super::slide_fragment::SlideFragmentHandler;
@@ -325,7 +326,13 @@ impl PresentationFragmentHandler {
       .map(str::to_string)
       .unwrap_or_else(|| "<theme>".to_string());
     let theme = theme_part.root_element(package)?;
-    import.ensure_theme(path.clone(), theme.name.clone(), theme.theme_id.clone());
+    import.ensure_theme(
+      path.clone(),
+      theme.name.clone(),
+      theme.theme_id.clone(),
+      ThemeColorScheme::from_dml(&theme.theme_elements.color_scheme),
+      ThemeFormatScheme::from_dml(&theme.theme_elements.format_scheme),
+    );
     Ok(Some(path))
   }
 

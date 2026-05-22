@@ -5,7 +5,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 use super::drawingml::color::Color;
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::graphical_object_frame_context::GraphicalObjectFrameContext;
-use super::drawingml::line::{LineFill, LineProperties};
+use super::drawingml::line::LineProperties;
 use super::drawingml::shape::{CustomShapeGeometry, FrameType, Point, Shape, ShapeService, Size};
 use super::drawingml::text_body::TextBody;
 use super::shape::PptShape;
@@ -364,22 +364,7 @@ fn import_fill_properties(choice: &p::ShapePropertiesChoice2) -> Option<FillProp
 }
 
 fn import_line_properties(outline: &a::Outline) -> Option<LineProperties> {
-  let fill = match outline.outline_choice1.as_ref() {
-    Some(a::OutlineChoice::NoFill(_)) => LineFill::None,
-    Some(a::OutlineChoice::SolidFill(fill)) => LineFill::Solid(import_solid_fill_color(fill)),
-    Some(a::OutlineChoice::GradientFill(fill)) => LineFill::Gradient(fill.clone()),
-    Some(a::OutlineChoice::PatternFill(fill)) => LineFill::Pattern(fill.clone()),
-    None => LineFill::Unspecified,
-  };
-
-  if fill == LineFill::Unspecified && outline.width.is_none() {
-    None
-  } else {
-    Some(LineProperties {
-      fill,
-      width_emu: outline.width.map(i64::from),
-    })
-  }
+  LineProperties::from_dml_outline(outline)
 }
 
 fn import_solid_fill_color(fill: &a::SolidFill) -> Option<Color> {

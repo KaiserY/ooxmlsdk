@@ -75,6 +75,12 @@ Already structurally aligned:
 - `SlidePersist` stores slide size, path identity, theme path, color maps,
   background records, slide name/visibility/master-shape visibility, shape
   tree, VML lifecycle markers, connector maps, and comments/notes slots.
+- Theme import stores `a:clrScheme` and `a:fmtScheme` as structured records
+  keyed by theme path. Scheme color lookup has a current-persist path through
+  slide or layout color map, master color map, then theme color scheme.
+- Shape actual fill/line/effect resolution now consumes theme style refs from
+  `a:style` against the current theme format scheme before applying direct
+  shape properties.
 - Background `bgPr` and `bgRef` are separate structured states. `bgRef` is not
   treated as a direct solid fill.
 - Shape import preserves non-visual metadata, placeholder subtype/index,
@@ -100,13 +106,14 @@ Already structurally aligned:
 Known gaps to keep visible:
 
 - Theme color scheme and style-matrix resolution are not complete.
-  `get_scheme_color()` must not pretend to return RGB until theme import is
-  ported.
+  `get_scheme_color()` may return concrete RGB only when the current theme
+  color record is already a concrete RGB or system `lastClr`; it must not
+  invent RGB for preset, HSL, percentage, or transformed colors.
 - `Shape::apply_shape_reference` still lacks the explicit `bUseText` branch,
   generic shape-property copy, and full custom geometry behavior.
-- Theme style-matrix resolution is still missing from actual fill/line/effect
-  calculation. The current cache only resolves reference/direct/group-fill
-  ordering and must not be mistaken for complete LibreOffice style handling.
+- Theme style-matrix lookup is structurally present for fill, line, effect, and
+  background-fill lists, but placeholder color (`phClr`), color transforms,
+  theme overrides, and full effect semantics remain incomplete.
 - Paragraph/run property application is incomplete beyond structural style
   selection.
 - `SlidePersist::create_background`, `create_connector_shape_connection`,
@@ -241,6 +248,16 @@ Color lookup order:
 1. Current slide/layout color map.
 2. Bound master color map.
 3. Theme color scheme.
+
+The theme color scheme is imported from `a:themeElements/a:clrScheme` and
+stored with the theme path. Keep unsupported theme color models as unresolved
+records instead of converting them to display strings.
+
+The theme format scheme is imported from `a:themeElements/a:fmtScheme` and owns
+fill, background-fill, line, and effect style lists. Style-matrix indexes are
+1-based and clamp to the last available item, matching LibreOffice
+`Theme::get*Style`; fill indexes `>= 1000` select the background-fill list with
+`index - 1000`.
 
 `presProps` is imported after presentation fragment handling; it is not
 persistent `PowerPointImport` state in LibreOffice.
@@ -504,6 +521,11 @@ Line resolution order:
 Effects have their own actual-resolution layer. Do not fold effects into fill
 or line.
 
+Theme style refs from `a:style` are resolved between inherited/reference shape
+properties and direct shape properties. Do not resolve `fillRef`, `lnRef`, or
+`effectRef` in the parser or display layer; they need the current
+`PowerPointImport`/`SlidePersist` theme context.
+
 Fill and line import must preserve unresolved structural variants even when the
 current display bridge cannot paint them. Dropping `gradFill`, `blipFill`,
 `pattFill`, or `ln/noFill` during import loses inheritance and theme semantics.
@@ -518,6 +540,12 @@ is a regression because it bypasses layout/master/theme context.
 Scheme colors resolve through `PowerPointImport` and current `SlidePersist`.
 Do not add a standalone `schemeClr -> RGB` shortcut disconnected from the
 current slide, master, and theme.
+
+Theme color and format-scheme import are only the first stages. Full
+LibreOffice parity also requires color transformations, placeholder colors,
+theme overrides, extra color schemes, and complete effect semantics. Do not
+treat basic `clrScheme` RGB lookup or style-list lookup as complete theme
+resolution.
 
 ---
 

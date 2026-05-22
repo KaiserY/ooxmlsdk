@@ -347,13 +347,20 @@ impl Shape {
 
   pub(crate) fn get_actual_fill_properties(
     &self,
-    _import: &PowerPointImport,
+    import: &PowerPointImport,
     parent_fill: Option<&FillProperties>,
   ) -> Option<FillProperties> {
     // Source: LibreOffice oox/source/drawingml/shape.cxx
     // getActualFillProperties applies reference/theme/direct properties, then
     // replaces direct grpFill with the parent group fill when one exists.
     let mut actual = self.shape_ref_fill_properties.clone();
+    if let Some(fill_ref) = self
+      .shape_style_refs
+      .as_ref()
+      .and_then(|refs| import.get_theme_fill_style(refs.fill_reference.index))
+    {
+      actual = Some(fill_ref);
+    }
     if let Some(fill) = &self.fill_properties {
       actual = match fill.kind {
         FillKind::Group => parent_fill.cloned().or_else(|| Some(fill.clone())),
@@ -365,22 +372,27 @@ impl Shape {
 
   pub(crate) fn get_actual_line_properties(
     &self,
-    _import: &PowerPointImport,
+    import: &PowerPointImport,
   ) -> Option<LineProperties> {
-    merge_line_properties(
-      self.shape_ref_line_properties.clone(),
-      self.line_properties.clone(),
-    )
+    let themed = self
+      .shape_style_refs
+      .as_ref()
+      .and_then(|refs| import.get_theme_line_style(refs.line_reference.index));
+    let inherited = merge_line_properties(self.shape_ref_line_properties.clone(), themed);
+    merge_line_properties(inherited, self.line_properties.clone())
   }
 
   pub(crate) fn get_actual_effect_properties(
     &self,
-    _import: &PowerPointImport,
+    import: &PowerPointImport,
   ) -> Option<EffectProperties> {
-    self
-      .effect_properties
-      .clone()
-      .or_else(|| self.shape_ref_effect_properties.clone())
+    self.effect_properties.clone().or_else(|| {
+      self
+        .shape_style_refs
+        .as_ref()
+        .and_then(|refs| import.get_theme_effect_style(refs.effect_reference.index))
+        .or_else(|| self.shape_ref_effect_properties.clone())
+    })
   }
 
   pub(crate) fn set_text_body(&mut self, text_body: TextBody) {

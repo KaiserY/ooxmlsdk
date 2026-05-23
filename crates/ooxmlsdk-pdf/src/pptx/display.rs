@@ -14,6 +14,7 @@ use crate::text_metrics::measure_text;
 use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units::DrawingmlPercentageValue;
@@ -438,7 +439,6 @@ fn lower_diagram(
   let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
   let width_pt = units::emu_to_points(shape.size.cx);
   let height_pt = units::emu_to_points(shape.size.cy);
-  let fill = diagram_accent_fill(import, slide);
   if let Some(background_fill) = diagram_background_fill(import, slide, &data_resource.model) {
     items.push(PageItem::Rect(RectItem {
       x_pt,
@@ -451,6 +451,22 @@ fn lower_diagram(
       stroke_opacity: 1.0,
     }));
   }
+  if let Some(drawing) = diagram_drawing_resource(slide, &data_resource.model)
+    && lower_diagram_drawing(
+      import,
+      slide,
+      drawing,
+      &data_resource.model,
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      items,
+    )
+  {
+    return;
+  }
+  let fill = diagram_accent_fill(import, slide);
   let colors = diagram_style_colors(import, slide, record);
   let shapes = shared_diagram::layout_shapes(
     &data_resource.model,
@@ -467,8 +483,10 @@ fn lower_diagram(
     },
     fill,
   );
+  let mut drawing_items = Vec::new();
+  let mut text_items = Vec::new();
   for diagram_shape in shapes {
-    items.push(PageItem::Rect(RectItem {
+    drawing_items.push(PageItem::Rect(RectItem {
       x_pt: diagram_shape.x,
       y_pt: diagram_shape.y,
       width_pt: diagram_shape.width,
@@ -478,27 +496,432 @@ fn lower_diagram(
       stroke: Some(BorderStyle::default()),
       stroke_opacity: 1.0,
     }));
-    items.push(PageItem::Text(TextItem {
-      x_pt: diagram_shape.x + 6.0,
-      y_pt: diagram_shape.y + (diagram_shape.height - DEFAULT_TEXT_FONT_SIZE_PT).max(0.0) / 2.0,
-      line_height_pt: DEFAULT_TEXT_FONT_SIZE_PT * DEFAULT_TEXT_LINE_HEIGHT_SCALE,
-      text: diagram_shape.text,
-      style: TextStyle {
-        font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
-        color: RgbColor { r: 0, g: 0, b: 0 },
-        ..TextStyle::default()
-      },
-      hyperlink_url: None,
-      dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: false,
-      decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-    }));
+    if !diagram_shape.text.trim().is_empty() {
+      text_items.push(DiagramDrawingTextItem {
+        order: diagram_shape.order,
+        item: PageItem::Text(TextItem {
+          x_pt: diagram_shape.x + 6.0,
+          y_pt: diagram_shape.y + (diagram_shape.height - DEFAULT_TEXT_FONT_SIZE_PT).max(0.0) / 2.0,
+          line_height_pt: DEFAULT_TEXT_FONT_SIZE_PT * DEFAULT_TEXT_LINE_HEIGHT_SCALE,
+          text: diagram_shape.text,
+          style: TextStyle {
+            font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
+            color: RgbColor { r: 0, g: 0, b: 0 },
+            ..TextStyle::default()
+          },
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          preserve_text_portion: false,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
+        }),
+      });
+    }
   }
+  text_items.sort_by_key(|text_item| text_item.order);
+  items.extend(drawing_items);
+  items.extend(text_items.into_iter().map(|text_item| text_item.item));
+}
+
+fn diagram_drawing_resource<'a>(
+  slide: &'a SlidePersist,
+  data: &dgm::DataModelRoot,
+) -> Option<&'a super::slide::DiagramDrawingResource> {
+  let extensions = data.data_model_extension_list.as_ref()?;
+  for extension in &extensions.data_model_extension {
+    if let Some(a::DataModelExtensionChoice::DataModelExtensionBlock(block)) =
+      extension.data_model_extension_choice.as_ref()
+      && let Some(rel_id) = block.rel_id.as_deref()
+      && let Some(resource) = slide.diagram_drawing_resources.get(rel_id)
+    {
+      return Some(resource);
+    }
+  }
+  None
+}
+
+fn lower_diagram_drawing(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  resource: &super::slide::DiagramDrawingResource,
+  data: &dgm::DataModelRoot,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  items: &mut Vec<PageItem>,
+) -> bool {
+  // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx loadDiagram()
+  // imports persisted diagramDrawing extDrawing before falling back to layout
+  // atom shape generation.
+  let Some(extent) = diagram_drawing_extent(&resource.drawing.shape_tree) else {
+    return false;
+  };
+  let scale_x = if extent.width > 0 {
+    width_pt / units::emu_to_points(extent.width)
+  } else {
+    1.0
+  };
+  let scale_y = if extent.height > 0 {
+    height_pt / units::emu_to_points(extent.height)
+  } else {
+    1.0
+  };
+  let text_orders = shared_diagram::presentation_point_list_orders(data);
+  let mut drawing_items = Vec::new();
+  let mut text_items = Vec::new();
+  for choice in &resource.drawing.shape_tree.shape_tree_choice {
+    match choice {
+      dsp::ShapeTreeChoice::Shape(shape) => lower_diagram_drawing_shape(
+        import,
+        slide,
+        shape,
+        &text_orders,
+        extent.x,
+        extent.y,
+        x_pt,
+        y_pt,
+        height_pt,
+        scale_x,
+        scale_y,
+        &mut drawing_items,
+        &mut text_items,
+      ),
+      dsp::ShapeTreeChoice::GroupShape(group) => lower_diagram_drawing_group(
+        import,
+        slide,
+        group,
+        &text_orders,
+        extent.x,
+        extent.y,
+        x_pt,
+        y_pt,
+        height_pt,
+        scale_x,
+        scale_y,
+        &mut drawing_items,
+        &mut text_items,
+      ),
+    }
+  }
+  if drawing_items.is_empty() && text_items.is_empty() {
+    return false;
+  }
+  text_items.sort_by_key(|text_item| text_item.order);
+  items.extend(drawing_items);
+  items.extend(text_items.into_iter().map(|text_item| text_item.item));
+  true
+}
+
+fn lower_diagram_drawing_group(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  group: &dsp::GroupShape,
+  text_orders: &HashMap<String, usize>,
+  origin_x: i64,
+  origin_y: i64,
+  x_pt: f32,
+  y_pt: f32,
+  container_height_pt: f32,
+  scale_x: f32,
+  scale_y: f32,
+  items: &mut Vec<PageItem>,
+  text_items: &mut Vec<DiagramDrawingTextItem>,
+) {
+  for choice in &group.group_shape_choice {
+    match choice {
+      dsp::GroupShapeChoice::Shape(shape) => lower_diagram_drawing_shape(
+        import,
+        slide,
+        shape,
+        text_orders,
+        origin_x,
+        origin_y,
+        x_pt,
+        y_pt,
+        container_height_pt,
+        scale_x,
+        scale_y,
+        items,
+        text_items,
+      ),
+      dsp::GroupShapeChoice::GroupShape(group) => lower_diagram_drawing_group(
+        import,
+        slide,
+        group,
+        text_orders,
+        origin_x,
+        origin_y,
+        x_pt,
+        y_pt,
+        container_height_pt,
+        scale_x,
+        scale_y,
+        items,
+        text_items,
+      ),
+    }
+  }
+}
+
+fn lower_diagram_drawing_shape(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &dsp::Shape,
+  text_orders: &HashMap<String, usize>,
+  origin_x: i64,
+  origin_y: i64,
+  x_pt: f32,
+  y_pt: f32,
+  container_height_pt: f32,
+  scale_x: f32,
+  scale_y: f32,
+  items: &mut Vec<PageItem>,
+  text_items: &mut Vec<DiagramDrawingTextItem>,
+) {
+  let Some(bounds) = diagram_shape_bounds(
+    &shape.shape_properties,
+    origin_x,
+    origin_y,
+    x_pt,
+    y_pt,
+    container_height_pt,
+    scale_x,
+    scale_y,
+  ) else {
+    return;
+  };
+  let fill_color =
+    diagram_shape_fill_color(import, slide, &shape.shape_properties).unwrap_or(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    });
+  items.push(PageItem::Rect(RectItem {
+    x_pt: bounds.x,
+    y_pt: bounds.y,
+    width_pt: bounds.width,
+    height_pt: bounds.height,
+    fill_color: Some(fill_color),
+    fill_opacity: 1.0,
+    stroke: Some(BorderStyle::default()),
+    stroke_opacity: 1.0,
+  }));
+  let text = shape
+    .text_body
+    .as_deref()
+    .map(diagram_drawing_text_body_text)
+    .unwrap_or_default();
+  if text.trim().is_empty() {
+    return;
+  }
+  let text_bounds = shape
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| {
+      diagram_text_transform_bounds(
+        transform,
+        origin_x,
+        origin_y,
+        x_pt,
+        y_pt,
+        container_height_pt,
+        scale_x,
+        scale_y,
+      )
+    })
+    .unwrap_or(bounds);
+  let text_item = PageItem::Text(TextItem {
+    x_pt: text_bounds.x + 4.0,
+    y_pt: text_bounds.y + (text_bounds.height - DEFAULT_TEXT_FONT_SIZE_PT).max(0.0) / 2.0,
+    line_height_pt: DEFAULT_TEXT_FONT_SIZE_PT * DEFAULT_TEXT_LINE_HEIGHT_SCALE,
+    text,
+    style: TextStyle {
+      font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
+      color: RgbColor { r: 0, g: 0, b: 0 },
+      ..TextStyle::default()
+    },
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    preserve_text_portion: false,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: PdfTextSegmentation::Line,
+  });
+  text_items.push(DiagramDrawingTextItem {
+    order: text_orders
+      .get(shape.model_id.as_str())
+      .copied()
+      .unwrap_or(usize::MAX),
+    item: text_item,
+  });
+}
+
+struct DiagramDrawingTextItem {
+  order: usize,
+  item: PageItem,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DiagramDrawingExtent {
+  x: i64,
+  y: i64,
+  width: i64,
+  height: i64,
+}
+
+fn diagram_drawing_extent(tree: &dsp::ShapeTree) -> Option<DiagramDrawingExtent> {
+  let mut extent: Option<DiagramDrawingExtent> = None;
+  for choice in &tree.shape_tree_choice {
+    match choice {
+      dsp::ShapeTreeChoice::Shape(shape) => merge_diagram_shape_extent(&mut extent, shape),
+      dsp::ShapeTreeChoice::GroupShape(group) => merge_diagram_group_extent(&mut extent, group),
+    }
+  }
+  extent
+}
+
+fn merge_diagram_group_extent(extent: &mut Option<DiagramDrawingExtent>, group: &dsp::GroupShape) {
+  for choice in &group.group_shape_choice {
+    match choice {
+      dsp::GroupShapeChoice::Shape(shape) => merge_diagram_shape_extent(extent, shape),
+      dsp::GroupShapeChoice::GroupShape(group) => merge_diagram_group_extent(extent, group),
+    }
+  }
+}
+
+fn merge_diagram_shape_extent(extent: &mut Option<DiagramDrawingExtent>, shape: &dsp::Shape) {
+  let Some(transform) = shape.shape_properties.transform2_d.as_deref() else {
+    return;
+  };
+  let Some(offset) = transform.offset.as_ref() else {
+    return;
+  };
+  let Some(extents) = transform.extents.as_ref() else {
+    return;
+  };
+  let x = offset.x.to_emu();
+  let y = offset.y.to_emu();
+  let width = extents.cx.to_emu();
+  let height = extents.cy.to_emu();
+  let right = x + width;
+  let bottom = y + height;
+  *extent = Some(match *extent {
+    Some(current) => {
+      let left = current.x.min(x);
+      let top = current.y.min(y);
+      DiagramDrawingExtent {
+        x: left,
+        y: top,
+        width: (current.x + current.width).max(right) - left,
+        height: (current.y + current.height).max(bottom) - top,
+      }
+    }
+    None => DiagramDrawingExtent {
+      x,
+      y,
+      width,
+      height,
+    },
+  });
+}
+
+fn diagram_shape_bounds(
+  properties: &dsp::ShapeProperties,
+  origin_x: i64,
+  origin_y: i64,
+  x_pt: f32,
+  y_pt: f32,
+  container_height_pt: f32,
+  scale_x: f32,
+  scale_y: f32,
+) -> Option<shared_diagram::DiagramBounds> {
+  let transform = properties.transform2_d.as_deref()?;
+  let offset = transform.offset.as_ref()?;
+  let extents = transform.extents.as_ref()?;
+  let x = offset.x.to_emu();
+  let y = offset.y.to_emu();
+  let width = units::emu_to_points(extents.cx.to_emu()) * scale_x;
+  let height = units::emu_to_points(extents.cy.to_emu()) * scale_y;
+  let local_y = units::emu_to_points(y - origin_y) * scale_y;
+  Some(shared_diagram::DiagramBounds {
+    x: x_pt + units::emu_to_points(x - origin_x) * scale_x,
+    y: y_pt + container_height_pt - local_y - height,
+    width,
+    height,
+  })
+}
+
+fn diagram_text_transform_bounds(
+  transform: &dsp::Transform2D,
+  origin_x: i64,
+  origin_y: i64,
+  x_pt: f32,
+  y_pt: f32,
+  container_height_pt: f32,
+  scale_x: f32,
+  scale_y: f32,
+) -> Option<shared_diagram::DiagramBounds> {
+  let offset = transform.offset.as_ref()?;
+  let extents = transform.extents.as_ref()?;
+  let x = offset.x.to_emu();
+  let y = offset.y.to_emu();
+  let width = units::emu_to_points(extents.cx.to_emu()) * scale_x;
+  let height = units::emu_to_points(extents.cy.to_emu()) * scale_y;
+  let local_y = units::emu_to_points(y - origin_y) * scale_y;
+  Some(shared_diagram::DiagramBounds {
+    x: x_pt + units::emu_to_points(x - origin_x) * scale_x,
+    y: y_pt + container_height_pt - local_y - height,
+    width,
+    height,
+  })
+}
+
+fn diagram_shape_fill_color(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  properties: &dsp::ShapeProperties,
+) -> Option<RgbColor> {
+  let fill = match properties.shape_properties_choice2.as_ref()? {
+    dsp::ShapePropertiesChoice2::SolidFill(fill) => fill,
+    _ => return None,
+  };
+  let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
+  let resolved = import.resolve_color_for_slide(slide, &color, None)?;
+  Some(RgbColor {
+    r: resolved.r,
+    g: resolved.g,
+    b: resolved.b,
+  })
+}
+
+fn diagram_drawing_text_body_text(text_body: &dsp::TextBody) -> String {
+  let mut text = String::new();
+  for paragraph in &text_body.paragraph {
+    if !text.is_empty() {
+      text.push('\n');
+    }
+    for choice in &paragraph.paragraph_choice {
+      match choice {
+        a::ParagraphChoice::Run(run) => text.push_str(run.text.as_str()),
+        a::ParagraphChoice::Field(field) => {
+          if let Some(field_text) = field.text.as_ref() {
+            text.push_str(field_text.as_str());
+          }
+        }
+        a::ParagraphChoice::Break(_) => text.push('\n'),
+        a::ParagraphChoice::TextMath(_) => {}
+      }
+    }
+  }
+  text.trim().to_string()
 }
 
 fn diagram_background_fill(

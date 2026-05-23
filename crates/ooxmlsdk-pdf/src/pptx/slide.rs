@@ -5,12 +5,14 @@ use ooxmlsdk::parts::{
   chart_color_style_part::ChartColorStylePart, chart_drawing_part::ChartDrawingPart,
   chart_part::ChartPart, chart_style_part::ChartStylePart, diagram_colors_part::DiagramColorsPart,
   diagram_data_part::DiagramDataPart, diagram_layout_definition_part::DiagramLayoutDefinitionPart,
-  diagram_style_part::DiagramStylePart, embedded_object_part::EmbeddedObjectPart,
-  embedded_package_part::EmbeddedPackagePart, extended_chart_part::ExtendedChartPart,
-  image_part::ImagePart, presentation_document::PresentationDocument, slide_part::SlidePart,
+  diagram_persist_layout_part::DiagramPersistLayoutPart, diagram_style_part::DiagramStylePart,
+  embedded_object_part::EmbeddedObjectPart, embedded_package_part::EmbeddedPackagePart,
+  extended_chart_part::ExtendedChartPart, image_part::ImagePart,
+  presentation_document::PresentationDocument, slide_part::SlidePart,
   theme_override_part::ThemeOverridePart,
 };
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_microsoft_com_office_drawing_2012_chart_style as cs,
   schemas_microsoft_com_office_drawing_2014_chartex as cx,
   schemas_microsoft_com_office_powerpoint_2018_8_main as p188,
@@ -131,6 +133,7 @@ pub(crate) struct SlidePersist {
   pub(crate) diagram_layout_resources: HashMap<String, DiagramLayoutResource>,
   pub(crate) diagram_style_resources: HashMap<String, DiagramStyleResource>,
   pub(crate) diagram_color_resources: HashMap<String, DiagramColorResource>,
+  pub(crate) diagram_drawing_resources: HashMap<String, DiagramDrawingResource>,
   pub(crate) embedded_object_resources: HashMap<String, BinaryResource>,
   pub(crate) embedded_package_resources: HashMap<String, BinaryResource>,
   pub(crate) media_resources: HashMap<String, MediaResource>,
@@ -328,6 +331,19 @@ impl DiagramColorResource {
   pub(crate) fn has_payload(&self) -> bool {
     self.path.as_ref().is_some_and(|path| !path.is_empty())
       || structured_resource_present(&self.colors)
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DiagramDrawingResource {
+  pub(crate) path: Option<String>,
+  pub(crate) drawing: dsp::Drawing,
+}
+
+impl DiagramDrawingResource {
+  pub(crate) fn has_payload(&self) -> bool {
+    self.path.as_ref().is_some_and(|path| !path.is_empty())
+      || structured_resource_present(&self.drawing)
   }
 }
 
@@ -911,6 +927,7 @@ impl SlidePersist {
       diagram_layout_resources: HashMap::new(),
       diagram_style_resources: HashMap::new(),
       diagram_color_resources: HashMap::new(),
+      diagram_drawing_resources: HashMap::new(),
       embedded_object_resources: HashMap::new(),
       embedded_package_resources: HashMap::new(),
       media_resources: HashMap::new(),
@@ -1149,6 +1166,24 @@ impl SlidePersist {
         },
       );
     }
+    let diagram_drawing_parts: Vec<_> = part
+      .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
+      .map(|related_part| {
+        (
+          related_part.relationship_id().to_string(),
+          related_part.part().clone(),
+        )
+      })
+      .collect();
+    for (relationship_id, diagram_part) in diagram_drawing_parts {
+      self.diagram_drawing_resources.insert(
+        relationship_id,
+        DiagramDrawingResource {
+          path: diagram_part.path(package).map(str::to_string),
+          drawing: diagram_part.root_element(package)?.clone(),
+        },
+      );
+    }
     for related_part in part.related_parts_of_type::<_, EmbeddedObjectPart>(package) {
       let relationship_id = related_part.relationship_id().to_string();
       if let Some(resource) = binary_resource(package, related_part.part()) {
@@ -1176,6 +1211,7 @@ impl SlidePersist {
     self.diagram_layout_resources = reference.diagram_layout_resources.clone();
     self.diagram_style_resources = reference.diagram_style_resources.clone();
     self.diagram_color_resources = reference.diagram_color_resources.clone();
+    self.diagram_drawing_resources = reference.diagram_drawing_resources.clone();
     self.embedded_object_resources = reference.embedded_object_resources.clone();
     self.embedded_package_resources = reference.embedded_package_resources.clone();
     self.media_resources = reference.media_resources.clone();

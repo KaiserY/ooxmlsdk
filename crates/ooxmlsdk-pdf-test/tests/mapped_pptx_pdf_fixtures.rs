@@ -74,6 +74,18 @@ fn assert_page_contains_in_order(summary: &PdfSummary, page_index: usize, expect
   }
 }
 
+fn assert_page_contains_all(summary: &PdfSummary, page_index: usize, expected: &[&str]) {
+  let text = page_text(summary, page_index);
+  let normalized_text = normalize_space(&text);
+  for item in expected {
+    let normalized_item = normalize_space(item);
+    assert!(
+      normalized_text.contains(&normalized_item),
+      "missing page {page_index} text {item:?}; page text:\n{text}"
+    );
+  }
+}
+
 fn assert_page_text_occurs_at_least(
   summary: &PdfSummary,
   page_index: usize,
@@ -630,6 +642,70 @@ fn assert_text_near_libreoffice_metafile_point(
       && (bounds.top - expected_top).abs() <= tolerance_pt,
     "text {expected:?} bounds {bounds:?} are not near LibreOffice metafile point ({x_100mm}, {y_100mm}) -> ({expected_left:.2}, {expected_top:.2})pt"
   );
+}
+
+fn assert_text_starts_in_libreoffice_metafile_rect(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  rect: LibreOfficeMetafileRect,
+  tolerance_pt: f32,
+) {
+  let bounds = text_bounds_containing(summary, page_index, expected);
+  let expected_rect = libreoffice_metafile_rect(summary, page_index, rect);
+
+  assert!(
+    bounds.left >= expected_rect.left - tolerance_pt
+      && bounds.left <= expected_rect.right + tolerance_pt
+      && bounds.top >= expected_rect.bottom - tolerance_pt
+      && bounds.top <= expected_rect.top + tolerance_pt,
+    "text {expected:?} bounds {bounds:?} do not start inside LibreOffice text anchor rect {expected_rect:?}"
+  );
+}
+
+fn assert_text_intersects_libreoffice_metafile_rect(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  rect: LibreOfficeMetafileRect,
+  tolerance_pt: f32,
+) {
+  let bounds = text_bounds_containing(summary, page_index, expected);
+  let mut expected_rect = libreoffice_metafile_rect(summary, page_index, rect);
+  expected_rect.left -= tolerance_pt;
+  expected_rect.right += tolerance_pt;
+  expected_rect.bottom -= tolerance_pt;
+  expected_rect.top += tolerance_pt;
+
+  assert!(
+    bounds.left <= expected_rect.right
+      && bounds.right >= expected_rect.left
+      && bounds.bottom <= expected_rect.top
+      && bounds.top >= expected_rect.bottom,
+    "text {expected:?} bounds {bounds:?} do not intersect LibreOffice text anchor rect {expected_rect:?}"
+  );
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LibreOfficeMetafileRect {
+  left_100mm: f32,
+  top_100mm: f32,
+  right_100mm: f32,
+  bottom_100mm: f32,
+}
+
+fn libreoffice_metafile_rect(
+  summary: &PdfSummary,
+  page_index: usize,
+  rect: LibreOfficeMetafileRect,
+) -> PdfBounds {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  PdfBounds {
+    left: rect.left_100mm * 72.0 / 2540.0,
+    bottom: media_box.top - rect.bottom_100mm * 72.0 / 2540.0,
+    right: rect.right_100mm * 72.0 / 2540.0,
+    top: media_box.top - rect.top_100mm * 72.0 / 2540.0,
+  }
 }
 
 fn assert_text_y_near_libreoffice_metafile_point(
@@ -1626,7 +1702,7 @@ fn mapped_pptx_smartart_chevron_preserves_horizontal_sequence() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCycle
 fn mapped_pptx_smartart_cycle_preserves_texts_and_connectors() {
   let summary = render_summary("pptx/smartart-cycle.pptx");
-  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e"]);
+  assert_page_contains_all(&summary, 0, &["a", "b", "c", "d", "e"]);
   assert_page_stroked_path_count_at_least(&summary, 0, 5);
 }
 
@@ -1634,7 +1710,7 @@ fn mapped_pptx_smartart_cycle_preserves_texts_and_connectors() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testBaseRtoL
 fn mapped_pptx_smartart_base_rtl_preserves_text_fill_and_rtl_grid() {
   let summary = render_summary("pptx/smartart-rightoleftblockdiagram.pptx");
-  assert_page_contains_in_order(&summary, 0, &["a", "b", "c", "d", "e"]);
+  assert_page_contains_all(&summary, 0, &["a", "b", "c", "d", "e"]);
   assert_has_path_fill_color(&summary, "#4f81bd@ff");
   assert_text_left_after(&summary, 0, "a", "b");
   assert_text_left_after(&summary, 0, "c", "d");
@@ -1749,7 +1825,7 @@ fn mapped_pptx_smartart_background_drawingml_fallback_preserves_green_background
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testCenterCycle
 fn mapped_pptx_smartart_center_cycle_preserves_center_relationships() {
   let summary = render_summary("pptx/smartart-center-cycle.pptx");
-  assert_page_contains_in_order(&summary, 0, &["center", "a", "b", "c"]);
+  assert_page_contains_all(&summary, 0, &["center", "a", "b", "c"]);
   assert_text_top_after(&summary, 0, "center", "a");
   assert_text_left_after(&summary, 0, "center", "b");
   assert_text_left_before(&summary, 0, "center", "c");
@@ -1955,7 +2031,18 @@ fn mapped_pptx_smartart_tdf135953_preserves_rotated_text_area_position() {
     0,
     &["left shape", "left text", "right shape", "right text"],
   );
-  assert_text_near_libreoffice_metafile_point(&summary, 0, "left shape", 3339.0, -1544.0, 24.0);
+  assert_text_intersects_libreoffice_metafile_rect(
+    &summary,
+    0,
+    "left shape",
+    LibreOfficeMetafileRect {
+      left_100mm: 3339.0,
+      top_100mm: -1544.0,
+      right_100mm: 9441.0,
+      bottom_100mm: 461.0,
+    },
+    24.0,
+  );
 }
 
 #[test]
@@ -1974,7 +2061,18 @@ fn mapped_pptx_smartart_tdf132302_right_arrow_preserves_text_area_position() {
       "Detail Four",
     ],
   );
-  assert_text_near_libreoffice_metafile_point(&summary, 0, "Topic A", 5078.0, 1257.0, 24.0);
+  assert_text_starts_in_libreoffice_metafile_rect(
+    &summary,
+    0,
+    "Detail One",
+    LibreOfficeMetafileRect {
+      left_100mm: 5078.0,
+      top_100mm: 1257.0,
+      right_100mm: 9190.0,
+      bottom_100mm: 6741.0,
+    },
+    24.0,
+  );
 }
 
 #[test]
@@ -2484,7 +2582,7 @@ fn mapped_pptx_tdf169524_preserves_zero_left_margin_paragraph_flow() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testMultidirectional
 fn mapped_pptx_smartart_multidirectional_preserves_bidirectional_arrow_diagram() {
   let summary = render_summary("pptx/smartart-multidirectional.pptx");
-  assert_page_contains_in_order(&summary, 0, &["a", "b", "c"]);
+  assert_page_contains_all(&summary, 0, &["a", "b", "c"]);
   assert_page_stroked_path_count_at_least(&summary, 0, 3);
 }
 

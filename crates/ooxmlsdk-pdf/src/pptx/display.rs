@@ -398,6 +398,7 @@ fn lower_chart_texts(
       style.clone(),
       None,
       line_height(&style, 1.0),
+      None,
     );
     text_y += line_step;
   }
@@ -624,7 +625,7 @@ fn lower_diagram(
           .or_insert((font_scale, line_scale));
       }
       pending_text_items.push(PendingDiagramTextItem {
-        order: diagram_shape.order,
+        order: diagram_shape.text_order,
         frame: text_frame,
         text_body,
         font_reference,
@@ -851,12 +852,13 @@ fn lower_diagram_drawing_shape(
   let mut lowered_text_items = Vec::new();
   lower_text_body_at_with_style(
     import,
-    text_frame,
+    text_frame.frame,
     &text_body,
     None,
     None,
     None,
     None,
+    text_frame.rotation_center_pt,
     &mut lowered_text_items,
   );
   for item in &mut lowered_text_items {
@@ -1358,34 +1360,34 @@ fn diagram_drawing_text_frame(
   shape_bounds: shared_diagram::DiagramBounds,
   parent_transform: DiagramDrawingTransform,
   text_body: &TextBody,
-) -> TextFrame {
+) -> DiagramDrawingTextFrame {
   let Some(text_transform) = shape.transform2_d.as_deref() else {
-    return text_body_frame(
+    return DiagramDrawingTextFrame::new(text_body_frame(
       shape_bounds.x,
       shape_bounds.y,
       shape_bounds.width,
       shape_bounds.height,
       text_body,
-    );
+    ));
   };
   let Some(mut text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform)
   else {
-    return text_body_frame(
+    return DiagramDrawingTextFrame::new(text_body_frame(
       shape_bounds.x,
       shape_bounds.y,
       shape_bounds.width,
       shape_bounds.height,
       text_body,
-    );
+    ));
   };
   let Some(preset_bounds) = diagram_preset_text_rectangle(shape, shape_bounds) else {
-    return text_body_frame(
+    return DiagramDrawingTextFrame::new(text_body_frame(
       shape_bounds.x,
       shape_bounds.y,
       shape_bounds.width,
       shape_bounds.height,
       text_body,
-    );
+    ));
   };
 
   let shape_rotation = shape
@@ -1416,7 +1418,7 @@ fn diagram_drawing_text_frame(
     right: preset_bounds.width - text_bounds.width - (text_bounds.x - preset_bounds.x),
     bottom: preset_bounds.height - text_bounds.height - (text_bounds.y - preset_bounds.y),
   };
-  text_body_frame_with_distances(
+  let frame = text_body_frame_with_distances(
     preset_bounds.x,
     preset_bounds.y,
     preset_bounds.width,
@@ -1424,7 +1426,26 @@ fn diagram_drawing_text_frame(
     text_body,
     offsets,
     0,
-  )
+  );
+  DiagramDrawingTextFrame {
+    frame,
+    rotation_center_pt: (angle_diff != 0).then_some((frame.x_pt, frame.y_pt)),
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DiagramDrawingTextFrame {
+  frame: TextFrame,
+  rotation_center_pt: Option<(f32, f32)>,
+}
+
+impl DiagramDrawingTextFrame {
+  fn new(frame: TextFrame) -> Self {
+    Self {
+      frame,
+      rotation_center_pt: None,
+    }
+  }
 }
 
 fn diagram_preset_text_rectangle(
@@ -3410,6 +3431,7 @@ fn lower_text_body_at_with_table_style(
     table_text_style,
     None,
     None,
+    None,
     items,
   );
 }
@@ -3430,6 +3452,7 @@ fn lower_text_body_at_with_font_ref(
     None,
     shape_hyperlink_url,
     None,
+    None,
     items,
   );
 }
@@ -3442,6 +3465,7 @@ fn lower_text_body_at_with_style(
   table_text_style: Option<&TableStyleTextProperties>,
   shape_hyperlink_url: Option<&str>,
   base_font_size_pt: Option<f32>,
+  rotation_center_pt: Option<(f32, f32)>,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style_and_scale(
@@ -3453,6 +3477,7 @@ fn lower_text_body_at_with_style(
     shape_hyperlink_url,
     base_font_size_pt,
     None,
+    rotation_center_pt,
     items,
   );
 }
@@ -3466,10 +3491,12 @@ fn lower_text_body_at_with_style_and_scale(
   shape_hyperlink_url: Option<&str>,
   base_font_size_pt: Option<f32>,
   auto_fit_font_scale: Option<f32>,
+  rotation_center_pt: Option<(f32, f32)>,
   items: &mut Vec<PageItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
-  options.rotation_center_pt = rotated_text_area_center(frame, options.rotation_deg);
+  options.rotation_center_pt =
+    rotation_center_pt.or_else(|| rotated_text_area_center(frame, options.rotation_deg));
   let base_style = text_base_style(
     import,
     text_body,
@@ -3837,16 +3864,15 @@ fn lower_paragraph(
       apply_text_scale(&mut bullet_style, options);
       let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
       max_line_height = max_line_height.max(bullet_line_height);
-      let (bullet_x, bullet_y) =
-        rotated_text_origin(run_x + paragraph_style.indent_pt, cursor.y_pt, options);
       push_text_item(
         items,
-        bullet_x,
-        bullet_y,
+        run_x + paragraph_style.indent_pt,
+        cursor.y_pt,
         label,
         bullet_style,
         shape_hyperlink_url.map(ToString::to_string),
         bullet_line_height,
+        options.rotation_center_pt,
       );
     }
 
@@ -3866,20 +3892,18 @@ fn lower_paragraph(
       max_line_height = max_line_height.max(run_line_height);
       let text = run_text(run, &style);
       if run.kind == TextRunKind::Math {
-        let (math_x, math_y) = rotated_text_origin(run_x, cursor.y_pt, options);
         push_math_ole_preview_item(
           items,
-          math_x,
-          math_y,
+          run_x,
+          cursor.y_pt,
           measure_text(&text, &style),
           run_line_height,
         );
       }
-      let (text_x, text_y) = rotated_text_origin(run_x, cursor.y_pt, options);
       push_text_item(
         items,
-        text_x,
-        text_y,
+        run_x,
+        cursor.y_pt,
         text.clone(),
         style.clone(),
         run
@@ -3887,6 +3911,7 @@ fn lower_paragraph(
           .clone()
           .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
         run_line_height,
+        options.rotation_center_pt,
       );
       run_x += measure_text(&text, &style);
     }
@@ -3899,19 +3924,6 @@ fn lower_paragraph(
     segment_start = segment_end + 1;
     is_first_segment = false;
   }
-}
-
-fn rotated_text_origin(x_pt: f32, y_pt: f32, options: &TextLoweringOptions) -> (f32, f32) {
-  let Some((center_x, center_y)) = options.rotation_center_pt else {
-    return (x_pt, y_pt);
-  };
-  let radians = options.rotation_deg.to_radians();
-  let dx = x_pt - center_x;
-  let dy = y_pt - center_y;
-  (
-    center_x + dx * radians.cos() - dy * radians.sin(),
-    center_y + dx * radians.sin() + dy * radians.cos(),
-  )
 }
 
 fn paragraph_run_width(
@@ -3979,6 +3991,7 @@ fn push_text_item(
   style: TextStyle,
   hyperlink_url: Option<String>,
   line_height_pt: f32,
+  rotation_center_pt: Option<(f32, f32)>,
 ) {
   items.push(PageItem::Text(TextItem {
     x_pt,
@@ -3986,6 +3999,7 @@ fn push_text_item(
     line_height_pt,
     text,
     style,
+    rotation_center_pt,
     hyperlink_url,
     dynamic_field: None,
     style_ref_keys: Vec::new(),

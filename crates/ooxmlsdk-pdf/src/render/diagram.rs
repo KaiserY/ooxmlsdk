@@ -24,7 +24,7 @@ pub(crate) struct DiagramShape {
   pub(crate) connector_angle_deg: f32,
   pub(crate) is_blip_placeholder: bool,
   pub(crate) fill: RgbColor,
-  pub(crate) order: usize,
+  pub(crate) text_order: usize,
   pub(crate) font_size_pt: Option<f32>,
   pub(crate) font_sync_group: Option<String>,
 }
@@ -41,6 +41,14 @@ pub(crate) struct DiagramTextBody {
 impl DiagramTextBody {
   pub(crate) fn is_empty(&self) -> bool {
     self.paragraphs.iter().all(DiagramTextParagraph::is_empty)
+  }
+
+  fn source_order(&self) -> Option<usize> {
+    self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.source_order)
+      .min()
   }
 
   fn append_point(&mut self, point: &dgm::Point, depth: i32) {
@@ -381,6 +389,7 @@ struct DiagramShapeNode {
   data_node_type: Option<dgm::ElementValues>,
   font_size_pt: Option<f32>,
   font_sync_group: Option<String>,
+  text_order: usize,
   constraints: Vec<DiagramConstraint>,
   direct_constraints: Vec<DiagramConstraint>,
   rules: Vec<DiagramRule>,
@@ -608,6 +617,7 @@ fn build_diagram_shape_tree(
       data_node_type: None,
       font_size_pt: None,
       font_sync_group: None,
+      text_order: usize::MAX,
       constraints: Vec::new(),
       direct_constraints: Vec::new(),
       rules: Vec::new(),
@@ -1139,6 +1149,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|points| points.first())
       .and_then(|binding| binding.point.r#type)
       .and_then(point_type_to_element_type);
+    let mut text_order = usize::MAX;
     if let Some(data_points) = data_points {
       let min_depth = data_points
         .iter()
@@ -1152,6 +1163,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
           paragraph.source_order = Some(binding.source_order);
         }
+        text_order = text_order.min(binding.source_order);
         if binding.depth == 0 || (shape_properties.is_none() && binding.depth == min_depth) {
           shape_properties = data_point.shape_properties.clone();
         }
@@ -1163,6 +1175,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
           paragraph.source_order = Some(*source_order);
         }
+        text_order = *source_order;
       }
     }
     if self.tree.is_none() {
@@ -1176,6 +1189,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .and_then(|shape| shape.hide_geometry)
       .map(bool::from)
       .unwrap_or(false);
+    let text_order = text_body.source_order().unwrap_or(text_order);
     let is_connector = shape_atom
       .and_then(|shape| shape.r#type.as_deref())
       .is_some_and(|shape_type| shape_type == "conn");
@@ -1217,6 +1231,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .font_sync_names
         .contains(name)
         .then(|| name.to_string()),
+      text_order,
       constraints: self.active_constraints(layout_node),
       direct_constraints: direct_constraints_unfiltered(layout_node),
       rules: self.active_rules(layout_node),
@@ -3076,7 +3091,6 @@ fn flatten_diagram_shape_tree(
   let x = offset_x + node.x;
   let y = offset_y + node.y;
   if !node.hidden_geometry && (node.has_geometry || !node.text_body.is_empty()) {
-    let order = shapes.len();
     shapes.push(DiagramShape {
       x,
       y,
@@ -3091,7 +3105,7 @@ fn flatten_diagram_shape_tree(
       connector_angle_deg: node.connector_angle_deg,
       is_blip_placeholder: node.is_blip_placeholder,
       fill: node.fill,
-      order,
+      text_order: node.text_order,
       font_size_pt: node.font_size_pt,
       font_sync_group: node.font_sync_group.clone(),
     });

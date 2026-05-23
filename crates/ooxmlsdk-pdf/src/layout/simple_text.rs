@@ -19,6 +19,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           line_height_pt: DEFAULT_LINE_HEIGHT_PT,
           text: line,
           style: TextStyle::default(),
+          rotation_center_pt: None,
           hyperlink_url: None,
           dynamic_field: None,
           style_ref_keys: Vec::new(),

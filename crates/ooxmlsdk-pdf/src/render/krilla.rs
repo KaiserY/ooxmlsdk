@@ -574,6 +574,7 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
     || current.hyperlink_url != next.hyperlink_url
     || current.dynamic_field != next.dynamic_field
     || current.paragraph_bidi != next.paragraph_bidi
+    || current.rotation_center_pt != next.rotation_center_pt
     || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
     || (current.y_pt - next.y_pt).abs() >= 0.01
     || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
@@ -994,11 +995,21 @@ fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
   match item {
     PaintItem::Text(text) => {
       let item = &text.item;
-      Some((
+      let bounds = (
         item.x_pt,
         item.y_pt,
         item.x_pt + text.width_pt,
         item.y_pt + item.line_height_pt,
+      );
+      if item.style.rotation_deg.abs() <= f32::EPSILON {
+        return Some(bounds);
+      }
+      let (rotation_x, rotation_y) = item.rotation_center_pt.unwrap_or((item.x_pt, item.y_pt));
+      Some(rotated_rect_bounds(
+        bounds,
+        rotation_x,
+        rotation_y,
+        item.style.rotation_deg,
       ))
     }
     PaintItem::Image(image) => Some((
@@ -1043,6 +1054,41 @@ fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
   }
 }
 
+fn rotated_rect_bounds(
+  (left, top, right, bottom): (f32, f32, f32, f32),
+  rotation_x: f32,
+  rotation_y: f32,
+  rotation_deg: f32,
+) -> (f32, f32, f32, f32) {
+  let angle = rotation_deg.to_radians();
+  let corners = [
+    rotate_point(left, top, rotation_x, rotation_y, angle),
+    rotate_point(right, top, rotation_x, rotation_y, angle),
+    rotate_point(right, bottom, rotation_x, rotation_y, angle),
+    rotate_point(left, bottom, rotation_x, rotation_y, angle),
+  ];
+  let mut min_x = f32::INFINITY;
+  let mut min_y = f32::INFINITY;
+  let mut max_x = f32::NEG_INFINITY;
+  let mut max_y = f32::NEG_INFINITY;
+  for (x, y) in corners {
+    min_x = min_x.min(x);
+    min_y = min_y.min(y);
+    max_x = max_x.max(x);
+    max_y = max_y.max(y);
+  }
+  (min_x, min_y, max_x, max_y)
+}
+
+fn rotate_point(x: f32, y: f32, rotation_x: f32, rotation_y: f32, angle: f32) -> (f32, f32) {
+  let dx = x - rotation_x;
+  let dy = y - rotation_y;
+  (
+    rotation_x + dx * angle.cos() - dy * angle.sin(),
+    rotation_y + dx * angle.sin() + dy * angle.cos(),
+  )
+}
+
 fn pdf_outline_for_entries(entries: &[OutlineEntry]) -> Option<Outline> {
   if entries.is_empty() {
     return None;
@@ -1079,20 +1125,23 @@ fn draw_text_item(
 ) {
   let item = &text.item;
   for portion in &text.portions {
+    let rotated = item.style.rotation_deg.abs() > f32::EPSILON;
+    if rotated {
+      let (rotation_x, rotation_y) = item
+        .rotation_center_pt
+        .unwrap_or((portion.x_pt, portion.baseline_y));
+      surface.push_transform(&Transform::from_rotate_at(
+        item.style.rotation_deg,
+        rotation_x,
+        rotation_y,
+      ));
+    }
     let clipped = push_paint_clip(surface, portion.clip.as_ref());
     if let Some(highlight) = &portion.highlight {
       draw_paint_rect(surface, highlight);
     }
     surface.set_stroke(stroke(&item.style));
     surface.set_fill(Some(fill(&item.style)));
-    let rotated = item.style.rotation_deg.abs() > f32::EPSILON;
-    if rotated {
-      surface.push_transform(&Transform::from_rotate_at(
-        item.style.rotation_deg,
-        portion.x_pt,
-        portion.baseline_y,
-      ));
-    }
     let vertical_scale = if item.text.contains('\t') {
       1.0
     } else {
@@ -1142,9 +1191,6 @@ fn draw_text_item(
     if (vertical_scale - 1.0).abs() > f32::EPSILON {
       surface.pop();
     }
-    if rotated {
-      surface.pop();
-    }
     if let Some(underline) = &portion.underline {
       draw_paint_stroke_line(surface, underline);
     }
@@ -1164,6 +1210,9 @@ fn draw_text_item(
       link_annotations.push(annotation);
     }
     if clipped {
+      surface.pop();
+    }
+    if rotated {
       surface.pop();
     }
   }

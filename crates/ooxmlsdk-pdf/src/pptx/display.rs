@@ -23,7 +23,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 
-use super::drawingml::color::Color;
+use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{
@@ -5315,6 +5315,22 @@ fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut Te
   if let Some(fill) = properties.run_properties_choice1.as_ref() {
     apply_text_fill(import, fill, style);
   }
+  if let Some(fill) = properties.run_properties_choice4.as_ref() {
+    apply_run_underline_fill(import, fill, style);
+  }
+  if (properties.hyperlink_on_click.is_some() || properties.hyperlink_on_mouse_over.is_some())
+    && properties.run_properties_choice1.is_none()
+  {
+    apply_hyperlink_text_fill(import, style);
+  }
+  if (properties.hyperlink_on_click.is_some() || properties.hyperlink_on_mouse_over.is_some())
+    && properties.underline.is_none()
+  {
+    style.underline = true;
+  }
+  if let Some(highlight) = properties.highlight.as_deref() {
+    apply_text_highlight(import, highlight, style);
+  }
 }
 
 fn apply_default_run_properties(
@@ -5339,6 +5355,12 @@ fn apply_default_run_properties(
   );
   if let Some(fill) = properties.default_run_properties_choice1.as_ref() {
     apply_default_text_fill(import, fill, style);
+  }
+  if let Some(fill) = properties.default_run_properties_choice4.as_ref() {
+    apply_default_run_underline_fill(import, fill, style);
+  }
+  if let Some(highlight) = properties.highlight.as_deref() {
+    apply_text_highlight(import, highlight, style);
   }
 }
 
@@ -5421,10 +5443,13 @@ fn apply_text_fill(
         style.opacity = color.opacity;
       }
     }
-    a::RunPropertiesChoice::GradientFill(_)
-    | a::RunPropertiesChoice::BlipFill(_)
-    | a::RunPropertiesChoice::PatternFill(_)
-    | a::RunPropertiesChoice::GroupFill => {}
+    a::RunPropertiesChoice::GradientFill(fill) => {
+      apply_best_solid_text_fill(import, Color::best_solid_gradient_color(fill), style);
+    }
+    a::RunPropertiesChoice::PatternFill(fill) => {
+      apply_best_solid_text_fill(import, Color::best_solid_pattern_color(fill), style);
+    }
+    a::RunPropertiesChoice::BlipFill(_) | a::RunPropertiesChoice::GroupFill => {}
   }
 }
 
@@ -5451,10 +5476,93 @@ fn apply_default_text_fill(
         style.opacity = color.opacity;
       }
     }
-    a::DefaultRunPropertiesChoice::GradientFill(_)
-    | a::DefaultRunPropertiesChoice::BlipFill(_)
-    | a::DefaultRunPropertiesChoice::PatternFill(_)
-    | a::DefaultRunPropertiesChoice::GroupFill => {}
+    a::DefaultRunPropertiesChoice::GradientFill(fill) => {
+      apply_best_solid_text_fill(import, Color::best_solid_gradient_color(fill), style);
+    }
+    a::DefaultRunPropertiesChoice::PatternFill(fill) => {
+      apply_best_solid_text_fill(import, Color::best_solid_pattern_color(fill), style);
+    }
+    a::DefaultRunPropertiesChoice::BlipFill(_) | a::DefaultRunPropertiesChoice::GroupFill => {}
+  }
+}
+
+fn apply_best_solid_text_fill(
+  import: &PowerPointImport,
+  color: Option<Color>,
+  style: &mut TextStyle,
+) {
+  // Source: LibreOffice oox/source/drawingml/textcharacterproperties.cxx
+  // maps DrawingML character fill to CharColor via getBestSolidColor().
+  if let Some(color) = color.and_then(|color| display_paint(import, &color, None)) {
+    style.color = color.color;
+    style.opacity = color.opacity;
+  }
+}
+
+fn apply_text_highlight(
+  import: &PowerPointImport,
+  highlight: &a::Highlight,
+  style: &mut TextStyle,
+) {
+  // Source: LibreOffice oox/source/drawingml/textcharacterpropertiescontext.cxx
+  // imports a:highlight (CT_Color) through ColorContext into CharBackColor.
+  if let Some(color) = highlight
+    .highlight_choice
+    .as_ref()
+    .and_then(Color::from_highlight_choice)
+    .and_then(|color| display_paint(import, &color, None))
+  {
+    style.highlight = Some(color.color);
+  }
+}
+
+fn apply_run_underline_fill(
+  import: &PowerPointImport,
+  fill: &a::RunPropertiesChoice4,
+  style: &mut TextStyle,
+) {
+  match fill {
+    a::RunPropertiesChoice4::UnderlineFillText => style.underline_color = None,
+    a::RunPropertiesChoice4::UnderlineFill(fill) => apply_underline_fill(import, fill, style),
+  }
+}
+
+fn apply_default_run_underline_fill(
+  import: &PowerPointImport,
+  fill: &a::DefaultRunPropertiesChoice4,
+  style: &mut TextStyle,
+) {
+  match fill {
+    a::DefaultRunPropertiesChoice4::UnderlineFillText => style.underline_color = None,
+    a::DefaultRunPropertiesChoice4::UnderlineFill(fill) => {
+      apply_underline_fill(import, fill, style)
+    }
+  }
+}
+
+fn apply_underline_fill(import: &PowerPointImport, fill: &a::UnderlineFill, style: &mut TextStyle) {
+  // Source: LibreOffice oox/source/drawingml/textcharacterpropertiescontext.cxx
+  // parses a:uFill through SimpleFillPropertiesContext into maUnderlineColor.
+  if let Some(color) = fill
+    .underline_fill_choice
+    .as_ref()
+    .and_then(Color::from_underline_fill_choice)
+    .and_then(|color| display_paint(import, &color, None))
+  {
+    style.underline_color = Some(color.color);
+  }
+}
+
+fn apply_hyperlink_text_fill(import: &PowerPointImport, style: &mut TextStyle) {
+  // Source: LibreOffice oox/source/drawingml/textrun.cxx assigns scheme
+  // color hlink when a hyperlink field has no explicit CharColor.
+  let color = Color::Scheme(SchemeColor {
+    value: a::SchemeColorValues::Hyperlink,
+    transformations: Vec::new(),
+  });
+  if let Some(color) = display_paint(import, &color, None) {
+    style.color = color.color;
+    style.opacity = color.opacity;
   }
 }
 

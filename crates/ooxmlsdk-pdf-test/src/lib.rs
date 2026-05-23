@@ -16,9 +16,10 @@ pub use ooxmlsdk_pdf::{
   PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 pub use pdf_extract::{
-  AnnotationSummary, LinkTargetKind, PdfBounds, PdfSummary, PixelRect, RawAnnotationSummary,
-  RawPageSummary, RawXObjectSummary, RenderedPageImage, assert_pdf_rect_close, parse_pdf_rect,
-  pdf_page_count, raw_image_pixel_from_pdf, rendered_page_image_from_pdf,
+  AnnotationSummary, LinkTargetKind, PathObjectSummary, PdfBounds, PdfSummary, PixelRect,
+  RawAnnotationSummary, RawPageSummary, RawXObjectSummary, RenderedPageImage,
+  assert_pdf_rect_close, parse_pdf_rect, pdf_page_count, raw_image_pixel_from_pdf,
+  rendered_page_image_from_pdf,
 };
 pub use render::render_fixture_pdf;
 

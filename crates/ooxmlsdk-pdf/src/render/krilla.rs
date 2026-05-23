@@ -622,7 +622,7 @@ impl PaintText {
       x2_pt: text.x_pt + width_pt,
       y2_pt: underline_y_pt,
       width_pt: decoration_metrics.underline_width_pt,
-      color: text.style.color,
+      color: text.style.underline_color.unwrap_or(text.style.color),
     });
     let strikethrough_y_pt = baseline_y - decoration_metrics.strikethrough_offset_pt;
     let strikethrough = text.style.strikethrough.then_some(PaintStrokeLine {

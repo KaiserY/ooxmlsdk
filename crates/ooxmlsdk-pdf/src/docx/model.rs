@@ -658,6 +658,7 @@ pub(crate) struct TextStyle {
   pub outline_opacity: f32,
   pub outline_width_pt: f32,
   pub highlight: Option<RgbColor>,
+  pub underline_color: Option<RgbColor>,
 }
 
 impl Default for TextStyle {
@@ -683,6 +684,7 @@ impl Default for TextStyle {
       outline_opacity: 1.0,
       outline_width_pt: 0.0,
       highlight: None,
+      underline_color: None,
     }
   }
 }

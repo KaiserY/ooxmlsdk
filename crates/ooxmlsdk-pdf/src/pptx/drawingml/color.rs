@@ -28,6 +28,72 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_highlight_choice(choice: &a::HighlightChoice) -> Option<Self> {
+    match choice {
+      a::HighlightChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::HighlightChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::HighlightChoice::HslColor(color) => Some(hsl_color(color)),
+      a::HighlightChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::HighlightChoice::PresetColor(color) => Some(preset_color(color)),
+      a::HighlightChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_underline_fill_choice(choice: &a::UnderlineFillChoice) -> Option<Self> {
+    match choice {
+      a::UnderlineFillChoice::SolidFill(fill) => fill
+        .solid_fill_choice
+        .as_ref()
+        .and_then(Self::from_solid_fill_choice),
+      a::UnderlineFillChoice::GradientFill(fill) => best_solid_gradient_color(fill),
+      a::UnderlineFillChoice::PatternFill(fill) => best_solid_pattern_color(fill),
+      a::UnderlineFillChoice::NoFill(_)
+      | a::UnderlineFillChoice::BlipFill(_)
+      | a::UnderlineFillChoice::GroupFill => None,
+    }
+  }
+
+  pub(crate) fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Self> {
+    best_solid_gradient_color(fill)
+  }
+
+  pub(crate) fn best_solid_pattern_color(fill: &a::PatternFill) -> Option<Self> {
+    best_solid_pattern_color(fill)
+  }
+
+  pub(crate) fn from_gradient_stop_choice(choice: &a::GradientStopChoice) -> Option<Self> {
+    match choice {
+      a::GradientStopChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::GradientStopChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::GradientStopChoice::HslColor(color) => Some(hsl_color(color)),
+      a::GradientStopChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::GradientStopChoice::PresetColor(color) => Some(preset_color(color)),
+      a::GradientStopChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_foreground_color_choice(choice: &a::ForegroundColorChoice) -> Option<Self> {
+    match choice {
+      a::ForegroundColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::ForegroundColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::ForegroundColorChoice::HslColor(color) => Some(hsl_color(color)),
+      a::ForegroundColorChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::ForegroundColorChoice::PresetColor(color) => Some(preset_color(color)),
+      a::ForegroundColorChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_background_color_choice(choice: &a::BackgroundColorChoice) -> Option<Self> {
+    match choice {
+      a::BackgroundColorChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      a::BackgroundColorChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      a::BackgroundColorChoice::HslColor(color) => Some(hsl_color(color)),
+      a::BackgroundColorChoice::SchemeColor(color) => Some(scheme_color(color)),
+      a::BackgroundColorChoice::PresetColor(color) => Some(preset_color(color)),
+      a::BackgroundColorChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_diagram_fill_color_choice(choice: &dgm::FillColorListChoice) -> Option<Self> {
     match choice {
       dgm::FillColorListChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
@@ -237,6 +303,36 @@ impl Color {
     apply_transformations(&mut color, transformations);
     Some(color)
   }
+}
+
+fn best_solid_gradient_color(fill: &a::GradientFill) -> Option<Color> {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // FillProperties::getBestSolidColor() uses the first gradient stop, or the
+  // second stop when there are more than two stops.
+  let stops = &fill.gradient_stop_list.as_ref()?.gradient_stop;
+  let index = usize::from(stops.len() > 2);
+  stops
+    .get(index)?
+    .gradient_stop_choice
+    .as_ref()
+    .and_then(Color::from_gradient_stop_choice)
+}
+
+fn best_solid_pattern_color(fill: &a::PatternFill) -> Option<Color> {
+  // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+  // prefers used pattern background color, otherwise foreground color.
+  fill
+    .background_color
+    .as_ref()
+    .and_then(|color| color.background_color_choice.as_ref())
+    .and_then(Color::from_background_color_choice)
+    .or_else(|| {
+      fill
+        .foreground_color
+        .as_ref()
+        .and_then(|color| color.foreground_color_choice.as_ref())
+        .and_then(Color::from_foreground_color_choice)
+    })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

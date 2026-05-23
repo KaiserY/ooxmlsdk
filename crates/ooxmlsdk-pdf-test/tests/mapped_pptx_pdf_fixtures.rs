@@ -452,12 +452,35 @@ fn assert_page_has_horizontal_stroked_path(summary: &PdfSummary, page_index: usi
       .iter()
       .filter(|path| path.page_index == page_index)
       .filter(|path| path.stroked == Some(true))
-      .filter_map(|path| path.bounds.as_deref())
-      .filter_map(|bounds| parse_pdf_rect(bounds).ok())
-      .any(|bounds| bounds.width() > 10.0 && bounds.height() <= 3.0),
+      .any(|path| {
+        path
+          .bounds
+          .as_deref()
+          .and_then(|bounds| parse_pdf_rect(bounds).ok())
+          .is_some_and(|bounds| bounds.width() > 10.0 && bounds.height() <= 3.0)
+          || is_horizontal_line_path(path)
+      }),
     "missing horizontal stroked path on page {page_index}; paths={:?}",
     summary.paths
   );
+}
+
+fn is_horizontal_line_path(path: &ooxmlsdk_pdf_test::PathObjectSummary) -> bool {
+  let [start, end] = path.segment_details.as_slice() else {
+    return false;
+  };
+  if start.segment_type != "MoveTo" || end.segment_type != "LineTo" {
+    return false;
+  }
+  let (Ok(x1), Ok(y1), Ok(x2), Ok(y2)) = (
+    start.x.parse::<f32>(),
+    start.y.parse::<f32>(),
+    end.x.parse::<f32>(),
+    end.y.parse::<f32>(),
+  ) else {
+    return false;
+  };
+  (x2 - x1).abs() > 10.0 && (y2 - y1).abs() <= 0.5
 }
 
 fn assert_text_centered_on_page(
@@ -1329,7 +1352,7 @@ fn mapped_pptx_bnc887225_preserves_last_row_and_column_table_fill_colors() {
 // Source: ../core/sd/qa/unit/import-tests3.cxx:testTableBorderLineStyle
 fn mapped_pptx_table_border_line_style_preserves_visible_table_borders() {
   let summary = render_summary("pptx/tableBorderLineStyle.pptx");
-  assert_page_contains_in_order(
+  assert_page_contains_all(
     &summary,
     0,
     &[

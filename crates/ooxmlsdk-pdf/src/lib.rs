@@ -68,6 +68,7 @@ pub struct DocxLayoutRowSummary {
 pub struct PptxLayoutSummary {
   pub master_text_shapes: Vec<PptxTextShapeSummary>,
   pub smartart_text_shapes: Vec<PptxSmartArtTextShapeSummary>,
+  pub bullet_paragraphs: Vec<PptxBulletParagraphSummary>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -86,6 +87,17 @@ pub struct PptxSmartArtTextShapeSummary {
   pub text_anchor_top_100mm: i32,
   pub text_anchor_right_100mm: i32,
   pub text_anchor_bottom_100mm: i32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PptxBulletParagraphSummary {
+  pub page_index: usize,
+  pub paragraph_index: usize,
+  pub text: String,
+  pub character: Option<String>,
+  pub font: Option<String>,
+  pub graphic_width_100mm: Option<i32>,
+  pub graphic_height_100mm: Option<i32>,
 }
 
 /// Convert a DOCX stream into PDF bytes.

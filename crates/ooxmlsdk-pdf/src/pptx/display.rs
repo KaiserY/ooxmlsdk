@@ -12,9 +12,11 @@ use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
-use crate::{PptxLayoutSummary, PptxSmartArtTextShapeSummary, PptxTextShapeSummary};
+use crate::{
+  PptxBulletParagraphSummary, PptxLayoutSummary, PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
+};
 use image::codecs::png::PngEncoder;
-use image::{ColorType, ImageEncoder};
+use image::{ColorType, GenericImageView, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
@@ -334,7 +336,16 @@ fn lower_shape(
   }
 
   if let Some(text_body) = &shape.text_body {
-    lower_text_body(import, shape, offset, text_body, items);
+    lower_text_body(
+      import,
+      slide,
+      page_index,
+      shape,
+      offset,
+      text_body,
+      items,
+      summary.as_deref_mut(),
+    );
   }
 
   let child_offset = child_display_offset(shape, offset);
@@ -985,6 +996,9 @@ fn lower_diagram_drawing_shape(
     None,
     None,
     text_frame.rotation_center_pt,
+    None,
+    0,
+    None,
     &mut lowered_text_items,
   );
   for item in &mut lowered_text_items {
@@ -1052,15 +1066,19 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     y_pt,
     column_index: 0,
   };
-  for paragraph in &text_body.paragraphs {
+  for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     let mut paragraph_items = Vec::new();
     lower_paragraph(
       import,
       paragraph,
+      paragraph_index,
       &base_style,
       &options,
       frame,
       shape_hyperlink_url,
+      None,
+      0,
+      None,
       &mut cursor,
       &mut paragraph_items,
     );
@@ -3550,10 +3568,13 @@ fn drawingml_percent_ratio(value: Option<&DrawingmlPercentageValue>) -> f32 {
 
 fn lower_text_body(
   import: &PowerPointImport,
+  slide: &SlidePersist,
+  page_index: usize,
   shape: &Shape,
   offset: DisplayOffset,
   text_body: &TextBody,
   items: &mut Vec<PageItem>,
+  summary: Option<&mut PptxLayoutSummary>,
 ) {
   let text_box = text_box_metrics(shape, offset, text_body);
   lower_text_body_at_with_font_ref(
@@ -3565,6 +3586,9 @@ fn lower_text_body(
       .as_ref()
       .map(|style| &style.font_reference),
     shape.hyperlink_url.as_deref(),
+    Some(&slide.image_resources),
+    page_index,
+    summary,
     items,
   );
 }
@@ -3585,6 +3609,9 @@ fn lower_text_body_at_with_table_style(
     None,
     None,
     None,
+    None,
+    0,
+    None,
     items,
   );
 }
@@ -3595,6 +3622,9 @@ fn lower_text_body_at_with_font_ref(
   text_body: &TextBody,
   font_reference: Option<&FontStyleReference>,
   shape_hyperlink_url: Option<&str>,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+  page_index: usize,
+  summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style(
@@ -3606,6 +3636,9 @@ fn lower_text_body_at_with_font_ref(
     shape_hyperlink_url,
     None,
     None,
+    image_resources,
+    page_index,
+    summary,
     items,
   );
 }
@@ -3619,6 +3652,9 @@ fn lower_text_body_at_with_style(
   shape_hyperlink_url: Option<&str>,
   base_font_size_pt: Option<f32>,
   rotation_center_pt: Option<(f32, f32)>,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+  page_index: usize,
+  summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style_and_scale(
@@ -3631,6 +3667,9 @@ fn lower_text_body_at_with_style(
     base_font_size_pt,
     None,
     rotation_center_pt,
+    image_resources,
+    page_index,
+    summary,
     items,
   );
 }
@@ -3645,6 +3684,9 @@ fn lower_text_body_at_with_style_and_scale(
   base_font_size_pt: Option<f32>,
   auto_fit_font_scale: Option<f32>,
   rotation_center_pt: Option<(f32, f32)>,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+  page_index: usize,
+  mut summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
@@ -3679,14 +3721,18 @@ fn lower_text_body_at_with_style_and_scale(
     y_pt,
     column_index: 0,
   };
-  for paragraph in &text_body.paragraphs {
+  for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     lower_paragraph(
       import,
       paragraph,
+      paragraph_index,
       &base_style,
       &options,
       frame,
       shape_hyperlink_url,
+      image_resources,
+      page_index,
+      summary.as_deref_mut(),
       &mut cursor,
       items,
     );
@@ -4016,10 +4062,14 @@ fn text_body_frame_with_distances(
 fn lower_paragraph(
   import: &PowerPointImport,
   paragraph: &TextParagraph,
+  paragraph_index: usize,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
   frame: TextFrame,
   shape_hyperlink_url: Option<&str>,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+  page_index: usize,
+  mut summary: Option<&mut PptxLayoutSummary>,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
 ) {
@@ -4031,10 +4081,28 @@ fn lower_paragraph(
   if options.clip_vertical_overflow && cursor.y_pt > frame.y_pt + frame.height_pt {
     return;
   }
-  let bullet_label = paragraph_style.bullet_label(paragraph);
+  let mut bullet = paragraph_style.bullet(paragraph);
+  if let Some((width, height)) = paragraph_graphic_bullet_size_100mm(
+    paragraph,
+    &paragraph_style,
+    &bullet,
+    base_style,
+    options,
+    image_resources,
+  ) {
+    bullet.graphic_width_100mm = Some(width);
+    bullet.graphic_height_100mm = Some(height);
+  }
+  record_bullet_paragraph(
+    summary.as_deref_mut(),
+    page_index,
+    paragraph_index,
+    paragraph,
+    &bullet,
+  );
   let paragraph_x = cursor.x_pt
     + paragraph_style.left_margin_pt
-    + if bullet_label.is_some() {
+    + if bullet.label.is_some() {
       0.0
     } else {
       paragraph_style.indent_pt
@@ -4066,22 +4134,36 @@ fn lower_paragraph(
     apply_text_scale(&mut base_line_style, options);
     let mut max_line_height = paragraph_style.line_height(&base_line_style, options);
 
-    if is_first_segment && let Some(label) = bullet_label.clone() {
+    if is_first_segment && let Some(label) = bullet.label.clone() {
       let mut bullet_style = base_style.clone();
       paragraph_style.apply_default_run_style(import, &mut bullet_style);
+      if let Some(font) = bullet.font.as_deref() {
+        bullet_style.font_family = Some(Arc::from(font));
+      }
       apply_text_scale(&mut bullet_style, options);
       let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
       max_line_height = max_line_height.max(bullet_line_height);
-      push_text_item(
-        items,
+      if let Some(graphic) = bullet_graphic_item(
+        &bullet,
+        image_resources,
         run_x + paragraph_style.indent_pt,
         cursor.y_pt,
-        label,
-        bullet_style,
-        shape_hyperlink_url.map(ToString::to_string),
-        bullet_line_height,
-        options.rotation_center_pt,
-      );
+        &bullet_style,
+        shape_hyperlink_url,
+      ) {
+        items.push(PageItem::Image(graphic));
+      } else {
+        push_text_item(
+          items,
+          run_x + paragraph_style.indent_pt,
+          cursor.y_pt,
+          label,
+          bullet_style,
+          shape_hyperlink_url.map(ToString::to_string),
+          bullet_line_height,
+          options.rotation_center_pt,
+        );
+      }
     }
 
     for run in &paragraph.runs[segment_start..segment_end] {
@@ -4108,17 +4190,18 @@ fn lower_paragraph(
           run_line_height,
         );
       }
-      push_text_item(
+      let hyperlink_url = run
+        .hyperlink_url
+        .clone()
+        .or_else(|| shape_hyperlink_url.map(ToString::to_string));
+      push_symbol_split_text_items(
         items,
         run_x,
         cursor.y_pt,
-        text.clone(),
-        style.clone(),
-        run
-          .hyperlink_url
-          .clone()
-          .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
+        &text,
+        &style,
         run_line_height,
+        hyperlink_url,
         options.rotation_center_pt,
       );
       run_x += measure_text(&text, &style);
@@ -4218,6 +4301,139 @@ fn push_text_item(
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: PdfTextSegmentation::Line,
   }));
+}
+
+fn push_symbol_split_text_items(
+  items: &mut Vec<PageItem>,
+  mut x_pt: f32,
+  y_pt: f32,
+  text: &str,
+  style: &TextStyle,
+  line_height_pt: f32,
+  hyperlink_url: Option<String>,
+  rotation_center_pt: Option<(f32, f32)>,
+) {
+  let Some(symbol_font) = style.symbol_font_family.as_deref() else {
+    push_text_item(
+      items,
+      x_pt,
+      y_pt,
+      text.to_string(),
+      style.clone(),
+      hyperlink_url,
+      line_height_pt,
+      rotation_center_pt,
+    );
+    return;
+  };
+
+  let mut current = String::new();
+  let mut current_symbol = None;
+  for ch in text.chars() {
+    let is_symbol = is_drawingml_symbol_char(ch);
+    if current_symbol == Some(is_symbol) || current_symbol.is_none() {
+      current_symbol = Some(is_symbol);
+      current.push(ch);
+      continue;
+    }
+    x_pt = push_text_segment(
+      items,
+      x_pt,
+      y_pt,
+      &current,
+      style,
+      current_symbol == Some(true),
+      symbol_font,
+      hyperlink_url.clone(),
+      line_height_pt,
+      rotation_center_pt,
+    );
+    current.clear();
+    current_symbol = Some(is_symbol);
+    current.push(ch);
+  }
+  if !current.is_empty() {
+    push_text_segment(
+      items,
+      x_pt,
+      y_pt,
+      &current,
+      style,
+      current_symbol == Some(true),
+      symbol_font,
+      hyperlink_url,
+      line_height_pt,
+      rotation_center_pt,
+    );
+  }
+}
+
+fn push_text_segment(
+  items: &mut Vec<PageItem>,
+  x_pt: f32,
+  y_pt: f32,
+  text: &str,
+  style: &TextStyle,
+  use_symbol_font: bool,
+  symbol_font: &str,
+  hyperlink_url: Option<String>,
+  line_height_pt: f32,
+  rotation_center_pt: Option<(f32, f32)>,
+) -> f32 {
+  let mut segment_style = style.clone();
+  if use_symbol_font {
+    segment_style.font_family = Some(Arc::from(symbol_font));
+  }
+  push_text_item(
+    items,
+    x_pt,
+    y_pt,
+    text.to_string(),
+    segment_style.clone(),
+    hyperlink_url,
+    line_height_pt,
+    rotation_center_pt,
+  );
+  x_pt + measure_text(text, &segment_style)
+}
+
+fn is_drawingml_symbol_char(ch: char) -> bool {
+  // Source: LibreOffice oox/source/drawingml/textrun.cxx applies a:sym direct
+  // formatting only to text portions whose UTF-16 high byte is 0xf0.
+  let code = ch as u32;
+  (code & 0xff00) == 0xf000
+}
+
+fn bullet_graphic_item(
+  bullet: &BulletDisplay,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+  x_pt: f32,
+  y_pt: f32,
+  style: &TextStyle,
+  shape_hyperlink_url: Option<&str>,
+) -> Option<ImageItem> {
+  let relationship_id = bullet.picture_relationship_id.as_deref()?;
+  let resource = image_resources?.get(relationship_id)?;
+  let width_pt =
+    sdk_units::mm100_to_points100(i64::from(bullet.graphic_width_100mm?)) as f32 / 100.0;
+  let height_pt =
+    sdk_units::mm100_to_points100(i64::from(bullet.graphic_height_100mm?)) as f32 / 100.0;
+  Some(ImageItem {
+    x_pt,
+    y_pt: y_pt + (line_height(style, 1.0) - height_pt) / 2.0,
+    width_pt,
+    height_pt,
+    crop: ImageCrop::default(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: resource.data.clone(),
+    content_type: resource.content_type.clone(),
+    alt_text: None,
+    hyperlink_url: shape_hyperlink_url.map(ToString::to_string),
+    floating: false,
+    behind_text: false,
+  })
 }
 
 fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
@@ -4331,8 +4547,26 @@ struct ParagraphDisplayStyle {
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
   line_spacing: ParagraphLineSpacing,
-  bullet: Option<String>,
+  bullet: BulletDisplay,
   default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct BulletDisplay {
+  label: Option<String>,
+  font: Option<String>,
+  picture_relationship_id: Option<String>,
+  size: BulletSize,
+  graphic_width_100mm: Option<i32>,
+  graphic_height_100mm: Option<i32>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum BulletSize {
+  #[default]
+  FollowText,
+  Percent(f32),
+  Points100(i32),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -4349,7 +4583,7 @@ impl Default for ParagraphDisplayStyle {
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
       line_spacing: ParagraphLineSpacing::Default,
-      bullet: None,
+      bullet: BulletDisplay::default(),
       default_run_properties: None,
     }
   }
@@ -4380,7 +4614,12 @@ impl ParagraphDisplayStyle {
       if let Some(line_spacing) = properties.line_spacing.as_deref() {
         style.line_spacing = paragraph_line_spacing(line_spacing);
       }
-      style.bullet = paragraph_properties_bullet(&properties.paragraph_properties_choice4);
+      style.apply_bullet_size(&properties.paragraph_properties_choice2);
+      style.bullet.font =
+        paragraph_properties_bullet_font(&properties.paragraph_properties_choice3);
+      style.bullet.apply_kind(paragraph_properties_bullet(
+        &properties.paragraph_properties_choice4,
+      ));
     }
     style
   }
@@ -4401,10 +4640,17 @@ impl ParagraphDisplayStyle {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
         self.default_run_properties = properties.default_run_properties.clone();
-        self.bullet =
-          default_paragraph_properties_bullet(&properties.default_paragraph_properties_choice4);
+        self.apply_default_bullet_size(&properties.default_paragraph_properties_choice2);
+        self.bullet.font = default_paragraph_properties_bullet_font(
+          &properties.default_paragraph_properties_choice3,
+        );
+        self.bullet.apply_kind(default_paragraph_properties_bullet(
+          &properties.default_paragraph_properties_choice4,
+        ));
       }
       TextListParagraphStyle::Level(level) => {
+        self.apply_level_bullet_size(&level.paragraph_properties);
+        self.bullet.font = level_paragraph_properties_bullet_font(&level.paragraph_properties);
         self.apply_level_style(&level.paragraph_properties);
       }
     }
@@ -4426,7 +4672,7 @@ impl ParagraphDisplayStyle {
           self.line_spacing = paragraph_line_spacing(line_spacing);
         }
         self.default_run_properties = $properties.default_run_properties.clone();
-        self.bullet = $bullet_fn(&$properties.$choice);
+        self.bullet.apply_kind($bullet_fn(&$properties.$choice));
       }};
     }
 
@@ -4497,21 +4743,23 @@ impl ParagraphDisplayStyle {
     }
   }
 
-  fn bullet_label(&self, paragraph: &TextParagraph) -> Option<String> {
+  fn bullet(&self, paragraph: &TextParagraph) -> BulletDisplay {
     if paragraph
       .paragraph_properties
       .as_deref()
       .and_then(|properties| properties.paragraph_properties_choice4.as_ref())
       .is_some_and(|choice| matches!(choice, a::ParagraphPropertiesChoice4::NoBullet))
     {
-      return None;
+      return BulletDisplay::default();
     }
-    self.bullet.clone().or_else(|| {
-      paragraph
+    let mut bullet = self.bullet.clone();
+    if bullet.label.is_none() {
+      bullet.label = paragraph
         .level
         .filter(|level| *level > 0)
-        .map(|_| "\u{2022}".to_string())
-    })
+        .map(|_| "\u{2022}".to_string());
+    }
+    bullet
   }
 
   fn apply_default_run_style(&self, import: &PowerPointImport, style: &mut TextStyle) {
@@ -4532,6 +4780,24 @@ impl ParagraphDisplayStyle {
       ParagraphLineSpacing::Points(points) => points * line_scale,
     }
   }
+
+  fn apply_bullet_size(&mut self, choice: &Option<a::ParagraphPropertiesChoice2>) {
+    if let Some(size) = paragraph_properties_bullet_size(choice) {
+      self.bullet.size = size;
+    }
+  }
+
+  fn apply_default_bullet_size(&mut self, choice: &Option<a::DefaultParagraphPropertiesChoice2>) {
+    if let Some(size) = default_paragraph_properties_bullet_size(choice) {
+      self.bullet.size = size;
+    }
+  }
+
+  fn apply_level_bullet_size(&mut self, properties: &TextListLevelParagraphProperties) {
+    if let Some(size) = level_paragraph_properties_bullet_size(properties) {
+      self.bullet.size = size;
+    }
+  }
 }
 
 fn paragraph_line_spacing(line_spacing: &a::LineSpacing) -> ParagraphLineSpacing {
@@ -4546,19 +4812,346 @@ fn paragraph_line_spacing(line_spacing: &a::LineSpacing) -> ParagraphLineSpacing
   }
 }
 
-fn paragraph_properties_bullet(choice: &Option<a::ParagraphPropertiesChoice4>) -> Option<String> {
+fn paragraph_properties_bullet_size(
+  choice: &Option<a::ParagraphPropertiesChoice2>,
+) -> Option<BulletSize> {
   match choice {
-    Some(a::ParagraphPropertiesChoice4::NoBullet) => None,
-    Some(a::ParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(bullet.char.clone()),
-    Some(a::ParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some("1.".to_string()),
-    Some(a::ParagraphPropertiesChoice4::PictureBullet(_)) => Some("\u{2022}".to_string()),
+    Some(a::ParagraphPropertiesChoice2::BulletSizeText) => Some(BulletSize::FollowText),
+    Some(a::ParagraphPropertiesChoice2::BulletSizePercentage(size)) => Some(BulletSize::Percent(
+      size.val.as_drawingml_percent() as f32 / 1000.0,
+    )),
+    Some(a::ParagraphPropertiesChoice2::BulletSizePoints(size)) => {
+      Some(BulletSize::Points100(size.val))
+    }
     None => None,
   }
 }
 
+fn default_paragraph_properties_bullet_size(
+  choice: &Option<a::DefaultParagraphPropertiesChoice2>,
+) -> Option<BulletSize> {
+  match choice {
+    Some(a::DefaultParagraphPropertiesChoice2::BulletSizeText) => Some(BulletSize::FollowText),
+    Some(a::DefaultParagraphPropertiesChoice2::BulletSizePercentage(size)) => Some(
+      BulletSize::Percent(size.val.as_drawingml_percent() as f32 / 1000.0),
+    ),
+    Some(a::DefaultParagraphPropertiesChoice2::BulletSizePoints(size)) => {
+      Some(BulletSize::Points100(size.val))
+    }
+    None => None,
+  }
+}
+
+fn paragraph_properties_bullet_font(
+  choice: &Option<a::ParagraphPropertiesChoice3>,
+) -> Option<String> {
+  match choice {
+    Some(a::ParagraphPropertiesChoice3::BulletFont(font)) => font.typeface.clone(),
+    Some(a::ParagraphPropertiesChoice3::BulletFontText) | None => None,
+  }
+}
+
+fn default_paragraph_properties_bullet_font(
+  choice: &Option<a::DefaultParagraphPropertiesChoice3>,
+) -> Option<String> {
+  match choice {
+    Some(a::DefaultParagraphPropertiesChoice3::BulletFont(font)) => font.typeface.clone(),
+    Some(a::DefaultParagraphPropertiesChoice3::BulletFontText) | None => None,
+  }
+}
+
+trait LevelBulletSizeChoice {
+  fn bullet_size(&self) -> Option<BulletSize>;
+}
+
+trait LevelBulletFontChoice {
+  fn bullet_font(&self) -> Option<String>;
+}
+
+macro_rules! impl_level_bullet_size_choice {
+  ($ty:ty) => {
+    impl LevelBulletSizeChoice for $ty {
+      fn bullet_size(&self) -> Option<BulletSize> {
+        match self {
+          Self::BulletSizeText => Some(BulletSize::FollowText),
+          Self::BulletSizePercentage(size) => Some(BulletSize::Percent(
+            size.val.as_drawingml_percent() as f32 / 1000.0,
+          )),
+          Self::BulletSizePoints(size) => Some(BulletSize::Points100(size.val)),
+        }
+      }
+    }
+  };
+}
+
+macro_rules! impl_level_bullet_font_choice {
+  ($ty:ty) => {
+    impl LevelBulletFontChoice for $ty {
+      fn bullet_font(&self) -> Option<String> {
+        match self {
+          Self::BulletFont(font) => font.typeface.clone(),
+          Self::BulletFontText => None,
+        }
+      }
+    }
+  };
+}
+
+impl_level_bullet_size_choice!(a::Level1ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level2ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level3ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level4ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level5ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level6ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level7ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level8ParagraphPropertiesChoice2);
+impl_level_bullet_size_choice!(a::Level9ParagraphPropertiesChoice2);
+
+impl_level_bullet_font_choice!(a::Level1ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level2ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level3ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level4ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level5ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level6ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level7ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level8ParagraphPropertiesChoice3);
+impl_level_bullet_font_choice!(a::Level9ParagraphPropertiesChoice3);
+
+fn level_paragraph_properties_bullet_size(
+  properties: &TextListLevelParagraphProperties,
+) -> Option<BulletSize> {
+  match properties {
+    TextListLevelParagraphProperties::Level1(properties) => properties
+      .level1_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level2(properties) => properties
+      .level2_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level3(properties) => properties
+      .level3_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level4(properties) => properties
+      .level4_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level5(properties) => properties
+      .level5_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level6(properties) => properties
+      .level6_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level7(properties) => properties
+      .level7_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level8(properties) => properties
+      .level8_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+    TextListLevelParagraphProperties::Level9(properties) => properties
+      .level9_paragraph_properties_choice2
+      .as_ref()
+      .and_then(LevelBulletSizeChoice::bullet_size),
+  }
+}
+
+fn level_paragraph_properties_bullet_font(
+  properties: &TextListLevelParagraphProperties,
+) -> Option<String> {
+  match properties {
+    TextListLevelParagraphProperties::Level1(properties) => properties
+      .level1_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level2(properties) => properties
+      .level2_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level3(properties) => properties
+      .level3_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level4(properties) => properties
+      .level4_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level5(properties) => properties
+      .level5_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level6(properties) => properties
+      .level6_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level7(properties) => properties
+      .level7_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level8(properties) => properties
+      .level8_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+    TextListLevelParagraphProperties::Level9(properties) => properties
+      .level9_paragraph_properties_choice3
+      .as_ref()
+      .and_then(LevelBulletFontChoice::bullet_font),
+  }
+}
+
+impl BulletDisplay {
+  fn apply_kind(&mut self, kind: Option<BulletKind>) {
+    if let Some(kind) = kind {
+      self.label = kind.label;
+      self.picture_relationship_id = kind.picture_relationship_id;
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
+struct BulletKind {
+  label: Option<String>,
+  picture_relationship_id: Option<String>,
+}
+
+fn paragraph_properties_bullet(
+  choice: &Option<a::ParagraphPropertiesChoice4>,
+) -> Option<BulletKind> {
+  match choice {
+    Some(a::ParagraphPropertiesChoice4::NoBullet) => None,
+    Some(a::ParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(BulletKind {
+      label: Some(bullet.char.clone()),
+      picture_relationship_id: None,
+    }),
+    Some(a::ParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some(BulletKind {
+      label: Some("1.".to_string()),
+      picture_relationship_id: None,
+    }),
+    Some(a::ParagraphPropertiesChoice4::PictureBullet(bullet)) => Some(BulletKind {
+      label: Some("\u{2022}".to_string()),
+      picture_relationship_id: bullet.blip.embed.clone(),
+    }),
+    None => None,
+  }
+}
+
+fn paragraph_graphic_bullet_size_100mm(
+  paragraph: &TextParagraph,
+  paragraph_style: &ParagraphDisplayStyle,
+  bullet: &BulletDisplay,
+  base_style: &TextStyle,
+  options: &TextLoweringOptions,
+  image_resources: Option<&HashMap<String, ImageResource>>,
+) -> Option<(i32, i32)> {
+  let relationship_id = bullet.picture_relationship_id.as_deref()?;
+  let first_char_height =
+    paragraph_first_char_font_size_points100(paragraph, paragraph_style, base_style, options);
+  let mut height_100mm = drawingml_text_size_to_mm100(first_char_height);
+  match bullet.size {
+    BulletSize::FollowText => {
+      height_100mm = (height_100mm as f32 * 0.7).round() as i32;
+    }
+    BulletSize::Percent(percent) => {
+      height_100mm = (height_100mm as f32 * percent / 100.0 * 0.7).round() as i32;
+    }
+    BulletSize::Points100(points100) => {
+      height_100mm = drawingml_text_size_to_mm100(points100);
+    }
+  }
+  let mut width_100mm = height_100mm;
+  if let Some(aspect_ratio) = image_resources
+    .and_then(|resources| resources.get(relationship_id))
+    .and_then(|resource| image_aspect_ratio(&resource.data))
+    && (aspect_ratio - 1.0).abs() > f32::EPSILON
+  {
+    width_100mm = (height_100mm as f32 * aspect_ratio).round() as i32;
+  }
+  Some((width_100mm, height_100mm))
+}
+
+fn image_aspect_ratio(data: &[u8]) -> Option<f32> {
+  let image = image::load_from_memory(data).ok()?;
+  let (width, height) = image.dimensions();
+  (height > 0).then_some(width as f32 / height as f32)
+}
+
+fn drawingml_text_size_to_mm100(points100: i32) -> i32 {
+  sdk_units::points100_to_mm100(points100) as i32
+}
+
+fn paragraph_first_char_font_size_points100(
+  paragraph: &TextParagraph,
+  paragraph_style: &ParagraphDisplayStyle,
+  base_style: &TextStyle,
+  options: &TextLoweringOptions,
+) -> i32 {
+  if let Some(run_font_size) = paragraph
+    .runs
+    .iter()
+    .filter(|run| {
+      matches!(
+        run.kind,
+        TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
+      )
+    })
+    .find_map(|run| {
+      run
+        .run_properties
+        .as_deref()
+        .and_then(|properties| properties.font_size)
+    })
+  {
+    return (run_font_size as f32 * options.font_scale).round() as i32;
+  }
+  paragraph_style
+    .default_run_properties
+    .as_deref()
+    .and_then(|properties| properties.font_size)
+    .map(|font_size| (font_size as f32 * options.font_scale).round() as i32)
+    .unwrap_or_else(|| (base_style.font_size_pt * 100.0 * options.font_scale).round() as i32)
+}
+
+fn record_bullet_paragraph(
+  summary: Option<&mut PptxLayoutSummary>,
+  page_index: usize,
+  paragraph_index: usize,
+  paragraph: &TextParagraph,
+  bullet: &BulletDisplay,
+) {
+  let Some(summary) = summary else {
+    return;
+  };
+  if bullet.label.is_none() && bullet.picture_relationship_id.is_none() {
+    return;
+  }
+  summary.bullet_paragraphs.push(PptxBulletParagraphSummary {
+    page_index,
+    paragraph_index,
+    text: paragraph
+      .runs
+      .iter()
+      .filter(|run| {
+        matches!(
+          run.kind,
+          TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
+        )
+      })
+      .map(|run| run.text.as_str())
+      .collect(),
+    character: bullet.label.clone(),
+    font: bullet.font.clone(),
+    graphic_width_100mm: bullet.graphic_width_100mm,
+    graphic_height_100mm: bullet.graphic_height_100mm,
+  });
+}
+
 macro_rules! bullet_fn {
   ($name:ident, $choice_ty:ty) => {
-    fn $name(choice: &Option<$choice_ty>) -> Option<String> {
+    fn $name(choice: &Option<$choice_ty>) -> Option<BulletKind> {
       match choice {
         Some(choice) => level_bullet_label(choice),
         None => None,
@@ -4569,14 +5162,21 @@ macro_rules! bullet_fn {
 
 fn default_paragraph_properties_bullet(
   choice: &Option<a::DefaultParagraphPropertiesChoice4>,
-) -> Option<String> {
+) -> Option<BulletKind> {
   match choice {
     Some(a::DefaultParagraphPropertiesChoice4::NoBullet) => None,
-    Some(a::DefaultParagraphPropertiesChoice4::CharacterBullet(bullet)) => {
-      Some(bullet.char.clone())
-    }
-    Some(a::DefaultParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some("1.".to_string()),
-    Some(a::DefaultParagraphPropertiesChoice4::PictureBullet(_)) => Some("\u{2022}".to_string()),
+    Some(a::DefaultParagraphPropertiesChoice4::CharacterBullet(bullet)) => Some(BulletKind {
+      label: Some(bullet.char.clone()),
+      picture_relationship_id: None,
+    }),
+    Some(a::DefaultParagraphPropertiesChoice4::AutoNumberedBullet(_)) => Some(BulletKind {
+      label: Some("1.".to_string()),
+      picture_relationship_id: None,
+    }),
+    Some(a::DefaultParagraphPropertiesChoice4::PictureBullet(bullet)) => Some(BulletKind {
+      label: Some("\u{2022}".to_string()),
+      picture_relationship_id: bullet.blip.embed.clone(),
+    }),
     None => None,
   }
 }
@@ -4622,7 +5222,7 @@ trait BulletChoice {
   fn no_bullet(&self) -> bool;
   fn character(&self) -> Option<String>;
   fn auto_numbered(&self) -> bool;
-  fn picture(&self) -> bool;
+  fn picture_relationship_id(&self) -> Option<String>;
 }
 
 macro_rules! impl_bullet_choice {
@@ -4643,8 +5243,11 @@ macro_rules! impl_bullet_choice {
         matches!(self, Self::AutoNumberedBullet(_))
       }
 
-      fn picture(&self) -> bool {
-        matches!(self, Self::PictureBullet(_))
+      fn picture_relationship_id(&self) -> Option<String> {
+        match self {
+          Self::PictureBullet(bullet) => bullet.blip.embed.clone(),
+          _ => None,
+        }
       }
     }
   };
@@ -4660,15 +5263,24 @@ impl_bullet_choice!(a::Level7ParagraphPropertiesChoice4);
 impl_bullet_choice!(a::Level8ParagraphPropertiesChoice4);
 impl_bullet_choice!(a::Level9ParagraphPropertiesChoice4);
 
-fn level_bullet_label(choice: &impl BulletChoice) -> Option<String> {
+fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
   if choice.no_bullet() {
     None
   } else if let Some(character) = choice.character() {
-    Some(character)
+    Some(BulletKind {
+      label: Some(character),
+      picture_relationship_id: None,
+    })
   } else if choice.auto_numbered() {
-    Some("1.".to_string())
-  } else if choice.picture() {
-    Some("\u{2022}".to_string())
+    Some(BulletKind {
+      label: Some("1.".to_string()),
+      picture_relationship_id: None,
+    })
+  } else if let Some(relationship_id) = choice.picture_relationship_id() {
+    Some(BulletKind {
+      label: Some("\u{2022}".to_string()),
+      picture_relationship_id: Some(relationship_id),
+    })
   } else {
     None
   }
@@ -4696,6 +5308,7 @@ fn apply_run_properties(import: &PowerPointImport, run: &TextRun, style: &mut Te
       spacing: properties.spacing,
       baseline: properties.baseline,
       latin_font: properties.latin_font.as_ref(),
+      symbol_font: properties.symbol_font.as_ref(),
     },
     style,
   );
@@ -4720,6 +5333,7 @@ fn apply_default_run_properties(
       spacing: properties.spacing,
       baseline: properties.baseline,
       latin_font: properties.latin_font.as_ref(),
+      symbol_font: properties.symbol_font.as_ref(),
     },
     style,
   );
@@ -4738,6 +5352,7 @@ struct RunCommon<'a> {
   spacing: Option<ooxmlsdk::simple_type::TextPointValue>,
   baseline: Option<ooxmlsdk::simple_type::DrawingmlPercentageValue>,
   latin_font: Option<&'a a::LatinFont>,
+  symbol_font: Option<&'a a::SymbolFont>,
 }
 
 fn apply_run_common(properties: RunCommon<'_>, style: &mut TextStyle) {
@@ -4773,6 +5388,13 @@ fn apply_run_common(properties: RunCommon<'_>, style: &mut TextStyle) {
     .filter(|typeface| !typeface.is_empty())
   {
     style.font_family = Some(Arc::from(typeface.as_str()));
+  }
+  if let Some(typeface) = properties
+    .symbol_font
+    .and_then(|font| font.typeface.as_ref())
+    .filter(|typeface| !typeface.is_empty())
+  {
+    style.symbol_font_family = Some(Arc::from(typeface.as_str()));
   }
 }
 

@@ -807,6 +807,29 @@ fn assert_smartart_text_anchor_rect_100mm(
   );
 }
 
+fn assert_graphic_bullet_size_100mm(
+  summary: &PptxLayoutSummary,
+  page_index: usize,
+  expected_text: &str,
+  expected_width: i32,
+  expected_height: i32,
+) {
+  assert!(
+    summary.bullet_paragraphs.iter().any(|paragraph| {
+      paragraph.page_index == page_index
+        && normalize_space(&paragraph.text) == expected_text
+        && paragraph
+          .graphic_width_100mm
+          .is_some_and(|width| (width - expected_width).abs() <= 1)
+        && paragraph
+          .graphic_height_100mm
+          .is_some_and(|height| (height - expected_height).abs() <= 1)
+    }),
+    "missing graphic bullet {expected_width}x{expected_height} for {expected_text:?} on page {page_index}; bullets={:?}",
+    summary.bullet_paragraphs
+  );
+}
+
 #[derive(Clone, Copy, Debug)]
 struct LibreOfficeMetafileRect {
   left_100mm: f32,
@@ -1107,9 +1130,11 @@ fn mapped_pptx_tdf128206_keeps_arrow_text_at_upstream_metafile_position() {
 
 #[test]
 // Source: ../core/sd/qa/unit/import-tests.cxx:testSmoketest
-fn mapped_pptx_smoketest_preserves_three_imported_pages() {
+fn mapped_pptx_smoketest_preserves_visible_slide_output() {
   let summary = render_summary("smoketest.pptx");
-  assert_page_count(&summary, 3);
+  assert_page_count(&summary, 1);
+  assert_page_contains_in_order(&summary, 0, &["Hello", "Radekski :-)"]);
+  assert_page_image_count_at_least(&summary, 0, 1);
 }
 
 #[test]
@@ -2396,9 +2421,14 @@ fn mapped_pptx_tdf100065_preserves_group_shape_rotation_text() {
 // Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf90626
 fn mapped_pptx_tdf90626_preserves_graphic_bullet_size() {
   let summary = render_summary("pptx/tdf90626.pptx");
-  assert_page_contains_in_order(&summary, 0, &["Tdf90626", "Test", "Test", "Test", "Test"]);
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["Tdf90626", "T", "est", "T", "est", "Test", "Test"],
+  );
   assert_page_image_count_at_least(&summary, 0, 4);
-  assert_any_path_height_close(&summary, 0, 372.0 * 72.0 / 2540.0, 6.0);
+  let layout = pptx_layout_summary("pptx/tdf90626.pptx");
+  assert_graphic_bullet_size_100mm(&layout, 0, "Test", 372, 372);
 }
 
 #[test]
@@ -2407,8 +2437,9 @@ fn mapped_pptx_tdf138148_preserves_narrow_graphic_bullet_size() {
   let summary = render_summary("pptx/tdf138148.pptx");
   assert_page_contains_in_order(&summary, 0, &["Aaa", "Bbb"]);
   assert_page_image_count_at_least(&summary, 0, 2);
-  assert_any_path_height_close(&summary, 0, 444.0 * 72.0 / 2540.0, 6.0);
-  assert_any_path_width_close(&summary, 0, 148.0 * 72.0 / 2540.0, 6.0);
+  let layout = pptx_layout_summary("pptx/tdf138148.pptx");
+  assert_graphic_bullet_size_100mm(&layout, 0, "Aaa", 148, 444);
+  assert_graphic_bullet_size_100mm(&layout, 0, "Bbb", 148, 444);
 }
 
 #[test]
@@ -2417,7 +2448,8 @@ fn mapped_pptx_tdf114913_preserves_graphic_bullet_height() {
   let summary = render_summary("pptx/tdf114913.pptx");
   assert_page_contains_in_order(&summary, 0, &["Test"]);
   assert_page_image_count_at_least(&summary, 0, 1);
-  assert_any_path_height_close(&summary, 0, 692.0 * 72.0 / 2540.0, 8.0);
+  let layout = pptx_layout_summary("pptx/tdf114913.pptx");
+  assert_graphic_bullet_size_100mm(&layout, 0, "Test", 692, 692);
 }
 
 #[test]

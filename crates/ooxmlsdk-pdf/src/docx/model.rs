@@ -639,6 +639,7 @@ pub(crate) enum ImageWrapMode {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TextStyle {
   pub font_family: Option<Arc<str>>,
+  pub symbol_font_family: Option<Arc<str>>,
   pub font_size_pt: f32,
   pub complex_font_size_pt: Option<f32>,
   pub character_spacing_pt: f32,
@@ -663,6 +664,7 @@ impl Default for TextStyle {
   fn default() -> Self {
     Self {
       font_family: None,
+      symbol_font_family: None,
       font_size_pt: 11.0,
       complex_font_size_pt: None,
       character_spacing_pt: 0.0,

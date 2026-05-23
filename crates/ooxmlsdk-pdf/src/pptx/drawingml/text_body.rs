@@ -49,6 +49,7 @@ pub(crate) enum TextAutoFit {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TextParagraph {
+  pub(crate) diagram_source_order: Option<usize>,
   pub(crate) level: Option<u8>,
   pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
@@ -236,7 +237,7 @@ impl TextBodyDisplayProperties {
       TextAutoFit::Normal {
         line_space_reduction,
         ..
-      } => (1.0 - line_space_reduction as f32 / 100_000.0).clamp(0.2, 1.0),
+      } => 1.0 - line_space_reduction as f32 / 100_000.0,
       TextAutoFit::None | TextAutoFit::Shape => 1.0,
     }
   }
@@ -272,6 +273,7 @@ impl TextParagraph {
       .filter_map(TextRun::from_dml)
       .collect();
     Self {
+      diagram_source_order: None,
       level,
       paragraph_properties: source.paragraph_properties.clone(),
       end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),

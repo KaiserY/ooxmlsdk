@@ -17,6 +17,7 @@ use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 
 use super::drawingml::color::Color;
@@ -43,7 +44,20 @@ use super::slide::{
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
-const DEFAULT_TEXT_INSET_EMU: i64 = 91_440;
+const AUTO_FIT_SCALE_LEVELS: [(f32, f32); 12] = [
+  (1.000, 0.9),
+  (0.925, 0.9),
+  (0.850, 0.9),
+  (0.850, 0.8),
+  (0.775, 0.8),
+  (0.700, 0.8),
+  (0.625, 0.8),
+  (0.550, 0.8),
+  (0.475, 0.8),
+  (0.400, 0.8),
+  (0.325, 0.8),
+  (0.250, 0.8),
+];
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 
 pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::LayoutDocument {
@@ -376,7 +390,15 @@ fn lower_chart_texts(
     if text_y > max_y {
       break;
     }
-    push_text_item(items, start_x, text_y, text, style.clone(), None, 1.0);
+    push_text_item(
+      items,
+      start_x,
+      text_y,
+      text,
+      style.clone(),
+      None,
+      line_height(&style, 1.0),
+    );
     text_y += line_step;
   }
 }
@@ -494,7 +516,7 @@ fn lower_diagram(
   let mut drawing_items = Vec::new();
   let mut text_items = Vec::new();
   let mut pending_text_items = Vec::new();
-  let mut font_sync_scales: HashMap<String, f32> = HashMap::new();
+  let mut font_sync_scales: HashMap<String, (f32, f32)> = HashMap::new();
   for diagram_shape in shapes {
     let fill_images = diagram_shape
       .shape_properties
@@ -589,13 +611,17 @@ fn lower_diagram(
         None,
         diagram_shape.font_size_pt,
       );
-      let font_scale =
-        text_auto_fit_font_scale(import, text_frame, &text_body, &base_style, &options);
+      let (font_scale, line_scale) =
+        text_auto_fit_scales(import, text_frame, &text_body, &base_style, &options);
       if let Some(group) = diagram_shape.font_sync_group.as_deref() {
         font_sync_scales
           .entry(group.to_string())
-          .and_modify(|scale| *scale = scale.min(font_scale))
-          .or_insert(font_scale);
+          .and_modify(|scale| {
+            if font_scale < scale.0 || (font_scale == scale.0 && line_scale < scale.1) {
+              *scale = (font_scale, line_scale);
+            }
+          })
+          .or_insert((font_scale, line_scale));
       }
       pending_text_items.push(PendingDiagramTextItem {
         order: diagram_shape.order,
@@ -605,17 +631,17 @@ fn lower_diagram(
         base_font_size_pt: diagram_shape.font_size_pt,
         font_sync_group: diagram_shape.font_sync_group,
         font_scale,
+        line_scale,
       });
     }
   }
   for pending in pending_text_items {
-    let mut lowered_text_items = Vec::new();
-    let font_scale = pending
+    let (font_scale, line_scale) = pending
       .font_sync_group
       .as_deref()
       .and_then(|group| font_sync_scales.get(group).copied())
-      .unwrap_or(pending.font_scale);
-    lower_text_body_at_with_style_and_scale(
+      .unwrap_or((pending.font_scale, pending.line_scale));
+    lower_diagram_text_body_at_with_style_and_scale(
       import,
       pending.frame,
       &pending.text_body,
@@ -623,20 +649,13 @@ fn lower_diagram(
       None,
       None,
       pending.base_font_size_pt,
-      Some(font_scale),
-      &mut lowered_text_items,
+      font_scale,
+      line_scale,
+      pending.order,
+      &mut text_items,
     );
-    for mut item in lowered_text_items {
-      if let PageItem::Text(text_item) = &mut item {
-        text_item.preserve_text_portion = true;
-      }
-      text_items.push(DiagramDrawingTextItem {
-        order: pending.order,
-        item,
-      });
-    }
   }
-  text_items.sort_by_key(|text_item| text_item.order);
+  text_items.sort_by_key(|text_item| (text_item.paragraph_order, text_item.order));
   items.extend(drawing_items);
   items.extend(text_items.into_iter().map(|text_item| text_item.item));
 }
@@ -672,19 +691,18 @@ fn lower_diagram_drawing(
   // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx loadDiagram()
   // imports persisted diagramDrawing extDrawing before falling back to layout
   // atom shape generation.
-  let Some(extent) = diagram_drawing_extent(&drawing_resource.drawing.shape_tree) else {
-    return false;
-  };
-  let scale_x = if extent.width > 0 {
-    width_pt / units::emu_to_points(extent.width)
-  } else {
-    1.0
-  };
-  let scale_y = if extent.height > 0 {
-    height_pt / units::emu_to_points(extent.height)
-  } else {
-    1.0
-  };
+  let transform = DiagramDrawingTransform::root(
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    drawing_resource
+      .drawing
+      .shape_tree
+      .group_shape_properties
+      .transform_group
+      .as_deref(),
+  );
   let text_orders = shared_diagram::presentation_point_list_orders(data);
   let mut drawing_items = Vec::new();
   let mut text_items = Vec::new();
@@ -696,13 +714,7 @@ fn lower_diagram_drawing(
         drawing_resource,
         shape,
         &text_orders,
-        extent.x,
-        extent.y,
-        x_pt,
-        y_pt,
-        height_pt,
-        scale_x,
-        scale_y,
+        transform,
         &mut drawing_items,
         &mut text_items,
       ),
@@ -712,13 +724,7 @@ fn lower_diagram_drawing(
         drawing_resource,
         group,
         &text_orders,
-        extent.x,
-        extent.y,
-        x_pt,
-        y_pt,
-        height_pt,
-        scale_x,
-        scale_y,
+        transform,
         &mut drawing_items,
         &mut text_items,
       ),
@@ -739,16 +745,12 @@ fn lower_diagram_drawing_group(
   drawing_resource: &super::slide::DiagramDrawingResource,
   group: &dsp::GroupShape,
   text_orders: &HashMap<String, usize>,
-  origin_x: i64,
-  origin_y: i64,
-  x_pt: f32,
-  y_pt: f32,
-  container_height_pt: f32,
-  scale_x: f32,
-  scale_y: f32,
+  parent_transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
 ) {
+  let transform =
+    parent_transform.for_group(group.group_shape_properties.transform_group.as_deref());
   for choice in &group.group_shape_choice {
     match choice {
       dsp::GroupShapeChoice::Shape(shape) => lower_diagram_drawing_shape(
@@ -757,13 +759,7 @@ fn lower_diagram_drawing_group(
         drawing_resource,
         shape,
         text_orders,
-        origin_x,
-        origin_y,
-        x_pt,
-        y_pt,
-        container_height_pt,
-        scale_x,
-        scale_y,
+        transform,
         items,
         text_items,
       ),
@@ -773,13 +769,7 @@ fn lower_diagram_drawing_group(
         drawing_resource,
         group,
         text_orders,
-        origin_x,
-        origin_y,
-        x_pt,
-        y_pt,
-        container_height_pt,
-        scale_x,
-        scale_y,
+        transform,
         items,
         text_items,
       ),
@@ -793,26 +783,11 @@ fn lower_diagram_drawing_shape(
   drawing_resource: &super::slide::DiagramDrawingResource,
   shape: &dsp::Shape,
   text_orders: &HashMap<String, usize>,
-  origin_x: i64,
-  origin_y: i64,
-  x_pt: f32,
-  y_pt: f32,
-  container_height_pt: f32,
-  scale_x: f32,
-  scale_y: f32,
+  transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
 ) {
-  let Some(bounds) = diagram_shape_bounds(
-    &shape.shape_properties,
-    origin_x,
-    origin_y,
-    x_pt,
-    y_pt,
-    container_height_pt,
-    scale_x,
-    scale_y,
-  ) else {
+  let Some(bounds) = diagram_shape_bounds(&shape.shape_properties, transform) else {
     return;
   };
   let fill_color =
@@ -842,7 +817,7 @@ fn lower_diagram_drawing_shape(
   let Some(text_body) = shape.text_body.as_deref() else {
     return;
   };
-  let text_body = TextBody::from_diagram_drawing(text_body);
+  let mut text_body = TextBody::from_diagram_drawing(text_body);
   if text_body
     .paragraphs
     .iter()
@@ -851,31 +826,32 @@ fn lower_diagram_drawing_shape(
   {
     return;
   }
-  let text_bounds = shape
+  let text_frame = diagram_drawing_text_frame(shape, bounds, transform, &text_body);
+  let shape_rotation = shape
+    .shape_properties
     .transform2_d
     .as_deref()
-    .and_then(|transform| {
-      diagram_text_transform_bounds(
-        transform,
-        origin_x,
-        origin_y,
-        x_pt,
-        y_pt,
-        container_height_pt,
-        scale_x,
-        scale_y,
-      )
-    })
-    .unwrap_or(bounds);
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default();
+  let text_rotation = shape
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default();
+  let total_rotation = shape_rotation + text_rotation;
+  if total_rotation != 0 {
+    text_body.display_properties.text_area_rotation = Some(
+      text_body
+        .display_properties
+        .text_area_rotation
+        .unwrap_or_default()
+        - total_rotation,
+    );
+  }
   let mut lowered_text_items = Vec::new();
   lower_text_body_at_with_style(
     import,
-    TextFrame {
-      x_pt: text_bounds.x + 4.0,
-      y_pt: text_bounds.y,
-      width_pt: (text_bounds.width - 8.0).max(1.0),
-      height_pt: text_bounds.height,
-    },
+    text_frame,
     &text_body,
     None,
     None,
@@ -895,13 +871,83 @@ fn lower_diagram_drawing_shape(
   text_items.extend(
     lowered_text_items
       .into_iter()
-      .map(|item| DiagramDrawingTextItem { order, item }),
+      .map(|item| DiagramDrawingTextItem {
+        order,
+        paragraph_order: 0,
+        item,
+      }),
   );
 }
 
 struct DiagramDrawingTextItem {
   order: usize,
+  paragraph_order: usize,
   item: PageItem,
+}
+
+fn lower_diagram_text_body_at_with_style_and_scale(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  table_text_style: Option<&TableStyleTextProperties>,
+  shape_hyperlink_url: Option<&str>,
+  base_font_size_pt: Option<f32>,
+  font_scale: f32,
+  line_scale: f32,
+  shape_order: usize,
+  items: &mut Vec<DiagramDrawingTextItem>,
+) {
+  let mut options = TextLoweringOptions::from_text_body(text_body);
+  options.font_scale = font_scale;
+  options.line_scale = line_scale;
+  options.rotation_center_pt = rotated_text_area_center(frame, options.rotation_deg);
+  let base_style = text_base_style(
+    import,
+    text_body,
+    font_reference,
+    table_text_style,
+    base_font_size_pt,
+  );
+  let mut scaled_base_style = base_style.clone();
+  apply_text_scale(&mut scaled_base_style, &options);
+  let estimated_height =
+    estimate_text_body_height(text_body, &scaled_base_style, options.line_scale);
+  let y_pt = match text_body.display_properties.anchor {
+    a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
+    a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
+    a::TextAnchoringTypeValues::Top => frame.y_pt,
+  };
+
+  let mut cursor = TextCursor {
+    x_pt: frame.x_pt,
+    y_pt,
+    column_index: 0,
+  };
+  for paragraph in &text_body.paragraphs {
+    let mut paragraph_items = Vec::new();
+    lower_paragraph(
+      import,
+      paragraph,
+      &base_style,
+      &options,
+      frame,
+      shape_hyperlink_url,
+      &mut cursor,
+      &mut paragraph_items,
+    );
+    let order = paragraph.diagram_source_order.unwrap_or(shape_order);
+    items.extend(paragraph_items.into_iter().map(|mut item| {
+      if let PageItem::Text(text_item) = &mut item {
+        text_item.preserve_text_portion = true;
+      }
+      DiagramDrawingTextItem {
+        order: shape_order,
+        paragraph_order: order,
+        item,
+      }
+    }));
+  }
 }
 
 struct PendingDiagramTextItem {
@@ -912,6 +958,7 @@ struct PendingDiagramTextItem {
   base_font_size_pt: Option<f32>,
   font_sync_group: Option<String>,
   font_scale: f32,
+  line_scale: f32,
 }
 
 fn diagram_connector_line_item(diagram_shape: &shared_diagram::DiagramShape) -> LineItem {
@@ -980,6 +1027,7 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
       .paragraphs
       .iter()
       .map(|paragraph| TextParagraph {
+        diagram_source_order: paragraph.source_order,
         level: paragraph.level,
         paragraph_properties: paragraph.paragraph_properties.clone(),
         end_paragraph_run_properties: paragraph.end_paragraph_run_properties.clone(),
@@ -1127,118 +1175,454 @@ fn diagram_model_shape_blip_fill_image_items(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct DiagramDrawingExtent {
-  x: i64,
-  y: i64,
-  width: i64,
-  height: i64,
+struct DiagramDrawingTransform {
+  xx: f32,
+  xy: f32,
+  yx: f32,
+  yy: f32,
+  tx_pt: f32,
+  ty_pt: f32,
 }
 
-fn diagram_drawing_extent(tree: &dsp::ShapeTree) -> Option<DiagramDrawingExtent> {
-  let mut extent: Option<DiagramDrawingExtent> = None;
-  for choice in &tree.shape_tree_choice {
-    match choice {
-      dsp::ShapeTreeChoice::Shape(shape) => merge_diagram_shape_extent(&mut extent, shape),
-      dsp::ShapeTreeChoice::GroupShape(group) => merge_diagram_group_extent(&mut extent, group),
+impl DiagramDrawingTransform {
+  fn root(
+    x_pt: f32,
+    y_pt: f32,
+    width_pt: f32,
+    height_pt: f32,
+    transform: Option<&a::TransformGroup>,
+  ) -> Self {
+    let mut root = Self {
+      xx: 1.0,
+      xy: 0.0,
+      yx: 0.0,
+      yy: 1.0,
+      tx_pt: x_pt,
+      ty_pt: y_pt,
+    };
+    root = root.for_group_transform(transform, width_pt, height_pt);
+    root
+  }
+
+  fn for_group(self, transform: Option<&a::TransformGroup>) -> Self {
+    self.for_group_transform(transform, None, None)
+  }
+
+  fn for_group_transform(
+    self,
+    transform: Option<&a::TransformGroup>,
+    width_pt: impl Into<Option<f32>>,
+    height_pt: impl Into<Option<f32>>,
+  ) -> Self {
+    let Some(transform) = transform else {
+      return self;
+    };
+    let off_x = transform
+      .offset
+      .as_ref()
+      .map(|offset| units::emu_to_points(offset.x.to_emu()))
+      .unwrap_or_default();
+    let off_y = transform
+      .offset
+      .as_ref()
+      .map(|offset| units::emu_to_points(offset.y.to_emu()))
+      .unwrap_or_default();
+    let ext_width = transform
+      .extents
+      .as_ref()
+      .map(|extents| units::emu_to_points(extents.cx.to_emu()))
+      .or_else(|| width_pt.into())
+      .unwrap_or_default();
+    let ext_height = transform
+      .extents
+      .as_ref()
+      .map(|extents| units::emu_to_points(extents.cy.to_emu()))
+      .or_else(|| height_pt.into())
+      .unwrap_or_default();
+    let child_x = transform
+      .child_offset
+      .as_ref()
+      .map(|offset| units::emu_to_points(offset.x.to_emu()))
+      .unwrap_or_default();
+    let child_y = transform
+      .child_offset
+      .as_ref()
+      .map(|offset| units::emu_to_points(offset.y.to_emu()))
+      .unwrap_or_default();
+    let child_width = transform
+      .child_extents
+      .as_ref()
+      .map(|extents| units::emu_to_points(extents.cx.to_emu()))
+      .unwrap_or(ext_width);
+    let child_height = transform
+      .child_extents
+      .as_ref()
+      .map(|extents| units::emu_to_points(extents.cy.to_emu()))
+      .unwrap_or(ext_height);
+    let scale_x = if child_width != 0.0 {
+      ext_width / child_width
+    } else {
+      1.0
+    };
+    let scale_y = if child_height != 0.0 {
+      ext_height / child_height
+    } else {
+      1.0
+    };
+    let group = Self {
+      xx: scale_x,
+      xy: 0.0,
+      yx: 0.0,
+      yy: scale_y,
+      tx_pt: off_x - child_x * scale_x,
+      ty_pt: off_y - child_y * scale_y,
+    };
+    self.concat(group)
+  }
+
+  fn concat(self, child: Self) -> Self {
+    Self {
+      xx: self.xx * child.xx + self.xy * child.yx,
+      xy: self.xx * child.xy + self.xy * child.yy,
+      yx: self.yx * child.xx + self.yy * child.yx,
+      yy: self.yx * child.xy + self.yy * child.yy,
+      tx_pt: self.xx * child.tx_pt + self.xy * child.ty_pt + self.tx_pt,
+      ty_pt: self.yx * child.tx_pt + self.yy * child.ty_pt + self.ty_pt,
     }
   }
-  extent
-}
 
-fn merge_diagram_group_extent(extent: &mut Option<DiagramDrawingExtent>, group: &dsp::GroupShape) {
-  for choice in &group.group_shape_choice {
-    match choice {
-      dsp::GroupShapeChoice::Shape(shape) => merge_diagram_shape_extent(extent, shape),
-      dsp::GroupShapeChoice::GroupShape(group) => merge_diagram_group_extent(extent, group),
+  fn apply_point(self, x: f32, y: f32) -> (f32, f32) {
+    (
+      self.xx * x + self.xy * y + self.tx_pt,
+      self.yx * x + self.yy * y + self.ty_pt,
+    )
+  }
+
+  fn apply_bounds(self, x: f32, y: f32, width: f32, height: f32) -> shared_diagram::DiagramBounds {
+    let points = [
+      self.apply_point(x, y),
+      self.apply_point(x + width, y),
+      self.apply_point(x, y + height),
+      self.apply_point(x + width, y + height),
+    ];
+    let left = points.iter().map(|(x, _)| *x).fold(f32::INFINITY, f32::min);
+    let top = points.iter().map(|(_, y)| *y).fold(f32::INFINITY, f32::min);
+    let right = points
+      .iter()
+      .map(|(x, _)| *x)
+      .fold(f32::NEG_INFINITY, f32::max);
+    let bottom = points
+      .iter()
+      .map(|(_, y)| *y)
+      .fold(f32::NEG_INFINITY, f32::max);
+    shared_diagram::DiagramBounds {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
     }
   }
-}
-
-fn merge_diagram_shape_extent(extent: &mut Option<DiagramDrawingExtent>, shape: &dsp::Shape) {
-  let Some(transform) = shape.shape_properties.transform2_d.as_deref() else {
-    return;
-  };
-  let Some(offset) = transform.offset.as_ref() else {
-    return;
-  };
-  let Some(extents) = transform.extents.as_ref() else {
-    return;
-  };
-  let x = offset.x.to_emu();
-  let y = offset.y.to_emu();
-  let width = extents.cx.to_emu();
-  let height = extents.cy.to_emu();
-  let right = x + width;
-  let bottom = y + height;
-  *extent = Some(match *extent {
-    Some(current) => {
-      let left = current.x.min(x);
-      let top = current.y.min(y);
-      DiagramDrawingExtent {
-        x: left,
-        y: top,
-        width: (current.x + current.width).max(right) - left,
-        height: (current.y + current.height).max(bottom) - top,
-      }
-    }
-    None => DiagramDrawingExtent {
-      x,
-      y,
-      width,
-      height,
-    },
-  });
 }
 
 fn diagram_shape_bounds(
   properties: &dsp::ShapeProperties,
-  origin_x: i64,
-  origin_y: i64,
-  x_pt: f32,
-  y_pt: f32,
-  container_height_pt: f32,
-  scale_x: f32,
-  scale_y: f32,
+  parent_transform: DiagramDrawingTransform,
 ) -> Option<shared_diagram::DiagramBounds> {
-  let transform = properties.transform2_d.as_deref()?;
-  let offset = transform.offset.as_ref()?;
-  let extents = transform.extents.as_ref()?;
-  let x = offset.x.to_emu();
-  let y = offset.y.to_emu();
-  let width = units::emu_to_points(extents.cx.to_emu()) * scale_x;
-  let height = units::emu_to_points(extents.cy.to_emu()) * scale_y;
-  let local_y = units::emu_to_points(y - origin_y) * scale_y;
-  Some(shared_diagram::DiagramBounds {
-    x: x_pt + units::emu_to_points(x - origin_x) * scale_x,
-    y: y_pt + container_height_pt - local_y - height,
-    width,
-    height,
-  })
+  let shape_transform = properties.transform2_d.as_deref()?;
+  let offset = shape_transform.offset.as_ref()?;
+  let extents = shape_transform.extents.as_ref()?;
+  Some(parent_transform.apply_bounds(
+    units::emu_to_points(offset.x.to_emu()),
+    units::emu_to_points(offset.y.to_emu()),
+    units::emu_to_points(extents.cx.to_emu()),
+    units::emu_to_points(extents.cy.to_emu()),
+  ))
 }
 
 fn diagram_text_transform_bounds(
   transform: &dsp::Transform2D,
-  origin_x: i64,
-  origin_y: i64,
-  x_pt: f32,
-  y_pt: f32,
-  container_height_pt: f32,
-  scale_x: f32,
-  scale_y: f32,
+  parent_transform: DiagramDrawingTransform,
 ) -> Option<shared_diagram::DiagramBounds> {
   let offset = transform.offset.as_ref()?;
   let extents = transform.extents.as_ref()?;
-  let x = offset.x.to_emu();
-  let y = offset.y.to_emu();
-  let width = units::emu_to_points(extents.cx.to_emu()) * scale_x;
-  let height = units::emu_to_points(extents.cy.to_emu()) * scale_y;
-  let local_y = units::emu_to_points(y - origin_y) * scale_y;
-  Some(shared_diagram::DiagramBounds {
-    x: x_pt + units::emu_to_points(x - origin_x) * scale_x,
-    y: y_pt + container_height_pt - local_y - height,
-    width,
-    height,
-  })
+  Some(parent_transform.apply_bounds(
+    units::emu_to_points(offset.x.to_emu()),
+    units::emu_to_points(offset.y.to_emu()),
+    units::emu_to_points(extents.cx.to_emu()),
+    units::emu_to_points(extents.cy.to_emu()),
+  ))
+}
+
+fn diagram_drawing_text_frame(
+  shape: &dsp::Shape,
+  shape_bounds: shared_diagram::DiagramBounds,
+  parent_transform: DiagramDrawingTransform,
+  text_body: &TextBody,
+) -> TextFrame {
+  let Some(text_transform) = shape.transform2_d.as_deref() else {
+    return text_body_frame(
+      shape_bounds.x,
+      shape_bounds.y,
+      shape_bounds.width,
+      shape_bounds.height,
+      text_body,
+    );
+  };
+  let Some(mut text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform)
+  else {
+    return text_body_frame(
+      shape_bounds.x,
+      shape_bounds.y,
+      shape_bounds.width,
+      shape_bounds.height,
+      text_body,
+    );
+  };
+  let Some(preset_bounds) = diagram_preset_text_rectangle(shape, shape_bounds) else {
+    return text_body_frame(
+      shape_bounds.x,
+      shape_bounds.y,
+      shape_bounds.width,
+      shape_bounds.height,
+      text_body,
+    );
+  };
+
+  let shape_rotation = shape
+    .shape_properties
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .unwrap_or_default();
+  let text_rotation = text_transform.rotation.unwrap_or_default();
+  let angle_diff = (shape_rotation + text_rotation).rem_euclid(21_600_000);
+  if angle_diff != 0 {
+    let angle = -(angle_diff as f32 / 60_000.0).to_radians();
+    let preset_center_x = preset_bounds.x + preset_bounds.width / 2.0;
+    let preset_center_y = preset_bounds.y + preset_bounds.height / 2.0;
+    let text_center_x = text_bounds.x + text_bounds.width / 2.0;
+    let text_center_y = text_bounds.y + text_bounds.height / 2.0;
+    let dx = text_center_x - preset_center_x;
+    let dy = text_center_y - preset_center_y;
+    let rotated_center_x = preset_center_x + dx * angle.cos() - dy * angle.sin();
+    let rotated_center_y = preset_center_y + dx * angle.sin() + dy * angle.cos();
+    text_bounds.x += rotated_center_x - text_center_x;
+    text_bounds.y += rotated_center_y - text_center_y;
+  }
+
+  let offsets = TextDistances {
+    left: text_bounds.x - preset_bounds.x,
+    top: text_bounds.y - preset_bounds.y,
+    right: preset_bounds.width - text_bounds.width - (text_bounds.x - preset_bounds.x),
+    bottom: preset_bounds.height - text_bounds.height - (text_bounds.y - preset_bounds.y),
+  };
+  text_body_frame_with_distances(
+    preset_bounds.x,
+    preset_bounds.y,
+    preset_bounds.width,
+    preset_bounds.height,
+    text_body,
+    offsets,
+    0,
+  )
+}
+
+fn diagram_preset_text_rectangle(
+  shape: &dsp::Shape,
+  bounds: shared_diagram::DiagramBounds,
+) -> Option<shared_diagram::DiagramBounds> {
+  let preset = match shape.shape_properties.shape_properties_choice1.as_ref()? {
+    dsp::ShapePropertiesChoice::PresetGeometry(preset) => preset.as_ref(),
+    dsp::ShapePropertiesChoice::CustomGeometry(_) => return None,
+  };
+  let guide = |index: usize, default: f32| {
+    preset
+      .adjust_value_list
+      .as_ref()
+      .and_then(|list| list.shape_guide.get(index))
+      .and_then(|guide| guide_value(guide.formula.as_str()))
+      .unwrap_or(default)
+  };
+  match preset.preset {
+    a::ShapeTypeValues::Ellipse => {
+      let factor = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + bounds.width * factor,
+        y: bounds.y + bounds.height * factor,
+        width: bounds.width * std::f32::consts::FRAC_1_SQRT_2,
+        height: bounds.height * std::f32::consts::FRAC_1_SQRT_2,
+      })
+    }
+    a::ShapeTypeValues::RoundRectangle | a::ShapeTypeValues::Round2SameRectangle => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 {
+        return None;
+      }
+      let max_adj = 50_000.0 * bounds.width / min_size;
+      let adj = guide(0, 16_667.0).clamp(0.0, max_adj);
+      let text_left = min_size * adj / 100_000.0 * 0.29289;
+      let height_factor = if preset.preset == a::ShapeTypeValues::RoundRectangle {
+        2.0
+      } else {
+        1.0
+      };
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + text_left,
+        y: bounds.y + text_left,
+        width: bounds.width - 2.0 * text_left,
+        height: bounds.height - height_factor * text_left,
+      })
+    }
+    a::ShapeTypeValues::Trapezoid => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 {
+        return None;
+      }
+      let max_adj = 50_000.0 * bounds.width / min_size;
+      let adj = guide(0, 25_000.0).clamp(0.0, max_adj);
+      let text_left = bounds.width / 3.0 * adj / max_adj;
+      let text_top = bounds.height / 3.0 * adj / max_adj;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + text_left,
+        y: bounds.y + text_top,
+        width: bounds.width - 2.0 * text_left,
+        height: bounds.height - 2.0 * text_top,
+      })
+    }
+    a::ShapeTypeValues::FlowChartManualOperation => {
+      let text_left = bounds.width / 5.0;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + text_left,
+        y: bounds.y,
+        width: bounds.width - 2.0 * text_left,
+        height: bounds.height,
+      })
+    }
+    a::ShapeTypeValues::Pie
+    | a::ShapeTypeValues::Rectangle
+    | a::ShapeTypeValues::WedgeRectangleCallout => Some(bounds),
+    a::ShapeTypeValues::UpArrowCallout | a::ShapeTypeValues::DownArrowCallout => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 || bounds.height <= 0.0 {
+        return None;
+      }
+      let adj3 = guide(2, 25_000.0).clamp(0.0, 100_000.0 * bounds.height / min_size);
+      let q2 = adj3 * min_size / bounds.height;
+      let adj4 = guide(3, 64_977.0).clamp(0.0, 100_000.0 - q2);
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height * adj4 / 100_000.0,
+      })
+    }
+    a::ShapeTypeValues::Hexagon => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 {
+        return None;
+      }
+      let max_adj = 50_000.0 * bounds.width / min_size;
+      let adj = guide(0, 25_000.0).clamp(0.0, max_adj);
+      let factor = adj / max_adj / 6.0 + 1.0 / 12.0;
+      let text_left = bounds.width * factor;
+      let text_top = bounds.height * factor;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + text_left,
+        y: bounds.y + text_top,
+        width: bounds.width - 2.0 * text_left,
+        height: bounds.height - 2.0 * text_top,
+      })
+    }
+    a::ShapeTypeValues::Gear6 => {
+      if bounds.width <= 0.0 || bounds.height <= 0.0 {
+        return None;
+      }
+      let mut a1 = guide(0, 15_000.0);
+      let mut a2 = guide(1, 3_526.0);
+      if preset
+        .adjust_value_list
+        .as_ref()
+        .is_some_and(|list| list.shape_guide.len() == 2)
+      {
+        a1 = a1.clamp(0.0, 20_000.0);
+        a2 = a2.clamp(0.0, 5_358.0);
+      }
+      let min_size = bounds.width.min(bounds.height);
+      let tooth_height = min_size * a1 / 100_000.0;
+      let half_land = min_size * a2 / 100_000.0 / 2.0;
+      let diagonal = tooth_height / 2.0 + half_land;
+      let radius_height = bounds.height / 2.0 - tooth_height;
+      let radius_width = bounds.width / 2.0 - tooth_height;
+      let max_radius = radius_width.min(radius_height);
+      let ha = diagonal.atan2(max_radius);
+      let angle = 330.0_f32.to_radians() - ha;
+      let ta11 = radius_width * angle.cos();
+      let ta12 = radius_height * angle.sin();
+      let b_angle = ta12.atan2(ta11);
+      let cta1 = radius_height * b_angle.cos();
+      let sta1 = radius_width * b_angle.sin();
+      let ma1 = cta1.hypot(sta1);
+      if ma1 == 0.0 {
+        return None;
+      }
+      let na1 = radius_width * radius_height / ma1;
+      let dxa1 = na1 * b_angle.cos();
+      let dya1 = na1 * b_angle.sin();
+      let right = bounds.width / 2.0 + dxa1;
+      let top = bounds.height / 2.0 + dya1;
+      let bottom = bounds.height - top;
+      let left = bounds.width - right;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x + left,
+        y: bounds.y + top,
+        width: right - left,
+        height: bottom - top,
+      })
+    }
+    a::ShapeTypeValues::Round1Rectangle => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 {
+        return None;
+      }
+      let adj = guide(0, 16_667.0).clamp(0.0, 50_000.0);
+      let dx = min_size * adj / 100_000.0 * 0.29289;
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width - dx,
+        height: bounds.height,
+      })
+    }
+    a::ShapeTypeValues::RightArrow => {
+      let min_size = bounds.width.min(bounds.height);
+      if min_size <= 0.0 || bounds.height <= 0.0 {
+        return None;
+      }
+      let a1 = guide(0, 50_000.0).clamp(0.0, 100_000.0);
+      let a2 = guide(1, 50_000.0).clamp(0.0, 100_000.0 * bounds.width / min_size);
+      let dx1 = min_size * a2 / 100_000.0;
+      let x1 = bounds.width - dx1;
+      let dy1 = bounds.height * a1 / 200_000.0;
+      let y1 = bounds.height / 2.0 - dy1;
+      let y2 = bounds.height / 2.0 + dy1;
+      let dx2 = y1 * dx1 / (bounds.height / 2.0);
+      Some(shared_diagram::DiagramBounds {
+        x: bounds.x,
+        y: bounds.y + y1,
+        width: x1 + dx2,
+        height: y2 - y1,
+      })
+    }
+    _ => None,
+  }
+}
+
+fn guide_value(formula: &str) -> Option<f32> {
+  formula
+    .strip_prefix("val ")
+    .unwrap_or(formula)
+    .parse::<f32>()
+    .ok()
 }
 
 fn diagram_shape_fill_color(
@@ -3085,6 +3469,7 @@ fn lower_text_body_at_with_style_and_scale(
   items: &mut Vec<PageItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
+  options.rotation_center_pt = rotated_text_area_center(frame, options.rotation_deg);
   let base_style = text_base_style(
     import,
     text_body,
@@ -3092,20 +3477,20 @@ fn lower_text_body_at_with_style_and_scale(
     table_text_style,
     base_font_size_pt,
   );
-  options.font_scale = auto_fit_font_scale
-    .unwrap_or_else(|| text_auto_fit_font_scale(import, frame, text_body, &base_style, &options));
+  let (font_scale, line_scale) = auto_fit_font_scale.map_or_else(
+    || text_auto_fit_scales(import, frame, text_body, &base_style, &options),
+    |font_scale| (font_scale, options.line_scale),
+  );
+  options.font_scale = font_scale;
+  options.line_scale = line_scale;
 
   let mut scaled_base_style = base_style.clone();
   apply_text_scale(&mut scaled_base_style, &options);
   let estimated_height =
     estimate_text_body_height(text_body, &scaled_base_style, options.line_scale);
   let y_pt = match text_body.display_properties.anchor {
-    a::TextAnchoringTypeValues::Center => {
-      frame.y_pt + ((frame.height_pt - estimated_height) / 2.0).max(0.0)
-    }
-    a::TextAnchoringTypeValues::Bottom => {
-      frame.y_pt + (frame.height_pt - estimated_height).max(0.0)
-    }
+    a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
+    a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
     a::TextAnchoringTypeValues::Top => frame.y_pt,
   };
 
@@ -3151,29 +3536,28 @@ fn text_base_style(
   base_style
 }
 
-fn text_auto_fit_font_scale(
+fn text_auto_fit_scales(
   import: &PowerPointImport,
   frame: TextFrame,
   text_body: &TextBody,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
-) -> f32 {
+) -> (f32, f32) {
   if text_body.display_properties.auto_fit != TextAutoFit::Shape {
-    return options.font_scale;
+    return (options.font_scale, options.line_scale);
   }
-  let text_width = estimate_text_body_width(import, text_body, base_style, options);
-  let text_height = estimate_text_body_height(text_body, base_style, options.line_scale);
-  let width_scale = if text_width > 0.0 {
-    frame.width_pt / text_width
-  } else {
-    1.0
-  };
-  let height_scale = if text_height > 0.0 {
-    frame.height_pt / text_height
-  } else {
-    1.0
-  };
-  options.font_scale * width_scale.min(height_scale).clamp(0.01, 1.0)
+  for (font_scale, line_scale) in AUTO_FIT_SCALE_LEVELS {
+    let mut level_options = *options;
+    level_options.font_scale *= font_scale;
+    level_options.line_scale = line_scale;
+    let text_height =
+      estimate_wrapped_text_body_height(import, frame, text_body, base_style, &level_options);
+    if text_height <= frame.height_pt {
+      return (level_options.font_scale, level_options.line_scale);
+    }
+  }
+  let (font_scale, line_scale) = AUTO_FIT_SCALE_LEVELS[AUTO_FIT_SCALE_LEVELS.len() - 1];
+  (options.font_scale * font_scale, line_scale)
 }
 
 fn apply_font_reference_text_style(
@@ -3237,6 +3621,14 @@ struct TextFrame {
   height_pt: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct TextDistances {
+  left: f32,
+  top: f32,
+  right: f32,
+  bottom: f32,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct TextCursor {
   x_pt: f32,
@@ -3248,10 +3640,13 @@ struct TextCursor {
 struct TextLoweringOptions {
   font_scale: f32,
   line_scale: f32,
+  round_font_size_to_pt: bool,
   rotation_deg: f32,
+  rotation_center_pt: Option<(f32, f32)>,
   column_count: usize,
   column_spacing_pt: f32,
   clip_vertical_overflow: bool,
+  anchor_center: bool,
 }
 
 impl TextLoweringOptions {
@@ -3259,10 +3654,14 @@ impl TextLoweringOptions {
     Self {
       font_scale: text_body.display_properties.font_scale(),
       line_scale: text_body.display_properties.line_height_scale(),
+      round_font_size_to_pt: text_body.display_properties.auto_fit == TextAutoFit::Shape,
       rotation_deg: text_body.display_properties.rotation_degrees(),
+      rotation_center_pt: None,
       column_count: text_body.display_properties.column_count.max(1),
       column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
-      clip_vertical_overflow: text_body.display_properties.clip_vertical_overflow,
+      clip_vertical_overflow: text_body.display_properties.clip_vertical_overflow
+        && text_body.display_properties.auto_fit != TextAutoFit::Shape,
+      anchor_center: text_body.display_properties.anchor_center,
     }
   }
 
@@ -3274,6 +3673,13 @@ impl TextLoweringOptions {
       ((frame.width_pt - total_spacing) / self.column_count as f32).max(0.0)
     }
   }
+}
+
+fn rotated_text_area_center(frame: TextFrame, rotation_deg: f32) -> Option<(f32, f32)> {
+  (rotation_deg.abs() > f32::EPSILON).then_some((
+    frame.x_pt + frame.width_pt / 2.0,
+    frame.y_pt + frame.height_pt / 2.0,
+  ))
 }
 
 fn text_box_metrics(shape: &Shape, offset: DisplayOffset, text_body: &TextBody) -> TextFrame {
@@ -3293,29 +3699,82 @@ fn text_body_frame(
   height_pt: f32,
   text_body: &TextBody,
 ) -> TextFrame {
+  text_body_frame_with_distances(
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    text_body,
+    TextDistances::default(),
+    0,
+  )
+}
+
+fn text_body_frame_with_distances(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  text_body: &TextBody,
+  offsets: TextDistances,
+  text_pre_rotation: i32,
+) -> TextFrame {
   let body_properties = text_body.body_properties.as_deref();
-  let left_inset = body_properties
-    .and_then(|properties| properties.left_inset)
-    .map(|value| units::emu_to_points(value.to_emu()))
-    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
-  let top_inset = body_properties
-    .and_then(|properties| properties.top_inset)
-    .map(|value| units::emu_to_points(value.to_emu()))
-    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
-  let right_inset = body_properties
-    .and_then(|properties| properties.right_inset)
-    .map(|value| units::emu_to_points(value.to_emu()))
-    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
-  let bottom_inset = body_properties
-    .and_then(|properties| properties.bottom_inset)
-    .map(|value| units::emu_to_points(value.to_emu()))
-    .unwrap_or_else(|| units::emu_to_points(DEFAULT_TEXT_INSET_EMU));
+  let insets = [
+    body_properties
+      .and_then(|properties| properties.left_inset)
+      .map(|value| units::emu_to_points(value.to_emu()))
+      .unwrap_or_default(),
+    body_properties
+      .and_then(|properties| properties.top_inset)
+      .map(|value| units::emu_to_points(value.to_emu()))
+      .unwrap_or_default(),
+    body_properties
+      .and_then(|properties| properties.right_inset)
+      .map(|value| units::emu_to_points(value.to_emu()))
+      .unwrap_or_default(),
+    body_properties
+      .and_then(|properties| properties.bottom_inset)
+      .map(|value| units::emu_to_points(value.to_emu()))
+      .unwrap_or_default(),
+  ];
+  let offset_values = [offsets.left, offsets.top, offsets.right, offsets.bottom];
+  let mut distances = [0.0; 4];
+  let mut offset_index = match text_pre_rotation.rem_euclid(21_600_000) {
+    5_400_000 => 3,
+    10_800_000 => 2,
+    16_200_000 => 1,
+    _ => 0,
+  };
+  match text_body.display_properties.vertical {
+    Some(a::TextVerticalValues::EastAsianVetical | a::TextVerticalValues::Vertical) => {
+      offset_index = (offset_index + 3) % 4;
+    }
+    Some(a::TextVerticalValues::Vertical270) => {
+      offset_index = (offset_index + 1) % 4;
+    }
+    _ => {}
+  }
+  for inset_index in 0..4 {
+    distances[offset_index] = offset_values[offset_index] + insets[inset_index];
+    offset_index = (offset_index + 1) % 4;
+  }
+  if width_pt > 0.0 && distances[0] + distances[2] >= width_pt {
+    let diff = (distances[0] + distances[2] - width_pt) / 2.0;
+    distances[0] -= diff;
+    distances[2] -= diff;
+  }
+  if height_pt > 0.0 && distances[1] + distances[3] >= height_pt {
+    let diff = (distances[1] + distances[3] - height_pt) / 2.0;
+    distances[1] -= diff;
+    distances[3] -= diff;
+  }
 
   TextFrame {
-    x_pt: x_pt + left_inset,
-    y_pt: y_pt + top_inset,
-    width_pt: (width_pt - left_inset - right_inset).max(0.0),
-    height_pt: (height_pt - top_inset - bottom_inset).max(0.0),
+    x_pt: x_pt + distances[0],
+    y_pt: y_pt + distances[1],
+    width_pt: (width_pt - distances[0] - distances[2]).max(0.0),
+    height_pt: (height_pt - distances[1] - distances[3]).max(0.0),
   }
 }
 
@@ -3361,29 +3820,33 @@ fn lower_paragraph(
       options,
       &paragraph.runs[segment_start..segment_end],
     );
-    let mut run_x = aligned_paragraph_x(
-      paragraph_x,
-      column_width,
-      line_width,
-      paragraph_style.alignment,
-    );
+    let alignment =
+      if options.anchor_center && paragraph_style.alignment == a::TextAlignmentTypeValues::Left {
+        a::TextAlignmentTypeValues::Center
+      } else {
+        paragraph_style.alignment
+      };
+    let mut run_x = aligned_paragraph_x(paragraph_x, column_width, line_width, alignment);
     let mut base_line_style = base_style.clone();
     apply_text_scale(&mut base_line_style, options);
-    let mut max_line_height = line_height(&base_line_style, options.line_scale);
+    let mut max_line_height = paragraph_style.line_height(&base_line_style, options);
 
     if is_first_segment && let Some(label) = bullet_label.clone() {
       let mut bullet_style = base_style.clone();
       paragraph_style.apply_default_run_style(import, &mut bullet_style);
       apply_text_scale(&mut bullet_style, options);
-      max_line_height = max_line_height.max(line_height(&bullet_style, options.line_scale));
+      let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
+      max_line_height = max_line_height.max(bullet_line_height);
+      let (bullet_x, bullet_y) =
+        rotated_text_origin(run_x + paragraph_style.indent_pt, cursor.y_pt, options);
       push_text_item(
         items,
-        run_x + paragraph_style.indent_pt,
-        cursor.y_pt,
+        bullet_x,
+        bullet_y,
         label,
         bullet_style,
         shape_hyperlink_url.map(ToString::to_string),
-        options.line_scale,
+        bullet_line_height,
       );
     }
 
@@ -3399,28 +3862,31 @@ fn lower_paragraph(
       paragraph_style.apply_default_run_style(import, &mut style);
       apply_run_properties(import, run, &mut style);
       apply_text_scale(&mut style, options);
-      max_line_height = max_line_height.max(line_height(&style, options.line_scale));
+      let run_line_height = paragraph_style.line_height(&style, options);
+      max_line_height = max_line_height.max(run_line_height);
       let text = run_text(run, &style);
       if run.kind == TextRunKind::Math {
+        let (math_x, math_y) = rotated_text_origin(run_x, cursor.y_pt, options);
         push_math_ole_preview_item(
           items,
-          run_x,
-          cursor.y_pt,
+          math_x,
+          math_y,
           measure_text(&text, &style),
-          line_height(&style, options.line_scale),
+          run_line_height,
         );
       }
+      let (text_x, text_y) = rotated_text_origin(run_x, cursor.y_pt, options);
       push_text_item(
         items,
-        run_x,
-        cursor.y_pt,
+        text_x,
+        text_y,
         text.clone(),
         style.clone(),
         run
           .hyperlink_url
           .clone()
           .or_else(|| shape_hyperlink_url.map(ToString::to_string)),
-        options.line_scale,
+        run_line_height,
       );
       run_x += measure_text(&text, &style);
     }
@@ -3433,6 +3899,19 @@ fn lower_paragraph(
     segment_start = segment_end + 1;
     is_first_segment = false;
   }
+}
+
+fn rotated_text_origin(x_pt: f32, y_pt: f32, options: &TextLoweringOptions) -> (f32, f32) {
+  let Some((center_x, center_y)) = options.rotation_center_pt else {
+    return (x_pt, y_pt);
+  };
+  let radians = options.rotation_deg.to_radians();
+  let dx = x_pt - center_x;
+  let dy = y_pt - center_y;
+  (
+    center_x + dx * radians.cos() - dy * radians.sin(),
+    center_y + dx * radians.sin() + dy * radians.cos(),
+  )
 }
 
 fn paragraph_run_width(
@@ -3461,7 +3940,14 @@ fn paragraph_run_width(
 }
 
 fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
-  style.font_size_pt *= options.font_scale;
+  style.font_size_pt = if options.round_font_size_to_pt {
+    // Source: LibreOffice svx/source/svdraw/svdotext.cxx calls
+    // setRoundFontSizeToPt(true) for AUTOFIT; editeng then rounds the
+    // unscaled font size and the scaled font size to the nearest point.
+    (style.font_size_pt.round() * options.font_scale).round()
+  } else {
+    style.font_size_pt * options.font_scale
+  };
   style.character_spacing_pt *= options.font_scale;
   style.baseline_shift_pt *= options.font_scale;
 }
@@ -3492,12 +3978,12 @@ fn push_text_item(
   text: String,
   style: TextStyle,
   hyperlink_url: Option<String>,
-  line_scale: f32,
+  line_height_pt: f32,
 ) {
   items.push(PageItem::Text(TextItem {
     x_pt,
     y_pt,
-    line_height_pt: line_height(&style, line_scale),
+    line_height_pt,
     text,
     style,
     hyperlink_url,
@@ -3517,36 +4003,41 @@ fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
 }
 
 fn estimate_text_body_height(text_body: &TextBody, base_style: &TextStyle, line_scale: f32) -> f32 {
-  let mut lines = 0usize;
+  let mut height = 0.0;
   for paragraph in &text_body.paragraphs {
-    lines += paragraph
+    let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+    let lines = paragraph
       .runs
       .iter()
       .filter(|run| run.kind == TextRunKind::Break)
       .count()
       + 1;
+    height += lines as f32 * paragraph_style.line_height_with_scale(base_style, line_scale);
   }
-  lines as f32 * line_height(base_style, line_scale)
+  height
 }
 
-fn estimate_text_body_width(
+fn estimate_wrapped_text_body_height(
   import: &PowerPointImport,
+  frame: TextFrame,
   text_body: &TextBody,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
 ) -> f32 {
-  text_body
-    .paragraphs
-    .iter()
-    .map(|paragraph| {
-      let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
-      paragraph
-        .runs
-        .split(|run| run.kind == TextRunKind::Break)
-        .map(|runs| paragraph_run_width(import, &paragraph_style, base_style, options, runs))
-        .fold(0.0, f32::max)
-    })
-    .fold(0.0, f32::max)
+  let column_width = options.column_width(frame).max(1.0);
+  let mut height = 0.0;
+  for paragraph in &text_body.paragraphs {
+    let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
+    let mut paragraph_base_style = base_style.clone();
+    paragraph_style.apply_default_run_style(import, &mut paragraph_base_style);
+    apply_text_scale(&mut paragraph_base_style, options);
+    for runs in paragraph.runs.split(|run| run.kind == TextRunKind::Break) {
+      let width = paragraph_run_width(import, &paragraph_style, base_style, options, runs);
+      let lines = (width / column_width).ceil().max(1.0);
+      height += lines * paragraph_style.line_height(&paragraph_base_style, options);
+    }
+  }
+  height
 }
 
 fn advance_text_column_if_needed(
@@ -3617,8 +4108,16 @@ struct ParagraphDisplayStyle {
   left_margin_pt: f32,
   indent_pt: f32,
   alignment: a::TextAlignmentTypeValues,
+  line_spacing: ParagraphLineSpacing,
   bullet: Option<String>,
   default_run_properties: Option<Box<a::DefaultRunProperties>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ParagraphLineSpacing {
+  Default,
+  Percent(f32),
+  Points(f32),
 }
 
 impl Default for ParagraphDisplayStyle {
@@ -3627,6 +4126,7 @@ impl Default for ParagraphDisplayStyle {
       left_margin_pt: 0.0,
       indent_pt: 0.0,
       alignment: a::TextAlignmentTypeValues::Left,
+      line_spacing: ParagraphLineSpacing::Default,
       bullet: None,
       default_run_properties: None,
     }
@@ -3655,6 +4155,9 @@ impl ParagraphDisplayStyle {
       if let Some(alignment) = properties.alignment {
         style.alignment = alignment;
       }
+      if let Some(line_spacing) = properties.line_spacing.as_deref() {
+        style.line_spacing = paragraph_line_spacing(line_spacing);
+      }
       style.bullet = paragraph_properties_bullet(&properties.paragraph_properties_choice4);
     }
     style
@@ -3672,6 +4175,9 @@ impl ParagraphDisplayStyle {
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = properties.alignment.unwrap_or(self.alignment);
+        if let Some(line_spacing) = properties.line_spacing.as_deref() {
+          self.line_spacing = paragraph_line_spacing(line_spacing);
+        }
         self.default_run_properties = properties.default_run_properties.clone();
         self.bullet =
           default_paragraph_properties_bullet(&properties.default_paragraph_properties_choice4);
@@ -3694,6 +4200,9 @@ impl ParagraphDisplayStyle {
           .map(|value| units::emu_to_points(i64::from(value)))
           .unwrap_or(self.indent_pt);
         self.alignment = $properties.alignment.unwrap_or(self.alignment);
+        if let Some(line_spacing) = $properties.line_spacing.as_deref() {
+          self.line_spacing = paragraph_line_spacing(line_spacing);
+        }
         self.default_run_properties = $properties.default_run_properties.clone();
         self.bullet = $bullet_fn(&$properties.$choice);
       }};
@@ -3787,6 +4296,31 @@ impl ParagraphDisplayStyle {
     if let Some(properties) = &self.default_run_properties {
       apply_default_run_properties(import, properties, style);
     }
+  }
+
+  fn line_height(&self, style: &TextStyle, options: &TextLoweringOptions) -> f32 {
+    self.line_height_with_scale(style, options.line_scale)
+  }
+
+  fn line_height_with_scale(&self, style: &TextStyle, line_scale: f32) -> f32 {
+    let natural_height = line_height(style, 1.0);
+    match self.line_spacing {
+      ParagraphLineSpacing::Default => line_height(style, line_scale),
+      ParagraphLineSpacing::Percent(ratio) => natural_height * ratio * line_scale,
+      ParagraphLineSpacing::Points(points) => points * line_scale,
+    }
+  }
+}
+
+fn paragraph_line_spacing(line_spacing: &a::LineSpacing) -> ParagraphLineSpacing {
+  match line_spacing.line_spacing_choice.as_ref() {
+    Some(a::LineSpacingChoice::SpacingPercent(spacing)) => {
+      ParagraphLineSpacing::Percent(spacing.val.as_ratio() as f32)
+    }
+    Some(a::LineSpacingChoice::SpacingPoints(spacing)) => {
+      ParagraphLineSpacing::Points(sdk_units::points100_to_points(spacing.val) as f32)
+    }
+    None => ParagraphLineSpacing::Default,
   }
 }
 

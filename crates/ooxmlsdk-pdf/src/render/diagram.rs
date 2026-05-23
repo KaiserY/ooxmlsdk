@@ -86,10 +86,24 @@ impl DiagramTextBody {
     }
   }
 
-  fn enable_auto_fit_if_default_text(&mut self) {
-    if !self.custom_text {
+  fn enable_auto_fit_if_default_text(&mut self, has_direct_font_size: bool) {
+    if !self.custom_text && !has_direct_font_size {
       self.auto_fit = true;
     }
+  }
+
+  fn has_direct_font_size(&self) -> bool {
+    self
+      .paragraphs
+      .iter()
+      .flat_map(|paragraph| &paragraph.runs)
+      .any(|run| {
+        run
+          .run_properties
+          .as_ref()
+          .and_then(|properties| properties.font_size)
+          .is_some()
+      })
   }
 
   fn apply_text_margins(&mut self, shape_width_pt: f32, constraints: &[DiagramConstraint]) {
@@ -181,6 +195,7 @@ impl DiagramTextBody {
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DiagramTextParagraph {
+  pub(crate) source_order: Option<usize>,
   pub(crate) level: Option<u8>,
   pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
@@ -197,6 +212,7 @@ impl DiagramTextParagraph {
       .and_then(|properties| properties.level)
       .map(|level| level as u8);
     Self {
+      source_order: None,
       level,
       paragraph_properties,
       end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
@@ -353,6 +369,7 @@ struct DiagramShapeNode {
   has_geometry: bool,
   hidden_geometry: bool,
   is_connector: bool,
+  shape_rotation_deg: f32,
   connector_angle_deg: f32,
   is_blip_placeholder: bool,
   z_order_offset: i32,
@@ -364,7 +381,6 @@ struct DiagramShapeNode {
   data_node_type: Option<dgm::ElementValues>,
   font_size_pt: Option<f32>,
   font_sync_group: Option<String>,
-  order: usize,
   constraints: Vec<DiagramConstraint>,
   direct_constraints: Vec<DiagramConstraint>,
   rules: Vec<DiagramRule>,
@@ -375,6 +391,7 @@ struct DiagramShapeNode {
 struct PresentationDataBinding<'a> {
   point: &'a dgm::Point,
   depth: i32,
+  source_order: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -403,6 +420,7 @@ struct LayoutAlgorithm {
   start_angle: f32,
   span_angle: f32,
   center_shape_mapping_first_node: bool,
+  rotation_path_along_path: bool,
   aspect_ratio: Option<f32>,
   auto_text_rotation: Option<dgm::AutoTextRotationValues>,
   text_anchor_vertical: dgm::TextAnchorVerticalValues,
@@ -474,76 +492,6 @@ fn diagram_points(data: &dgm::DataModelRoot) -> Vec<&dgm::Point> {
     .collect()
 }
 
-fn document_node_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
-  let points = diagram_points(data);
-  let mut orders = HashMap::new();
-  let Some(root_id) = points
-    .iter()
-    .find(|point| point.r#type == Some(dgm::PointValues::Document))
-    .map(|point| point.model_id.as_str())
-  else {
-    return orders;
-  };
-  let Some(connections) = data.connection_list.as_ref() else {
-    return orders;
-  };
-  let point_by_id: HashMap<&str, &dgm::Point> = points
-    .iter()
-    .copied()
-    .map(|point| (point.model_id.as_str(), point))
-    .collect();
-  let mut children_by_source: HashMap<&str, Vec<&dgm::Connection>> = HashMap::new();
-  for connection in &connections.connection {
-    if connection
-      .r#type
-      .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
-    {
-      children_by_source
-        .entry(connection.source_id.as_str())
-        .or_default()
-        .push(connection);
-    }
-  }
-  for children in children_by_source.values_mut() {
-    children.sort_by_key(|connection| connection.source_position);
-  }
-  let mut visited = HashSet::new();
-  append_document_node_orders(
-    root_id,
-    &point_by_id,
-    &children_by_source,
-    &mut visited,
-    &mut orders,
-  );
-  orders
-}
-
-fn append_document_node_orders<'a>(
-  parent_id: &str,
-  point_by_id: &HashMap<&'a str, &'a dgm::Point>,
-  children_by_source: &HashMap<&'a str, Vec<&'a dgm::Connection>>,
-  visited: &mut HashSet<&'a str>,
-  orders: &mut HashMap<String, usize>,
-) {
-  let Some(children) = children_by_source.get(parent_id) else {
-    return;
-  };
-  for connection in children {
-    let child_id = connection.destination_id.as_str();
-    if !visited.insert(child_id) {
-      continue;
-    }
-    if let Some(point) = point_by_id.get(child_id)
-      && point
-        .r#type
-        .is_none_or(|kind| matches!(kind, dgm::PointValues::Node | dgm::PointValues::Assistant))
-    {
-      orders.insert(child_id.to_string(), orders.len());
-    }
-    append_document_node_orders(child_id, point_by_id, children_by_source, visited, orders);
-  }
-}
-
 fn build_diagram_shape_tree(
   data: &dgm::DataModelRoot,
   layout: &dgm::LayoutDefinition,
@@ -554,8 +502,7 @@ fn build_diagram_shape_tree(
 ) -> Option<DiagramShapeNode> {
   let connections = data.connection_list.as_ref()?;
   let points = diagram_points(data);
-  let mut metrics = layout_node_metrics(Some(layout));
-  metrics.data_orders = document_node_orders(data);
+  let metrics = layout_node_metrics(Some(layout));
   let point_by_id: HashMap<&str, &dgm::Point> = points
     .iter()
     .copied()
@@ -563,6 +510,11 @@ fn build_diagram_shape_tree(
     .collect();
   let mut data_by_presentation: HashMap<&str, Vec<(u32, PresentationDataBinding<'_>)>> =
     HashMap::new();
+  let point_orders: HashMap<&str, usize> = points
+    .iter()
+    .enumerate()
+    .map(|(index, point)| (point.model_id.as_str(), index))
+    .collect();
   let mut points_by_presentation_name: HashMap<&str, Vec<&dgm::Point>> = HashMap::new();
   for point in &points {
     if let Some(name) = presentation_name(point) {
@@ -587,6 +539,10 @@ fn build_diagram_shape_tree(
           PresentationDataBinding {
             point: data_point,
             depth: presentation_source_depth(data, data_point.model_id.as_str()),
+            source_order: point_orders
+              .get(data_point.model_id.as_str())
+              .copied()
+              .unwrap_or_default(),
           },
         ));
     }
@@ -614,6 +570,7 @@ fn build_diagram_shape_tree(
   collect_for_each_refs_from_layout_node(&layout.layout_node, &mut for_each_by_name);
   let mut visitor = DiagramShapeCreationVisitor {
     point_by_id: &point_by_id,
+    point_orders: &point_orders,
     points_by_presentation_name: &points_by_presentation_name,
     data_by_presentation: &data_by_presentation,
     for_each_by_name: &for_each_by_name,
@@ -639,6 +596,7 @@ fn build_diagram_shape_tree(
       has_geometry: false,
       hidden_geometry: false,
       is_connector: false,
+      shape_rotation_deg: 0.0,
       connector_angle_deg: 0.0,
       is_blip_placeholder: false,
       z_order_offset: 0,
@@ -650,7 +608,6 @@ fn build_diagram_shape_tree(
       data_node_type: None,
       font_size_pt: None,
       font_sync_group: None,
-      order: usize::MAX,
       constraints: Vec::new(),
       direct_constraints: Vec::new(),
       rules: Vec::new(),
@@ -730,6 +687,7 @@ fn collect_for_each_refs_from_choose<'a>(
 
 struct DiagramShapeCreationVisitor<'a> {
   point_by_id: &'a HashMap<&'a str, &'a dgm::Point>,
+  point_orders: &'a HashMap<&'a str, usize>,
   points_by_presentation_name: &'a HashMap<&'a str, Vec<&'a dgm::Point>>,
   data_by_presentation: &'a HashMap<&'a str, Vec<PresentationDataBinding<'a>>>,
   for_each_by_name: &'a HashMap<&'a str, &'a dgm::ForEach>,
@@ -1151,7 +1109,6 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .data_by_presentation
       .get(presentation_point.model_id.as_str());
     let mut text_body = DiagramTextBody::default();
-    let mut order = self.current_index;
     let mut shape_properties =
       presentation_point
         .shape_properties
@@ -1190,18 +1147,22 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .unwrap_or_default();
       for binding in data_points {
         let data_point = binding.point;
+        let first_new_paragraph = text_body.paragraphs.len();
         text_body.append_point(data_point, binding.depth);
+        for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
+          paragraph.source_order = Some(binding.source_order);
+        }
         if binding.depth == 0 || (shape_properties.is_none() && binding.depth == min_depth) {
           shape_properties = data_point.shape_properties.clone();
         }
-        order = order.min(
-          self
-            .metrics
-            .data_orders
-            .get(data_point.model_id.as_str())
-            .copied()
-            .unwrap_or(self.current_index),
-        );
+      }
+    } else {
+      let first_new_paragraph = text_body.paragraphs.len();
+      text_body.append_point(presentation_point, 0);
+      if let Some(source_order) = self.point_orders.get(presentation_point.model_id.as_str()) {
+        for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
+          paragraph.source_order = Some(*source_order);
+        }
       }
     }
     if self.tree.is_none() {
@@ -1231,6 +1192,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       has_geometry,
       hidden_geometry,
       is_connector,
+      shape_rotation_deg: 0.0,
       connector_angle_deg: 0.0,
       is_blip_placeholder: shape_atom
         .and_then(|shape| shape.blip_placeholder)
@@ -1255,7 +1217,6 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .font_sync_names
         .contains(name)
         .then(|| name.to_string()),
-      order,
       constraints: self.active_constraints(layout_node),
       direct_constraints: direct_constraints_unfiltered(layout_node),
       rules: self.active_rules(layout_node),
@@ -1660,6 +1621,8 @@ fn parse_constraint(
         | dgm::ConstraintValues::RightMargin
         | dgm::ConstraintValues::TopMargin
         | dgm::ConstraintValues::BottomMargin
+        | dgm::ConstraintValues::PrimaryFontSize
+        | dgm::ConstraintValues::SecondaryFontSize
     ) {
       require_for_name = false;
     }
@@ -1733,7 +1696,6 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
 struct LayoutNodeMetrics {
   font_sizes: HashMap<String, f32>,
   font_sync_names: HashSet<String>,
-  data_orders: HashMap<String, usize>,
 }
 
 fn layout_node_metrics(layout: Option<&dgm::LayoutDefinition>) -> LayoutNodeMetrics {
@@ -1894,6 +1856,12 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::CenterShapeMapping)
       .and_then(|parameter| parameter.val.as_deref())
       == Some("fNode"),
+    rotation_path_along_path: algorithm
+      .parameter
+      .iter()
+      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::RotationPath)
+      .and_then(|parameter| parameter.val.as_deref())
+      == Some("alongPath"),
     aspect_ratio: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::AspectRatio),
     auto_text_rotation: algorithm
       .parameter
@@ -1993,9 +1961,7 @@ fn algorithm_parameter_f32(
 }
 
 fn layout_diagram_shape_tree(root: &mut DiagramShapeNode) {
-  let constraints = root.constraints.clone();
-  let rules = root.rules.clone();
-  layout_diagram_shape_node(root, &constraints, &rules);
+  layout_diagram_shape_node(root, &[], &[]);
 }
 
 fn layout_diagram_shape_node(
@@ -2054,6 +2020,7 @@ fn has_text_algorithm_descendant(node: &DiagramShapeNode) -> bool {
 }
 
 fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConstraint]) {
+  let has_direct_font_size = node.text_body.has_direct_font_size();
   let font_size = constraints
     .iter()
     .rev()
@@ -2068,7 +2035,9 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
     node.text_body.apply_primary_font_size(font_size);
   }
   node.text_body.apply_text_margins(node.width, constraints);
-  node.text_body.enable_auto_fit_if_default_text();
+  node
+    .text_body
+    .enable_auto_fit_if_default_text(has_direct_font_size);
   node.text_rotation_deg = text_pre_rotation_degrees(
     node
       .algorithms
@@ -2115,13 +2084,14 @@ fn points_to_emu(value: f32) -> i32 {
 }
 
 fn shape_rotation_degrees(node: &DiagramShapeNode) -> f32 {
-  node
-    .shape_properties
-    .as_deref()
-    .and_then(|properties| properties.transform2_d.as_deref())
-    .and_then(|transform| transform.rotation)
-    .map(|rotation| rotation as f32 / 60_000.0)
-    .unwrap_or_default()
+  node.shape_rotation_deg
+    + node
+      .shape_properties
+      .as_deref()
+      .and_then(|properties| properties.transform2_d.as_deref())
+      .and_then(|transform| transform.rotation)
+      .map(|rotation| rotation as f32 / 60_000.0)
+      .unwrap_or_default()
 }
 
 fn text_pre_rotation_degrees(
@@ -2546,17 +2516,19 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if node.children.is_empty() {
     return;
   }
-  let center_x = node.width / 2.0;
-  let center_y = node.height / 2.0;
-  let child_width = node.width / 4.0;
-  let child_height = node.height / 4.0;
-  let radius = ((node.width - child_width) / 2.0).min((node.height - child_height) / 2.0);
+  let center_x = lo_i32(node.width / 2.0);
+  let center_y = lo_i32(node.height / 2.0);
+  let child_width = lo_i32(node.width / 4.0);
+  let child_height = lo_i32(node.height / 4.0);
+  let connector_width = lo_i32(node.width / 12.0);
+  let connector_height = lo_i32(node.height / 12.0);
+  let radius = lo_i32(((node.width - child_width) / 2.0).min((node.height - child_height) / 2.0));
   let mut start = 0usize;
   if algorithm.center_shape_mapping_first_node
     && let Some(center) = node.children.first_mut()
   {
-    center.x = center_x - child_width / 2.0;
-    center.y = center_y - child_height / 2.0;
+    center.x = center_x - lo_i32(child_width / 2.0);
+    center.y = center_y - lo_i32(child_height / 2.0);
     center.width = child_width;
     center.height = child_height;
     start = 1;
@@ -2565,7 +2537,12 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if count == 0 {
     return;
   }
-  let connector_radius = radius * (algorithm.span_angle / count as f32).to_radians().cos();
+  let connector_radius = lo_i32(
+    radius
+      * ((algorithm.span_angle as i32 / count as i32) as f32)
+        .to_radians()
+        .cos(),
+  );
   let connector_angle = if algorithm.span_angle > 0.0 {
     0.0
   } else {
@@ -2575,15 +2552,19 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
     let angle = (index as f32) * algorithm.span_angle / count as f32 + algorithm.start_angle;
     let radians = angle.to_radians();
     let (width, height, current_radius) = if child.is_connector {
-      (node.width / 12.0, node.height / 12.0, connector_radius)
+      (connector_width, connector_height, connector_radius)
     } else {
       (child_width, child_height, radius)
     };
-    child.x = center_x + current_radius * radians.sin() - width / 2.0;
-    child.y = center_y - current_radius * radians.cos() - height / 2.0;
+    child.x = lo_i32(center_x + current_radius * radians.sin() - lo_i32(width / 2.0));
+    child.y = lo_i32(center_y - current_radius * radians.cos() - lo_i32(height / 2.0));
     child.width = width;
     child.height = height;
+    if algorithm.rotation_path_along_path {
+      child.shape_rotation_deg = angle;
+    }
     if child.is_connector {
+      child.shape_rotation_deg = connector_angle + angle;
       child.connector_angle_deg = connector_angle + angle;
     }
   }
@@ -2704,18 +2685,20 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     1
   };
   let vertical_count = vertical_shapes_count(node).max(1);
-  let mut child_width = node.width
-    / (horizontal_shapes_count as f32 + (horizontal_shapes_count - 1) as f32 * space_width);
+  let mut child_width = lo_i32(
+    node.width
+      / (horizontal_shapes_count as f32 + (horizontal_shapes_count - 1) as f32 * space_width),
+  );
   let child_height =
-    node.height / (vertical_count as f32 + (vertical_count - 1) as f32 * space_height);
+    lo_i32(node.height / (vertical_count as f32 + (vertical_count - 1) as f32 * space_height));
   let connector_width = 1.0;
   let connector_height = child_height;
   let mut x = 0.0;
   let mut y = 0.0;
   if algorithm.kind == dgm::AlgorithmValues::HierarchyChild && horizontal_shapes_count == 1 {
     let child_indent = 0.1;
-    x = child_width * child_indent;
-    child_width *= 1.0 - 2.0 * child_indent;
+    x = lo_i32(child_width * child_indent);
+    child_width = lo_i32(child_width * (1.0 - 2.0 * child_indent));
   }
 
   let mut index = 0usize;
@@ -2730,8 +2713,10 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     }
 
     let child_vertical_count = vertical_shapes_count(child).max(1);
-    let height = child_height
-      * (child_vertical_count as f32 + (child_vertical_count - 1) as f32 * space_height);
+    let height = lo_i32(
+      child_height
+        * (child_vertical_count as f32 + (child_vertical_count - 1) as f32 * space_height),
+    );
     child.width = child_width;
     child.height = height;
 
@@ -2739,15 +2724,15 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
       direction,
       LinearDirection::FromTop | LinearDirection::FromBottom
     ) {
-      y += height + child_height * space_height;
+      y += lo_i32(height + child_height * space_height);
     } else {
-      x += child_width + child_width * space_width;
+      x += lo_i32(child_width + child_width * space_width);
     }
     row_height = row_height.max(height);
 
     if algorithm.secondary_linear_direction == LinearDirection::FromTop && index % 2 == 1 {
       x = 0.0;
-      y += row_height + child_height * space_height;
+      y += lo_i32(row_height + child_height * space_height);
       row_height = 0.0;
     }
     index += 1;
@@ -2857,7 +2842,7 @@ fn snake_layout_tree(
     if constraint.value != 0.0 {
       continue;
     }
-    let value = reference * constraint.factor;
+    let value = lo_i32(reference * constraint.factor);
     if let Some(point_type) = constraint.point_type {
       properties_by_type
         .entry(point_type)
@@ -2924,16 +2909,16 @@ fn snake_layout_tree(
     }
   }
 
-  let mut child_width = node.width / (columns as f32 + (columns - 1) as f32 * space);
-  let mut child_height = child_width * grid_aspect_ratio;
+  let mut child_width = lo_i32(node.width / (columns as f32 + (columns - 1) as f32 * space));
+  let mut child_height = lo_i32(child_width * grid_aspect_ratio);
   if columns == 1 && rows > 1 {
     let mut num_spaces = -1.0;
     if space_from_constraints {
       num_spaces += 4.0;
     }
-    child_height = node.height / (rows as f32 + (rows as f32 + num_spaces) * space);
+    child_height = lo_i32(node.height / (rows as f32 + (rows as f32 + num_spaces) * space));
     if child_aspect_ratio > 1.0 {
-      child_width = node.width.min(child_height * child_aspect_ratio);
+      child_width = node.width.min(lo_i32(child_height * child_aspect_ratio));
     }
     horizontal = false;
   }
@@ -2957,16 +2942,17 @@ fn snake_layout_tree(
     && node.children.get(1).and_then(|child| child.data_node_type)
       == Some(dgm::ElementValues::SiblingTransition);
   for (index, child) in node.children.iter_mut().enumerate() {
-    child.x = x.max(0.0);
-    child.y = y.max(0.0);
+    child.x = x;
+    child.y = y;
     let mut current_width = child_width;
     let mut current_height = child_height;
     if widths_from_constraints && max_row_width != 0.0 {
-      current_width = node.width * shape_widths[index] / max_row_width;
+      current_width = lo_i32(node.width * shape_widths[index] / max_row_width);
     }
     if child_aspect_ratio != 0.0 {
-      current_height = (current_width / child_aspect_ratio)
-        .min(node.height / (rows as f32 + (rows - 1) as f32 * space));
+      current_height = lo_i32(current_width / child_aspect_ratio).min(lo_i32(
+        node.height / (rows as f32 + (rows - 1) as f32 * space),
+      ));
     }
     row_height = row_height.max(current_height);
     child.width = current_width;
@@ -2976,7 +2962,7 @@ fn snake_layout_tree(
     match algorithm.continue_direction {
       ContinueDirection::SameDirection => {
         if placed % columns == 0 || placed / columns + 1 != rows {
-          x += increment_x * (current_width + space * current_width);
+          x += increment_x * lo_i32(current_width + space * current_width);
         }
         column_index += 1;
         if column_index == columns {
@@ -2988,26 +2974,26 @@ fn snake_layout_tree(
             x = if widths_from_constraints {
               start_x
             } else {
-              start_x + (increment_x * (current_width + space * current_width)) / 2.0
+              start_x + lo_i32(increment_x * (current_width + space * current_width)) / 2.0
             };
           } else {
             x = start_x;
           }
-          y += increment_y * (row_height + space * row_height);
+          y += increment_y * lo_i32(row_height + space * row_height);
           column_index = 0;
           row_height = 0.0;
         }
         if placed % columns != 0 && placed >= 3 && placed / columns + 1 == rows {
-          x += increment_x * (current_width + space * current_width);
+          x += increment_x * lo_i32(current_width + space * current_width);
         }
       }
       ContinueDirection::ReverseDirection => {
         if (placed % columns == 0 || placed / columns + 1 != rows)
           && (placed / columns + 1) % 2 != 0
         {
-          x += current_width + space * current_width;
+          x += lo_i32(current_width + space * current_width);
         } else if placed % columns != 0 && placed / columns + 1 != rows {
-          x -= current_width + space * current_width;
+          x -= lo_i32(current_width + space * current_width);
         }
         column_index += 1;
         if column_index == columns {
@@ -3024,11 +3010,11 @@ fn snake_layout_tree(
             && count != rows * columns
             && (placed / columns + 1) % 2 != 0
           {
-            x = start_x + (increment_x * (current_width + space * current_width)) / 2.0;
+            x = start_x + lo_i32(increment_x * (current_width + space * current_width)) / 2.0;
           } else if (placed / columns + 1) % 2 != 0 {
             x = start_x;
           }
-          y += increment_y * (child_height + space * child_height);
+          y += increment_y * lo_i32(child_height + space * child_height);
           column_index = 0;
         }
         if placed % columns != 0
@@ -3036,17 +3022,21 @@ fn snake_layout_tree(
           && placed / columns + 1 == rows
           && (placed / columns + 1) % 2 == 0
         {
-          x -= increment_x * (current_width + space * current_width);
+          x -= increment_x * lo_i32(current_width + space * current_width);
         } else if placed % columns != 0
           && placed >= 3
           && placed / columns + 1 == rows
           && (placed / columns + 1) % 2 != 0
         {
-          x += increment_x * (current_width + space * current_width);
+          x += increment_x * lo_i32(current_width + space * current_width);
         }
       }
     }
   }
+}
+
+fn lo_i32(value: f32) -> f32 {
+  (value as i32) as f32
 }
 
 fn sort_diagram_shape_children_by_z_order(node: &mut DiagramShapeNode) {
@@ -3086,6 +3076,7 @@ fn flatten_diagram_shape_tree(
   let x = offset_x + node.x;
   let y = offset_y + node.y;
   if !node.hidden_geometry && (node.has_geometry || !node.text_body.is_empty()) {
+    let order = shapes.len();
     shapes.push(DiagramShape {
       x,
       y,
@@ -3100,7 +3091,7 @@ fn flatten_diagram_shape_tree(
       connector_angle_deg: node.connector_angle_deg,
       is_blip_placeholder: node.is_blip_placeholder,
       fill: node.fill,
-      order: node.order,
+      order,
       font_size_pt: node.font_size_pt,
       font_sync_group: node.font_sync_group.clone(),
     });

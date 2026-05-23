@@ -4376,7 +4376,7 @@ fn paragraph_frame(paragraph: &crate::docx::Paragraph) -> Option<FloatingFrame> 
   let mut content = paragraph.clone();
   content.format.frame = None;
   Some(FloatingFrame {
-    blocks: vec![Block::Paragraph(content)],
+    blocks: vec![Block::paragraph(content)],
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
@@ -9036,7 +9036,7 @@ fn table_cell_blocks_for_split_fragment(
       if let Some(paragraph) =
         paragraph_fragment_around_last_rendered_page_break(paragraph, follow_fragment)
       {
-        blocks.push(Block::Paragraph(paragraph));
+        blocks.push(Block::paragraph(paragraph));
       }
     }
     block if follow_fragment => blocks.push(block.clone()),
@@ -12637,7 +12637,7 @@ mod tests {
     let flow = table_cell_flow();
     let first_content = estimated_paragraph_content_height(&first, flow);
     let second_content = estimated_paragraph_content_height(&second, flow);
-    let blocks = vec![Block::Paragraph(first), Block::Paragraph(second)];
+    let blocks = vec![Block::paragraph(first), Block::paragraph(second)];
 
     let height = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
     let expected = first_content + 74.0 + second_content + 8.0;
@@ -12704,7 +12704,7 @@ mod tests {
     };
     let flow = table_cell_flow();
     let content = estimated_paragraph_content_height(&paragraph, flow);
-    let blocks = vec![Block::Paragraph(paragraph)];
+    let blocks = vec![Block::paragraph(paragraph)];
 
     let whole = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
     let follow =
@@ -12764,7 +12764,7 @@ mod tests {
       flow.setup,
       flow.text_segmentation,
     );
-    let blocks = vec![Block::Paragraph(paragraph)];
+    let blocks = vec![Block::paragraph(paragraph)];
 
     let height = table_cell_blocks_content_height(&blocks, flow, TableCellMeasureMode::WholeCell);
 
@@ -12927,7 +12927,7 @@ mod tests {
       style_ref_text: None,
       preserve_text_portion: false,
     };
-    let blocks = vec![Block::Paragraph(Paragraph {
+    let blocks = vec![Block::paragraph(Paragraph {
       inlines: vec![InlineItem::Text(run.clone())],
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),

@@ -1,13 +1,10 @@
 mod display;
 mod drawingml;
-mod graphic_shape_context;
 mod import;
-mod layout_fragment;
 mod presentation;
 mod shape;
 mod shape_context;
 mod shape_group_context;
-mod shape_properties_context;
 mod slide;
 mod slide_fragment;
 

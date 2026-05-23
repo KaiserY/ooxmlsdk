@@ -34,7 +34,6 @@ pub(crate) struct Shape {
   pub(crate) child_position: Point,
   pub(crate) child_size: Size,
   pub(crate) rotation: f32,
-  pub(crate) diagram_rotation: f32,
   pub(crate) flip_h: bool,
   pub(crate) flip_v: bool,
   pub(crate) children: Vec<Shape>,
@@ -78,24 +77,22 @@ pub(crate) struct Size {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum ShapeService {
   #[default]
-  CustomShape,
-  GraphicObjectShape,
-  GroupShape,
-  LineShape,
-  ConnectorShape,
-  Ole2Shape,
-  TitleTextShape,
-  SubtitleShape,
-  OutlinerShape,
-  NotesShape,
-  DateTimeShape,
-  HeaderShape,
-  FooterShape,
-  SlideNumberShape,
-  PageShape,
-  ChartShape,
-  TableShape,
-  MediaShape,
+  Custom,
+  GraphicObject,
+  Group,
+  Line,
+  Connector,
+  Ole2,
+  TitleText,
+  Subtitle,
+  Outliner,
+  DateTime,
+  Header,
+  Footer,
+  SlideNumber,
+  Chart,
+  Table,
+  Media,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -249,7 +246,6 @@ impl Shape {
       child_position: Point::default(),
       child_size: Size::default(),
       rotation: 0.0,
-      diagram_rotation: 0.0,
       flip_h: false,
       flip_v: false,
       children: Vec::new(),
@@ -278,8 +274,6 @@ impl Shape {
       graphic_data: None,
     }
   }
-
-  pub(crate) fn set_defaults(&mut self) {}
 
   pub(crate) fn apply_shape_reference(&mut self, reference: &Shape) {
     self.apply_shape_reference_with_text(reference, true);
@@ -325,14 +319,6 @@ impl Shape {
 
   pub(crate) fn set_referenced(&mut self, referenced: bool) {
     self.referenced = referenced;
-  }
-
-  pub(crate) fn add_shape(&mut self, shape: Shape) {
-    self.children.push(shape);
-  }
-
-  pub(crate) fn add_children(&mut self, children: Vec<Shape>) {
-    self.children.extend(children);
   }
 
   pub(crate) fn hide_as_master_shape(&mut self) {
@@ -387,7 +373,7 @@ impl Shape {
         name: self.name.clone(),
       };
       shape_map.push(entry.clone());
-      if self.service_name == ShapeService::ConnectorShape {
+      if self.service_name == ShapeService::Connector {
         connector_shape_map.push(entry);
       }
     }
@@ -405,19 +391,17 @@ impl Shape {
   fn placeholder_service_name(&self) -> Option<ShapeService> {
     match self.sub_type? {
       p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle => {
-        Some(ShapeService::TitleTextShape)
+        Some(ShapeService::TitleText)
       }
-      p::PlaceholderValues::SubTitle => Some(ShapeService::SubtitleShape),
-      p::PlaceholderValues::Body | p::PlaceholderValues::Object => {
-        Some(ShapeService::OutlinerShape)
-      }
-      p::PlaceholderValues::DateAndTime => Some(ShapeService::DateTimeShape),
-      p::PlaceholderValues::SlideNumber => Some(ShapeService::SlideNumberShape),
-      p::PlaceholderValues::Footer => Some(ShapeService::FooterShape),
-      p::PlaceholderValues::Header => Some(ShapeService::HeaderShape),
-      p::PlaceholderValues::Chart => Some(ShapeService::ChartShape),
-      p::PlaceholderValues::Table => Some(ShapeService::TableShape),
-      p::PlaceholderValues::Media => Some(ShapeService::MediaShape),
+      p::PlaceholderValues::SubTitle => Some(ShapeService::Subtitle),
+      p::PlaceholderValues::Body | p::PlaceholderValues::Object => Some(ShapeService::Outliner),
+      p::PlaceholderValues::DateAndTime => Some(ShapeService::DateTime),
+      p::PlaceholderValues::SlideNumber => Some(ShapeService::SlideNumber),
+      p::PlaceholderValues::Footer => Some(ShapeService::Footer),
+      p::PlaceholderValues::Header => Some(ShapeService::Header),
+      p::PlaceholderValues::Chart => Some(ShapeService::Chart),
+      p::PlaceholderValues::Table => Some(ShapeService::Table),
+      p::PlaceholderValues::Media => Some(ShapeService::Media),
       p::PlaceholderValues::ClipArt
       | p::PlaceholderValues::Diagram
       | p::PlaceholderValues::SlideImage
@@ -429,7 +413,7 @@ impl Shape {
     // Source: LibreOffice oox/source/drawingml/table/tableproperties.cxx
     // expands undersized rows to the graphical frame height, while still using
     // the DrawingML grid/row dimensions when they exceed the frame.
-    if self.service_name == ShapeService::TableShape
+    if self.service_name == ShapeService::Table
       && let Some(table) = &self.table_properties
     {
       let width = table.grid.iter().copied().sum::<i64>();
@@ -442,10 +426,6 @@ impl Shape {
       }
     }
   }
-
-  pub(crate) fn put_property_to_grab_bag(&self) {}
-
-  pub(crate) fn put_properties_to_grab_bag(&self) {}
 
   pub(crate) fn get_actual_fill_properties(
     &self,
@@ -518,7 +498,7 @@ impl Shape {
 
   pub(crate) fn set_chart_type(&mut self) {
     self.frame_type = FrameType::Chart;
-    self.service_name = ShapeService::ChartShape;
+    self.service_name = ShapeService::Chart;
   }
 
   pub(crate) fn set_chart_ex_type(&mut self) {
@@ -527,17 +507,17 @@ impl Shape {
 
   pub(crate) fn set_table_type(&mut self) {
     self.frame_type = FrameType::Table;
-    self.service_name = ShapeService::TableShape;
+    self.service_name = ShapeService::Table;
   }
 
   pub(crate) fn set_diagram_type(&mut self) {
     self.frame_type = FrameType::Diagram;
-    self.service_name = ShapeService::GroupShape;
+    self.service_name = ShapeService::Group;
   }
 
   pub(crate) fn set_ole_object_type(&mut self) {
     self.frame_type = FrameType::Ole;
-    self.service_name = ShapeService::Ole2Shape;
+    self.service_name = ShapeService::Ole2;
   }
 
   pub(crate) fn set_graphic_data_record(&mut self, record: GraphicDataRecord) {
@@ -547,9 +527,9 @@ impl Shape {
   pub(crate) fn set_custom_shape_geometry(&mut self, geometry: CustomShapeGeometry) {
     if let CustomShapeGeometry::Preset(preset) = &geometry
       && preset.preset == a::ShapeTypeValues::Line
-      && self.service_name != ShapeService::ConnectorShape
+      && self.service_name != ShapeService::Connector
     {
-      self.service_name = ShapeService::LineShape;
+      self.service_name = ShapeService::Line;
     }
     self.custom_shape_properties.geometry = Some(geometry);
   }
@@ -620,7 +600,7 @@ impl Shape {
       resource: None,
     });
     self.frame_type = FrameType::Media;
-    self.service_name = ShapeService::MediaShape;
+    self.service_name = ShapeService::Media;
   }
 
   pub(crate) fn set_content_part_resource(&mut self, resource: Option<MediaResource>) {
@@ -643,7 +623,7 @@ impl Shape {
       resource,
     });
     self.frame_type = FrameType::Media;
-    self.service_name = ShapeService::MediaShape;
+    self.service_name = ShapeService::Media;
   }
 
   pub(crate) fn add_connector_shape_properties(
@@ -661,17 +641,9 @@ impl Shape {
       });
   }
 
-  pub(crate) fn clone_fill_properties(&self) -> Option<FillProperties> {
-    self.fill_properties.clone()
+  pub(crate) fn keep_diagram_drawing(&mut self) {
+    self.frame_type = FrameType::Diagram;
   }
-
-  pub(crate) fn keep_diagram_drawing(&mut self) {}
-
-  pub(crate) fn prepare_diagram_helper(&mut self) {}
-
-  pub(crate) fn propagate_diagram_helper(&mut self) {}
-
-  pub(crate) fn migrate_diagram_helper_to_new_shape(&mut self) {}
 }
 
 fn merge_line_properties(

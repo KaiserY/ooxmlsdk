@@ -20,12 +20,7 @@ pub(crate) struct SlideFragmentHandler {
   slide_persist: SlidePersist,
   shape_location: ShapeLocation,
   slide_name: Option<String>,
-  slide_properties: SlideProperties,
-  char_vector: String,
 }
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct SlideProperties;
 
 impl SlideFragmentHandler {
   pub(crate) fn new(slide_persist: SlidePersist, shape_location: ShapeLocation) -> Self {
@@ -33,8 +28,6 @@ impl SlideFragmentHandler {
       slide_persist,
       shape_location,
       slide_name: None,
-      slide_properties: SlideProperties,
-      char_vector: String::new(),
     }
   }
 
@@ -168,14 +161,6 @@ impl SlideFragmentHandler {
   pub(crate) fn on_create_context(&mut self, shape_tree: &p::ShapeTree) {
     let mut group_context = PPTShapeGroupContext::new(self.shape_location);
     group_context.on_create_context(&mut self.slide_persist, shape_tree);
-  }
-
-  pub(crate) fn on_characters(&mut self, text: &str) {
-    self.char_vector.push_str(text);
-  }
-
-  pub(crate) fn get_char_vector(&self) -> &str {
-    &self.char_vector
   }
 
   fn import_background(&mut self, background: &p::Background) {

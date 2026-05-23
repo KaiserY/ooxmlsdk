@@ -223,7 +223,7 @@ pub(crate) fn extract(
 }
 
 fn simple_text_block(text: String, style: TextStyle) -> Block {
-  Block::Paragraph(Paragraph {
+  Block::paragraph(Paragraph {
     inlines: vec![InlineItem::Text(TextRun {
       text,
       style: style.clone(),
@@ -250,7 +250,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
 }
 
 fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> Block {
-  Block::Paragraph(Paragraph {
+  Block::paragraph(Paragraph {
     inlines: vec![InlineItem::Image(InlineImage {
       data: image.data,
       content_type: image.content_type,
@@ -751,13 +751,13 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     if let Some(Block::Frame(previous)) = blocks.last_mut()
       && paragraph_belongs_to_frame(previous, frame, &paragraph)
     {
-      previous.blocks.push(Block::Paragraph(paragraph));
+      previous.blocks.push(Block::paragraph(paragraph));
       return;
     }
     let fill_color = paragraph.format.shading;
     let borders = paragraph.format.borders;
     blocks.push(Block::Frame(FloatingFrame {
-      blocks: vec![Block::Paragraph(paragraph)],
+      blocks: vec![Block::paragraph(paragraph)],
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
@@ -767,7 +767,7 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
     }));
     return;
   }
-  blocks.push(Block::Paragraph(paragraph));
+  blocks.push(Block::paragraph(paragraph));
 }
 
 fn paragraph_belongs_to_frame(
@@ -1125,7 +1125,7 @@ fn sdt_block_blocks(
     .iter()
     .filter_map(|choice| match choice {
       w::SdtContentBlockChoice::Paragraph(paragraph) => {
-        Some(vec![Block::Paragraph(paragraph_model(
+        Some(vec![Block::paragraph(paragraph_model(
           paragraph.as_ref(),
           styles,
           numbering,
@@ -1198,7 +1198,7 @@ fn header_blocks(
       .header_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::HeaderChoice::Paragraph(paragraph) => Some(Block::Paragraph(paragraph_model(
+        w::HeaderChoice::Paragraph(paragraph) => Some(Block::paragraph(paragraph_model(
           paragraph,
           styles,
           &mut numbering,
@@ -1281,7 +1281,7 @@ fn footer_blocks(
       .footer_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::FooterChoice::Paragraph(paragraph) => Some(Block::Paragraph(paragraph_model(
+        w::FooterChoice::Paragraph(paragraph) => Some(Block::paragraph(paragraph_model(
           paragraph,
           styles,
           &mut numbering,
@@ -1536,7 +1536,7 @@ fn append_note_blocks<'a>(
       is_first_paragraph = false;
     }
     preserve_note_text_portions(&mut model);
-    blocks.push(Block::Paragraph(model));
+    blocks.push(Block::paragraph(model));
   }
 }
 
@@ -2084,20 +2084,20 @@ fn table_cell_model(
 
 fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   let Some(frame) = paragraph.format.frame else {
-    blocks.push(Block::Paragraph(paragraph));
+    blocks.push(Block::paragraph(paragraph));
     return;
   };
   paragraph.format.frame = None;
   if let Some(Block::Frame(previous)) = blocks.last_mut()
     && paragraph_belongs_to_frame(previous, frame, &paragraph)
   {
-    previous.blocks.push(Block::Paragraph(paragraph));
+    previous.blocks.push(Block::paragraph(paragraph));
     return;
   }
   let fill_color = paragraph.format.shading;
   let borders = paragraph.format.borders;
   blocks.push(Block::Frame(FloatingFrame {
-    blocks: vec![Block::Paragraph(paragraph)],
+    blocks: vec![Block::paragraph(paragraph)],
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
     height_rule: frame.height_rule,
@@ -8569,7 +8569,7 @@ fn textbox_blocks_with_base(
             ..Default::default()
           },
         );
-        blocks.push(Block::Paragraph(paragraph));
+        blocks.push(Block::paragraph(paragraph));
       }
       w::TextBoxContentChoice::Table(table) => {
         let mut table = table_model(

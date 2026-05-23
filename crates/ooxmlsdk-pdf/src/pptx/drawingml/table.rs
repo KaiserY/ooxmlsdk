@@ -6,7 +6,7 @@ use super::line::{LineFill, LineProperties};
 use super::shape::{FontStyleReference, ShapeStyleReference};
 use super::text_body::TextBody;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TableProperties {
   pub(crate) style_id: Option<String>,
   pub(crate) inline_style: Option<TableStyle>,
@@ -130,23 +130,6 @@ pub(crate) struct TableCellMargins {
   pub(crate) right: i32,
   pub(crate) top: i32,
   pub(crate) bottom: i32,
-}
-
-impl Default for TableProperties {
-  fn default() -> Self {
-    Self {
-      style_id: None,
-      inline_style: None,
-      first_row: false,
-      first_column: false,
-      last_row: false,
-      last_column: false,
-      band_row: false,
-      band_column: false,
-      grid: Vec::new(),
-      rows: Vec::new(),
-    }
-  }
 }
 
 impl Default for TableCellMargins {

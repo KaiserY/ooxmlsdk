@@ -160,25 +160,29 @@ fn collect_shape_summary(
   let height_pt = units::emu_to_points_f32(shape.size.cy as f32 * transform.scale_y);
   let (geo_x_pt, geo_y_pt) =
     rotated_shape_geo_top_left(x_pt, y_pt, width_pt, height_pt, shape.rotation);
-  summary.draw_shapes.push(draw_shape_summary_from_parts(
-    page_index,
-    shape_path.clone(),
-    format!("{:?}", shape.service_name),
-    shape_geometry_name(shape.custom_shape_properties.geometry.as_ref()),
-    shape_text(shape.text_body.as_ref()),
-    geo_x_pt,
-    geo_y_pt,
-    width_pt,
-    height_pt,
-    shape.actual_fill_properties.as_ref(),
-    shape.rotation,
-    shape.flip_h,
-    shape.flip_v,
-    shape.text_body.as_ref().map(|text_body| {
-      let frame = text_body_frame(x_pt, y_pt, width_pt, height_pt, text_body);
-      text_distances_from_frame(x_pt, y_pt, width_pt, height_pt, frame)
-    }),
-  ));
+  summary
+    .draw_shapes
+    .push(draw_shape_summary_from_parts(DrawShapeSummaryParts {
+      page_index,
+      shape_path: shape_path.clone(),
+      service_name: format!("{:?}", shape.service_name),
+      geometry: shape_geometry_name(shape.custom_shape_properties.geometry.as_ref()),
+      text: shape_text(shape.text_body.as_ref()),
+      frame: TextFrame {
+        x_pt: geo_x_pt,
+        y_pt: geo_y_pt,
+        width_pt,
+        height_pt,
+      },
+      fill: shape.actual_fill_properties.as_ref(),
+      rotation_deg: shape.rotation,
+      flip_h: shape.flip_h,
+      flip_v: shape.flip_v,
+      text_distances: shape.text_body.as_ref().map(|text_body| {
+        let frame = text_body_frame(x_pt, y_pt, width_pt, height_pt, text_body);
+        text_distances_from_frame(x_pt, y_pt, width_pt, height_pt, frame)
+      }),
+    }));
 
   let child_transform = transform.child(shape);
   for (child_index, child) in shape.children.iter().enumerate() {
@@ -349,16 +353,20 @@ fn lower_background(
         import,
         slide,
         &fill_properties,
-        0.0,
-        0.0,
-        slide.size.width_pt,
-        slide.size.height_pt,
-        0.0,
-        false,
-        false,
-        false,
-        None,
-        None,
+        ImageFillPlacement {
+          frame: TextFrame {
+            x_pt: 0.0,
+            y_pt: 0.0,
+            width_pt: slide.size.width_pt,
+            height_pt: slide.size.height_pt,
+          },
+          rotation_deg: 0.0,
+          flip_horizontal: false,
+          flip_vertical: false,
+          crop_bitmap: false,
+          alt_text: None,
+          hyperlink_url: None,
+        },
       )
       .into_iter()
       .map(PageItem::Image),
@@ -457,12 +465,12 @@ fn lower_shape(
     .is_some_and(graphic_data_has_structured_identity);
 
   if let Some(table) = &shape.table_properties
-    && shape.service_name == ShapeService::TableShape
+    && shape.service_name == ShapeService::Table
   {
     lower_table(import, shape, offset, table, items);
   }
 
-  if shape.service_name == ShapeService::ChartShape
+  if shape.service_name == ShapeService::Chart
     && let Some(record) = &shape.graphic_data
   {
     lower_chart(import, slide, shape, offset, record, items);
@@ -472,12 +480,14 @@ fn lower_shape(
     && let Some(record) = &shape.graphic_data
   {
     lower_diagram(
-      import,
-      slide,
+      PptxLoweringContext {
+        import,
+        slide,
+        page_index,
+      },
       shape,
       offset,
       record,
-      page_index,
       items,
       summary.as_deref_mut(),
     );
@@ -485,9 +495,11 @@ fn lower_shape(
 
   if let Some(text_body) = &shape.text_body {
     lower_text_body(
-      import,
-      slide,
-      page_index,
+      PptxLoweringContext {
+        import,
+        slide,
+        page_index,
+      },
       shape,
       offset,
       text_body,
@@ -629,8 +641,10 @@ fn lower_chart_texts(
   texts: Vec<String>,
   items: &mut Vec<PageItem>,
 ) {
-  let mut style = TextStyle::default();
-  style.font_size_pt = 11.0;
+  let style = TextStyle {
+    font_size_pt: 11.0,
+    ..TextStyle::default()
+  };
   let line_step = 13.2;
   let start_x = x + width * 0.12;
   let mut text_y = y + height * 0.12;
@@ -642,12 +656,14 @@ fn lower_chart_texts(
     }
     push_text_item(
       items,
-      start_x,
-      text_y,
+      TextItemPlacement {
+        x_pt: start_x,
+        y_pt: text_y,
+        line_height_pt: line_height(&style, 1.0),
+        rotation_center_pt: None,
+      },
       text,
       style.clone(),
-      None,
-      line_height(&style, 1.0),
       None,
     );
     text_y += line_step;
@@ -703,13 +719,18 @@ fn chart_theme<'a>(
     .or_else(|| import.get_current_theme_ptr())
 }
 
+#[derive(Clone, Copy)]
+struct PptxLoweringContext<'a> {
+  import: &'a PowerPointImport,
+  slide: &'a SlidePersist,
+  page_index: usize,
+}
+
 fn lower_diagram(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
+  context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
   record: &GraphicDataRecord,
-  page_index: usize,
   items: &mut Vec<PageItem>,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
@@ -720,7 +741,9 @@ fn lower_diagram(
   let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
   let width_pt = units::emu_to_points(shape.size.cx);
   let height_pt = units::emu_to_points(shape.size.cy);
-  if let Some(background_fill) = diagram_background_fill(import, slide, &data_resource.model) {
+  if let Some(background_fill) =
+    diagram_background_fill(context.import, context.slide, &data_resource.model)
+  {
     items.push(PageItem::Rect(RectItem {
       x_pt,
       y_pt,
@@ -732,26 +755,26 @@ fn lower_diagram(
       stroke_opacity: 1.0,
     }));
   }
-  if let Some(drawing) = diagram_drawing_resource(slide, &data_resource.model)
+  if let Some(drawing) = diagram_drawing_resource(context.slide, &data_resource.model)
     && lower_diagram_drawing(
-      import,
-      slide,
+      context,
       drawing,
       &data_resource.model,
-      x_pt,
-      y_pt,
-      width_pt,
-      height_pt,
+      TextFrame {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
       items,
-      page_index,
       summary.as_deref_mut(),
     )
   {
     return;
   }
-  let fill = diagram_accent_fill(import, slide);
+  let fill = diagram_accent_fill(context.import, context.slide);
   let styles = diagram_styles(record);
-  let colors = diagram_style_colors(import, slide, record);
+  let colors = diagram_style_colors(context.import, context.slide, record);
   let shapes = shared_diagram::layout_shapes(
     &data_resource.model,
     record
@@ -778,8 +801,8 @@ fn lower_diagram(
       .as_deref()
       .map(|properties| {
         diagram_model_shape_blip_fill_image_items(
-          import,
-          slide,
+          context.import,
+          context.slide,
           data_resource,
           properties,
           shared_diagram::DiagramBounds {
@@ -806,7 +829,9 @@ fn lower_diagram(
     let fill_color = diagram_shape
       .shape_properties
       .as_deref()
-      .and_then(|properties| diagram_model_shape_fill_color(import, slide, properties))
+      .and_then(|properties| {
+        diagram_model_shape_fill_color(context.import, context.slide, properties)
+      })
       .unwrap_or(diagram_shape.fill);
     let suppress_fill = diagram_shape
       .shape_properties
@@ -830,7 +855,9 @@ fn lower_diagram(
         stroke: diagram_shape
           .shape_properties
           .as_deref()
-          .and_then(|properties| diagram_model_shape_outline(import, slide, properties))
+          .and_then(|properties| {
+            diagram_model_shape_outline(context.import, context.slide, properties)
+          })
           .or_else(|| Some(BorderStyle::default()).filter(|_| !suppress_fill)),
         stroke_opacity: 1.0,
       }));
@@ -856,7 +883,7 @@ fn lower_diagram(
       );
       record_smartart_text_shape(
         summary.as_deref_mut(),
-        page_index,
+        context.page_index,
         &text_body,
         diagram_shape.x,
         diagram_shape.y,
@@ -868,14 +895,19 @@ fn lower_diagram(
         .map(|style| diagram_font_style_reference(&style.font_reference, diagram_shape.text_fill));
       let options = TextLoweringOptions::from_text_body(&text_body);
       let base_style = text_base_style(
-        import,
+        context.import,
         &text_body,
         font_reference.as_ref(),
         None,
         diagram_shape.font_size_pt,
       );
-      let (font_scale, line_scale) =
-        text_auto_fit_scales(import, text_frame, &text_body, &base_style, &options);
+      let (font_scale, line_scale) = text_auto_fit_scales(
+        context.import,
+        text_frame,
+        &text_body,
+        &base_style,
+        &options,
+      );
       let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
       if sync_auto_fit && let Some(group) = diagram_shape.font_sync_group.as_deref() {
         font_sync_scales
@@ -908,16 +940,18 @@ fn lower_diagram(
       .and_then(|group| font_sync_scales.get(group).copied())
       .unwrap_or((pending.font_scale, pending.line_scale));
     lower_diagram_text_body_at_with_style_and_scale(
-      import,
+      context.import,
       pending.frame,
       &pending.text_body,
-      pending.font_reference.as_ref(),
-      None,
-      None,
-      pending.base_font_size_pt,
-      font_scale,
-      line_scale,
-      pending.order,
+      DiagramTextLoweringStyle {
+        font_reference: pending.font_reference.as_ref(),
+        table_text_style: None,
+        shape_hyperlink_url: None,
+        base_font_size_pt: pending.base_font_size_pt,
+        font_scale,
+        line_scale,
+        shape_order: pending.order,
+      },
       &mut text_items,
     );
   }
@@ -944,26 +978,21 @@ fn diagram_drawing_resource<'a>(
 }
 
 fn lower_diagram_drawing(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
+  context: PptxLoweringContext<'_>,
   drawing_resource: &super::slide::DiagramDrawingResource,
   data: &dgm::DataModelRoot,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
+  frame: TextFrame,
   items: &mut Vec<PageItem>,
-  page_index: usize,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) -> bool {
   // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx loadDiagram()
   // imports persisted diagramDrawing extDrawing before falling back to layout
   // atom shape generation.
   let transform = DiagramDrawingTransform::root(
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
+    frame.x_pt,
+    frame.y_pt,
+    frame.width_pt,
+    frame.height_pt,
     drawing_resource
       .drawing
       .shape_tree
@@ -972,32 +1001,31 @@ fn lower_diagram_drawing(
       .as_deref(),
   );
   let text_orders = shared_diagram::presentation_point_list_orders(data);
+  let drawing_context = DiagramDrawingLoweringContext {
+    import: context.import,
+    slide: context.slide,
+    drawing_resource,
+    text_orders: &text_orders,
+    page_index: context.page_index,
+  };
   let mut drawing_items = Vec::new();
   let mut text_items = Vec::new();
   for choice in &drawing_resource.drawing.shape_tree.shape_tree_choice {
     match choice {
       dsp::ShapeTreeChoice::Shape(shape) => lower_diagram_drawing_shape(
-        import,
-        slide,
-        drawing_resource,
+        drawing_context,
         shape,
-        &text_orders,
         transform,
         &mut drawing_items,
         &mut text_items,
-        page_index,
         summary.as_deref_mut(),
       ),
       dsp::ShapeTreeChoice::GroupShape(group) => lower_diagram_drawing_group(
-        import,
-        slide,
-        drawing_resource,
+        drawing_context,
         group,
-        &text_orders,
         transform,
         &mut drawing_items,
         &mut text_items,
-        page_index,
         summary.as_deref_mut(),
       ),
     }
@@ -1011,16 +1039,21 @@ fn lower_diagram_drawing(
   true
 }
 
+#[derive(Clone, Copy)]
+struct DiagramDrawingLoweringContext<'a> {
+  import: &'a PowerPointImport,
+  slide: &'a SlidePersist,
+  drawing_resource: &'a super::slide::DiagramDrawingResource,
+  text_orders: &'a HashMap<String, usize>,
+  page_index: usize,
+}
+
 fn lower_diagram_drawing_group(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  drawing_resource: &super::slide::DiagramDrawingResource,
+  context: DiagramDrawingLoweringContext<'_>,
   group: &dsp::GroupShape,
-  text_orders: &HashMap<String, usize>,
   parent_transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
-  page_index: usize,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let transform =
@@ -1028,27 +1061,19 @@ fn lower_diagram_drawing_group(
   for choice in &group.group_shape_choice {
     match choice {
       dsp::GroupShapeChoice::Shape(shape) => lower_diagram_drawing_shape(
-        import,
-        slide,
-        drawing_resource,
+        context,
         shape,
-        text_orders,
         transform,
         items,
         text_items,
-        page_index,
         summary.as_deref_mut(),
       ),
       dsp::GroupShapeChoice::GroupShape(group) => lower_diagram_drawing_group(
-        import,
-        slide,
-        drawing_resource,
+        context,
         group,
-        text_orders,
         transform,
         items,
         text_items,
-        page_index,
         summary.as_deref_mut(),
       ),
     }
@@ -1056,33 +1081,29 @@ fn lower_diagram_drawing_group(
 }
 
 fn lower_diagram_drawing_shape(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  drawing_resource: &super::slide::DiagramDrawingResource,
+  context: DiagramDrawingLoweringContext<'_>,
   shape: &dsp::Shape,
-  text_orders: &HashMap<String, usize>,
   transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
-  page_index: usize,
   mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let Some(bounds) = diagram_shape_bounds(&shape.shape_properties, transform) else {
     return;
   };
   if let Some(summary) = summary.as_deref_mut() {
-    record_diagram_draw_shape_summary(summary, page_index, shape, bounds, transform);
+    record_diagram_draw_shape_summary(summary, context.page_index, shape, bounds, transform);
   }
-  let fill_color =
-    diagram_shape_fill_color(import, slide, &shape.shape_properties).unwrap_or(RgbColor {
+  let fill_color = diagram_shape_fill_color(context.import, context.slide, &shape.shape_properties)
+    .unwrap_or(RgbColor {
       r: 255,
       g: 255,
       b: 255,
     });
   let fill_images = diagram_shape_blip_fill_image_items(
-    import,
-    slide,
-    drawing_resource,
+    context.import,
+    context.slide,
+    context.drawing_resource,
     &shape.shape_properties,
     bounds,
   );
@@ -1112,7 +1133,7 @@ fn lower_diagram_drawing_shape(
   let text_frame = diagram_drawing_text_frame(shape, bounds, transform, &text_body);
   record_smartart_text_shape(
     summary,
-    page_index,
+    context.page_index,
     &text_body,
     text_frame.text_area_x_pt,
     text_frame.text_area_y_pt,
@@ -1141,16 +1162,14 @@ fn lower_diagram_drawing_shape(
   }
   let mut lowered_text_items = Vec::new();
   lower_text_body_at_with_style(
-    import,
+    context.import,
     text_frame.frame,
     &text_body,
-    None,
-    None,
-    None,
-    None,
-    text_frame.rotation_center_pt,
-    None,
-    0,
+    TextStyleLoweringInputs {
+      rotation_center_pt: text_frame.rotation_center_pt,
+      ..TextStyleLoweringInputs::default()
+    },
+    TextLoweringRuntime::default(),
     None,
     &mut lowered_text_items,
   );
@@ -1159,7 +1178,8 @@ fn lower_diagram_drawing_shape(
       text.preserve_text_portion = true;
     }
   }
-  let order = text_orders
+  let order = context
+    .text_orders
     .get(shape.model_id.as_str())
     .copied()
     .unwrap_or(usize::MAX);
@@ -1180,29 +1200,33 @@ struct DiagramDrawingTextItem {
   item: PageItem,
 }
 
-fn lower_diagram_text_body_at_with_style_and_scale(
-  import: &PowerPointImport,
-  frame: TextFrame,
-  text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
-  table_text_style: Option<&TableStyleTextProperties>,
-  shape_hyperlink_url: Option<&str>,
+struct DiagramTextLoweringStyle<'a> {
+  font_reference: Option<&'a FontStyleReference>,
+  table_text_style: Option<&'a TableStyleTextProperties>,
+  shape_hyperlink_url: Option<&'a str>,
   base_font_size_pt: Option<f32>,
   font_scale: f32,
   line_scale: f32,
   shape_order: usize,
+}
+
+fn lower_diagram_text_body_at_with_style_and_scale(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  style_inputs: DiagramTextLoweringStyle<'_>,
   items: &mut Vec<DiagramDrawingTextItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
-  options.font_scale = font_scale;
-  options.line_scale = line_scale;
+  options.font_scale = style_inputs.font_scale;
+  options.line_scale = style_inputs.line_scale;
   options.rotation_center_pt = rotated_text_area_center(frame, options.rotation_deg);
   let base_style = text_base_style(
     import,
     text_body,
-    font_reference,
-    table_text_style,
-    base_font_size_pt,
+    style_inputs.font_reference,
+    style_inputs.table_text_style,
+    style_inputs.base_font_size_pt,
   );
   let estimated_height =
     estimate_wrapped_text_body_height(import, frame, text_body, &base_style, &options);
@@ -1220,26 +1244,30 @@ fn lower_diagram_text_body_at_with_style_and_scale(
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     let mut paragraph_items = Vec::new();
     lower_paragraph(
-      import,
+      ParagraphLoweringContext {
+        import,
+        base_style: &base_style,
+        options: &options,
+        frame,
+        shape_hyperlink_url: style_inputs.shape_hyperlink_url,
+        image_resources: None,
+        page_index: 0,
+      },
       paragraph,
       paragraph_index,
-      &base_style,
-      &options,
-      frame,
-      shape_hyperlink_url,
-      None,
-      0,
       None,
       &mut cursor,
       &mut paragraph_items,
     );
-    let order = paragraph.diagram_source_order.unwrap_or(shape_order);
+    let order = paragraph
+      .diagram_source_order
+      .unwrap_or(style_inputs.shape_order);
     items.extend(paragraph_items.into_iter().map(|mut item| {
       if let PageItem::Text(text_item) = &mut item {
         text_item.preserve_text_portion = true;
       }
       DiagramDrawingTextItem {
-        order: shape_order,
+        order: style_inputs.shape_order,
         paragraph_order: order,
         item,
       }
@@ -1465,16 +1493,20 @@ fn diagram_model_shape_blip_fill_image_items(
     blip_fill,
     blip,
     resource,
-    bounds.x,
-    bounds.y,
-    bounds.width,
-    bounds.height,
-    rotation_deg,
-    flip_horizontal,
-    flip_vertical,
-    false,
-    None,
-    None,
+    ImageFillPlacement {
+      frame: TextFrame {
+        x_pt: bounds.x,
+        y_pt: bounds.y,
+        width_pt: bounds.width,
+        height_pt: bounds.height,
+      },
+      rotation_deg,
+      flip_horizontal,
+      flip_vertical,
+      crop_bitmap: false,
+      alt_text: None,
+      hyperlink_url: None,
+    },
   )
 }
 
@@ -2070,16 +2102,20 @@ fn diagram_shape_blip_fill_image_items(
     blip_fill,
     blip,
     resource,
-    bounds.x,
-    bounds.y,
-    bounds.width,
-    bounds.height,
-    rotation_deg,
-    flip_horizontal,
-    flip_vertical,
-    false,
-    None,
-    None,
+    ImageFillPlacement {
+      frame: TextFrame {
+        x_pt: bounds.x,
+        y_pt: bounds.y,
+        width_pt: bounds.width,
+        height_pt: bounds.height,
+      },
+      rotation_deg,
+      flip_horizontal,
+      flip_vertical,
+      crop_bitmap: false,
+      alt_text: None,
+      hyperlink_url: None,
+    },
   )
 }
 
@@ -2290,7 +2326,7 @@ fn lower_shape_hyperlink(shape: &Shape, offset: DisplayOffset, items: &mut Vec<P
   let Some(hyperlink_url) = &shape.hyperlink_url else {
     return;
   };
-  if shape.service_name == ShapeService::GroupShape || shape.size.cx <= 0 || shape.size.cy <= 0 {
+  if shape.service_name == ShapeService::Group || shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
   items.push(PageItem::LinkArea(LinkAreaItem {
@@ -2374,10 +2410,12 @@ fn lower_table(
           cell,
           style_part.as_ref(),
           table_background,
-          x,
-          y,
-          cell_width,
-          row_height,
+          TextFrame {
+            x_pt: x,
+            y_pt: y,
+            width_pt: cell_width,
+            height_pt: row_height,
+          },
           items,
         );
       }
@@ -2468,63 +2506,33 @@ fn table_cell_style_part(
   // order: whole table, first/last row/column, horizontal banding, corners,
   // then vertical banding. Direct tcPr is merged afterwards by the caller.
   let mut result = TableStylePart::default();
-  merge_style_part(
-    import,
-    &mut result,
-    &style.whole_table,
-    true,
+  let cell_position = TableStyleCellPosition {
     column,
     max_column,
     row,
     max_row,
+    whole_table: false,
+  };
+  merge_style_part(
+    import,
+    &mut result,
+    &style.whole_table,
+    TableStyleCellPosition {
+      whole_table: true,
+      ..cell_position
+    },
   );
   if table.first_row && row == 0 {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.first_row,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.first_row, cell_position);
   }
   if table.last_row && row == max_row {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.last_row,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.last_row, cell_position);
   }
   if table.first_column && column == 0 {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.first_column,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.first_column, cell_position);
   }
   if table.last_column && column == max_column {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.last_column,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.last_column, cell_position);
   }
   if table.band_row
     && (!table.first_row || row != 0)
@@ -2540,64 +2548,19 @@ fn table_cell_style_part(
     } else {
       &style.band1_horizontal
     };
-    merge_style_part(
-      import,
-      &mut result,
-      part,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, part, cell_position);
   }
   if row == 0 && column == 0 {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.northwest_cell,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.northwest_cell, cell_position);
   }
   if row == max_row && column == 0 {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.southwest_cell,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.southwest_cell, cell_position);
   }
   if row == 0 && column == max_column {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.northeast_cell,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.northeast_cell, cell_position);
   }
   if row == max_row && column == max_column {
-    merge_style_part(
-      import,
-      &mut result,
-      &style.southeast_cell,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, &style.southeast_cell, cell_position);
   }
   if table.band_column
     && (!table.first_row || row != 0)
@@ -2611,44 +2574,31 @@ fn table_cell_style_part(
     } else {
       &style.band1_vertical
     };
-    merge_style_part(
-      import,
-      &mut result,
-      part,
-      false,
-      column,
-      max_column,
-      row,
-      max_row,
-    );
+    merge_style_part(import, &mut result, part, cell_position);
   }
   result
+}
+
+#[derive(Clone, Copy)]
+struct TableStyleCellPosition {
+  column: usize,
+  max_column: usize,
+  row: usize,
+  max_row: usize,
+  whole_table: bool,
 }
 
 fn merge_style_part(
   import: &PowerPointImport,
   target: &mut TableStylePart,
   source: &TableStylePart,
-  whole_table: bool,
-  column: usize,
-  max_column: usize,
-  row: usize,
-  max_row: usize,
+  cell_position: TableStyleCellPosition,
 ) {
   if let Some(fill) = table_style_part_fill(import, source) {
     target.fill_properties = Some(fill);
   }
   let mut borders = TableCellBorders::default();
-  merge_style_borders(
-    import,
-    &mut borders,
-    &source.borders,
-    whole_table,
-    column,
-    max_column,
-    row,
-    max_row,
-  );
+  merge_style_borders(import, &mut borders, &source.borders, cell_position);
   merge_cell_borders_from_style(&mut target.borders, &borders);
   target.text.merge_from(&source.text);
 }
@@ -2674,28 +2624,24 @@ fn merge_style_borders(
   import: &PowerPointImport,
   target: &mut TableCellBorders,
   source: &TableStyleBorders,
-  whole_table: bool,
-  column: usize,
-  max_column: usize,
-  row: usize,
-  max_row: usize,
+  cell_position: TableStyleCellPosition,
 ) {
-  if (!whole_table || column == 0)
+  if (!cell_position.whole_table || cell_position.column == 0)
     && let Some(line) = table_style_border_line(import, &source.left, &source.left_reference)
   {
     target.left = Some(line);
   }
-  if (!whole_table || column >= max_column)
+  if (!cell_position.whole_table || cell_position.column >= cell_position.max_column)
     && let Some(line) = table_style_border_line(import, &source.right, &source.right_reference)
   {
     target.right = Some(line);
   }
-  if (!whole_table || row == 0)
+  if (!cell_position.whole_table || cell_position.row == 0)
     && let Some(line) = table_style_border_line(import, &source.top, &source.top_reference)
   {
     target.top = Some(line);
   }
-  if (!whole_table || row >= max_row)
+  if (!cell_position.whole_table || cell_position.row >= cell_position.max_row)
     && let Some(line) = table_style_border_line(import, &source.bottom, &source.bottom_reference)
   {
     target.bottom = Some(line);
@@ -2705,10 +2651,10 @@ fn merge_style_borders(
     &source.inside_horizontal,
     &source.inside_horizontal_reference,
   ) {
-    if row != 0 {
+    if cell_position.row != 0 {
       target.top = Some(line.clone());
     }
-    if row != max_row {
+    if cell_position.row != cell_position.max_row {
       target.bottom = Some(line);
     }
   }
@@ -2717,10 +2663,10 @@ fn merge_style_borders(
     &source.inside_vertical,
     &source.inside_vertical_reference,
   ) {
-    if column != 0 {
+    if cell_position.column != 0 {
       target.left = Some(line.clone());
     }
-    if column != max_column {
+    if cell_position.column != cell_position.max_column {
       target.right = Some(line);
     }
   }
@@ -2800,22 +2746,19 @@ fn lower_table_cell(
   cell: &TableCell,
   style_part: Option<&TableStylePart>,
   table_background: Option<DisplayPaint>,
-  x: f32,
-  y: f32,
-  width: f32,
-  height: f32,
+  frame: TextFrame,
   items: &mut Vec<PageItem>,
 ) {
-  if width <= 0.0 || height <= 0.0 {
+  if frame.width_pt <= 0.0 || frame.height_pt <= 0.0 {
     return;
   }
   let fill = table_cell_fill_paint(import, cell, style_part, table_background);
   if let Some(fill) = fill {
     items.push(PageItem::Rect(RectItem {
-      x_pt: x,
-      y_pt: y,
-      width_pt: width,
-      height_pt: height,
+      x_pt: frame.x_pt,
+      y_pt: frame.y_pt,
+      width_pt: frame.width_pt,
+      height_pt: frame.height_pt,
       fill_color: Some(fill.color),
       fill_opacity: fill.opacity,
       stroke: None,
@@ -2823,7 +2766,15 @@ fn lower_table_cell(
     }));
   }
   let borders = table_cell_effective_borders(cell, style_part);
-  lower_table_cell_borders(import, &borders, x, y, width, height, items);
+  lower_table_cell_borders(
+    import,
+    &borders,
+    frame.x_pt,
+    frame.y_pt,
+    frame.width_pt,
+    frame.height_pt,
+    items,
+  );
 
   if let Some(text_body) = &cell.text_body {
     let mut text_body = text_body.clone();
@@ -2831,16 +2782,17 @@ fn lower_table_cell(
     text_body.display_properties.anchor = cell.anchor;
     text_body.display_properties.anchor_center = cell.anchor_center;
     text_body.display_properties.horizontal_overflow = Some(cell.horizontal_overflow);
-    let x = x + units::emu_to_points(i64::from(cell.margins.left));
-    let y = y + units::emu_to_points(i64::from(cell.margins.top));
+    let x = frame.x_pt + units::emu_to_points(i64::from(cell.margins.left));
+    let y = frame.y_pt + units::emu_to_points(i64::from(cell.margins.top));
     lower_text_body_at_with_table_style(
       import,
       TextFrame {
         x_pt: x,
         y_pt: y,
-        width_pt: (width - units::emu_to_points(i64::from(cell.margins.left + cell.margins.right)))
-          .max(0.0),
-        height_pt: (height
+        width_pt: (frame.width_pt
+          - units::emu_to_points(i64::from(cell.margins.left + cell.margins.right)))
+        .max(0.0),
+        height_pt: (frame.height_pt
           - units::emu_to_points(i64::from(cell.margins.top + cell.margins.bottom)))
         .max(0.0),
       },
@@ -3050,7 +3002,7 @@ fn lower_shape_bounds(
   offset: DisplayOffset,
   items: &mut Vec<PageItem>,
 ) {
-  if shape.service_name == ShapeService::GroupShape || shape.size.cx <= 0 || shape.size.cy <= 0 {
+  if shape.service_name == ShapeService::Group || shape.size.cx <= 0 || shape.size.cy <= 0 {
     return;
   }
 
@@ -3070,20 +3022,24 @@ fn lower_shape_bounds(
         import,
         slide,
         fill,
-        x_pt,
-        y_pt,
-        width_pt,
-        height_pt,
-        shape.rotation,
-        shape.flip_h,
-        shape.flip_v,
-        shape.custom_shape_properties.geometry.is_some(),
-        shape
-          .description
-          .clone()
-          .or_else(|| shape.title.clone())
-          .or_else(|| shape.name.clone()),
-        shape.hyperlink_url.clone(),
+        ImageFillPlacement {
+          frame: TextFrame {
+            x_pt,
+            y_pt,
+            width_pt,
+            height_pt,
+          },
+          rotation_deg: shape.rotation,
+          flip_horizontal: shape.flip_h,
+          flip_vertical: shape.flip_v,
+          crop_bitmap: shape.custom_shape_properties.geometry.is_some(),
+          alt_text: shape
+            .description
+            .clone()
+            .or_else(|| shape.title.clone())
+            .or_else(|| shape.name.clone()),
+          hyperlink_url: shape.hyperlink_url.clone(),
+        },
       )
     })
     .unwrap_or_default();
@@ -3122,20 +3078,22 @@ fn child_display_offset(shape: &Shape, offset: DisplayOffset) -> DisplayOffset {
   }
 }
 
-fn blip_fill_image_items(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  fill: &FillProperties,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
+#[derive(Clone, Debug)]
+struct ImageFillPlacement {
+  frame: TextFrame,
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
   crop_bitmap: bool,
   alt_text: Option<String>,
   hyperlink_url: Option<String>,
+}
+
+fn blip_fill_image_items(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  fill: &FillProperties,
+  placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
   let FillKind::Blip(blip_fill) = &fill.kind else {
     return Vec::new();
@@ -3149,23 +3107,7 @@ fn blip_fill_image_items(
   let Some(resource) = slide.image_resources.get(relationship_id) else {
     return Vec::new();
   };
-  blip_fill_image_items_from_resource(
-    import,
-    slide,
-    blip_fill,
-    blip,
-    resource,
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
-    rotation_deg,
-    flip_horizontal,
-    flip_vertical,
-    crop_bitmap,
-    alt_text,
-    hyperlink_url,
-  )
+  blip_fill_image_items_from_resource(import, slide, blip_fill, blip, resource, placement)
 }
 
 fn blip_fill_image_items_from_resource(
@@ -3174,16 +3116,7 @@ fn blip_fill_image_items_from_resource(
   blip_fill: &a::BlipFill,
   blip: &a::Blip,
   resource: &ImageResource,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
-  rotation_deg: f32,
-  flip_horizontal: bool,
-  flip_vertical: bool,
-  crop_bitmap: bool,
-  alt_text: Option<String>,
-  hyperlink_url: Option<String>,
+  placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
   let image_data = image_data_with_blip_effects(
     import,
@@ -3199,20 +3132,7 @@ fn blip_fill_image_items_from_resource(
 
   let crop = blip_fill_image_crop(blip_fill);
   if let Some(a::BlipFillChoice::Tile(tile)) = blip_fill.blip_fill_choice.as_ref() {
-    return tiled_blip_fill_image_items(
-      &image_data.data,
-      content_type,
-      tile,
-      x_pt,
-      y_pt,
-      width_pt,
-      height_pt,
-      rotation_deg,
-      flip_horizontal,
-      flip_vertical,
-      alt_text,
-      hyperlink_url,
-    );
+    return tiled_blip_fill_image_items(&image_data.data, content_type, tile, placement);
   }
 
   // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
@@ -3222,63 +3142,60 @@ fn blip_fill_image_items_from_resource(
       &image_data.data,
       content_type,
       &a::Tile::default(),
-      x_pt,
-      y_pt,
-      width_pt,
-      height_pt,
-      rotation_deg,
-      flip_horizontal,
-      flip_vertical,
-      alt_text,
-      hyperlink_url,
+      placement,
     );
   }
 
-  let (data, content_type, crop, flip_horizontal, flip_vertical) = if crop_bitmap
+  let (data, content_type, crop, flip_horizontal, flip_vertical) = if placement.crop_bitmap
     && ((blip_fill.source_rectangle.is_some() && crop != ImageCrop::default())
-      || flip_horizontal
-      || flip_vertical)
+      || placement.flip_horizontal
+      || placement.flip_vertical)
   {
-    transform_image_data_to_png(&image_data.data, crop, flip_horizontal, flip_vertical)
-      .map(|data| {
-        (
-          data,
-          Some("image/png".into()),
-          ImageCrop::default(),
-          false,
-          false,
-        )
-      })
-      .unwrap_or((
-        image_data.data,
-        content_type,
-        crop,
-        flip_horizontal,
-        flip_vertical,
-      ))
+    transform_image_data_to_png(
+      &image_data.data,
+      crop,
+      placement.flip_horizontal,
+      placement.flip_vertical,
+    )
+    .map(|data| {
+      (
+        data,
+        Some("image/png".into()),
+        ImageCrop::default(),
+        false,
+        false,
+      )
+    })
+    .unwrap_or((
+      image_data.data,
+      content_type,
+      crop,
+      placement.flip_horizontal,
+      placement.flip_vertical,
+    ))
   } else {
     (
       image_data.data,
       content_type,
       crop,
-      flip_horizontal,
-      flip_vertical,
+      placement.flip_horizontal,
+      placement.flip_vertical,
     )
   };
 
   vec![ImageItem {
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
+    x_pt: placement.frame.x_pt,
+    y_pt: placement.frame.y_pt,
+    width_pt: placement.frame.width_pt,
+    height_pt: placement.frame.height_pt,
     crop,
-    rotation_deg,
+    rotation_deg: placement.rotation_deg,
     flip_horizontal,
     flip_vertical,
     data,
     content_type,
-    alt_text,
-    hyperlink_url,
+    alt_text: placement.alt_text,
+    hyperlink_url: placement.hyperlink_url,
     floating: false,
     behind_text: false,
   }]
@@ -3288,18 +3205,10 @@ fn tiled_blip_fill_image_items(
   data: &[u8],
   content_type: Option<String>,
   tile: &a::Tile,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
-  rotation_deg: f32,
-  flip_horizontal: bool,
-  flip_vertical: bool,
-  alt_text: Option<String>,
-  hyperlink_url: Option<String>,
+  placement: ImageFillPlacement,
 ) -> Vec<ImageItem> {
   let (mut tile_width_pt, mut tile_height_pt) =
-    image_tile_size_pt(data).unwrap_or((width_pt, height_pt));
+    image_tile_size_pt(data).unwrap_or((placement.frame.width_pt, placement.frame.height_pt));
   let scale_x = tile
     .horizontal_ratio
     .as_ref()
@@ -3310,8 +3219,12 @@ fn tiled_blip_fill_image_items(
     .as_ref()
     .map(|value| value.as_ratio() as f32)
     .unwrap_or(1.0);
-  tile_width_pt = (tile_width_pt * scale_x).max(1.0).min(width_pt.max(1.0));
-  tile_height_pt = (tile_height_pt * scale_y).max(1.0).min(height_pt.max(1.0));
+  tile_width_pt = (tile_width_pt * scale_x)
+    .max(1.0)
+    .min(placement.frame.width_pt.max(1.0));
+  tile_height_pt = (tile_height_pt * scale_y)
+    .max(1.0)
+    .min(placement.frame.height_pt.max(1.0));
   let offset_x_pt = tile
     .horizontal_offset
     .map(|value| units::emu_to_points(value.to_emu()))
@@ -3321,26 +3234,26 @@ fn tiled_blip_fill_image_items(
     .map(|value| units::emu_to_points(value.to_emu()))
     .unwrap_or(0.0);
 
-  let mut start_x = x_pt + offset_x_pt % tile_width_pt;
-  while start_x > x_pt {
+  let mut start_x = placement.frame.x_pt + offset_x_pt % tile_width_pt;
+  while start_x > placement.frame.x_pt {
     start_x -= tile_width_pt;
   }
-  let mut start_y = y_pt + offset_y_pt % tile_height_pt;
-  while start_y > y_pt {
+  let mut start_y = placement.frame.y_pt + offset_y_pt % tile_height_pt;
+  while start_y > placement.frame.y_pt {
     start_y -= tile_height_pt;
   }
 
   let mut images = Vec::new();
   let mut y = start_y;
   let mut row = 0usize;
-  while y < y_pt + height_pt && images.len() < 256 {
+  while y < placement.frame.y_pt + placement.frame.height_pt && images.len() < 256 {
     let mut x = start_x;
     let mut column = 0usize;
-    while x < x_pt + width_pt && images.len() < 256 {
-      let item_x = x.max(x_pt);
-      let item_y = y.max(y_pt);
-      let item_right = (x + tile_width_pt).min(x_pt + width_pt);
-      let item_bottom = (y + tile_height_pt).min(y_pt + height_pt);
+    while x < placement.frame.x_pt + placement.frame.width_pt && images.len() < 256 {
+      let item_x = x.max(placement.frame.x_pt);
+      let item_y = y.max(placement.frame.y_pt);
+      let item_right = (x + tile_width_pt).min(placement.frame.x_pt + placement.frame.width_pt);
+      let item_bottom = (y + tile_height_pt).min(placement.frame.y_pt + placement.frame.height_pt);
       if item_right > item_x && item_bottom > item_y {
         let crop = ImageCrop {
           left: ((item_x - x) / tile_width_pt).max(0.0),
@@ -3355,13 +3268,13 @@ fn tiled_blip_fill_image_items(
           width_pt: item_right - item_x,
           height_pt: item_bottom - item_y,
           crop,
-          rotation_deg,
-          flip_horizontal: flip_horizontal ^ tile_flip_h,
-          flip_vertical: flip_vertical ^ tile_flip_v,
+          rotation_deg: placement.rotation_deg,
+          flip_horizontal: placement.flip_horizontal ^ tile_flip_h,
+          flip_vertical: placement.flip_vertical ^ tile_flip_v,
           data: data.to_vec(),
           content_type: content_type.clone(),
-          alt_text: alt_text.clone(),
-          hyperlink_url: hyperlink_url.clone(),
+          alt_text: placement.alt_text.clone(),
+          hyperlink_url: placement.hyperlink_url.clone(),
           floating: false,
           behind_text: false,
         });
@@ -3565,16 +3478,15 @@ fn apply_image_effects(
   let mut image = image::load_from_memory(&raster_data).ok()?.to_rgba8();
   for pixel in image.pixels_mut() {
     let [mut r, mut g, mut b, mut a] = pixel.0;
-    if let Some(effect) = effects.color_change {
-      if channel_within_tolerance(r, effect.from.r, effect.tolerance)
-        && channel_within_tolerance(g, effect.from.g, effect.tolerance)
-        && channel_within_tolerance(b, effect.from.b, effect.tolerance)
-      {
-        r = effect.to.r;
-        g = effect.to.g;
-        b = effect.to.b;
-        a = effect.alpha;
-      }
+    if let Some(effect) = effects.color_change
+      && channel_within_tolerance(r, effect.from.r, effect.tolerance)
+      && channel_within_tolerance(g, effect.from.g, effect.tolerance)
+      && channel_within_tolerance(b, effect.from.b, effect.tolerance)
+    {
+      r = effect.to.r;
+      g = effect.to.g;
+      b = effect.to.b;
+      a = effect.alpha;
     }
     if effects.grayscale {
       let luminance = image_luminance(r, g, b);
@@ -3782,9 +3694,7 @@ fn drawingml_percent_ratio(value: Option<&DrawingmlPercentageValue>) -> f32 {
 }
 
 fn lower_text_body(
-  import: &PowerPointImport,
-  slide: &SlidePersist,
-  page_index: usize,
+  context: PptxLoweringContext<'_>,
   shape: &Shape,
   offset: DisplayOffset,
   text_body: &TextBody,
@@ -3809,7 +3719,11 @@ fn lower_text_body(
   }
   let text_box = text_box_metrics(shape, offset, &text_body);
   lower_text_body_at_with_font_ref(
-    import,
+    TextBodyLoweringContext {
+      import: context.import,
+      image_resources: Some(&context.slide.image_resources),
+      page_index: context.page_index,
+    },
     text_box,
     &text_body,
     shape
@@ -3817,8 +3731,6 @@ fn lower_text_body(
       .as_ref()
       .map(|style| &style.font_reference),
     shape.hyperlink_url.as_deref(),
-    Some(&slide.image_resources),
-    page_index,
     summary,
     items,
   );
@@ -3835,56 +3747,72 @@ fn lower_text_body_at_with_table_style(
     import,
     frame,
     text_body,
-    None,
-    table_text_style,
-    None,
-    None,
-    None,
-    None,
-    0,
+    TextStyleLoweringInputs {
+      table_text_style,
+      ..TextStyleLoweringInputs::default()
+    },
+    TextLoweringRuntime::default(),
     None,
     items,
   );
 }
 
 fn lower_text_body_at_with_font_ref(
-  import: &PowerPointImport,
+  context: TextBodyLoweringContext<'_>,
   frame: TextFrame,
   text_body: &TextBody,
   font_reference: Option<&FontStyleReference>,
   shape_hyperlink_url: Option<&str>,
-  image_resources: Option<&HashMap<String, ImageResource>>,
-  page_index: usize,
   summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
   lower_text_body_at_with_style(
-    import,
+    context.import,
     frame,
     text_body,
-    font_reference,
-    None,
-    shape_hyperlink_url,
-    None,
-    None,
-    image_resources,
-    page_index,
+    TextStyleLoweringInputs {
+      font_reference,
+      shape_hyperlink_url,
+      ..TextStyleLoweringInputs::default()
+    },
+    TextLoweringRuntime {
+      image_resources: context.image_resources,
+      page_index: context.page_index,
+    },
     summary,
     items,
   );
+}
+
+#[derive(Clone, Copy)]
+struct TextBodyLoweringContext<'a> {
+  import: &'a PowerPointImport,
+  image_resources: Option<&'a HashMap<String, ImageResource>>,
+  page_index: usize,
+}
+
+#[derive(Clone, Copy, Default)]
+struct TextStyleLoweringInputs<'a> {
+  font_reference: Option<&'a FontStyleReference>,
+  table_text_style: Option<&'a TableStyleTextProperties>,
+  shape_hyperlink_url: Option<&'a str>,
+  base_font_size_pt: Option<f32>,
+  auto_fit_font_scale: Option<f32>,
+  rotation_center_pt: Option<(f32, f32)>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct TextLoweringRuntime<'a> {
+  image_resources: Option<&'a HashMap<String, ImageResource>>,
+  page_index: usize,
 }
 
 fn lower_text_body_at_with_style(
   import: &PowerPointImport,
   frame: TextFrame,
   text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
-  table_text_style: Option<&TableStyleTextProperties>,
-  shape_hyperlink_url: Option<&str>,
-  base_font_size_pt: Option<f32>,
-  rotation_center_pt: Option<(f32, f32)>,
-  image_resources: Option<&HashMap<String, ImageResource>>,
-  page_index: usize,
+  style_inputs: TextStyleLoweringInputs<'_>,
+  runtime: TextLoweringRuntime<'_>,
   summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
@@ -3892,14 +3820,8 @@ fn lower_text_body_at_with_style(
     import,
     frame,
     text_body,
-    font_reference,
-    table_text_style,
-    shape_hyperlink_url,
-    base_font_size_pt,
-    None,
-    rotation_center_pt,
-    image_resources,
-    page_index,
+    style_inputs,
+    runtime,
     summary,
     items,
   );
@@ -3909,28 +3831,23 @@ fn lower_text_body_at_with_style_and_scale(
   import: &PowerPointImport,
   frame: TextFrame,
   text_body: &TextBody,
-  font_reference: Option<&FontStyleReference>,
-  table_text_style: Option<&TableStyleTextProperties>,
-  shape_hyperlink_url: Option<&str>,
-  base_font_size_pt: Option<f32>,
-  auto_fit_font_scale: Option<f32>,
-  rotation_center_pt: Option<(f32, f32)>,
-  image_resources: Option<&HashMap<String, ImageResource>>,
-  page_index: usize,
+  style_inputs: TextStyleLoweringInputs<'_>,
+  runtime: TextLoweringRuntime<'_>,
   mut summary: Option<&mut PptxLayoutSummary>,
   items: &mut Vec<PageItem>,
 ) {
   let mut options = TextLoweringOptions::from_text_body(text_body);
-  options.rotation_center_pt =
-    rotation_center_pt.or_else(|| rotated_text_area_center(frame, options.rotation_deg));
+  options.rotation_center_pt = style_inputs
+    .rotation_center_pt
+    .or_else(|| rotated_text_area_center(frame, options.rotation_deg));
   let base_style = text_base_style(
     import,
     text_body,
-    font_reference,
-    table_text_style,
-    base_font_size_pt,
+    style_inputs.font_reference,
+    style_inputs.table_text_style,
+    style_inputs.base_font_size_pt,
   );
-  let (font_scale, line_scale) = auto_fit_font_scale.map_or_else(
+  let (font_scale, line_scale) = style_inputs.auto_fit_font_scale.map_or_else(
     || text_auto_fit_scales(import, frame, text_body, &base_style, &options),
     |font_scale| (font_scale, options.line_scale),
   );
@@ -3953,15 +3870,17 @@ fn lower_text_body_at_with_style_and_scale(
   let item_start = items.len();
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     lower_paragraph(
-      import,
+      ParagraphLoweringContext {
+        import,
+        base_style: &base_style,
+        options: &options,
+        frame,
+        shape_hyperlink_url: style_inputs.shape_hyperlink_url,
+        image_resources: runtime.image_resources,
+        page_index: runtime.page_index,
+      },
       paragraph,
       paragraph_index,
-      &base_style,
-      &options,
-      frame,
-      shape_hyperlink_url,
-      image_resources,
-      page_index,
       summary.as_deref_mut(),
       &mut cursor,
       items,
@@ -4131,44 +4050,43 @@ struct ShapeTextDistances100mm {
   bottom: i32,
 }
 
-fn draw_shape_summary_from_parts(
+struct DrawShapeSummaryParts<'a> {
   page_index: usize,
   shape_path: Vec<usize>,
   service_name: String,
   geometry: Option<String>,
   text: String,
-  x_pt: f32,
-  y_pt: f32,
-  width_pt: f32,
-  height_pt: f32,
-  fill: Option<&FillProperties>,
+  frame: TextFrame,
+  fill: Option<&'a FillProperties>,
   rotation_deg: f32,
   flip_h: bool,
   flip_v: bool,
   text_distances: Option<ShapeTextDistances100mm>,
-) -> PptxDrawShapeSummary {
+}
+
+fn draw_shape_summary_from_parts(parts: DrawShapeSummaryParts<'_>) -> PptxDrawShapeSummary {
   let (fill_style, gradient_style, gradient_angle) =
-    fill_summary(fill, rotation_deg, flip_h, flip_v);
+    fill_summary(parts.fill, parts.rotation_deg, parts.flip_h, parts.flip_v);
   PptxDrawShapeSummary {
-    page_index,
-    shape_path,
-    service_name,
-    geometry,
-    text,
-    left_100mm: points_to_100mm(x_pt),
-    top_100mm: points_to_100mm(y_pt),
-    right_100mm: points_to_100mm(x_pt + width_pt),
-    bottom_100mm: points_to_100mm(y_pt + height_pt),
-    width_100mm: points_to_100mm(width_pt),
-    height_100mm: points_to_100mm(height_pt),
+    page_index: parts.page_index,
+    shape_path: parts.shape_path,
+    service_name: parts.service_name,
+    geometry: parts.geometry,
+    text: parts.text,
+    left_100mm: points_to_100mm(parts.frame.x_pt),
+    top_100mm: points_to_100mm(parts.frame.y_pt),
+    right_100mm: points_to_100mm(parts.frame.x_pt + parts.frame.width_pt),
+    bottom_100mm: points_to_100mm(parts.frame.y_pt + parts.frame.height_pt),
+    width_100mm: points_to_100mm(parts.frame.width_pt),
+    height_100mm: points_to_100mm(parts.frame.height_pt),
     fill_style,
     fill_uses_slide_background: false,
     gradient_style,
     gradient_angle,
-    text_left_distance_100mm: text_distances.map(|distances| distances.left),
-    text_upper_distance_100mm: text_distances.map(|distances| distances.top),
-    text_right_distance_100mm: text_distances.map(|distances| distances.right),
-    text_lower_distance_100mm: text_distances.map(|distances| distances.bottom),
+    text_left_distance_100mm: parts.text_distances.map(|distances| distances.left),
+    text_upper_distance_100mm: parts.text_distances.map(|distances| distances.top),
+    text_right_distance_100mm: parts.text_distances.map(|distances| distances.right),
+    text_lower_distance_100mm: parts.text_distances.map(|distances| distances.bottom),
   }
 }
 
@@ -4304,35 +4222,39 @@ fn record_diagram_draw_shape_summary(
     .and_then(|transform| transform.rotation)
     .map(|rotation| rotation as f32 / 60_000.0)
     .unwrap_or_default();
-  summary.draw_shapes.push(draw_shape_summary_from_parts(
-    page_index,
-    Vec::new(),
-    "DiagramShape".to_string(),
-    diagram_geometry_name(&shape.shape_properties),
-    text_body
-      .as_ref()
-      .map(text_body_plain_text)
-      .unwrap_or_default(),
-    bounds.x,
-    bounds.y,
-    bounds.width,
-    bounds.height,
-    fill.as_ref(),
-    rotation_deg,
-    shape
-      .shape_properties
-      .transform2_d
-      .as_deref()
-      .and_then(|transform| transform.horizontal_flip)
-      .is_some_and(|value| value.as_bool()),
-    shape
-      .shape_properties
-      .transform2_d
-      .as_deref()
-      .and_then(|transform| transform.vertical_flip)
-      .is_some_and(|value| value.as_bool()),
-    text_distances,
-  ));
+  summary
+    .draw_shapes
+    .push(draw_shape_summary_from_parts(DrawShapeSummaryParts {
+      page_index,
+      shape_path: Vec::new(),
+      service_name: "DiagramShape".to_string(),
+      geometry: diagram_geometry_name(&shape.shape_properties),
+      text: text_body
+        .as_ref()
+        .map(text_body_plain_text)
+        .unwrap_or_default(),
+      frame: TextFrame {
+        x_pt: bounds.x,
+        y_pt: bounds.y,
+        width_pt: bounds.width,
+        height_pt: bounds.height,
+      },
+      fill: fill.as_ref(),
+      rotation_deg,
+      flip_h: shape
+        .shape_properties
+        .transform2_d
+        .as_deref()
+        .and_then(|transform| transform.horizontal_flip)
+        .is_some_and(|value| value.as_bool()),
+      flip_v: shape
+        .shape_properties
+        .transform2_d
+        .as_deref()
+        .and_then(|transform| transform.vertical_flip)
+        .is_some_and(|value| value.as_bool()),
+      text_distances,
+    }));
 }
 
 fn diagram_fill_properties(properties: &dsp::ShapeProperties) -> Option<FillProperties> {
@@ -4575,8 +4497,8 @@ fn text_body_frame_with_distances(
     }
     _ => {}
   }
-  for inset_index in 0..4 {
-    distances[offset_index] = offset_values[offset_index] + insets[inset_index];
+  for inset in insets {
+    distances[offset_index] = offset_values[offset_index] + inset;
     offset_index = (offset_index + 1) % 4;
   }
   if width_pt > 0.0 && distances[0] + distances[2] >= width_pt {
@@ -4598,26 +4520,33 @@ fn text_body_frame_with_distances(
   }
 }
 
+#[derive(Clone, Copy)]
+struct ParagraphLoweringContext<'a> {
+  import: &'a PowerPointImport,
+  base_style: &'a TextStyle,
+  options: &'a TextLoweringOptions,
+  frame: TextFrame,
+  shape_hyperlink_url: Option<&'a str>,
+  image_resources: Option<&'a HashMap<String, ImageResource>>,
+  page_index: usize,
+}
+
 fn lower_paragraph(
-  import: &PowerPointImport,
+  context: ParagraphLoweringContext<'_>,
   paragraph: &TextParagraph,
   paragraph_index: usize,
-  base_style: &TextStyle,
-  options: &TextLoweringOptions,
-  frame: TextFrame,
-  shape_hyperlink_url: Option<&str>,
-  image_resources: Option<&HashMap<String, ImageResource>>,
-  page_index: usize,
   summary: Option<&mut PptxLayoutSummary>,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
 ) {
   let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
-  let column_width = options.column_width(frame);
-  let column_x =
-    frame.x_pt + cursor.column_index as f32 * (column_width + options.column_spacing_pt);
+  let column_width = context.options.column_width(context.frame);
+  let column_x = context.frame.x_pt
+    + cursor.column_index as f32 * (column_width + context.options.column_spacing_pt);
   cursor.x_pt = column_x;
-  if options.clip_vertical_overflow && cursor.y_pt > frame.y_pt + frame.height_pt {
+  if context.options.clip_vertical_overflow
+    && cursor.y_pt > context.frame.y_pt + context.frame.height_pt
+  {
     return;
   }
   let mut bullet = paragraph_style.bullet(paragraph);
@@ -4625,14 +4554,20 @@ fn lower_paragraph(
     paragraph,
     &paragraph_style,
     &bullet,
-    base_style,
-    options,
-    image_resources,
+    context.base_style,
+    context.options,
+    context.image_resources,
   ) {
     bullet.graphic_width_100mm = Some(width);
     bullet.graphic_height_100mm = Some(height);
   }
-  record_bullet_paragraph(summary, page_index, paragraph_index, paragraph, &bullet);
+  record_bullet_paragraph(
+    summary,
+    context.page_index,
+    paragraph_index,
+    paragraph,
+    &bullet,
+  );
   let paragraph_x = cursor.x_pt
     + paragraph_style.left_margin_pt
     + if bullet.label.is_some() {
@@ -4650,14 +4585,14 @@ fn lower_paragraph(
       .map(|offset| segment_start + offset)
       .unwrap_or(paragraph.runs.len());
     let text_lines = layout_text_lines(
-      import,
+      context.import,
       &paragraph_style,
-      base_style,
-      options,
+      context.base_style,
+      context.options,
       &paragraph.runs[segment_start..segment_end],
       column_width,
     );
-    let alignment = if options.anchor_center {
+    let alignment = if context.options.anchor_center {
       // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
       // maps horizontal text with anchorCtr=1 to TextHorizontalAdjust_CENTER,
       // so the shape-level adjustment overrides paragraph alignment.
@@ -4668,48 +4603,50 @@ fn lower_paragraph(
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
       let mut run_x = aligned_paragraph_x(paragraph_x, column_width, text_line.width_pt, alignment);
-      let mut base_line_style = base_style.clone();
-      apply_text_scale(&mut base_line_style, options);
-      let mut max_line_height = paragraph_style.line_height(&base_line_style, options);
+      let mut base_line_style = context.base_style.clone();
+      apply_text_scale(&mut base_line_style, context.options);
+      let mut max_line_height = paragraph_style.line_height(&base_line_style, context.options);
 
       if is_first_segment
         && line_index == 0
         && let Some(label) = bullet.label.clone()
       {
-        let mut bullet_style = base_style.clone();
-        paragraph_style.apply_default_run_style(import, &mut bullet_style);
+        let mut bullet_style = context.base_style.clone();
+        paragraph_style.apply_default_run_style(context.import, &mut bullet_style);
         if let Some(font) = bullet.font.as_deref() {
           bullet_style.font_family = Some(Arc::from(font));
         }
-        apply_text_scale(&mut bullet_style, options);
-        let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
+        apply_text_scale(&mut bullet_style, context.options);
+        let bullet_line_height = paragraph_style.line_height(&bullet_style, context.options);
         max_line_height = max_line_height.max(bullet_line_height);
         if let Some(graphic) = bullet_graphic_item(
           &bullet,
-          image_resources,
+          context.image_resources,
           run_x + paragraph_style.indent_pt,
           cursor.y_pt,
           &bullet_style,
-          shape_hyperlink_url,
+          context.shape_hyperlink_url,
         ) {
           items.push(PageItem::Image(graphic));
         } else {
           push_text_item(
             items,
-            run_x + paragraph_style.indent_pt,
-            cursor.y_pt,
+            TextItemPlacement {
+              x_pt: run_x + paragraph_style.indent_pt,
+              y_pt: cursor.y_pt,
+              line_height_pt: bullet_line_height,
+              rotation_center_pt: context.options.rotation_center_pt,
+            },
             label,
             bullet_style,
-            shape_hyperlink_url.map(ToString::to_string),
-            bullet_line_height,
-            options.rotation_center_pt,
+            context.shape_hyperlink_url.map(ToString::to_string),
           );
         }
       }
 
       for line_run in &text_line.runs {
         let style = line_run.style.clone();
-        let run_line_height = paragraph_style.line_height(&style, options);
+        let run_line_height = paragraph_style.line_height(&style, context.options);
         max_line_height = max_line_height.max(run_line_height);
         if line_run.run.kind == TextRunKind::Math {
           push_math_ole_preview_item(
@@ -4724,22 +4661,24 @@ fn lower_paragraph(
           .run
           .hyperlink_url
           .clone()
-          .or_else(|| shape_hyperlink_url.map(ToString::to_string));
+          .or_else(|| context.shape_hyperlink_url.map(ToString::to_string));
         push_symbol_split_text_items(
           items,
-          run_x,
-          cursor.y_pt,
+          TextItemPlacement {
+            x_pt: run_x,
+            y_pt: cursor.y_pt,
+            line_height_pt: run_line_height,
+            rotation_center_pt: context.options.rotation_center_pt,
+          },
           &line_run.text,
           &style,
-          run_line_height,
           hyperlink_url,
-          options.rotation_center_pt,
         );
         run_x += line_run.width_pt;
       }
 
       cursor.y_pt += max_line_height;
-      advance_text_column_if_needed(cursor, frame, *options);
+      advance_text_column_if_needed(cursor, context.frame, *context.options);
     }
 
     if segment_end == paragraph.runs.len() {
@@ -4910,23 +4849,28 @@ fn aligned_paragraph_x(
   }
 }
 
-fn push_text_item(
-  items: &mut Vec<PageItem>,
+#[derive(Clone, Copy)]
+struct TextItemPlacement {
   x_pt: f32,
   y_pt: f32,
+  line_height_pt: f32,
+  rotation_center_pt: Option<(f32, f32)>,
+}
+
+fn push_text_item(
+  items: &mut Vec<PageItem>,
+  placement: TextItemPlacement,
   text: String,
   style: TextStyle,
   hyperlink_url: Option<String>,
-  line_height_pt: f32,
-  rotation_center_pt: Option<(f32, f32)>,
 ) {
   items.push(PageItem::Text(TextItem {
-    x_pt,
-    y_pt,
-    line_height_pt,
+    x_pt: placement.x_pt,
+    y_pt: placement.y_pt,
+    line_height_pt: placement.line_height_pt,
     text,
     style,
-    rotation_center_pt,
+    rotation_center_pt: placement.rotation_center_pt,
     hyperlink_url,
     dynamic_field: None,
     style_ref_keys: Vec::new(),
@@ -4941,24 +4885,18 @@ fn push_text_item(
 
 fn push_symbol_split_text_items(
   items: &mut Vec<PageItem>,
-  mut x_pt: f32,
-  y_pt: f32,
+  mut placement: TextItemPlacement,
   text: &str,
   style: &TextStyle,
-  line_height_pt: f32,
   hyperlink_url: Option<String>,
-  rotation_center_pt: Option<(f32, f32)>,
 ) {
   let Some(symbol_font) = style.symbol_font_family.as_deref() else {
     push_text_item(
       items,
-      x_pt,
-      y_pt,
+      placement,
       text.to_string(),
       style.clone(),
       hyperlink_url,
-      line_height_pt,
-      rotation_center_pt,
     );
     return;
   };
@@ -4972,17 +4910,14 @@ fn push_symbol_split_text_items(
       current.push(ch);
       continue;
     }
-    x_pt = push_text_segment(
+    placement.x_pt = push_text_segment(
       items,
-      x_pt,
-      y_pt,
+      placement,
       &current,
       style,
       current_symbol == Some(true),
       symbol_font,
       hyperlink_url.clone(),
-      line_height_pt,
-      rotation_center_pt,
     );
     current.clear();
     current_symbol = Some(is_symbol);
@@ -4991,30 +4926,24 @@ fn push_symbol_split_text_items(
   if !current.is_empty() {
     push_text_segment(
       items,
-      x_pt,
-      y_pt,
+      placement,
       &current,
       style,
       current_symbol == Some(true),
       symbol_font,
       hyperlink_url,
-      line_height_pt,
-      rotation_center_pt,
     );
   }
 }
 
 fn push_text_segment(
   items: &mut Vec<PageItem>,
-  x_pt: f32,
-  y_pt: f32,
+  placement: TextItemPlacement,
   text: &str,
   style: &TextStyle,
   use_symbol_font: bool,
   symbol_font: &str,
   hyperlink_url: Option<String>,
-  line_height_pt: f32,
-  rotation_center_pt: Option<(f32, f32)>,
 ) -> f32 {
   let mut segment_style = style.clone();
   if use_symbol_font {
@@ -5022,15 +4951,12 @@ fn push_text_segment(
   }
   push_text_item(
     items,
-    x_pt,
-    y_pt,
+    placement,
     text.to_string(),
     segment_style.clone(),
     hyperlink_url,
-    line_height_pt,
-    rotation_center_pt,
   );
-  x_pt + measure_text(text, &segment_style)
+  placement.x_pt + measure_text(text, &segment_style)
 }
 
 fn is_drawingml_symbol_char(ch: char) -> bool {
@@ -5908,13 +5834,13 @@ fn level_bullet_label(choice: &impl BulletChoice) -> Option<BulletKind> {
       label: Some("1.".to_string()),
       picture_relationship_id: None,
     })
-  } else if let Some(relationship_id) = choice.picture_relationship_id() {
-    Some(BulletKind {
-      label: Some("\u{2022}".to_string()),
-      picture_relationship_id: Some(relationship_id),
-    })
   } else {
-    None
+    choice
+      .picture_relationship_id()
+      .map(|relationship_id| BulletKind {
+        label: Some("\u{2022}".to_string()),
+        picture_relationship_id: Some(relationship_id),
+      })
   }
 }
 

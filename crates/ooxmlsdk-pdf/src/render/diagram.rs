@@ -440,10 +440,10 @@ struct LayoutAlgorithm {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum LinearDirection {
   #[default]
-  FromLeft,
-  FromRight,
-  FromTop,
-  FromBottom,
+  Left,
+  Right,
+  Top,
+  Bottom,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1178,9 +1178,7 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         text_order = *source_order;
       }
     }
-    if self.tree.is_none() {
-      return None;
-    }
+    self.tree.as_ref()?;
     let active_algorithms = self.active_algorithms(layout_node);
     let has_geometry = shape_atom
       .and_then(|shape| shape.r#type.as_deref())
@@ -1600,7 +1598,7 @@ fn direct_constraints_unfiltered(node: &dgm::LayoutNode) -> Vec<DiagramConstrain
       dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints.as_ref()),
       _ => None,
     })
-    .flat_map(|constraints| parse_constraints_unfiltered(constraints))
+    .flat_map(parse_constraints_unfiltered)
     .collect()
 }
 
@@ -1940,10 +1938,10 @@ fn text_anchor_vertical_from_value(value: &str) -> dgm::TextAnchorVerticalValues
 
 fn linear_direction_from_value(value: &str) -> LinearDirection {
   match value {
-    "fromR" => LinearDirection::FromRight,
-    "fromT" => LinearDirection::FromTop,
-    "fromB" => LinearDirection::FromBottom,
-    _ => LinearDirection::FromLeft,
+    "fromR" => LinearDirection::Right,
+    "fromT" => LinearDirection::Top,
+    "fromB" => LinearDirection::Bottom,
+    _ => LinearDirection::Left,
   }
 }
 
@@ -2308,17 +2306,17 @@ fn linear_layout_tree(
   }
   let horizontal = matches!(
     algorithm.linear_direction,
-    LinearDirection::FromLeft | LinearDirection::FromRight
+    LinearDirection::Left | LinearDirection::Right
   );
   let reverse = matches!(
     algorithm.linear_direction,
-    LinearDirection::FromRight | LinearDirection::FromBottom
+    LinearDirection::Right | LinearDirection::Bottom
   );
   let connector_angle = match algorithm.linear_direction {
-    LinearDirection::FromLeft => 0.0,
-    LinearDirection::FromRight => 180.0,
-    LinearDirection::FromTop => 270.0,
-    LinearDirection::FromBottom => 90.0,
+    LinearDirection::Left => 0.0,
+    LinearDirection::Right => 180.0,
+    LinearDirection::Top => 270.0,
+    LinearDirection::Bottom => 90.0,
   };
   let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
   for constraint in constraints
@@ -2658,7 +2656,7 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
   }
 
   let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
-    LinearDirection::FromTop
+    LinearDirection::Top
   } else {
     algorithm.linear_direction
   };
@@ -2688,13 +2686,9 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     }
   }
 
-  let horizontal_shapes_count = if algorithm.secondary_linear_direction == LinearDirection::FromTop
-  {
+  let horizontal_shapes_count = if algorithm.secondary_linear_direction == LinearDirection::Top {
     2
-  } else if matches!(
-    direction,
-    LinearDirection::FromLeft | LinearDirection::FromRight
-  ) {
+  } else if matches!(direction, LinearDirection::Left | LinearDirection::Right) {
     count
   } else {
     1
@@ -2735,17 +2729,14 @@ fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm
     child.width = child_width;
     child.height = height;
 
-    if matches!(
-      direction,
-      LinearDirection::FromTop | LinearDirection::FromBottom
-    ) {
+    if matches!(direction, LinearDirection::Top | LinearDirection::Bottom) {
       y += lo_i32(height + child_height * space_height);
     } else {
       x += lo_i32(child_width + child_width * space_width);
     }
     row_height = row_height.max(height);
 
-    if algorithm.secondary_linear_direction == LinearDirection::FromTop && index % 2 == 1 {
+    if algorithm.secondary_linear_direction == LinearDirection::Top && index % 2 == 1 {
       x = 0.0;
       y += lo_i32(row_height + child_height * space_height);
       row_height = 0.0;
@@ -2762,27 +2753,21 @@ fn vertical_shapes_count(node: &DiagramShapeNode) -> usize {
     return if node.is_connector { 0 } else { 1 };
   }
   let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
-    LinearDirection::FromTop
+    LinearDirection::Top
   } else {
     algorithm.linear_direction
   };
-  if matches!(
-    direction,
-    LinearDirection::FromTop | LinearDirection::FromBottom
-  ) {
+  if matches!(direction, LinearDirection::Top | LinearDirection::Bottom) {
     node.children.iter().map(vertical_shapes_count).sum()
-  } else if matches!(
-    direction,
-    LinearDirection::FromLeft | LinearDirection::FromRight
-  ) && algorithm.secondary_linear_direction == LinearDirection::FromTop
+  } else if matches!(direction, LinearDirection::Left | LinearDirection::Right)
+    && algorithm.secondary_linear_direction == LinearDirection::Top
   {
-    (node
+    node
       .children
       .iter()
       .map(vertical_shapes_count)
       .sum::<usize>()
-      + 1)
-      / 2
+      .div_ceil(2)
   } else {
     node
       .children
@@ -3004,7 +2989,7 @@ fn snake_layout_tree(
       }
       ContinueDirection::ReverseDirection => {
         if (placed % columns == 0 || placed / columns + 1 != rows)
-          && (placed / columns + 1) % 2 != 0
+          && !(placed / columns + 1).is_multiple_of(2)
         {
           x += lo_i32(current_width + space * current_width);
         } else if placed % columns != 0 && placed / columns + 1 != rows {
@@ -3016,17 +3001,17 @@ fn snake_layout_tree(
             && placed + 1 >= 4
             && (placed + 1) / columns + 1 == rows
             && count != rows * columns
-            && (placed / columns + 1) % 2 == 0
+            && (placed / columns + 1).is_multiple_of(2)
           {
             x -= current_width * 3.0 / 2.0;
           } else if (placed + 1) % columns != 0
             && placed + 1 >= 4
             && (placed + 1) / columns + 1 == rows
             && count != rows * columns
-            && (placed / columns + 1) % 2 != 0
+            && !(placed / columns + 1).is_multiple_of(2)
           {
             x = start_x + lo_i32(increment_x * (current_width + space * current_width)) / 2.0;
-          } else if (placed / columns + 1) % 2 != 0 {
+          } else if !(placed / columns + 1).is_multiple_of(2) {
             x = start_x;
           }
           y += increment_y * lo_i32(child_height + space * child_height);
@@ -3035,13 +3020,13 @@ fn snake_layout_tree(
         if placed % columns != 0
           && placed >= 3
           && placed / columns + 1 == rows
-          && (placed / columns + 1) % 2 == 0
+          && (placed / columns + 1).is_multiple_of(2)
         {
           x -= increment_x * lo_i32(current_width + space * current_width);
         } else if placed % columns != 0
           && placed >= 3
           && placed / columns + 1 == rows
-          && (placed / columns + 1) % 2 != 0
+          && !(placed / columns + 1).is_multiple_of(2)
         {
           x += increment_x * lo_i32(current_width + space * current_width);
         }

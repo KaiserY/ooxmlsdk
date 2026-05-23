@@ -10,12 +10,8 @@ const SKIP_PLACEHOLDER_INDEX: u32 = u32::MAX;
 #[derive(Clone, Debug)]
 pub(crate) struct PptShape {
   pub(crate) shape: Shape,
-  pub(crate) model_id: Option<String>,
   pub(crate) shape_location: ShapeLocation,
-  pub(crate) referenced: bool,
-  pub(crate) placeholder: Option<Box<Shape>>,
   pub(crate) placeholder_reference_path: Option<Vec<usize>>,
-  pub(crate) has_noninherited_shape_properties: bool,
 }
 
 impl PptShape {
@@ -24,21 +20,9 @@ impl PptShape {
     shape.shape_location = Some(shape_location);
     Self {
       shape,
-      model_id: None,
       shape_location,
-      referenced: false,
-      placeholder: None,
       placeholder_reference_path: None,
-      has_noninherited_shape_properties: false,
     }
-  }
-
-  pub(crate) fn add_shape(self, slide_persist: &mut SlidePersist) {
-    // Source: LibreOffice oox/source/ppt/pptshape.cxx
-    // PPTShape::addShape selects service names and applies placeholder text
-    // styles before generic DrawingML createAndInsert.
-    let shape = self.into_shape(slide_persist);
-    slide_persist.shapes.push(shape);
   }
 
   pub(crate) fn into_shape(mut self, slide_persist: &SlidePersist) -> Shape {
@@ -148,10 +132,6 @@ impl PptShape {
     slide_persist.get_sub_type_text_list_style(self.shape.sub_type)
   }
 
-  pub(crate) fn is_placeholder_candidate(&self) -> bool {
-    self.shape.sub_type.is_some() || self.shape.sub_type_index.is_some()
-  }
-
   pub(crate) fn set_text_master_styles(&mut self, slide_persist: &SlidePersist) {
     // Source: LibreOffice oox/source/ppt/pptshape.cxx
     // PPTShape::addShape merges master text list style, placeholder text body
@@ -183,10 +163,6 @@ impl PptShape {
     if !style.is_empty() {
       self.shape.set_master_text_list_style(style);
     }
-  }
-
-  pub(crate) fn set_has_noninherited_shape_properties(&mut self) {
-    self.has_noninherited_shape_properties = true;
   }
 
   fn apply_empty_placeholder_text(&mut self, slide_persist: &SlidePersist) {

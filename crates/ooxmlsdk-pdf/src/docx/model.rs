@@ -79,9 +79,15 @@ pub(crate) enum SectionBreakKind {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Block {
-  Paragraph(Paragraph),
+  Paragraph(Box<Paragraph>),
   Table(Table),
   Frame(FloatingFrame),
+}
+
+impl Block {
+  pub(crate) fn paragraph(paragraph: Paragraph) -> Self {
+    Self::Paragraph(Box::new(paragraph))
+  }
 }
 
 #[derive(Clone, Debug)]

@@ -436,7 +436,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         format: Box::new(crate::docx::ParagraphFormat::default()),
         style_ref_keys: Vec::new(),
         style_ref_text: None,
@@ -548,7 +548,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         inlines: vec![
           crate::docx::InlineItem::Text(base.clone()),
           crate::docx::InlineItem::Text(shifted.clone()),
@@ -626,7 +626,7 @@ mod tests {
         endnote_blocks: Vec::new(),
         endnotes: Default::default(),
         comment_blocks: Vec::new(),
-        blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
           inlines: vec![
             crate::docx::InlineItem::Text(tall.clone()),
             crate::docx::InlineItem::Text(next.clone()),
@@ -698,7 +698,7 @@ mod tests {
 
     fn cell(text: &str, width: f32) -> crate::docx::TableCell {
       crate::docx::TableCell {
-        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        blocks: vec![crate::docx::Block::paragraph(paragraph(text))],
         shading: None,
         borders: crate::docx::CellBordersModel::default(),
         margins: crate::docx::CellMargins {
@@ -809,7 +809,7 @@ mod tests {
 
     fn cell(text: &str, borders: crate::docx::CellBordersModel) -> crate::docx::TableCell {
       crate::docx::TableCell {
-        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        blocks: vec![crate::docx::Block::paragraph(paragraph(text))],
         shading: None,
         borders,
         margins: crate::docx::CellMargins::default(),
@@ -953,7 +953,7 @@ mod tests {
 
     fn cell(text: &str) -> crate::docx::TableCell {
       crate::docx::TableCell {
-        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        blocks: vec![crate::docx::Block::paragraph(paragraph(text))],
         shading: None,
         borders: crate::docx::CellBordersModel::default(),
         margins: crate::docx::CellMargins::default(),
@@ -1072,7 +1072,7 @@ mod tests {
       cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
         cells: vec![crate::docx::TableCell {
-          blocks: vec![crate::docx::Block::Paragraph(paragraph("B"))],
+          blocks: vec![crate::docx::Block::paragraph(paragraph("B"))],
           shading: None,
           borders: crate::docx::CellBordersModel::default(),
           margins: crate::docx::CellMargins::default(),
@@ -1149,7 +1149,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         format: Box::new(crate::docx::ParagraphFormat::default()),
         style_ref_keys: Vec::new(),
         style_ref_text: None,
@@ -1240,7 +1240,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         format: Box::new(format),
         style_ref_keys: Vec::new(),
         style_ref_text: None,
@@ -1344,7 +1344,7 @@ mod tests {
       sections: Vec::new(),
       title_page: true,
       header_blocks: Vec::new(),
-      first_header_blocks: vec![crate::docx::Block::Paragraph(paragraph(
+      first_header_blocks: vec![crate::docx::Block::paragraph(paragraph(
         "First only header",
         false,
       ))],
@@ -1356,8 +1356,8 @@ mod tests {
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
       blocks: vec![
-        crate::docx::Block::Paragraph(paragraph("F1", false)),
-        crate::docx::Block::Paragraph(paragraph("S2", true)),
+        crate::docx::Block::paragraph(paragraph("F1", false)),
+        crate::docx::Block::paragraph(paragraph("S2", true)),
       ],
     };
 
@@ -1406,7 +1406,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Image(image)],
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
@@ -1562,8 +1562,8 @@ mod tests {
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
       blocks: vec![
-        crate::docx::Block::Paragraph(anchor),
-        crate::docx::Block::Paragraph(following),
+        crate::docx::Block::paragraph(anchor),
+        crate::docx::Block::paragraph(following),
       ],
     };
 
@@ -1661,7 +1661,7 @@ mod tests {
       endnote_blocks: Vec::new(),
       endnotes: Default::default(),
       comment_blocks: Vec::new(),
-      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+      blocks: vec![crate::docx::Block::paragraph(crate::docx::Paragraph {
         inlines: vec![
           crate::docx::InlineItem::Image(image),
           crate::docx::InlineItem::Text(run.clone()),

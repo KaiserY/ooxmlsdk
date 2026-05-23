@@ -57,8 +57,8 @@ impl SlideSize {
 
   pub(crate) fn from_notes(size: &p::NotesSize) -> Self {
     Self {
-      width_pt: units::emu_to_points(i64::from(size.cx)),
-      height_pt: units::emu_to_points(i64::from(size.cy)),
+      width_pt: units::emu_to_points(size.cx),
+      height_pt: units::emu_to_points(size.cy),
     }
   }
 
@@ -96,7 +96,6 @@ pub(crate) enum ShapeLocation {
 #[derive(Clone, Debug)]
 pub(crate) struct SlidePersist {
   pub(crate) path: String,
-  pub(crate) relationship_id: Option<String>,
   pub(crate) layout_path: Option<String>,
   pub(crate) master_path: Option<String>,
   pub(crate) size: SlideSize,
@@ -115,9 +114,7 @@ pub(crate) struct SlidePersist {
   pub(crate) body_text_style: Option<TextListStyle>,
   pub(crate) notes_text_style: Option<TextListStyle>,
   pub(crate) other_text_style: Option<TextListStyle>,
-  pub(crate) time_node_list: Vec<TimeNode>,
   pub(crate) header_footer: HeaderFooter,
-  pub(crate) layout_value_token: Option<String>,
   pub(crate) is_master: bool,
   pub(crate) is_notes: bool,
   pub(crate) comments: Vec<SlideComment>,
@@ -341,13 +338,6 @@ pub(crate) struct DiagramDrawingResource {
   pub(crate) path: Option<String>,
   pub(crate) drawing: dsp::Drawing,
   pub(crate) image_resources: HashMap<String, ImageResource>,
-}
-
-impl DiagramDrawingResource {
-  pub(crate) fn has_payload(&self) -> bool {
-    self.path.as_ref().is_some_and(|path| !path.is_empty())
-      || structured_resource_present(&self.drawing)
-  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -605,9 +595,6 @@ pub(crate) enum BackgroundKind {
     placeholder_color: Option<Color>,
   },
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct TimeNode;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct HeaderFooter {
@@ -884,7 +871,7 @@ impl SlidePersist {
 
   fn new(
     path: String,
-    relationship_id: Option<String>,
+    _relationship_id: Option<String>,
     size: SlideSize,
     is_master: bool,
     is_notes: bool,
@@ -892,7 +879,6 @@ impl SlidePersist {
   ) -> Self {
     Self {
       path,
-      relationship_id,
       layout_path: None,
       master_path: None,
       size,
@@ -911,9 +897,7 @@ impl SlidePersist {
       body_text_style: None,
       notes_text_style: None,
       other_text_style: None,
-      time_node_list: Vec::new(),
       header_footer: HeaderFooter::default(),
-      layout_value_token: None,
       is_master,
       is_notes,
       comments: Vec::new(),
@@ -936,10 +920,6 @@ impl SlidePersist {
       media_resources: HashMap::new(),
       hyperlink_targets: HashMap::new(),
     }
-  }
-
-  pub(crate) fn get_layout_from_value_token(&self) -> Option<String> {
-    self.layout_value_token.clone()
   }
 
   pub(crate) fn set_color_map(&mut self, color_map: ColorMap) {

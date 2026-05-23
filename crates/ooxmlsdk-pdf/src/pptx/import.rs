@@ -30,7 +30,6 @@ pub(crate) struct PowerPointImport {
   pub(crate) actual_slide_persist_context: Option<Box<SlidePersist>>,
   pub(crate) table_style_list_path: Option<String>,
   pub(crate) table_style_list: Option<TableStyleList>,
-  pub(crate) chart_converter: ChartConverter,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -42,9 +41,6 @@ pub(crate) struct ThemeFragmentRecord {
   pub(crate) font_scheme: ThemeFontScheme,
   pub(crate) format_scheme: ThemeFormatScheme,
 }
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct ChartConverter;
 
 impl PowerPointImport {
   pub(crate) fn import_document(package: &mut PresentationDocument) -> Result<Self> {
@@ -68,17 +64,12 @@ impl PowerPointImport {
       actual_slide_persist_context: None,
       table_style_list_path: None,
       table_style_list: None,
-      chart_converter: ChartConverter,
     };
 
     let mut handler = PresentationFragmentHandler::new(package, presentation_part.clone())?;
     handler.finalize_import(package, &mut import)?;
     import.load_table_style_list(package, &presentation_part)?;
     Ok(import)
-  }
-
-  pub(crate) fn get_current_theme(&self) -> Option<&ThemeFragmentRecord> {
-    self.get_current_theme_ptr()
   }
 
   pub(crate) fn get_current_theme_ptr(&self) -> Option<&ThemeFragmentRecord> {
@@ -195,17 +186,6 @@ impl PowerPointImport {
     self.get_scheme_color_token(token)
   }
 
-  pub(crate) fn get_scheme_color(&self, token: a::SchemeColorValues) -> Option<String> {
-    // Source: LibreOffice oox/source/ppt/pptimport.cxx
-    // getSchemeColor first maps the scheme token using the active slide/layout
-    // and master color maps, then resolves the mapped token against the current
-    // DrawingML theme. Do not return a token string as if it were a resolved
-    // color; theme color-scheme import must be ported from upstream first.
-    self
-      .resolve_color(self.get_scheme_color_record(token)?, None)
-      .map(|color| format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b))
-  }
-
   pub(crate) fn get_scheme_color_record(&self, token: a::SchemeColorValues) -> Option<&Color> {
     let mapped_token = self.get_scheme_color_token(token)?;
     self
@@ -285,14 +265,6 @@ impl PowerPointImport {
     self.get_table_styles()?.style(style_id)
   }
 
-  pub(crate) fn get_vml_drawing(&self) -> Option<()> {
-    None
-  }
-
-  pub(crate) fn get_chart_converter(&self) -> &ChartConverter {
-    &self.chart_converter
-  }
-
   pub(crate) fn set_actual_slide_persist(&mut self, index: Option<usize>) {
     self.actual_slide_persist = index;
     if index.is_none() {
@@ -334,11 +306,4 @@ impl PowerPointImport {
     self.table_style_list = Some(TableStyleList::from_dml(path, table_style_list));
     Ok(())
   }
-}
-
-pub(crate) fn part_path(package: &PresentationDocument, part: &PresentationPart) -> String {
-  part
-    .path(package)
-    .map(str::to_string)
-    .unwrap_or_else(|| "<presentation>".to_string())
 }

@@ -8,11 +8,6 @@ use super::line::LineProperties;
 use super::shape_properties::EffectProperties;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Theme {
-  pub(crate) path: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ThemeColorScheme {
   pub(crate) name: String,
   pub(crate) entries: Vec<ThemeColorEntry>,

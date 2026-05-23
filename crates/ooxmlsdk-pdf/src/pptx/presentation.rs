@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use ooxmlsdk::parts::notes_master_part::NotesMasterPart;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::presentation_part::PresentationPart;
@@ -12,7 +10,7 @@ use crate::error::Result;
 
 use super::drawingml::text_list_style::TextListStyle;
 use super::drawingml::theme::{ThemeColorScheme, ThemeFontScheme, ThemeFormatScheme};
-use super::import::{PowerPointImport, part_path};
+use super::import::PowerPointImport;
 use super::slide::{ColorMap, ShapeLocation, SlideCommentAuthor, SlidePersist, SlideSize};
 use super::slide_fragment::SlideFragmentHandler;
 
@@ -22,18 +20,14 @@ pub(crate) struct PresentationFragmentHandler {
   slide_master_vector: Vec<String>,
   slides_vector: Vec<SlideRef>,
   notes_master_vector: Vec<String>,
-  slide_id_to_index_map: HashMap<u32, usize>,
   custom_show_list: Vec<CustomShow>,
-  section_list: Vec<SlideSection>,
   default_text_list_style: Option<TextListStyle>,
   slide_size: SlideSize,
   notes_size: SlideSize,
   comment_authors: Vec<SlideCommentAuthor>,
-  comment_authors_read: bool,
   embed_true_type_fonts: bool,
   save_subset_fonts: bool,
   embedded_font_typefaces: Vec<String>,
-  in_section_extension: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,11 +39,6 @@ pub(crate) struct SlideRef {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CustomShow {
   pub(crate) id: u32,
-  pub(crate) name: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct SlideSection {
   pub(crate) name: String,
 }
 
@@ -68,12 +57,7 @@ impl PresentationFragmentHandler {
       .map(SlideSize::from_pml)
       .unwrap_or_else(PowerPointImport::default_slide_size);
     let notes_size = SlideSize::from_notes(&presentation.notes_size);
-    let slides_vector = slide_refs(&presentation);
-    let slide_id_to_index_map = slides_vector
-      .iter()
-      .enumerate()
-      .map(|(index, slide_ref)| (slide_ref.slide_id, index))
-      .collect();
+    let slides_vector = slide_refs(presentation);
     let slide_master_vector = presentation
       .slide_master_id_list
       .as_ref()
@@ -100,7 +84,7 @@ impl PresentationFragmentHandler {
       .default_text_style
       .as_ref()
       .map(|style| TextListStyle::from_pml_default_text_style(style));
-    let custom_show_list = custom_show_list(&presentation);
+    let custom_show_list = custom_show_list(presentation);
     let embed_true_type_fonts = presentation
       .embed_true_type_fonts
       .as_ref()
@@ -109,7 +93,7 @@ impl PresentationFragmentHandler {
       .save_subset_fonts
       .as_ref()
       .is_some_and(|value| value.as_bool());
-    let embedded_font_typefaces = embedded_font_typefaces(&presentation);
+    let embedded_font_typefaces = embedded_font_typefaces(presentation);
     let comment_authors = presentation_comment_authors(package, &presentation_part)?;
 
     Ok(Self {
@@ -117,18 +101,14 @@ impl PresentationFragmentHandler {
       slide_master_vector,
       slides_vector,
       notes_master_vector,
-      slide_id_to_index_map,
       custom_show_list,
-      section_list: Vec::new(),
       default_text_list_style,
       slide_size,
       notes_size,
-      comment_authors_read: !comment_authors.is_empty(),
       comment_authors,
       embed_true_type_fonts,
       save_subset_fonts,
       embedded_font_typefaces,
-      in_section_extension: false,
     })
   }
 
@@ -196,8 +176,6 @@ impl PresentationFragmentHandler {
     }
     Ok(())
   }
-
-  pub(crate) fn import_master_slide(&mut self) {}
 
   pub(crate) fn import_slide(
     &mut self,
@@ -577,10 +555,6 @@ impl PresentationFragmentHandler {
 
   pub(crate) fn save_sections(&self) {}
 
-  pub(crate) fn save_theme_to_grab_bag(&self) {}
-
-  pub(crate) fn save_color_map_to_grab_bag(&self) {}
-
   pub(crate) fn import_custom_slide_show(&self) {}
 
   fn import_presentation_properties(
@@ -624,10 +598,6 @@ impl PresentationFragmentHandler {
       Some(p::ShowPropertiesChoice2::SlideAll) | None => {}
     }
     Ok(())
-  }
-
-  pub(crate) fn presentation_path(&self, package: &PresentationDocument) -> String {
-    part_path(package, &self.presentation_part)
   }
 
   fn embedded_font_typefaces(&self) -> Vec<String> {

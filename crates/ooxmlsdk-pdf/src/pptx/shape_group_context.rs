@@ -62,7 +62,7 @@ impl PPTShapeGroupContext {
   ) -> Option<Shape> {
     match choice {
       p::ShapeTreeChoice::Shape(shape) => {
-        Some(self.import_shape(slide_persist, shape, ShapeService::CustomShape))
+        Some(self.import_shape(slide_persist, shape, ShapeService::Custom))
       }
       p::ShapeTreeChoice::GroupShape(group) => Some(self.import_group_shape(slide_persist, group)),
       p::ShapeTreeChoice::GraphicFrame(frame) => {
@@ -86,7 +86,7 @@ impl PPTShapeGroupContext {
   ) -> Option<Shape> {
     match choice {
       p::GroupShapeChoice::Shape(shape) => {
-        Some(self.import_shape(slide_persist, shape, ShapeService::CustomShape))
+        Some(self.import_shape(slide_persist, shape, ShapeService::Custom))
       }
       p::GroupShapeChoice::GroupShape(group) => Some(self.import_group_shape(slide_persist, group)),
       p::GroupShapeChoice::GraphicFrame(frame) => {
@@ -163,7 +163,7 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     group: &p::GroupShape,
   ) -> Shape {
-    let mut shape = PptShape::new(ShapeService::GroupShape, self.shape_location);
+    let mut shape = PptShape::new(ShapeService::Group, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
       slide_persist,
@@ -196,7 +196,7 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     frame: &p::GraphicFrame,
   ) -> Shape {
-    let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
+    let mut shape = PptShape::new(ShapeService::GraphicObject, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
       slide_persist,
@@ -222,7 +222,7 @@ impl PPTShapeGroupContext {
     let shape = self
       .graphic_shape
       .take()
-      .unwrap_or_else(|| PptShape::new(ShapeService::GraphicObjectShape, self.shape_location));
+      .unwrap_or_else(|| PptShape::new(ShapeService::GraphicObject, self.shape_location));
     shape.into_shape(slide_persist)
   }
 
@@ -231,7 +231,7 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     source: &p::ConnectionShape,
   ) -> Shape {
-    let mut shape = PptShape::new(ShapeService::ConnectorShape, self.shape_location);
+    let mut shape = PptShape::new(ShapeService::Connector, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
       slide_persist,
@@ -257,7 +257,7 @@ impl PPTShapeGroupContext {
   }
 
   fn import_picture(&mut self, slide_persist: &mut SlidePersist, picture: &p::Picture) -> Shape {
-    let mut shape = PptShape::new(ShapeService::GraphicObjectShape, self.shape_location);
+    let mut shape = PptShape::new(ShapeService::GraphicObject, self.shape_location);
     apply_non_visual_drawing_properties(
       &mut shape.shape,
       slide_persist,
@@ -309,7 +309,7 @@ impl PPTShapeGroupContext {
     slide_persist: &mut SlidePersist,
     content_part: &p::ContentPart,
   ) -> Shape {
-    let mut shape = PptShape::new(ShapeService::MediaShape, self.shape_location);
+    let mut shape = PptShape::new(ShapeService::Media, self.shape_location);
     if let Some(properties) = &content_part.non_visual_content_part_properties {
       apply_p14_non_visual_drawing_properties(
         &mut shape.shape,
@@ -328,14 +328,12 @@ impl PPTShapeGroupContext {
   }
 
   pub(crate) fn import_ext_drawings(&mut self) {
-    if let Some(shape) = &mut self.graphic_shape {
-      if shape.shape.frame_type == FrameType::Diagram {
-        shape.shape.keep_diagram_drawing();
-      }
+    if let Some(shape) = &mut self.graphic_shape
+      && shape.shape.frame_type == FrameType::Diagram
+    {
+      shape.shape.keep_diagram_drawing();
     }
   }
-
-  pub(crate) fn apply_font_ref_color(&mut self) {}
 }
 
 fn apply_graphic_placeholder(

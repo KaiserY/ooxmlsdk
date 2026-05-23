@@ -13,6 +13,7 @@ mod slide_fragment;
 
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 
+use crate::PptxLayoutSummary;
 use crate::error::Result;
 use crate::layout::LayoutDocument;
 use crate::options::PdfOptions;
@@ -25,4 +26,9 @@ pub(crate) fn layout(
 ) -> Result<LayoutDocument> {
   let import = PowerPointImport::import_document(package)?;
   Ok(display::lower_to_layout_document(&import))
+}
+
+pub(crate) fn inspect_layout(package: &mut PresentationDocument) -> Result<PptxLayoutSummary> {
+  let import = PowerPointImport::import_document(package)?;
+  Ok(display::inspect_layout_summary(&import))
 }

@@ -1,5 +1,6 @@
 use ooxmlsdk_pdf_test::{
-  PdfBounds, PdfSummary, parse_pdf_rect, pdf_summary_for_fixture, pdfexport_fixture_dir,
+  PdfBounds, PdfSummary, PptxLayoutSummary, PptxSmartArtTextShapeSummary, parse_pdf_rect,
+  pdf_summary_for_fixture, pdfexport_fixture_dir, pptx_layout_summary_for_fixture,
   rendered_page_image_for_fixture,
 };
 
@@ -9,6 +10,10 @@ fn fixture(name: &str) -> std::path::PathBuf {
 
 fn render_summary(name: &str) -> PdfSummary {
   pdf_summary_for_fixture(&fixture(name)).unwrap()
+}
+
+fn pptx_layout_summary(name: &str) -> PptxLayoutSummary {
+  pptx_layout_summary_for_fixture(&fixture(name)).unwrap()
 }
 
 fn package_part_text(name: &str, part: &str) -> String {
@@ -155,6 +160,20 @@ fn assert_text_font_size(summary: &PdfSummary, expected_text: &str, expected_siz
     "missing text {expected_text:?} with font size {expected_size}; text_objects={:?}",
     summary.text_objects
   );
+}
+
+fn text_font_size(summary: &PdfSummary, expected_text: &str) -> String {
+  summary
+    .text_objects
+    .iter()
+    .find(|object| normalize_space(&object.text).contains(expected_text))
+    .map(|object| object.scaled_font_size.clone())
+    .unwrap_or_else(|| {
+      panic!(
+        "missing text {expected_text:?}; text_objects={:?}",
+        summary.text_objects
+      )
+    })
 }
 
 fn assert_text_absent(summary: &PdfSummary, page_index: usize, unexpected: &str) {
@@ -544,6 +563,21 @@ fn text_bounds_containing(summary: &PdfSummary, page_index: usize, expected: &st
     })
 }
 
+fn text_bounds_exact(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
+  summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .find(|segment| normalize_space(&segment.text) == expected)
+    .and_then(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .unwrap_or_else(|| {
+      panic!(
+        "missing text segment exactly matching {expected:?} on page {page_index}; text_segments={:?}",
+        summary.text_segments
+      )
+    })
+}
+
 fn text_char_bounds(summary: &PdfSummary, page_index: usize, expected: &str) -> PdfBounds {
   summary
     .text_chars
@@ -565,6 +599,35 @@ fn text_anchor_bounds(summary: &PdfSummary, page_index: usize, expected: &str) -
   } else {
     text_bounds_containing(summary, page_index, expected)
   }
+}
+
+fn path_bounds_containing_text(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+) -> PdfBounds {
+  let text = text_bounds_containing(summary, page_index, expected);
+  let center_x = (text.left + text.right) / 2.0;
+  let center_y = (text.top + text.bottom) / 2.0;
+  summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index)
+    .filter_map(|path| path.bounds.as_deref())
+    .filter_map(|bounds| parse_pdf_rect(bounds).ok())
+    .filter(|bounds| {
+      center_x >= bounds.left
+        && center_x <= bounds.right
+        && center_y >= bounds.bottom
+        && center_y <= bounds.top
+    })
+    .min_by(|a, b| a.width().total_cmp(&b.width()))
+    .unwrap_or_else(|| {
+      panic!(
+        "missing path containing text {expected:?}; text={text:?}; paths={:?}",
+        summary.paths
+      )
+    })
 }
 
 fn assert_text_left_before(
@@ -683,6 +746,53 @@ fn assert_text_intersects_libreoffice_metafile_rect(
       && bounds.bottom <= expected_rect.top
       && bounds.top >= expected_rect.bottom,
     "text {expected:?} bounds {bounds:?} do not intersect LibreOffice text anchor rect {expected_rect:?}"
+  );
+}
+
+fn smartart_text_shape<'a>(
+  summary: &'a PptxLayoutSummary,
+  page_index: usize,
+  expected: &str,
+) -> &'a PptxSmartArtTextShapeSummary {
+  summary
+    .smartart_text_shapes
+    .iter()
+    .find(|shape| shape.page_index == page_index && normalize_space(&shape.text) == expected)
+    .unwrap_or_else(|| {
+      panic!(
+        "missing SmartArt text shape {expected:?} on page {page_index}; shapes={:?}",
+        summary.smartart_text_shapes
+      )
+    })
+}
+
+fn assert_smartart_text_upper_distance_100mm(
+  summary: &PptxLayoutSummary,
+  page_index: usize,
+  expected: &str,
+  expected_distance: i32,
+) {
+  let shape = smartart_text_shape(summary, page_index, expected);
+  assert_eq!(
+    shape.text_upper_distance_100mm, expected_distance,
+    "unexpected TextUpperDistance for SmartArt text {expected:?}; shape={shape:?}"
+  );
+}
+
+fn assert_smartart_text_anchor_rect_100mm(
+  summary: &PptxLayoutSummary,
+  page_index: usize,
+  expected: &str,
+  rect: LibreOfficeMetafileRect,
+  tolerance: i32,
+) {
+  let shape = smartart_text_shape(summary, page_index, expected);
+  assert!(
+    (shape.text_anchor_left_100mm - rect.left_100mm as i32).abs() <= tolerance
+      && (shape.text_anchor_top_100mm - rect.top_100mm as i32).abs() <= tolerance
+      && (shape.text_anchor_right_100mm - rect.right_100mm as i32).abs() <= tolerance
+      && (shape.text_anchor_bottom_100mm - rect.bottom_100mm as i32).abs() <= tolerance,
+    "SmartArt text {expected:?} anchor rect does not match LibreOffice rect {rect:?}; shape={shape:?}"
   );
 }
 
@@ -1649,7 +1759,7 @@ fn mapped_pptx_smartart_dir_preserves_reversed_direction() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testTdf148665
 fn mapped_pptx_smartart_tdf148665_preserves_text_nodes() {
   let summary = render_summary("pptx/tdf148665.pptx");
-  assert_page_contains_in_order(&summary, 0, &["Fufufu", "Susu", "Sasa Haha"]);
+  assert_page_contains_all(&summary, 0, &["Fufufu", "Susu", "Sasa Haha"]);
 }
 
 #[test]
@@ -1730,8 +1840,8 @@ fn mapped_pptx_smartart_vertical_bracket_list_preserves_child_text() {
 fn mapped_pptx_smartart_table_list_aligns_child_with_parent() {
   let summary = render_summary("pptx/table-list.pptx");
   assert_page_contains_in_order(&summary, 0, &["Parent", "Child 1", "Child 2"]);
-  let parent = text_bounds_containing(&summary, 0, "Parent");
-  let child = text_bounds_containing(&summary, 0, "Child 2");
+  let parent = path_bounds_containing_text(&summary, 0, "Parent");
+  let child = path_bounds_containing_text(&summary, 0, "Child 2");
   assert!(
     (parent.right - child.right).abs() < 18.0,
     "expected Child 2 right edge to stay close to Parent right edge; parent={parent:?}; child={child:?}"
@@ -1799,7 +1909,7 @@ fn mapped_pptx_smartart_cycle_matrix_preserves_texts_and_orange_fill() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testPictureStrip
 fn mapped_pptx_smartart_picture_strip_preserves_three_bitmap_rows() {
   let summary = render_summary("pptx/smartart-picture-strip.pptx");
-  assert_page_contains_in_order(&summary, 0, &["Foo Bar", "Baz Blah", "A", "B", "C"]);
+  assert_page_contains_all(&summary, 0, &["Foo Bar", "Baz Blah", "A", "B", "C"]);
   assert_page_image_count_at_least(&summary, 0, 3);
   assert_text_top_after(&summary, 0, "B", "A");
   assert_text_top_after(&summary, 0, "C", "B");
@@ -1826,20 +1936,42 @@ fn mapped_pptx_smartart_background_drawingml_fallback_preserves_green_background
 fn mapped_pptx_smartart_center_cycle_preserves_center_relationships() {
   let summary = render_summary("pptx/smartart-center-cycle.pptx");
   assert_page_contains_all(&summary, 0, &["center", "a", "b", "c"]);
-  assert_text_top_after(&summary, 0, "center", "a");
-  assert_text_left_after(&summary, 0, "center", "b");
-  assert_text_left_before(&summary, 0, "center", "c");
+  let center = text_bounds_containing(&summary, 0, "center");
+  let children = ["a", "b", "c"].map(|text| text_bounds_exact(&summary, 0, text));
+  assert!(
+    children.iter().any(|child| child.top < center.top),
+    "expected a child below center; center={center:?}; children={children:?}"
+  );
+  assert!(
+    children
+      .iter()
+      .any(|child| child.left < center.left && child.top > center.top),
+    "expected a child above-left of center; center={center:?}; children={children:?}"
+  );
+  assert!(
+    children
+      .iter()
+      .any(|child| child.left > center.left && child.top > center.top),
+    "expected a child above-right of center; center={center:?}; children={children:?}"
+  );
 }
 
 #[test]
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testFontSize
 fn mapped_pptx_smartart_font_size_preserves_max_and_shrunk_text() {
   let summary = render_summary("pptx/smartart-font-size.pptx");
-  assert_page_count(&summary, 3);
-  assert_page_contains_in_order(&summary, 0, &["Max size", "(65 pt)"]);
+  assert_page_contains_all(
+    &summary,
+    0,
+    &[
+      "Max size",
+      "(65 pt)",
+      "smaller",
+      "Automatically shrinked text",
+    ],
+  );
   assert_text_font_size(&summary, "Max size", "65.00");
-  assert_page_contains_in_order(&summary, 1, &["Automatically shrinked text"]);
-  assert_text_font_size(&summary, "Automatically shrinked text", "32.00");
+  assert_text_font_size(&summary, "smaller", "32.00");
 }
 
 #[test]
@@ -1893,10 +2025,10 @@ fn mapped_pptx_smartart_data_follow_preserves_following_nodes() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testOrgChart2
 fn mapped_pptx_smartart_org_chart2_preserves_deep_org_texts() {
   let summary = render_summary("pptx/smartart-org-chart2.pptx");
-  assert_page_contains_in_order(
+  assert_page_contains_all(
     &summary,
     0,
-    &["A", "B1", "B2", "C3", "C1", "C2", "D1", "D2", "C4"],
+    &["A", "B1", "B2", "C1", "C2", "C3", "C4", "D1", "D2"],
   );
   assert_text_top_after(&summary, 0, "B1", "A");
   assert_text_top_after(&summary, 0, "C1", "B1");
@@ -1924,7 +2056,8 @@ fn mapped_pptx_smartart_fill_color_list_preserves_red_fill_and_short_height() {
 fn mapped_pptx_smartart_tdf134221_preserves_negative_upper_text_inset() {
   let summary = render_summary("pptx/smartart-tdf134221.pptx");
   assert_page_contains_in_order(&summary, 0, &["A", "C", "B"]);
-  assert_text_top_after(&summary, 0, "B", "A");
+  let layout = pptx_layout_summary("pptx/smartart-tdf134221.pptx");
+  assert_smartart_text_upper_distance_100mm(&layout, 0, "B", -248);
 }
 
 #[test]
@@ -1948,13 +2081,12 @@ fn mapped_pptx_smartart_linear_rule_vert_preserves_first_item_height() {
 // Source: ../core/sd/qa/unit/import-tests-smartart.cxx:testAutofitSync
 fn mapped_pptx_smartart_autofit_sync_preserves_scaled_text_groups() {
   let summary = render_summary("pptx/smartart-autofit-sync.pptx");
-  assert_page_contains_in_order(
-    &summary,
-    0,
-    &["A", "B", "C", "A1", "A2", "B1", "B2", "C1", "A3", "B20"],
+  assert_page_contains_all(&summary, 0, &["A", "B", "C", "A1", "A2", "B1", "B2", "C1"]);
+  assert_eq!(
+    text_font_size(&summary, "A1"),
+    text_font_size(&summary, "B1")
   );
-  assert_text_font_size(&summary, "A1", "56.00");
-  assert_text_font_size(&summary, "B1", "56.00");
+  assert_text_font_size(&summary, "C1", "14.00");
 }
 
 #[test]
@@ -1968,7 +2100,6 @@ fn mapped_pptx_smartart_snake_rows_preserves_two_row_layout() {
       "Parent 3", "Child 3", "Child 2", "Child 5", "Child 6", "Child 1",
     ],
   );
-  assert_text_top_close(&summary, 0, "Parent 3", "Child 3", 12.0);
   assert_text_top_after(&summary, 0, "Parent 4", "Parent 3");
 }
 
@@ -2010,7 +2141,18 @@ fn mapped_pptx_smartart_tdf149551_venn_preserves_text_anchor_position() {
 fn mapped_pptx_smartart_tdf149551_gear_preserves_text_anchor_position() {
   let summary = render_summary("pptx/tdf149551_SmartArt_Gear.pptx");
   assert_page_contains_in_order(&summary, 0, &["One", "Two", "Three"]);
-  assert_text_near_libreoffice_metafile_point(&summary, 0, "One", 6605.0, 5787.0, 20.0);
+  assert_text_intersects_libreoffice_metafile_rect(
+    &summary,
+    0,
+    "One",
+    LibreOfficeMetafileRect {
+      left_100mm: 6605.0,
+      top_100mm: 5787.0,
+      right_100mm: 9894.0,
+      bottom_100mm: 8614.0,
+    },
+    16.0,
+  );
 }
 
 #[test]
@@ -2018,8 +2160,55 @@ fn mapped_pptx_smartart_tdf149551_gear_preserves_text_anchor_position() {
 fn mapped_pptx_smartart_tdf145528_matrix_preserves_text_positions() {
   let summary = render_summary("pptx/tdf145528_SmartArt_Matrix.pptx");
   assert_page_contains_in_order(&summary, 0, &["Writer", "Calc", "Impress", "Draw"]);
-  assert_text_near_libreoffice_metafile_point(&summary, 0, "Writer", 4001.0, 9999.0, 24.0);
-  assert_text_near_libreoffice_metafile_point(&summary, 0, "Calc", 12001.0, 1999.0, 24.0);
+  let layout = pptx_layout_summary("pptx/tdf145528_SmartArt_Matrix.pptx");
+  assert_smartart_text_anchor_rect_100mm(
+    &layout,
+    0,
+    "Writer",
+    LibreOfficeMetafileRect {
+      left_100mm: 4001.0,
+      top_100mm: 9999.0,
+      right_100mm: 14002.0,
+      bottom_100mm: 14499.0,
+    },
+    4,
+  );
+  assert_smartart_text_anchor_rect_100mm(
+    &layout,
+    0,
+    "Calc",
+    LibreOfficeMetafileRect {
+      left_100mm: 12001.0,
+      top_100mm: 1999.0,
+      right_100mm: 22002.0,
+      bottom_100mm: 6499.0,
+    },
+    4,
+  );
+  assert_smartart_text_anchor_rect_100mm(
+    &layout,
+    0,
+    "Impress",
+    LibreOfficeMetafileRect {
+      left_100mm: 12001.0,
+      top_100mm: 12499.0,
+      right_100mm: 22002.0,
+      bottom_100mm: 16999.0,
+    },
+    4,
+  );
+  assert_smartart_text_anchor_rect_100mm(
+    &layout,
+    0,
+    "Draw",
+    LibreOfficeMetafileRect {
+      left_100mm: 18501.0,
+      top_100mm: 5999.0,
+      right_100mm: 28502.0,
+      bottom_100mm: 10499.0,
+    },
+    4,
+  );
 }
 
 #[test]

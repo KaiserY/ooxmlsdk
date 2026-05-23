@@ -2572,7 +2572,7 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
       (child_width, child_height, radius)
     };
     child.x = lo_i32(center_x + current_radius * radians.sin() - lo_i32(width / 2.0));
-    child.y = lo_i32(center_y - current_radius * radians.cos() - lo_i32(height / 2.0));
+    child.y = lo_i32(center_y + current_radius * radians.cos() - lo_i32(height / 2.0));
     child.width = width;
     child.height = height;
     if algorithm.rotation_path_along_path {

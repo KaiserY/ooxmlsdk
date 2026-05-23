@@ -64,6 +64,22 @@ pub struct DocxLayoutRowSummary {
   pub height_pt: f32,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct PptxLayoutSummary {
+  pub smartart_text_shapes: Vec<PptxSmartArtTextShapeSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PptxSmartArtTextShapeSummary {
+  pub page_index: usize,
+  pub text: String,
+  pub text_upper_distance_100mm: i32,
+  pub text_anchor_left_100mm: i32,
+  pub text_anchor_top_100mm: i32,
+  pub text_anchor_right_100mm: i32,
+  pub text_anchor_bottom_100mm: i32,
+}
+
 /// Convert a DOCX stream into PDF bytes.
 pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
 where
@@ -111,6 +127,25 @@ where
   validate_docx_fonts(&doc)?;
   let layout = layout::layout(&doc, &options)?;
   Ok(layout_summary(layout))
+}
+
+/// Inspect PPTX SmartArt layout without rendering to PDF.
+///
+/// This mirrors LibreOffice SmartArt import tests that assert Sdr shape text
+/// distances and `TakeTextAnchorRect()` values directly.
+pub fn inspect_pptx_layout<R>(reader: R, _options: PdfOptions) -> Result<PptxLayoutSummary>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = PresentationDocument::new_with_settings(reader, settings)?;
+  pptx::inspect_layout(&mut document)
 }
 
 fn layout_summary(layout: layout::LayoutDocument) -> DocxLayoutSummary {

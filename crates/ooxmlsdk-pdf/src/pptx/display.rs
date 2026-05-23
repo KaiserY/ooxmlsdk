@@ -12,6 +12,7 @@ use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
+use crate::{PptxLayoutSummary, PptxSmartArtTextShapeSummary};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
@@ -64,12 +65,31 @@ pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::Lay
   let pages = import
     .draw_pages
     .iter()
-    .map(|slide| (slide.size.to_page_setup(), lower_slide_items(import, slide)))
+    .enumerate()
+    .map(|(page_index, slide)| {
+      (
+        slide.size.to_page_setup(),
+        lower_slide_items_with_summary(import, slide, page_index, None),
+      )
+    })
     .collect();
   layout::fixed_pages_with_items(pages)
 }
 
-fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<PageItem> {
+pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSummary {
+  let mut summary = PptxLayoutSummary::default();
+  for (page_index, slide) in import.draw_pages.iter().enumerate() {
+    let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
+  }
+  summary
+}
+
+fn lower_slide_items_with_summary(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  page_index: usize,
+  mut summary: Option<&mut PptxLayoutSummary>,
+) -> Vec<PageItem> {
   let mut items = Vec::new();
   let _has_structured_comment_identity = slide.comments.iter().any(|comment| comment.has_payload())
     || slide
@@ -87,7 +107,14 @@ fn lower_slide_items(import: &PowerPointImport, slide: &SlidePersist) -> Vec<Pag
   {
     lower_background(import, slide, background, &mut items);
   }
-  lower_shapes(import, slide, &slide.shapes, &mut items);
+  lower_shapes(
+    import,
+    slide,
+    &slide.shapes,
+    page_index,
+    &mut items,
+    summary.as_deref_mut(),
+  );
   items
 }
 
@@ -179,10 +206,20 @@ fn lower_shapes(
   import: &PowerPointImport,
   slide: &SlidePersist,
   shapes: &[Shape],
+  page_index: usize,
   items: &mut Vec<PageItem>,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   for shape in shapes {
-    lower_shape(import, slide, shape, DisplayOffset::default(), items);
+    lower_shape(
+      import,
+      slide,
+      shape,
+      DisplayOffset::default(),
+      page_index,
+      items,
+      summary.as_deref_mut(),
+    );
   }
 }
 
@@ -197,7 +234,9 @@ fn lower_shape(
   slide: &SlidePersist,
   shape: &Shape,
   offset: DisplayOffset,
+  page_index: usize,
   items: &mut Vec<PageItem>,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   if shape.hidden
     || shape.hidden_master_shape
@@ -247,7 +286,16 @@ fn lower_shape(
   if shape.frame_type == super::drawingml::shape::FrameType::Diagram
     && let Some(record) = &shape.graphic_data
   {
-    lower_diagram(import, slide, shape, offset, record, items);
+    lower_diagram(
+      import,
+      slide,
+      shape,
+      offset,
+      record,
+      page_index,
+      items,
+      summary.as_deref_mut(),
+    );
   }
 
   if let Some(text_body) = &shape.text_body {
@@ -256,7 +304,15 @@ fn lower_shape(
 
   let child_offset = child_display_offset(shape, offset);
   for child in &shape.children {
-    lower_shape(import, slide, child, child_offset, items);
+    lower_shape(
+      import,
+      slide,
+      child,
+      child_offset,
+      page_index,
+      items,
+      summary.as_deref_mut(),
+    );
   }
 }
 
@@ -459,7 +515,9 @@ fn lower_diagram(
   shape: &Shape,
   offset: DisplayOffset,
   record: &GraphicDataRecord,
+  page_index: usize,
   items: &mut Vec<PageItem>,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let Some(data_resource) = record.diagram_data_resource.as_ref() else {
     return;
@@ -491,6 +549,8 @@ fn lower_diagram(
       width_pt,
       height_pt,
       items,
+      page_index,
+      summary.as_deref_mut(),
     )
   {
     return;
@@ -600,6 +660,13 @@ fn lower_diagram(
         diagram_shape.height,
         &text_body,
       );
+      record_smartart_text_shape(
+        summary.as_deref_mut(),
+        page_index,
+        &text_body,
+        diagram_shape.y,
+        text_frame,
+      );
       let font_reference = diagram_shape
         .style
         .as_deref()
@@ -614,7 +681,8 @@ fn lower_diagram(
       );
       let (font_scale, line_scale) =
         text_auto_fit_scales(import, text_frame, &text_body, &base_style, &options);
-      if let Some(group) = diagram_shape.font_sync_group.as_deref() {
+      let sync_auto_fit = text_body.display_properties.auto_fit == TextAutoFit::Shape;
+      if sync_auto_fit && let Some(group) = diagram_shape.font_sync_group.as_deref() {
         font_sync_scales
           .entry(group.to_string())
           .and_modify(|scale| {
@@ -631,6 +699,7 @@ fn lower_diagram(
         font_reference,
         base_font_size_pt: diagram_shape.font_size_pt,
         font_sync_group: diagram_shape.font_sync_group,
+        sync_auto_fit,
         font_scale,
         line_scale,
       });
@@ -640,6 +709,7 @@ fn lower_diagram(
     let (font_scale, line_scale) = pending
       .font_sync_group
       .as_deref()
+      .filter(|_| pending.sync_auto_fit)
       .and_then(|group| font_sync_scales.get(group).copied())
       .unwrap_or((pending.font_scale, pending.line_scale));
     lower_diagram_text_body_at_with_style_and_scale(
@@ -688,6 +758,8 @@ fn lower_diagram_drawing(
   width_pt: f32,
   height_pt: f32,
   items: &mut Vec<PageItem>,
+  page_index: usize,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) -> bool {
   // Source: LibreOffice oox/source/drawingml/diagram/diagram.cxx loadDiagram()
   // imports persisted diagramDrawing extDrawing before falling back to layout
@@ -718,6 +790,8 @@ fn lower_diagram_drawing(
         transform,
         &mut drawing_items,
         &mut text_items,
+        page_index,
+        summary.as_deref_mut(),
       ),
       dsp::ShapeTreeChoice::GroupShape(group) => lower_diagram_drawing_group(
         import,
@@ -728,6 +802,8 @@ fn lower_diagram_drawing(
         transform,
         &mut drawing_items,
         &mut text_items,
+        page_index,
+        summary.as_deref_mut(),
       ),
     }
   }
@@ -749,6 +825,8 @@ fn lower_diagram_drawing_group(
   parent_transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
+  page_index: usize,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let transform =
     parent_transform.for_group(group.group_shape_properties.transform_group.as_deref());
@@ -763,6 +841,8 @@ fn lower_diagram_drawing_group(
         transform,
         items,
         text_items,
+        page_index,
+        summary.as_deref_mut(),
       ),
       dsp::GroupShapeChoice::GroupShape(group) => lower_diagram_drawing_group(
         import,
@@ -773,6 +853,8 @@ fn lower_diagram_drawing_group(
         transform,
         items,
         text_items,
+        page_index,
+        summary.as_deref_mut(),
       ),
     }
   }
@@ -787,6 +869,8 @@ fn lower_diagram_drawing_shape(
   transform: DiagramDrawingTransform,
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
+  page_index: usize,
+  summary: Option<&mut PptxLayoutSummary>,
 ) {
   let Some(bounds) = diagram_shape_bounds(&shape.shape_properties, transform) else {
     return;
@@ -828,6 +912,13 @@ fn lower_diagram_drawing_shape(
     return;
   }
   let text_frame = diagram_drawing_text_frame(shape, bounds, transform, &text_body);
+  record_smartart_text_shape(
+    summary,
+    page_index,
+    &text_body,
+    text_frame.text_area_y_pt,
+    text_frame.frame,
+  );
   let shape_rotation = shape
     .shape_properties
     .transform2_d
@@ -959,6 +1050,7 @@ struct PendingDiagramTextItem {
   font_reference: Option<FontStyleReference>,
   base_font_size_pt: Option<f32>,
   font_sync_group: Option<String>,
+  sync_auto_fit: bool,
   font_scale: f32,
   line_scale: f32,
 }
@@ -1362,32 +1454,41 @@ fn diagram_drawing_text_frame(
   text_body: &TextBody,
 ) -> DiagramDrawingTextFrame {
   let Some(text_transform) = shape.transform2_d.as_deref() else {
-    return DiagramDrawingTextFrame::new(text_body_frame(
-      shape_bounds.x,
+    return DiagramDrawingTextFrame::new(
+      text_body_frame(
+        shape_bounds.x,
+        shape_bounds.y,
+        shape_bounds.width,
+        shape_bounds.height,
+        text_body,
+      ),
       shape_bounds.y,
-      shape_bounds.width,
-      shape_bounds.height,
-      text_body,
-    ));
+    );
   };
   let Some(mut text_bounds) = diagram_text_transform_bounds(text_transform, parent_transform)
   else {
-    return DiagramDrawingTextFrame::new(text_body_frame(
-      shape_bounds.x,
+    return DiagramDrawingTextFrame::new(
+      text_body_frame(
+        shape_bounds.x,
+        shape_bounds.y,
+        shape_bounds.width,
+        shape_bounds.height,
+        text_body,
+      ),
       shape_bounds.y,
-      shape_bounds.width,
-      shape_bounds.height,
-      text_body,
-    ));
+    );
   };
   let Some(preset_bounds) = diagram_preset_text_rectangle(shape, shape_bounds) else {
-    return DiagramDrawingTextFrame::new(text_body_frame(
-      shape_bounds.x,
+    return DiagramDrawingTextFrame::new(
+      text_body_frame(
+        shape_bounds.x,
+        shape_bounds.y,
+        shape_bounds.width,
+        shape_bounds.height,
+        text_body,
+      ),
       shape_bounds.y,
-      shape_bounds.width,
-      shape_bounds.height,
-      text_body,
-    ));
+    );
   };
 
   let shape_rotation = shape
@@ -1427,8 +1528,23 @@ fn diagram_drawing_text_frame(
     offsets,
     0,
   );
+  let mut frame = frame;
+  let shape_rotation = shape_rotation.rem_euclid(21_600_000);
+  if shape_rotation != 0 {
+    let angle = (shape_rotation as f32 / 60_000.0).to_radians();
+    let (x, y) = rotate_point(
+      frame.x_pt,
+      frame.y_pt,
+      shape_bounds.x + shape_bounds.width / 2.0,
+      shape_bounds.y + shape_bounds.height / 2.0,
+      angle,
+    );
+    frame.x_pt = x;
+    frame.y_pt = y;
+  }
   DiagramDrawingTextFrame {
     frame,
+    text_area_y_pt: preset_bounds.y,
     rotation_center_pt: (angle_diff != 0).then_some((frame.x_pt, frame.y_pt)),
   }
 }
@@ -1436,13 +1552,15 @@ fn diagram_drawing_text_frame(
 #[derive(Clone, Copy, Debug)]
 struct DiagramDrawingTextFrame {
   frame: TextFrame,
+  text_area_y_pt: f32,
   rotation_center_pt: Option<(f32, f32)>,
 }
 
 impl DiagramDrawingTextFrame {
-  fn new(frame: TextFrame) -> Self {
+  fn new(frame: TextFrame, text_area_y_pt: f32) -> Self {
     Self {
       frame,
+      text_area_y_pt,
       rotation_center_pt: None,
     }
   }
@@ -3646,6 +3764,61 @@ struct TextFrame {
   y_pt: f32,
   width_pt: f32,
   height_pt: f32,
+}
+
+fn record_smartart_text_shape(
+  summary: Option<&mut PptxLayoutSummary>,
+  page_index: usize,
+  text_body: &TextBody,
+  text_area_y_pt: f32,
+  frame: TextFrame,
+) {
+  let Some(summary) = summary else {
+    return;
+  };
+  let text = text_body_plain_text(text_body);
+  if text.trim().is_empty() {
+    return;
+  }
+  summary
+    .smartart_text_shapes
+    .push(PptxSmartArtTextShapeSummary {
+      page_index,
+      text,
+      text_upper_distance_100mm: points_to_100mm(frame.y_pt - text_area_y_pt),
+      text_anchor_left_100mm: points_to_100mm(frame.x_pt),
+      text_anchor_top_100mm: points_to_100mm(frame.y_pt),
+      text_anchor_right_100mm: points_to_100mm(frame.x_pt + frame.width_pt),
+      text_anchor_bottom_100mm: points_to_100mm(frame.y_pt + frame.height_pt),
+    });
+}
+
+fn text_body_plain_text(text_body: &TextBody) -> String {
+  text_body
+    .paragraphs
+    .iter()
+    .map(|paragraph| {
+      paragraph
+        .runs
+        .iter()
+        .map(|run| run.text.as_str())
+        .collect::<String>()
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn points_to_100mm(value: f32) -> i32 {
+  (value * 2540.0 / 72.0).round() as i32
+}
+
+fn rotate_point(x: f32, y: f32, center_x: f32, center_y: f32, angle: f32) -> (f32, f32) {
+  let dx = x - center_x;
+  let dy = y - center_y;
+  (
+    center_x + dx * angle.cos() - dy * angle.sin(),
+    center_y + dx * angle.sin() + dy * angle.cos(),
+  )
 }
 
 #[derive(Clone, Copy, Debug, Default)]

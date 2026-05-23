@@ -3,6 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
+use image::codecs::jpeg::JpegEncoder;
 use image::{GenericImageView, ImageFormat as RasterImageFormat, Rgba};
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
@@ -245,6 +246,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
         &fonts,
         &internal_links,
         &mut link_annotations,
+        options,
       );
     }
     surface.finish();
@@ -937,6 +939,7 @@ fn draw_paint_item(
   fonts: &FontSet,
   internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
+  options: &PdfOptions,
 ) {
   match item {
     PaintItem::Text(text) if !text.item.text.is_empty() => {
@@ -959,7 +962,7 @@ fn draw_paint_item(
     PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
-      match decode_image(&image.data, image.content_type.as_deref()) {
+      match decode_image(&image.data, image.content_type.as_deref(), options) {
         Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
         Err(_) => draw_missing_image(surface, image),
       }
@@ -1552,13 +1555,23 @@ fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Pa
   path.finish()
 }
 
-fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
+fn decode_image(data: &[u8], content_type: Option<&str>, options: &PdfOptions) -> Result<Image> {
   if let Some(raster) = emf_wmf::decode_metafile_as_raster(data, content_type)
     .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
   {
     return match raster.content_type {
       "image/jpeg" => Image::from_jpeg(raster.data.into(), false).map_err(PdfError::Krilla),
       "image/png" => {
+        if let Some(quality) = options.jpeg_quality {
+          let raster = image::load_from_memory_with_format(&raster.data, RasterImageFormat::Png)
+            .map_err(|err| {
+              PdfError::Krilla(format!(
+                "failed to decode EMF/WMF PNG for JPEG export: {err}"
+              ))
+            })?;
+          let jpeg = encode_jpeg(raster, quality)?;
+          return Image::from_jpeg(jpeg.into(), false).map_err(PdfError::Krilla);
+        }
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
         Image::from_custom(image, false).map_err(PdfError::Krilla)
@@ -1592,6 +1605,16 @@ fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
   let raster =
     raster.map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
   Image::from_custom(PdfRasterImage::from_dynamic(raster), false).map_err(PdfError::Krilla)
+}
+
+fn encode_jpeg(image: image::DynamicImage, quality: u8) -> Result<Vec<u8>> {
+  let rgb = image.to_rgb8();
+  let (width, height) = rgb.dimensions();
+  let mut jpeg = Vec::new();
+  JpegEncoder::new_with_quality(&mut jpeg, quality)
+    .encode(rgb.as_raw(), width, height, image::ExtendedColorType::Rgb8)
+    .map_err(|err| PdfError::Krilla(format!("failed to encode JPEG image: {err}")))?;
+  Ok(jpeg)
 }
 
 fn decode_png_relaxed(data: &[u8]) -> std::result::Result<PdfRasterImage, String> {

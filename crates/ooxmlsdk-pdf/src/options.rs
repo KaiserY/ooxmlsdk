@@ -9,6 +9,9 @@ pub struct PdfOptions {
 
   /// Whether PDF content streams should be compressed.
   pub compress_content_streams: bool,
+
+  /// JPEG quality used when the PDF filter asks raster graphics to be stored as JPEG.
+  pub jpeg_quality: Option<u8>,
 }
 
 impl Default for PdfOptions {
@@ -16,6 +19,7 @@ impl Default for PdfOptions {
     Self {
       standards: Vec::new(),
       compress_content_streams: true,
+      jpeg_quality: None,
     }
   }
 }

@@ -1,6 +1,6 @@
 use ooxmlsdk_pdf_test::{
   PdfBounds, PdfSummary, assert_pdf_rect_close, pdf_page_count_for_fixture,
-  pdf_summary_for_fixture, pdfexport_fixture_dir,
+  pdf_summary_for_fixture, pdf_summary_for_fixture_with_options, pdfexport_fixture_dir,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -202,7 +202,14 @@ fn pdfexport_fixture_content_control_rtl_matches_upstream_widget_rects() {
 #[test]
 // Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx:testTdf129085
 fn pdfexport_fixture_tdf129085_preserves_single_jpeg_xobject() {
-  let summary = render_summary("tdf129085.docx");
+  let summary = pdf_summary_for_fixture_with_options(
+    &fixture("tdf129085.docx"),
+    ooxmlsdk_pdf::PdfOptions {
+      jpeg_quality: Some(50),
+      ..ooxmlsdk_pdf::PdfOptions::default()
+    },
+  )
+  .unwrap();
   assert_eq!(summary.page_count, 1);
 
   let page = raw_page(&summary, 0);
@@ -211,7 +218,11 @@ fn pdfexport_fixture_tdf129085_preserves_single_jpeg_xobject() {
   let xobject = &page.xobjects[0];
   assert_eq!(xobject.type_name.as_deref(), Some("XObject"));
   assert_eq!(xobject.subtype_name.as_deref(), Some("Image"));
-  assert_eq!(xobject.image_format.as_deref(), Some("Jpeg"));
+  assert_eq!(
+    xobject.image_format.as_deref(),
+    Some("Jpeg"),
+    "xobject={xobject:?}"
+  );
   assert_eq!(xobject.decoded_width_px, Some(884));
   assert_eq!(xobject.decoded_height_px, Some(925));
   assert_eq!(xobject.bits_per_pixel, Some(24));

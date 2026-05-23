@@ -22,6 +22,11 @@ pub(crate) fn emu_to_points(value: i64) -> f32 {
 }
 
 #[inline]
+pub(crate) fn emu_to_points_f32(value: f32) -> f32 {
+  value / sdk_units::EMUS_PER_POINT as f32
+}
+
+#[inline]
 pub(crate) fn millimeters_to_points(value: f32) -> f32 {
   value * POINTS_PER_INCH / MILLIMETERS_PER_INCH
 }

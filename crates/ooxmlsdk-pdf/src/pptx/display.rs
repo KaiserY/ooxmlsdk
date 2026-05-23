@@ -13,7 +13,8 @@ use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
 use crate::{
-  PptxBulletParagraphSummary, PptxLayoutSummary, PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
+  PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
+  PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
@@ -27,7 +28,7 @@ use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
 use super::drawingml::line::{LineFill, LineProperties};
 use super::drawingml::shape::{
-  FontStyleReference, GraphicDataKind, GraphicDataRecord, Shape, ShapeService,
+  CustomShapeGeometry, FontStyleReference, GraphicDataKind, GraphicDataRecord, Shape, ShapeService,
 };
 use super::drawingml::table::{
   TableCell, TableCellBorders, TableProperties, TableStyle, TableStyleBorders, TableStylePart,
@@ -92,8 +93,14 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
       .iter()
       .map(notes_page_shape_count)
       .collect(),
+    draw_page_shape_counts: import
+      .draw_pages
+      .iter()
+      .map(draw_page_shape_count)
+      .collect(),
     ..PptxLayoutSummary::default()
   };
+  collect_draw_shape_summaries(import, &mut summary);
   collect_master_text_shapes(import, &mut summary);
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
     let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
@@ -103,6 +110,124 @@ pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSum
 
 fn notes_page_shape_count(slide: &SlidePersist) -> usize {
   slide.shapes.iter().map(notes_shape_count).sum()
+}
+
+fn draw_page_shape_count(slide: &SlidePersist) -> usize {
+  slide
+    .shapes
+    .iter()
+    .filter(|shape| shape.shape_location == Some(super::slide::ShapeLocation::Slide))
+    .count()
+}
+
+fn collect_draw_shape_summaries(import: &PowerPointImport, summary: &mut PptxLayoutSummary) {
+  for (page_index, slide) in import.draw_pages.iter().enumerate() {
+    for (shape_index, shape) in slide.shapes.iter().enumerate() {
+      if shape.shape_location != Some(super::slide::ShapeLocation::Slide) {
+        continue;
+      }
+      collect_shape_summary(
+        summary,
+        page_index,
+        shape,
+        ShapeSummaryTransform::default(),
+        vec![shape_index],
+      );
+    }
+  }
+}
+
+fn collect_shape_summary(
+  summary: &mut PptxLayoutSummary,
+  page_index: usize,
+  shape: &Shape,
+  transform: ShapeSummaryTransform,
+  shape_path: Vec<usize>,
+) {
+  if shape.hidden
+    || shape.hidden_master_shape
+    || shape.referenced
+    || is_uninstantiated_placeholder(shape)
+  {
+    return;
+  }
+
+  let x_pt =
+    units::emu_to_points_f32(transform.x_emu + shape.position.x as f32 * transform.scale_x);
+  let y_pt =
+    units::emu_to_points_f32(transform.y_emu + shape.position.y as f32 * transform.scale_y);
+  let width_pt = units::emu_to_points_f32(shape.size.cx as f32 * transform.scale_x);
+  let height_pt = units::emu_to_points_f32(shape.size.cy as f32 * transform.scale_y);
+  let (geo_x_pt, geo_y_pt) =
+    rotated_shape_geo_top_left(x_pt, y_pt, width_pt, height_pt, shape.rotation);
+  summary.draw_shapes.push(draw_shape_summary_from_parts(
+    page_index,
+    shape_path.clone(),
+    format!("{:?}", shape.service_name),
+    shape_geometry_name(shape.custom_shape_properties.geometry.as_ref()),
+    shape_text(shape.text_body.as_ref()),
+    geo_x_pt,
+    geo_y_pt,
+    width_pt,
+    height_pt,
+    shape.actual_fill_properties.as_ref(),
+    shape.rotation,
+    shape.flip_h,
+    shape.flip_v,
+    shape.text_body.as_ref().map(|text_body| {
+      let frame = text_body_frame(x_pt, y_pt, width_pt, height_pt, text_body);
+      text_distances_from_frame(x_pt, y_pt, width_pt, height_pt, frame)
+    }),
+  ));
+
+  let child_transform = transform.child(shape);
+  for (child_index, child) in shape.children.iter().enumerate() {
+    let mut child_path = shape_path.clone();
+    child_path.push(child_index);
+    collect_shape_summary(summary, page_index, child, child_transform, child_path);
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ShapeSummaryTransform {
+  x_emu: f32,
+  y_emu: f32,
+  scale_x: f32,
+  scale_y: f32,
+}
+
+impl Default for ShapeSummaryTransform {
+  fn default() -> Self {
+    Self {
+      x_emu: 0.0,
+      y_emu: 0.0,
+      scale_x: 1.0,
+      scale_y: 1.0,
+    }
+  }
+}
+
+impl ShapeSummaryTransform {
+  fn child(self, shape: &Shape) -> Self {
+    let scale_x = if shape.child_size.cx != 0 {
+      self.scale_x * shape.size.cx as f32 / shape.child_size.cx as f32
+    } else {
+      self.scale_x
+    };
+    let scale_y = if shape.child_size.cy != 0 {
+      self.scale_y * shape.size.cy as f32 / shape.child_size.cy as f32
+    } else {
+      self.scale_y
+    };
+    let parent_x = self.x_emu + shape.position.x as f32 * self.scale_x;
+    let parent_y = self.y_emu + shape.position.y as f32 * self.scale_y;
+    Self {
+      x_emu: parent_x - shape.child_position.x as f32 * scale_x,
+      y_emu: parent_y - shape.child_position.y as f32 * scale_y,
+      scale_x,
+      scale_y,
+    }
+  }
 }
 
 fn notes_shape_count(shape: &Shape) -> usize {
@@ -148,7 +273,7 @@ fn lower_slide_items_with_summary(
   import: &PowerPointImport,
   slide: &SlidePersist,
   page_index: usize,
-  mut summary: Option<&mut PptxLayoutSummary>,
+  summary: Option<&mut PptxLayoutSummary>,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
   let _has_structured_comment_identity = slide.comments.iter().any(|comment| comment.has_payload())
@@ -173,7 +298,7 @@ fn lower_slide_items_with_summary(
     &slide.shapes,
     page_index,
     &mut items,
-    summary.as_deref_mut(),
+    summary,
   );
   items
 }
@@ -733,6 +858,7 @@ fn lower_diagram(
         summary.as_deref_mut(),
         page_index,
         &text_body,
+        diagram_shape.x,
         diagram_shape.y,
         text_frame,
       );
@@ -939,11 +1065,14 @@ fn lower_diagram_drawing_shape(
   items: &mut Vec<PageItem>,
   text_items: &mut Vec<DiagramDrawingTextItem>,
   page_index: usize,
-  summary: Option<&mut PptxLayoutSummary>,
+  mut summary: Option<&mut PptxLayoutSummary>,
 ) {
   let Some(bounds) = diagram_shape_bounds(&shape.shape_properties, transform) else {
     return;
   };
+  if let Some(summary) = summary.as_deref_mut() {
+    record_diagram_draw_shape_summary(summary, page_index, shape, bounds, transform);
+  }
   let fill_color =
     diagram_shape_fill_color(import, slide, &shape.shape_properties).unwrap_or(RgbColor {
       r: 255,
@@ -985,6 +1114,7 @@ fn lower_diagram_drawing_shape(
     summary,
     page_index,
     &text_body,
+    text_frame.text_area_x_pt,
     text_frame.text_area_y_pt,
     text_frame.frame,
   );
@@ -1542,6 +1672,7 @@ fn diagram_drawing_text_frame(
         shape_bounds.height,
         text_body,
       ),
+      shape_bounds.x,
       shape_bounds.y,
     );
   };
@@ -1555,6 +1686,7 @@ fn diagram_drawing_text_frame(
         shape_bounds.height,
         text_body,
       ),
+      shape_bounds.x,
       shape_bounds.y,
     );
   };
@@ -1567,6 +1699,7 @@ fn diagram_drawing_text_frame(
         shape_bounds.height,
         text_body,
       ),
+      shape_bounds.x,
       shape_bounds.y,
     );
   };
@@ -1608,6 +1741,13 @@ fn diagram_drawing_text_frame(
     offsets,
     0,
   );
+  let text_distances_100mm = Some(text_distances_from_frame(
+    preset_bounds.x,
+    preset_bounds.y,
+    preset_bounds.width,
+    preset_bounds.height,
+    frame,
+  ));
   let mut frame = frame;
   let shape_rotation = shape_rotation.rem_euclid(21_600_000);
   if shape_rotation != 0 {
@@ -1624,24 +1764,36 @@ fn diagram_drawing_text_frame(
   }
   DiagramDrawingTextFrame {
     frame,
+    text_area_x_pt: preset_bounds.x,
     text_area_y_pt: preset_bounds.y,
     rotation_center_pt: (angle_diff != 0).then_some((frame.x_pt, frame.y_pt)),
+    text_distances_100mm,
   }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct DiagramDrawingTextFrame {
   frame: TextFrame,
+  text_area_x_pt: f32,
   text_area_y_pt: f32,
   rotation_center_pt: Option<(f32, f32)>,
+  text_distances_100mm: Option<ShapeTextDistances100mm>,
 }
 
 impl DiagramDrawingTextFrame {
-  fn new(frame: TextFrame, text_area_y_pt: f32) -> Self {
+  fn new(frame: TextFrame, text_area_x_pt: f32, text_area_y_pt: f32) -> Self {
     Self {
       frame,
+      text_area_x_pt,
       text_area_y_pt,
       rotation_center_pt: None,
+      text_distances_100mm: Some(text_distances_from_frame(
+        text_area_x_pt,
+        text_area_y_pt,
+        frame.width_pt,
+        frame.height_pt,
+        frame,
+      )),
     }
   }
 }
@@ -3249,6 +3401,7 @@ struct ImportedImageData {
 struct ImageEffects {
   color_change: Option<ColorChangeEffect>,
   grayscale: bool,
+  watermark: bool,
   brightness: Option<i32>,
   contrast: Option<i32>,
   bilevel_threshold: Option<u8>,
@@ -3333,14 +3486,25 @@ fn image_effects_from_blip(
       }
       a::BlipChoice::Grayscale => effects.grayscale = true,
       a::BlipChoice::LuminanceEffect(luminance) => {
-        effects.brightness = luminance
+        let brightness = luminance
           .brightness
           .as_ref()
           .map(|value| (value.as_ratio() * 100.0).round() as i32);
-        effects.contrast = luminance
+        let contrast = luminance
           .contrast
           .as_ref()
           .map(|value| (value.as_ratio() * 100.0).round() as i32);
+        // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
+        // maps MSO washout (bright=70%, contrast=-70%) to
+        // GraphicDrawMode::Watermark and clears AdjustLuminance/Contrast.
+        if brightness == Some(70) && contrast == Some(-70) {
+          effects.watermark = true;
+          effects.brightness = None;
+          effects.contrast = None;
+        } else {
+          effects.brightness = brightness;
+          effects.contrast = contrast;
+        }
       }
       a::BlipChoice::BiLevel(bilevel) => {
         // Source: LibreOffice oox/source/drawingml/fillproperties.cxx
@@ -3417,6 +3581,11 @@ fn apply_image_effects(
       r = luminance;
       g = luminance;
       b = luminance;
+    }
+    if effects.watermark {
+      r = libreoffice_luminance_contrast_component(r, 0.5, -0.7);
+      g = libreoffice_luminance_contrast_component(g, 0.5, -0.7);
+      b = libreoffice_luminance_contrast_component(b, 0.5, -0.7);
     }
     if effects.brightness.is_some() || effects.contrast.is_some() {
       let brightness = effects.brightness.unwrap_or(0);
@@ -3534,6 +3703,25 @@ fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) 
     .clamp(0.0, 255.0) as u8
 }
 
+fn libreoffice_luminance_contrast_component(value: u8, luminance: f32, contrast: f32) -> u8 {
+  // Source: LibreOffice
+  // basegfx/source/color/bcolormodifier.cxx
+  // BColorModifier_RGBLuminanceContrast applies contrast as a 0..1 slope and
+  // combines luminance with the prepared contrast offset.
+  let luminance = luminance.clamp(-1.0, 1.0);
+  let contrast = contrast.clamp(-1.0, 1.0);
+  let contrast_offset = if contrast >= 0.0 {
+    128.0 / (128.0 - contrast * 127.0)
+  } else {
+    (128.0 + contrast * 127.0) / 128.0
+  };
+  let prepared_contrast_offset = (128.0 - contrast_offset * 128.0) / 255.0;
+  ((f32::from(value) / 255.0) * contrast_offset + luminance + prepared_contrast_offset)
+    .clamp(0.0, 1.0)
+    .mul_add(255.0, 0.0)
+    .round() as u8
+}
+
 fn blip_fill_image_crop(blip_fill: &a::BlipFill) -> ImageCrop {
   blip_fill
     .blip_fill_choice
@@ -3603,11 +3791,27 @@ fn lower_text_body(
   items: &mut Vec<PageItem>,
   summary: Option<&mut PptxLayoutSummary>,
 ) {
-  let text_box = text_box_metrics(shape, offset, text_body);
+  let mut text_body = text_body.clone();
+  if shape.rotation.abs() > f32::EPSILON
+    && text_body
+      .display_properties
+      .text_camera_z_rotation
+      .is_some()
+  {
+    let shape_rotation = (shape.rotation * 60_000.0).round() as i32;
+    text_body.display_properties.text_area_rotation = Some(
+      text_body
+        .display_properties
+        .text_area_rotation
+        .unwrap_or_default()
+        + shape_rotation,
+    );
+  }
+  let text_box = text_box_metrics(shape, offset, &text_body);
   lower_text_body_at_with_font_ref(
     import,
     text_box,
-    text_body,
+    &text_body,
     shape
       .shape_style_refs
       .as_ref()
@@ -3746,6 +3950,7 @@ fn lower_text_body_at_with_style_and_scale(
     y_pt,
     column_index: 0,
   };
+  let item_start = items.len();
   for (paragraph_index, paragraph) in text_body.paragraphs.iter().enumerate() {
     lower_paragraph(
       import,
@@ -3762,6 +3967,52 @@ fn lower_text_body_at_with_style_and_scale(
       items,
     );
   }
+  apply_text_camera_z_rotation(
+    &mut items[item_start..],
+    text_body.display_properties.camera_z_rotation_degrees(),
+  );
+}
+
+fn apply_text_camera_z_rotation(items: &mut [PageItem], rotation_deg: f32) {
+  if rotation_deg.abs() <= f32::EPSILON {
+    return;
+  }
+  let Some((left, top, right, bottom)) = text_items_bounds(items) else {
+    return;
+  };
+  let center_x = (left + right) / 2.0;
+  let center_y = (top + bottom) / 2.0;
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    text.style.rotation_deg += rotation_deg;
+    text.rotation_center_pt = Some((center_x, center_y));
+  }
+}
+
+fn text_items_bounds(items: &[PageItem]) -> Option<(f32, f32, f32, f32)> {
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for item in items {
+    let PageItem::Text(text) = item else {
+      continue;
+    };
+    let width_pt = measure_text(&text.text, &text.style);
+    let left = text.x_pt;
+    let top = text.y_pt - text.line_height_pt;
+    let right = text.x_pt + width_pt;
+    let bottom = text.y_pt;
+    bounds = Some(match bounds {
+      Some((old_left, old_top, old_right, old_bottom)) => (
+        old_left.min(left),
+        old_top.min(top),
+        old_right.max(right),
+        old_bottom.max(bottom),
+      ),
+      None => (left, top, right, bottom),
+    });
+  }
+  bounds
 }
 
 fn text_base_style(
@@ -3872,10 +4123,257 @@ struct TextFrame {
   height_pt: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ShapeTextDistances100mm {
+  left: i32,
+  top: i32,
+  right: i32,
+  bottom: i32,
+}
+
+fn draw_shape_summary_from_parts(
+  page_index: usize,
+  shape_path: Vec<usize>,
+  service_name: String,
+  geometry: Option<String>,
+  text: String,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  fill: Option<&FillProperties>,
+  rotation_deg: f32,
+  flip_h: bool,
+  flip_v: bool,
+  text_distances: Option<ShapeTextDistances100mm>,
+) -> PptxDrawShapeSummary {
+  let (fill_style, gradient_style, gradient_angle) =
+    fill_summary(fill, rotation_deg, flip_h, flip_v);
+  PptxDrawShapeSummary {
+    page_index,
+    shape_path,
+    service_name,
+    geometry,
+    text,
+    left_100mm: points_to_100mm(x_pt),
+    top_100mm: points_to_100mm(y_pt),
+    right_100mm: points_to_100mm(x_pt + width_pt),
+    bottom_100mm: points_to_100mm(y_pt + height_pt),
+    width_100mm: points_to_100mm(width_pt),
+    height_100mm: points_to_100mm(height_pt),
+    fill_style,
+    fill_uses_slide_background: false,
+    gradient_style,
+    gradient_angle,
+    text_left_distance_100mm: text_distances.map(|distances| distances.left),
+    text_upper_distance_100mm: text_distances.map(|distances| distances.top),
+    text_right_distance_100mm: text_distances.map(|distances| distances.right),
+    text_lower_distance_100mm: text_distances.map(|distances| distances.bottom),
+  }
+}
+
+fn text_distances_from_frame(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  frame: TextFrame,
+) -> ShapeTextDistances100mm {
+  ShapeTextDistances100mm {
+    left: points_to_100mm(frame.x_pt - x_pt),
+    top: points_to_100mm(frame.y_pt - y_pt),
+    right: points_to_100mm(x_pt + width_pt - frame.x_pt - frame.width_pt),
+    bottom: points_to_100mm(y_pt + height_pt - frame.y_pt - frame.height_pt),
+  }
+}
+
+fn shape_geometry_name(geometry: Option<&CustomShapeGeometry>) -> Option<String> {
+  match geometry {
+    Some(CustomShapeGeometry::Preset(preset)) => Some(format!("ooxml-{:?}", preset.preset)),
+    Some(CustomShapeGeometry::Custom(_)) => Some("custom".to_string()),
+    None => None,
+  }
+}
+
+fn diagram_geometry_name(properties: &dsp::ShapeProperties) -> Option<String> {
+  match properties.shape_properties_choice1.as_ref() {
+    Some(dsp::ShapePropertiesChoice::PresetGeometry(preset)) => {
+      Some(format!("ooxml-{:?}", preset.preset))
+    }
+    Some(dsp::ShapePropertiesChoice::CustomGeometry(_)) => Some("custom".to_string()),
+    None => None,
+  }
+}
+
+fn shape_text(text_body: Option<&TextBody>) -> String {
+  text_body.map(text_body_plain_text).unwrap_or_default()
+}
+
+fn rotated_shape_geo_top_left(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  rotation_deg: f32,
+) -> (f32, f32) {
+  if rotation_deg.abs() <= f32::EPSILON {
+    return (x_pt, y_pt);
+  }
+  let center_x = x_pt + width_pt / 2.0;
+  let center_y = y_pt + height_pt / 2.0;
+  rotate_point(x_pt, y_pt, center_x, center_y, rotation_deg.to_radians())
+}
+
+fn fill_summary(
+  fill: Option<&FillProperties>,
+  rotation_deg: f32,
+  flip_h: bool,
+  flip_v: bool,
+) -> (String, Option<String>, Option<i16>) {
+  match fill.map(|fill| &fill.kind) {
+    Some(FillKind::None) => ("None".to_string(), None, None),
+    Some(FillKind::Solid(_)) => ("Solid".to_string(), None, None),
+    Some(FillKind::Group) => ("Group".to_string(), None, None),
+    Some(FillKind::Blip(_)) => ("Bitmap".to_string(), None, None),
+    Some(FillKind::Pattern(_)) => ("Pattern".to_string(), None, None),
+    Some(FillKind::Gradient(gradient)) => (
+      "Gradient".to_string(),
+      gradient_style(gradient),
+      gradient_angle(gradient, rotation_deg, flip_h, flip_v),
+    ),
+    None => ("Default".to_string(), None, None),
+  }
+}
+
+fn gradient_style(gradient: &a::GradientFill) -> Option<String> {
+  match gradient.gradient_fill_choice.as_ref()? {
+    a::GradientFillChoice::LinearGradientFill(_) => Some("Linear".to_string()),
+    a::GradientFillChoice::PathGradientFill(path) => Some(match path.path {
+      Some(a::PathShadeValues::Circle) => "Radial".to_string(),
+      Some(a::PathShadeValues::Rectangle | a::PathShadeValues::Shape) | None => {
+        "Rectangle".to_string()
+      }
+    }),
+  }
+}
+
+fn gradient_angle(
+  gradient: &a::GradientFill,
+  rotation_deg: f32,
+  flip_h: bool,
+  flip_v: bool,
+) -> Option<i16> {
+  let a::GradientFillChoice::LinearGradientFill(linear) = gradient.gradient_fill_choice.as_ref()?
+  else {
+    return None;
+  };
+  let mut shade_angle = linear.angle.unwrap_or_default();
+  if flip_h {
+    shade_angle = 180 * 60_000 - shade_angle;
+  }
+  if flip_v {
+    shade_angle = -shade_angle;
+  }
+  let shape_rotation = (rotation_deg * 60_000.0).round() as i32;
+  let dml_angle = shade_angle + shape_rotation;
+  Some((8100 - dml_angle / 6_000).rem_euclid(3600) as i16)
+}
+
+fn record_diagram_draw_shape_summary(
+  summary: &mut PptxLayoutSummary,
+  page_index: usize,
+  shape: &dsp::Shape,
+  bounds: shared_diagram::DiagramBounds,
+  transform: DiagramDrawingTransform,
+) {
+  let fill = diagram_fill_properties(&shape.shape_properties);
+  let text_body = shape
+    .text_body
+    .as_deref()
+    .map(TextBody::from_diagram_drawing);
+  let text_distances = text_body.as_ref().map(|text_body| {
+    let frame = diagram_drawing_text_frame(shape, bounds, transform, text_body);
+    frame.text_distances_100mm.unwrap_or_else(|| {
+      text_distances_from_frame(bounds.x, bounds.y, bounds.width, bounds.height, frame.frame)
+    })
+  });
+  let rotation_deg = shape
+    .shape_properties
+    .transform2_d
+    .as_deref()
+    .and_then(|transform| transform.rotation)
+    .map(|rotation| rotation as f32 / 60_000.0)
+    .unwrap_or_default();
+  summary.draw_shapes.push(draw_shape_summary_from_parts(
+    page_index,
+    Vec::new(),
+    "DiagramShape".to_string(),
+    diagram_geometry_name(&shape.shape_properties),
+    text_body
+      .as_ref()
+      .map(text_body_plain_text)
+      .unwrap_or_default(),
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+    fill.as_ref(),
+    rotation_deg,
+    shape
+      .shape_properties
+      .transform2_d
+      .as_deref()
+      .and_then(|transform| transform.horizontal_flip)
+      .is_some_and(|value| value.as_bool()),
+    shape
+      .shape_properties
+      .transform2_d
+      .as_deref()
+      .and_then(|transform| transform.vertical_flip)
+      .is_some_and(|value| value.as_bool()),
+    text_distances,
+  ));
+}
+
+fn diagram_fill_properties(properties: &dsp::ShapeProperties) -> Option<FillProperties> {
+  Some(match properties.shape_properties_choice2.as_ref()? {
+    dsp::ShapePropertiesChoice2::NoFill(_) => FillProperties {
+      kind: FillKind::None,
+      placeholder_color: None,
+    },
+    dsp::ShapePropertiesChoice2::SolidFill(fill) => FillProperties {
+      kind: FillKind::Solid(
+        fill
+          .solid_fill_choice
+          .as_ref()
+          .and_then(Color::from_solid_fill_choice),
+      ),
+      placeholder_color: None,
+    },
+    dsp::ShapePropertiesChoice2::GradientFill(fill) => FillProperties {
+      kind: FillKind::Gradient(fill.clone()),
+      placeholder_color: None,
+    },
+    dsp::ShapePropertiesChoice2::BlipFill(fill) => FillProperties {
+      kind: FillKind::Blip(fill.clone()),
+      placeholder_color: None,
+    },
+    dsp::ShapePropertiesChoice2::PatternFill(fill) => FillProperties {
+      kind: FillKind::Pattern(fill.clone()),
+      placeholder_color: None,
+    },
+    dsp::ShapePropertiesChoice2::GroupFill => FillProperties {
+      kind: FillKind::Group,
+      placeholder_color: None,
+    },
+  })
+}
+
 fn record_smartart_text_shape(
   summary: Option<&mut PptxLayoutSummary>,
   page_index: usize,
   text_body: &TextBody,
+  text_area_x_pt: f32,
   text_area_y_pt: f32,
   frame: TextFrame,
 ) {
@@ -3891,6 +4389,7 @@ fn record_smartart_text_shape(
     .push(PptxSmartArtTextShapeSummary {
       page_index,
       text,
+      text_left_distance_100mm: points_to_100mm(frame.x_pt - text_area_x_pt),
       text_upper_distance_100mm: points_to_100mm(frame.y_pt - text_area_y_pt),
       text_anchor_left_100mm: points_to_100mm(frame.x_pt),
       text_anchor_top_100mm: points_to_100mm(frame.y_pt),
@@ -4109,7 +4608,7 @@ fn lower_paragraph(
   shape_hyperlink_url: Option<&str>,
   image_resources: Option<&HashMap<String, ImageResource>>,
   page_index: usize,
-  mut summary: Option<&mut PptxLayoutSummary>,
+  summary: Option<&mut PptxLayoutSummary>,
   cursor: &mut TextCursor,
   items: &mut Vec<PageItem>,
 ) {
@@ -4133,13 +4632,7 @@ fn lower_paragraph(
     bullet.graphic_width_100mm = Some(width);
     bullet.graphic_height_100mm = Some(height);
   }
-  record_bullet_paragraph(
-    summary.as_deref_mut(),
-    page_index,
-    paragraph_index,
-    paragraph,
-    &bullet,
-  );
+  record_bullet_paragraph(summary, page_index, paragraph_index, paragraph, &bullet);
   let paragraph_x = cursor.x_pt
     + paragraph_style.left_margin_pt
     + if bullet.label.is_some() {
@@ -4164,12 +4657,14 @@ fn lower_paragraph(
       &paragraph.runs[segment_start..segment_end],
       column_width,
     );
-    let alignment =
-      if options.anchor_center && paragraph_style.alignment == a::TextAlignmentTypeValues::Left {
-        a::TextAlignmentTypeValues::Center
-      } else {
-        paragraph_style.alignment
-      };
+    let alignment = if options.anchor_center {
+      // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
+      // maps horizontal text with anchorCtr=1 to TextHorizontalAdjust_CENTER,
+      // so the shape-level adjustment overrides paragraph alignment.
+      a::TextAlignmentTypeValues::Center
+    } else {
+      paragraph_style.alignment
+    };
 
     for (line_index, text_line) in text_lines.iter().enumerate() {
       let mut run_x = aligned_paragraph_x(paragraph_x, column_width, text_line.width_pt, alignment);

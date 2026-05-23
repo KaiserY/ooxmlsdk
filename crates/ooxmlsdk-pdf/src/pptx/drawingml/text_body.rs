@@ -28,6 +28,7 @@ pub(crate) struct TextBodyDisplayProperties {
   pub(crate) column_count: usize,
   pub(crate) column_spacing_emu: i64,
   pub(crate) text_area_rotation: Option<i32>,
+  pub(crate) text_camera_z_rotation: Option<i32>,
   pub(crate) vertical: Option<a::TextVerticalValues>,
   pub(crate) anchor: a::TextAnchoringTypeValues,
   pub(crate) anchor_center: bool,
@@ -144,6 +145,7 @@ impl Default for TextBodyDisplayProperties {
       column_count: 1,
       column_spacing_emu: 0,
       text_area_rotation: None,
+      text_camera_z_rotation: None,
       vertical: None,
       anchor: a::TextAnchoringTypeValues::Top,
       anchor_center: false,
@@ -180,6 +182,11 @@ impl TextBodyDisplayProperties {
         .map(|spacing| spacing.to_emu())
         .unwrap_or_default(),
       text_area_rotation: properties.rotation,
+      text_camera_z_rotation: properties
+        .scene3_d_type
+        .as_deref()
+        .and_then(|scene| scene.camera.rotation.as_ref())
+        .map(|rotation| rotation.revolution),
       vertical: properties.vertical,
       anchor: properties.anchor.unwrap_or(a::TextAnchoringTypeValues::Top),
       anchor_center: properties
@@ -257,6 +264,17 @@ impl TextBodyDisplayProperties {
     } else {
       body_rotation + vertical_rotation
     }
+  }
+
+  pub(crate) fn camera_z_rotation_degrees(&self) -> f32 {
+    // Source: LibreOffice oox/source/drawingml/shape.cxx stores
+    // bodyPr/scene3d camera rot@rev as TextCameraZRotateAngle, and
+    // svx/source/svdraw/svdotextdecomposition.cxx applies it as
+    // 360 - GetCameraZRotation() during text decomposition.
+    self
+      .text_camera_z_rotation
+      .map(|rotation| 360.0 - rotation as f32 / 60_000.0)
+      .unwrap_or_default()
   }
 }
 

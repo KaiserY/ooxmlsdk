@@ -74,9 +74,34 @@ pub struct PptxLayoutSummary {
   pub save_subset_fonts: bool,
   pub embedded_font_typefaces: Vec<String>,
   pub notes_page_shape_counts: Vec<usize>,
+  pub draw_page_shape_counts: Vec<usize>,
+  pub draw_shapes: Vec<PptxDrawShapeSummary>,
   pub master_text_shapes: Vec<PptxTextShapeSummary>,
   pub smartart_text_shapes: Vec<PptxSmartArtTextShapeSummary>,
   pub bullet_paragraphs: Vec<PptxBulletParagraphSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PptxDrawShapeSummary {
+  pub page_index: usize,
+  pub shape_path: Vec<usize>,
+  pub service_name: String,
+  pub geometry: Option<String>,
+  pub text: String,
+  pub left_100mm: i32,
+  pub top_100mm: i32,
+  pub right_100mm: i32,
+  pub bottom_100mm: i32,
+  pub width_100mm: i32,
+  pub height_100mm: i32,
+  pub fill_style: String,
+  pub fill_uses_slide_background: bool,
+  pub gradient_style: Option<String>,
+  pub gradient_angle: Option<i16>,
+  pub text_left_distance_100mm: Option<i32>,
+  pub text_upper_distance_100mm: Option<i32>,
+  pub text_right_distance_100mm: Option<i32>,
+  pub text_lower_distance_100mm: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -90,6 +115,7 @@ pub struct PptxTextShapeSummary {
 pub struct PptxSmartArtTextShapeSummary {
   pub page_index: usize,
   pub text: String,
+  pub text_left_distance_100mm: i32,
   pub text_upper_distance_100mm: i32,
   pub text_anchor_left_100mm: i32,
   pub text_anchor_top_100mm: i32,

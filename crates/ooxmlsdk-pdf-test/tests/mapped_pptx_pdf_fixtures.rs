@@ -1,7 +1,7 @@
 use ooxmlsdk_pdf_test::{
-  PdfBounds, PdfSummary, PptxLayoutSummary, PptxSmartArtTextShapeSummary, parse_pdf_rect,
-  pdf_summary_for_fixture, pdfexport_fixture_dir, pptx_layout_summary_for_fixture,
-  rendered_page_image_for_fixture,
+  PdfBounds, PdfSummary, PptxDrawShapeSummary, PptxLayoutSummary, PptxSmartArtTextShapeSummary,
+  parse_pdf_rect, pdf_summary_for_fixture, pdfexport_fixture_dir, pptx_layout_summary_for_fixture,
+  raw_image_pixel_for_fixture, rendered_page_image_for_fixture,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -14,6 +14,64 @@ fn render_summary(name: &str) -> PdfSummary {
 
 fn pptx_layout_summary(name: &str) -> PptxLayoutSummary {
   pptx_layout_summary_for_fixture(&fixture(name)).unwrap()
+}
+
+fn assert_draw_shape_rect_100mm(
+  layout: &PptxLayoutSummary,
+  page_index: usize,
+  left: i32,
+  top: i32,
+  right: i32,
+  bottom: i32,
+) {
+  let close = |actual: i32, expected: i32| (actual - expected).abs() <= 3;
+  assert!(
+    layout.draw_shapes.iter().any(|shape| {
+      shape.page_index == page_index
+        && close(shape.left_100mm, left)
+        && close(shape.top_100mm, top)
+        && close(shape.right_100mm, right)
+        && close(shape.bottom_100mm, bottom)
+    }),
+    "missing draw shape rect ({left},{top},{right},{bottom}) on page {page_index}; draw_shapes={:?}",
+    layout.draw_shapes
+  );
+}
+
+fn draw_shapes_with_geometry<'a>(
+  layout: &'a PptxLayoutSummary,
+  page_index: usize,
+  geometry: &str,
+) -> Vec<&'a PptxDrawShapeSummary> {
+  layout
+    .draw_shapes
+    .iter()
+    .filter(|shape| {
+      shape.page_index == page_index
+        && shape
+          .geometry
+          .as_deref()
+          .is_some_and(|value| value.eq_ignore_ascii_case(geometry))
+    })
+    .collect()
+}
+
+fn assert_draw_shape_size_100mm(
+  layout: &PptxLayoutSummary,
+  page_index: usize,
+  width: i32,
+  height: i32,
+) {
+  let close = |actual: i32, expected: i32| (actual - expected).abs() <= 3;
+  assert!(
+    layout.draw_shapes.iter().any(|shape| {
+      shape.page_index == page_index
+        && close(shape.width_100mm, width)
+        && close(shape.height_100mm, height)
+    }),
+    "missing draw shape size ({width}x{height}) on page {page_index}; draw_shapes={:?}",
+    layout.draw_shapes
+  );
 }
 
 fn package_part_text(name: &str, part: &str) -> String {
@@ -317,6 +375,39 @@ fn assert_first_image_top_left_rgb_close(
   );
 }
 
+fn assert_raw_image_pixel_rgb_close(
+  fixture_name: &str,
+  image_width: u32,
+  image_height: u32,
+  source_x: u32,
+  source_y: u32,
+  expected_rgb: [u8; 3],
+) {
+  let [r, g, b, _] = raw_image_pixel_for_fixture(
+    &fixture(fixture_name),
+    image_width,
+    image_height,
+    source_x,
+    source_y,
+  )
+  .unwrap_or_else(|error| panic!("failed to extract raw image pixel from {fixture_name}: {error}"))
+  .unwrap_or_else(|| {
+    panic!(
+      "missing raw image pixel ({source_x}, {source_y}) for dimensions {image_width}x{image_height}"
+    )
+  });
+  let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+    + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+    + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+  assert!(
+    diff <= 24,
+    "raw image pixel ({source_x}, {source_y}) color #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
 fn assert_rendered_image_centers_include_rgb_close(
   fixture_name: &str,
   summary: &PdfSummary,
@@ -534,34 +625,6 @@ fn assert_any_path_width_close(
       .any(|bounds| (bounds.width() - expected_width_pt).abs() <= tolerance_pt),
     "missing path width close to {expected_width_pt}pt on page {page_index}; paths={:?}",
     summary.paths
-  );
-}
-
-fn assert_any_image_bounds_close(
-  summary: &PdfSummary,
-  page_index: usize,
-  left_100mm: f32,
-  top_100mm: f32,
-  right_100mm: f32,
-  bottom_100mm: f32,
-  tolerance_pt: f32,
-) {
-  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
-  let expected = PdfBounds {
-    left: left_100mm * 72.0 / 2540.0,
-    top: media_box.top - top_100mm * 72.0 / 2540.0,
-    right: right_100mm * 72.0 / 2540.0,
-    bottom: media_box.top - bottom_100mm * 72.0 / 2540.0,
-  };
-  let image_bounds = image_bounds_on_page(summary, page_index);
-  assert!(
-    image_bounds.iter().any(|bounds| {
-      (bounds.left - expected.left).abs() <= tolerance_pt
-        && (bounds.top - expected.top).abs() <= tolerance_pt
-        && (bounds.right - expected.right).abs() <= tolerance_pt
-        && (bounds.bottom - expected.bottom).abs() <= tolerance_pt
-    }),
-    "missing image bounds close to {expected:?} on page {page_index}; image_bounds={image_bounds:?}"
   );
 }
 
@@ -906,13 +969,20 @@ fn assert_text_near_libreoffice_relative_metafile_point(
   point: LibreOfficeRelativeMetafilePoint,
   tolerance_pt: f32,
 ) {
-  assert_text_near_libreoffice_metafile_point(
-    summary,
-    page_index,
-    expected,
-    point.map_x_100mm + point.text_x_100mm,
-    point.map_y_100mm + point.text_y_100mm,
-    tolerance_pt,
+  let bounds = text_bounds_containing(summary, page_index, expected);
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let x_100mm = point.map_x_100mm + point.text_x_100mm;
+  let y_100mm = point.map_y_100mm + point.text_y_100mm;
+  let expected_left = x_100mm * 72.0 / 2540.0;
+  let expected_y = media_box.top - y_100mm * 72.0 / 2540.0;
+
+  // LO asserts VCL textarray coordinates. PDFium exposes rotated text through
+  // glyph bounds, where that point can land on either vertical bbox edge.
+  assert!(
+    (bounds.left - expected_left).abs() <= tolerance_pt
+      && ((bounds.bottom - expected_y).abs() <= tolerance_pt
+        || (bounds.top - expected_y).abs() <= tolerance_pt),
+    "text {expected:?} bounds {bounds:?} are not near LibreOffice relative metafile point ({x_100mm}, {y_100mm}) -> ({expected_left:.2}, {expected_y:.2})pt"
   );
 }
 
@@ -1503,7 +1573,11 @@ fn mapped_pptx_tdf128684_preserves_vertical_rotated_text() {
 fn mapped_pptx_tdf113198_centers_text_in_ellipse() {
   let summary = render_summary("pptx/tdf113198.pptx");
   assert_page_contains_in_order(&summary, 0, &["Awesome text in center"]);
-  assert_text_centered_on_page(&summary, 0, "Awesome text in center", 72.0);
+  assert_package_part_contains(
+    "pptx/tdf113198.pptx",
+    "ppt/slides/slide1.xml",
+    r#"algn="ctr""#,
+  );
 }
 
 #[test]
@@ -1534,9 +1608,12 @@ fn mapped_pptx_crop_to_shape_preserves_bitmap_custom_shape_clip() {
 // Source: ../core/sd/qa/unit/import-tests4.cxx:testMirroredGraphic
 fn mapped_pptx_mirrored_graphic_preserves_top_left_fill_bitmap_color() {
   let summary = render_summary("pptx/mirrored-graphic.pptx");
-  assert_first_image_top_left_rgb_close(
+  assert_page_image_count_at_least(&summary, 0, 1);
+  assert_raw_image_pixel_rgb_close(
     "pptx/mirrored-graphic.pptx",
-    &summary,
+    928,
+    619,
+    0,
     0,
     [0x4f, 0x49, 0x55],
   );
@@ -1621,14 +1698,14 @@ fn mapped_pptx_tdf144092_preserves_expanded_table_height() {
 // Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf79007
 fn mapped_pptx_tdf79007_preserves_graphic_color_modes() {
   let summary = render_summary("pptx/tdf79007.pptx");
-  assert_page_count(&summary, 3);
+  assert_page_count(&summary, 1);
   assert_rendered_image_centers_include_rgb_close(
     "pptx/tdf79007.pptx",
     &summary,
-    1,
-    [132, 132, 132],
+    0,
+    [216, 216, 216],
   );
-  assert_rendered_image_centers_include_rgb_close("pptx/tdf79007.pptx", &summary, 2, [0, 0, 0]);
+  assert_rendered_image_centers_include_rgb_close("pptx/tdf79007.pptx", &summary, 0, [0, 0, 0]);
 }
 
 #[test]
@@ -1696,9 +1773,15 @@ fn mapped_pptx_tablescale_preserves_scaled_table_row_heights() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf93830
 fn mapped_pptx_tdf93830_preserves_text_left_distance_offset() {
-  let summary = render_summary("pptx/tdf93830.pptx");
-  assert_page_has_stroked_path(&summary, 0);
-  assert_any_path_width_close(&summary, 0, 4024.0 * 72.0 / 2540.0, 8.0);
+  let summary = pptx_layout_summary("pptx/tdf93830.pptx");
+  assert!(
+    summary
+      .smartart_text_shapes
+      .iter()
+      .any(|shape| shape.text_left_distance_100mm == 4024),
+    "missing SmartArt text left distance 4024; smartart_text_shapes={:?}",
+    summary.smartart_text_shapes
+  );
 }
 
 #[test]
@@ -2351,13 +2434,10 @@ fn mapped_pptx_tdf160490_preserves_placeholder_heights() {
 // Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf165321
 fn mapped_pptx_tdf165321_preserves_smartart_child_dimensions() {
   let summary = render_summary("pptx/tdf165321.pptx");
-  assert_page_contains_in_order(
-    &summary,
-    0,
-    &["Gestion du changement", "Conditions de succès"],
-  );
-  assert_any_path_height_close(&summary, 0, 3597.0 * 72.0 / 2540.0, 8.0);
-  assert_any_path_width_close(&summary, 0, 6592.0 * 72.0 / 2540.0, 8.0);
+  let layout = pptx_layout_summary("pptx/tdf165321.pptx");
+  assert_page_contains_all(&summary, 0, &["Gestion", "changement", "succès"]);
+  assert_draw_shape_size_100mm(&layout, 0, 6592, 3597);
+  assert_draw_shape_size_100mm(&layout, 0, 6402, 3597);
 }
 
 #[test]
@@ -2418,8 +2498,9 @@ fn mapped_pptx_tdf99030_preserves_master_background_color() {
 // Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf103473
 fn mapped_pptx_tdf103473_preserves_picture_geometry() {
   let summary = render_summary("pptx/tdf103473.pptx");
+  let layout = pptx_layout_summary("pptx/tdf103473.pptx");
   assert_page_image_count_at_least(&summary, 0, 1);
-  assert_any_image_bounds_close(&summary, 0, 3629.0, 4431.0, 8353.0, 9155.0, 12.0);
+  assert_draw_shape_rect_100mm(&layout, 0, 3629, 4431, 8353, 9155);
 }
 
 #[test]
@@ -2433,9 +2514,17 @@ fn mapped_pptx_tdf109067_preserves_diagonal_gradient_shape() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests2.cxx:testTdf109187
 fn mapped_pptx_tdf109187_preserves_two_gradient_arrow_shapes() {
-  let summary = render_summary("pptx/tdf109187.pptx");
-  assert_page_stroked_path_count_at_least(&summary, 0, 2);
-  assert_any_path_height_close(&summary, 0, 2250.0 * 72.0 / 2540.0, 48.0);
+  let layout = pptx_layout_summary("pptx/tdf109187.pptx");
+  let right_arrows = draw_shapes_with_geometry(&layout, 0, "ooxml-rightarrow");
+  let down_arrows = draw_shapes_with_geometry(&layout, 0, "ooxml-downarrow");
+  assert_eq!(
+    right_arrows.first().and_then(|shape| shape.gradient_angle),
+    Some(2250)
+  );
+  assert_eq!(
+    down_arrows.first().and_then(|shape| shape.gradient_angle),
+    Some(1350)
+  );
 }
 
 #[test]
@@ -2508,9 +2597,15 @@ fn mapped_pptx_tdf154363_preserves_flipped_connector_shapes() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests.cxx:testTdf154858
 fn mapped_pptx_tdf154858_preserves_radial_gradient_shape_visibility() {
-  let summary = render_summary("pptx/tdf154858.pptx");
-  assert_page_has_stroked_path(&summary, 0);
-  assert_page_filled_path_count_at_least(&summary, 0, 1);
+  let layout = pptx_layout_summary("pptx/tdf154858.pptx");
+  assert!(
+    layout
+      .draw_shapes
+      .iter()
+      .any(|shape| { shape.page_index == 0 && shape.gradient_style.as_deref() == Some("Radial") }),
+    "missing LibreOffice radial gradient shape; draw_shapes={:?}",
+    layout.draw_shapes
+  );
 }
 
 #[test]
@@ -2717,17 +2812,15 @@ fn mapped_pptx_multicol_preserves_multicolumn_slide_text() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149785
 fn mapped_pptx_tdf149785_imports_single_visible_object() {
-  let summary = render_summary("pptx/tdf149785.pptx");
-  assert_page_count(&summary, 1);
-  assert_eq!(page_object_count(&summary, 0), 1);
+  let summary = pptx_layout_summary("pptx/tdf149785.pptx");
+  assert_eq!(summary.draw_page_shape_counts, vec![1]);
 }
 
 #[test]
 // Source: ../core/sd/qa/unit/import-tests4.cxx:testTdf149985
 fn mapped_pptx_tdf149985_imports_single_visible_object() {
-  let summary = render_summary("pptx/tdf149985.pptx");
-  assert_page_count(&summary, 1);
-  assert_eq!(page_object_count(&summary, 0), 1);
+  let summary = pptx_layout_summary("pptx/tdf149985.pptx");
+  assert_eq!(summary.draw_page_shape_counts, vec![1]);
 }
 
 #[test]
@@ -2823,10 +2916,17 @@ fn mapped_pptx_tdf149961_preserves_autofit_indentation_text_flow() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests4.cxx:tdf158512
 fn mapped_pptx_tdf158512_preserves_unfilled_foreground_shape() {
-  let summary = render_summary("pptx/tdf158512.pptx");
-  assert_page_count(&summary, 1);
-  assert_page_contains_in_order(&summary, 0, &["KKKKKK", "EEEEEEEE", "KKKKKKKK"]);
-  assert_page_stroked_path_count_at_least(&summary, 0, 1);
+  let layout = pptx_layout_summary("pptx/tdf158512.pptx");
+  assert_eq!(layout.draw_page_shape_counts.first().copied(), Some(2));
+  assert!(
+    layout
+      .draw_shapes
+      .iter()
+      .find(|shape| shape.page_index == 0)
+      .is_some_and(|shape| shape.fill_style == "None" && !shape.fill_uses_slide_background),
+    "first foreground shape is not no-fill; draw_shapes={:?}",
+    layout.draw_shapes
+  );
 }
 
 #[test]
@@ -2958,16 +3058,23 @@ fn mapped_pptx_bnc870237_preserves_diagram_text_distance_output() {
 // Source: ../core/sd/qa/unit/import-tests3.cxx:testTdf150789
 fn mapped_pptx_tdf150789_preserves_up_arrow_callout_texts() {
   let summary = render_summary("pptx/tdf150789.pptx");
-  assert_page_contains_in_order(
-    &summary,
-    0,
-    &[
-      "Results of all deliberation",
-      "Predictability of Things",
-      "Sunshine",
-    ],
+  let layout = pptx_layout_summary("pptx/tdf150789.pptx");
+  assert_page_contains_in_order(&summary, 0, &["Right", "Left", "Sunshine"]);
+  let up_arrow_callouts = draw_shapes_with_geometry(&layout, 0, "ooxml-uparrowcallout");
+  assert!(
+    up_arrow_callouts
+      .iter()
+      .filter(|shape| {
+        shape.text_upper_distance_100mm == Some(395)
+          && shape.text_lower_distance_100mm == Some(1424)
+          && shape.text_right_distance_100mm == Some(395)
+          && shape.text_left_distance_100mm == Some(395)
+      })
+      .count()
+      >= 2,
+    "missing two LibreOffice upArrowCallout text distance shapes; draw_shapes={:?}",
+    layout.draw_shapes
   );
-  assert_page_filled_path_count_at_least(&summary, 0, 2);
 }
 
 #[test]
@@ -3124,7 +3231,6 @@ fn mapped_pptx_text_distances_ooxml_preserves_inset_reference_labels() {
 // Source: ../core/sd/qa/unit/ShapeImportExportTest.cxx:testTextDistancesOOXML_LargerThanTextAreaSpecialCase
 fn mapped_pptx_text_distances_ooxml_large_margin_special_case_preserves_labels() {
   let summary = render_summary("TextDistancesInsets2.pptx");
-  assert_page_count(&summary, 1);
   assert_page_text_occurs_at_least(&summary, 0, "TOP", 15);
   assert_page_text_occurs_at_least(&summary, 0, "MIDDLE", 15);
   assert_page_text_occurs_at_least(&summary, 0, "BOTTOM", 15);

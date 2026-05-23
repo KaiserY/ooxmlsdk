@@ -12,8 +12,8 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub use ooxmlsdk_pdf::{
-  DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary, PptxLayoutSummary,
-  PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
+  DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary, PptxDrawShapeSummary,
+  PptxLayoutSummary, PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PathObjectSummary, PdfBounds, PdfSummary, PixelRect,
@@ -54,7 +54,14 @@ pub fn pdfexport_fixtures() -> Vec<PathBuf> {
 }
 
 pub fn pdf_summary_for_fixture(fixture: &Path) -> Result<PdfSummary> {
-  let pdf = render_fixture_pdf(fixture)?;
+  pdf_summary_for_fixture_with_options(fixture, ooxmlsdk_pdf::PdfOptions::default())
+}
+
+pub fn pdf_summary_for_fixture_with_options(
+  fixture: &Path,
+  options: ooxmlsdk_pdf::PdfOptions,
+) -> Result<PdfSummary> {
+  let pdf = render::render_fixture_pdf_with_options(fixture, options)?;
   PdfSummary::from_bytes(&pdf).map_err(CalibrationError::PdfiumExtraction)
 }
 

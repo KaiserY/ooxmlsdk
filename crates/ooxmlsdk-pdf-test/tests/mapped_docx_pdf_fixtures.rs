@@ -3166,7 +3166,8 @@ fn mapped_fixture_tdf106153_keeps_all_textboxes_inside_page() {
 fn mapped_fixture_tdf109137_keeps_blue_rectangle_on_first_page() {
   let summary = render_summary("tdf109137.docx");
   assert_page_contains(&summary, 0, "Gráfico");
-  assert_page_path_count(&summary, 0, 1);
+  assert_page_image_count(&summary, 0, 1);
+  assert_rendered_pixel_rgb_close("tdf109137.docx", 0, 1024, 512, 655, [0, 0, 255]);
 }
 
 #[test]

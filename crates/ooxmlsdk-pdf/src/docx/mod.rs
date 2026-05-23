@@ -18,8 +18,10 @@ use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
+  schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
   schemas_microsoft_com_office_word_2010_wordprocessing_shape as wps,
   schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
@@ -311,73 +313,6 @@ fn text_style_with_color(styles: &StylesCatalog, color: RgbColor) -> TextStyle {
   style
 }
 
-fn resolve_empty_scheme_color(
-  event: &quick_xml::events::BytesStart<'_>,
-  theme_colors: &ThemeColors,
-) -> Option<ResolvedColor> {
-  let value = attr_value(event, b"val")?;
-  Some(ResolvedColor {
-    color: resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)?,
-    opacity: 1.0,
-  })
-}
-
-fn resolve_scheme_color_from_reader(
-  reader: &mut Reader<&[u8]>,
-  start: quick_xml::events::BytesStart<'_>,
-  theme_colors: &ThemeColors,
-) -> Option<ResolvedColor> {
-  let value = attr_value(&start, b"val")?;
-  let mut color = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)?;
-  let mut opacity = 1.0f32;
-  let target_name = start.name().as_ref().to_vec();
-  let mut depth = 1usize;
-
-  while depth > 0 {
-    match reader.read_event().ok()? {
-      Event::Start(event) if event.name().as_ref() == target_name.as_slice() => depth += 1,
-      Event::End(event) if event.name().as_ref() == target_name.as_slice() => {
-        depth = depth.saturating_sub(1);
-      }
-      Event::Start(event) | Event::Empty(event) => {
-        if qname_ends_with(event.name().as_ref(), b"tint") {
-          if let Some(value) = percent_attr(&event, b"val") {
-            color = apply_drawingml_tint(color, value);
-          }
-        } else if qname_ends_with(event.name().as_ref(), b"shade") {
-          if let Some(value) = percent_attr(&event, b"val") {
-            color = apply_drawingml_shade(color, value);
-          }
-        } else if qname_ends_with(event.name().as_ref(), b"satMod") {
-          if let Some(value) = drawingml_percent_attr(&event, b"val") {
-            let mut hsl = HslColor::from_rgb(color);
-            hsl.apply_saturation_mod(value);
-            color = hsl.to_rgb();
-          }
-        } else if qname_ends_with(event.name().as_ref(), b"lumMod") {
-          if let Some(value) = percent_attr(&event, b"val") {
-            let mut hsl = HslColor::from_rgb(color);
-            hsl.apply_luminance_mod(value);
-            color = hsl.to_rgb();
-          }
-        } else if qname_ends_with(event.name().as_ref(), b"lumOff") {
-          if let Some(value) = percent_attr(&event, b"val") {
-            let mut hsl = HslColor::from_rgb(color);
-            hsl.apply_luminance_offset(value);
-            color = hsl.to_rgb();
-          }
-        } else if qname_ends_with(event.name().as_ref(), b"alpha") {
-          opacity = alpha_percent_attr(&event, b"val");
-        }
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
-
-  Some(ResolvedColor { color, opacity })
-}
-
 fn apply_drawingml_shade(color: RgbColor, amount: f32) -> RgbColor {
   let red = drawingml_rgb_component_to_crgb(color.r);
   let green = drawingml_rgb_component_to_crgb(color.g);
@@ -414,58 +349,6 @@ fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
 fn drawingml_gamma(value: i32, gamma: f64) -> i32 {
   let scale = f64::from(sdk_units::DRAWINGML_PERCENT_SCALE);
   ((f64::from(value) / scale).powf(gamma) * scale + 0.5) as i32
-}
-
-fn resolve_drawingml_scheme_color_name(
-  value: &str,
-  theme_colors: &ThemeColors,
-) -> Option<RgbColor> {
-  match value {
-    "dk1" | "tx1" => theme_colors.dark1,
-    "lt1" | "bg1" => theme_colors.light1,
-    "dk2" | "tx2" => theme_colors.dark2,
-    "lt2" | "bg2" => theme_colors.light2,
-    "accent1" => theme_colors.accent1,
-    "accent2" => theme_colors.accent2,
-    "accent3" => theme_colors.accent3,
-    "accent4" => theme_colors.accent4,
-    "accent5" => theme_colors.accent5,
-    "accent6" => theme_colors.accent6,
-    "hlink" => theme_colors.hyperlink,
-    "folHlink" => theme_colors.followed_hyperlink,
-    _ => None,
-  }
-}
-
-fn color_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<RgbColor> {
-  parse_hex_color(attr_value(event, key)?.as_ref())
-}
-
-fn attr_value(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<Box<str>> {
-  event
-    .attributes()
-    .flatten()
-    .find(|attribute| attribute.key.as_ref() == key)
-    .and_then(|attribute| String::from_utf8(attribute.value.into_owned()).ok())
-    .map(String::into_boxed_str)
-}
-
-fn percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
-  attr_value(event, key)?
-    .parse::<DrawingmlPercentageValue>()
-    .ok()
-    .map(|value| (value.as_ratio() as f32).clamp(0.0, 1.0))
-}
-
-fn drawingml_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
-  attr_value(event, key)?
-    .parse::<DrawingmlPercentageValue>()
-    .ok()
-    .map(|value| value.as_ratio() as f32)
-}
-
-fn alpha_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> f32 {
-  percent_attr(event, key).unwrap_or(1.0)
 }
 
 fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
@@ -5223,11 +5106,10 @@ fn push_drawing_textboxes_impl(
     None => return,
   };
 
-  for child in graphic_data
-    .graphic_data_choice
-    .iter()
-    .filter_map(drawing_graphic_data_choice_xml)
-  {
+  for child in graphic_data.graphic_data_choice.iter() {
+    let Some(child) = drawing_graphic_data_choice_xml(child) else {
+      continue;
+    };
     let textbox_context = DrawingTextBoxImportContext {
       base_style: base_style.clone(),
       styles,
@@ -5254,16 +5136,6 @@ fn push_drawing_textboxes_impl(
         images,
         hyperlinks,
       );
-    } else if let Some(text) = drawing_textbox_text(&child) {
-      inlines.push(InlineItem::Text(TextRun {
-        text,
-        style: base_style.clone(),
-        hyperlink_url: None,
-        dynamic_field: None,
-        style_ref_keys: Vec::new(),
-        style_ref_text: None,
-        preserve_text_portion: false,
-      }));
     }
   }
 }
@@ -5368,11 +5240,9 @@ fn drawingml_textbox_frame_from_fragment(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineShape> {
-  let text_box = if let Some(content) = drawing_textbox_content(xml) {
-    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks)
-  } else {
-    drawingml_wordprocessing_textbox_frame_from_fragment(xml, base_style, styles)?
-  };
+  let content = drawing_textbox_content(xml)?;
+  let text_box =
+    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
   let auto_fit = drawingml_textbox_uses_auto_fit(xml);
   let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
   let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit, placement);
@@ -5442,118 +5312,6 @@ fn drawingml_textbox_frame_from_fragment(
   })
 }
 
-fn drawingml_wordprocessing_textbox_frame_from_fragment(
-  xml: &str,
-  base_style: TextStyle,
-  styles: &StylesCatalog,
-) -> Option<TextBoxFrameContent> {
-  // Source: LibreOffice oox/source/shape/WpsContext.cxx imports wps:txbx
-  // content as text on the owning drawing shape. Some mc:AlternateContent
-  // fragments arrive without namespace declarations on the extracted child,
-  // so fall back to local-name parsing instead of dropping the textbox.
-  let txbx_content = first_named_xml_fragment(xml, b"txbxContent")?;
-  let texts = wordprocessing_textbox_texts_from_xml(&txbx_content);
-  if texts.is_empty() {
-    return None;
-  }
-  let blocks = texts
-    .into_iter()
-    .map(|text| simple_text_block(text, base_style.clone()))
-    .collect();
-  let mut frame = TextBoxFrameContent::new(blocks);
-  if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
-    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
-  }
-  if drawingml_textbox_uses_auto_light_text(xml, styles) {
-    let color = RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    };
-    recolor_blocks_text(&mut frame.blocks, color);
-  }
-  if let Some(rotation_deg) = drawingml_textbox_text_rotation(xml) {
-    rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
-  }
-  apply_drawingml_textbox_layout_adjustments(&mut frame);
-  Some(frame)
-}
-
-fn wordprocessing_textbox_texts_from_xml(xml: &str) -> Vec<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  let mut in_paragraph = false;
-  let mut in_text = false;
-  let mut current = String::new();
-  let mut texts = Vec::new();
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
-        in_paragraph = true;
-        current.clear();
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
-        if !current.is_empty() {
-          texts.push(current.clone());
-        }
-        current.clear();
-        in_paragraph = false;
-      }
-      Ok(Event::Start(event))
-        if in_paragraph
-          && (qname_ends_with(event.name().as_ref(), b"t")
-            || qname_ends_with(event.name().as_ref(), b"delText")) =>
-      {
-        in_text = true;
-      }
-      Ok(Event::End(event))
-        if qname_ends_with(event.name().as_ref(), b"t")
-          || qname_ends_with(event.name().as_ref(), b"delText") =>
-      {
-        in_text = false;
-      }
-      Ok(Event::Text(event)) if in_paragraph && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::CData(event)) if in_paragraph && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
-    }
-  }
-
-  texts
-}
-
-fn recolor_blocks_text(blocks: &mut [Block], color: RgbColor) {
-  for block in blocks {
-    match block {
-      Block::Paragraph(paragraph) => {
-        for inline in &mut paragraph.inlines {
-          if let InlineItem::Text(run) = inline {
-            run.style.color = color;
-          }
-        }
-      }
-      Block::Table(table) => {
-        for row in &mut table.rows {
-          for cell in &mut row.cells {
-            recolor_blocks_text(&mut cell.blocks, color);
-          }
-        }
-      }
-      Block::Frame(frame) => recolor_blocks_text(&mut frame.blocks, color),
-    }
-  }
-}
-
 fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
   match placement {
     ImagePlacement::Floating(mut placement) => {
@@ -5610,67 +5368,50 @@ fn drawingml_text_fill_colors(xml: &str, theme_colors: &ThemeColors) -> Vec<RgbC
   let Some(fragment) = first_named_xml_fragment(xml, b"textFill") else {
     return Vec::new();
   };
-  let mut reader = Reader::from_str(&fragment);
-  reader.config_mut().trim_text(false);
-  let mut colors = Vec::new();
+  let fragment = textbox_fragment_with_namespaces(fragment);
+  let Ok(fill) = w14::FillTextEffect::from_bytes(fragment.as_bytes()) else {
+    return Vec::new();
+  };
+  drawingml_text_fill_colors_from_effect(&fill, theme_colors)
+}
 
-  loop {
-    match reader.read_event().ok() {
-      Some(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        if let Some(color) = color_attr_local(&event, b"val") {
-          push_unique_color(&mut colors, color);
-        }
-      }
-      Some(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        if let Some(color) = color_attr_local(&event, b"val") {
-          push_unique_color(&mut colors, color);
-        }
-      }
-      Some(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        if let Some(value) = attr_value_local(&event, b"val")
-          && let Some(color) = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)
-        {
-          push_unique_color(&mut colors, color);
-        }
-      }
-      Some(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        if let Some(value) = attr_value_local(&event, b"val")
-          && let Some(color) = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)
-        {
-          push_unique_color(&mut colors, color);
-        }
-      }
-      Some(Event::Eof) | None => break,
-      _ => {}
+fn drawingml_text_fill_colors_from_effect(
+  fill: &w14::FillTextEffect,
+  theme_colors: &ThemeColors,
+) -> Vec<RgbColor> {
+  match fill.fill_text_effect_choice.as_ref() {
+    None => Vec::new(),
+    Some(w14::FillTextEffectChoice::NoFillEmpty) => Vec::new(),
+    Some(w14::FillTextEffectChoice::SolidColorFillProperties(fill)) => {
+      resolve_solid_text_fill(fill, theme_colors)
+        .map(|color| color.color)
+        .into_iter()
+        .collect()
+    }
+    Some(w14::FillTextEffectChoice::GradientFillProperties(fill)) => {
+      drawingml_w14_gradient_fill_colors(fill, theme_colors)
     }
   }
-
-  colors
 }
 
-fn push_unique_color(colors: &mut Vec<RgbColor>, color: RgbColor) {
-  if !colors.contains(&color) {
-    colors.push(color);
-  }
-}
-
-fn attr_value_local(
-  event: &quick_xml::events::BytesStart<'_>,
-  local_name: &[u8],
-) -> Option<Box<str>> {
-  event
-    .attributes()
-    .flatten()
-    .find(|attribute| qname_ends_with(attribute.key.as_ref(), local_name))
-    .and_then(|attribute| String::from_utf8(attribute.value.into_owned()).ok())
-    .map(String::into_boxed_str)
-}
-
-fn color_attr_local(
-  event: &quick_xml::events::BytesStart<'_>,
-  local_name: &[u8],
-) -> Option<RgbColor> {
-  parse_hex_color(attr_value_local(event, local_name)?.as_ref())
+fn drawingml_w14_gradient_fill_colors(
+  fill: &w14::GradientFillProperties,
+  theme_colors: &ThemeColors,
+) -> Vec<RgbColor> {
+  fill
+    .gradient_stop_list
+    .as_ref()
+    .into_iter()
+    .flat_map(|list| &list.gradient_stop)
+    .filter_map(|stop| match stop.gradient_stop_choice.as_ref()? {
+      w14::GradientStopChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+      w14::GradientStopChoice::SchemeColor(color) => {
+        let mut resolved = theme_colors.resolve_word2010(color.val)?;
+        resolved = apply_w14_scheme_transforms(resolved, &color.scheme_color_choice);
+        Some(resolved)
+      }
+    })
+    .collect()
 }
 
 fn first_text_color_in_blocks(blocks: &[Block]) -> Option<RgbColor> {
@@ -5764,22 +5505,14 @@ fn text_box_frame_from_drawingml(
 
 fn drawingml_textbox_text_rotation(xml: &str) -> Option<f32> {
   let body_pr = first_named_xml_fragment(xml, b"bodyPr")?;
-  let mut reader = Reader::from_str(&body_pr);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"bodyPr") =>
-      {
-        return match attr_value(&event, b"vert").as_deref() {
-          Some("vert") | Some("wordArtVert") | Some("eaVert") => Some(-90.0),
-          Some("vert270") | Some("wordArtVertRtl") => Some(90.0),
-          _ => None,
-        };
-      }
-      Ok(Event::Eof) | Err(_) => return None,
-      _ => {}
+  match drawingml_body_properties_from_fragment(&body_pr)?.vertical {
+    Some(a::TextVerticalValues::Vertical)
+    | Some(a::TextVerticalValues::WordArtVertical)
+    | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
+    Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
+      Some(90.0)
     }
+    _ => None,
   }
 }
 
@@ -5852,41 +5585,108 @@ fn normalized_linear_rgb(component: u8) -> f32 {
 }
 
 fn apply_drawingml_textbox_body_properties(xml: &str, frame: &mut TextBoxFrameContent) {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
+  let Some(properties) = drawingml_body_properties_from_fragment(xml) else {
+    return;
+  };
+  frame.left_pt = properties
+    .left_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.left_pt);
+  frame.top_pt = properties
+    .top_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.top_pt);
+  frame.right_pt = properties
+    .right_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.right_pt);
+  frame.bottom_pt = properties
+    .bottom_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.bottom_pt);
+  frame.vertical_alignment = match properties.anchor {
+    Some(a::TextAnchoringTypeValues::Center) => TextBoxVerticalAlignment::Center,
+    Some(a::TextAnchoringTypeValues::Bottom) => TextBoxVerticalAlignment::Bottom,
+    _ => frame.vertical_alignment,
+  };
+}
 
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"bodyPr") =>
-      {
-        frame.left_pt = attr_value(&event, b"lIns")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(frame.left_pt);
-        frame.top_pt = attr_value(&event, b"tIns")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(frame.top_pt);
-        frame.right_pt = attr_value(&event, b"rIns")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(frame.right_pt);
-        frame.bottom_pt = attr_value(&event, b"bIns")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(frame.bottom_pt);
-        frame.vertical_alignment = match attr_value(&event, b"anchor").as_deref() {
-          Some("ctr") => TextBoxVerticalAlignment::Center,
-          Some("b") | Some("bottom") => TextBoxVerticalAlignment::Bottom,
-          _ => frame.vertical_alignment,
-        };
-        break;
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
+#[derive(Clone, Copy, Debug, Default)]
+struct DrawingMlBodyProperties {
+  left_inset_emu: Option<i64>,
+  top_inset_emu: Option<i64>,
+  right_inset_emu: Option<i64>,
+  bottom_inset_emu: Option<i64>,
+  vertical: Option<a::TextVerticalValues>,
+  anchor: Option<a::TextAnchoringTypeValues>,
+}
+
+fn drawingml_body_properties_from_fragment(xml: &str) -> Option<DrawingMlBodyProperties> {
+  let xml = drawingml_fragment_with_namespaces(xml.to_string());
+  if root_qname(&xml).is_some_and(|name| name.starts_with("wps:")) {
+    let properties = wps::TextBodyProperties::from_bytes(xml.as_bytes()).ok()?;
+    return Some(DrawingMlBodyProperties {
+      left_inset_emu: properties.left_inset.map(i64::from),
+      top_inset_emu: properties.top_inset.map(i64::from),
+      right_inset_emu: properties.right_inset.map(i64::from),
+      bottom_inset_emu: properties.bottom_inset.map(i64::from),
+      vertical: properties.vertical,
+      anchor: properties.anchor,
+    });
+  }
+  let properties = a::BodyProperties::from_bytes(xml.as_bytes()).ok()?;
+  Some(DrawingMlBodyProperties {
+    left_inset_emu: properties.left_inset.map(|value| value.to_emu()),
+    top_inset_emu: properties.top_inset.map(|value| value.to_emu()),
+    right_inset_emu: properties.right_inset.map(|value| value.to_emu()),
+    bottom_inset_emu: properties.bottom_inset.map(|value| value.to_emu()),
+    vertical: properties.vertical,
+    anchor: properties.anchor,
+  })
+}
+
+fn root_qname(xml: &str) -> Option<&str> {
+  let start = xml.trim_start().strip_prefix('<')?;
+  start
+    .split(|character: char| {
+      character.is_ascii_whitespace() || character == '>' || character == '/'
+    })
+    .next()
+}
+
+fn drawingml_fragment_with_namespaces(mut xml: String) -> String {
+  let mut namespaces = String::new();
+  if !xml.contains("xmlns:a=") {
+    namespaces.push_str(" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"");
+  }
+  if !xml.contains("xmlns:wps=") {
+    namespaces
+      .push_str(" xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"");
+  }
+  if !xml.contains("xmlns:wpg=") {
+    namespaces
+      .push_str(" xmlns:wpg=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\"");
+  }
+  if !xml.contains("xmlns:dsp=") {
+    namespaces.push_str(" xmlns:dsp=\"http://schemas.microsoft.com/office/drawing/2008/diagram\"");
+  }
+  if !xml.contains("xmlns:r=") {
+    namespaces
+      .push_str(" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"");
+  }
+  if namespaces.is_empty() {
+    return xml;
+  }
+
+  if let Some(index) = xml.find('>') {
+    if xml.as_bytes().get(index.saturating_sub(1)) == Some(&b'/') {
+      xml.insert_str(index.saturating_sub(1), &namespaces);
+    } else {
+      xml.insert_str(index, &namespaces);
     }
   }
+
+  xml
 }
 
 #[cfg(test)]
@@ -6015,50 +5815,55 @@ fn push_drawing_shapes_impl(
   let transform =
     DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
   let effect_extent = drawing_effect_extent(drawing);
-  for xml in graphic_data
-    .graphic_data_choice
-    .iter()
-    .filter_map(drawing_graphic_data_choice_xml)
-  {
-    if let Some(chart_shapes) =
-      drawing_chart_shapes(drawing, &xml, &images.charts_by_relationship_id)
-    {
-      inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
-      continue;
+  for choice in &graphic_data.graphic_data_choice {
+    match choice {
+      a::GraphicDataChoice::ChartReference(reference) => {
+        if let Some(chart_shapes) =
+          drawing_chart_shapes(drawing, reference, &images.charts_by_relationship_id)
+        {
+          inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
+        }
+      }
+      a::GraphicDataChoice::RelationshipIds(relationship_ids) => {
+        if let Some(diagram_shapes) = drawing_diagram_shapes(
+          relationship_ids,
+          placement,
+          transform,
+          DrawingShapeImportContext {
+            effect_extent,
+            styles,
+            images,
+            hyperlinks,
+            smartart_text_colors_by_model_id: None,
+          },
+        ) {
+          inlines.extend(diagram_shapes);
+        }
+      }
+      _ => {
+        let Some(xml) = drawing_graphic_data_choice_xml(choice) else {
+          continue;
+        };
+        inlines.extend(drawingml_shapes_from_xml(
+          &xml,
+          placement,
+          transform,
+          DrawingShapeImportContext {
+            effect_extent,
+            styles,
+            images,
+            hyperlinks,
+            smartart_text_colors_by_model_id: None,
+          },
+          false,
+        ));
+      }
     }
-    if let Some(diagram_shapes) = drawing_diagram_shapes(
-      &xml,
-      placement,
-      transform,
-      DrawingShapeImportContext {
-        effect_extent,
-        styles,
-        images,
-        hyperlinks,
-        smartart_text_colors_by_model_id: None,
-      },
-    ) {
-      inlines.extend(diagram_shapes);
-      continue;
-    }
-    inlines.extend(drawingml_shapes_from_xml(
-      &xml,
-      placement,
-      transform,
-      DrawingShapeImportContext {
-        effect_extent,
-        styles,
-        images,
-        hyperlinks,
-        smartart_text_colors_by_model_id: None,
-      },
-      false,
-    ));
   }
 }
 
 fn drawing_diagram_shapes(
-  graphic_xml: &str,
+  relationship_ids: &dgm::RelationshipIds,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
@@ -6066,18 +5871,19 @@ fn drawing_diagram_shapes(
   // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
   // resolves dgm:relIds through the diagram data part, then imports the
   // persisted diagramDrawing extDrawing fallback when present.
-  let data_relationship_id = drawing_diagram_data_relationship_id(graphic_xml)?;
+  let data_relationship_id = relationship_ids.data_part.as_str();
   let data_xml = context
     .images
     .diagram_data_by_relationship_id
-    .get(&data_relationship_id)?;
-  let text_colors_by_model_id = drawing_diagram_color_relationship_id(graphic_xml)
-    .and_then(|relationship_id| {
+    .get(data_relationship_id)?;
+  let text_colors_by_model_id = (!relationship_ids.color_part.is_empty())
+    .then(|| {
       context
         .images
         .diagram_colors_by_relationship_id
-        .get(&relationship_id)
+        .get(relationship_ids.color_part.as_str())
     })
+    .flatten()
     .map(|colors| {
       diagram_text_fill_colors_by_model_id(data_xml, colors, &context.styles.theme_colors)
     });
@@ -6096,39 +5902,6 @@ fn drawing_diagram_shapes(
     },
     false,
   ))
-}
-
-fn drawing_diagram_data_relationship_id(xml: &str) -> Option<String> {
-  drawing_diagram_relationship_id(xml, b"dm")
-}
-
-fn drawing_diagram_color_relationship_id(xml: &str) -> Option<String> {
-  drawing_diagram_relationship_id(xml, b"cs")
-}
-
-fn drawing_diagram_relationship_id(xml: &str, key: &[u8]) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"relIds") =>
-      {
-        for attr in event.attributes().with_checks(false).flatten() {
-          let attr_key = attr.key.as_ref();
-          if attr_key == key
-            || attr_key
-              .strip_suffix(key)
-              .is_some_and(|prefix| prefix.ends_with(b":"))
-          {
-            return decode_xml_attr_value(&attr, reader.decoder());
-          }
-        }
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
 }
 
 fn diagram_text_fill_colors_by_model_id(
@@ -6216,11 +5989,10 @@ fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<Stri
 
 fn drawing_chart_shapes(
   drawing: &w::Drawing,
-  graphic_xml: &str,
+  reference: &c::ChartReference,
   charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
 ) -> Option<Vec<InlineShape>> {
-  let relationship_id = drawing_chart_relationship_id(graphic_xml)?;
-  let chart_space = charts_by_relationship_id.get(&relationship_id)?;
+  let chart_space = charts_by_relationship_id.get(reference.id.as_str())?;
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let stroke = Some(BorderStyle::default());
 
@@ -6264,26 +6036,6 @@ fn drawing_chart_shapes(
       vec![chart_shape(width_pt, height_pt, 0.0, placement, stroke)]
     }
   })
-}
-
-fn drawing_chart_relationship_id(xml: &str) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"chart") =>
-      {
-        for attr in event.attributes().with_checks(false).flatten() {
-          if attr.key.as_ref().ends_with(b":id") || attr.key.as_ref() == b"id" {
-            return decode_xml_attr_value(&attr, reader.decoder());
-          }
-        }
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
 }
 
 fn chart_has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
@@ -6467,6 +6219,123 @@ struct DrawingMlGroupXfrm {
   child_offset_y: f32,
   child_width: f32,
   child_height: f32,
+}
+
+enum DrawingMlShapeProperties {
+  Drawing(a::ShapeProperties),
+  Wordprocessing(wps::ShapeProperties),
+  Picture(pic::ShapeProperties),
+}
+
+enum DrawingMlFillProperties<'a> {
+  NoFill,
+  Solid(&'a a::SolidFill),
+  Gradient(&'a a::GradientFill),
+}
+
+impl DrawingMlShapeProperties {
+  fn from_fragment(xml: &str) -> Option<Self> {
+    let xml = drawingml_fragment_with_namespaces(xml.to_string());
+    if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes()) {
+      return Some(Self::Drawing(properties));
+    }
+    if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes()) {
+      return Some(Self::Wordprocessing(properties));
+    }
+    pic::ShapeProperties::from_bytes(xml.as_bytes())
+      .ok()
+      .map(Self::Picture)
+  }
+
+  fn transform2_d(&self) -> Option<&a::Transform2D> {
+    match self {
+      Self::Drawing(properties) => properties.transform2_d.as_deref(),
+      Self::Wordprocessing(properties) => properties.transform2_d.as_deref(),
+      Self::Picture(properties) => properties.transform2_d.as_deref(),
+    }
+  }
+
+  fn geometry_kind(&self) -> Option<InlineShapeGeometry> {
+    let is_line = match self {
+      Self::Drawing(properties) => matches!(
+        properties.shape_properties_choice1.as_ref(),
+        Some(a::ShapePropertiesChoice::PresetGeometry(geometry))
+          if geometry.preset == a::ShapeTypeValues::Line
+      ),
+      Self::Wordprocessing(properties) => matches!(
+        properties.shape_properties_choice1.as_ref(),
+        Some(wps::ShapePropertiesChoice::PresetGeometry(geometry))
+          if geometry.preset == a::ShapeTypeValues::Line
+      ),
+      Self::Picture(properties) => matches!(
+        properties.shape_properties_choice1.as_ref(),
+        Some(pic::ShapePropertiesChoice::PresetGeometry(geometry))
+          if geometry.preset == a::ShapeTypeValues::Line
+      ),
+    };
+
+    Some(if is_line {
+      InlineShapeGeometry::Line
+    } else {
+      InlineShapeGeometry::Rectangle
+    })
+  }
+
+  fn custom_geometry(&self) -> Option<&a::CustomGeometry> {
+    match self {
+      Self::Drawing(properties) => match properties.shape_properties_choice1.as_ref()? {
+        a::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
+        a::ShapePropertiesChoice::PresetGeometry(_) => None,
+      },
+      Self::Wordprocessing(properties) => match properties.shape_properties_choice1.as_ref()? {
+        wps::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
+        wps::ShapePropertiesChoice::PresetGeometry(_) => None,
+      },
+      Self::Picture(properties) => match properties.shape_properties_choice1.as_ref()? {
+        pic::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
+        pic::ShapePropertiesChoice::PresetGeometry(_) => None,
+      },
+    }
+  }
+
+  fn fill(&self) -> Option<DrawingMlFillProperties<'_>> {
+    match self {
+      Self::Drawing(properties) => match properties.shape_properties_choice2.as_ref()? {
+        a::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
+        a::ShapePropertiesChoice2::SolidFill(fill) => {
+          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
+        }
+        a::ShapePropertiesChoice2::GradientFill(fill) => {
+          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        _ => None,
+      },
+      Self::Wordprocessing(properties) => match properties.shape_properties_choice2.as_ref()? {
+        wps::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
+        wps::ShapePropertiesChoice2::SolidFill(fill) => {
+          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
+        }
+        wps::ShapePropertiesChoice2::GradientFill(fill) => {
+          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        _ => None,
+      },
+      Self::Picture(properties) => match properties.shape_properties_choice2.as_ref()? {
+        pic::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
+        pic::ShapePropertiesChoice2::SolidFill(fill) => {
+          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
+        }
+        pic::ShapePropertiesChoice2::GradientFill(fill) => {
+          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        _ => None,
+      },
+    }
+  }
+}
+
+fn drawingml_shape_properties_from_fragment(xml: &str) -> Option<DrawingMlShapeProperties> {
+  DrawingMlShapeProperties::from_fragment(xml)
 }
 
 fn drawingml_shapes_from_xml(
@@ -6777,17 +6646,9 @@ fn drawingml_shape_from_fragment(
 }
 
 fn drawingml_model_id(xml: &str) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event) => {
-        return attr_value(&event, b"modelId").map(|value| value.to_string());
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
+  let xml = drawingml_fragment_with_namespaces(xml.to_string());
+  let shape = dsp::Shape::from_bytes(xml.as_bytes()).ok()?;
+  Some(shape.model_id)
 }
 
 fn drawingml_shape_text_box_from_fragment(
@@ -6820,53 +6681,40 @@ fn drawingml_shape_text_box_from_fragment(
 }
 
 fn drawingml_shape_text_body_texts(xml: &str) -> Vec<String> {
-  let tx_body = match first_named_xml_fragment(xml, b"txBody") {
-    Some(tx_body) => tx_body,
-    None => return Vec::new(),
+  let Some(tx_body) = first_named_xml_fragment(xml, b"txBody") else {
+    return Vec::new();
   };
-  let mut reader = Reader::from_str(&tx_body);
-  reader.config_mut().trim_text(false);
-  let mut in_paragraph = false;
-  let mut in_text = false;
-  let mut current = String::new();
-  let mut texts = Vec::new();
+  let tx_body = drawingml_fragment_with_namespaces(tx_body);
+  if let Ok(text_body) = a::TextBody::from_bytes(tx_body.as_bytes()) {
+    return drawingml_text_body_texts(&text_body.paragraph);
+  }
+  if let Ok(text_body) = dsp::TextBody::from_bytes(tx_body.as_bytes()) {
+    return drawingml_text_body_texts(&text_body.paragraph);
+  }
+  Vec::new()
+}
 
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
-        in_paragraph = true;
-        current.clear();
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
-        if !current.is_empty() {
-          texts.push(current.clone());
-        }
-        current.clear();
-        in_paragraph = false;
-      }
-      Ok(Event::Start(event)) if in_paragraph && qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = true;
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = false;
-      }
-      Ok(Event::Text(event)) if in_paragraph && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
+fn drawingml_text_body_texts(paragraphs: &[a::Paragraph]) -> Vec<String> {
+  paragraphs
+    .iter()
+    .filter_map(drawingml_paragraph_text)
+    .collect()
+}
+
+fn drawingml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
+  let mut text = String::new();
+  for choice in &paragraph.paragraph_choice {
+    match choice {
+      a::ParagraphChoice::Run(run) => text.push_str(run.text.as_str()),
+      a::ParagraphChoice::Field(field) => {
+        if let Some(text_node) = &field.text {
+          text.push_str(text_node.as_str());
         }
       }
-      Ok(Event::CData(event)) if in_paragraph && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
+      _ => {}
     }
   }
-
-  texts
+  (!text.is_empty()).then_some(text)
 }
 
 #[cfg(test)]
@@ -6890,92 +6738,46 @@ fn drawingml_shape_geometry_with_transform(
 
 fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXfrm> {
   let grp_sp_pr = first_named_xml_fragment(xml, b"grpSpPr")?;
-  let xfrm = first_named_xml_fragment(&grp_sp_pr, b"xfrm")?;
-  let mut reader = Reader::from_str(&xfrm);
-  reader.config_mut().trim_text(false);
+  let grp_sp_pr = drawingml_fragment_with_namespaces(grp_sp_pr);
+  let transform =
+    if let Ok(properties) = wpg::GroupShapeProperties::from_bytes(grp_sp_pr.as_bytes()) {
+      properties.transform_group
+    } else {
+      a::VisualGroupShapeProperties::from_bytes(grp_sp_pr.as_bytes())
+        .ok()?
+        .transform_group
+    }?;
   let mut group = DrawingMlGroupXfrm::default();
 
-  loop {
-    match reader.read_event().ok()? {
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"off") => {
-        group.offset_x_pt = attr_value(&event, b"x")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.offset_x_pt);
-        group.offset_y_pt = attr_value(&event, b"y")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.offset_y_pt);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"ext") => {
-        group.width_pt = attr_value(&event, b"cx")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.width_pt);
-        group.height_pt = attr_value(&event, b"cy")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.height_pt);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chOff") => {
-        group.child_offset_x = attr_value(&event, b"x")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(group.child_offset_x);
-        group.child_offset_y = attr_value(&event, b"y")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(group.child_offset_y);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chExt") => {
-        group.child_width = attr_value(&event, b"cx")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(group.child_width);
-        group.child_height = attr_value(&event, b"cy")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(group.child_height);
-      }
-      Event::Eof => return Some(group),
-      _ => {}
-    }
+  if let Some(offset) = transform.offset {
+    group.offset_x_pt = units::emu_to_points(offset.x.to_emu());
+    group.offset_y_pt = units::emu_to_points(offset.y.to_emu());
   }
+  if let Some(extents) = transform.extents {
+    group.width_pt = units::emu_to_points(extents.cx.to_emu());
+    group.height_pt = units::emu_to_points(extents.cy.to_emu());
+  }
+  if let Some(child_offset) = transform.child_offset {
+    group.child_offset_x = child_offset.x.to_emu() as f32;
+    group.child_offset_y = child_offset.y.to_emu() as f32;
+  }
+  if let Some(child_extents) = transform.child_extents {
+    group.child_width = child_extents.cx.to_emu() as f32;
+    group.child_height = child_extents.cy.to_emu() as f32;
+  }
+
+  Some(group)
 }
 
 fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
-  let mut reader = Reader::from_str(sp_pr);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"prstGeom")
-          && attr_value(&event, b"prst")
-            .as_deref()
-            .is_some_and(|value| value.eq_ignore_ascii_case("line")) =>
-      {
-        return InlineShapeGeometry::Line;
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
-  }
-
-  InlineShapeGeometry::Rectangle
+  drawingml_shape_properties_from_fragment(sp_pr)
+    .and_then(|properties| properties.geometry_kind())
+    .unwrap_or(InlineShapeGeometry::Rectangle)
 }
 
 fn drawingml_has_custom_geometry(sp_pr: &str) -> bool {
-  let mut reader = Reader::from_str(sp_pr);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"custGeom") =>
-      {
-        return true;
-      }
-      Ok(Event::Eof) | Err(_) => return false,
-      _ => {}
-    }
-  }
+  drawingml_shape_properties_from_fragment(sp_pr)
+    .is_some_and(|properties| properties.custom_geometry().is_some())
 }
 
 fn drawingml_custom_geometry(
@@ -6983,28 +6785,26 @@ fn drawingml_custom_geometry(
   width_pt: f32,
   height_pt: f32,
 ) -> Option<InlineShapeGeometry> {
-  let mut reader = Reader::from_str(sp_pr);
-  reader.config_mut().trim_text(false);
-  let mut in_path = false;
-  let mut path_width = 0.0f32;
-  let mut path_height = 0.0f32;
+  let properties = drawingml_shape_properties_from_fragment(sp_pr)?;
+  let geometry = properties.custom_geometry()?;
+  let path = geometry.path_list.path.first()?;
+  let path_width = path
+    .width
+    .map(|value| value.to_emu() as f32)
+    .unwrap_or(width_pt);
+  let path_height = path
+    .height
+    .map(|value| value.to_emu() as f32)
+    .unwrap_or(height_pt);
   let mut points = Vec::new();
   let mut closed = false;
 
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"path") => {
-        in_path = true;
-        path_width = attr_value(&event, b"w")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(width_pt);
-        path_height = attr_value(&event, b"h")
-          .and_then(|value| value.parse::<f32>().ok())
-          .unwrap_or(height_pt);
-      }
-      Event::Empty(event) if in_path && qname_ends_with(event.name().as_ref(), b"pt") => {
-        let x = attr_value(&event, b"x")?.parse::<f32>().ok()?;
-        let y = attr_value(&event, b"y")?.parse::<f32>().ok()?;
+  for choice in &path.path_choice {
+    match choice {
+      a::PathChoice::CloseShapePath => closed = true,
+      a::PathChoice::MoveTo(point) => {
+        let x = point.point.x.parse::<f32>().ok()?;
+        let y = point.point.y.parse::<f32>().ok()?;
         points.push(drawingml_custom_geometry_point(
           x,
           y,
@@ -7014,13 +6814,18 @@ fn drawingml_custom_geometry(
           height_pt,
         ));
       }
-      Event::Empty(event) if in_path && qname_ends_with(event.name().as_ref(), b"close") => {
-        closed = true;
+      a::PathChoice::LineTo(point) => {
+        let x = point.point.x.parse::<f32>().ok()?;
+        let y = point.point.y.parse::<f32>().ok()?;
+        points.push(drawingml_custom_geometry_point(
+          x,
+          y,
+          path_width,
+          path_height,
+          width_pt,
+          height_pt,
+        ));
       }
-      Event::End(event) if in_path && qname_ends_with(event.name().as_ref(), b"path") => {
-        break;
-      }
-      Event::Eof => break,
       _ => {}
     }
   }
@@ -7059,39 +6864,25 @@ fn drawingml_geometry_from_sp_pr(
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
 ) -> Option<(f32, f32, f32, f32)> {
-  let mut reader = Reader::from_str(sp_pr);
-  reader.config_mut().trim_text(false);
   let mut offset_x_pt = 0.0f32;
   let mut offset_y_pt = 0.0f32;
   let mut width_pt = 0.0f32;
   let mut height_pt = 0.0f32;
   let mut saw_ext = false;
 
-  loop {
-    match reader.read_event() {
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"off") => {
-        offset_x_pt = attr_value(&event, b"x")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
-          .unwrap_or(offset_x_pt);
-        offset_y_pt = attr_value(&event, b"y")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
-          .unwrap_or(offset_y_pt);
-      }
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
-        saw_ext = true;
-        width_pt = attr_value(&event, b"cx")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
-          .unwrap_or(width_pt);
-        height_pt = attr_value(&event, b"cy")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
-          .unwrap_or(height_pt);
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
+  let properties = drawingml_shape_properties_from_fragment(sp_pr);
+  if let Some(transform) = properties
+    .as_ref()
+    .and_then(|properties| properties.transform2_d())
+  {
+    if let Some(offset) = &transform.offset {
+      offset_x_pt = drawingml_coordinate_to_points(offset.x.to_emu(), raw_coordinates);
+      offset_y_pt = drawingml_coordinate_to_points(offset.y.to_emu(), raw_coordinates);
+    }
+    if let Some(extents) = &transform.extents {
+      saw_ext = true;
+      width_pt = drawingml_coordinate_to_points(extents.cx.to_emu(), raw_coordinates);
+      height_pt = drawingml_coordinate_to_points(extents.cy.to_emu(), raw_coordinates);
     }
   }
 
@@ -7214,6 +7005,79 @@ fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<Inli
   })
 }
 
+fn resolve_drawingml_solid_fill(
+  fill: &a::SolidFill,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  match fill.solid_fill_choice.as_ref()? {
+    a::SolidFillChoice::RgbColorModelHex(color) => Some(ResolvedColor {
+      color: parse_hex_color(color.val.as_str())?,
+      opacity: opacity_from_drawingml_rgb_transforms(&color.rgb_color_model_hex_choice),
+    }),
+    a::SolidFillChoice::SystemColor(color) => Some(ResolvedColor {
+      color: color.last_color.as_deref().and_then(parse_hex_color)?,
+      opacity: opacity_from_drawingml_system_transforms(&color.system_color_choice),
+    }),
+    a::SolidFillChoice::SchemeColor(color) => Some(ResolvedColor {
+      color: resolve_drawingml_scheme_color(color, theme_colors)?,
+      opacity: opacity_from_drawingml_scheme_transforms(&color.scheme_color_choice),
+    }),
+    a::SolidFillChoice::PresetColor(color) => Some(ResolvedColor {
+      color: drawingml_preset_color_value(color.val)?,
+      opacity: 1.0,
+    }),
+    _ => None,
+  }
+}
+
+fn drawingml_first_gradient_fill_color(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  let stop = fill.gradient_stop_list.as_ref()?.gradient_stop.first()?;
+  match stop.gradient_stop_choice.as_ref()? {
+    a::GradientStopChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::GradientStopChoice::SystemColor(color) => {
+      color.last_color.as_deref().and_then(parse_hex_color)
+    }
+    a::GradientStopChoice::SchemeColor(color) => {
+      resolve_drawingml_scheme_color(color, theme_colors)
+    }
+    a::GradientStopChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
+    _ => None,
+  }
+}
+
+fn opacity_from_drawingml_rgb_transforms(transforms: &[a::RgbColorModelHexChoice]) -> f32 {
+  transforms
+    .iter()
+    .find_map(|transform| match transform {
+      a::RgbColorModelHexChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
+      _ => None,
+    })
+    .unwrap_or(1.0)
+}
+
+fn opacity_from_drawingml_system_transforms(transforms: &[a::SystemColorChoice]) -> f32 {
+  transforms
+    .iter()
+    .find_map(|transform| match transform {
+      a::SystemColorChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
+      _ => None,
+    })
+    .unwrap_or(1.0)
+}
+
+fn opacity_from_drawingml_scheme_transforms(transforms: &[a::SchemeColorChoice]) -> f32 {
+  transforms
+    .iter()
+    .find_map(|transform| match transform {
+      a::SchemeColorChoice::Alpha(value) => drawingml_percent_to_ratio(&value.val),
+      _ => None,
+    })
+    .unwrap_or(1.0)
+}
+
 struct ImportedImageData {
   data: Vec<u8>,
   content_type: Option<String>,
@@ -7334,98 +7198,32 @@ fn drawingml_child_placement(
 }
 
 fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  let mut depth = 0usize;
-  let mut in_root = false;
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) => {
-        if !in_root {
-          in_root = true;
-        } else {
-          depth += 1;
-          if depth == 1 && qname_ends_with(event.name().as_ref(), b"solidFill") {
-            let fragment = read_outer_xml_fragment(&mut reader, event)?;
-            return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
-              .map(|color| color.color);
-          }
-          if depth == 1 && qname_ends_with(event.name().as_ref(), b"gradFill") {
-            let fragment = read_outer_xml_fragment(&mut reader, event)?;
-            return drawingml_first_fill_color(&fragment, theme_colors);
-          }
-        }
-      }
-      Event::Empty(event)
-        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"noFill") =>
-      {
-        return None;
-      }
-      Event::Empty(event)
-        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"solidFill") =>
-      {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Empty(event.into_owned())).ok()?;
-        let fragment = String::from_utf8(writer.into_inner()).ok()?;
-        return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
-          .map(|color| color.color);
-      }
-      Event::Empty(event)
-        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"gradFill") =>
-      {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Empty(event.into_owned())).ok()?;
-        let fragment = String::from_utf8(writer.into_inner()).ok()?;
-        return drawingml_first_fill_color(&fragment, theme_colors);
-      }
-      Event::End(_) if in_root => {
-        if depth == 0 {
-          return None;
-        }
-        depth -= 1;
-      }
-      Event::Eof => return None,
-      _ => {}
+  let properties = drawingml_shape_properties_from_fragment(xml)?;
+  match properties.fill()? {
+    DrawingMlFillProperties::NoFill => None,
+    DrawingMlFillProperties::Solid(fill) => {
+      resolve_drawingml_solid_fill(fill, theme_colors).map(|color| color.color)
+    }
+    DrawingMlFillProperties::Gradient(fill) => {
+      drawingml_first_gradient_fill_color(fill, theme_colors)
     }
   }
-}
-
-fn drawingml_first_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  drawingml_color_from_named_fragment(xml, b"srgbClr", theme_colors)
-    .or_else(|| drawingml_color_from_named_fragment(xml, b"schemeClr", theme_colors))
-    .map(|color| color.color)
 }
 
 fn drawingml_shape_has_no_fill(xml: &str) -> bool {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  let mut in_root = false;
-  let mut depth = 0usize;
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(_)) if !in_root => {
-        in_root = true;
-      }
-      Ok(Event::Start(_)) if in_root => {
-        depth += 1;
-      }
-      Ok(Event::Empty(event))
-        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"noFill") =>
-      {
-        return true;
-      }
-      Ok(Event::End(_)) if in_root => {
-        if depth == 0 {
-          return false;
-        }
-        depth -= 1;
-      }
-      Ok(Event::Eof) | Err(_) => return false,
-      _ => {}
-    }
+  let xml = drawingml_fragment_with_namespaces(xml.to_string());
+  if root_qname(&xml).is_some_and(|name| name.ends_with(":ln") || name == "ln") {
+    return a::Outline::from_bytes(xml.as_bytes())
+      .ok()
+      .and_then(|outline| outline.outline_choice1)
+      .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)));
   }
+
+  let properties = drawingml_shape_properties_from_fragment(&xml);
+  properties
+    .as_ref()
+    .and_then(|properties| properties.fill())
+    .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
 }
 
 fn drawingml_shape_style_color(
@@ -7433,7 +7231,13 @@ fn drawingml_shape_style_color(
   local_name: &[u8],
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
-  drawingml_color_from_named_fragment(xml, local_name, theme_colors).map(|color| color.color)
+  if local_name != b"fillRef" {
+    return None;
+  }
+  let fragment = first_named_xml_fragment(xml, local_name)?;
+  let fragment = drawingml_fragment_with_namespaces(fragment);
+  let reference = a::FillReference::from_bytes(fragment.as_bytes()).ok()?;
+  drawingml_fill_reference_color(&reference, theme_colors)
 }
 
 fn drawingml_shape_style_stroke(
@@ -7442,9 +7246,11 @@ fn drawingml_shape_style_stroke(
   theme_lines: &ThemeLineStyles,
 ) -> Option<BorderStyle> {
   let fragment = first_named_xml_fragment(xml, b"lnRef")?;
-  let index = drawingml_style_ref_index(&fragment)?;
+  let fragment = drawingml_fragment_with_namespaces(fragment);
+  let reference = a::LineReference::from_bytes(fragment.as_bytes()).ok()?;
+  let index = usize::try_from(reference.index).ok()?;
   let width_pt = theme_lines.width_pt(index)?;
-  let color = drawingml_color_from_named_fragment(&fragment, b"schemeClr", theme_colors)?.color;
+  let color = drawingml_line_reference_color(&reference, theme_colors)?;
   Some(BorderStyle {
     width_pt,
     spacing_pt: 0.0,
@@ -7453,50 +7259,63 @@ fn drawingml_shape_style_stroke(
   })
 }
 
-fn drawingml_style_ref_index(xml: &str) -> Option<usize> {
-  let mut reader = Reader::from_str(xml);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"lnRef") =>
-      {
-        return attr_value(&event, b"idx")?.parse::<usize>().ok();
-      }
-      Event::Eof => return None,
-      _ => {}
+fn drawingml_fill_reference_color(
+  reference: &a::FillReference,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match reference.fill_reference_choice.as_ref()? {
+    a::FillReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::FillReferenceChoice::SystemColor(color) => {
+      color.last_color.as_deref().and_then(parse_hex_color)
     }
+    a::FillReferenceChoice::SchemeColor(color) => {
+      resolve_drawingml_scheme_color(color, theme_colors)
+    }
+    a::FillReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
+    _ => None,
+  }
+}
+
+fn drawingml_line_reference_color(
+  reference: &a::LineReference,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match reference.line_reference_choice.as_ref()? {
+    a::LineReferenceChoice::RgbColorModelHex(color) => parse_hex_color(color.val.as_str()),
+    a::LineReferenceChoice::SystemColor(color) => {
+      color.last_color.as_deref().and_then(parse_hex_color)
+    }
+    a::LineReferenceChoice::SchemeColor(color) => {
+      resolve_drawingml_scheme_color(color, theme_colors)
+    }
+    a::LineReferenceChoice::PresetColor(color) => drawingml_preset_color_value(color.val),
+    _ => None,
   }
 }
 
 fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<BorderStyle> {
   let line_fragment = first_named_xml_fragment(xml, b"ln")?;
-  if drawingml_shape_has_no_fill(&line_fragment) {
-    return None;
-  }
-  let mut width_pt = units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU);
-  let mut reader = Reader::from_str(&line_fragment);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"ln") =>
-      {
-        width_pt = attr_value(&event, b"w")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(width_pt);
-        break;
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
+  let line =
+    a::Outline::from_bytes(drawingml_fragment_with_namespaces(line_fragment.clone()).as_bytes())
+      .ok()?;
+  let color = match line.outline_choice1.as_ref()? {
+    a::OutlineChoice::NoFill(_) => return None,
+    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
+    a::OutlineChoice::GradientFill(fill) => {
+      drawingml_first_gradient_fill_color(fill, theme_colors)?
     }
-  }
+    a::OutlineChoice::PatternFill(_) => return None,
+  };
+  let width_pt = line
+    .width
+    .map(i64::from)
+    .map(units::emu_to_points)
+    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
 
   Some(BorderStyle {
     width_pt,
     spacing_pt: 0.0,
-    color: drawingml_color_from_named_fragment(&line_fragment, b"solidFill", theme_colors)?.color,
+    color,
     compound: false,
   })
 }
@@ -7506,52 +7325,6 @@ fn drawingml_shape_has_no_line(xml: &str) -> bool {
     return false;
   };
   drawingml_shape_has_no_fill(&line_fragment)
-}
-
-fn drawingml_color_from_named_fragment(
-  xml: &str,
-  local_name: &[u8],
-  theme_colors: &ThemeColors,
-) -> Option<ResolvedColor> {
-  let fragment = first_named_xml_fragment(xml, local_name)?;
-  let mut reader = Reader::from_str(&fragment);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_empty_scheme_color(&event, theme_colors);
-      }
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        let color = color_attr(&event, b"val")?;
-        return Some(ResolvedColor {
-          color,
-          opacity: 1.0,
-        });
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        let color = color_attr(&event, b"val")?;
-        return Some(ResolvedColor {
-          color,
-          opacity: 1.0,
-        });
-      }
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"sysClr") =>
-      {
-        let color = color_attr(&event, b"lastClr").or_else(|| color_attr(&event, b"val"))?;
-        return Some(ResolvedColor {
-          color,
-          opacity: 1.0,
-        });
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
 }
 
 fn push_pict_shapes_impl(
@@ -9446,41 +9219,8 @@ fn drawing_textbox_content(xml: &str) -> Option<w::TextBoxContent> {
     return None;
   }
 
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Start(event.into_owned())).ok()?;
-        let mut depth = 1usize;
-
-        while depth > 0 {
-          let event = reader.read_event().ok()?;
-          match &event {
-            Event::Start(_) => depth += 1,
-            Event::End(_) => depth = depth.saturating_sub(1),
-            Event::Empty(_) => {}
-            Event::Eof => return None,
-            _ => {}
-          }
-          writer.write_event(event.into_owned()).ok()?;
-        }
-
-        let xml = textbox_fragment_with_namespaces(String::from_utf8(writer.into_inner()).ok()?);
-        return w::TextBoxContent::from_bytes(xml.as_bytes()).ok();
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
-        let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Empty(event.into_owned())).ok()?;
-        let xml = textbox_fragment_with_namespaces(String::from_utf8(writer.into_inner()).ok()?);
-        return w::TextBoxContent::from_bytes(xml.as_bytes()).ok();
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
+  let xml = textbox_fragment_with_namespaces(first_named_xml_fragment(xml, b"txbxContent")?);
+  w::TextBoxContent::from_bytes(xml.as_bytes()).ok()
 }
 
 fn textbox_fragment_with_namespaces(mut xml: String) -> String {
@@ -9504,56 +9244,6 @@ fn textbox_fragment_with_namespaces(mut xml: String) -> String {
   }
 
   xml
-}
-
-fn drawing_textbox_text(xml: &str) -> Option<String> {
-  if !xml.contains("txbxContent") {
-    return None;
-  }
-
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(true);
-  let mut textbox_depth = 0usize;
-  let mut paragraph_depth = 0usize;
-  let mut in_text = false;
-  let mut output = String::new();
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) => {
-        if qname_ends_with(event.name().as_ref(), b"txbxContent") {
-          textbox_depth += 1;
-        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") {
-          paragraph_depth += 1;
-        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") {
-          in_text = true;
-        }
-      }
-      Event::End(event) => {
-        if qname_ends_with(event.name().as_ref(), b"t") {
-          in_text = false;
-        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") {
-          paragraph_depth = paragraph_depth.saturating_sub(1);
-          output.push('\n');
-        } else if qname_ends_with(event.name().as_ref(), b"txbxContent") {
-          textbox_depth = textbox_depth.saturating_sub(1);
-        }
-      }
-      Event::Text(event) if textbox_depth > 0 && in_text => {
-        output.push_str(event.xml10_content().ok()?.as_ref());
-      }
-      Event::CData(event) if textbox_depth > 0 && in_text => {
-        output.push_str(event.xml10_content().ok()?.as_ref());
-      }
-      Event::Eof => break,
-      _ => {}
-    }
-  }
-
-  if paragraph_depth > 0 {
-    output.push('\n');
-  }
-  (!output.is_empty()).then_some(output)
 }
 
 fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
@@ -12944,10 +12634,22 @@ mod tests {
   </wps:txbx>
 </wps:wsp>"#;
 
-    assert_eq!(
-      drawing_textbox_text(xml).as_deref(),
-      Some("Modern text box\nSecond line\n")
+    let content = drawing_textbox_content(xml).expect("typed textbox content");
+    let blocks = textbox_blocks(
+      &content,
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
     );
+    let text: Vec<_> = blocks
+      .iter()
+      .filter_map(|block| match block {
+        Block::Paragraph(paragraph) => Some(inline_text(&paragraph.inlines)),
+        _ => None,
+      })
+      .collect();
+
+    assert_eq!(text, ["Modern text box", "Second line"]);
   }
 
   #[test]

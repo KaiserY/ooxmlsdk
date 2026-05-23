@@ -44,7 +44,6 @@ use super::slide::{
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
 const DEFAULT_TEXT_INSET_EMU: i64 = 91_440;
-const DEFAULT_BULLET_INDENT_PT: f32 = 18.0;
 const DEFAULT_TABLE_BORDER_PT: f32 = 0.75;
 
 pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::LayoutDocument {
@@ -494,6 +493,8 @@ fn lower_diagram(
   );
   let mut drawing_items = Vec::new();
   let mut text_items = Vec::new();
+  let mut pending_text_items = Vec::new();
+  let mut font_sync_scales: HashMap<String, f32> = HashMap::new();
   for diagram_shape in shapes {
     let fill_images = diagram_shape
       .shape_properties
@@ -502,6 +503,7 @@ fn lower_diagram(
         diagram_model_shape_blip_fill_image_items(
           import,
           slide,
+          data_resource,
           properties,
           shared_diagram::DiagramBounds {
             x: diagram_shape.x,
@@ -512,6 +514,17 @@ fn lower_diagram(
         )
       })
       .unwrap_or_default();
+    if fill_images.is_empty()
+      && diagram_shape.is_blip_placeholder
+      && let Some(item) = diagram_blip_placeholder_image_item(shared_diagram::DiagramBounds {
+        x: diagram_shape.x,
+        y: diagram_shape.y,
+        width: diagram_shape.width,
+        height: diagram_shape.height,
+      })
+    {
+      drawing_items.push(PageItem::Image(item));
+    }
     drawing_items.extend(fill_images.into_iter().map(PageItem::Image));
     let fill_color = diagram_shape
       .shape_properties
@@ -522,25 +535,29 @@ fn lower_diagram(
       .shape_properties
       .as_deref()
       .is_some_and(diagram_model_shape_suppresses_fill);
-    drawing_items.push(PageItem::Rect(RectItem {
-      x_pt: diagram_shape.x,
-      y_pt: diagram_shape.y,
-      width_pt: diagram_shape.width,
-      height_pt: diagram_shape.height,
-      fill_color: diagram_shape
-        .shape_properties
-        .as_deref()
-        .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
-        .then_some(fill_color)
-        .filter(|_| !suppress_fill),
-      fill_opacity: 1.0,
-      stroke: diagram_shape
-        .shape_properties
-        .as_deref()
-        .and_then(|properties| diagram_model_shape_outline(import, slide, properties))
-        .or_else(|| Some(BorderStyle::default()).filter(|_| !suppress_fill)),
-      stroke_opacity: 1.0,
-    }));
+    if diagram_shape.is_connector {
+      drawing_items.push(PageItem::Line(diagram_connector_line_item(&diagram_shape)));
+    } else {
+      drawing_items.push(PageItem::Rect(RectItem {
+        x_pt: diagram_shape.x,
+        y_pt: diagram_shape.y,
+        width_pt: diagram_shape.width,
+        height_pt: diagram_shape.height,
+        fill_color: diagram_shape
+          .shape_properties
+          .as_deref()
+          .is_none_or(|properties| !diagram_model_shape_has_blip_fill(properties))
+          .then_some(fill_color)
+          .filter(|_| !suppress_fill),
+        fill_opacity: 1.0,
+        stroke: diagram_shape
+          .shape_properties
+          .as_deref()
+          .and_then(|properties| diagram_model_shape_outline(import, slide, properties))
+          .or_else(|| Some(BorderStyle::default()).filter(|_| !suppress_fill)),
+        stroke_opacity: 1.0,
+      }));
+    }
     if !diagram_shape.text_body.is_empty() {
       let mut text_body = diagram_text_body(&diagram_shape.text_body);
       if diagram_shape.text_rotation_deg != 0.0 {
@@ -564,26 +581,59 @@ fn lower_diagram(
         .style
         .as_deref()
         .map(|style| diagram_font_style_reference(&style.font_reference, diagram_shape.text_fill));
-      let mut lowered_text_items = Vec::new();
-      lower_text_body_at_with_style(
+      let options = TextLoweringOptions::from_text_body(&text_body);
+      let base_style = text_base_style(
         import,
-        text_frame,
         &text_body,
         font_reference.as_ref(),
         None,
-        None,
         diagram_shape.font_size_pt,
-        &mut lowered_text_items,
       );
-      for mut item in lowered_text_items {
-        if let PageItem::Text(text_item) = &mut item {
-          text_item.preserve_text_portion = true;
-        }
-        text_items.push(DiagramDrawingTextItem {
-          order: diagram_shape.order,
-          item,
-        });
+      let font_scale =
+        text_auto_fit_font_scale(import, text_frame, &text_body, &base_style, &options);
+      if let Some(group) = diagram_shape.font_sync_group.as_deref() {
+        font_sync_scales
+          .entry(group.to_string())
+          .and_modify(|scale| *scale = scale.min(font_scale))
+          .or_insert(font_scale);
       }
+      pending_text_items.push(PendingDiagramTextItem {
+        order: diagram_shape.order,
+        frame: text_frame,
+        text_body,
+        font_reference,
+        base_font_size_pt: diagram_shape.font_size_pt,
+        font_sync_group: diagram_shape.font_sync_group,
+        font_scale,
+      });
+    }
+  }
+  for pending in pending_text_items {
+    let mut lowered_text_items = Vec::new();
+    let font_scale = pending
+      .font_sync_group
+      .as_deref()
+      .and_then(|group| font_sync_scales.get(group).copied())
+      .unwrap_or(pending.font_scale);
+    lower_text_body_at_with_style_and_scale(
+      import,
+      pending.frame,
+      &pending.text_body,
+      pending.font_reference.as_ref(),
+      None,
+      None,
+      pending.base_font_size_pt,
+      Some(font_scale),
+      &mut lowered_text_items,
+    );
+    for mut item in lowered_text_items {
+      if let PageItem::Text(text_item) = &mut item {
+        text_item.preserve_text_portion = true;
+      }
+      text_items.push(DiagramDrawingTextItem {
+        order: pending.order,
+        item,
+      });
     }
   }
   text_items.sort_by_key(|text_item| text_item.order);
@@ -854,6 +904,56 @@ struct DiagramDrawingTextItem {
   item: PageItem,
 }
 
+struct PendingDiagramTextItem {
+  order: usize,
+  frame: TextFrame,
+  text_body: TextBody,
+  font_reference: Option<FontStyleReference>,
+  base_font_size_pt: Option<f32>,
+  font_sync_group: Option<String>,
+  font_scale: f32,
+}
+
+fn diagram_connector_line_item(diagram_shape: &shared_diagram::DiagramShape) -> LineItem {
+  let center_x = diagram_shape.x + diagram_shape.width / 2.0;
+  let center_y = diagram_shape.y + diagram_shape.height / 2.0;
+  let length = diagram_shape.width.max(diagram_shape.height).max(1.0);
+  let radians = diagram_shape.connector_angle_deg.to_radians();
+  let dx = radians.cos() * length / 2.0;
+  let dy = radians.sin() * length / 2.0;
+  LineItem {
+    x1_pt: center_x - dx,
+    y1_pt: center_y - dy,
+    x2_pt: center_x + dx,
+    y2_pt: center_y + dy,
+    width_pt: 1.0,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    kind: LineItemKind::Stroke,
+  }
+}
+
+fn diagram_blip_placeholder_image_item(bounds: shared_diagram::DiagramBounds) -> Option<ImageItem> {
+  if bounds.width <= f32::EPSILON || bounds.height <= f32::EPSILON {
+    return None;
+  }
+  Some(ImageItem {
+    x_pt: bounds.x,
+    y_pt: bounds.y,
+    width_pt: bounds.width,
+    height_pt: bounds.height,
+    crop: ImageCrop::default(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
+    data: transparent_png_1x1()?,
+    content_type: Some("image/png".to_string()),
+    alt_text: None,
+    hyperlink_url: None,
+    floating: false,
+    behind_text: false,
+  })
+}
+
 fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
   let mut display_properties = source
     .body_properties
@@ -971,6 +1071,7 @@ fn diagram_model_shape_outline(
 fn diagram_model_shape_blip_fill_image_items(
   import: &PowerPointImport,
   slide: &SlidePersist,
+  data_resource: &super::slide::DiagramDataResource,
   properties: &dgm::ShapeProperties,
   bounds: shared_diagram::DiagramBounds,
 ) -> Vec<ImageItem> {
@@ -985,7 +1086,7 @@ fn diagram_model_shape_blip_fill_image_items(
   let Some(relationship_id) = blip.embed.as_deref() else {
     return Vec::new();
   };
-  let Some(resource) = slide.image_resources.get(relationship_id) else {
+  let Some(resource) = data_resource.image_resources.get(relationship_id) else {
     return Vec::new();
   };
   let rotation_deg = properties
@@ -2959,35 +3060,40 @@ fn lower_text_body_at_with_style(
   base_font_size_pt: Option<f32>,
   items: &mut Vec<PageItem>,
 ) {
-  let mut options = TextLoweringOptions::from_text_body(text_body);
-  let mut base_style = TextStyle {
-    font_family: Some(Arc::from("Liberation Sans")),
-    font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
-    rotation_deg: options.rotation_deg,
-    ..TextStyle::default()
-  };
-  if let Some(font_reference) = font_reference {
-    apply_font_reference_text_style(import, font_reference, &mut base_style);
-  }
-  if let Some(table_text_style) = table_text_style {
-    apply_table_text_style(import, table_text_style, &mut base_style);
-  }
+  lower_text_body_at_with_style_and_scale(
+    import,
+    frame,
+    text_body,
+    font_reference,
+    table_text_style,
+    shape_hyperlink_url,
+    base_font_size_pt,
+    None,
+    items,
+  );
+}
 
-  if text_body.display_properties.auto_fit == TextAutoFit::Shape {
-    let text_width = estimate_text_body_width(import, text_body, &base_style, &options);
-    let text_height = estimate_text_body_height(text_body, &base_style, options.line_scale);
-    let width_scale = if text_width > 0.0 {
-      frame.width_pt / text_width
-    } else {
-      1.0
-    };
-    let height_scale = if text_height > 0.0 {
-      frame.height_pt / text_height
-    } else {
-      1.0
-    };
-    options.font_scale *= width_scale.min(height_scale).clamp(0.01, 1.0);
-  }
+fn lower_text_body_at_with_style_and_scale(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  table_text_style: Option<&TableStyleTextProperties>,
+  shape_hyperlink_url: Option<&str>,
+  base_font_size_pt: Option<f32>,
+  auto_fit_font_scale: Option<f32>,
+  items: &mut Vec<PageItem>,
+) {
+  let mut options = TextLoweringOptions::from_text_body(text_body);
+  let base_style = text_base_style(
+    import,
+    text_body,
+    font_reference,
+    table_text_style,
+    base_font_size_pt,
+  );
+  options.font_scale = auto_fit_font_scale
+    .unwrap_or_else(|| text_auto_fit_font_scale(import, frame, text_body, &base_style, &options));
 
   let mut scaled_base_style = base_style.clone();
   apply_text_scale(&mut scaled_base_style, &options);
@@ -3020,6 +3126,54 @@ fn lower_text_body_at_with_style(
       items,
     );
   }
+}
+
+fn text_base_style(
+  import: &PowerPointImport,
+  text_body: &TextBody,
+  font_reference: Option<&FontStyleReference>,
+  table_text_style: Option<&TableStyleTextProperties>,
+  base_font_size_pt: Option<f32>,
+) -> TextStyle {
+  let options = TextLoweringOptions::from_text_body(text_body);
+  let mut base_style = TextStyle {
+    font_family: Some(Arc::from("Liberation Sans")),
+    font_size_pt: base_font_size_pt.unwrap_or(DEFAULT_TEXT_FONT_SIZE_PT),
+    rotation_deg: options.rotation_deg,
+    ..TextStyle::default()
+  };
+  if let Some(font_reference) = font_reference {
+    apply_font_reference_text_style(import, font_reference, &mut base_style);
+  }
+  if let Some(table_text_style) = table_text_style {
+    apply_table_text_style(import, table_text_style, &mut base_style);
+  }
+  base_style
+}
+
+fn text_auto_fit_font_scale(
+  import: &PowerPointImport,
+  frame: TextFrame,
+  text_body: &TextBody,
+  base_style: &TextStyle,
+  options: &TextLoweringOptions,
+) -> f32 {
+  if text_body.display_properties.auto_fit != TextAutoFit::Shape {
+    return options.font_scale;
+  }
+  let text_width = estimate_text_body_width(import, text_body, base_style, options);
+  let text_height = estimate_text_body_height(text_body, base_style, options.line_scale);
+  let width_scale = if text_width > 0.0 {
+    frame.width_pt / text_width
+  } else {
+    1.0
+  };
+  let height_scale = if text_height > 0.0 {
+    frame.height_pt / text_height
+  } else {
+    1.0
+  };
+  options.font_scale * width_scale.min(height_scale).clamp(0.01, 1.0)
 }
 
 fn apply_font_reference_text_style(
@@ -3183,7 +3337,14 @@ fn lower_paragraph(
   if options.clip_vertical_overflow && cursor.y_pt > frame.y_pt + frame.height_pt {
     return;
   }
-  let paragraph_x = cursor.x_pt + paragraph_style.left_margin_pt + paragraph_style.indent_pt;
+  let bullet_label = paragraph_style.bullet_label(paragraph);
+  let paragraph_x = cursor.x_pt
+    + paragraph_style.left_margin_pt
+    + if bullet_label.is_some() {
+      0.0
+    } else {
+      paragraph_style.indent_pt
+    };
   let mut segment_start = 0usize;
   let mut is_first_segment = true;
 
@@ -3210,14 +3371,14 @@ fn lower_paragraph(
     apply_text_scale(&mut base_line_style, options);
     let mut max_line_height = line_height(&base_line_style, options.line_scale);
 
-    if is_first_segment && let Some(label) = paragraph_style.bullet_label(paragraph) {
+    if is_first_segment && let Some(label) = bullet_label.clone() {
       let mut bullet_style = base_style.clone();
       paragraph_style.apply_default_run_style(import, &mut bullet_style);
       apply_text_scale(&mut bullet_style, options);
       max_line_height = max_line_height.max(line_height(&bullet_style, options.line_scale));
       push_text_item(
         items,
-        run_x - DEFAULT_BULLET_INDENT_PT,
+        run_x + paragraph_style.indent_pt,
         cursor.y_pt,
         label,
         bullet_style,
@@ -3606,6 +3767,14 @@ impl ParagraphDisplayStyle {
   }
 
   fn bullet_label(&self, paragraph: &TextParagraph) -> Option<String> {
+    if paragraph
+      .paragraph_properties
+      .as_deref()
+      .and_then(|properties| properties.paragraph_properties_choice4.as_ref())
+      .is_some_and(|choice| matches!(choice, a::ParagraphPropertiesChoice4::NoBullet))
+    {
+      return None;
+    }
     self.bullet.clone().or_else(|| {
       paragraph
         .level

@@ -287,6 +287,7 @@ impl ChartColorStyleResource {
 pub(crate) struct DiagramDataResource {
   pub(crate) path: Option<String>,
   pub(crate) model: dgm::DataModelRoot,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
 }
 
 impl DiagramDataResource {
@@ -1112,6 +1113,7 @@ impl SlidePersist {
         DiagramDataResource {
           path: diagram_part.path(package).map(str::to_string),
           model: diagram_part.root_element(package)?.clone(),
+          image_resources: collect_image_resources(package, &diagram_part),
         },
       );
     }

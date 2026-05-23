@@ -20,9 +20,13 @@ pub(crate) struct DiagramShape {
   pub(crate) style: Option<Box<dgm::Style>>,
   pub(crate) text_fill: Option<RgbColor>,
   pub(crate) text_rotation_deg: f32,
+  pub(crate) is_connector: bool,
+  pub(crate) connector_angle_deg: f32,
+  pub(crate) is_blip_placeholder: bool,
   pub(crate) fill: RgbColor,
   pub(crate) order: usize,
   pub(crate) font_size_pt: Option<f32>,
+  pub(crate) font_sync_group: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -119,6 +123,59 @@ impl DiagramTextBody {
     let mut body_properties = self.body_properties.clone().unwrap_or_default();
     body_properties.anchor = Some(anchor);
     self.body_properties = Some(body_properties);
+  }
+
+  fn apply_text_algorithm_paragraph_rules(
+    &mut self,
+    start_bullets_at_level: i32,
+    alignment: Option<a::TextAlignmentTypeValues>,
+  ) {
+    let Some(base_level) = self
+      .paragraphs
+      .iter()
+      .filter_map(|paragraph| paragraph.level)
+      .min()
+    else {
+      return;
+    };
+    let start_bullets_at_level = (start_bullets_at_level - 1).max(0) as u8;
+    let mut is_bullet_list = false;
+    for paragraph in &mut self.paragraphs {
+      let normalized_level = paragraph
+        .level
+        .unwrap_or(base_level)
+        .saturating_sub(base_level);
+      paragraph.level = Some(normalized_level);
+      let mut properties = paragraph.paragraph_properties.clone().unwrap_or_default();
+      properties.level = Some(i32::from(normalized_level));
+      if normalized_level >= start_bullets_at_level {
+        if properties.left_margin.is_none() {
+          properties.left_margin =
+            Some(285_750 * i32::from(normalized_level - start_bullets_at_level + 1));
+        }
+        if properties.indent.is_none() {
+          properties.indent = Some(-285_750);
+        }
+        properties.paragraph_properties_choice4 = Some(
+          a::ParagraphPropertiesChoice4::CharacterBullet(Box::new(a::CharacterBullet {
+            char: "\u{2022}".to_string(),
+          })),
+        );
+        is_bullet_list = true;
+      } else if properties.paragraph_properties_choice4.is_none() {
+        properties.paragraph_properties_choice4 = Some(a::ParagraphPropertiesChoice4::NoBullet);
+      }
+      paragraph.paragraph_properties = Some(properties);
+    }
+
+    let alignment = alignment.or((!is_bullet_list).then_some(a::TextAlignmentTypeValues::Center));
+    if let Some(alignment) = alignment {
+      for paragraph in &mut self.paragraphs {
+        let mut properties = paragraph.paragraph_properties.clone().unwrap_or_default();
+        properties.alignment = Some(alignment);
+        paragraph.paragraph_properties = Some(properties);
+      }
+    }
   }
 }
 
@@ -273,6 +330,7 @@ pub(crate) fn layout_shapes(
       build_diagram_shape_tree(data, layout, styles, colors, accent_fill, bounds)
   {
     layout_diagram_shape_tree(&mut tree);
+    sort_diagram_shape_children_by_z_order(&mut tree);
     let mut shapes = Vec::new();
     flatten_diagram_shape_tree(&tree, bounds.x, bounds.y, &mut shapes);
     return shapes;
@@ -295,6 +353,9 @@ struct DiagramShapeNode {
   has_geometry: bool,
   hidden_geometry: bool,
   is_connector: bool,
+  connector_angle_deg: f32,
+  is_blip_placeholder: bool,
+  z_order_offset: i32,
   shape_properties: Option<Box<dgm::ShapeProperties>>,
   style: Option<Box<dgm::Style>>,
   text_fill: Option<RgbColor>,
@@ -302,6 +363,7 @@ struct DiagramShapeNode {
   aspect_ratio: f32,
   data_node_type: Option<dgm::ElementValues>,
   font_size_pt: Option<f32>,
+  font_sync_group: Option<String>,
   order: usize,
   constraints: Vec<DiagramConstraint>,
   direct_constraints: Vec<DiagramConstraint>,
@@ -344,6 +406,8 @@ struct LayoutAlgorithm {
   aspect_ratio: Option<f32>,
   auto_text_rotation: Option<dgm::AutoTextRotationValues>,
   text_anchor_vertical: dgm::TextAnchorVerticalValues,
+  start_bullets_at_level: i32,
+  parent_text_left_to_right_alignment: Option<dgm::TextAlignmentValues>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -575,6 +639,9 @@ fn build_diagram_shape_tree(
       has_geometry: false,
       hidden_geometry: false,
       is_connector: false,
+      connector_angle_deg: 0.0,
+      is_blip_placeholder: false,
+      z_order_offset: 0,
       shape_properties: None,
       style: None,
       text_fill: None,
@@ -582,6 +649,7 @@ fn build_diagram_shape_tree(
       aspect_ratio: 0.0,
       data_node_type: None,
       font_size_pt: None,
+      font_sync_group: None,
       order: usize::MAX,
       constraints: Vec::new(),
       direct_constraints: Vec::new(),
@@ -1163,6 +1231,14 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       has_geometry,
       hidden_geometry,
       is_connector,
+      connector_angle_deg: 0.0,
+      is_blip_placeholder: shape_atom
+        .and_then(|shape| shape.blip_placeholder)
+        .map(bool::from)
+        .unwrap_or(false),
+      z_order_offset: shape_atom
+        .and_then(|shape| shape.z_order_offset)
+        .unwrap_or_default(),
       shape_properties,
       style,
       text_fill,
@@ -1174,6 +1250,11 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
         .unwrap_or_default(),
       data_node_type,
       font_size_pt: self.metrics.font_sizes.get(name).copied(),
+      font_sync_group: self
+        .metrics
+        .font_sync_names
+        .contains(name)
+        .then(|| name.to_string()),
       order,
       constraints: self.active_constraints(layout_node),
       direct_constraints: direct_constraints_unfiltered(layout_node),
@@ -1651,6 +1732,7 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
 #[derive(Clone, Debug, Default)]
 struct LayoutNodeMetrics {
   font_sizes: HashMap<String, f32>,
+  font_sync_names: HashSet<String>,
   data_orders: HashMap<String, usize>,
 }
 
@@ -1722,6 +1804,13 @@ fn collect_constraints(node: &dgm::LayoutNode, metrics: &mut LayoutNodeMetrics) 
         && let (Some(name), Some(value)) = (constraint.for_name.as_deref(), constraint.val)
       {
         metrics.font_sizes.insert(name.to_string(), value as f32);
+      }
+      if constraint.r#type == dgm::ConstraintValues::PrimaryFontSize
+        && constraint.r#for == Some(dgm::ConstraintRelationshipValues::Descendant)
+        && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
+        && let Some(name) = constraint.for_name.as_deref()
+      {
+        metrics.font_sync_names.insert(name.to_string());
       }
     }
   }
@@ -1819,6 +1908,34 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .and_then(|parameter| parameter.val.as_deref())
       .map(text_anchor_vertical_from_value)
       .unwrap_or(dgm::TextAnchorVerticalValues::Middle),
+    start_bullets_at_level: algorithm_parameter_f32(
+      algorithm,
+      dgm::ParameterIdValues::StartBulletsAtLevel,
+    )
+    .unwrap_or(2.0)
+    .round() as i32,
+    parent_text_left_to_right_alignment: algorithm
+      .parameter
+      .iter()
+      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::ParentTextLeftToRightAlignment)
+      .and_then(|parameter| parameter.val.as_deref())
+      .map(text_alignment_from_value),
+  }
+}
+
+fn text_alignment_from_value(value: &str) -> dgm::TextAlignmentValues {
+  match value {
+    "ctr" => dgm::TextAlignmentValues::Center,
+    "r" => dgm::TextAlignmentValues::Right,
+    _ => dgm::TextAlignmentValues::Left,
+  }
+}
+
+fn drawingml_alignment_from_diagram(value: dgm::TextAlignmentValues) -> a::TextAlignmentTypeValues {
+  match value {
+    dgm::TextAlignmentValues::Center => a::TextAlignmentTypeValues::Center,
+    dgm::TextAlignmentValues::Right => a::TextAlignmentTypeValues::Right,
+    dgm::TextAlignmentValues::Left => a::TextAlignmentTypeValues::Left,
   }
 }
 
@@ -1921,8 +2038,8 @@ fn layout_shape_children(
         node.text_body = DiagramTextBody::default();
       }
     }
-    dgm::AlgorithmValues::Connector => {}
-    dgm::AlgorithmValues::Pyramid => linear_layout_tree(node, algorithm, constraints, rules),
+    dgm::AlgorithmValues::Connector => connector_layout_tree(node),
+    dgm::AlgorithmValues::Pyramid => pyramid_layout_tree(node),
   }
 }
 
@@ -1974,6 +2091,22 @@ fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConst
       dgm::TextAnchorVerticalValues::Bottom => a::TextAnchoringTypeValues::Bottom,
       dgm::TextAnchorVerticalValues::Middle => a::TextAnchoringTypeValues::Center,
     },
+  );
+  let alignment = node
+    .algorithms
+    .iter()
+    .rev()
+    .find_map(|algorithm| algorithm.parent_text_left_to_right_alignment)
+    .map(drawingml_alignment_from_diagram);
+  node.text_body.apply_text_algorithm_paragraph_rules(
+    node
+      .algorithms
+      .iter()
+      .rev()
+      .map(|algorithm| algorithm.start_bullets_at_level)
+      .next()
+      .unwrap_or(2),
+    alignment,
   );
 }
 
@@ -2196,6 +2329,12 @@ fn linear_layout_tree(
     algorithm.linear_direction,
     LinearDirection::FromRight | LinearDirection::FromBottom
   );
+  let connector_angle = match algorithm.linear_direction {
+    LinearDirection::FromLeft => 0.0,
+    LinearDirection::FromRight => 180.0,
+    LinearDirection::FromTop => 270.0,
+    LinearDirection::FromBottom => 90.0,
+  };
   let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
   for constraint in constraints
     .iter()
@@ -2367,6 +2506,9 @@ fn linear_layout_tree(
       child.y = ((node.height - height) / 2.0).max(0.0);
       child.width = width;
       child.height = height;
+      if child.is_connector {
+        child.connector_angle_deg = connector_angle;
+      }
       if reverse {
         cursor -= space_width;
       } else {
@@ -2385,6 +2527,9 @@ fn linear_layout_tree(
       child.y = y.max(0.0);
       child.width = width;
       child.height = height;
+      if child.is_connector {
+        child.connector_angle_deg = connector_angle;
+      }
       if reverse {
         cursor -= space_height;
       } else {
@@ -2421,6 +2566,11 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
     return;
   }
   let connector_radius = radius * (algorithm.span_angle / count as f32).to_radians().cos();
+  let connector_angle = if algorithm.span_angle > 0.0 {
+    0.0
+  } else {
+    180.0
+  };
   for (index, child) in node.children.iter_mut().skip(start).enumerate() {
     let angle = (index as f32) * algorithm.span_angle / count as f32 + algorithm.start_angle;
     let radians = angle.to_radians();
@@ -2433,6 +2583,76 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
     child.y = center_y - current_radius * radians.cos() - height / 2.0;
     child.width = width;
     child.height = height;
+    if child.is_connector {
+      child.connector_angle_deg = connector_angle + angle;
+    }
+  }
+}
+
+fn connector_layout_tree(node: &mut DiagramShapeNode) {
+  if !node.is_connector {
+    return;
+  }
+  let mut properties = HashMap::from([(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, node.width),
+      (dgm::ConstraintValues::Height, node.height),
+      (dgm::ConstraintValues::Left, 0.0),
+      (dgm::ConstraintValues::Top, 0.0),
+      (dgm::ConstraintValues::Right, node.width),
+      (dgm::ConstraintValues::Bottom, node.height),
+    ]),
+  )]);
+  for constraint in &node.direct_constraints {
+    let Some(reference_properties) = properties.get(constraint.ref_for_name.as_str()) else {
+      continue;
+    };
+    let Some(reference) = reference_properties.get(&constraint.reference).copied() else {
+      continue;
+    };
+    properties
+      .entry(constraint.for_name.clone())
+      .or_default()
+      .insert(constraint.target, reference * constraint.factor);
+  }
+  let Some(parent_properties) = properties.get("") else {
+    return;
+  };
+  let width = parent_properties
+    .get(&dgm::ConstraintValues::Width)
+    .copied()
+    .unwrap_or(node.width);
+  let height = parent_properties
+    .get(&dgm::ConstraintValues::Height)
+    .copied()
+    .unwrap_or(node.height);
+  node.x += (node.width - width) / 2.0;
+  node.y += (node.height - height) / 2.0;
+  node.width = width;
+  node.height = height;
+}
+
+fn pyramid_layout_tree(node: &mut DiagramShapeNode) {
+  if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
+    return;
+  }
+  let count = node.children.len();
+  let aspect_ratio = 0.32;
+  let mut child_width = node.width / count as f32;
+  let child_height = node.height / count as f32;
+  let mut x = aspect_ratio * child_width * (count - 1) as f32;
+  let mut y = aspect_ratio * child_height;
+  for child in &mut node.children {
+    child.x = x;
+    child.y = y;
+    if count > 1 {
+      x -= child_height / (count - 1) as f32;
+    }
+    child_width += child_height;
+    child.width = child_width;
+    child.height = child_height;
+    y += child_height;
   }
 }
 
@@ -2829,6 +3049,34 @@ fn snake_layout_tree(
   }
 }
 
+fn sort_diagram_shape_children_by_z_order(node: &mut DiagramShapeNode) {
+  let mut z_orders: Vec<i32> = (0..node.children.len()).map(|index| index as i32).collect();
+  for index in 0..node.children.len() {
+    let offset = node.children[index].z_order_offset;
+    if offset <= 0 {
+      continue;
+    }
+    z_orders[index] += offset;
+    for next in 0..offset as usize {
+      let next_index = index + next + 1;
+      if next_index >= z_orders.len() {
+        break;
+      }
+      z_orders[next_index] -= 1;
+    }
+    node.children[index].z_order_offset = 0;
+  }
+  let mut indexed_children: Vec<_> = node.children.drain(..).enumerate().collect();
+  indexed_children.sort_by_key(|(index, _)| z_orders[*index]);
+  node.children = indexed_children
+    .into_iter()
+    .map(|(_, mut child)| {
+      sort_diagram_shape_children_by_z_order(&mut child);
+      child
+    })
+    .collect();
+}
+
 fn flatten_diagram_shape_tree(
   node: &DiagramShapeNode,
   offset_x: f32,
@@ -2848,9 +3096,13 @@ fn flatten_diagram_shape_tree(
       style: node.style.clone(),
       text_fill: node.text_fill,
       text_rotation_deg: node.text_rotation_deg,
+      is_connector: node.is_connector,
+      connector_angle_deg: node.connector_angle_deg,
+      is_blip_placeholder: node.is_blip_placeholder,
       fill: node.fill,
       order: node.order,
       font_size_pt: node.font_size_pt,
+      font_sync_group: node.font_sync_group.clone(),
     });
   }
   for child in &node.children {

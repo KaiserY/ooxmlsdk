@@ -1,6 +1,7 @@
 use ooxmlsdk_pdf_test::{
   PdfBounds, PdfSummary, assert_pdf_rect_close, docx_layout_summary_for_fixture, parse_pdf_rect,
-  pdf_summary_for_fixture, pdfexport_fixture_dir, rendered_page_image_for_fixture,
+  pdf_summary_for_fixture, pdfexport_fixture_dir, raw_image_pixel_for_fixture,
+  rendered_page_image_for_fixture,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -437,6 +438,41 @@ fn assert_rendered_image_source_pixel_color(
   assert!(
     diff <= 12,
     "rendered image pixel ({source_x}, {source_y}) color #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
+fn assert_raw_image_source_pixel_color(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  image_width: u32,
+  image_height: u32,
+  source_x: u32,
+  source_y: u32,
+  expected_rgb: [u8; 3],
+) {
+  assert_raw_xobject_dimensions(summary, image_width, image_height);
+  let [r, g, b, _] = raw_image_pixel_for_fixture(
+    &fixture(fixture_name),
+    image_width,
+    image_height,
+    source_x,
+    source_y,
+  )
+  .unwrap_or_else(|error| panic!("failed to extract raw image pixel from {fixture_name}: {error}"))
+  .unwrap_or_else(|| {
+    panic!(
+      "missing raw image pixel ({source_x}, {source_y}) for dimensions {image_width}x{image_height}"
+    )
+  });
+  let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+    + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+    + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+  assert!(
+    diff <= 12,
+    "raw image pixel ({source_x}, {source_y}) color #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}",
     expected_rgb[0],
     expected_rgb[1],
     expected_rgb[2]
@@ -2289,16 +2325,7 @@ fn mapped_fixture_mso_brightness_contrast_preserves_bitmap_dimensions() {
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport16.cxx:testTdf136841
 fn mapped_fixture_tdf136841_preserves_cropped_bitmap_dimensions() {
   let summary = render_summary("tdf136841.docx");
-  assert_raw_xobject_dimensions(&summary, 76, 76);
-  assert_rendered_image_source_pixel_color(
-    "tdf136841.docx",
-    &summary,
-    76,
-    76,
-    38,
-    38,
-    [228, 72, 70],
-  );
+  assert_raw_image_source_pixel_color("tdf136841.docx", &summary, 76, 76, 38, 38, [228, 72, 70]);
 }
 
 #[test]

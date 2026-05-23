@@ -1,4 +1,4 @@
-use image::codecs::jpeg::JpegEncoder;
+use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 
 // Source: LibreOffice vcl/source/filter/wmf/emfwr.cxx writes these Win32 EMF
@@ -75,18 +75,23 @@ const DIB_ROW_ALIGNMENT_BYTES: usize = 4;
 const BI_RGB: u32 = 0;
 const BI_JPEG: u32 = 4;
 const BI_PNG: u32 = 5;
-const JPEG_QUALITY: u8 = 75;
 
-pub(crate) fn decode_metafile_as_jpeg(
+#[derive(Clone, Debug)]
+pub(crate) struct DecodedMetafile {
+  pub(crate) data: Vec<u8>,
+  pub(crate) content_type: &'static str,
+}
+
+pub(crate) fn decode_metafile_as_raster(
   data: &[u8],
   content_type: Option<&str>,
-) -> Result<Option<Vec<u8>>, String> {
+) -> Result<Option<DecodedMetafile>, String> {
   if !looks_like_metafile(data, content_type) {
     return Ok(None);
   }
 
-  if let Some(jpeg) = decode_emf_as_jpeg(data)? {
-    return Ok(Some(jpeg));
+  if let Some(raster) = decode_emf_as_raster(data)? {
+    return Ok(Some(raster));
   }
 
   Ok(None)
@@ -99,7 +104,7 @@ fn looks_like_metafile(data: &[u8], content_type: Option<&str>) -> bool {
   ) || is_emf(data)
 }
 
-fn decode_emf_as_jpeg(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+fn decode_emf_as_raster(data: &[u8]) -> Result<Option<DecodedMetafile>, String> {
   if !is_emf(data) {
     return Ok(None);
   }
@@ -135,9 +140,9 @@ fn decode_emf_as_jpeg(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
 
   let (record_type, record_offset, record_size) = match bitmap_record {
     Some(record) => record,
-    None => return decode_vector_emf_as_jpeg(data).map(Some),
+    None => return decode_vector_emf_as_png(data).map(Some),
   };
-  decode_bitmap_record_as_jpeg(data, record_type, record_offset, record_size).map(Some)
+  decode_bitmap_record_as_raster(data, record_type, record_offset, record_size).map(Some)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -437,7 +442,7 @@ impl EmfVectorState {
   }
 }
 
-fn decode_vector_emf_as_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
+fn decode_vector_emf_as_png(data: &[u8]) -> Result<DecodedMetafile, String> {
   let mut state = EmfVectorState::new(data)?;
   let mut pos = EMF_HEADER_SIZE;
 
@@ -583,15 +588,18 @@ fn decode_vector_emf_as_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
     pos += record_size;
   }
 
-  rgb_to_jpeg(&state.rgb, state.width as u32, state.height as u32)
+  Ok(DecodedMetafile {
+    data: rgb_to_png(&state.rgb, state.width as u32, state.height as u32)?,
+    content_type: "image/png",
+  })
 }
 
-fn decode_bitmap_record_as_jpeg(
+fn decode_bitmap_record_as_raster(
   data: &[u8],
   record_type: u32,
   record_offset: usize,
   _record_size: usize,
-) -> Result<Vec<u8>, String> {
+) -> Result<DecodedMetafile, String> {
   let (off_bmi_src, cb_bmi_src, off_bits_src, cb_bits_src) = match record_type {
     EMR_STRETCH_DIBITS => (
       read_u32(data, record_offset + EMR_BITMAP_INFO_OFFSET_OFFSET)? as usize,
@@ -644,14 +652,25 @@ fn decode_bitmap_record_as_jpeg(
 
   let bits = &data[bits_start..bits_end];
   match compression {
-    BI_JPEG => Ok(bits.to_vec()),
-    BI_PNG => png_to_jpeg(bits),
-    BI_RGB => dib_to_jpeg(bits, width, height, bit_count),
+    BI_JPEG => Ok(DecodedMetafile {
+      data: bits.to_vec(),
+      content_type: "image/jpeg",
+    }),
+    BI_PNG => Ok(DecodedMetafile {
+      data: bits.to_vec(),
+      content_type: "image/png",
+    }),
+    BI_RGB => dib_to_png(bits, width, height, bit_count),
     other => Err(format!("unsupported DIB compression: {other}")),
   }
 }
 
-fn dib_to_jpeg(bits: &[u8], width: i32, height: i32, bit_count: u16) -> Result<Vec<u8>, String> {
+fn dib_to_png(
+  bits: &[u8],
+  width: i32,
+  height: i32,
+  bit_count: u16,
+) -> Result<DecodedMetafile, String> {
   if width <= 0 || height == 0 {
     return Err(format!("unsupported DIB size {width}x{height}"));
   }
@@ -711,13 +730,10 @@ fn dib_to_jpeg(bits: &[u8], width: i32, height: i32, bit_count: u16) -> Result<V
     }
   }
 
-  rgb_to_jpeg(&rgb, width as u32, height_abs as u32)
-}
-
-fn png_to_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
-  let image = image::load_from_memory(data).map_err(|err| err.to_string())?;
-  let rgb = image.to_rgb8();
-  rgb_to_jpeg(&rgb, rgb.width(), rgb.height())
+  Ok(DecodedMetafile {
+    data: rgb_to_png(&rgb, width as u32, height_abs as u32)?,
+    content_type: "image/png",
+  })
 }
 
 fn process_emf_plus_comment(
@@ -980,9 +996,9 @@ fn read_xform(data: &[u8], offset: usize) -> Result<EmfTransform, String> {
   })
 }
 
-fn rgb_to_jpeg(rgb: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
+fn rgb_to_png(rgb: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
   let mut output = Vec::new();
-  let encoder = JpegEncoder::new_with_quality(&mut output, JPEG_QUALITY);
+  let encoder = PngEncoder::new(&mut output);
   encoder
     .write_image(rgb, width, height, ColorType::Rgb8.into())
     .map_err(|err| err.to_string())?;
@@ -1037,10 +1053,10 @@ mod tests {
   use ooxmlsdk::parts::PartRef;
   use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
 
-  use super::decode_metafile_as_jpeg;
+  use super::decode_metafile_as_raster;
 
   #[test]
-  fn emf_fixture_decodes_to_jpeg() {
+  fn emf_fixture_decodes_to_png() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf129085.docx");
     let package = WordprocessingDocument::new_from_file(path).unwrap();
@@ -1056,14 +1072,17 @@ mod tests {
     let emf = image.data(&package).unwrap();
     let content_type = image.content_type(&package);
 
-    let jpeg = decode_metafile_as_jpeg(emf, content_type).unwrap().unwrap();
-    let decoded = image::load_from_memory(&jpeg).unwrap();
+    let raster = decode_metafile_as_raster(emf, content_type)
+      .unwrap()
+      .unwrap();
+    assert_eq!(raster.content_type, "image/png");
+    let decoded = image::load_from_memory(&raster.data).unwrap();
     assert_eq!(decoded.width(), 884);
     assert_eq!(decoded.height(), 925);
   }
 
   #[test]
-  fn emf_bitmap_record_fixture_decodes_to_jpeg() {
+  fn emf_bitmap_record_fixture_decodes_to_png_without_jpeg_loss() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf136841.docx");
     let package = WordprocessingDocument::new_from_file(path).unwrap();
@@ -1079,9 +1098,26 @@ mod tests {
     let emf = image.data(&package).unwrap();
     let content_type = image.content_type(&package);
 
-    let jpeg = decode_metafile_as_jpeg(emf, content_type).unwrap().unwrap();
-    let decoded = image::load_from_memory(&jpeg).unwrap();
+    let raster = decode_metafile_as_raster(emf, content_type)
+      .unwrap()
+      .unwrap();
+    assert_eq!(raster.content_type, "image/png");
+    let decoded = image::load_from_memory(&raster.data).unwrap();
     assert_eq!(decoded.width(), 76);
     assert_eq!(decoded.height(), 76);
+    let rgb = decoded.to_rgb8();
+    let pixel = rgb.get_pixel(38, 38).0;
+    let diff = pixel
+      .iter()
+      .zip([228u8, 72, 70])
+      .map(|(actual, expected)| (i16::from(*actual) - i16::from(expected)).abs())
+      .sum::<i16>();
+    assert!(
+      diff <= 3,
+      "decoded pixel was #{:02x}{:02x}{:02x}",
+      pixel[0],
+      pixel[1],
+      pixel[2]
+    );
   }
 }

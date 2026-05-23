@@ -42,7 +42,8 @@ use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::units;
 
-use chart::{chart_visible_texts, supplemental_graphic_blocks};
+use crate::render::chart as shared_chart;
+use chart::supplemental_graphic_blocks;
 pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
 use package::{HyperlinkCatalog, ImageCatalog};
@@ -6205,14 +6206,6 @@ fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<Stri
     )
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ChartKind {
-  Pie,
-  Bar,
-  Area,
-  Other,
-}
-
 fn drawing_chart_shapes(
   drawing: &w::Drawing,
   graphic_xml: &str,
@@ -6223,8 +6216,8 @@ fn drawing_chart_shapes(
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let stroke = Some(BorderStyle::default());
 
-  Some(match chart_kind(chart_space) {
-    ChartKind::Pie => {
+  Some(match shared_chart::kind(chart_space) {
+    shared_chart::ChartKind::Pie => {
       let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
         .min(width_pt)
         .min(height_pt);
@@ -6233,14 +6226,14 @@ fn drawing_chart_shapes(
         chart_shape(diameter_pt, diameter_pt, 0.0, placement, stroke),
       ]
     }
-    ChartKind::Bar => vec![chart_shape(
+    shared_chart::ChartKind::Bar => vec![chart_shape(
       width_pt / 3.0,
       height_pt * 0.55,
       0.0,
       placement,
       stroke,
     )],
-    ChartKind::Area => {
+    shared_chart::ChartKind::Area => {
       let mut shapes = vec![chart_shape(
         width_pt,
         height_pt,
@@ -6259,7 +6252,9 @@ fn drawing_chart_shapes(
       }
       shapes
     }
-    ChartKind::Other => vec![chart_shape(width_pt, height_pt, 0.0, placement, stroke)],
+    shared_chart::ChartKind::Other => {
+      vec![chart_shape(width_pt, height_pt, 0.0, placement, stroke)]
+    }
   })
 }
 
@@ -6283,29 +6278,8 @@ fn drawing_chart_relationship_id(xml: &str) -> Option<String> {
   }
 }
 
-fn chart_kind(chart_space: &c::ChartSpace) -> ChartKind {
-  chart_space
-    .chart
-    .plot_area
-    .plot_area_choice1
-    .iter()
-    .find_map(|choice| match choice {
-      c::PlotAreaChoice::PieChart(_)
-      | c::PlotAreaChoice::Pie3DChart(_)
-      | c::PlotAreaChoice::DoughnutChart(_)
-      | c::PlotAreaChoice::OfPieChart(_) => Some(ChartKind::Pie),
-      c::PlotAreaChoice::BarChart(_) | c::PlotAreaChoice::Bar3DChart(_) => Some(ChartKind::Bar),
-      c::PlotAreaChoice::AreaChart(_) | c::PlotAreaChoice::Area3DChart(_) => Some(ChartKind::Area),
-      _ => None,
-    })
-    .unwrap_or(ChartKind::Other)
-}
-
 fn chart_has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
-  let values = chart_visible_texts(chart_space);
-  expected
-    .iter()
-    .all(|expected| values.iter().any(|value| value == expected))
+  shared_chart::has_values(chart_space, expected)
 }
 
 fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {

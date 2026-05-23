@@ -6,6 +6,7 @@ use crate::layout::{
   self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
   TextItem,
 };
+use crate::render::chart as shared_chart;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
@@ -26,8 +27,8 @@ use super::drawingml::table::{
 };
 use super::drawingml::text_body::{TextBody, TextParagraph, TextRun, TextRunKind};
 use super::drawingml::text_list_style::{TextListLevelParagraphProperties, TextListParagraphStyle};
-use super::import::PowerPointImport;
-use super::slide::{BackgroundKind, BackgroundProperties, SlidePersist};
+use super::import::{PowerPointImport, ThemeFragmentRecord};
+use super::slide::{BackgroundKind, BackgroundProperties, ChartResource, SlidePersist};
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;
 const DEFAULT_TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
@@ -209,6 +210,12 @@ fn lower_shape(
     lower_table(import, shape, offset, table, items);
   }
 
+  if shape.service_name == ShapeService::ChartShape
+    && let Some(record) = &shape.graphic_data
+  {
+    lower_chart(import, slide, shape, offset, record, items);
+  }
+
   if let Some(text_body) = &shape.text_body {
     lower_text_body(import, shape, offset, text_body, items);
   }
@@ -268,6 +275,132 @@ fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
       .embedded_package_resource
       .as_ref()
       .is_some_and(|resource| resource.has_payload())
+}
+
+fn lower_chart(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &Shape,
+  offset: DisplayOffset,
+  record: &GraphicDataRecord,
+  items: &mut Vec<PageItem>,
+) {
+  if shape.size.cx <= 0 || shape.size.cy <= 0 {
+    return;
+  }
+  let Some(chart_resource) = &record.chart_resource else {
+    return;
+  };
+  let paints = chart_data_point_paints(import, slide, chart_resource);
+  let texts = shared_chart::visible_texts(&chart_resource.chart_space);
+  if paints.is_empty() && texts.is_empty() {
+    return;
+  }
+
+  let x = units::emu_to_points(offset.x_emu + shape.position.x);
+  let y = units::emu_to_points(offset.y_emu + shape.position.y);
+  let width = units::emu_to_points(shape.size.cx);
+  let height = units::emu_to_points(shape.size.cy);
+  let plot_x = x + width * 0.12;
+  let plot_y = y + height * 0.12;
+  let plot_width = width * 0.76;
+  let plot_height = height * 0.76;
+  if !paints.is_empty() {
+    let point_count = paints.len().max(1) as f32;
+    let gap = (plot_width * 0.02).min(6.0);
+    let item_width = ((plot_width - gap * (point_count - 1.0)) / point_count).max(1.0);
+
+    // Source: LibreOffice sd/qa/unit/import-tests4.cxx:testTdf153012
+    // Chart data point fills resolve against c:clrMapOvr, so bg1 maps through
+    // the chart color map instead of the slide p:clrMapOvr.
+    for (index, paint) in paints.iter().enumerate() {
+      items.push(PageItem::Rect(RectItem {
+        x_pt: plot_x + index as f32 * (item_width + gap),
+        y_pt: plot_y,
+        width_pt: item_width,
+        height_pt: plot_height,
+        fill_color: Some(paint.color),
+        fill_opacity: paint.opacity,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }));
+    }
+  }
+
+  lower_chart_texts(x, y, width, height, texts, items);
+}
+
+fn lower_chart_texts(
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+  texts: Vec<String>,
+  items: &mut Vec<PageItem>,
+) {
+  let mut style = TextStyle::default();
+  style.font_size_pt = 11.0;
+  let line_step = 13.2;
+  let start_x = x + width * 0.12;
+  let mut text_y = y + height * 0.12;
+  let max_y = y + height * 0.9;
+
+  for text in texts {
+    if text_y > max_y {
+      break;
+    }
+    push_text_item(items, start_x, text_y, text, style.clone(), None, 1.0);
+    text_y += line_step;
+  }
+}
+
+fn chart_data_point_paints(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+) -> Vec<DisplayPaint> {
+  shared_chart::data_point_solid_fills(&chart_resource.chart_space)
+    .into_iter()
+    .filter_map(|fill| display_paint_for_chart(import, slide, chart_resource, fill.fill))
+    .collect()
+}
+
+fn display_paint_for_chart(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  chart_resource: &ChartResource,
+  fill: &a::SolidFill,
+) -> Option<DisplayPaint> {
+  let theme = chart_theme(import, slide)?;
+  let color_map = chart_resource.chart_space.color_map_override.as_deref();
+  let color = fill
+    .solid_fill_choice
+    .as_ref()
+    .and_then(Color::from_solid_fill_choice)?;
+  let mut scheme_resolver = |token| {
+    let mapped = shared_chart::scheme_color_token(color_map, token)?;
+    theme.color_scheme.get_color(mapped).cloned()
+  };
+  let color = color.resolve_rgb(&mut scheme_resolver, None)?;
+  Some(DisplayPaint {
+    color: RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    },
+    opacity: color_opacity(color.alpha),
+  })
+}
+
+fn chart_theme<'a>(
+  import: &'a PowerPointImport,
+  slide: &SlidePersist,
+) -> Option<&'a ThemeFragmentRecord> {
+  slide
+    .theme_path
+    .as_deref()
+    .and_then(|path| import.get_theme(path))
+    .or_else(|| import.get_current_theme_ptr())
 }
 
 fn lower_picture(
@@ -1575,9 +1708,10 @@ fn apply_image_effects(
   content_type: Option<&str>,
   effects: ImageEffects,
 ) -> Option<Vec<u8>> {
-  let raster_data = emf_wmf::decode_metafile_as_jpeg(data, content_type)
+  let raster_data = emf_wmf::decode_metafile_as_raster(data, content_type)
     .ok()
     .flatten()
+    .map(|raster| raster.data)
     .unwrap_or_else(|| data.to_vec());
   let mut image = image::load_from_memory(&raster_data).ok()?.to_rgba8();
   for pixel in image.pixels_mut() {
@@ -2607,7 +2741,10 @@ fn apply_text_fill(
 ) {
   match fill {
     a::RunPropertiesChoice::NoFill(_) => {
-      style.hidden = true;
+      // Source: LibreOffice sd/qa/unit/import-tests2.cxx:testTdf118776
+      // imports text noFill as 99% CharTransparence, not as a dropped run.
+      style.color = RgbColor { r: 0, g: 0, b: 0 };
+      style.opacity = 0.01;
     }
     a::RunPropertiesChoice::SolidFill(fill) => {
       if let Some(color) = fill
@@ -2634,7 +2771,10 @@ fn apply_default_text_fill(
 ) {
   match fill {
     a::DefaultRunPropertiesChoice::NoFill(_) => {
-      style.hidden = true;
+      // Source: LibreOffice sd/qa/unit/import-tests2.cxx:testTdf118776
+      // imports text noFill as 99% CharTransparence, not as a dropped run.
+      style.color = RgbColor { r: 0, g: 0, b: 0 };
+      style.opacity = 0.01;
     }
     a::DefaultRunPropertiesChoice::SolidFill(fill) => {
       if let Some(color) = fill

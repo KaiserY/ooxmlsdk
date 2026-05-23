@@ -383,7 +383,8 @@ mod tests {
         | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_)
-        | crate::layout::PageItem::Polyline(_) => None,
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
       .collect::<Vec<_>>();
 
@@ -1095,7 +1096,8 @@ mod tests {
         | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_)
-        | crate::layout::PageItem::Polyline(_) => None,
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
       .collect::<Vec<_>>();
 
@@ -1185,7 +1187,8 @@ mod tests {
         | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_)
-        | crate::layout::PageItem::Polyline(_) => None,
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
       .collect::<Vec<_>>();
 
@@ -1334,7 +1337,8 @@ mod tests {
         | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_)
-        | crate::layout::PageItem::Polyline(_) => None,
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
       .expect("inline image");
 
@@ -1591,7 +1595,8 @@ mod tests {
         | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_)
-        | crate::layout::PageItem::Polyline(_) => None,
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
       .expect("aligned image");
 
@@ -1757,7 +1762,9 @@ mod tests {
         crate::layout::PageItem::Image(_) => None,
         crate::layout::PageItem::Rect(_) => None,
         crate::layout::PageItem::Fill(_) => None,
-        crate::layout::PageItem::Line(_) | crate::layout::PageItem::Polyline(_) => None,
+        crate::layout::PageItem::Line(_)
+        | crate::layout::PageItem::Polyline(_)
+        | crate::layout::PageItem::LinkArea(_) => None,
       })
   }
 }

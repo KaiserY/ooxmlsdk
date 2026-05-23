@@ -1504,10 +1504,20 @@ fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Pa
 }
 
 fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
-  if let Some(jpeg) = emf_wmf::decode_metafile_as_jpeg(data, content_type)
+  if let Some(raster) = emf_wmf::decode_metafile_as_raster(data, content_type)
     .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
   {
-    return Image::from_jpeg(jpeg.into(), true).map_err(PdfError::Krilla);
+    return match raster.content_type {
+      "image/jpeg" => Image::from_jpeg(raster.data.into(), false).map_err(PdfError::Krilla),
+      "image/png" => {
+        let image = decode_png_relaxed(&raster.data)
+          .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF PNG: {err}")))?;
+        Image::from_custom(image, false).map_err(PdfError::Krilla)
+      }
+      content_type => Err(PdfError::Krilla(format!(
+        "unsupported EMF/WMF raster content type: {content_type}"
+      ))),
+    };
   }
 
   let format = content_type
@@ -1515,14 +1525,14 @@ fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
     .or_else(|| image::guess_format(data).ok());
 
   if matches!(format, Some(RasterImageFormat::Jpeg))
-    && let Ok(image) = Image::from_jpeg(data.to_vec().into(), true)
+    && let Ok(image) = Image::from_jpeg(data.to_vec().into(), false)
   {
     return Ok(image);
   }
   if matches!(format, Some(RasterImageFormat::Png))
     && let Ok(image) = decode_png_relaxed(data)
   {
-    return Image::from_custom(image, true).map_err(PdfError::Krilla);
+    return Image::from_custom(image, false).map_err(PdfError::Krilla);
   }
 
   let raster = match format {
@@ -1532,7 +1542,7 @@ fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
 
   let raster =
     raster.map_err(|err| PdfError::Krilla(format!("failed to decode raster image: {err}")))?;
-  Image::from_custom(PdfRasterImage::from_dynamic(raster), true).map_err(PdfError::Krilla)
+  Image::from_custom(PdfRasterImage::from_dynamic(raster), false).map_err(PdfError::Krilla)
 }
 
 fn decode_png_relaxed(data: &[u8]) -> std::result::Result<PdfRasterImage, String> {

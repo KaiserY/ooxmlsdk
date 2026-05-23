@@ -15,7 +15,7 @@ pub use ooxmlsdk_pdf::{DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSu
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PdfBounds, PdfSummary, PixelRect, RawAnnotationSummary,
   RawPageSummary, RawXObjectSummary, RenderedPageImage, assert_pdf_rect_close, parse_pdf_rect,
-  pdf_page_count, rendered_page_image_from_pdf,
+  pdf_page_count, raw_image_pixel_from_pdf, rendered_page_image_from_pdf,
 };
 pub use render::render_fixture_pdf;
 
@@ -73,6 +73,18 @@ pub fn rendered_page_image_for_fixture(
 ) -> Result<RenderedPageImage> {
   let pdf = render_fixture_pdf(fixture)?;
   rendered_page_image_from_pdf(&pdf, page_index, target_width)
+    .map_err(CalibrationError::PdfiumExtraction)
+}
+
+pub fn raw_image_pixel_for_fixture(
+  fixture: &Path,
+  image_width: u32,
+  image_height: u32,
+  source_x: u32,
+  source_y: u32,
+) -> Result<Option<[u8; 4]>> {
+  let pdf = render_fixture_pdf(fixture)?;
+  raw_image_pixel_from_pdf(&pdf, image_width, image_height, source_x, source_y)
     .map_err(CalibrationError::PdfiumExtraction)
 }
 

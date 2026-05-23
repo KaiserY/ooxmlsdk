@@ -401,6 +401,55 @@ pub fn rendered_page_image_from_pdf(
   ))
 }
 
+pub fn raw_image_pixel_from_pdf(
+  pdf: &[u8],
+  image_width: u32,
+  image_height: u32,
+  source_x: u32,
+  source_y: u32,
+) -> Result<Option<[u8; 4]>, String> {
+  let _guard = pdfium_lock().lock().unwrap();
+  let pdfium = bind_pdfium()?;
+  let document = pdfium
+    .load_pdf_from_byte_vec(pdf.to_vec(), None)
+    .map_err(|error| format!("PDFium could not load PDF bytes: {error}"))?;
+
+  for page in document.pages().iter() {
+    for object in page.objects().iter() {
+      if object.object_type() != PdfPageObjectType::Image {
+        continue;
+      }
+      let Some(image) = object.as_image_object() else {
+        continue;
+      };
+      if image.width().ok() != Some(image_width as i32)
+        || image.height().ok() != Some(image_height as i32)
+      {
+        continue;
+      }
+
+      let bitmap = image
+        .get_raw_bitmap()
+        .map_err(|error| format!("PDFium could not extract raw image bitmap: {error}"))?;
+      let width = bitmap.width() as u32;
+      let height = bitmap.height() as u32;
+      if source_x >= width || source_y >= height {
+        return Ok(None);
+      }
+      let rgba = bitmap.as_rgba_bytes();
+      let offset = ((source_y * width + source_x) * 4) as usize;
+      return Ok(Some([
+        rgba[offset],
+        rgba[offset + 1],
+        rgba[offset + 2],
+        rgba[offset + 3],
+      ]));
+    }
+  }
+
+  Ok(None)
+}
+
 struct PdfiumSummary {
   page_count: usize,
   media_boxes: Vec<String>,

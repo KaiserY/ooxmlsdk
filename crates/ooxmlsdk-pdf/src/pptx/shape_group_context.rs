@@ -155,7 +155,6 @@ impl PPTShapeGroupContext {
       resolve_text_body_hyperlinks(slide_persist, &mut text_body);
       shape.shape.set_text_body(text_body);
     }
-    shape.mark_empty_placeholder_reference(slide_persist);
     shape.into_shape(slide_persist)
   }
 

@@ -66,7 +66,15 @@ pub struct DocxLayoutRowSummary {
 
 #[derive(Clone, Debug, Default)]
 pub struct PptxLayoutSummary {
+  pub master_text_shapes: Vec<PptxTextShapeSummary>,
   pub smartart_text_shapes: Vec<PptxSmartArtTextShapeSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PptxTextShapeSummary {
+  pub master_page_index: usize,
+  pub shape_index: usize,
+  pub text: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]

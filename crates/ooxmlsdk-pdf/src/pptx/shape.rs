@@ -76,6 +76,7 @@ impl PptShape {
     };
     self.shape.apply_shape_reference(&reference);
     self.shape.set_placeholder(reference);
+    mark_referenced(&mut slide_persist.shapes, &path);
     self.placeholder_reference_path = Some(path);
   }
 
@@ -125,6 +126,13 @@ impl PptShape {
     }
   }
 
+  pub(crate) fn placeholder_type_by_index(
+    slide_persist: &SlidePersist,
+    index: u32,
+  ) -> Option<p::PlaceholderValues> {
+    find_placeholder_by_index(&slide_persist.shapes, index, false).and_then(|shape| shape.sub_type)
+  }
+
   pub(crate) fn get_sub_type_text_list_style<'a>(
     &self,
     slide_persist: &'a SlidePersist,
@@ -171,23 +179,6 @@ impl PptShape {
 
   pub(crate) fn set_has_noninherited_shape_properties(&mut self) {
     self.has_noninherited_shape_properties = true;
-  }
-
-  pub(crate) fn mark_empty_placeholder_reference(&self, slide_persist: &mut SlidePersist) {
-    if self.shape_location != ShapeLocation::Slide {
-      return;
-    }
-    if !self
-      .shape
-      .text_body
-      .as_ref()
-      .is_some_and(text_body_is_empty)
-    {
-      return;
-    }
-    if let Some(path) = &self.placeholder_reference_path {
-      mark_referenced(&mut slide_persist.shapes, path);
-    }
   }
 
   fn apply_empty_placeholder_text(&mut self, slide_persist: &SlidePersist) {

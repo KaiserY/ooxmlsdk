@@ -12,7 +12,7 @@ use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
-use crate::{PptxLayoutSummary, PptxSmartArtTextShapeSummary};
+use crate::{PptxLayoutSummary, PptxSmartArtTextShapeSummary, PptxTextShapeSummary};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
@@ -78,10 +78,45 @@ pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::Lay
 
 pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSummary {
   let mut summary = PptxLayoutSummary::default();
+  collect_master_text_shapes(import, &mut summary);
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
     let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
   }
   summary
+}
+
+fn collect_master_text_shapes(import: &PowerPointImport, summary: &mut PptxLayoutSummary) {
+  for (master_page_index, master) in import.master_pages.iter().enumerate() {
+    let mut shape_index = 0;
+    collect_text_shapes_from_shape_list(
+      master_page_index,
+      &master.shapes,
+      &mut shape_index,
+      &mut summary.master_text_shapes,
+    );
+  }
+}
+
+fn collect_text_shapes_from_shape_list(
+  master_page_index: usize,
+  shapes: &[Shape],
+  shape_index: &mut usize,
+  summary: &mut Vec<PptxTextShapeSummary>,
+) {
+  for shape in shapes {
+    if let Some(text_body) = &shape.text_body {
+      let text = text_body_plain_text(text_body);
+      if !text.trim().is_empty() {
+        summary.push(PptxTextShapeSummary {
+          master_page_index,
+          shape_index: *shape_index,
+          text,
+        });
+      }
+    }
+    *shape_index += 1;
+    collect_text_shapes_from_shape_list(master_page_index, &shape.children, shape_index, summary);
+  }
 }
 
 fn lower_slide_items_with_summary(

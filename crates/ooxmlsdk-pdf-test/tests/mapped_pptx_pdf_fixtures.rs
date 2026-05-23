@@ -52,6 +52,17 @@ fn assert_package_part_contains_in_order(name: &str, part: &str, expected: &[&st
   }
 }
 
+fn assert_master_text_contains(summary: &PptxLayoutSummary, expected: &str) {
+  assert!(
+    summary
+      .master_text_shapes
+      .iter()
+      .any(|shape| shape.text.contains(expected)),
+    "missing master text {expected:?}; master_text_shapes={:?}",
+    summary.master_text_shapes
+  );
+}
+
 fn normalize_space(text: &str) -> String {
   text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -1221,8 +1232,8 @@ fn mapped_pptx_tdf156718_preserves_table_style_text_and_fill_colors() {
 #[test]
 // Source: ../core/sd/qa/unit/import-tests3.cxx:testBnc584721_1
 fn mapped_pptx_bnc584721_1_preserves_master_title_text() {
-  let summary = render_summary("pptx/bnc584721_1_2.pptx");
-  assert_page_contains_in_order(&summary, 0, &["Click to edit Master title style"]);
+  let summary = pptx_layout_summary("pptx/bnc584721_1_2.pptx");
+  assert_master_text_contains(&summary, "Click to edit Master title style");
 }
 
 #[test]
@@ -2277,8 +2288,9 @@ fn mapped_pptx_tdf157529_preserves_fully_transparent_shape_fills() {
 fn mapped_pptx_tdf160490_preserves_placeholder_heights() {
   let summary = render_summary("pptx/tdf160490.pptx");
   assert_page_contains_in_order(&summary, 0, &["HELLO", "Set Top, Bottom margin"]);
+  assert_page_contains_in_order(&summary, 1, &["HELLO", "Not set Top, Bottom margin"]);
   assert_any_path_height_close(&summary, 0, 3726.0 * 72.0 / 2540.0, 8.0);
-  assert_any_path_height_close(&summary, 0, 3365.0 * 72.0 / 2540.0, 8.0);
+  assert_any_path_height_close(&summary, 1, 3365.0 * 72.0 / 2540.0, 8.0);
 }
 
 #[test]
@@ -2689,9 +2701,8 @@ fn mapped_pptx_n862510_2_preserves_rotated_smartart_shape_output() {
 fn mapped_pptx_tdf157285_preserves_placeholder_heights() {
   let summary = render_summary("pptx/tdf157285.pptx");
   assert_page_contains_in_order(&summary, 0, &["Hello"]);
-  assert_page_contains_in_order(&summary, 1, &["Hello"]);
   assert_any_path_height_close(&summary, 0, 2565.0 * 72.0 / 2540.0, 8.0);
-  assert_any_path_height_close(&summary, 1, 1180.0 * 72.0 / 2540.0, 8.0);
+  assert_any_path_height_close(&summary, 0, 1180.0 * 72.0 / 2540.0, 8.0);
 }
 
 #[test]

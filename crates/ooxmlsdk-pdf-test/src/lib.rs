@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 pub use ooxmlsdk_pdf::{
   DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary, PptxLayoutSummary,
-  PptxSmartArtTextShapeSummary,
+  PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PdfBounds, PdfSummary, PixelRect, RawAnnotationSummary,

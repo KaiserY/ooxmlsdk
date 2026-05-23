@@ -21,11 +21,17 @@ impl<'a> PPTShapeContext<'a> {
     // Source: LibreOffice oox/source/ppt/pptshapecontext.cxx
     // Placeholder lookup applies layout/master references before shape
     // properties and text body are finalized.
-    self.shape.shape.sub_type = Some(placeholder.r#type.unwrap_or(p::PlaceholderValues::Object));
+    let mut sub_type = placeholder.r#type.unwrap_or(p::PlaceholderValues::Object);
     if placeholder.index != Some(u32::MAX) {
       self.shape.shape.sub_type_index = placeholder.index;
-      self.shape.inherit_placeholder_type_by_index(slide_persist);
+      if placeholder.r#type.is_none()
+        && let Some(index) = placeholder.index
+        && let Some(inherited_type) = PptShape::placeholder_type_by_index(slide_persist, index)
+      {
+        sub_type = inherited_type;
+      }
     }
+    self.shape.shape.sub_type = Some(sub_type);
     self.shape.apply_placeholder_reference(slide_persist);
   }
 }

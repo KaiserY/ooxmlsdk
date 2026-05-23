@@ -66,6 +66,14 @@ pub struct DocxLayoutRowSummary {
 
 #[derive(Clone, Debug, Default)]
 pub struct PptxLayoutSummary {
+  pub is_endless: bool,
+  pub is_automatic: bool,
+  pub first_page_name: Option<String>,
+  pub custom_show_name: Option<String>,
+  pub embed_true_type_fonts: bool,
+  pub save_subset_fonts: bool,
+  pub embedded_font_typefaces: Vec<String>,
+  pub notes_page_shape_counts: Vec<usize>,
   pub master_text_shapes: Vec<PptxTextShapeSummary>,
   pub smartart_text_shapes: Vec<PptxSmartArtTextShapeSummary>,
   pub bullet_paragraphs: Vec<PptxBulletParagraphSummary>,

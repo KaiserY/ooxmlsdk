@@ -230,8 +230,6 @@ fn placeholder_prompt_text(
     (p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle, false) => {
       Some("Click to add Title")
     }
-    (p::PlaceholderValues::Body | p::PlaceholderValues::Object, false) => Some("Click to add Text"),
-    (p::PlaceholderValues::Body, true) => Some("Click to add Notes"),
     _ => None,
   }
 }

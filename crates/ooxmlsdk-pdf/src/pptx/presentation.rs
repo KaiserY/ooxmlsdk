@@ -31,6 +31,8 @@ pub(crate) struct PresentationFragmentHandler {
   comment_authors: Vec<SlideCommentAuthor>,
   comment_authors_read: bool,
   embed_true_type_fonts: bool,
+  save_subset_fonts: bool,
+  embedded_font_typefaces: Vec<String>,
   in_section_extension: bool,
 }
 
@@ -42,6 +44,7 @@ pub(crate) struct SlideRef {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CustomShow {
+  pub(crate) id: u32,
   pub(crate) name: String,
 }
 
@@ -97,6 +100,16 @@ impl PresentationFragmentHandler {
       .default_text_style
       .as_ref()
       .map(|style| TextListStyle::from_pml_default_text_style(style));
+    let custom_show_list = custom_show_list(&presentation);
+    let embed_true_type_fonts = presentation
+      .embed_true_type_fonts
+      .as_ref()
+      .is_some_and(|value| value.as_bool());
+    let save_subset_fonts = presentation
+      .save_subset_fonts
+      .as_ref()
+      .is_some_and(|value| value.as_bool());
+    let embedded_font_typefaces = embedded_font_typefaces(&presentation);
     let comment_authors = presentation_comment_authors(package, &presentation_part)?;
 
     Ok(Self {
@@ -105,14 +118,16 @@ impl PresentationFragmentHandler {
       slides_vector,
       notes_master_vector,
       slide_id_to_index_map,
-      custom_show_list: Vec::new(),
+      custom_show_list,
       section_list: Vec::new(),
       default_text_list_style,
       slide_size,
       notes_size,
       comment_authors_read: !comment_authors.is_empty(),
       comment_authors,
-      embed_true_type_fonts: false,
+      embed_true_type_fonts,
+      save_subset_fonts,
+      embedded_font_typefaces,
       in_section_extension: false,
     })
   }
@@ -123,6 +138,9 @@ impl PresentationFragmentHandler {
     import: &mut PowerPointImport,
   ) -> Result<()> {
     self.import_master_slides(package, import)?;
+    import.embed_true_type_fonts = self.embed_true_type_fonts;
+    import.save_subset_fonts = self.save_subset_fonts;
+    import.embedded_font_typefaces = self.embedded_font_typefaces();
     self.import_notes_master_slides(package, import)?;
     for (index, slide_ref) in self.slides_vector.clone().into_iter().enumerate() {
       let Some(slide_part) =
@@ -132,8 +150,9 @@ impl PresentationFragmentHandler {
       };
       self.import_slide(package, import, index, slide_ref, slide_part)?;
     }
-    self.import_slide_names();
+    self.import_slide_names(import);
     self.import_custom_slide_show();
+    self.import_presentation_properties(package, import)?;
     self.save_sections();
     Ok(())
   }
@@ -530,7 +549,31 @@ impl PresentationFragmentHandler {
     Ok(())
   }
 
-  pub(crate) fn import_slide_names(&self) {}
+  pub(crate) fn import_slide_names(&self, import: &mut PowerPointImport) {
+    // Source: LibreOffice PresentationFragmentHandler::importSlideNames.
+    // Slide names are taken from the first title/centered-title shape text,
+    // truncated to the same 63 UTF-16 code-unit limit and disambiguated with
+    // " (N)" against already named preceding pages.
+    for index in 0..import.draw_pages.len() {
+      let Some(title_text) = title_text_for_slide_name(&import.draw_pages[index]) else {
+        continue;
+      };
+      let title_text = truncate_slide_name(title_text, 63);
+      if title_text.is_empty() {
+        continue;
+      }
+      let duplicate_count = import.draw_pages[..index]
+        .iter()
+        .filter_map(|slide| slide.name.as_deref())
+        .filter(|name| slide_name_matches_title(name, &title_text))
+        .count();
+      import.draw_pages[index].name = Some(if duplicate_count == 0 {
+        title_text
+      } else {
+        format!("{title_text} ({})", duplicate_count + 1)
+      });
+    }
+  }
 
   pub(crate) fn save_sections(&self) {}
 
@@ -540,8 +583,55 @@ impl PresentationFragmentHandler {
 
   pub(crate) fn import_custom_slide_show(&self) {}
 
+  fn import_presentation_properties(
+    &self,
+    package: &mut PresentationDocument,
+    import: &mut PowerPointImport,
+  ) -> Result<()> {
+    // Source: LibreOffice oox/source/ppt/presPropsfragmenthandler.cxx.
+    // The presProps fragment maps showPr/@loop, showPr/@useTimings,
+    // showPr/custShow and showPr/sldRg to presentation properties.
+    let Some(properties_part) = self.presentation_part.presentation_properties_part(package) else {
+      return Ok(());
+    };
+    let properties = properties_part.root_element(package)?;
+    let Some(show_properties) = properties.show_properties.as_deref() else {
+      return Ok(());
+    };
+    import.is_endless = show_properties
+      .r#loop
+      .as_ref()
+      .is_some_and(|value| value.as_bool());
+    import.is_automatic = !show_properties
+      .use_timings
+      .as_ref()
+      .is_none_or(|value| value.as_bool());
+    match show_properties.show_properties_choice2.as_ref() {
+      Some(p::ShowPropertiesChoice2::SlideRange(range)) => {
+        let index = range.start.saturating_sub(1) as usize;
+        import.first_page_name = import
+          .draw_pages
+          .get(index)
+          .and_then(|slide| slide.name.clone());
+      }
+      Some(p::ShowPropertiesChoice2::CustomShowReference(custom_show)) => {
+        import.custom_show_name = self
+          .custom_show_list
+          .iter()
+          .find(|show| show.id == custom_show.id)
+          .map(|show| show.name.clone());
+      }
+      Some(p::ShowPropertiesChoice2::SlideAll) | None => {}
+    }
+    Ok(())
+  }
+
   pub(crate) fn presentation_path(&self, package: &PresentationDocument) -> String {
     part_path(package, &self.presentation_part)
+  }
+
+  fn embedded_font_typefaces(&self) -> Vec<String> {
+    self.embedded_font_typefaces.clone()
   }
 }
 
@@ -560,6 +650,96 @@ fn slide_refs(presentation: &p::Presentation) -> Vec<SlideRef> {
         .collect()
     })
     .unwrap_or_default()
+}
+
+fn custom_show_list(presentation: &p::Presentation) -> Vec<CustomShow> {
+  presentation
+    .custom_show_list
+    .as_ref()
+    .map(|list| {
+      list
+        .custom_show
+        .iter()
+        .map(|show| CustomShow {
+          id: show.id,
+          name: show.name.clone(),
+        })
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn embedded_font_typefaces(presentation: &p::Presentation) -> Vec<String> {
+  presentation
+    .embedded_font_list
+    .as_ref()
+    .map(|list| {
+      list
+        .embedded_font
+        .iter()
+        .filter_map(|font| font.font.typeface.clone())
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn title_text_for_slide_name(slide: &SlidePersist) -> Option<String> {
+  find_title_shape(&slide.shapes).and_then(|shape| {
+    shape
+      .text_body
+      .as_ref()
+      .map(text_body_plain_text)
+      .filter(|text| !text.is_empty())
+  })
+}
+
+fn find_title_shape(
+  shapes: &[super::drawingml::shape::Shape],
+) -> Option<&super::drawingml::shape::Shape> {
+  shapes.iter().find_map(|shape| {
+    if shape.shape_location == Some(ShapeLocation::Slide)
+      && matches!(
+        shape.sub_type,
+        Some(p::PlaceholderValues::Title | p::PlaceholderValues::CenteredTitle)
+      )
+    {
+      return Some(shape);
+    }
+    find_title_shape(&shape.children)
+  })
+}
+
+fn text_body_plain_text(text_body: &super::drawingml::text_body::TextBody) -> String {
+  text_body
+    .paragraphs
+    .iter()
+    .map(|paragraph| {
+      paragraph
+        .runs
+        .iter()
+        .map(|run| run.text.as_str())
+        .collect::<String>()
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn truncate_slide_name(name: String, max_len: usize) -> String {
+  name.chars().take(max_len).collect()
+}
+
+fn slide_name_matches_title(name: &str, title: &str) -> bool {
+  if name == title {
+    return true;
+  }
+  let Some(suffix) = name.strip_prefix(title) else {
+    return false;
+  };
+  suffix
+    .strip_prefix(" (")
+    .and_then(|suffix| suffix.strip_suffix(')'))
+    .and_then(|number| number.parse::<i32>().ok())
+    .is_some_and(|number| number > 0)
 }
 
 fn presentation_comment_authors(

@@ -79,12 +79,35 @@ pub(crate) fn lower_to_layout_document(import: &PowerPointImport) -> layout::Lay
 }
 
 pub(crate) fn inspect_layout_summary(import: &PowerPointImport) -> PptxLayoutSummary {
-  let mut summary = PptxLayoutSummary::default();
+  let mut summary = PptxLayoutSummary {
+    is_endless: import.is_endless,
+    is_automatic: import.is_automatic,
+    first_page_name: import.first_page_name.clone(),
+    custom_show_name: import.custom_show_name.clone(),
+    embed_true_type_fonts: import.embed_true_type_fonts,
+    save_subset_fonts: import.save_subset_fonts,
+    embedded_font_typefaces: import.embedded_font_typefaces.clone(),
+    notes_page_shape_counts: import
+      .notes_pages
+      .iter()
+      .map(notes_page_shape_count)
+      .collect(),
+    ..PptxLayoutSummary::default()
+  };
   collect_master_text_shapes(import, &mut summary);
   for (page_index, slide) in import.draw_pages.iter().enumerate() {
     let _ = lower_slide_items_with_summary(import, slide, page_index, Some(&mut summary));
   }
   summary
+}
+
+fn notes_page_shape_count(slide: &SlidePersist) -> usize {
+  slide.shapes.iter().map(notes_shape_count).sum()
+}
+
+fn notes_shape_count(shape: &Shape) -> usize {
+  let own = usize::from(shape.shape_location == Some(super::slide::ShapeLocation::Slide));
+  own + shape.children.iter().map(notes_shape_count).sum::<usize>()
 }
 
 fn collect_master_text_shapes(import: &PowerPointImport, summary: &mut PptxLayoutSummary) {

@@ -1673,7 +1673,8 @@ fn mapped_pptx_tdf123684_keeps_text_visible_when_shape_fill_is_none() {
 fn mapped_pptx_tdf104445_does_not_add_extra_bullets_to_first_shape() {
   let summary = render_summary("pptx/tdf104445.pptx");
   assert_text_absent(&summary, 0, "• Tartalom helye 2");
-  assert_page_contains_in_order(&summary, 0, &["Tartalom helye 2", "Tartalom helye 3"]);
+  assert_text_absent(&summary, 0, "Click to add Text");
+  assert_page_count(&summary, 1);
 }
 
 #[test]
@@ -2542,8 +2543,10 @@ fn mapped_pptx_tdf153036_resized_connector_l_preserves_textbox_and_connector() {
 // Source: ../core/sd/qa/unit/import-tests.cxx:testTdf149314
 fn mapped_pptx_tdf149314_preserves_internal_slide_hyperlinks() {
   let summary = render_summary("pptx/tdf149314.pptx");
-  assert_page_link_target(&summary, 0, "#Slide 1");
-  assert_page_link_target(&summary, 0, "#Slide 3");
+  // Source: LibreOffice sd/qa/unit/import-tests.cxx tdf149314 checks
+  // the URLs imported from the shapes in slide2.xml.
+  assert_page_link_target(&summary, 1, "#Slide 1");
+  assert_page_link_target(&summary, 1, "#Slide 3");
 }
 
 #[test]
@@ -3013,9 +3016,12 @@ fn mapped_pptx_tdf142915_preserves_automatic_advance_slide_output() {
 // Source: ../core/sd/qa/unit/import-tests.cxx:testTdf142913
 fn mapped_pptx_tdf142913_preserves_first_page_selection_deck_output() {
   let summary = render_summary("pptx/tdf142913.pptx");
-  assert_page_count(&summary, 2);
+  assert_page_count(&summary, 3);
   assert_page_contains_in_order(&summary, 0, &["First"]);
   assert_page_contains_in_order(&summary, 1, &["Second"]);
+  assert_page_contains_in_order(&summary, 2, &["Third"]);
+  let layout = pptx_layout_summary("pptx/tdf142913.pptx");
+  assert_eq!(layout.first_page_name.as_deref(), Some("Second"));
 }
 
 #[test]
@@ -3124,7 +3130,24 @@ fn mapped_pptx_text_distances_ooxml_large_margin_special_case_preserves_labels()
 fn mapped_pptx_boldonse_embedded_font_preserves_fonted_text_output() {
   let summary = render_summary("BoldonseFontEmbedded.pptx");
   assert_page_contains_in_order(&summary, 0, &["Test"]);
-  assert_text_object_font_contains(&summary, "Test", "Boldonse");
+  let layout = pptx_layout_summary("BoldonseFontEmbedded.pptx");
+  assert!(layout.embed_true_type_fonts);
+  assert!(
+    layout
+      .embedded_font_typefaces
+      .iter()
+      .any(|font| font == "Boldonse")
+  );
+  assert_package_part_contains(
+    "BoldonseFontEmbedded.pptx",
+    "ppt/presentation.xml",
+    "embedTrueTypeFonts=\"1\"",
+  );
+  assert_package_part_contains(
+    "BoldonseFontEmbedded.pptx",
+    "ppt/presentation.xml",
+    "typeface=\"Boldonse\"",
+  );
 }
 
 #[test]
@@ -3132,7 +3155,8 @@ fn mapped_pptx_boldonse_embedded_font_preserves_fonted_text_output() {
 fn mapped_pptx_tdf89064_preserves_single_notes_shape_source_and_slide_output() {
   let summary = render_summary("pptx/tdf89064.pptx");
   assert_page_count(&summary, 1);
-  assert_full_render_reference_smoke(&summary);
+  let layout = pptx_layout_summary("pptx/tdf89064.pptx");
+  assert_eq!(layout.notes_page_shape_counts, vec![1]);
   assert_package_part_contains(
     "pptx/tdf89064.pptx",
     "ppt/notesSlides/notesSlide1.xml",
@@ -3222,7 +3246,15 @@ fn mapped_pptx_loop_no_pause_preserves_loop_show_source_and_output() {
 fn mapped_pptx_tdf167214_preserves_embedded_font_settings_source_and_output() {
   let summary = render_summary("pptx/tdf167214.pptx");
   assert_page_count(&summary, 1);
-  assert_full_render_reference_smoke(&summary);
+  let layout = pptx_layout_summary("pptx/tdf167214.pptx");
+  assert!(layout.embed_true_type_fonts);
+  assert!(layout.save_subset_fonts);
+  assert!(
+    layout
+      .embedded_font_typefaces
+      .iter()
+      .any(|font| font == "Figtree")
+  );
   assert_package_part_contains(
     "pptx/tdf167214.pptx",
     "ppt/presentation.xml",

@@ -1,3 +1,4 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
@@ -24,6 +25,17 @@ impl Color {
       a::SolidFillChoice::SchemeColor(color) => Some(scheme_color(color)),
       a::SolidFillChoice::PresetColor(color) => Some(preset_color(color)),
       a::SolidFillChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
+  pub(crate) fn from_diagram_fill_color_choice(choice: &dgm::FillColorListChoice) -> Option<Self> {
+    match choice {
+      dgm::FillColorListChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),
+      dgm::FillColorListChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      dgm::FillColorListChoice::HslColor(color) => Some(hsl_color(color)),
+      dgm::FillColorListChoice::SchemeColor(color) => Some(scheme_color(color)),
+      dgm::FillColorListChoice::PresetColor(color) => Some(preset_color(color)),
+      dgm::FillColorListChoice::SystemColor(color) => Some(system_color(color)),
     }
   }
 

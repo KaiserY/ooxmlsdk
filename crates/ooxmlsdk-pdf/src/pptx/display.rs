@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -7,11 +8,13 @@ use crate::layout::{
   TextItem,
 };
 use crate::render::chart as shared_chart;
+use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units::DrawingmlPercentageValue;
 
@@ -175,7 +178,11 @@ fn lower_shape(
   offset: DisplayOffset,
   items: &mut Vec<PageItem>,
 ) {
-  if shape.hidden || shape.hidden_master_shape || shape.referenced {
+  if shape.hidden
+    || shape.hidden_master_shape
+    || shape.referenced
+    || is_uninstantiated_placeholder(shape)
+  {
     return;
   }
 
@@ -216,6 +223,12 @@ fn lower_shape(
     lower_chart(import, slide, shape, offset, record, items);
   }
 
+  if shape.frame_type == super::drawingml::shape::FrameType::Diagram
+    && let Some(record) = &shape.graphic_data
+  {
+    lower_diagram(import, slide, shape, offset, record, items);
+  }
+
   if let Some(text_body) = &shape.text_body {
     lower_text_body(import, shape, offset, text_body, items);
   }
@@ -224,6 +237,13 @@ fn lower_shape(
   for child in &shape.children {
     lower_shape(import, slide, child, child_offset, items);
   }
+}
+
+fn is_uninstantiated_placeholder(shape: &Shape) -> bool {
+  shape.sub_type.is_some()
+    && shape
+      .shape_location
+      .is_some_and(|location| location != super::slide::ShapeLocation::Slide)
 }
 
 fn graphic_data_has_structured_identity(record: &GraphicDataRecord) -> bool {
@@ -401,6 +421,151 @@ fn chart_theme<'a>(
     .as_deref()
     .and_then(|path| import.get_theme(path))
     .or_else(|| import.get_current_theme_ptr())
+}
+
+fn lower_diagram(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  shape: &Shape,
+  offset: DisplayOffset,
+  record: &GraphicDataRecord,
+  items: &mut Vec<PageItem>,
+) {
+  let Some(data_resource) = record.diagram_data_resource.as_ref() else {
+    return;
+  };
+  let x_pt = units::emu_to_points(offset.x_emu + shape.position.x);
+  let y_pt = units::emu_to_points(offset.y_emu + shape.position.y);
+  let width_pt = units::emu_to_points(shape.size.cx);
+  let height_pt = units::emu_to_points(shape.size.cy);
+  let fill = diagram_accent_fill(import, slide);
+  if let Some(background_fill) = diagram_background_fill(import, slide, &data_resource.model) {
+    items.push(PageItem::Rect(RectItem {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+      fill_color: Some(background_fill),
+      fill_opacity: 1.0,
+      stroke: None,
+      stroke_opacity: 1.0,
+    }));
+  }
+  let colors = diagram_style_colors(import, slide, record);
+  let shapes = shared_diagram::layout_shapes(
+    &data_resource.model,
+    record
+      .diagram_layout_resource
+      .as_ref()
+      .map(|resource| &resource.layout),
+    colors.as_ref(),
+    shared_diagram::DiagramBounds {
+      x: x_pt,
+      y: y_pt,
+      width: width_pt,
+      height: height_pt,
+    },
+    fill,
+  );
+  for diagram_shape in shapes {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: diagram_shape.x,
+      y_pt: diagram_shape.y,
+      width_pt: diagram_shape.width,
+      height_pt: diagram_shape.height,
+      fill_color: Some(diagram_shape.fill),
+      fill_opacity: 1.0,
+      stroke: Some(BorderStyle::default()),
+      stroke_opacity: 1.0,
+    }));
+    items.push(PageItem::Text(TextItem {
+      x_pt: diagram_shape.x + 6.0,
+      y_pt: diagram_shape.y + (diagram_shape.height - DEFAULT_TEXT_FONT_SIZE_PT).max(0.0) / 2.0,
+      line_height_pt: DEFAULT_TEXT_FONT_SIZE_PT * DEFAULT_TEXT_LINE_HEIGHT_SCALE,
+      text: diagram_shape.text,
+      style: TextStyle {
+        font_size_pt: DEFAULT_TEXT_FONT_SIZE_PT,
+        color: RgbColor { r: 0, g: 0, b: 0 },
+        ..TextStyle::default()
+      },
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+  }
+}
+
+fn diagram_background_fill(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  data: &dgm::DataModelRoot,
+) -> Option<RgbColor> {
+  let fill = match data.background.as_deref()?.background_choice1.as_ref()? {
+    dgm::BackgroundChoice::SolidFill(fill) => fill,
+    _ => return None,
+  };
+  let color = Color::from_solid_fill_choice(fill.solid_fill_choice.as_ref()?)?;
+  let resolved = import.resolve_color_for_slide(slide, &color, None)?;
+  Some(RgbColor {
+    r: resolved.r,
+    g: resolved.g,
+    b: resolved.b,
+  })
+}
+
+fn diagram_style_colors(
+  import: &PowerPointImport,
+  slide: &SlidePersist,
+  record: &GraphicDataRecord,
+) -> Option<shared_diagram::DiagramStyleColors> {
+  let color_resource = record.diagram_color_resource.as_ref()?;
+  let mut fill_by_label = HashMap::new();
+  for label in &color_resource.colors.color_transform_style_label {
+    let Some(fill_list) = label.fill_color_list.as_ref() else {
+      continue;
+    };
+    let fills: Vec<RgbColor> = fill_list
+      .fill_color_list_choice
+      .iter()
+      .filter_map(Color::from_diagram_fill_color_choice)
+      .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
+      .map(|color| RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      })
+      .collect();
+    if !fills.is_empty() {
+      fill_by_label.insert(label.name.clone(), fills);
+    }
+  }
+  (!fill_by_label.is_empty()).then_some(shared_diagram::DiagramStyleColors { fill_by_label })
+}
+
+fn diagram_accent_fill(import: &PowerPointImport, slide: &SlidePersist) -> RgbColor {
+  chart_theme(import, slide)
+    .and_then(|theme| {
+      theme
+        .color_scheme
+        .get_color(a::ColorSchemeIndexValues::Accent1)
+    })
+    .and_then(|color| import.resolve_color_for_slide(slide, color, None))
+    .map(|color| RgbColor {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    })
+    .unwrap_or(RgbColor {
+      r: 0x4f,
+      g: 0x81,
+      b: 0xbd,
+    })
 }
 
 fn lower_picture(

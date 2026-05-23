@@ -64,13 +64,17 @@ impl PptShape {
     let Some(first) = first else {
       return;
     };
-    let master_only = self.shape_location == ShapeLocation::Layout;
+    let candidate_scope = match self.shape_location {
+      ShapeLocation::Layout => PlaceholderCandidateScope::MasterOnly,
+      ShapeLocation::Slide => PlaceholderCandidateScope::InheritedOnly,
+      ShapeLocation::Master => PlaceholderCandidateScope::All,
+    };
     let Some((path, reference)) = find_placeholder_path(
       &slide_persist.shapes,
       first,
       second,
       self.shape.sub_type_index,
-      master_only,
+      candidate_scope,
     ) else {
       return;
     };
@@ -97,13 +101,17 @@ impl PptShape {
     let Some(first) = first else {
       return;
     };
-    let master_only = self.shape_location == ShapeLocation::Layout;
+    let candidate_scope = match self.shape_location {
+      ShapeLocation::Layout => PlaceholderCandidateScope::MasterOnly,
+      ShapeLocation::Slide => PlaceholderCandidateScope::InheritedOnly,
+      ShapeLocation::Master => PlaceholderCandidateScope::All,
+    };
     let Some((path, reference)) = find_placeholder_path(
       &slide_persist.shapes,
       first,
       second,
       self.shape.sub_type_index,
-      master_only,
+      candidate_scope,
     ) else {
       return;
     };
@@ -266,12 +274,29 @@ fn placeholder_candidates(
   }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlaceholderCandidateScope {
+  All,
+  InheritedOnly,
+  MasterOnly,
+}
+
+impl PlaceholderCandidateScope {
+  fn accepts(self, location: Option<ShapeLocation>) -> bool {
+    match self {
+      Self::All => true,
+      Self::InheritedOnly => location != Some(ShapeLocation::Slide),
+      Self::MasterOnly => location == Some(ShapeLocation::Master),
+    }
+  }
+}
+
 fn find_placeholder_path(
   shapes: &[Shape],
   first: p::PlaceholderValues,
   second: Option<p::PlaceholderValues>,
   index: Option<u32>,
-  master_only: bool,
+  scope: PlaceholderCandidateScope,
 ) -> Option<(Vec<usize>, Shape)> {
   let mut choices: [Option<(Vec<usize>, Shape)>; 5] = Default::default();
   find_placeholder_candidates(
@@ -279,7 +304,7 @@ fn find_placeholder_path(
     first,
     second,
     index,
-    master_only,
+    scope,
     &mut Vec::new(),
     &mut choices,
   );
@@ -291,25 +316,17 @@ fn find_placeholder_candidates(
   first: p::PlaceholderValues,
   second: Option<p::PlaceholderValues>,
   index: Option<u32>,
-  master_only: bool,
+  scope: PlaceholderCandidateScope,
   path: &mut Vec<usize>,
   choices: &mut [Option<(Vec<usize>, Shape)>; 5],
 ) {
   for (shape_index, shape) in shapes.iter().enumerate().rev() {
     path.push(shape_index);
-    if !master_only || shape.shape_location == Some(ShapeLocation::Master) {
+    if scope.accepts(shape.shape_location) {
       add_placeholder_choice(shape, first, second, index, path, choices);
     }
     if !shape.children.is_empty() {
-      find_placeholder_candidates(
-        &shape.children,
-        first,
-        second,
-        index,
-        master_only,
-        path,
-        choices,
-      );
+      find_placeholder_candidates(&shape.children, first, second, index, scope, path, choices);
       if choices[0].is_some() {
         path.pop();
         return;

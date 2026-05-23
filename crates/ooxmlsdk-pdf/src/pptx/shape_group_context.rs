@@ -13,7 +13,7 @@ use super::drawingml::shape::{
   CustomShapeGeometry, FrameType, MediaKind, Point, Shape, ShapeService, Size,
 };
 use super::drawingml::shape_properties::EffectProperties;
-use super::drawingml::text_body::{TextBody, TextRun};
+use super::drawingml::text_body::{TextBody, TextRun, TextRunKind};
 use super::shape::PptShape;
 use super::shape_context::PPTShapeContext;
 use super::slide::{ShapeLocation, SlidePersist};
@@ -431,6 +431,9 @@ fn resolve_text_run_hyperlink(slide_persist: &SlidePersist, run: &mut TextRun) {
     .as_deref()
     .and_then(|properties| properties.hyperlink_on_click.as_deref())
     .and_then(|hyperlink| hyperlink_url(slide_persist, hyperlink));
+  if run.hyperlink_url.is_some() && run.kind == TextRunKind::Run {
+    run.kind = TextRunKind::Field;
+  }
 }
 
 fn apply_application_media(

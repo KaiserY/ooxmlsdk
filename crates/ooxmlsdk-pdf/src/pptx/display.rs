@@ -1074,10 +1074,8 @@ fn lower_diagram_text_body_at_with_style_and_scale(
     table_text_style,
     base_font_size_pt,
   );
-  let mut scaled_base_style = base_style.clone();
-  apply_text_scale(&mut scaled_base_style, &options);
   let estimated_height =
-    estimate_text_body_height(text_body, &scaled_base_style, options.line_scale);
+    estimate_wrapped_text_body_height(import, frame, text_body, &base_style, &options);
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
@@ -1177,6 +1175,12 @@ fn diagram_text_body(source: &shared_diagram::DiagramTextBody) -> TextBody {
     .as_deref()
     .map(TextBodyDisplayProperties::from_body_properties)
     .unwrap_or_default();
+  // Source: LibreOffice oox/source/drawingml/diagram/diagramlayoutatoms.cxx
+  // creates SmartArt text shapes from diagram layout constraints first; text
+  // size is then synchronized/autofit inside that fixed layout. Do not apply
+  // the generic DrawingML shape word-wrap default here, or persisted SmartArt
+  // text areas wrap instead of shrinking/syncing in the LO order.
+  display_properties.word_wrap = false;
   if source.auto_fit {
     display_properties.auto_fit = TextAutoFit::Shape;
   }
@@ -3729,10 +3733,8 @@ fn lower_text_body_at_with_style_and_scale(
   options.font_scale = font_scale;
   options.line_scale = line_scale;
 
-  let mut scaled_base_style = base_style.clone();
-  apply_text_scale(&mut scaled_base_style, &options);
   let estimated_height =
-    estimate_text_body_height(text_body, &scaled_base_style, options.line_scale);
+    estimate_wrapped_text_body_height(import, frame, text_body, &base_style, &options);
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
@@ -3940,6 +3942,19 @@ struct TextCursor {
   column_index: usize,
 }
 
+struct TextLineRun<'a> {
+  run: &'a TextRun,
+  text: String,
+  width_pt: f32,
+  style: TextStyle,
+}
+
+#[derive(Default)]
+struct TextLine<'a> {
+  runs: Vec<TextLineRun<'a>>,
+  width_pt: f32,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct TextLoweringOptions {
   font_scale: f32,
@@ -3949,6 +3964,7 @@ struct TextLoweringOptions {
   rotation_center_pt: Option<(f32, f32)>,
   column_count: usize,
   column_spacing_pt: f32,
+  word_wrap: bool,
   clip_vertical_overflow: bool,
   anchor_center: bool,
 }
@@ -3963,6 +3979,7 @@ impl TextLoweringOptions {
       rotation_center_pt: None,
       column_count: text_body.display_properties.column_count.max(1),
       column_spacing_pt: units::emu_to_points(text_body.display_properties.column_spacing_emu),
+      word_wrap: text_body.display_properties.word_wrap,
       clip_vertical_overflow: text_body.display_properties.clip_vertical_overflow
         && text_body.display_properties.auto_fit != TextAutoFit::Shape,
       anchor_center: text_body.display_properties.anchor_center,
@@ -4139,12 +4156,13 @@ fn lower_paragraph(
       .position(|run| run.kind == TextRunKind::Break)
       .map(|offset| segment_start + offset)
       .unwrap_or(paragraph.runs.len());
-    let line_width = paragraph_run_width(
+    let text_lines = layout_text_lines(
       import,
       &paragraph_style,
       base_style,
       options,
       &paragraph.runs[segment_start..segment_end],
+      column_width,
     );
     let alignment =
       if options.anchor_center && paragraph_style.alignment == a::TextAlignmentTypeValues::Left {
@@ -4152,86 +4170,83 @@ fn lower_paragraph(
       } else {
         paragraph_style.alignment
       };
-    let mut run_x = aligned_paragraph_x(paragraph_x, column_width, line_width, alignment);
-    let mut base_line_style = base_style.clone();
-    apply_text_scale(&mut base_line_style, options);
-    let mut max_line_height = paragraph_style.line_height(&base_line_style, options);
 
-    if is_first_segment && let Some(label) = bullet.label.clone() {
-      let mut bullet_style = base_style.clone();
-      paragraph_style.apply_default_run_style(import, &mut bullet_style);
-      if let Some(font) = bullet.font.as_deref() {
-        bullet_style.font_family = Some(Arc::from(font));
-      }
-      apply_text_scale(&mut bullet_style, options);
-      let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
-      max_line_height = max_line_height.max(bullet_line_height);
-      if let Some(graphic) = bullet_graphic_item(
-        &bullet,
-        image_resources,
-        run_x + paragraph_style.indent_pt,
-        cursor.y_pt,
-        &bullet_style,
-        shape_hyperlink_url,
-      ) {
-        items.push(PageItem::Image(graphic));
-      } else {
-        push_text_item(
-          items,
+    for (line_index, text_line) in text_lines.iter().enumerate() {
+      let mut run_x = aligned_paragraph_x(paragraph_x, column_width, text_line.width_pt, alignment);
+      let mut base_line_style = base_style.clone();
+      apply_text_scale(&mut base_line_style, options);
+      let mut max_line_height = paragraph_style.line_height(&base_line_style, options);
+
+      if is_first_segment
+        && line_index == 0
+        && let Some(label) = bullet.label.clone()
+      {
+        let mut bullet_style = base_style.clone();
+        paragraph_style.apply_default_run_style(import, &mut bullet_style);
+        if let Some(font) = bullet.font.as_deref() {
+          bullet_style.font_family = Some(Arc::from(font));
+        }
+        apply_text_scale(&mut bullet_style, options);
+        let bullet_line_height = paragraph_style.line_height(&bullet_style, options);
+        max_line_height = max_line_height.max(bullet_line_height);
+        if let Some(graphic) = bullet_graphic_item(
+          &bullet,
+          image_resources,
           run_x + paragraph_style.indent_pt,
           cursor.y_pt,
-          label,
-          bullet_style,
-          shape_hyperlink_url.map(ToString::to_string),
-          bullet_line_height,
-          options.rotation_center_pt,
-        );
+          &bullet_style,
+          shape_hyperlink_url,
+        ) {
+          items.push(PageItem::Image(graphic));
+        } else {
+          push_text_item(
+            items,
+            run_x + paragraph_style.indent_pt,
+            cursor.y_pt,
+            label,
+            bullet_style,
+            shape_hyperlink_url.map(ToString::to_string),
+            bullet_line_height,
+            options.rotation_center_pt,
+          );
+        }
       }
-    }
 
-    for run in &paragraph.runs[segment_start..segment_end] {
-      if !matches!(
-        run.kind,
-        TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
-      ) || run.text.is_empty()
-      {
-        continue;
-      }
-      let mut style = base_style.clone();
-      paragraph_style.apply_default_run_style(import, &mut style);
-      apply_run_properties(import, run, &mut style);
-      apply_text_scale(&mut style, options);
-      let run_line_height = paragraph_style.line_height(&style, options);
-      max_line_height = max_line_height.max(run_line_height);
-      let text = run_text(run, &style);
-      if run.kind == TextRunKind::Math {
-        push_math_ole_preview_item(
+      for line_run in &text_line.runs {
+        let style = line_run.style.clone();
+        let run_line_height = paragraph_style.line_height(&style, options);
+        max_line_height = max_line_height.max(run_line_height);
+        if line_run.run.kind == TextRunKind::Math {
+          push_math_ole_preview_item(
+            items,
+            run_x,
+            cursor.y_pt,
+            line_run.width_pt,
+            run_line_height,
+          );
+        }
+        let hyperlink_url = line_run
+          .run
+          .hyperlink_url
+          .clone()
+          .or_else(|| shape_hyperlink_url.map(ToString::to_string));
+        push_symbol_split_text_items(
           items,
           run_x,
           cursor.y_pt,
-          measure_text(&text, &style),
+          &line_run.text,
+          &style,
           run_line_height,
+          hyperlink_url,
+          options.rotation_center_pt,
         );
+        run_x += line_run.width_pt;
       }
-      let hyperlink_url = run
-        .hyperlink_url
-        .clone()
-        .or_else(|| shape_hyperlink_url.map(ToString::to_string));
-      push_symbol_split_text_items(
-        items,
-        run_x,
-        cursor.y_pt,
-        &text,
-        &style,
-        run_line_height,
-        hyperlink_url,
-        options.rotation_center_pt,
-      );
-      run_x += measure_text(&text, &style);
+
+      cursor.y_pt += max_line_height;
+      advance_text_column_if_needed(cursor, frame, *options);
     }
 
-    cursor.y_pt += max_line_height;
-    advance_text_column_if_needed(cursor, frame, *options);
     if segment_end == paragraph.runs.len() {
       break;
     }
@@ -4240,14 +4255,15 @@ fn lower_paragraph(
   }
 }
 
-fn paragraph_run_width(
+fn layout_text_lines<'a>(
   import: &PowerPointImport,
   paragraph_style: &ParagraphDisplayStyle,
   base_style: &TextStyle,
   options: &TextLoweringOptions,
-  runs: &[TextRun],
-) -> f32 {
-  runs
+  runs: &'a [TextRun],
+  column_width: f32,
+) -> Vec<TextLine<'a>> {
+  let visible_runs = runs
     .iter()
     .filter(|run| {
       matches!(
@@ -4255,14 +4271,116 @@ fn paragraph_run_width(
         TextRunKind::Run | TextRunKind::Field | TextRunKind::Math
       ) && !run.text.is_empty()
     })
-    .map(|run| {
-      let mut style = base_style.clone();
-      paragraph_style.apply_default_run_style(import, &mut style);
-      apply_run_properties(import, run, &mut style);
-      apply_text_scale(&mut style, options);
-      measure_text(&run_text(run, &style), &style)
-    })
-    .sum()
+    .collect::<Vec<_>>();
+  if visible_runs.is_empty() {
+    return vec![TextLine::default()];
+  }
+
+  let mut lines = Vec::new();
+  let mut current = TextLine::default();
+  for run in visible_runs {
+    let style = styled_text_run(import, paragraph_style, base_style, options, run);
+    let text = run_text(run, &style);
+    for hard_line in text.split_inclusive('\n') {
+      let (line_text, has_hard_break) = hard_line
+        .strip_suffix('\n')
+        .map_or((hard_line, false), |text| (text, true));
+      for token in text_wrap_tokens(line_text) {
+        let width_pt = measure_text(token, &style);
+        if options.word_wrap
+          && current.width_pt > f32::EPSILON
+          && current.width_pt + width_pt > column_width
+        {
+          trim_text_line_end(&mut current);
+          lines.push(current);
+          current = TextLine::default();
+        }
+        push_text_line_token(&mut current, run, token, width_pt, &style);
+      }
+      if has_hard_break {
+        trim_text_line_end(&mut current);
+        lines.push(current);
+        current = TextLine::default();
+      }
+    }
+  }
+  trim_text_line_end(&mut current);
+  lines.push(current);
+  lines
+}
+
+fn push_text_line_token<'a>(
+  line: &mut TextLine<'a>,
+  run: &'a TextRun,
+  token: &str,
+  width_pt: f32,
+  style: &TextStyle,
+) {
+  line.width_pt += width_pt;
+  if let Some(last) = line.runs.last_mut()
+    && std::ptr::eq(last.run, run)
+  {
+    last.text.push_str(token);
+    last.width_pt += width_pt;
+    return;
+  }
+  line.runs.push(TextLineRun {
+    run,
+    text: token.to_string(),
+    width_pt,
+    style: style.clone(),
+  });
+}
+
+fn text_wrap_tokens(text: &str) -> Vec<&str> {
+  if text.is_empty() {
+    return Vec::new();
+  }
+  let mut tokens = Vec::new();
+  let mut start = 0usize;
+  for (index, ch) in text.char_indices() {
+    if ch.is_whitespace() {
+      let end = index + ch.len_utf8();
+      tokens.push(&text[start..end]);
+      start = end;
+    }
+  }
+  if start < text.len() {
+    tokens.push(&text[start..]);
+  }
+  tokens
+}
+
+fn trim_text_line_end(line: &mut TextLine<'_>) {
+  while let Some(run) = line.runs.last_mut() {
+    let trimmed_len = run.text.trim_end().len();
+    if trimmed_len == run.text.len() {
+      break;
+    }
+    let trimmed = run.text[..trimmed_len].to_string();
+    let removed_width = run.width_pt - measure_text(&trimmed, &run.style);
+    run.text = trimmed;
+    run.width_pt -= removed_width;
+    line.width_pt -= removed_width;
+    if !run.text.is_empty() {
+      break;
+    }
+    line.runs.pop();
+  }
+}
+
+fn styled_text_run(
+  import: &PowerPointImport,
+  paragraph_style: &ParagraphDisplayStyle,
+  base_style: &TextStyle,
+  options: &TextLoweringOptions,
+  run: &TextRun,
+) -> TextStyle {
+  let mut style = base_style.clone();
+  paragraph_style.apply_default_run_style(import, &mut style);
+  apply_run_properties(import, run, &mut style);
+  apply_text_scale(&mut style, options);
+  style
 }
 
 fn apply_text_scale(style: &mut TextStyle, options: &TextLoweringOptions) {
@@ -4463,21 +4581,6 @@ fn line_height(style: &TextStyle, line_scale: f32) -> f32 {
   style.font_size_pt * DEFAULT_TEXT_LINE_HEIGHT_SCALE * line_scale
 }
 
-fn estimate_text_body_height(text_body: &TextBody, base_style: &TextStyle, line_scale: f32) -> f32 {
-  let mut height = 0.0;
-  for paragraph in &text_body.paragraphs {
-    let paragraph_style = ParagraphDisplayStyle::from_paragraph(paragraph);
-    let lines = paragraph
-      .runs
-      .iter()
-      .filter(|run| run.kind == TextRunKind::Break)
-      .count()
-      + 1;
-    height += lines as f32 * paragraph_style.line_height_with_scale(base_style, line_scale);
-  }
-  height
-}
-
 fn estimate_wrapped_text_body_height(
   import: &PowerPointImport,
   frame: TextFrame,
@@ -4493,8 +4596,19 @@ fn estimate_wrapped_text_body_height(
     paragraph_style.apply_default_run_style(import, &mut paragraph_base_style);
     apply_text_scale(&mut paragraph_base_style, options);
     for runs in paragraph.runs.split(|run| run.kind == TextRunKind::Break) {
-      let width = paragraph_run_width(import, &paragraph_style, base_style, options, runs);
-      let lines = (width / column_width).ceil().max(1.0);
+      let lines = if options.word_wrap {
+        layout_text_lines(
+          import,
+          &paragraph_style,
+          base_style,
+          options,
+          runs,
+          column_width,
+        )
+        .len() as f32
+      } else {
+        1.0
+      };
       height += lines * paragraph_style.line_height(&paragraph_base_style, options);
     }
   }

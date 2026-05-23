@@ -3,6 +3,10 @@
     {
       "ClassName": "RelationshipIds",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Point",
+      "ParentChoiceHasAnyIn": ["PointList"]
     }
   ]
 }

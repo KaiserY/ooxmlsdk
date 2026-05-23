@@ -1,7 +1,10 @@
 use ooxmlsdk::schemas::{
+  schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_presentationml_2006_main as p,
 };
+
+use crate::render::math::text_math_text;
 
 use super::text_list_style::{TextListParagraphStyle, TextListParagraphStyleRef, TextListStyle};
 
@@ -96,6 +99,17 @@ impl TextBody {
     )
   }
 
+  pub(crate) fn from_diagram_drawing(source: &dsp::TextBody) -> Self {
+    // Source: LibreOffice oox/source/drawingml/textbodycontext.cxx
+    // Diagram drawing text bodies are regular DrawingML text bodies inside
+    // dsp:sp. Import them through the same text body model as p:txBody.
+    Self::from_parts(
+      &source.body_properties,
+      source.list_style.as_deref(),
+      &source.paragraph,
+    )
+  }
+
   fn from_parts(
     body_properties: &a::BodyProperties,
     list_style: Option<&a::ListStyle>,
@@ -140,7 +154,7 @@ impl Default for TextBodyDisplayProperties {
 }
 
 impl TextBodyDisplayProperties {
-  fn from_body_properties(properties: &a::BodyProperties) -> Self {
+  pub(crate) fn from_body_properties(properties: &a::BodyProperties) -> Self {
     // Source: LibreOffice oox/source/drawingml/textbodypropertiescontext.cxx
     // TextBodyPropertiesContext maps CT_TextBodyProperties into a stable text
     // property bag before any shape is created. Keep these as typed PPTX text
@@ -315,8 +329,8 @@ impl TextRun {
         run_properties: field.run_properties.clone(),
         field_paragraph_properties: field.paragraph_properties.clone(),
       }),
-      a::ParagraphChoice::TextMath(_) => Some(Self {
-        text: String::new(),
+      a::ParagraphChoice::TextMath(math) => Some(Self {
+        text: text_math_text(math),
         kind: TextRunKind::Math,
         hyperlink_url: None,
         field_type: None,

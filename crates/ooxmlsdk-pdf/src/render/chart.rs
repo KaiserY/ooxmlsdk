@@ -1,6 +1,8 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 
+use crate::render::math::text_math_text;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ChartKind {
   Pie,
@@ -460,7 +462,8 @@ fn push_rich_texts(texts: &mut Vec<String>, paragraphs: &[a::Paragraph]) {
             text.push_str(value);
           }
         }
-        a::ParagraphChoice::Break(_) | a::ParagraphChoice::TextMath(_) => {}
+        a::ParagraphChoice::Break(_) => {}
+        a::ParagraphChoice::TextMath(math) => text.push_str(&text_math_text(math)),
       }
     }
     push_unique_text(texts, &text);

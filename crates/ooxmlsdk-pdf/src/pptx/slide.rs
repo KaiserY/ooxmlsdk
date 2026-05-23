@@ -25,6 +25,7 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::docx::PageSetup;
 use crate::error::Result;
+use crate::render::math::text_math_text;
 use crate::units;
 
 use super::drawingml::color::Color;
@@ -338,6 +339,7 @@ impl DiagramColorResource {
 pub(crate) struct DiagramDrawingResource {
   pub(crate) path: Option<String>,
   pub(crate) drawing: dsp::Drawing,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
 }
 
 impl DiagramDrawingResource {
@@ -819,7 +821,7 @@ fn text_from_dml_paragraphs(paragraphs: &[a::Paragraph]) -> Option<String> {
             text.push_str(field_text);
           }
         }
-        a::ParagraphChoice::TextMath(_) => {}
+        a::ParagraphChoice::TextMath(math) => text.push_str(&text_math_text(math)),
       }
     }
   }
@@ -1104,6 +1106,7 @@ impl SlidePersist {
       })
       .collect();
     for (relationship_id, diagram_part) in diagram_data_parts {
+      self.import_image_parts(package, &diagram_part);
       self.diagram_data_resources.insert(
         relationship_id,
         DiagramDataResource {
@@ -1181,6 +1184,7 @@ impl SlidePersist {
         DiagramDrawingResource {
           path: diagram_part.path(package).map(str::to_string),
           drawing: diagram_part.root_element(package)?.clone(),
+          image_resources: collect_image_resources(package, &diagram_part),
         },
       );
     }

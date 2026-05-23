@@ -6142,7 +6142,15 @@ fn diagram_text_fill_colors_by_model_id(
   }
 
   let mut colors = HashMap::new();
-  for point in &data.point_list.point {
+  for point in data
+    .point_list
+    .xml_children
+    .iter()
+    .filter_map(|child| match child {
+      dgm::PointListChoice::Point(point) => Some(point.as_ref()),
+      dgm::PointListChoice::XmlAny(_) => None,
+    })
+  {
     let Some(style_label) = point
       .property_set
       .as_deref()

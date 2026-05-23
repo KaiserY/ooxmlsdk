@@ -39,6 +39,21 @@ impl Color {
     }
   }
 
+  pub(crate) fn from_diagram_text_fill_color_choice(
+    choice: &dgm::TextFillColorListChoice,
+  ) -> Option<Self> {
+    match choice {
+      dgm::TextFillColorListChoice::RgbColorModelPercentage(color) => {
+        Some(rgb_percent_color(color))
+      }
+      dgm::TextFillColorListChoice::RgbColorModelHex(color) => Some(rgb_hex_color(color)),
+      dgm::TextFillColorListChoice::HslColor(color) => Some(hsl_color(color)),
+      dgm::TextFillColorListChoice::SchemeColor(color) => Some(scheme_color(color)),
+      dgm::TextFillColorListChoice::PresetColor(color) => Some(preset_color(color)),
+      dgm::TextFillColorListChoice::SystemColor(color) => Some(system_color(color)),
+    }
+  }
+
   pub(crate) fn from_fill_reference_choice(choice: &a::FillReferenceChoice) -> Option<Self> {
     match choice {
       a::FillReferenceChoice::RgbColorModelPercentage(color) => Some(rgb_percent_color(color)),

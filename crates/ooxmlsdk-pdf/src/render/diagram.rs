@@ -1,8 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
+use ooxmlsdk::schemas::{
+  schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+  schemas_openxmlformats_org_drawingml_2006_main as a,
+};
+use ooxmlsdk::simple_type::Coordinate32Value;
 
 use crate::docx::RgbColor;
+use crate::render::math::text_math_text;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DiagramShape {
@@ -10,14 +15,237 @@ pub(crate) struct DiagramShape {
   pub(crate) y: f32,
   pub(crate) width: f32,
   pub(crate) height: f32,
-  pub(crate) text: String,
+  pub(crate) text_body: DiagramTextBody,
+  pub(crate) shape_properties: Option<Box<dgm::ShapeProperties>>,
+  pub(crate) style: Option<Box<dgm::Style>>,
+  pub(crate) text_fill: Option<RgbColor>,
+  pub(crate) text_rotation_deg: f32,
   pub(crate) fill: RgbColor,
   pub(crate) order: usize,
+  pub(crate) font_size_pt: Option<f32>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct DiagramTextBody {
+  pub(crate) body_properties: Option<Box<a::BodyProperties>>,
+  pub(crate) list_style: Option<Box<a::ListStyle>>,
+  pub(crate) auto_fit: bool,
+  pub(crate) paragraphs: Vec<DiagramTextParagraph>,
+  custom_text: bool,
+}
+
+impl DiagramTextBody {
+  pub(crate) fn is_empty(&self) -> bool {
+    self.paragraphs.iter().all(DiagramTextParagraph::is_empty)
+  }
+
+  fn append_point(&mut self, point: &dgm::Point, depth: i32) {
+    let Some(text_body) = point.text_body.as_deref() else {
+      return;
+    };
+    if text_body
+      .paragraph
+      .first()
+      .is_none_or(|paragraph| paragraph.paragraph_choice.is_empty())
+    {
+      return;
+    }
+    if self.body_properties.is_none() {
+      self.body_properties = Some(text_body.body_properties.clone());
+      self.list_style = text_body.list_style.clone();
+      self.custom_text = point
+        .property_set
+        .as_deref()
+        .and_then(|properties| properties.text_changed)
+        .is_some_and(|value| value.as_bool());
+    }
+    let first_paragraph_properties = text_body
+      .paragraph
+      .first()
+      .and_then(|paragraph| paragraph.paragraph_properties.clone());
+    for paragraph in &text_body.paragraph {
+      let mut diagram_paragraph =
+        DiagramTextParagraph::from_dml_runs(paragraph, first_paragraph_properties.clone());
+      if depth != -1 {
+        diagram_paragraph.apply_binding_depth(depth);
+      }
+      self.paragraphs.push(diagram_paragraph);
+    }
+  }
+
+  fn apply_primary_font_size(&mut self, font_size_pt: f32) {
+    let font_size = (font_size_pt * 100.0).round() as i32;
+    for paragraph in &mut self.paragraphs {
+      for run in &mut paragraph.runs {
+        run.apply_primary_font_size(font_size);
+      }
+    }
+  }
+
+  fn enable_auto_fit_if_default_text(&mut self) {
+    if !self.custom_text {
+      self.auto_fit = true;
+    }
+  }
+
+  fn apply_text_margins(&mut self, shape_width_pt: f32, constraints: &[DiagramConstraint]) {
+    for constraint in constraints {
+      if constraint.reference != dgm::ConstraintValues::Width
+        || (!constraint.for_name.is_empty())
+        || !matches!(
+          constraint.target,
+          dgm::ConstraintValues::LeftMargin
+            | dgm::ConstraintValues::RightMargin
+            | dgm::ConstraintValues::TopMargin
+            | dgm::ConstraintValues::BottomMargin
+        )
+      {
+        continue;
+      }
+      let margin = Coordinate32Value::Emu(points_to_emu(shape_width_pt * constraint.factor));
+      let mut body_properties = self.body_properties.clone().unwrap_or_default();
+      match constraint.target {
+        dgm::ConstraintValues::LeftMargin => body_properties.left_inset = Some(margin),
+        dgm::ConstraintValues::RightMargin => body_properties.right_inset = Some(margin),
+        dgm::ConstraintValues::TopMargin => body_properties.top_inset = Some(margin),
+        dgm::ConstraintValues::BottomMargin => body_properties.bottom_inset = Some(margin),
+        _ => {}
+      }
+      self.body_properties = Some(body_properties);
+    }
+  }
+
+  fn set_vertical_anchor(&mut self, anchor: a::TextAnchoringTypeValues) {
+    let mut body_properties = self.body_properties.clone().unwrap_or_default();
+    body_properties.anchor = Some(anchor);
+    self.body_properties = Some(body_properties);
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct DiagramTextParagraph {
+  pub(crate) level: Option<u8>,
+  pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
+  pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
+  pub(crate) runs: Vec<DiagramTextRun>,
+}
+
+impl DiagramTextParagraph {
+  fn from_dml_runs(
+    source: &a::Paragraph,
+    paragraph_properties: Option<Box<a::ParagraphProperties>>,
+  ) -> Self {
+    let level = paragraph_properties
+      .as_ref()
+      .and_then(|properties| properties.level)
+      .map(|level| level as u8);
+    Self {
+      level,
+      paragraph_properties,
+      end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
+      runs: source
+        .paragraph_choice
+        .iter()
+        .filter_map(DiagramTextRun::from_dml)
+        .collect(),
+    }
+  }
+
+  fn is_empty(&self) -> bool {
+    self.runs.iter().all(|run| run.text.trim().is_empty())
+  }
+
+  fn apply_binding_depth(&mut self, depth: i32) {
+    let clamped_depth = depth.clamp(0, 8);
+    if self
+      .paragraph_properties
+      .as_ref()
+      .and_then(|properties| properties.level)
+      .is_none()
+    {
+      self.level = Some(clamped_depth as u8);
+      let mut properties = self.paragraph_properties.clone().unwrap_or_default();
+      properties.level = Some(clamped_depth);
+      self.paragraph_properties = Some(properties);
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DiagramTextRun {
+  pub(crate) text: String,
+  pub(crate) kind: DiagramTextRunKind,
+  pub(crate) field_type: Option<String>,
+  pub(crate) run_properties: Option<Box<a::RunProperties>>,
+  pub(crate) field_paragraph_properties: Option<Box<a::ParagraphProperties>>,
+}
+
+impl DiagramTextRun {
+  fn from_dml(choice: &a::ParagraphChoice) -> Option<Self> {
+    match choice {
+      a::ParagraphChoice::Run(run) => Some(Self {
+        text: run.text.clone(),
+        kind: DiagramTextRunKind::Run,
+        field_type: None,
+        run_properties: run.run_properties.clone(),
+        field_paragraph_properties: None,
+      }),
+      a::ParagraphChoice::Break(line_break) => Some(Self {
+        text: "\n".to_string(),
+        kind: DiagramTextRunKind::Break,
+        field_type: None,
+        run_properties: line_break.run_properties.clone(),
+        field_paragraph_properties: None,
+      }),
+      a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| Self {
+        text: text.clone(),
+        kind: DiagramTextRunKind::Field,
+        field_type: field.r#type.clone(),
+        run_properties: field.run_properties.clone(),
+        field_paragraph_properties: field.paragraph_properties.clone(),
+      }),
+      a::ParagraphChoice::TextMath(math) => Some(Self {
+        text: text_math_text(math),
+        kind: DiagramTextRunKind::Math,
+        field_type: None,
+        run_properties: None,
+        field_paragraph_properties: None,
+      }),
+    }
+  }
+
+  fn apply_primary_font_size(&mut self, font_size: i32) {
+    if matches!(
+      self.kind,
+      DiagramTextRunKind::Run | DiagramTextRunKind::Field | DiagramTextRunKind::Math
+    ) {
+      let mut properties = self.run_properties.clone().unwrap_or_default();
+      if properties.font_size.is_none() {
+        properties.font_size = Some(font_size);
+      }
+      self.run_properties = Some(properties);
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum DiagramTextRunKind {
+  #[default]
+  Run,
+  Break,
+  Field,
+  Math,
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DiagramStyleColors {
   pub(crate) fill_by_label: HashMap<String, Vec<RgbColor>>,
+  pub(crate) text_fill_by_label: HashMap<String, Vec<RgbColor>>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct DiagramStyles {
+  pub(crate) style_by_label: HashMap<String, Box<dgm::Style>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -31,6 +259,7 @@ pub(crate) struct DiagramBounds {
 pub(crate) fn layout_shapes(
   data: &dgm::DataModelRoot,
   layout: Option<&dgm::LayoutDefinition>,
+  styles: Option<&DiagramStyles>,
   colors: Option<&DiagramStyleColors>,
   bounds: DiagramBounds,
   accent_fill: RgbColor,
@@ -40,7 +269,8 @@ pub(crate) fn layout_shapes(
   // diagram data model, then applies layout atoms. This is the shared entry
   // point for that same model-to-shapes stage.
   if let Some(layout) = layout
-    && let Some(mut tree) = build_diagram_shape_tree(data, layout, colors, accent_fill, bounds)
+    && let Some(mut tree) =
+      build_diagram_shape_tree(data, layout, styles, colors, accent_fill, bounds)
   {
     layout_diagram_shape_tree(&mut tree);
     let mut shapes = Vec::new();
@@ -48,65 +278,41 @@ pub(crate) fn layout_shapes(
     return shapes;
   }
 
-  let mut nodes = ordered_document_nodes(data, layout, colors, accent_fill);
-  nodes.retain(|node| !node.text.is_empty());
-  nodes.sort_by_key(|node| node.order);
-  if nodes.is_empty() || bounds.width <= 0.0 || bounds.height <= 0.0 {
-    return Vec::new();
-  }
-
-  match root_algorithm(data, layout) {
-    Some(algorithm) if algorithm.kind == dgm::AlgorithmValues::Snake => {
-      snake_layout(&nodes, bounds, algorithm.reverse)
-    }
-    Some(algorithm)
-      if matches!(
-        algorithm.kind,
-        dgm::AlgorithmValues::Linear | dgm::AlgorithmValues::Composite
-      ) =>
-    {
-      linear_layout(
-        &nodes,
-        bounds,
-        algorithm.reverse,
-        algorithm.kind == dgm::AlgorithmValues::Linear,
-      )
-    }
-    Some(algorithm) if algorithm.kind == dgm::AlgorithmValues::Cycle => {
-      cycle_layout(&nodes, bounds, algorithm.reverse)
-    }
-    _ => snake_layout(&nodes, bounds, false),
-  }
-}
-
-#[derive(Clone, Debug)]
-struct DiagramNode {
-  text: String,
-  fill: RgbColor,
-  preferred_height: Option<f32>,
-  height_width_factor: Option<f32>,
-  order: usize,
-  depth: usize,
+  Vec::new()
 }
 
 #[derive(Clone, Debug)]
 struct DiagramShapeNode {
   internal_name: String,
-  text: String,
+  text_body: DiagramTextBody,
   fill: RgbColor,
   x: f32,
   y: f32,
   width: f32,
   height: f32,
-  algorithm: Option<LayoutAlgorithm>,
+  algorithms: Vec<LayoutAlgorithm>,
   child_order: dgm::ChildOrderValues,
   has_geometry: bool,
   hidden_geometry: bool,
   is_connector: bool,
+  shape_properties: Option<Box<dgm::ShapeProperties>>,
+  style: Option<Box<dgm::Style>>,
+  text_fill: Option<RgbColor>,
+  text_rotation_deg: f32,
+  aspect_ratio: f32,
+  data_node_type: Option<dgm::ElementValues>,
+  font_size_pt: Option<f32>,
   order: usize,
   constraints: Vec<DiagramConstraint>,
+  direct_constraints: Vec<DiagramConstraint>,
   rules: Vec<DiagramRule>,
   children: Vec<DiagramShapeNode>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PresentationDataBinding<'a> {
+  point: &'a dgm::Point,
+  depth: i32,
 }
 
 #[derive(Clone, Debug)]
@@ -117,8 +323,6 @@ struct DiagramConstraint {
   value: f32,
   target: dgm::ConstraintValues,
   reference: dgm::ConstraintValues,
-  operator: dgm::BoolOperatorValues,
-  r#for: Option<dgm::ConstraintRelationshipValues>,
   point_type: Option<dgm::ElementValues>,
 }
 
@@ -130,13 +334,16 @@ struct DiagramRule {
 #[derive(Clone, Copy, Debug)]
 struct LayoutAlgorithm {
   kind: dgm::AlgorithmValues,
-  reverse: bool,
   linear_direction: LinearDirection,
-  secondary_linear_direction: Option<LinearDirection>,
+  secondary_linear_direction: LinearDirection,
+  grow_direction: GrowDirection,
+  continue_direction: ContinueDirection,
   start_angle: f32,
   span_angle: f32,
   center_shape_mapping_first_node: bool,
-  aspect_ratio: f32,
+  aspect_ratio: Option<f32>,
+  auto_text_rotation: Option<dgm::AutoTextRotationValues>,
+  text_anchor_vertical: dgm::TextAnchorVerticalValues,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -148,113 +355,25 @@ enum LinearDirection {
   FromBottom,
 }
 
-fn ordered_document_nodes(
-  data: &dgm::DataModelRoot,
-  layout: Option<&dgm::LayoutDefinition>,
-  colors: Option<&DiagramStyleColors>,
-  fallback_fill: RgbColor,
-) -> Vec<DiagramNode> {
-  let points = &data.point_list.point;
-  if let Some(nodes) = ordered_presentation_nodes(
-    data,
-    layout,
-    layout_node_metrics(layout),
-    colors,
-    fallback_fill,
-  ) {
-    return nodes;
-  }
-
-  let Some(root_id) = points
-    .iter()
-    .find(|point| point.r#type == Some(dgm::PointValues::Document))
-    .map(|point| point.model_id.as_str().to_string())
-  else {
-    return Vec::new();
-  };
-
-  let mut nodes = Vec::new();
-  if let Some(connections) = data.connection_list.as_ref() {
-    let point_by_id: HashMap<&str, &dgm::Point> = points
-      .iter()
-      .map(|point| (point.model_id.as_str(), point))
-      .collect();
-    let presentation_by_data = presentation_points_by_data(points, connections);
-    let mut children_by_source: HashMap<&str, Vec<&dgm::Connection>> = HashMap::new();
-    for connection in &connections.connection {
-      if connection
-        .r#type
-        .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
-      {
-        children_by_source
-          .entry(connection.source_id.as_str())
-          .or_default()
-          .push(connection);
-      }
-    }
-    for child_connections in children_by_source.values_mut() {
-      child_connections.sort_by_key(|connection| connection.source_position);
-    }
-    let mut visited = HashSet::new();
-    append_document_nodes(
-      root_id.as_str(),
-      0,
-      &point_by_id,
-      &children_by_source,
-      &presentation_by_data,
-      &mut visited,
-      &mut nodes,
-      colors,
-      fallback_fill,
-    );
-  }
-  if !nodes.is_empty() {
-    return nodes;
-  }
-
-  points
-    .iter()
-    .filter(|point| {
-      point
-        .r#type
-        .is_none_or(|kind| kind == dgm::PointValues::Node)
-    })
-    .map(|point| DiagramNode {
-      text: point_text(point),
-      fill: fallback_fill,
-      preferred_height: None,
-      height_width_factor: None,
-      order: usize::MAX,
-      depth: 0,
-    })
-    .collect()
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum GrowDirection {
+  #[default]
+  TopLeft,
+  TopRight,
+  BottomLeft,
+  BottomRight,
 }
 
-fn presentation_points_by_data<'a>(
-  points: &'a [dgm::Point],
-  connections: &'a dgm::ConnectionList,
-) -> HashMap<&'a str, &'a dgm::Point> {
-  let point_by_id: HashMap<&str, &dgm::Point> = points
-    .iter()
-    .map(|point| (point.model_id.as_str(), point))
-    .collect();
-  connections
-    .connection
-    .iter()
-    .filter(|connection| connection.r#type == Some(dgm::ConnectionValues::PresentationOf))
-    .filter_map(|connection| {
-      Some((
-        connection.source_id.as_str(),
-        *point_by_id.get(connection.destination_id.as_str())?,
-      ))
-    })
-    .collect()
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ContinueDirection {
+  #[default]
+  SameDirection,
+  ReverseDirection,
 }
 
 pub(crate) fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
-  let data_orders: HashMap<&str, usize> = data
-    .point_list
-    .point
+  let points = diagram_points(data);
+  let data_orders: HashMap<&str, usize> = points
     .iter()
     .enumerate()
     .filter(|(_, point)| {
@@ -279,11 +398,22 @@ pub(crate) fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashM
     .collect()
 }
 
-fn document_node_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
-  let mut orders = HashMap::new();
-  let Some(root_id) = data
+fn diagram_points(data: &dgm::DataModelRoot) -> Vec<&dgm::Point> {
+  data
     .point_list
-    .point
+    .xml_children
+    .iter()
+    .filter_map(|child| match child {
+      dgm::PointListChoice::Point(point) => Some(point.as_ref()),
+      dgm::PointListChoice::XmlAny(_) => None,
+    })
+    .collect()
+}
+
+fn document_node_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
+  let points = diagram_points(data);
+  let mut orders = HashMap::new();
+  let Some(root_id) = points
     .iter()
     .find(|point| point.r#type == Some(dgm::PointValues::Document))
     .map(|point| point.model_id.as_str())
@@ -293,10 +423,9 @@ fn document_node_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
   let Some(connections) = data.connection_list.as_ref() else {
     return orders;
   };
-  let point_by_id: HashMap<&str, &dgm::Point> = data
-    .point_list
-    .point
+  let point_by_id: HashMap<&str, &dgm::Point> = points
     .iter()
+    .copied()
     .map(|point| (point.model_id.as_str(), point))
     .collect();
   let mut children_by_source: HashMap<&str, Vec<&dgm::Connection>> = HashMap::new();
@@ -325,88 +454,6 @@ fn document_node_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
   orders
 }
 
-fn document_node_depths(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
-  let mut depths = HashMap::new();
-  let Some(root_id) = data
-    .point_list
-    .point
-    .iter()
-    .find(|point| point.r#type == Some(dgm::PointValues::Document))
-    .map(|point| point.model_id.as_str())
-  else {
-    return depths;
-  };
-  let Some(connections) = data.connection_list.as_ref() else {
-    return depths;
-  };
-  let point_by_id: HashMap<&str, &dgm::Point> = data
-    .point_list
-    .point
-    .iter()
-    .map(|point| (point.model_id.as_str(), point))
-    .collect();
-  let mut children_by_source: HashMap<&str, Vec<&dgm::Connection>> = HashMap::new();
-  for connection in &connections.connection {
-    if connection
-      .r#type
-      .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf)
-    {
-      children_by_source
-        .entry(connection.source_id.as_str())
-        .or_default()
-        .push(connection);
-    }
-  }
-  for children in children_by_source.values_mut() {
-    children.sort_by_key(|connection| connection.source_position);
-  }
-  let mut visited = HashSet::new();
-  append_document_node_depths(
-    root_id,
-    0,
-    &point_by_id,
-    &children_by_source,
-    &mut visited,
-    &mut depths,
-  );
-  depths
-}
-
-fn append_document_node_depths<'a>(
-  parent_id: &str,
-  parent_depth: usize,
-  point_by_id: &HashMap<&'a str, &'a dgm::Point>,
-  children_by_source: &HashMap<&'a str, Vec<&'a dgm::Connection>>,
-  visited: &mut HashSet<&'a str>,
-  depths: &mut HashMap<String, usize>,
-) {
-  let Some(children) = children_by_source.get(parent_id) else {
-    return;
-  };
-  for connection in children {
-    let child_id = connection.destination_id.as_str();
-    if !visited.insert(child_id) {
-      continue;
-    }
-    let depth = parent_depth + 1;
-    if let Some(point) = point_by_id.get(child_id)
-      && point
-        .r#type
-        .is_none_or(|kind| matches!(kind, dgm::PointValues::Node | dgm::PointValues::Assistant))
-    {
-      depths.insert(child_id.to_string(), depth);
-    }
-    append_document_node_depths(
-      child_id,
-      depth,
-      point_by_id,
-      children_by_source,
-      visited,
-      depths,
-    );
-  }
-}
-
 fn append_document_node_orders<'a>(
   parent_id: &str,
   point_by_id: &HashMap<&'a str, &'a dgm::Point>,
@@ -433,150 +480,27 @@ fn append_document_node_orders<'a>(
   }
 }
 
-fn ordered_presentation_nodes(
-  data: &dgm::DataModelRoot,
-  layout: Option<&dgm::LayoutDefinition>,
-  mut metrics: LayoutNodeMetrics,
-  colors: Option<&DiagramStyleColors>,
-  fallback_fill: RgbColor,
-) -> Option<Vec<DiagramNode>> {
-  let connections = data.connection_list.as_ref()?;
-  metrics.data_orders = document_node_orders(data);
-  metrics.data_depths = document_node_depths(data);
-  let point_by_id: HashMap<&str, &dgm::Point> = data
-    .point_list
-    .point
-    .iter()
-    .map(|point| (point.model_id.as_str(), point))
-    .collect();
-  let mut children_by_source: HashMap<&str, Vec<&dgm::Connection>> = HashMap::new();
-  let mut data_by_presentation: HashMap<&str, Vec<(u32, &dgm::Point)>> = HashMap::new();
-  let mut points_by_presentation_name: HashMap<&str, Vec<&dgm::Point>> = HashMap::new();
-  for point in &data.point_list.point {
-    if let Some(name) = presentation_name(point) {
-      points_by_presentation_name
-        .entry(name)
-        .or_default()
-        .push(point);
-    }
-  }
-  for connection in &connections.connection {
-    match connection.r#type {
-      Some(dgm::ConnectionValues::PresentationParentOf) => children_by_source
-        .entry(connection.source_id.as_str())
-        .or_default()
-        .push(connection),
-      Some(dgm::ConnectionValues::PresentationOf) => {
-        if let (Some(data_point), Some(presentation_point)) = (
-          point_by_id.get(connection.source_id.as_str()),
-          point_by_id.get(connection.destination_id.as_str()),
-        ) {
-          data_by_presentation
-            .entry(presentation_point.model_id.as_str())
-            .or_default()
-            .push((connection.destination_position, data_point));
-        }
-      }
-      _ => {}
-    }
-  }
-  let data_by_presentation: HashMap<&str, Vec<&dgm::Point>> = data_by_presentation
-    .into_iter()
-    .map(|(presentation_id, mut data_points)| {
-      data_points.sort_by_key(|(position, _)| *position);
-      (
-        presentation_id,
-        data_points
-          .into_iter()
-          .map(|(_, data_point)| data_point)
-          .collect(),
-      )
-    })
-    .collect();
-  for children in children_by_source.values_mut() {
-    children.sort_by_key(|connection| connection.source_position);
-  }
-
-  let root_presentation = data
-    .point_list
-    .point
-    .iter()
-    .find(|point| {
-      point.r#type == Some(dgm::PointValues::Presentation)
-        && associated_data_point(point, &point_by_id)
-          .is_some_and(|point| point.r#type == Some(dgm::PointValues::Document))
-    })
-    .or_else(|| {
-      data.point_list.point.iter().find(|point| {
-        point.r#type == Some(dgm::PointValues::Presentation)
-          && presentation_name(point).is_some_and(|name| metrics.is_text_shape(name))
-      })
-    })?;
-
-  let root_point = associated_data_point(root_presentation, &point_by_id)?;
-  let mut for_each_by_name = HashMap::new();
-  if let Some(layout) = layout {
-    collect_for_each_refs_from_layout_node(&layout.layout_node, &mut for_each_by_name);
-  }
-  let mut visitor = DiagramShapeCreationVisitor {
-    point_by_id: &point_by_id,
-    points_by_presentation_name: &points_by_presentation_name,
-    data_by_presentation: &data_by_presentation,
-    for_each_by_name: &for_each_by_name,
-    connections,
-    metrics: &metrics,
-    colors,
-    fallback_fill,
-    current_point: root_point,
-    current_index: 0,
-    current_step: 1,
-    current_count: 1,
-    nodes: Vec::new(),
-    tree: None,
-    parent_path: Vec::new(),
-    tree_root_mapped: false,
-  };
-  if let Some(layout) = layout {
-    visitor.visit_layout_node(&layout.layout_node);
-    return Some(visitor.nodes);
-  }
-
-  let mut nodes = Vec::new();
-  let mut visited = HashSet::new();
-  append_presentation_nodes(
-    root_presentation.model_id.as_str(),
-    &point_by_id,
-    &data_by_presentation,
-    &children_by_source,
-    &metrics,
-    &mut visited,
-    &mut nodes,
-    colors,
-    fallback_fill,
-  );
-  Some(nodes)
-}
-
 fn build_diagram_shape_tree(
   data: &dgm::DataModelRoot,
   layout: &dgm::LayoutDefinition,
+  styles: Option<&DiagramStyles>,
   colors: Option<&DiagramStyleColors>,
   fallback_fill: RgbColor,
   bounds: DiagramBounds,
 ) -> Option<DiagramShapeNode> {
   let connections = data.connection_list.as_ref()?;
+  let points = diagram_points(data);
   let mut metrics = layout_node_metrics(Some(layout));
   metrics.data_orders = document_node_orders(data);
-  metrics.data_depths = document_node_depths(data);
-  let point_by_id: HashMap<&str, &dgm::Point> = data
-    .point_list
-    .point
+  let point_by_id: HashMap<&str, &dgm::Point> = points
     .iter()
+    .copied()
     .map(|point| (point.model_id.as_str(), point))
     .collect();
-  let mut data_by_presentation: HashMap<&str, Vec<(u32, &dgm::Point)>> = HashMap::new();
+  let mut data_by_presentation: HashMap<&str, Vec<(u32, PresentationDataBinding<'_>)>> =
+    HashMap::new();
   let mut points_by_presentation_name: HashMap<&str, Vec<&dgm::Point>> = HashMap::new();
-  for point in &data.point_list.point {
+  for point in &points {
     if let Some(name) = presentation_name(point) {
       points_by_presentation_name
         .entry(name)
@@ -594,10 +518,16 @@ fn build_diagram_shape_tree(
       data_by_presentation
         .entry(presentation_point.model_id.as_str())
         .or_default()
-        .push((connection.destination_position, data_point));
+        .push((
+          connection.destination_position,
+          PresentationDataBinding {
+            point: data_point,
+            depth: presentation_source_depth(data, data_point.model_id.as_str()),
+          },
+        ));
     }
   }
-  let data_by_presentation: HashMap<&str, Vec<&dgm::Point>> = data_by_presentation
+  let data_by_presentation: HashMap<&str, Vec<PresentationDataBinding<'_>>> = data_by_presentation
     .into_iter()
     .map(|(presentation_id, mut data_points)| {
       data_points.sort_by_key(|(position, _)| *position);
@@ -610,7 +540,7 @@ fn build_diagram_shape_tree(
       )
     })
     .collect();
-  let root_presentation = data.point_list.point.iter().find(|point| {
+  let root_presentation = points.iter().find(|point| {
     point.r#type == Some(dgm::PointValues::Presentation)
       && associated_data_point(point, &point_by_id)
         .is_some_and(|point| point.r#type == Some(dgm::PointValues::Document))
@@ -625,28 +555,36 @@ fn build_diagram_shape_tree(
     for_each_by_name: &for_each_by_name,
     connections,
     metrics: &metrics,
+    styles,
     colors,
     fallback_fill,
     current_point: root_point,
     current_index: 0,
     current_step: 1,
     current_count: 1,
-    nodes: Vec::new(),
     tree: Some(DiagramShapeNode {
       internal_name: String::new(),
-      text: String::new(),
+      text_body: DiagramTextBody::default(),
       fill: fallback_fill,
       x: 0.0,
       y: 0.0,
       width: bounds.width,
       height: bounds.height,
-      algorithm: None,
+      algorithms: Vec::new(),
       child_order: dgm::ChildOrderValues::Bottom,
       has_geometry: false,
       hidden_geometry: false,
       is_connector: false,
+      shape_properties: None,
+      style: None,
+      text_fill: None,
+      text_rotation_deg: 0.0,
+      aspect_ratio: 0.0,
+      data_node_type: None,
+      font_size_pt: None,
       order: usize::MAX,
       constraints: Vec::new(),
+      direct_constraints: Vec::new(),
       rules: Vec::new(),
       children: Vec::new(),
     }),
@@ -725,17 +663,17 @@ fn collect_for_each_refs_from_choose<'a>(
 struct DiagramShapeCreationVisitor<'a> {
   point_by_id: &'a HashMap<&'a str, &'a dgm::Point>,
   points_by_presentation_name: &'a HashMap<&'a str, Vec<&'a dgm::Point>>,
-  data_by_presentation: &'a HashMap<&'a str, Vec<&'a dgm::Point>>,
+  data_by_presentation: &'a HashMap<&'a str, Vec<PresentationDataBinding<'a>>>,
   for_each_by_name: &'a HashMap<&'a str, &'a dgm::ForEach>,
   connections: &'a dgm::ConnectionList,
   metrics: &'a LayoutNodeMetrics,
+  styles: Option<&'a DiagramStyles>,
   colors: Option<&'a DiagramStyleColors>,
   fallback_fill: RgbColor,
   current_point: &'a dgm::Point,
   current_index: usize,
   current_step: usize,
   current_count: usize,
-  nodes: Vec<DiagramNode>,
   tree: Option<DiagramShapeNode>,
   parent_path: Vec<usize>,
   tree_root_mapped: bool,
@@ -1141,64 +1079,70 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     presentation_point: &'a dgm::Point,
   ) -> Option<Vec<usize>> {
     let shape_atom = self.active_shape_atom(layout_node);
-    let explicit_data_points = self
+    let data_points = self
       .data_by_presentation
       .get(presentation_point.model_id.as_str());
-    let fallback_data_point = explicit_data_points.is_none().then(|| {
-      self
-        .metrics
-        .allows_associated_text_fallback(name)
-        .then(|| associated_data_point(presentation_point, self.point_by_id))
-        .flatten()
-    });
-    let data_points: Vec<_> = explicit_data_points
-      .into_iter()
-      .flatten()
-      .copied()
-      .chain(fallback_data_point.into_iter().flatten())
-      .collect();
-    let mut text = String::new();
-    let mut order = usize::MAX;
-    let mut depth = usize::MAX;
-    for data_point in &data_points {
-      let data_text = point_text(data_point);
-      if !data_text.is_empty() {
-        if !text.is_empty() {
-          text.push('\n');
+    let mut text_body = DiagramTextBody::default();
+    let mut order = self.current_index;
+    let mut shape_properties =
+      presentation_point
+        .shape_properties
+        .as_ref()
+        .and_then(|properties| {
+          diagram_shape_properties_has_blip_fill(properties).then(|| properties.clone())
+        });
+    let style_label = presentation_point
+      .property_set
+      .as_deref()
+      .and_then(|property_set| property_set.presentation_style_label.as_deref())
+      .or(layout_node.style_label.as_deref());
+    let style = style_label
+      .and_then(|label| {
+        self
+          .styles
+          .and_then(|styles| styles.style_by_label.get(label))
+      })
+      .cloned();
+    let text_fill = style_label
+      .and_then(|label| {
+        self
+          .colors
+          .and_then(|colors| colors.text_fill_by_label.get(label))
+      })
+      .and_then(|fills| color_by_index(fills, self.current_index));
+    let data_node_type = data_points
+      .and_then(|points| points.first())
+      .and_then(|binding| binding.point.r#type)
+      .and_then(point_type_to_element_type);
+    if let Some(data_points) = data_points {
+      let min_depth = data_points
+        .iter()
+        .map(|binding| binding.depth)
+        .min()
+        .unwrap_or_default();
+      for binding in data_points {
+        let data_point = binding.point;
+        text_body.append_point(data_point, binding.depth);
+        if binding.depth == 0 || (shape_properties.is_none() && binding.depth == min_depth) {
+          shape_properties = data_point.shape_properties.clone();
         }
-        text.push_str(data_text.as_str());
+        order = order.min(
+          self
+            .metrics
+            .data_orders
+            .get(data_point.model_id.as_str())
+            .copied()
+            .unwrap_or(self.current_index),
+        );
       }
-      order = order.min(
-        self
-          .metrics
-          .data_orders
-          .get(data_point.model_id.as_str())
-          .copied()
-          .unwrap_or(usize::MAX),
-      );
-      depth = depth.min(
-        self
-          .metrics
-          .data_depths
-          .get(data_point.model_id.as_str())
-          .copied()
-          .unwrap_or_default(),
-      );
-    }
-    if self.metrics.is_text_shape(name) && !text.is_empty() {
-      self.nodes.push(DiagramNode {
-        text: text.clone(),
-        fill: diagram_node_fill(Some(presentation_point), self.colors, self.fallback_fill),
-        preferred_height: self.metrics.preferred_heights.get(name).copied(),
-        height_width_factor: self.metrics.height_width_factors.get(name).copied(),
-        order,
-        depth: if depth == usize::MAX { 0 } else { depth },
-      });
     }
     if self.tree.is_none() {
       return None;
     }
-    let has_geometry = shape_atom.is_some();
+    let active_algorithms = self.active_algorithms(layout_node);
+    let has_geometry = shape_atom
+      .and_then(|shape| shape.r#type.as_deref())
+      .is_some_and(|shape_type| !shape_type.is_empty());
     let hidden_geometry = shape_atom
       .and_then(|shape| shape.hide_geometry)
       .map(bool::from)
@@ -1208,19 +1152,31 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
       .is_some_and(|shape_type| shape_type == "conn");
     let child = DiagramShapeNode {
       internal_name: name.to_string(),
-      text,
+      text_body,
       fill: diagram_node_fill(Some(presentation_point), self.colors, self.fallback_fill),
       x: 0.0,
       y: 0.0,
       width: 0.0,
       height: 0.0,
-      algorithm: self.active_algorithm(layout_node),
+      algorithms: active_algorithms.clone(),
       child_order: layout_node.child_order.unwrap_or_default(),
       has_geometry,
       hidden_geometry,
       is_connector,
+      shape_properties,
+      style,
+      text_fill,
+      text_rotation_deg: 0.0,
+      aspect_ratio: active_algorithms
+        .iter()
+        .rev()
+        .find_map(|algorithm| algorithm.aspect_ratio)
+        .unwrap_or_default(),
+      data_node_type,
+      font_size_pt: self.metrics.font_sizes.get(name).copied(),
       order,
       constraints: self.active_constraints(layout_node),
+      direct_constraints: direct_constraints_unfiltered(layout_node),
       rules: self.active_rules(layout_node),
       children: Vec::new(),
     };
@@ -1265,56 +1221,54 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
     None
   }
 
-  fn active_algorithm(&self, node: &'a dgm::LayoutNode) -> Option<LayoutAlgorithm> {
+  fn active_algorithms(&self, node: &'a dgm::LayoutNode) -> Vec<LayoutAlgorithm> {
+    let mut active = Vec::new();
     for choice in &node.layout_node_choice {
       match choice {
-        dgm::LayoutNodeChoice::Algorithm(algorithm) => return Some(layout_algorithm(algorithm)),
+        dgm::LayoutNodeChoice::Algorithm(algorithm) => active.push(layout_algorithm(algorithm)),
         dgm::LayoutNodeChoice::Choose(choose) => {
-          if let Some(algorithm) = self.active_algorithm_in_choose(choose) {
-            return Some(algorithm);
-          }
+          self.collect_active_algorithms_from_choose(choose, &mut active);
         }
         _ => {}
       }
     }
-    None
+    active
   }
 
-  fn active_algorithm_in_choose(&self, choose: &'a dgm::Choose) -> Option<LayoutAlgorithm> {
+  fn collect_active_algorithms_from_choose(
+    &self,
+    choose: &'a dgm::Choose,
+    active: &mut Vec<LayoutAlgorithm>,
+  ) {
     for branch in &choose.diagram_choose_if {
       if self.choose_if_decision(branch) {
         for choice in &branch.diagram_choose_if_choice {
           match choice {
             dgm::DiagramChooseIfChoice::Algorithm(algorithm) => {
-              return Some(layout_algorithm(algorithm));
+              active.push(layout_algorithm(algorithm));
             }
             dgm::DiagramChooseIfChoice::Choose(choose) => {
-              if let Some(algorithm) = self.active_algorithm_in_choose(choose) {
-                return Some(algorithm);
-              }
+              self.collect_active_algorithms_from_choose(choose, active);
             }
             _ => {}
           }
         }
-        return None;
+        return;
       }
     }
     if let Some(branch) = choose.diagram_choose_else.as_ref() {
       for choice in &branch.diagram_choose_else_choice {
         match choice {
           dgm::DiagramChooseElseChoice::Algorithm(algorithm) => {
-            return Some(layout_algorithm(algorithm));
+            active.push(layout_algorithm(algorithm));
           }
           dgm::DiagramChooseElseChoice::Choose(choose) => {
-            if let Some(algorithm) = self.active_algorithm_in_choose(choose) {
-              return Some(algorithm);
-            }
+            self.collect_active_algorithms_from_choose(choose, active);
           }
           _ => {}
         }
       }
     }
-    None
   }
 
   fn active_shape_atom_in_choose(&self, choose: &'a dgm::Choose) -> Option<&'a dgm::Shape> {
@@ -1461,78 +1415,6 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
   }
 }
 
-fn append_presentation_nodes<'a>(
-  parent_id: &str,
-  point_by_id: &HashMap<&'a str, &'a dgm::Point>,
-  data_by_presentation: &HashMap<&'a str, Vec<&'a dgm::Point>>,
-  children_by_source: &HashMap<&'a str, Vec<&'a dgm::Connection>>,
-  metrics: &LayoutNodeMetrics,
-  visited: &mut HashSet<&'a str>,
-  nodes: &mut Vec<DiagramNode>,
-  colors: Option<&DiagramStyleColors>,
-  fallback_fill: RgbColor,
-) {
-  let Some(child_connections) = children_by_source.get(parent_id) else {
-    return;
-  };
-  for connection in child_connections {
-    let child_id = connection.destination_id.as_str();
-    if !visited.insert(child_id) {
-      continue;
-    }
-    if let Some(presentation_point) = point_by_id.get(child_id) {
-      if let Some(name) = presentation_name(presentation_point)
-        && metrics.is_text_shape(name)
-      {
-        let explicit_data_points = data_by_presentation.get(child_id);
-        let fallback_data_point = explicit_data_points.is_none().then(|| {
-          metrics
-            .allows_associated_text_fallback(name)
-            .then(|| associated_data_point(presentation_point, point_by_id))
-            .flatten()
-        });
-        let mut data_points = explicit_data_points
-          .into_iter()
-          .flatten()
-          .copied()
-          .chain(fallback_data_point.into_iter().flatten());
-        for data_point in &mut data_points {
-          let text = point_text(data_point);
-          if !text.is_empty() {
-            nodes.push(DiagramNode {
-              text,
-              fill: diagram_node_fill(Some(*presentation_point), colors, fallback_fill),
-              preferred_height: metrics.preferred_heights.get(name).copied(),
-              height_width_factor: metrics.height_width_factors.get(name).copied(),
-              order: metrics
-                .data_orders
-                .get(data_point.model_id.as_str())
-                .copied()
-                .unwrap_or(usize::MAX),
-              depth: metrics
-                .data_depths
-                .get(data_point.model_id.as_str())
-                .copied()
-                .unwrap_or_default(),
-            });
-          }
-        }
-      }
-      append_presentation_nodes(
-        child_id,
-        point_by_id,
-        data_by_presentation,
-        children_by_source,
-        metrics,
-        visited,
-        nodes,
-        colors,
-        fallback_fill,
-      );
-    }
-  }
-}
-
 fn presentation_name(point: &dgm::Point) -> Option<&str> {
   point
     .property_set
@@ -1554,6 +1436,35 @@ fn associated_data_point<'a>(
   presentation_association_id(presentation_point)
     .and_then(|id| point_by_id.get(id))
     .copied()
+}
+
+fn presentation_source_depth(data: &dgm::DataModelRoot, source_id: &str) -> i32 {
+  let depth = data
+    .connection_list
+    .as_ref()
+    .map(|connections| presentation_source_depth_from_connections(connections, source_id))
+    .unwrap_or_default();
+  if depth == 0 { -1 } else { depth }
+}
+
+fn presentation_source_depth_from_connections(
+  connections: &dgm::ConnectionList,
+  source_id: &str,
+) -> i32 {
+  for connection in &connections.connection {
+    let has_transitions =
+      connection.parent_transition_id.is_some() && connection.sibling_transition_id.is_some();
+    let is_parent_of = connection
+      .r#type
+      .is_none_or(|kind| kind == dgm::ConnectionValues::ParentOf);
+    if has_transitions && is_parent_of && connection.destination_id == source_id {
+      return presentation_source_depth_from_connections(
+        connections,
+        connection.source_id.as_str(),
+      ) + 1;
+    }
+  }
+  0
 }
 
 fn direction_condition_value(direction: dgm::DirectionValues) -> i32 {
@@ -1590,6 +1501,17 @@ fn parse_hierarchy_branch_condition_value(value: &str) -> i32 {
   }
 }
 
+fn point_type_to_element_type(point_type: dgm::PointValues) -> Option<dgm::ElementValues> {
+  match point_type {
+    dgm::PointValues::Node => Some(dgm::ElementValues::Node),
+    dgm::PointValues::Assistant => Some(dgm::ElementValues::Assistant),
+    dgm::PointValues::Document => Some(dgm::ElementValues::Document),
+    dgm::PointValues::Presentation => Some(dgm::ElementValues::Presentation),
+    dgm::PointValues::ParentTransition => Some(dgm::ElementValues::ParentTransition),
+    dgm::PointValues::SiblingTransition => Some(dgm::ElementValues::SiblingTransition),
+  }
+}
+
 fn diagram_shape_node_mut<'a>(
   node: &'a mut DiagramShapeNode,
   path: &[usize],
@@ -1613,6 +1535,18 @@ fn direct_constraints(node: &dgm::LayoutNode) -> Vec<DiagramConstraint> {
     .collect()
 }
 
+fn direct_constraints_unfiltered(node: &dgm::LayoutNode) -> Vec<DiagramConstraint> {
+  node
+    .layout_node_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      dgm::LayoutNodeChoice::Constraints(constraints) => Some(constraints.as_ref()),
+      _ => None,
+    })
+    .flat_map(|constraints| parse_constraints_unfiltered(constraints))
+    .collect()
+}
+
 fn parse_constraints(
   constraints: &dgm::Constraints,
   require_for_name: bool,
@@ -1621,6 +1555,14 @@ fn parse_constraints(
     .constraint
     .iter()
     .filter_map(|constraint| parse_constraint(constraint, require_for_name))
+    .collect()
+}
+
+fn parse_constraints_unfiltered(constraints: &dgm::Constraints) -> Vec<DiagramConstraint> {
+  constraints
+    .constraint
+    .iter()
+    .filter_map(parse_constraint_unfiltered)
     .collect()
 }
 
@@ -1667,8 +1609,18 @@ fn parse_constraint(
     value: constraint.val.unwrap_or_default() as f32,
     target: constraint.r#type,
     reference: constraint.reference_type.unwrap_or_default(),
-    operator: constraint.operator.unwrap_or_default(),
-    r#for: constraint.r#for,
+    point_type: constraint.point_type,
+  })
+}
+
+fn parse_constraint_unfiltered(constraint: &dgm::Constraint) -> Option<DiagramConstraint> {
+  (constraint.r#type != dgm::ConstraintValues::None).then(|| DiagramConstraint {
+    for_name: constraint.for_name.clone().unwrap_or_default(),
+    ref_for_name: constraint.reference_for_name.clone().unwrap_or_default(),
+    factor: constraint.fact.unwrap_or(1.0) as f32,
+    value: constraint.val.unwrap_or_default() as f32,
+    target: constraint.r#type,
+    reference: constraint.reference_type.unwrap_or_default(),
     point_type: constraint.point_type,
   })
 }
@@ -1698,35 +1650,8 @@ fn parse_rules(rules: &dgm::RuleList) -> Vec<DiagramRule> {
 
 #[derive(Clone, Debug, Default)]
 struct LayoutNodeMetrics {
-  shape_names: HashSet<String>,
-  text_names: HashSet<String>,
-  text_axes: HashMap<String, Vec<dgm::AxisValues>>,
-  preferred_heights: HashMap<String, f32>,
-  height_width_factors: HashMap<String, f32>,
+  font_sizes: HashMap<String, f32>,
   data_orders: HashMap<String, usize>,
-  data_depths: HashMap<String, usize>,
-}
-
-impl LayoutNodeMetrics {
-  fn is_text_shape(&self, name: &str) -> bool {
-    if self.text_names.is_empty() {
-      self.shape_names.contains(name)
-    } else {
-      self.text_names.contains(name)
-    }
-  }
-
-  fn allows_associated_text_fallback(&self, name: &str) -> bool {
-    self.text_axes.get(name).is_none_or(|axes| {
-      axes.is_empty()
-        || axes.iter().any(|axis| {
-          matches!(
-            axis,
-            dgm::AxisValues::_Self | dgm::AxisValues::DescendantOrSelf
-          )
-        })
-    })
-  }
 }
 
 fn layout_node_metrics(layout: Option<&dgm::LayoutDefinition>) -> LayoutNodeMetrics {
@@ -1738,44 +1663,6 @@ fn layout_node_metrics(layout: Option<&dgm::LayoutDefinition>) -> LayoutNodeMetr
 }
 
 fn collect_layout_node_metrics(node: &dgm::LayoutNode, metrics: &mut LayoutNodeMetrics) {
-  let has_shape = node
-    .layout_node_choice
-    .iter()
-    .any(|choice| matches!(choice, dgm::LayoutNodeChoice::Shape(_)));
-  let has_text_algorithm = node.layout_node_choice.iter().any(|choice| {
-    matches!(
-      choice,
-      dgm::LayoutNodeChoice::Algorithm(algorithm)
-        if algorithm.r#type == dgm::AlgorithmValues::Text
-    )
-  });
-  let text_axes = node
-    .layout_node_choice
-    .iter()
-    .filter_map(|choice| match choice {
-      dgm::LayoutNodeChoice::PresentationOf(presentation_of) => Some(presentation_of),
-      _ => None,
-    })
-    .next()
-    .and_then(|presentation_of| presentation_of.axis.clone());
-  let has_rendered_text_axis = text_axes.as_ref().is_none_or(|axes| {
-    axes.is_empty()
-      || axes.iter().any(|axis| {
-        matches!(
-          axis,
-          dgm::AxisValues::_Self | dgm::AxisValues::Descendant | dgm::AxisValues::DescendantOrSelf
-        )
-      })
-  });
-  if has_shape && let Some(name) = node.name.as_deref() {
-    metrics.shape_names.insert(name.to_string());
-    if has_text_algorithm && has_rendered_text_axis {
-      metrics.text_names.insert(name.to_string());
-      if let Some(axes) = text_axes {
-        metrics.text_axes.insert(name.to_string(), axes);
-      }
-    }
-  }
   collect_constraints(node, metrics);
   for choice in &node.layout_node_choice {
     match choice {
@@ -1826,90 +1713,16 @@ fn collect_choose_metrics(choose: &dgm::Choose, metrics: &mut LayoutNodeMetrics)
 }
 
 fn collect_constraints(node: &dgm::LayoutNode, metrics: &mut LayoutNodeMetrics) {
-  let mut font_sizes: HashMap<String, f32> = HashMap::new();
-  let node_name = node.name.as_deref();
   for choice in &node.layout_node_choice {
     let dgm::LayoutNodeChoice::Constraints(constraints) = choice else {
       continue;
     };
     for constraint in &constraints.constraint {
-      if constraint.r#type == dgm::ConstraintValues::Height
-        && constraint.reference_type == Some(dgm::ConstraintValues::Width)
-        && let Some(factor) = constraint.fact
-        && let Some(name) = constraint.for_name.as_deref().or(node_name)
-      {
-        metrics
-          .height_width_factors
-          .insert(name.to_string(), factor as f32);
-      }
       if constraint.r#type == dgm::ConstraintValues::PrimaryFontSize
         && let (Some(name), Some(value)) = (constraint.for_name.as_deref(), constraint.val)
       {
-        font_sizes.insert(name.to_string(), value as f32);
+        metrics.font_sizes.insert(name.to_string(), value as f32);
       }
-    }
-    for constraint in &constraints.constraint {
-      if constraint.r#type == dgm::ConstraintValues::Height
-        && constraint.reference_type == Some(dgm::ConstraintValues::PrimaryFontSize)
-        && let (Some(name), Some(factor)) = (constraint.for_name.as_deref(), constraint.fact)
-        && let Some(font_size) = font_sizes.get(name)
-      {
-        metrics
-          .preferred_heights
-          .insert(name.to_string(), font_size * factor as f32);
-      }
-    }
-  }
-}
-
-fn append_document_nodes<'a>(
-  parent_id: &str,
-  depth: u32,
-  point_by_id: &HashMap<&'a str, &'a dgm::Point>,
-  children_by_source: &HashMap<&'a str, Vec<&'a dgm::Connection>>,
-  presentation_by_data: &HashMap<&'a str, &'a dgm::Point>,
-  visited: &mut HashSet<&'a str>,
-  nodes: &mut Vec<DiagramNode>,
-  colors: Option<&DiagramStyleColors>,
-  fallback_fill: RgbColor,
-) {
-  let Some(child_connections) = children_by_source.get(parent_id) else {
-    return;
-  };
-  for connection in child_connections {
-    let child_id = connection.destination_id.as_str();
-    if !visited.insert(child_id) {
-      continue;
-    }
-    if let Some(point) = point_by_id.get(child_id) {
-      if point
-        .r#type
-        .is_none_or(|kind| matches!(kind, dgm::PointValues::Node | dgm::PointValues::Assistant))
-      {
-        nodes.push(DiagramNode {
-          text: point_text(point),
-          fill: diagram_node_fill(
-            presentation_by_data.get(child_id).copied(),
-            colors,
-            fallback_fill,
-          ),
-          preferred_height: None,
-          height_width_factor: None,
-          order: nodes.len(),
-          depth: depth as usize,
-        });
-      }
-      append_document_nodes(
-        child_id,
-        depth.saturating_add(1),
-        point_by_id,
-        children_by_source,
-        presentation_by_data,
-        visited,
-        nodes,
-        colors,
-        fallback_fill,
-      );
     }
   }
 }
@@ -1932,118 +1745,19 @@ fn diagram_node_fill(
     .max(0) as usize;
   colors
     .and_then(|colors| colors.fill_by_label.get(style_label))
-    .and_then(|fills| {
-      if fills.is_empty() {
-        None
-      } else {
-        Some(fills[style_index % fills.len()])
-      }
-    })
+    .and_then(|fills| color_by_index(fills, style_index))
     .unwrap_or(fallback_fill)
 }
 
-pub(crate) fn point_text(point: &dgm::Point) -> String {
-  point
-    .text_body
-    .as_deref()
-    .map(text_body_text)
-    .unwrap_or_default()
-    .trim()
-    .to_string()
+fn diagram_shape_properties_has_blip_fill(properties: &dgm::ShapeProperties) -> bool {
+  matches!(
+    properties.shape_properties_choice2.as_ref(),
+    Some(dgm::ShapePropertiesChoice2::BlipFill(_))
+  )
 }
 
-fn text_body_text(text_body: &dgm::TextBody) -> String {
-  let mut text = String::new();
-  for paragraph in &text_body.paragraph {
-    if !text.is_empty() {
-      text.push('\n');
-    }
-    for choice in &paragraph.paragraph_choice {
-      match choice {
-        ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::ParagraphChoice::Run(
-          run,
-        ) => text.push_str(run.text.as_str()),
-        ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::ParagraphChoice::Field(
-          field,
-        ) => {
-          if let Some(field_text) = field.text.as_ref() {
-            text.push_str(field_text.as_str());
-          }
-        }
-        ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::ParagraphChoice::Break(
-          _,
-        ) => text.push('\n'),
-        ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::ParagraphChoice::TextMath(
-          _,
-        ) => {}
-      }
-    }
-  }
-  text
-}
-
-fn root_algorithm(
-  data: &dgm::DataModelRoot,
-  layout: Option<&dgm::LayoutDefinition>,
-) -> Option<LayoutAlgorithm> {
-  let reversed = document_direction(data) == Some(dgm::DirectionValues::Reversed);
-  layout.and_then(|layout| first_algorithm(&layout.layout_node, reversed))
-}
-
-fn document_direction(data: &dgm::DataModelRoot) -> Option<dgm::DirectionValues> {
-  data
-    .point_list
-    .point
-    .iter()
-    .filter_map(|point| point.property_set.as_ref())
-    .filter_map(|properties| properties.presentation_layout_variables.as_deref())
-    .filter_map(|variables| variables.direction.as_ref())
-    .filter_map(|direction| direction.val)
-    .find(|direction| *direction == dgm::DirectionValues::Reversed)
-}
-
-fn first_algorithm(node: &dgm::LayoutNode, reversed: bool) -> Option<LayoutAlgorithm> {
-  for choice in &node.layout_node_choice {
-    match choice {
-      dgm::LayoutNodeChoice::Algorithm(algorithm) => {
-        return Some(layout_algorithm(algorithm).with_reversed(reversed));
-      }
-      dgm::LayoutNodeChoice::Choose(choose) => {
-        if !reversed {
-          for branch in &choose.diagram_choose_if {
-            if let Some(algorithm) = first_algorithm_in_if(branch) {
-              return Some(algorithm.with_reversed(reversed));
-            }
-          }
-        }
-        if let Some(branch) = choose.diagram_choose_else.as_ref()
-          && let Some(algorithm) = first_algorithm_in_else(branch)
-        {
-          return Some(algorithm.with_reversed(reversed));
-        }
-      }
-      _ => {}
-    }
-  }
-  None
-}
-
-fn first_algorithm_in_if(branch: &dgm::DiagramChooseIf) -> Option<LayoutAlgorithm> {
-  for choice in &branch.diagram_choose_if_choice {
-    if let dgm::DiagramChooseIfChoice::Algorithm(algorithm) = choice {
-      return Some(layout_algorithm(algorithm));
-    }
-  }
-  None
-}
-
-fn first_algorithm_in_else(branch: &dgm::DiagramChooseElse) -> Option<LayoutAlgorithm> {
-  for choice in &branch.diagram_choose_else_choice {
-    if let dgm::DiagramChooseElseChoice::Algorithm(algorithm) = choice {
-      return Some(layout_algorithm(algorithm));
-    }
-  }
-  None
+fn color_by_index(colors: &[RgbColor], index: usize) -> Option<RgbColor> {
+  (!colors.is_empty()).then(|| colors[index % colors.len()])
 }
 
 fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
@@ -2059,24 +1773,28 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
     .iter()
     .find(|parameter| parameter.r#type == dgm::ParameterIdValues::SecondaryLinearDirection)
     .and_then(|parameter| parameter.val.as_deref())
-    .and_then(|value| (value != "none").then(|| linear_direction_from_value(value)));
-  let reverse = algorithm.parameter.iter().any(|parameter| {
-    matches!(
-      (parameter.r#type, parameter.val.as_deref()),
-      (
-        dgm::ParameterIdValues::GrowDirection,
-        Some("tR" | "bR" | "rT" | "rB")
-      )
-    )
-  }) || matches!(
-    linear_direction,
-    LinearDirection::FromRight | LinearDirection::FromBottom
-  );
+    .and_then(|value| (value != "none").then(|| linear_direction_from_value(value)))
+    .unwrap_or_default();
+  let grow_direction = algorithm
+    .parameter
+    .iter()
+    .find(|parameter| parameter.r#type == dgm::ParameterIdValues::GrowDirection)
+    .and_then(|parameter| parameter.val.as_deref())
+    .map(grow_direction_from_value)
+    .unwrap_or_default();
+  let continue_direction = algorithm
+    .parameter
+    .iter()
+    .find(|parameter| parameter.r#type == dgm::ParameterIdValues::ContinueDirection)
+    .and_then(|parameter| parameter.val.as_deref())
+    .map(continue_direction_from_value)
+    .unwrap_or_default();
   LayoutAlgorithm {
     kind: algorithm.r#type,
-    reverse,
     linear_direction,
     secondary_linear_direction,
+    grow_direction,
+    continue_direction,
     start_angle: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::StartAngle)
       .unwrap_or_default(),
     span_angle: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::SpanAngle)
@@ -2087,15 +1805,36 @@ fn layout_algorithm(algorithm: &dgm::Algorithm) -> LayoutAlgorithm {
       .find(|parameter| parameter.r#type == dgm::ParameterIdValues::CenterShapeMapping)
       .and_then(|parameter| parameter.val.as_deref())
       == Some("fNode"),
-    aspect_ratio: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::AspectRatio)
-      .unwrap_or_default(),
+    aspect_ratio: algorithm_parameter_f32(algorithm, dgm::ParameterIdValues::AspectRatio),
+    auto_text_rotation: algorithm
+      .parameter
+      .iter()
+      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::AutoTextRotation)
+      .and_then(|parameter| parameter.val.as_deref())
+      .map(auto_text_rotation_from_value),
+    text_anchor_vertical: algorithm
+      .parameter
+      .iter()
+      .find(|parameter| parameter.r#type == dgm::ParameterIdValues::TextAnchorVertical)
+      .and_then(|parameter| parameter.val.as_deref())
+      .map(text_anchor_vertical_from_value)
+      .unwrap_or(dgm::TextAnchorVerticalValues::Middle),
   }
 }
 
-impl LayoutAlgorithm {
-  fn with_reversed(mut self, reversed: bool) -> Self {
-    self.reverse |= reversed;
-    self
+fn auto_text_rotation_from_value(value: &str) -> dgm::AutoTextRotationValues {
+  match value {
+    "grav" => dgm::AutoTextRotationValues::Gravity,
+    "none" => dgm::AutoTextRotationValues::None,
+    _ => dgm::AutoTextRotationValues::Upright,
+  }
+}
+
+fn text_anchor_vertical_from_value(value: &str) -> dgm::TextAnchorVerticalValues {
+  match value {
+    "t" => dgm::TextAnchorVerticalValues::Top,
+    "b" => dgm::TextAnchorVerticalValues::Bottom,
+    _ => dgm::TextAnchorVerticalValues::Middle,
   }
 }
 
@@ -2105,6 +1844,22 @@ fn linear_direction_from_value(value: &str) -> LinearDirection {
     "fromT" => LinearDirection::FromTop,
     "fromB" => LinearDirection::FromBottom,
     _ => LinearDirection::FromLeft,
+  }
+}
+
+fn grow_direction_from_value(value: &str) -> GrowDirection {
+  match value {
+    "tR" => GrowDirection::TopRight,
+    "bL" => GrowDirection::BottomLeft,
+    "bR" => GrowDirection::BottomRight,
+    _ => GrowDirection::TopLeft,
+  }
+}
+
+fn continue_direction_from_value(value: &str) -> ContinueDirection {
+  match value {
+    "revDir" => ContinueDirection::ReverseDirection,
+    _ => ContinueDirection::SameDirection,
   }
 }
 
@@ -2135,14 +1890,11 @@ fn layout_diagram_shape_node(
   constraints.extend(node.constraints.clone());
   let mut rules = inherited_rules.to_vec();
   rules.extend(node.rules.clone());
-  if let Some(algorithm) = node.algorithm {
+  for algorithm in node.algorithms.clone() {
     layout_shape_children(node, algorithm, &constraints, &rules);
   }
   for child in &mut node.children {
     layout_diagram_shape_node(child, &constraints, &rules);
-  }
-  if node.child_order == dgm::ChildOrderValues::Top {
-    node.children.reverse();
   }
 }
 
@@ -2163,14 +1915,115 @@ fn layout_shape_children(
       hierarchy_layout_tree(node, algorithm)
     }
     dgm::AlgorithmValues::Snake => snake_layout_tree(node, algorithm, constraints),
-    dgm::AlgorithmValues::Text | dgm::AlgorithmValues::Space | dgm::AlgorithmValues::Connector => {}
+    dgm::AlgorithmValues::Text => apply_text_algorithm(node, constraints),
+    dgm::AlgorithmValues::Space => {
+      if has_text_algorithm_descendant(node) {
+        node.text_body = DiagramTextBody::default();
+      }
+    }
+    dgm::AlgorithmValues::Connector => {}
     dgm::AlgorithmValues::Pyramid => linear_layout_tree(node, algorithm, constraints, rules),
+  }
+}
+
+fn has_text_algorithm_descendant(node: &DiagramShapeNode) -> bool {
+  node.children.iter().any(|child| {
+    child
+      .algorithms
+      .iter()
+      .any(|algorithm| algorithm.kind == dgm::AlgorithmValues::Text)
+      || has_text_algorithm_descendant(child)
+  })
+}
+
+fn apply_text_algorithm(node: &mut DiagramShapeNode, constraints: &[DiagramConstraint]) {
+  let font_size = constraints
+    .iter()
+    .rev()
+    .find(|constraint| {
+      constraint.target == dgm::ConstraintValues::PrimaryFontSize
+        && (constraint.for_name.is_empty() || constraint.for_name == node.internal_name)
+    })
+    .map(|constraint| constraint.value)
+    .filter(|value| *value > 0.0);
+  if let Some(font_size) = font_size {
+    node.font_size_pt = Some(font_size);
+    node.text_body.apply_primary_font_size(font_size);
+  }
+  node.text_body.apply_text_margins(node.width, constraints);
+  node.text_body.enable_auto_fit_if_default_text();
+  node.text_rotation_deg = text_pre_rotation_degrees(
+    node
+      .algorithms
+      .iter()
+      .rev()
+      .find_map(|algorithm| algorithm.auto_text_rotation)
+      .unwrap_or(dgm::AutoTextRotationValues::Upright),
+    shape_rotation_degrees(node),
+  );
+  node.text_body.set_vertical_anchor(
+    match node
+      .algorithms
+      .iter()
+      .rev()
+      .map(|algorithm| algorithm.text_anchor_vertical)
+      .next()
+      .unwrap_or(dgm::TextAnchorVerticalValues::Middle)
+    {
+      dgm::TextAnchorVerticalValues::Top => a::TextAnchoringTypeValues::Top,
+      dgm::TextAnchorVerticalValues::Bottom => a::TextAnchoringTypeValues::Bottom,
+      dgm::TextAnchorVerticalValues::Middle => a::TextAnchoringTypeValues::Center,
+    },
+  );
+}
+
+fn points_to_emu(value: f32) -> i32 {
+  (value * 12_700.0).round() as i32
+}
+
+fn shape_rotation_degrees(node: &DiagramShapeNode) -> f32 {
+  node
+    .shape_properties
+    .as_deref()
+    .and_then(|properties| properties.transform2_d.as_deref())
+    .and_then(|transform| transform.rotation)
+    .map(|rotation| rotation as f32 / 60_000.0)
+    .unwrap_or_default()
+}
+
+fn text_pre_rotation_degrees(
+  auto_text_rotation: dgm::AutoTextRotationValues,
+  shape_rotation: f32,
+) -> f32 {
+  let mut normalized = shape_rotation;
+  while normalized < 0.0 {
+    normalized += 360.0;
+  }
+  while normalized > 360.0 {
+    normalized -= 360.0;
+  }
+  match auto_text_rotation {
+    dgm::AutoTextRotationValues::Upright => {
+      if normalized >= 315.0 {
+        0.0
+      } else if normalized > 225.0 {
+        -270.0
+      } else if normalized >= 135.0 {
+        -180.0
+      } else if normalized > 45.0 {
+        -90.0
+      } else {
+        0.0
+      }
+    }
+    dgm::AutoTextRotationValues::Gravity if normalized > 90.0 && normalized < 270.0 => -180.0,
+    dgm::AutoTextRotationValues::Gravity | dgm::AutoTextRotationValues::None => 0.0,
   }
 }
 
 impl DiagramShapeNode {
   fn is_empty_group(&self) -> bool {
-    self.text.is_empty() && self.children.is_empty() && !self.has_geometry
+    self.text_body.is_empty() && self.children.is_empty() && !self.has_geometry
   }
 }
 
@@ -2180,7 +2033,7 @@ fn composite_layout_tree(
   constraints: &[DiagramConstraint],
 ) {
   let mut properties: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
-  let parent_width = if algorithm.aspect_ratio == 1.0 {
+  let parent_width = if algorithm.aspect_ratio.unwrap_or_default() == 1.0 {
     node.width.min(node.height)
   } else {
     node.width
@@ -2212,6 +2065,18 @@ fn composite_layout_tree(
       .filter(|constraint| constraint.for_name == child.internal_name)
     {
       apply_constraint_to_layout(constraint, &mut properties);
+    }
+    for constraint in &child.direct_constraints {
+      if !constraint.for_name.is_empty() || !constraint.ref_for_name.is_empty() {
+        continue;
+      }
+      if constraint.value == 0.0 && constraint.reference == dgm::ConstraintValues::None {
+        continue;
+      }
+      let mut constraint = constraint.clone();
+      constraint.for_name = child.internal_name.clone();
+      constraint.ref_for_name = child.internal_name.clone();
+      apply_constraint_to_layout(&constraint, &mut properties);
     }
     let properties_for_child = properties.get(child.internal_name.as_str());
     let mut width = node.width;
@@ -2267,6 +2132,9 @@ fn composite_layout_tree(
         child.y += diff / 2.0;
       }
     }
+  }
+  if node.child_order == dgm::ChildOrderValues::Top {
+    node.children.reverse();
   }
 }
 
@@ -2337,7 +2205,10 @@ fn linear_layout_tree(
       properties
         .entry(constraint.for_name.clone())
         .or_default()
-        .insert(dgm::ConstraintValues::Width, node.width * constraint.factor);
+        .insert(
+          dgm::ConstraintValues::Width,
+          (node.width * constraint.factor).min(node.width),
+        );
     }
     if constraint.target == dgm::ConstraintValues::Height {
       properties
@@ -2345,26 +2216,85 @@ fn linear_layout_tree(
         .or_default()
         .insert(
           dgm::ConstraintValues::Height,
-          node.height * constraint.factor,
+          (node.height * constraint.factor).min(node.height),
         );
     }
   }
-  let mut space = 0.0;
+  let mut space_width = 0.0;
+  let mut space_height = 0.0;
   for constraint in constraints {
     if matches!(constraint.for_name.as_str(), "sp" | "space" | "sibTrans") {
-      if horizontal && constraint.target == dgm::ConstraintValues::Width {
-        space = node.width * constraint.factor;
+      if constraint.target == dgm::ConstraintValues::Width {
+        space_width = node.width * constraint.factor;
       }
-      if !horizontal && constraint.target == dgm::ConstraintValues::Height {
-        space = node.height * constraint.factor;
+      if constraint.target == dgm::ConstraintValues::Height {
+        space_height = node.height * constraint.factor;
       }
     }
   }
-  let shrink_names: HashSet<&str> = rules.iter().map(|rule| rule.for_name.as_str()).collect();
+  let mut shrink_names: HashSet<String> = rules.iter().map(|rule| rule.for_name.clone()).collect();
+  if !horizontal {
+    shrink_names.clear();
+  }
   if shrink_names.is_empty() {
     node.children.retain(|child| !child.is_empty_group());
   }
-  let count = node.children.len().max(1) as f32;
+
+  let mut count = node.children.len() as f32;
+  if !shrink_names.is_empty() {
+    let mut shrink_dependencies = HashSet::new();
+    for child in &node.children {
+      if shrink_names.contains(child.internal_name.as_str()) {
+        continue;
+      }
+      if count > 1.0 {
+        count -= 1.0;
+        let mut dependency = false;
+        let mut factor = 0.0;
+        for constraint in constraints
+          .iter()
+          .filter(|constraint| constraint.for_name == child.internal_name)
+        {
+          if horizontal && constraint.target != dgm::ConstraintValues::Width {
+            continue;
+          }
+          if !horizontal && constraint.target != dgm::ConstraintValues::Height {
+            continue;
+          }
+          factor = constraint.factor;
+          if !shrink_names.contains(constraint.ref_for_name.as_str()) {
+            continue;
+          }
+          count += constraint.factor;
+          shrink_dependencies.insert(child.internal_name.clone());
+          dependency = true;
+          break;
+        }
+        if !dependency && child.is_empty_group() {
+          let scale_down_empty_spacing = if horizontal {
+            properties
+              .get(child.internal_name.as_str())
+              .and_then(|properties| properties.get(&dgm::ConstraintValues::Width))
+              .is_some_and(|width| *width > 0.0)
+          } else {
+            properties
+              .get(child.internal_name.as_str())
+              .and_then(|properties| properties.get(&dgm::ConstraintValues::Height))
+              .is_some_and(|height| *height > 0.0)
+          };
+          if scale_down_empty_spacing {
+            count += factor;
+            shrink_dependencies.insert(child.internal_name.clone());
+          }
+        }
+      }
+    }
+    shrink_names.extend(shrink_dependencies);
+    space_width = 0.0;
+    space_height = 0.0;
+  }
+
+  let count = count.max(1.0);
   let base_width = if horizontal {
     node.width / count
   } else {
@@ -2388,14 +2318,23 @@ fn linear_layout_tree(
       .unwrap_or(base_height);
     total_primary += if horizontal { width } else { height };
   }
-  total_primary += (count - 1.0).max(0.0) * space;
-  let scale = if horizontal && total_primary > node.width {
+  total_primary += if horizontal {
+    (count - 1.0).max(0.0) * space_width
+  } else {
+    (count - 1.0).max(0.0) * space_height
+  };
+  let width_scale = if horizontal && total_primary > node.width {
     node.width / total_primary
-  } else if !horizontal && total_primary > node.height {
+  } else {
+    1.0
+  };
+  let height_scale = if !horizontal && total_primary > node.height {
     node.height / total_primary
   } else {
     1.0
   };
+  space_width *= width_scale;
+  space_height *= height_scale;
   let mut cursor = if reverse {
     if horizontal { node.width } else { node.height }
   } else {
@@ -2412,8 +2351,8 @@ fn linear_layout_tree(
       .copied()
       .unwrap_or(base_height);
     if shrink_names.is_empty() || shrink_names.contains(child.internal_name.as_str()) {
-      width *= scale;
-      height *= scale;
+      width *= width_scale;
+      height *= height_scale;
     }
     if horizontal {
       let x = if reverse {
@@ -2429,9 +2368,9 @@ fn linear_layout_tree(
       child.width = width;
       child.height = height;
       if reverse {
-        cursor -= space * scale;
+        cursor -= space_width;
       } else {
-        cursor += space * scale;
+        cursor += space_width;
       }
     } else {
       let y = if reverse {
@@ -2447,11 +2386,14 @@ fn linear_layout_tree(
       child.width = width;
       child.height = height;
       if reverse {
-        cursor -= space * scale;
+        cursor -= space_height;
       } else {
-        cursor += space * scale;
+        cursor += space_height;
       }
     }
+  }
+  if node.child_order == dgm::ChildOrderValues::Top {
+    node.children.reverse();
   }
 }
 
@@ -2478,11 +2420,12 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
   if count == 0 {
     return;
   }
+  let connector_radius = radius * (algorithm.span_angle / count as f32).to_radians().cos();
   for (index, child) in node.children.iter_mut().skip(start).enumerate() {
     let angle = (index as f32) * algorithm.span_angle / count as f32 + algorithm.start_angle;
     let radians = angle.to_radians();
     let (width, height, current_radius) = if child.is_connector {
-      (node.width / 12.0, node.height / 12.0, radius)
+      (node.width / 12.0, node.height / 12.0, connector_radius)
     } else {
       (child_width, child_height, radius)
     };
@@ -2494,89 +2437,394 @@ fn cycle_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
 }
 
 fn hierarchy_layout_tree(node: &mut DiagramShapeNode, algorithm: LayoutAlgorithm) {
+  if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
+    return;
+  }
+
   let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
     LinearDirection::FromTop
   } else {
     algorithm.linear_direction
   };
-  let algorithm = LayoutAlgorithm {
-    linear_direction: direction,
-    ..algorithm
+  let mut count = node.children.len();
+  if algorithm.kind == dgm::AlgorithmValues::HierarchyChild {
+    count = node
+      .children
+      .iter()
+      .filter(|child| !child.is_connector)
+      .count();
+  }
+  if count == 0 {
+    return;
+  }
+
+  let space_width = 0.1;
+  let space_height = 0.3;
+  if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot && count == 3 {
+    let assistant_index = node
+      .children
+      .iter()
+      .position(|child| child_contains_data_node_type(child, dgm::ElementValues::Assistant));
+    if assistant_index == Some(2)
+      && !child_contains_data_node_type(&node.children[1], dgm::ElementValues::Assistant)
+    {
+      node.children.swap(1, 2);
+    }
+  }
+
+  let horizontal_shapes_count = if algorithm.secondary_linear_direction == LinearDirection::FromTop
+  {
+    2
+  } else if matches!(
+    direction,
+    LinearDirection::FromLeft | LinearDirection::FromRight
+  ) {
+    count
+  } else {
+    1
   };
-  linear_layout_tree(node, algorithm, &[], &[]);
+  let vertical_count = vertical_shapes_count(node).max(1);
+  let mut child_width = node.width
+    / (horizontal_shapes_count as f32 + (horizontal_shapes_count - 1) as f32 * space_width);
+  let child_height =
+    node.height / (vertical_count as f32 + (vertical_count - 1) as f32 * space_height);
+  let connector_width = 1.0;
+  let connector_height = child_height;
+  let mut x = 0.0;
+  let mut y = 0.0;
+  if algorithm.kind == dgm::AlgorithmValues::HierarchyChild && horizontal_shapes_count == 1 {
+    let child_indent = 0.1;
+    x = child_width * child_indent;
+    child_width *= 1.0 - 2.0 * child_indent;
+  }
+
+  let mut index = 0usize;
+  let mut row_height = 0.0_f32;
+  for child in &mut node.children {
+    child.x = x;
+    child.y = y;
+    if algorithm.kind == dgm::AlgorithmValues::HierarchyChild && child.is_connector {
+      child.width = connector_width;
+      child.height = connector_height;
+      continue;
+    }
+
+    let child_vertical_count = vertical_shapes_count(child).max(1);
+    let height = child_height
+      * (child_vertical_count as f32 + (child_vertical_count - 1) as f32 * space_height);
+    child.width = child_width;
+    child.height = height;
+
+    if matches!(
+      direction,
+      LinearDirection::FromTop | LinearDirection::FromBottom
+    ) {
+      y += height + child_height * space_height;
+    } else {
+      x += child_width + child_width * space_width;
+    }
+    row_height = row_height.max(height);
+
+    if algorithm.secondary_linear_direction == LinearDirection::FromTop && index % 2 == 1 {
+      x = 0.0;
+      y += row_height + child_height * space_height;
+      row_height = 0.0;
+    }
+    index += 1;
+  }
+}
+
+fn vertical_shapes_count(node: &DiagramShapeNode) -> usize {
+  let Some(algorithm) = node.algorithms.last().copied() else {
+    return if node.is_connector { 0 } else { 1 };
+  };
+  if node.children.is_empty() {
+    return if node.is_connector { 0 } else { 1 };
+  }
+  let direction = if algorithm.kind == dgm::AlgorithmValues::HierarchyRoot {
+    LinearDirection::FromTop
+  } else {
+    algorithm.linear_direction
+  };
+  if matches!(
+    direction,
+    LinearDirection::FromTop | LinearDirection::FromBottom
+  ) {
+    node.children.iter().map(vertical_shapes_count).sum()
+  } else if matches!(
+    direction,
+    LinearDirection::FromLeft | LinearDirection::FromRight
+  ) && algorithm.secondary_linear_direction == LinearDirection::FromTop
+  {
+    (node
+      .children
+      .iter()
+      .map(vertical_shapes_count)
+      .sum::<usize>()
+      + 1)
+      / 2
+  } else {
+    node
+      .children
+      .iter()
+      .map(vertical_shapes_count)
+      .max()
+      .unwrap_or(1)
+  }
+}
+
+fn child_contains_data_node_type(
+  node: &DiagramShapeNode,
+  data_node_type: dgm::ElementValues,
+) -> bool {
+  node.data_node_type == Some(data_node_type)
+    || node
+      .children
+      .iter()
+      .any(|child| child_contains_data_node_type(child, data_node_type))
 }
 
 fn snake_layout_tree(
   node: &mut DiagramShapeNode,
   algorithm: LayoutAlgorithm,
-  _constraints: &[DiagramConstraint],
+  constraints: &[DiagramConstraint],
 ) {
-  if node.children.is_empty() {
+  if node.children.is_empty() || node.width == 0.0 || node.height == 0.0 {
     return;
   }
+
+  let child_aspect_ratio = node
+    .children
+    .first()
+    .map(|child| child.aspect_ratio)
+    .unwrap_or(0.0);
+  let mut shape_width = node.width;
+  let shape_height = node.height;
+  if child_aspect_ratio != 0.0
+    && shape_height != 0.0
+    && child_aspect_ratio < shape_width / shape_height
+  {
+    shape_width = shape_height * child_aspect_ratio;
+  }
+
+  let mut space_from_constraint = 1.0;
+  let mut properties_by_name: HashMap<String, HashMap<dgm::ConstraintValues, f32>> = HashMap::new();
+  let mut properties_by_type: HashMap<dgm::ElementValues, HashMap<dgm::ConstraintValues, f32>> =
+    HashMap::new();
+  properties_by_name.insert(
+    String::new(),
+    HashMap::from([
+      (dgm::ConstraintValues::Width, shape_width),
+      (dgm::ConstraintValues::Height, shape_height),
+    ]),
+  );
+  for constraint in constraints {
+    if matches!(
+      constraint.reference,
+      dgm::ConstraintValues::Width | dgm::ConstraintValues::Height
+    ) && constraint.target == dgm::ConstraintValues::Spacing
+      && constraint.for_name.is_empty()
+    {
+      space_from_constraint = constraint.factor;
+    }
+    let Some(reference_properties) = properties_by_name.get(constraint.ref_for_name.as_str())
+    else {
+      continue;
+    };
+    let Some(reference) = reference_properties.get(&constraint.reference) else {
+      continue;
+    };
+    if constraint.value != 0.0 {
+      continue;
+    }
+    let value = reference * constraint.factor;
+    if let Some(point_type) = constraint.point_type {
+      properties_by_type
+        .entry(point_type)
+        .or_default()
+        .insert(constraint.target, value);
+    } else {
+      properties_by_name
+        .entry(constraint.for_name.clone())
+        .or_default()
+        .insert(constraint.target, value);
+    }
+  }
+
+  let shape_widths: Vec<f32> = node
+    .children
+    .iter()
+    .map(|child| {
+      child
+        .data_node_type
+        .and_then(|data_node_type| properties_by_type.get(&data_node_type))
+        .and_then(|properties| properties.get(&dgm::ConstraintValues::Width))
+        .copied()
+        .unwrap_or(shape_width)
+    })
+    .collect();
+
+  let space_from_constraints = space_from_constraint != 1.0;
+  let mut horizontal = true;
+  let (increment_x, increment_y) = match algorithm.grow_direction {
+    GrowDirection::TopLeft => (1.0, 1.0),
+    GrowDirection::TopRight => (-1.0, 1.0),
+    GrowDirection::BottomLeft => {
+      horizontal = false;
+      (1.0, -1.0)
+    }
+    GrowDirection::BottomRight => {
+      horizontal = false;
+      (-1.0, -1.0)
+    }
+  };
+
   let count = node.children.len();
-  let space = 0.3_f32;
-  let aspect_ratio = 0.54_f32;
+  let space = if space_from_constraints {
+    space_from_constraint
+  } else {
+    0.3
+  };
+  let grid_aspect_ratio = 0.54;
   let mut columns = 1usize;
   let mut rows = 1usize;
   let mut max_row_width = 0.0_f32;
-  for candidate_rows in 1..count {
-    let candidate_columns = count.div_ceil(candidate_rows);
-    let row_width = node.width * candidate_columns as f32;
-    let total_height = node.height * candidate_rows as f32;
-    if row_width > 0.0 && total_height / row_width >= aspect_ratio {
-      columns = candidate_columns;
+  if child_aspect_ratio != 0.0 && count as f32 <= child_aspect_ratio {
+    rows = count;
+  } else {
+    for candidate_rows in 1..count {
+      let candidate_columns = count.div_ceil(candidate_rows);
       rows = candidate_rows;
-      max_row_width = row_width;
-      break;
+      columns = candidate_columns;
+      let row_width: f32 = shape_widths.iter().take(candidate_columns).sum();
+      if row_width != 0.0 && shape_height * candidate_rows as f32 / row_width >= grid_aspect_ratio {
+        max_row_width = row_width;
+        break;
+      }
     }
   }
-  if max_row_width == 0.0 {
-    columns = count;
-    rows = 1;
+
+  let mut child_width = node.width / (columns as f32 + (columns - 1) as f32 * space);
+  let mut child_height = child_width * grid_aspect_ratio;
+  if columns == 1 && rows > 1 {
+    let mut num_spaces = -1.0;
+    if space_from_constraints {
+      num_spaces += 4.0;
+    }
+    child_height = node.height / (rows as f32 + (rows as f32 + num_spaces) * space);
+    if child_aspect_ratio > 1.0 {
+      child_width = node.width.min(child_height * child_aspect_ratio);
+    }
+    horizontal = false;
   }
-  let child_width = node.width / (columns as f32 + (columns.saturating_sub(1) as f32) * space);
-  let child_height = (child_width * aspect_ratio)
-    .min(node.height / (rows as f32 + (rows.saturating_sub(1) as f32) * space));
-  let step_x = child_width + child_width * space;
-  let step_y = child_height + child_height * space;
-  let start_x = if algorithm.reverse {
+
+  let mut x = if increment_x == -1.0 {
     node.width - child_width
   } else {
     0.0
   };
-  let inc_x = if algorithm.reverse { -1.0 } else { 1.0 };
-  let mut x = start_x;
-  let mut y = 0.0;
+  let mut y = if increment_y == -1.0 {
+    node.height - child_height
+  } else if space_from_constraints && !horizontal {
+    child_height * space * 2.0
+  } else {
+    0.0
+  };
+  let start_x = x;
   let mut column_index = 0usize;
+  let mut row_height = 0.0_f32;
+  let widths_from_constraints = count >= 2
+    && node.children.get(1).and_then(|child| child.data_node_type)
+      == Some(dgm::ElementValues::SiblingTransition);
   for (index, child) in node.children.iter_mut().enumerate() {
-    child.x = x;
-    child.y = y;
-    child.width = child_width;
-    child.height = child_height;
-
-    let next_index = index + 1;
-    if next_index % columns == 0 || ((next_index / columns) + 1) != rows {
-      x += inc_x * step_x;
+    child.x = x.max(0.0);
+    child.y = y.max(0.0);
+    let mut current_width = child_width;
+    let mut current_height = child_height;
+    if widths_from_constraints && max_row_width != 0.0 {
+      current_width = node.width * shape_widths[index] / max_row_width;
     }
+    if child_aspect_ratio != 0.0 {
+      current_height = (current_width / child_aspect_ratio)
+        .min(node.height / (rows as f32 + (rows - 1) as f32 * space));
+    }
+    row_height = row_height.max(current_height);
+    child.width = current_width;
+    child.height = current_height;
 
-    column_index += 1;
-    if column_index == columns {
-      if (next_index + 1) % columns != 0
-        && (next_index + 1) >= 3
-        && ((next_index + 1) / columns + 1) == rows
-        && count != rows * columns
-      {
-        x = start_x + inc_x * step_x / 2.0;
-      } else {
-        x = start_x;
+    let placed = index + 1;
+    match algorithm.continue_direction {
+      ContinueDirection::SameDirection => {
+        if placed % columns == 0 || placed / columns + 1 != rows {
+          x += increment_x * (current_width + space * current_width);
+        }
+        column_index += 1;
+        if column_index == columns {
+          if (placed + 1) % columns != 0
+            && placed + 1 >= 3
+            && (placed + 1) / columns + 1 == rows
+            && count != rows * columns
+          {
+            x = if widths_from_constraints {
+              start_x
+            } else {
+              start_x + (increment_x * (current_width + space * current_width)) / 2.0
+            };
+          } else {
+            x = start_x;
+          }
+          y += increment_y * (row_height + space * row_height);
+          column_index = 0;
+          row_height = 0.0;
+        }
+        if placed % columns != 0 && placed >= 3 && placed / columns + 1 == rows {
+          x += increment_x * (current_width + space * current_width);
+        }
       }
-      y += step_y;
-      column_index = 0;
-    }
-
-    if next_index % columns != 0 && next_index >= 3 && ((next_index / columns) + 1) == rows {
-      x += inc_x * step_x;
+      ContinueDirection::ReverseDirection => {
+        if (placed % columns == 0 || placed / columns + 1 != rows)
+          && (placed / columns + 1) % 2 != 0
+        {
+          x += current_width + space * current_width;
+        } else if placed % columns != 0 && placed / columns + 1 != rows {
+          x -= current_width + space * current_width;
+        }
+        column_index += 1;
+        if column_index == columns {
+          if (placed + 1) % columns != 0
+            && placed + 1 >= 4
+            && (placed + 1) / columns + 1 == rows
+            && count != rows * columns
+            && (placed / columns + 1) % 2 == 0
+          {
+            x -= current_width * 3.0 / 2.0;
+          } else if (placed + 1) % columns != 0
+            && placed + 1 >= 4
+            && (placed + 1) / columns + 1 == rows
+            && count != rows * columns
+            && (placed / columns + 1) % 2 != 0
+          {
+            x = start_x + (increment_x * (current_width + space * current_width)) / 2.0;
+          } else if (placed / columns + 1) % 2 != 0 {
+            x = start_x;
+          }
+          y += increment_y * (child_height + space * child_height);
+          column_index = 0;
+        }
+        if placed % columns != 0
+          && placed >= 3
+          && placed / columns + 1 == rows
+          && (placed / columns + 1) % 2 == 0
+        {
+          x -= increment_x * (current_width + space * current_width);
+        } else if placed % columns != 0
+          && placed >= 3
+          && placed / columns + 1 == rows
+          && (placed / columns + 1) % 2 != 0
+        {
+          x += increment_x * (current_width + space * current_width);
+        }
+      }
     }
   }
 }
@@ -2589,161 +2837,23 @@ fn flatten_diagram_shape_tree(
 ) {
   let x = offset_x + node.x;
   let y = offset_y + node.y;
-  if !node.hidden_geometry && (node.has_geometry || !node.text.trim().is_empty()) {
+  if !node.hidden_geometry && (node.has_geometry || !node.text_body.is_empty()) {
     shapes.push(DiagramShape {
       x,
       y,
       width: node.width,
       height: node.height,
-      text: node.text.clone(),
+      text_body: node.text_body.clone(),
+      shape_properties: node.shape_properties.clone(),
+      style: node.style.clone(),
+      text_fill: node.text_fill,
+      text_rotation_deg: node.text_rotation_deg,
       fill: node.fill,
       order: node.order,
+      font_size_pt: node.font_size_pt,
     });
   }
   for child in &node.children {
     flatten_diagram_shape_tree(child, x, y, shapes);
   }
-}
-
-fn snake_layout(nodes: &[DiagramNode], bounds: DiagramBounds, reverse: bool) -> Vec<DiagramShape> {
-  let columns = if nodes.len() <= 3 {
-    nodes.len().max(1)
-  } else {
-    2
-  };
-  let rows = nodes.len().div_ceil(columns).max(1);
-  grid_layout(nodes, bounds, columns, rows, reverse)
-}
-
-fn linear_layout(
-  nodes: &[DiagramNode],
-  bounds: DiagramBounds,
-  reverse: bool,
-  allow_hierarchy: bool,
-) -> Vec<DiagramShape> {
-  if allow_hierarchy
-    && nodes
-      .iter()
-      .map(|node| node.depth)
-      .max()
-      .unwrap_or_default()
-      > nodes
-        .iter()
-        .map(|node| node.depth)
-        .min()
-        .unwrap_or_default()
-  {
-    return hierarchical_linear_layout(nodes, bounds, reverse);
-  }
-  grid_layout(nodes, bounds, nodes.len().max(1), 1, reverse)
-}
-
-fn hierarchical_linear_layout(
-  nodes: &[DiagramNode],
-  bounds: DiagramBounds,
-  reverse: bool,
-) -> Vec<DiagramShape> {
-  // Source: LibreOffice CompositeAlg + LinAlg: child layout nodes are sized
-  // inside their parent composite, and linear layout spreads the composites
-  // along the primary axis. This preserves that parent/descendant grouping for
-  // the flattened render model until the full shape tree visitor is in place.
-  let min_depth = nodes
-    .iter()
-    .map(|node| node.depth)
-    .min()
-    .unwrap_or_default();
-  let max_depth = nodes
-    .iter()
-    .map(|node| node.depth)
-    .max()
-    .unwrap_or(min_depth);
-  let rows = (max_depth - min_depth + 1).max(1);
-  let mut groups = Vec::<Vec<&DiagramNode>>::new();
-  for node in nodes {
-    if node.depth == min_depth || groups.is_empty() {
-      groups.push(vec![node]);
-    } else if let Some(group) = groups.last_mut() {
-      group.push(node);
-    }
-  }
-  let columns = groups.len().max(1);
-  let gap = (bounds.width.min(bounds.height) * 0.04).clamp(4.0, 18.0);
-  let cell_width = (bounds.width - gap * (columns.saturating_sub(1) as f32)) / columns as f32;
-  let cell_height = (bounds.height - gap * (rows.saturating_sub(1) as f32)) / rows as f32;
-  let mut shapes = Vec::new();
-  for (group_index, group) in groups.iter().enumerate() {
-    let column = if reverse {
-      columns - 1 - group_index
-    } else {
-      group_index
-    };
-    for node in group {
-      let row = node.depth.saturating_sub(min_depth).min(rows - 1);
-      let x = bounds.x + column as f32 * (cell_width + gap);
-      let shape_height = node
-        .height_width_factor
-        .map(|factor| cell_width * factor)
-        .or(node.preferred_height)
-        .map(|height| height.max(18.0).min(cell_height))
-        .unwrap_or_else(|| (cell_height * 0.72).max(18.0));
-      let y = bounds.y + row as f32 * (cell_height + gap) + (cell_height - shape_height) / 2.0;
-      shapes.push(DiagramShape {
-        x,
-        y,
-        width: cell_width.max(1.0),
-        height: shape_height,
-        text: node.text.clone(),
-        fill: node.fill,
-        order: node.order,
-      });
-    }
-  }
-  shapes
-}
-
-fn cycle_layout(nodes: &[DiagramNode], bounds: DiagramBounds, reverse: bool) -> Vec<DiagramShape> {
-  let columns = ((nodes.len() as f32).sqrt().ceil() as usize).max(1);
-  let rows = nodes.len().div_ceil(columns).max(1);
-  grid_layout(nodes, bounds, columns, rows, reverse)
-}
-
-fn grid_layout(
-  nodes: &[DiagramNode],
-  bounds: DiagramBounds,
-  columns: usize,
-  rows: usize,
-  reverse: bool,
-) -> Vec<DiagramShape> {
-  let gap = (bounds.width.min(bounds.height) * 0.04).clamp(4.0, 18.0);
-  let cell_width = (bounds.width - gap * (columns.saturating_sub(1) as f32)) / columns as f32;
-  let cell_height = (bounds.height - gap * (rows.saturating_sub(1) as f32)) / rows as f32;
-  nodes
-    .iter()
-    .enumerate()
-    .map(|(index, node)| {
-      let column = if reverse {
-        columns - 1 - index % columns
-      } else {
-        index % columns
-      };
-      let row = index / columns;
-      let x = bounds.x + column as f32 * (cell_width + gap);
-      let shape_height = node
-        .height_width_factor
-        .map(|factor| cell_width * factor)
-        .or(node.preferred_height)
-        .map(|height| height.max(18.0).min(cell_height))
-        .unwrap_or_else(|| (cell_height * 0.72).max(18.0));
-      let y = bounds.y + row as f32 * (cell_height + gap) + (cell_height - shape_height) / 2.0;
-      DiagramShape {
-        x,
-        y,
-        width: cell_width.max(1.0),
-        height: shape_height,
-        text: node.text.clone(),
-        fill: node.fill,
-        order: node.order,
-      }
-    })
-    .collect()
 }

@@ -2517,9 +2517,8 @@ pub struct StyleLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PtList/dgm:ptLst")]
 pub struct PointList {
-  /// Point.
-  #[sdk(child(qname = "dgm:CT_Pt/dgm:pt"))]
-  pub point: Vec<Point>,
+  #[sdk(choice(qname = "dgm:CT_Pt/dgm:pt", any))]
+  pub xml_children: Vec<PointListChoice>,
 }
 /// Connection List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3045,6 +3044,14 @@ pub enum DiagramDefinitionExtensionChoice {
   NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
   /// Defines the TextListStyleType Class.
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum PointListChoice {
+  /// Point.
+  Point(std::boxed::Box<Point>),
+  /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }

@@ -121,7 +121,18 @@ impl<'a> CalcPrintDocument<'a> {
     let mut pages = Vec::new();
     let mut skipped_empty_pages = 0usize;
     let mut document_top_down = true;
-    for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
+    let any_visible_used_sheet = import
+      .sheets
+      .iter()
+      .any(|sheet| sheet.visible() && sheet.used_range().is_some());
+    for sheet in import.sheets.iter().filter(|sheet| {
+      sheet.visible()
+        && if any_visible_used_sheet {
+          sheet.used_range().is_some()
+        } else {
+          sheet.active
+        }
+    }) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
@@ -570,7 +581,13 @@ fn print_areas_for_sheet(
   if !named_ranges.resolved_print_areas.is_empty() {
     return named_ranges.resolved_print_areas.clone();
   }
-  sheet.used_range().into_iter().collect()
+  match sheet.used_range() {
+    Some(range) => vec![range],
+    // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea(true).
+    // With skip-empty disabled, a missing document print area still leaves the
+    // default start/end range printable, so header/footer-only sheets export a page.
+    None => vec![CellRange::single(CellAddress { col: 1, row: 1 })],
+  }
 }
 
 fn page_areas_for_sheet(
@@ -786,6 +803,7 @@ fn print_cells_for_area<'a>(
         cell.data_type,
         import.globals.settings.date_1904,
       );
+      let rendered_text = pivot_display_text(sheet, address, rendered_text);
       cells.push(CalcPrintCell {
         address,
         text: cell.display_text.as_str(),
@@ -802,6 +820,25 @@ fn print_cells_for_area<'a>(
     }
   }
   cells
+}
+
+fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> String {
+  if !is_pivot_table_cell(sheet, address) {
+    return text;
+  }
+  // Source: LibreOffice DataPilot output uses STR_PIVOT_TOTAL ("Total Result")
+  // for Calc-rendered grand totals after OOXML pivot import.
+  match text.as_str() {
+    "Grand Total" | "Total general" => "Total Result".to_string(),
+    _ => text,
+  }
+}
+
+fn is_pivot_table_cell(sheet: &CalcSheet, address: CellAddress) -> bool {
+  sheet.resources.pivot_tables.tables.iter().any(|pivot| {
+    CellRange::parse_a1_range(&pivot.location_reference)
+      .is_some_and(|range| range.contains(address))
+  })
 }
 
 fn rendered_number_text(

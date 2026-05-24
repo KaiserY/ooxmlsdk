@@ -507,8 +507,10 @@ impl DrawingObjectModel {
         + shape.text_body.as_deref().map_or(0, xdr_text_body_text_len),
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
-      fill_color: shape_fill_color(&shape.shape_properties),
-      line_color: shape_line_color(&shape.shape_properties),
+      fill_color: shape_fill_color(&shape.shape_properties)
+        .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      line_color: shape_line_color(&shape.shape_properties)
+        .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
     }
@@ -600,8 +602,10 @@ impl DrawingObjectModel {
       text_color: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
-      fill_color: shape_fill_color(&shape.shape_properties),
-      line_color: shape_line_color(&shape.shape_properties),
+      fill_color: shape_fill_color(&shape.shape_properties)
+        .or_else(|| shape_style_fill_color(shape.shape_style.as_deref())),
+      line_color: shape_line_color(&shape.shape_properties)
+        .or_else(|| shape_style_line_color(shape.shape_style.as_deref())),
       line_width_emu: shape_line_width_emu(&shape.shape_properties),
       no_line: shape_no_line(&shape.shape_properties),
     }
@@ -623,7 +627,7 @@ impl DrawingObjectModel {
         .blip_fill
         .blip
         .as_ref()
-        .and_then(|blip| blip.embed.clone().or_else(|| blip.link.clone())),
+        .and_then(|blip| blip_relationship_id(blip)),
       hyperlink_relationship_id: hyperlink_relationship_id(
         properties.hyperlink_on_click.as_deref(),
       ),
@@ -681,6 +685,24 @@ impl DrawingObjectModel {
       no_line: false,
     }
   }
+}
+
+fn blip_relationship_id(blip: &a::Blip) -> Option<String> {
+  // Source: LibreOffice oox/source/drawingml and export/drawingml.cxx keeps SVG
+  // blips as the primary graphic with a bitmap fallback. Preserve that owner
+  // choice here instead of always taking the fallback r:embed.
+  blip
+    .blip_extension_list
+    .as_ref()
+    .and_then(|list| {
+      list.blip_extension.iter().find_map(|extension| {
+        match extension.blip_extension_choice.as_ref()? {
+          a::BlipExtensionChoice::SvgBlip(svg) => svg.embed.clone().or_else(|| svg.link.clone()),
+          _ => None,
+        }
+      })
+    })
+    .or_else(|| blip.embed.clone().or_else(|| blip.link.clone()))
 }
 
 fn hyperlink_relationship_id(hyperlink: Option<&a::HyperlinkOnClick>) -> Option<String> {
@@ -833,6 +855,64 @@ fn shape_no_line(properties: &xdr::ShapeProperties) -> bool {
     .as_deref()
     .and_then(|line| line.outline_choice1.as_ref())
     .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
+}
+
+fn shape_style_fill_color(style: Option<&xdr::ShapeStyle>) -> Option<RgbColor> {
+  let choice = style?.fill_reference.fill_reference_choice.as_ref()?;
+  match choice {
+    a::FillReferenceChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
+    a::FillReferenceChoice::SchemeColor(color) => scheme_color(color),
+    _ => None,
+  }
+}
+
+fn shape_style_line_color(style: Option<&xdr::ShapeStyle>) -> Option<RgbColor> {
+  let choice = style?.line_reference.line_reference_choice.as_ref()?;
+  match choice {
+    a::LineReferenceChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
+    a::LineReferenceChoice::SchemeColor(color) => scheme_color(color),
+    _ => None,
+  }
+}
+
+fn scheme_color(color: &a::SchemeColor) -> Option<RgbColor> {
+  // Source: LibreOffice resolves xdr:style scheme colors through the workbook
+  // theme/style matrix before SdrObject painting. Until the workbook theme
+  // bridge owns these colors, keep the Office default theme mapping used by
+  // OOXML's generated style references.
+  match color.val {
+    a::SchemeColorValues::Accent1 => Some(RgbColor {
+      r: 0x4f,
+      g: 0x81,
+      b: 0xbd,
+    }),
+    a::SchemeColorValues::Accent2 => Some(RgbColor {
+      r: 0xc0,
+      g: 0x50,
+      b: 0x4d,
+    }),
+    a::SchemeColorValues::Accent3 => Some(RgbColor {
+      r: 0x9b,
+      g: 0xbb,
+      b: 0x59,
+    }),
+    a::SchemeColorValues::Accent4 => Some(RgbColor {
+      r: 0x80,
+      g: 0x64,
+      b: 0xa2,
+    }),
+    a::SchemeColorValues::Accent5 => Some(RgbColor {
+      r: 0x4b,
+      g: 0xac,
+      b: 0xc6,
+    }),
+    a::SchemeColorValues::Accent6 => Some(RgbColor {
+      r: 0xf7,
+      g: 0x96,
+      b: 0x46,
+    }),
+    _ => None,
+  }
 }
 
 fn solid_fill_color(fill: &a::SolidFill) -> Option<RgbColor> {

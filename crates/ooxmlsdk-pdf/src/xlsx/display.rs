@@ -320,6 +320,9 @@ fn calc_row_inter_cell_spaces(current: &TextItem, next: &TextItem, next_is_row_e
   let space_width = text_metrics::measure_text(" ", &current.style)
     .max(current.style.font_size_pt * 0.25)
     .max(1.0);
+  if gap <= 0.0 {
+    return usize::from(next_is_row_end);
+  }
   if gap < space_width * 1.5 {
     1
   } else {
@@ -1794,18 +1797,22 @@ fn header_footer_text(page: &CalcPrintPage<'_>, header: bool) -> Option<String> 
   } else {
     model.odd_footer.as_ref()
   }?;
-  Some(expand_header_footer_tokens(text, page))
+  Some(text.clone())
 }
 
 fn render_header_footer_line(
   items: &mut Vec<PageItem>,
   x_pt: f32,
   y_pt: f32,
-  _page: &CalcPrintPage<'_>,
+  page: &CalcPrintPage<'_>,
   setup: PageSetup,
   text: &str,
 ) {
   for (align, value) in split_header_footer_sections(text) {
+    if value.is_empty() {
+      continue;
+    }
+    let value = expand_header_footer_tokens(&value, page);
     if value.is_empty() {
       continue;
     }

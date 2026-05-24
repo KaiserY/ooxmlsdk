@@ -130,15 +130,15 @@ fn worksheet_sheet(
   active: bool,
   shared_strings: &[SharedStringModel],
 ) -> Result<CalcSheet> {
-  let raw_values = part
+  let raw_data = part
     .data_as_str(package)
     .ok()
     .flatten()
-    .map(super::worksheet::worksheet_raw_cell_values)
+    .map(super::worksheet::worksheet_raw_data)
     .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_worksheet_part(package, part)?;
-  Ok(CalcSheet::from_worksheet(
+  let mut sheet = CalcSheet::from_worksheet(
     workbook_index,
     sheet.name.as_str().to_string(),
     sheet.sheet_id,
@@ -148,8 +148,46 @@ fn worksheet_sheet(
     worksheet,
     resources,
     shared_strings,
-    &raw_values,
-  ))
+    &raw_data.cell_values,
+  );
+  apply_raw_header_footer(&mut sheet, &raw_data);
+  Ok(sheet)
+}
+
+fn apply_raw_header_footer(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawWorksheetData) {
+  let header_footer = &mut sheet.page_settings.header_footer;
+  apply_raw_header_footer_text(&mut header_footer.odd_header, raw_data.odd_header.as_ref());
+  apply_raw_header_footer_text(&mut header_footer.odd_footer, raw_data.odd_footer.as_ref());
+  apply_raw_header_footer_text(
+    &mut header_footer.even_header,
+    raw_data.even_header.as_ref(),
+  );
+  apply_raw_header_footer_text(
+    &mut header_footer.even_footer,
+    raw_data.even_footer.as_ref(),
+  );
+  apply_raw_header_footer_text(
+    &mut header_footer.first_header,
+    raw_data.first_header.as_ref(),
+  );
+  apply_raw_header_footer_text(
+    &mut header_footer.first_footer,
+    raw_data.first_footer.as_ref(),
+  );
+}
+
+fn apply_raw_header_footer_text(target: &mut Option<String>, raw: Option<&String>) {
+  if target.as_deref().is_none_or(str::is_empty)
+    || raw.is_some_and(|raw| {
+      header_footer_has_sections(raw) && !target.as_deref().is_some_and(header_footer_has_sections)
+    })
+  {
+    *target = raw.cloned();
+  }
+}
+
+fn header_footer_has_sections(text: &str) -> bool {
+  text.contains("&L") || text.contains("&C") || text.contains("&R")
 }
 
 fn chartsheet(
@@ -266,7 +304,10 @@ fn run_color(color: &x::Color) -> Option<RgbColor> {
 }
 
 fn active_workbook_sheet(workbook: &x::Workbook) -> Option<usize> {
-  super::workbook_settings::WorkbookGlobals::from_workbook(workbook)
-    .active_tab()
-    .map(|index| index as usize)
+  Some(
+    super::workbook_settings::WorkbookGlobals::from_workbook(workbook)
+      .active_tab()
+      .map(|index| index as usize)
+      .unwrap_or(0),
+  )
 }

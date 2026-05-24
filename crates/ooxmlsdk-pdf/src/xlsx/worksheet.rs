@@ -4,6 +4,7 @@ use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+use quick_xml::escape::unescape;
 use quick_xml::events::Event;
 
 use super::comments::CommentsCatalog;
@@ -196,6 +197,17 @@ pub(crate) struct FormulaModel {
   pub(crate) input1_reference: Option<String>,
   pub(crate) input2_reference: Option<String>,
   pub(crate) assigns_value_to_name: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct RawWorksheetData {
+  pub(crate) cell_values: HashMap<String, String>,
+  pub(crate) odd_header: Option<String>,
+  pub(crate) odd_footer: Option<String>,
+  pub(crate) even_header: Option<String>,
+  pub(crate) even_footer: Option<String>,
+  pub(crate) first_header: Option<String>,
+  pub(crate) first_footer: Option<String>,
 }
 
 impl CalcSheet {
@@ -909,12 +921,13 @@ impl SheetResourceCatalog {
   }
 }
 
-pub(crate) fn worksheet_raw_cell_values(xml: &str) -> HashMap<String, String> {
+pub(crate) fn worksheet_raw_data(xml: &str) -> RawWorksheetData {
   let mut reader = quick_xml::Reader::from_str(xml);
   reader.config_mut().trim_text(false);
-  let mut values = HashMap::new();
+  let mut data = RawWorksheetData::default();
   let mut current_cell: Option<String> = None;
   let mut in_value = false;
+  let mut header_footer_tag: Option<&'static str> = None;
   loop {
     match reader.read_event() {
       Ok(Event::Start(event)) => {
@@ -927,14 +940,33 @@ pub(crate) fn worksheet_raw_cell_values(xml: &str) -> HashMap<String, String> {
             .map(|attr| String::from_utf8_lossy(attr.value.as_ref()).into_owned());
         } else if name.as_ref().ends_with(b"v") {
           in_value = current_cell.is_some();
+        } else {
+          header_footer_tag = raw_header_footer_tag(name.as_ref());
         }
       }
       Ok(Event::Text(event)) if in_value => {
         if let Some(cell) = &current_cell {
-          values.insert(
+          data.cell_values.insert(
             cell.clone(),
             super::text::decode_excel_escaped_text(&String::from_utf8_lossy(event.as_ref())),
           );
+        }
+      }
+      Ok(Event::Text(event)) => {
+        if let Some(tag) = header_footer_tag {
+          let raw = String::from_utf8_lossy(event.as_ref());
+          let text = unescape(&raw)
+            .map(|value| value.into_owned())
+            .unwrap_or_else(|_| raw.into_owned());
+          match tag {
+            "oddHeader" => data.odd_header = Some(text),
+            "oddFooter" => data.odd_footer = Some(text),
+            "evenHeader" => data.even_header = Some(text),
+            "evenFooter" => data.even_footer = Some(text),
+            "firstHeader" => data.first_header = Some(text),
+            "firstFooter" => data.first_footer = Some(text),
+            _ => {}
+          }
         }
       }
       Ok(Event::End(event)) => {
@@ -943,6 +975,8 @@ pub(crate) fn worksheet_raw_cell_values(xml: &str) -> HashMap<String, String> {
           in_value = false;
         } else if name.as_ref().ends_with(b"c") {
           current_cell = None;
+        } else if raw_header_footer_tag(name.as_ref()).is_some() {
+          header_footer_tag = None;
         }
       }
       Ok(Event::Eof) => break,
@@ -950,7 +984,25 @@ pub(crate) fn worksheet_raw_cell_values(xml: &str) -> HashMap<String, String> {
       _ => {}
     }
   }
-  values
+  data
+}
+
+fn raw_header_footer_tag(name: &[u8]) -> Option<&'static str> {
+  if name.ends_with(b"oddHeader") {
+    Some("oddHeader")
+  } else if name.ends_with(b"oddFooter") {
+    Some("oddFooter")
+  } else if name.ends_with(b"evenHeader") {
+    Some("evenHeader")
+  } else if name.ends_with(b"evenFooter") {
+    Some("evenFooter")
+  } else if name.ends_with(b"firstHeader") {
+    Some("firstHeader")
+  } else if name.ends_with(b"firstFooter") {
+    Some("firstFooter")
+  } else {
+    None
+  }
 }
 
 fn worksheet_rows(

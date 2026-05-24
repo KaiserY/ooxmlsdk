@@ -282,7 +282,9 @@ impl StylesCatalog {
       11 => Some("0.00E+00"),
       12 => Some("# ?/?"),
       13 => Some("# ??/??"),
-      14 => Some("mm-dd-yy"),
+      // Source: LibreOffice sc/source/filter/excel/xlstyle.cxx
+      // spBuiltInFormats_ENGLISH_US maps Excel builtin 14 to M/D/YYYY.
+      14 => Some("M/D/YYYY"),
       15 => Some("d-mmm-yy"),
       16 => Some("d-mmm"),
       17 => Some("mmm-yy"),
@@ -290,7 +292,7 @@ impl StylesCatalog {
       19 => Some("h:mm:ss AM/PM"),
       20 => Some("h:mm"),
       21 => Some("h:mm:ss"),
-      22 => Some("m/d/yy h:mm"),
+      22 => Some("M/D/YYYY h:mm"),
       37 => Some("#,##0 ;(#,##0)"),
       38 => Some("#,##0 ;[Red](#,##0)"),
       39 => Some("#,##0.00;(#,##0.00)"),

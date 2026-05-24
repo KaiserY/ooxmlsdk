@@ -84,6 +84,8 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) hyperlink_action: Option<String>,
   pub(crate) graphic_uri: Option<String>,
   pub(crate) text: String,
+  pub(crate) text_font_size_points100: Option<i32>,
+  pub(crate) text_color: Option<RgbColor>,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
   pub(crate) fill_color: Option<RgbColor>,
@@ -217,9 +219,10 @@ pub(crate) struct DiagramColorCatalog {
   pub(crate) text_len: usize,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramDrawingCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) drawing: Option<Box<dsp::Drawing>>,
   pub(crate) shapes: usize,
   pub(crate) groups: usize,
   pub(crate) text_shapes: usize,
@@ -492,6 +495,14 @@ impl DrawingObjectModel {
         .as_deref()
         .map(xdr_text_body_text)
         .unwrap_or_default(),
+      text_font_size_points100: shape
+        .text_body
+        .as_deref()
+        .and_then(xdr_text_body_first_run_font_size),
+      text_color: shape
+        .text_body
+        .as_deref()
+        .and_then(xdr_text_body_first_run_color),
       text_len: shape.text_link.as_ref().map_or(0, |value| value.len())
         + shape.text_body.as_deref().map_or(0, xdr_text_body_text_len),
       child_objects: 0,
@@ -522,6 +533,8 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: group_shape_text(group),
+      text_font_size_points100: None,
+      text_color: None,
       text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
@@ -552,6 +565,8 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
       text: String::new(),
+      text_font_size_points100: None,
+      text_color: None,
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
@@ -581,6 +596,8 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
+      text_font_size_points100: None,
+      text_color: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties),
@@ -614,6 +631,8 @@ impl DrawingObjectModel {
       hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
+      text_font_size_points100: None,
+      text_color: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
@@ -631,6 +650,8 @@ impl DrawingObjectModel {
       hyperlink_invalid_url: None,
       hyperlink_action: None,
       text: String::new(),
+      text_font_size_points100: None,
+      text_color: None,
       ..Self::unknown()
     }
   }
@@ -650,6 +671,8 @@ impl DrawingObjectModel {
       hyperlink_action: None,
       graphic_uri: None,
       text: String::new(),
+      text_font_size_points100: None,
+      text_color: None,
       child_objects: 0,
       has_style: false,
       fill_color: None,
@@ -725,6 +748,31 @@ fn xdr_text_body_text(text_body: &xdr::TextBody) -> String {
   dml_paragraphs_text(&text_body.paragraph)
 }
 
+fn xdr_text_body_first_run_font_size(text_body: &xdr::TextBody) -> Option<i32> {
+  text_body
+    .paragraph
+    .iter()
+    .flat_map(|paragraph| paragraph.paragraph_choice.iter())
+    .find_map(|choice| match choice {
+      a::ParagraphChoice::Run(run) => run
+        .run_properties
+        .as_deref()
+        .and_then(|properties| properties.font_size),
+      _ => None,
+    })
+}
+
+fn xdr_text_body_first_run_color(text_body: &xdr::TextBody) -> Option<RgbColor> {
+  text_body
+    .paragraph
+    .iter()
+    .flat_map(|paragraph| paragraph.paragraph_choice.iter())
+    .find_map(|choice| match choice {
+      a::ParagraphChoice::Run(run) => run.run_properties.as_deref().and_then(drawingml_run_color),
+      _ => None,
+    })
+}
+
 fn dgm_text_body_text(text_body: &dgm::TextBody) -> String {
   dml_paragraphs_text(&text_body.paragraph)
 }
@@ -790,6 +838,13 @@ fn shape_no_line(properties: &xdr::ShapeProperties) -> bool {
 fn solid_fill_color(fill: &a::SolidFill) -> Option<RgbColor> {
   match fill.solid_fill_choice.as_ref()? {
     a::SolidFillChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
+    _ => None,
+  }
+}
+
+fn drawingml_run_color(properties: &a::RunProperties) -> Option<RgbColor> {
+  match properties.run_properties_choice1.as_ref()? {
+    a::RunPropertiesChoice::SolidFill(fill) => solid_fill_color(fill),
     _ => None,
   }
 }
@@ -1058,6 +1113,7 @@ impl DiagramDrawingCatalog {
   fn from_drawing(relationship_id: Option<String>, drawing: &dsp::Drawing) -> Self {
     let mut catalog = Self {
       relationship_id,
+      drawing: Some(Box::new(drawing.clone())),
       extension_markers: usize::from(drawing.shape_tree.office_art_extension_list.is_some()),
       ..Self::default()
     };

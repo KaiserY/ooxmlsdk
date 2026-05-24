@@ -7,7 +7,7 @@ use crate::error::Result;
 use super::pivot::PivotCacheCatalog;
 use super::query::ConnectionsCatalog;
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
-use super::workbook::WorkbookFragment;
+use super::workbook::{SharedStringModel, WorkbookFragment};
 use super::workbook_catalog::WorkbookCatalog;
 use super::workbook_settings::WorkbookGlobals;
 use super::worksheet::CalcSheet;
@@ -16,7 +16,7 @@ use super::worksheet::CalcSheet;
 pub(crate) struct ExcelImport {
   pub(crate) workbook: x::Workbook,
   pub(crate) sheets: Vec<CalcSheet>,
-  pub(crate) shared_strings: Vec<String>,
+  pub(crate) shared_strings: Vec<SharedStringModel>,
   pub(crate) globals: WorkbookGlobals,
   pub(crate) pivot_caches: PivotCacheCatalog,
   pub(crate) connections: ConnectionsCatalog,

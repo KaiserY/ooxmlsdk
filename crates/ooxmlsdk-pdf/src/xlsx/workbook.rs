@@ -5,6 +5,7 @@ use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
+use crate::docx::RgbColor;
 use crate::error::Result;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
@@ -14,9 +15,26 @@ use super::worksheet::{CalcSheet, SheetResourceCatalog};
 pub(crate) struct WorkbookFragment {
   workbook_part: WorkbookPart,
   workbook: x::Workbook,
-  pub(crate) shared_strings: Vec<String>,
+  pub(crate) shared_strings: Vec<SharedStringModel>,
   pub(crate) styles: StylesCatalog,
   pub(crate) defined_names: DefinedNamesCatalog,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct SharedStringModel {
+  pub(crate) text: String,
+  pub(crate) runs: Vec<SharedStringRun>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct SharedStringRun {
+  pub(crate) text: String,
+  pub(crate) font_size_pt: Option<f32>,
+  pub(crate) color: Option<RgbColor>,
+  pub(crate) bold: bool,
+  pub(crate) italic: bool,
+  pub(crate) underline: bool,
+  pub(crate) strikethrough: bool,
 }
 
 impl WorkbookFragment {
@@ -109,7 +127,7 @@ fn worksheet_sheet(
   workbook_index: usize,
   state: Option<x::SheetStateValues>,
   active: bool,
-  shared_strings: &[String],
+  shared_strings: &[SharedStringModel],
 ) -> Result<CalcSheet> {
   let worksheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_worksheet_part(package, part)?;
@@ -151,7 +169,7 @@ fn chartsheet(
 fn shared_strings(
   package: &mut SpreadsheetDocument,
   workbook_part: &WorkbookPart,
-) -> Result<Vec<String>> {
+) -> Result<Vec<SharedStringModel>> {
   let Some(shared_string_part) = workbook_part.shared_string_table_part(package) else {
     return Ok(Vec::new());
   };
@@ -160,7 +178,7 @@ fn shared_strings(
     table
       .shared_string_item
       .iter()
-      .map(shared_string_item_text)
+      .map(shared_string_item_model)
       .collect(),
   )
 }
@@ -177,6 +195,59 @@ fn shared_string_item_text(item: &x::SharedStringItem) -> String {
     .iter()
     .filter_map(|run| run.text.xml_content.as_deref())
     .collect()
+}
+
+fn shared_string_item_model(item: &x::SharedStringItem) -> SharedStringModel {
+  let text = shared_string_item_text(item);
+  let runs = item.run.iter().map(shared_string_run).collect::<Vec<_>>();
+  SharedStringModel { text, runs }
+}
+
+fn shared_string_run(run: &x::Run) -> SharedStringRun {
+  let mut model = SharedStringRun {
+    text: run.text.xml_content.clone().unwrap_or_default(),
+    ..SharedStringRun::default()
+  };
+  if let Some(properties) = &run.run_properties {
+    for choice in &properties.run_properties_choice {
+      match choice {
+        x::RunPropertiesChoice::Bold(value) => {
+          model.bold = value.val.map_or(true, |value| value.as_bool());
+        }
+        x::RunPropertiesChoice::Italic(value) => {
+          model.italic = value.val.map_or(true, |value| value.as_bool());
+        }
+        x::RunPropertiesChoice::Strike(value) => {
+          model.strikethrough = value.val.map_or(true, |value| value.as_bool());
+        }
+        x::RunPropertiesChoice::Underline(value) => {
+          model.underline = !matches!(value.val, Some(x::UnderlineValues::None));
+        }
+        x::RunPropertiesChoice::FontSize(value) => {
+          model.font_size_pt = Some(value.val as f32);
+        }
+        x::RunPropertiesChoice::Color(value) => {
+          model.color = run_color(value);
+        }
+        _ => {}
+      }
+    }
+  }
+  model
+}
+
+fn run_color(color: &x::Color) -> Option<RgbColor> {
+  let rgb = color.rgb.as_deref()?;
+  let value = rgb.strip_prefix('#').unwrap_or(rgb);
+  let value = if value.len() == 8 { &value[2..] } else { value };
+  if value.len() != 6 {
+    return None;
+  }
+  Some(RgbColor {
+    r: u8::from_str_radix(&value[0..2], 16).ok()?,
+    g: u8::from_str_radix(&value[2..4], 16).ok()?,
+    b: u8::from_str_radix(&value[4..6], 16).ok()?,
+  })
 }
 
 fn active_workbook_sheet(workbook: &x::Workbook) -> Option<usize> {

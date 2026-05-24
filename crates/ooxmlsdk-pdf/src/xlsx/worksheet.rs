@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
@@ -15,6 +17,7 @@ use super::sheet_relationships::SheetRelationshipCatalog;
 use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
+use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
 use crate::units;
 
@@ -37,7 +40,7 @@ pub(crate) struct CalcSheet {
   pub(crate) rows: Vec<CalcRow>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub(crate) struct CellAddress {
   pub(crate) col: u32,
   pub(crate) row: u32,
@@ -172,6 +175,7 @@ pub(crate) struct CalcCell {
   pub(crate) formula: Option<FormulaModel>,
   pub(crate) cached_value: Option<String>,
   pub(crate) display_text: String,
+  pub(crate) rich_text_runs: Vec<SharedStringRun>,
   pub(crate) has_extensions: bool,
 }
 
@@ -202,7 +206,7 @@ impl CalcSheet {
     active: bool,
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
-    shared_strings: &[String],
+    shared_strings: &[SharedStringModel],
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
     let metrics = SheetMetrics::from_worksheet(&worksheet);
@@ -902,8 +906,8 @@ impl SheetResourceCatalog {
   }
 }
 
-fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[String]) -> Vec<CalcRow> {
-  worksheet
+fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[SharedStringModel]) -> Vec<CalcRow> {
+  let mut rows = worksheet
     .sheet_data
     .row
     .iter()
@@ -919,7 +923,209 @@ fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[String]) -> Vec<Ca
         .map(|cell| CalcCell::from_cell(cell, shared_strings))
         .collect(),
     })
-    .collect()
+    .collect::<Vec<_>>();
+  recalculate_simple_formula_cells(&mut rows);
+  rows
+}
+
+fn recalculate_simple_formula_cells(rows: &mut [CalcRow]) {
+  // Source: LibreOffice sc/source/filter/oox/workbookhelper.cxx imports cell
+  // formulas into the Calc model, then formula cells can be interpreted rather
+  // than trusting stale OOXML cached values. Keep this bridge deliberately
+  // scoped to Calc's primitive numeric expression shape while the full token
+  // compiler is not present.
+  let mut values = formula_numeric_values(rows);
+  for _ in 0..8 {
+    let mut changed = false;
+    for row in rows.iter_mut() {
+      for cell in &mut row.cells {
+        let Some(address) = cell.address() else {
+          continue;
+        };
+        let Some(formula) = cell.formula.as_ref() else {
+          continue;
+        };
+        let Some(value) = eval_formula_number(&formula.text, &values) else {
+          continue;
+        };
+        let rendered = render_formula_number(value);
+        if cell.display_text != rendered {
+          cell.display_text = rendered;
+          cell.cached_value = Some(cell.display_text.clone());
+          changed = true;
+        }
+        values.insert(address, value);
+      }
+    }
+    if !changed {
+      break;
+    }
+  }
+}
+
+fn formula_numeric_values(rows: &[CalcRow]) -> HashMap<CellAddress, f64> {
+  let mut values = HashMap::new();
+  for (row_position, row) in rows.iter().enumerate() {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    for (cell_position, cell) in row.cells.iter().enumerate() {
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row_index,
+      });
+      if let Ok(value) = cell.display_text.trim().parse::<f64>() {
+        values.insert(address, value);
+      }
+    }
+  }
+  values
+}
+
+fn eval_formula_number(formula: &str, values: &HashMap<CellAddress, f64>) -> Option<f64> {
+  let mut parser = FormulaNumberParser {
+    input: formula.as_bytes(),
+    position: 0,
+    values,
+  };
+  let value = parser.parse_expression()?;
+  parser.skip_ws();
+  (parser.position == parser.input.len()).then_some(value)
+}
+
+struct FormulaNumberParser<'a> {
+  input: &'a [u8],
+  position: usize,
+  values: &'a HashMap<CellAddress, f64>,
+}
+
+impl FormulaNumberParser<'_> {
+  fn parse_expression(&mut self) -> Option<f64> {
+    let mut value = self.parse_term()?;
+    loop {
+      self.skip_ws();
+      match self.peek() {
+        None => return Some(value),
+        Some(b'+') => {
+          self.position += 1;
+          value += self.parse_term()?;
+        }
+        Some(b'-') => {
+          self.position += 1;
+          value -= self.parse_term()?;
+        }
+        _ => return Some(value),
+      }
+    }
+  }
+
+  fn parse_term(&mut self) -> Option<f64> {
+    let mut value = self.parse_factor()?;
+    loop {
+      self.skip_ws();
+      match self.peek() {
+        Some(b'*') => {
+          self.position += 1;
+          value *= self.parse_factor()?;
+        }
+        Some(b'/') => {
+          self.position += 1;
+          value /= self.parse_factor()?;
+        }
+        _ => return Some(value),
+      }
+    }
+  }
+
+  fn parse_factor(&mut self) -> Option<f64> {
+    self.skip_ws();
+    match self.peek()? {
+      b'(' => {
+        self.position += 1;
+        let value = self.parse_expression()?;
+        self.skip_ws();
+        if self.peek()? != b')' {
+          return None;
+        }
+        self.position += 1;
+        Some(value)
+      }
+      b'+' => {
+        self.position += 1;
+        self.parse_factor()
+      }
+      b'-' => {
+        self.position += 1;
+        Some(-self.parse_factor()?)
+      }
+      ch if ch.is_ascii_digit() || ch == b'.' => self.parse_number(),
+      ch if ch.is_ascii_alphabetic() || ch == b'$' => self.parse_reference(),
+      _ => None,
+    }
+  }
+
+  fn parse_number(&mut self) -> Option<f64> {
+    let start = self.position;
+    while self
+      .peek()
+      .is_some_and(|ch| ch.is_ascii_digit() || matches!(ch, b'.' | b'E' | b'e' | b'+' | b'-'))
+    {
+      if matches!(self.peek(), Some(b'+' | b'-')) && self.position > start {
+        let prev = self.input[self.position - 1];
+        if !matches!(prev, b'E' | b'e') {
+          break;
+        }
+      }
+      self.position += 1;
+    }
+    std::str::from_utf8(&self.input[start..self.position])
+      .ok()?
+      .parse::<f64>()
+      .ok()
+  }
+
+  fn parse_reference(&mut self) -> Option<f64> {
+    while self.peek() == Some(b'$') {
+      self.position += 1;
+    }
+    let col_start = self.position;
+    while self.peek().is_some_and(|ch| ch.is_ascii_alphabetic()) {
+      self.position += 1;
+    }
+    if col_start == self.position {
+      return None;
+    }
+    while self.peek() == Some(b'$') {
+      self.position += 1;
+    }
+    let row_start = self.position;
+    while self.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+      self.position += 1;
+    }
+    if row_start == self.position {
+      return None;
+    }
+    let address = std::str::from_utf8(&self.input[col_start..self.position]).ok()?;
+    let address = address.replace('$', "");
+    self.values.get(&CellAddress::parse_a1(&address)?).copied()
+  }
+
+  fn skip_ws(&mut self) {
+    while self.peek().is_some_and(|ch| ch.is_ascii_whitespace()) {
+      self.position += 1;
+    }
+  }
+
+  fn peek(&self) -> Option<u8> {
+    self.input.get(self.position).copied()
+  }
+}
+
+fn render_formula_number(value: f64) -> String {
+  if (value.fract()).abs() < f64::EPSILON {
+    format!("{}", value as i64)
+  } else {
+    let text = format!("{value:.15}");
+    text.trim_end_matches('0').trim_end_matches('.').to_string()
+  }
 }
 
 fn digit_width_to_points(value: f32) -> f32 {
@@ -933,7 +1139,7 @@ impl CalcCell {
     self.reference.as_deref().and_then(CellAddress::parse_a1)
   }
 
-  fn from_cell(cell: &x::Cell, shared_strings: &[String]) -> Self {
+  fn from_cell(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> Self {
     let cached_value = cell
       .cell_value
       .as_ref()
@@ -949,6 +1155,7 @@ impl CalcCell {
       formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
       cached_value,
       display_text: cell_text(cell, shared_strings),
+      rich_text_runs: cell_rich_text_runs(cell, shared_strings),
       has_extensions: cell.extension_list.is_some(),
     }
   }
@@ -994,7 +1201,7 @@ fn inline_string_text(value: &x::InlineString) -> String {
     .collect()
 }
 
-fn cell_text(cell: &x::Cell, shared_strings: &[String]) -> String {
+fn cell_text(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> String {
   match cell.data_type {
     Some(x::CellValues::SharedString) => cell
       .cell_value
@@ -1002,7 +1209,7 @@ fn cell_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       .and_then(|value| value.xml_content.as_deref())
       .and_then(|index| index.parse::<usize>().ok())
       .and_then(|index| shared_strings.get(index))
-      .cloned()
+      .map(|shared| shared.text.clone())
       .unwrap_or_default(),
     Some(x::CellValues::InlineString) => cell
       .inline_string
@@ -1024,6 +1231,37 @@ fn cell_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       .and_then(|value| value.xml_content.as_deref())
       .map(ToString::to_string)
       .unwrap_or_default(),
+  }
+}
+
+fn cell_rich_text_runs(
+  cell: &x::Cell,
+  shared_strings: &[SharedStringModel],
+) -> Vec<SharedStringRun> {
+  match cell.data_type {
+    Some(x::CellValues::SharedString) => cell
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.as_deref())
+      .and_then(|index| index.parse::<usize>().ok())
+      .and_then(|index| shared_strings.get(index))
+      .map(|shared| shared.runs.clone())
+      .unwrap_or_default(),
+    Some(x::CellValues::InlineString) => cell
+      .inline_string
+      .as_ref()
+      .map(|inline| {
+        inline
+          .run
+          .iter()
+          .map(|run| SharedStringRun {
+            text: run.text.xml_content.clone().unwrap_or_default(),
+            ..SharedStringRun::default()
+          })
+          .collect()
+      })
+      .unwrap_or_default(),
+    _ => Vec::new(),
   }
 }
 

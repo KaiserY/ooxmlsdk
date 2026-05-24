@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use crate::docx::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
@@ -217,19 +220,31 @@ fn render_cell_area(
       continue;
     }
     let hyperlink_url = hyperlink_for_cell(page, cell.address);
-    render_cell_text(
-      items,
-      &cell.rendered_text,
-      CellRect {
-        x_pt,
-        y_pt,
-        width_pt,
-        height_pt,
-      },
-      import.styles.text_style_for_cell(cell.style_index),
-      import.styles.alignment_for_cell(cell.style_index),
-      hyperlink_url.clone(),
-    );
+    let cell_rect = CellRect {
+      x_pt,
+      y_pt,
+      width_pt,
+      height_pt,
+    };
+    let base_style = import.styles.text_style_for_cell(cell.style_index);
+    if !cell.rich_text_runs.is_empty() && cell.rendered_text == cell.text {
+      render_cell_rich_text(
+        items,
+        cell.rich_text_runs,
+        cell_rect,
+        base_style,
+        hyperlink_url.clone(),
+      );
+    } else {
+      render_cell_text(
+        items,
+        &cell.rendered_text,
+        cell_rect,
+        base_style,
+        import.styles.alignment_for_cell(cell.style_index),
+        hyperlink_url.clone(),
+      );
+    }
     if let Some(hyperlink_url) = hyperlink_url {
       items.push(PageItem::LinkArea(LinkAreaItem {
         x_pt,
@@ -243,6 +258,60 @@ fn render_cell_area(
   if page.page_settings.print_grid_lines {
     render_grid(items, page, area, origin_x_pt, origin_y_pt, zoom_scale);
   }
+}
+
+fn render_cell_rich_text(
+  items: &mut Vec<PageItem>,
+  runs: &[super::workbook::SharedStringRun],
+  rect: CellRect,
+  base_style: TextStyle,
+  hyperlink_url: Option<String>,
+) {
+  let mut x_pt = rect.x_pt + XLSX_CELL_TEXT_INSET_PT;
+  let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
+  for run in runs.iter().filter(|run| !run.text.is_empty()) {
+    let mut style = base_style.clone();
+    if let Some(font_size_pt) = run.font_size_pt {
+      style.font_size_pt = font_size_pt;
+    }
+    if let Some(color) = run.color {
+      style.color = color;
+    }
+    style.bold = run.bold;
+    style.italic = run.italic;
+    style.underline = run.underline;
+    style.strikethrough = run.strikethrough;
+    let line_height = (style.font_size_pt * 1.15).max(1.0);
+    items.push(PageItem::Text(TextItem {
+      x_pt,
+      y_pt,
+      line_height_pt: line_height,
+      text: run.text.clone(),
+      style: style.clone(),
+      rotation_center_pt: None,
+      hyperlink_url: hyperlink_url.clone(),
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: true,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Portion,
+    }));
+    x_pt += approximate_text_width_pt(&run.text, style.font_size_pt);
+    if x_pt > rect.x_pt + rect.width_pt {
+      break;
+    }
+  }
+}
+
+fn approximate_text_width_pt(text: &str, font_size_pt: f32) -> f32 {
+  text
+    .chars()
+    .map(|ch| if ch.is_ascii_whitespace() { 0.33 } else { 0.55 })
+    .sum::<f32>()
+    * font_size_pt
 }
 
 fn conditional_fill_color(
@@ -396,6 +465,7 @@ fn render_cell_text(
     };
   }
   for line in lines {
+    let preserve_text_portion = line.chars().any(|ch| !ch.is_ascii());
     items.push(PageItem::Text(TextItem {
       x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
       y_pt,
@@ -412,9 +482,13 @@ fn render_cell_text(
       style_ref_text: None,
       form_widget_id: None,
       paragraph_bidi: false,
-      preserve_text_portion: false,
+      preserve_text_portion,
       decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
+      pdf_text_segmentation: if preserve_text_portion {
+        PdfTextSegmentation::Portion
+      } else {
+        PdfTextSegmentation::Line
+      },
     }));
     y_pt += line_height;
   }
@@ -780,6 +854,11 @@ fn print_page_diagram_items(
         width: width_pt * zoom_scale,
         height: height_pt * zoom_scale,
       };
+      if let Some(drawing) = persisted_diagram_drawing(&drawing.diagrams, data_model)
+        && push_persisted_diagram_items(&mut items, drawing, bounds)
+      {
+        continue;
+      }
       for shape in shared_diagram::layout_shapes(
         data_model,
         drawing
@@ -801,6 +880,283 @@ fn print_page_diagram_items(
     }
   }
   items
+}
+
+fn persisted_diagram_drawing<'a>(
+  diagrams: &'a super::drawing::DiagramResourceCatalog,
+  data: &dgm::DataModelRoot,
+) -> Option<&'a dsp::Drawing> {
+  let relationship_id = data
+    .data_model_extension_list
+    .as_ref()?
+    .data_model_extension
+    .iter()
+    .find_map(
+      |extension| match extension.data_model_extension_choice.as_ref()? {
+        a::DataModelExtensionChoice::DataModelExtensionBlock(block) => block.rel_id.as_deref(),
+        _ => None,
+      },
+    )?;
+  diagrams
+    .drawing_parts
+    .iter()
+    .find(|drawing| drawing.relationship_id.as_deref() == Some(relationship_id))
+    .and_then(|drawing| drawing.drawing.as_deref())
+}
+
+fn push_persisted_diagram_items(
+  items: &mut Vec<PageItem>,
+  drawing: &dsp::Drawing,
+  bounds: shared_diagram::DiagramBounds,
+) -> bool {
+  let content_bounds = persisted_diagram_content_bounds(drawing);
+  let start_len = items.len();
+  for choice in &drawing.shape_tree.shape_tree_choice {
+    match choice {
+      dsp::ShapeTreeChoice::Shape(shape) => {
+        push_persisted_diagram_shape(items, shape, bounds, content_bounds);
+      }
+      dsp::ShapeTreeChoice::GroupShape(group) => {
+        push_persisted_diagram_group(items, group, bounds, content_bounds);
+      }
+    }
+  }
+  items.len() > start_len
+}
+
+fn push_persisted_diagram_group(
+  items: &mut Vec<PageItem>,
+  group: &dsp::GroupShape,
+  bounds: shared_diagram::DiagramBounds,
+  content_bounds: Option<(i64, i64, i64, i64)>,
+) {
+  for choice in &group.group_shape_choice {
+    match choice {
+      dsp::GroupShapeChoice::Shape(shape) => {
+        push_persisted_diagram_shape(items, shape, bounds, content_bounds);
+      }
+      dsp::GroupShapeChoice::GroupShape(group) => {
+        push_persisted_diagram_group(items, group, bounds, content_bounds);
+      }
+    }
+  }
+}
+
+fn push_persisted_diagram_shape(
+  items: &mut Vec<PageItem>,
+  shape: &dsp::Shape,
+  bounds: shared_diagram::DiagramBounds,
+  content_bounds: Option<(i64, i64, i64, i64)>,
+) {
+  let Some((x, y, width, height)) = transform_bounds_pt(
+    shape.shape_properties.transform2_d.as_deref(),
+    bounds,
+    content_bounds,
+  ) else {
+    return;
+  };
+  items.push(PageItem::Rect(RectItem {
+    x_pt: x,
+    y_pt: y,
+    width_pt: width,
+    height_pt: height,
+    fill_color: Some(RgbColor {
+      r: 0x4f,
+      g: 0x81,
+      b: 0xbd,
+    }),
+    fill_opacity: 1.0,
+    stroke: Some(BorderStyle::default()),
+    stroke_opacity: 1.0,
+  }));
+  let Some(text_body) = shape.text_body.as_deref() else {
+    return;
+  };
+  let text = dml_paragraph_texts(&text_body.paragraph);
+  if text.trim().is_empty() {
+    return;
+  }
+  let (text_x, text_y, text_width, text_height) =
+    transform_bounds_pt_dsp(shape.transform2_d.as_deref(), bounds, content_bounds)
+      .unwrap_or((x, y, width, height));
+  render_drawing_text(
+    items,
+    &text,
+    text_x,
+    text_y,
+    text_width,
+    text_height,
+    persisted_diagram_text_style(text_body),
+    None,
+  );
+}
+
+fn persisted_diagram_text_style(text_body: &dsp::TextBody) -> Option<TextStyle> {
+  let mut style = TextStyle::default();
+  let mut changed = false;
+  for choice in text_body
+    .paragraph
+    .iter()
+    .flat_map(|paragraph| paragraph.paragraph_choice.iter())
+  {
+    if let a::ParagraphChoice::Run(run) = choice
+      && let Some(properties) = run.run_properties.as_deref()
+    {
+      if let Some(font_size) = properties.font_size {
+        style.font_size_pt = font_size as f32 / 100.0;
+        changed = true;
+      }
+      break;
+    }
+  }
+  changed.then_some(style)
+}
+
+fn dml_paragraph_texts(paragraphs: &[a::Paragraph]) -> String {
+  paragraphs
+    .iter()
+    .map(|paragraph| {
+      paragraph
+        .paragraph_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          a::ParagraphChoice::Run(run) => Some(run.text.as_str()),
+          a::ParagraphChoice::Field(field) => field.text.as_deref(),
+          _ => None,
+        })
+        .collect::<String>()
+    })
+    .filter(|line| !line.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn transform_bounds_pt(
+  transform: Option<&a::Transform2D>,
+  bounds: shared_diagram::DiagramBounds,
+  content_bounds: Option<(i64, i64, i64, i64)>,
+) -> Option<(f32, f32, f32, f32)> {
+  let transform = transform?;
+  let offset = transform.offset.as_ref()?;
+  let extents = transform.extents.as_ref()?;
+  transform_bounds_from_emu(
+    offset.x.to_emu(),
+    offset.y.to_emu(),
+    extents.cx.to_emu(),
+    extents.cy.to_emu(),
+    bounds,
+    content_bounds,
+  )
+}
+
+fn transform_bounds_pt_dsp(
+  transform: Option<&dsp::Transform2D>,
+  bounds: shared_diagram::DiagramBounds,
+  content_bounds: Option<(i64, i64, i64, i64)>,
+) -> Option<(f32, f32, f32, f32)> {
+  let transform = transform?;
+  let offset = transform.offset.as_ref()?;
+  let extents = transform.extents.as_ref()?;
+  transform_bounds_from_emu(
+    offset.x.to_emu(),
+    offset.y.to_emu(),
+    extents.cx.to_emu(),
+    extents.cy.to_emu(),
+    bounds,
+    content_bounds,
+  )
+}
+
+fn transform_bounds_from_emu(
+  x_emu: i64,
+  y_emu: i64,
+  width_emu: i64,
+  height_emu: i64,
+  bounds: shared_diagram::DiagramBounds,
+  content_bounds: Option<(i64, i64, i64, i64)>,
+) -> Option<(f32, f32, f32, f32)> {
+  let (min_x, min_y, max_x, max_y) =
+    content_bounds.unwrap_or((x_emu, y_emu, x_emu + width_emu, y_emu + height_emu));
+  let content_width = (max_x - min_x).max(1) as f32;
+  let content_height = (max_y - min_y).max(1) as f32;
+  Some((
+    bounds.x + (x_emu - min_x) as f32 / content_width * bounds.width,
+    bounds.y + (y_emu - min_y) as f32 / content_height * bounds.height,
+    width_emu as f32 / content_width * bounds.width,
+    height_emu as f32 / content_height * bounds.height,
+  ))
+}
+
+fn persisted_diagram_content_bounds(drawing: &dsp::Drawing) -> Option<(i64, i64, i64, i64)> {
+  let mut bounds = None;
+  for choice in &drawing.shape_tree.shape_tree_choice {
+    collect_persisted_diagram_bounds(choice, &mut bounds);
+  }
+  bounds
+}
+
+fn collect_persisted_diagram_bounds(
+  choice: &dsp::ShapeTreeChoice,
+  bounds: &mut Option<(i64, i64, i64, i64)>,
+) {
+  match choice {
+    dsp::ShapeTreeChoice::Shape(shape) => {
+      if let Some(transform) = shape.shape_properties.transform2_d.as_deref()
+        && let (Some(offset), Some(extents)) = (&transform.offset, &transform.extents)
+      {
+        let shape_bounds = (
+          offset.x.to_emu(),
+          offset.y.to_emu(),
+          offset.x.to_emu() + extents.cx.to_emu(),
+          offset.y.to_emu() + extents.cy.to_emu(),
+        );
+        *bounds = Some(match *bounds {
+          Some((min_x, min_y, max_x, max_y)) => (
+            min_x.min(shape_bounds.0),
+            min_y.min(shape_bounds.1),
+            max_x.max(shape_bounds.2),
+            max_y.max(shape_bounds.3),
+          ),
+          None => shape_bounds,
+        });
+      }
+    }
+    dsp::ShapeTreeChoice::GroupShape(group) => {
+      collect_persisted_group_bounds(group, bounds);
+    }
+  }
+}
+
+fn collect_persisted_group_bounds(
+  group: &dsp::GroupShape,
+  bounds: &mut Option<(i64, i64, i64, i64)>,
+) {
+  for child in &group.group_shape_choice {
+    match child {
+      dsp::GroupShapeChoice::Shape(shape) => {
+        if let Some(transform) = shape.shape_properties.transform2_d.as_deref()
+          && let (Some(offset), Some(extents)) = (&transform.offset, &transform.extents)
+        {
+          let shape_bounds = (
+            offset.x.to_emu(),
+            offset.y.to_emu(),
+            offset.x.to_emu() + extents.cx.to_emu(),
+            offset.y.to_emu() + extents.cy.to_emu(),
+          );
+          *bounds = Some(match *bounds {
+            Some((min_x, min_y, max_x, max_y)) => (
+              min_x.min(shape_bounds.0),
+              min_y.min(shape_bounds.1),
+              max_x.max(shape_bounds.2),
+              max_y.max(shape_bounds.3),
+            ),
+            None => shape_bounds,
+          });
+        }
+      }
+      dsp::GroupShapeChoice::GroupShape(group) => collect_persisted_group_bounds(group, bounds),
+    }
+  }
 }
 
 fn diagram_styles(
@@ -840,6 +1196,7 @@ fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::D
       shape.y,
       shape.width,
       shape.height,
+      None,
       None,
     );
   }
@@ -911,6 +1268,7 @@ fn print_page_drawing_text_items(
         origin_y_pt + y_pt * zoom_scale,
         width_pt * zoom_scale,
         height_pt * zoom_scale,
+        drawing_object_text_style(&anchor.object),
         drawing_object_hyperlink_url(drawing, &anchor.object),
       );
     }
@@ -938,13 +1296,14 @@ fn drawing_anchor_text(
     if !chart_text.is_empty() {
       return chart_text;
     }
-    return drawing
+    if drawing
       .diagrams
       .data_parts
       .iter()
-      .find(|data| data.relationship_id.as_deref() == Some(relationship_id))
-      .map(|data| data.visible_texts.join("\n"))
-      .unwrap_or_default();
+      .any(|data| data.relationship_id.as_deref() == Some(relationship_id))
+    {
+      return String::new();
+    }
   }
   String::new()
 }
@@ -956,9 +1315,10 @@ fn render_drawing_text(
   y_pt: f32,
   _width_pt: f32,
   height_pt: f32,
+  style: Option<TextStyle>,
   hyperlink_url: Option<String>,
 ) {
-  let style = TextStyle::default();
+  let style = style.unwrap_or_default();
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
     let y = y_pt + XLSX_CELL_TEXT_INSET_PT + index as f32 * line_height;
@@ -985,6 +1345,20 @@ fn render_drawing_text(
   }
 }
 
+fn drawing_object_text_style(object: &super::drawing::DrawingObjectModel) -> Option<TextStyle> {
+  let mut style = TextStyle::default();
+  let mut changed = false;
+  if let Some(font_size) = object.text_font_size_points100 {
+    style.font_size_pt = font_size as f32 / 100.0;
+    changed = true;
+  }
+  if let Some(color) = object.text_color {
+    style.color = color;
+    changed = true;
+  }
+  changed.then_some(style)
+}
+
 fn render_metafile_texts(
   items: &mut Vec<PageItem>,
   resource: &super::drawing::ImageResource,
@@ -1005,6 +1379,7 @@ fn render_metafile_texts(
     y_pt,
     width_pt,
     height_pt,
+    None,
     hyperlink_url,
   );
 }
@@ -1040,6 +1415,7 @@ fn print_page_vml_text_items(
       origin_y_pt + y_pt * zoom_scale,
       width_pt * zoom_scale,
       height_pt * zoom_scale,
+      None,
       None,
     );
   }

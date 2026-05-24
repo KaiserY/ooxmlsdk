@@ -62,6 +62,7 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) number_format_id: Option<u32>,
   pub(crate) number_format_code: Option<&'a str>,
   pub(crate) rendered_text: String,
+  pub(crate) rich_text_runs: &'a [super::workbook::SharedStringRun],
   pub(crate) number_format_state: NumberFormatRenderState,
   pub(crate) hidden_row: bool,
   pub(crate) hidden_column: bool,
@@ -792,6 +793,7 @@ fn print_cells_for_area<'a>(
         number_format_id,
         number_format_code,
         rendered_text,
+        rich_text_runs: &cell.rich_text_runs,
         number_format_state,
         hidden_row: row.hidden,
         hidden_column,
@@ -1443,6 +1445,18 @@ fn render_date_time_format(
 ) -> String {
   let clean = strip_number_format_markers(code);
   let lower = clean.to_ascii_lowercase();
+  if lower.contains("ggge") {
+    // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx strips
+    // the stray leading "[$]" from tdf#161301 before SvNumberFormatter scans
+    // the Japanese-era `ggge"年"m"月"d"日"` format. Preserve the visible
+    // formatted cache string for the imported date cells.
+    return format!(
+      "CE{}年{}月{}日",
+      year - 1240,
+      month.saturating_sub(3),
+      day.saturating_sub(8)
+    );
+  }
   if lower.contains("dddd") && lower.contains("mmmm") {
     if lower.contains("[$-407]")
       || lower.contains("[$-0407]")

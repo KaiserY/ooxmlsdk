@@ -1842,3 +1842,161 @@ fn mapped_xlsx_tdf139167_keeps_conditional_style_sample_text_visible() {
   assert_eq!(summary.page_count, 1);
   assert_page_contains(&summary, 0, "Hello");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/jumbosheets-test.cxx:testTdf109061
+fn mapped_xlsx_tdf109061_keeps_recalculated_sum_visible() {
+  let summary = render_summary("tdf109061.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Test");
+  assert_page_contains(&summary, 0, "1 2 3");
+  assert_page_contains(&summary, 0, "Sum: 6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testTdf112106
+fn mapped_xlsx_tdf112106_keeps_pivot_data_layout_values_visible() {
+  let summary = render_summary("tdf112106.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Country - all -");
+  assert_page_contains(&summary, 0, "Banana $617");
+  assert_page_contains(&summary, 0, "Total Result $13,126");
+  assert_page_contains(&summary, 1, "Order ID Product Category Amount Date Country");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testTdf155402
+fn mapped_xlsx_tdf155402_keeps_filename_cell_result_visible() {
+  let summary = render_summary("tdf155402.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "[tdf155402.xlsx]Sheet1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf91251_missingOverflowRoundtrip
+fn mapped_xlsx_tdf91251_keeps_textbox_overflow_sample_text_visible() {
+  let summary = render_summary("tdf91251_missingOverflowRoundtrip.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Text Box");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf164417
+fn mapped_xlsx_tdf164417_keeps_autofilter_date_rows_visible() {
+  let summary = render_summary("tdf164417.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Num Text Date");
+  assert_page_contains(&summary, 0, "1a 31/12/24");
+  assert_page_contains(&summary, 0, "2a 31/12/2024 (text)");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf165886
+fn mapped_xlsx_tdf165886_keeps_formula_quote_results_visible() {
+  let summary = render_summary("tdf165886.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "0 #NAME? TRUE");
+  assert_page_text_occurrences(&summary, 0, "#NAME?", 7);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf166413
+fn mapped_xlsx_tdf166413_keeps_conditional_formula_quote_samples_visible() {
+  let summary = render_summary("tdf166413.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(&summary, 0, r#"test ABC "ABC""#, 4);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf95640_xlsx_to_xlsx
+fn mapped_xlsx_tdf95640_keeps_standard_filter_rows_visible() {
+  let summary = render_summary("tdf95640.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "AAA BBB");
+  assert_page_contains(&summary, 0, "jan 2");
+  assert_page_contains(&summary, 0, "feb 1");
+  assert_page_contains(&summary, 0, "mar 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf97598XLSX
+fn mapped_xlsx_tdf97598_keeps_scenario_cell_text_visible() {
+  let summary = render_summary("tdf97598_scenarios.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Cell A1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testEscapeCharInNumberFormatXLSX
+fn mapped_xlsx_tdf81939_keeps_escaped_number_formats_visible() {
+  let summary = render_summary("tdf81939.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "01 23 45 67 89");
+  assert_page_contains(&summary, 0, "01.23.45.678.9");
+  assert_page_contains(&summary, 0, "123,456,789 €");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf155321_CondFormatColor_XLSX
+fn mapped_xlsx_tdf155321_keeps_conditional_color_scale_values_visible() {
+  let summary = render_summary("tdf155321.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 2 2");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf156028_ColorScale_XLSX
+fn mapped_xlsx_tdf156028_keeps_single_color_scale_value_visible() {
+  let summary = render_summary("tdf156028.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf138601_CondFormatXLSX
+fn mapped_xlsx_tdf138601_keeps_conditional_format_values_visible() {
+  let summary = render_summary("tdf138601.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "4 10 5");
+  assert_page_contains(&summary, 0, "6 2");
+  assert_page_contains(&summary, 0, "3 7");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatOperatorsSameRangeXLSX
+fn mapped_xlsx_tdf139928_keeps_conditional_operator_sample_text_visible() {
+  let summary = render_summary("tdf139928.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "hello h o l");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:tdf169379
+fn mapped_xlsx_tdf169379_keeps_distinct_conditional_format_columns_visible() {
+  let summary = render_summary("tdf169379.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 10 100");
+  assert_page_contains(&summary, 0, "10 100 1000");
+  assert_page_contains(&summary, 0, "20 200 2000");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testContentXLSXStrict
+fn mapped_xlsx_universal_content_strict_keeps_core_values_visible() {
+  let summary = render_summary("universal-content-strict.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "1 String1 6");
+  assert_page_contains(&summary, 0, "2 String2 5");
+  assert_page_contains(&summary, 0, "-1 11");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testRowIndex1BasedXLSX
+fn mapped_xlsx_row_index_1_based_keeps_first_row_and_multiline_text_visible() {
+  let summary = render_summary("row-index-1-based.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Action Plan.Name Action Plan.Description");
+  assert_page_contains(&summary, 0, "Jerry This is a longer Text.");
+  assert_page_contains(&summary, 0, "Second line.");
+  assert_page_contains(&summary, 0, "Third line.");
+}

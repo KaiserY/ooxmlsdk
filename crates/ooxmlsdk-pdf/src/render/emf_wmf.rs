@@ -26,6 +26,8 @@ const EMR_ELLIPSE: u32 = 42;
 const EMR_RECTANGLE: u32 = 43;
 const EMR_SET_DIBITS_TO_DEVICE: u32 = 80;
 const EMR_STRETCH_DIBITS: u32 = 81;
+const EMR_EXT_TEXTOUT_A: u32 = 83;
+const EMR_EXT_TEXTOUT_W: u32 = 84;
 const EMR_POLYGON16: u32 = 86;
 const EMR_POLYLINE16: u32 = 87;
 const EMR_POLYPOLYGON16: u32 = 91;
@@ -95,6 +97,50 @@ pub(crate) fn decode_metafile_as_raster(
   }
 
   Ok(None)
+}
+
+pub(crate) fn extract_metafile_texts(data: &[u8], content_type: Option<&str>) -> Vec<String> {
+  if !looks_like_metafile(data, content_type) || !is_emf(data) || data.len() < EMF_HEADER_SIZE {
+    return Vec::new();
+  }
+
+  let mut texts = Vec::new();
+  let mut pos = EMF_HEADER_SIZE;
+  while pos + EMF_RECORD_HEADER_SIZE <= data.len() {
+    let Ok(record_type) = read_u32(data, pos) else {
+      break;
+    };
+    let Ok(record_size) = read_u32(data, pos + 4) else {
+      break;
+    };
+    let record_size = record_size as usize;
+    if record_size < EMF_RECORD_HEADER_SIZE || pos + record_size > data.len() {
+      break;
+    }
+
+    match record_type {
+      EMR_EXT_TEXTOUT_W => {
+        if let Some(text) = extract_emr_ext_text_out_w(data, pos, record_size)
+          && !text.trim().is_empty()
+        {
+          texts.push(text);
+        }
+      }
+      EMR_EXT_TEXTOUT_A => {
+        if let Some(text) = extract_emr_ext_text_out_a(data, pos, record_size)
+          && !text.trim().is_empty()
+        {
+          texts.push(text);
+        }
+      }
+      EMR_EOF => break,
+      _ => {}
+    }
+
+    pos += record_size;
+  }
+
+  texts
 }
 
 fn looks_like_metafile(data: &[u8], content_type: Option<&str>) -> bool {
@@ -1009,6 +1055,73 @@ fn is_emf(data: &[u8]) -> bool {
   data.len() >= EMF_HEADER_SIZE
     && matches!(read_u32(data, 0), Ok(1))
     && matches!(read_u32(data, 4), Ok(size) if size as usize == EMF_HEADER_SIZE)
+}
+
+fn extract_emr_ext_text_out_w(
+  data: &[u8],
+  record_offset: usize,
+  record_size: usize,
+) -> Option<String> {
+  let text = ext_text_record(data, record_offset, record_size)?;
+  let byte_len = text.characters.checked_mul(2)?;
+  let start = record_offset.checked_add(text.string_offset)?;
+  let end = start.checked_add(byte_len)?;
+  let bytes = data.get(start..end)?;
+  let units = bytes
+    .chunks_exact(2)
+    .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+    .collect::<Vec<_>>();
+  Some(
+    String::from_utf16_lossy(&units)
+      .trim_end_matches('\0')
+      .to_string(),
+  )
+}
+
+fn extract_emr_ext_text_out_a(
+  data: &[u8],
+  record_offset: usize,
+  record_size: usize,
+) -> Option<String> {
+  let text = ext_text_record(data, record_offset, record_size)?;
+  let start = record_offset.checked_add(text.string_offset)?;
+  let end = start.checked_add(text.characters)?;
+  let bytes = data.get(start..end)?;
+  Some(
+    bytes
+      .iter()
+      .take_while(|byte| **byte != 0)
+      .map(|byte| char::from(*byte))
+      .collect(),
+  )
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExtTextRecord {
+  characters: usize,
+  string_offset: usize,
+}
+
+fn ext_text_record(data: &[u8], record_offset: usize, record_size: usize) -> Option<ExtTextRecord> {
+  // Source: LibreOffice vcl/source/filter/wmf/emfwr.cxx writes EMR_EXTTEXTOUTW
+  // with rclBounds, graphics mode, scales, then EMRTEXT. EMRTEXT::offString is
+  // relative to the record start.
+  const EMRTEXT_OFFSET: usize = 36;
+  const EMRTEXT_CHARS_OFFSET: usize = EMRTEXT_OFFSET + 8;
+  const EMRTEXT_STRING_OFFSET: usize = EMRTEXT_OFFSET + 12;
+  let minimum_size = EMRTEXT_OFFSET + 40;
+  if record_size < minimum_size {
+    return None;
+  }
+  let characters = read_u32(data, record_offset + EMRTEXT_CHARS_OFFSET).ok()? as usize;
+  let string_offset = read_u32(data, record_offset + EMRTEXT_STRING_OFFSET).ok()? as usize;
+  if characters == 0 || string_offset >= record_size {
+    return None;
+  }
+  Some(ExtTextRecord {
+    characters,
+    string_offset,
+  })
 }
 
 fn read_u16(data: &[u8], offset: usize) -> Result<u16, String> {

@@ -139,7 +139,7 @@ pub(crate) struct ChartResourceCatalog {
   pub(crate) color_styles: usize,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramResourceCatalog {
   pub(crate) data_parts: Vec<DiagramDataCatalog>,
   pub(crate) layout_parts: Vec<DiagramLayoutCatalog>,
@@ -148,9 +148,10 @@ pub(crate) struct DiagramResourceCatalog {
   pub(crate) drawing_parts: Vec<DiagramDrawingCatalog>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramDataCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) data_model: Option<Box<dgm::DataModelRoot>>,
   pub(crate) visible_texts: Vec<String>,
   pub(crate) points: usize,
   pub(crate) unknown_points: usize,
@@ -167,9 +168,10 @@ pub(crate) struct DiagramDataCatalog {
   pub(crate) text_len: usize,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramLayoutCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) layout: Option<Box<dgm::LayoutDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
   pub(crate) has_category_list: bool,
@@ -190,9 +192,10 @@ pub(crate) struct DiagramLayoutCatalog {
   pub(crate) text_len: usize,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramStyleCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) style: Option<Box<dgm::StyleDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
   pub(crate) has_categories: bool,
@@ -202,9 +205,10 @@ pub(crate) struct DiagramStyleCatalog {
   pub(crate) text_len: usize,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DiagramColorCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) colors: Option<Box<dgm::ColorsDefinition>>,
   pub(crate) titles: usize,
   pub(crate) descriptions: usize,
   pub(crate) has_categories: bool,
@@ -866,6 +870,7 @@ impl DiagramDataCatalog {
   fn from_data_model(relationship_id: Option<String>, data_model: &dgm::DataModelRoot) -> Self {
     let mut catalog = Self {
       relationship_id,
+      data_model: Some(Box::new(data_model.clone())),
       background: data_model.background.is_some(),
       whole: data_model.whole.is_some(),
       extension_markers: data_model
@@ -945,6 +950,7 @@ impl DiagramLayoutCatalog {
   fn from_layout(relationship_id: Option<String>, layout: &dgm::LayoutDefinition) -> Self {
     let mut stats = DiagramLayoutCatalog {
       relationship_id,
+      layout: Some(Box::new(layout.clone())),
       titles: layout.title.len(),
       descriptions: layout.description.len(),
       has_category_list: layout.category_list.is_some(),
@@ -977,6 +983,7 @@ impl DiagramStyleCatalog {
     let style = part.root_element(package)?;
     Ok(Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
+      style: Some(Box::new(style.clone())),
       titles: style.style_definition_title.len(),
       descriptions: style.style_label_description.len(),
       has_categories: style.style_display_categories.is_some(),
@@ -1009,6 +1016,7 @@ impl DiagramColorCatalog {
     let colors = part.root_element(package)?;
     Ok(Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
+      colors: Some(Box::new(colors.clone())),
       titles: colors.color_definition_title.len(),
       descriptions: colors.color_transform_description.len(),
       has_categories: colors.color_transform_categories.is_some(),

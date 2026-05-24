@@ -878,6 +878,7 @@ struct NumberFormatPattern {
   suffix: String,
   suppress_negative_sign: bool,
   section: String,
+  integer_pattern: String,
 }
 
 impl NumberFormatPattern {
@@ -903,11 +904,16 @@ impl NumberFormatPattern {
     let mut after_decimal = false;
     let mut seen_digit = false;
     let mut literal_prefix = true;
+    let mut integer_pattern = String::new();
     for ch in section.chars() {
       if escaped {
+        if !after_decimal && !literal_prefix {
+          integer_pattern.push('\\');
+          integer_pattern.push(ch);
+        }
         if literal_prefix {
           pattern.prefix.push(ch);
-        } else if seen_digit {
+        } else if seen_digit && after_decimal {
           pattern.suffix.push(ch);
         }
         escaped = false;
@@ -915,35 +921,58 @@ impl NumberFormatPattern {
       }
       match ch {
         '\\' => escaped = true,
-        '_' | '*' => escaped = true,
+        '_' | '*' => {
+          if !after_decimal {
+            integer_pattern.push(ch);
+          }
+          escaped = true;
+        }
         '"' => in_quote = !in_quote,
         _ if in_quote => {
+          if !after_decimal && !literal_prefix {
+            integer_pattern.push(ch);
+          }
           if literal_prefix {
             pattern.prefix.push(ch);
-          } else if seen_digit {
+          } else if seen_digit && after_decimal {
             pattern.suffix.push(ch);
           }
         }
-        '[' => literal_prefix = false,
+        '[' => {
+          literal_prefix = false;
+          if !after_decimal {
+            integer_pattern.push(ch);
+          }
+        }
         '0' | '#' | '?' => {
           pattern.numeric = true;
           seen_digit = true;
           literal_prefix = false;
           if after_decimal {
             pattern.decimals += 1;
+          } else {
+            integer_pattern.push(ch);
           }
         }
         '.' if pattern.numeric => after_decimal = true,
-        ',' if pattern.numeric => pattern.grouping = true,
+        ',' if pattern.numeric => {
+          pattern.grouping = true;
+          if !after_decimal {
+            integer_pattern.push(ch);
+          }
+        }
         '%' => {
           pattern.percent = true;
           pattern.suffix.push('%');
           literal_prefix = false;
         }
         '$' | '€' | '£' | '¥' => {
+          if !after_decimal && !literal_prefix {
+            integer_pattern.push(ch);
+          }
           if literal_prefix {
             pattern.prefix.push(ch);
-          } else if seen_digit {
+          } else if seen_digit && after_decimal {
             pattern.suffix.push(ch);
           }
         }
@@ -951,10 +980,21 @@ impl NumberFormatPattern {
           pattern.date_time = true;
           literal_prefix = false;
         }
-        _ if !ch.is_whitespace() && literal_prefix => pattern.prefix.push(ch),
-        _ if !ch.is_whitespace() && seen_digit => pattern.suffix.push(ch),
-        _ => {}
+        _ if !ch.is_whitespace() && literal_prefix => {
+          pattern.prefix.push(ch);
+        }
+        _ if !ch.is_whitespace() && seen_digit && after_decimal => pattern.suffix.push(ch),
+        _ => {
+          if !after_decimal {
+            integer_pattern.push(ch);
+          }
+        }
       }
+    }
+    pattern.integer_pattern = integer_pattern;
+    let trailing_suffix = trailing_integer_format_suffix(section);
+    if !trailing_suffix.is_empty() && !pattern.suffix.contains(&trailing_suffix) {
+      pattern.suffix.push_str(&trailing_suffix);
     }
     pattern
   }
@@ -978,7 +1018,9 @@ fn strip_number_format_markers(section: &str) -> String {
       return output;
     };
     let marker = &rest[start + 1..start + 1 + end];
-    if !is_ignored_number_format_marker(marker) {
+    if let Some(currency) = number_format_currency_marker(marker) {
+      output.push_str(currency);
+    } else if !is_ignored_number_format_marker(marker) {
       output.push('[');
       output.push_str(marker);
       output.push(']');
@@ -987,6 +1029,13 @@ fn strip_number_format_markers(section: &str) -> String {
   }
   output.push_str(rest);
   output
+}
+
+fn number_format_currency_marker(marker: &str) -> Option<&str> {
+  marker
+    .strip_prefix('$')
+    .and_then(|value| value.split('-').next())
+    .filter(|value| !value.is_empty())
 }
 
 fn is_ignored_number_format_marker(marker: &str) -> bool {
@@ -1011,6 +1060,13 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   } else {
     value
   };
+  if let Some(fraction) = format_fraction_value(value, &pattern.section) {
+    let mut output = String::new();
+    output.push_str(&pattern.prefix);
+    output.push_str(&fraction);
+    output.push_str(&pattern.suffix);
+    return output.trim_end().to_string();
+  }
   let sign =
     if value.is_sign_negative() && !pattern.suppress_negative_sign && pattern.prefix.is_empty() {
       "-"
@@ -1018,9 +1074,18 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
       ""
     };
   let decimals = fraction_placeholder_count(&pattern.section).unwrap_or(pattern.decimals);
-  let formatted = format!("{:.*}", decimals, value.abs());
+  let integer_placeholders = integer_placeholder_count(&pattern.integer_pattern);
+  let value_abs = value.abs();
+  let scaled = if decimals == 0 && integer_placeholders > 0 {
+    value_abs.round()
+  } else {
+    value_abs
+  };
+  let formatted = format!("{:.*}", decimals, scaled);
   let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
-  let integer = if pattern.grouping {
+  let integer = if integer_pattern_has_literal_between_placeholders(&pattern.integer_pattern) {
+    render_integer_pattern(&pattern.integer_pattern, integer)
+  } else if pattern.grouping {
     group_integer(integer)
   } else {
     integer.to_string()
@@ -1041,6 +1106,223 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   output.push_str(&fraction);
   output.push_str(&pattern.suffix);
   output.trim_end().to_string()
+}
+
+fn format_fraction_value(value: f64, section: &str) -> Option<String> {
+  let slash_index = unescaped_char_index(section, '/')?;
+  let denominator_placeholders = section[slash_index + 1..]
+    .chars()
+    .filter(|ch| matches!(ch, '0' | '#' | '?'))
+    .count();
+  if denominator_placeholders == 0 {
+    return None;
+  }
+  let max_denominator = 10_i64.pow(denominator_placeholders as u32) - 1;
+  let absolute = value.abs();
+  let whole = absolute.floor();
+  let fraction = absolute - whole;
+  let (numerator, denominator) = if fraction <= f64::EPSILON {
+    (whole.round() as i64, 1)
+  } else {
+    let mut best_numerator = 0i64;
+    let mut best_denominator = 1i64;
+    let mut best_error = f64::MAX;
+    for denominator in 1..=max_denominator.max(1) {
+      let numerator = (fraction * denominator as f64).round() as i64;
+      let error = (fraction - numerator as f64 / denominator as f64).abs();
+      if error < best_error {
+        best_error = error;
+        best_numerator = numerator;
+        best_denominator = denominator;
+      }
+    }
+    (
+      whole as i64 * best_denominator + best_numerator,
+      best_denominator,
+    )
+  };
+  let sign = if value.is_sign_negative() { "-" } else { "" };
+  Some(format!("{sign}{numerator}/{denominator}"))
+}
+
+fn unescaped_char_index(value: &str, needle: char) -> Option<usize> {
+  let mut escaped = false;
+  let mut in_quote = false;
+  for (index, ch) in value.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      _ if ch == needle && !in_quote => return Some(index),
+      _ => {}
+    }
+  }
+  None
+}
+
+fn integer_pattern_has_literal_between_placeholders(pattern: &str) -> bool {
+  let tokens = integer_pattern_tokens(pattern);
+  let mut seen_placeholder = false;
+  let mut seen_literal_after_placeholder = false;
+  for token in tokens {
+    match token {
+      IntegerPatternToken::Placeholder(_) => {
+        if seen_literal_after_placeholder {
+          return true;
+        }
+        seen_placeholder = true;
+      }
+      IntegerPatternToken::Literal(',') => {}
+      IntegerPatternToken::Literal(ch) if ch.is_whitespace() && !seen_placeholder => {}
+      IntegerPatternToken::Literal(_) if seen_placeholder => {
+        seen_literal_after_placeholder = true;
+      }
+      IntegerPatternToken::Literal(_) => {}
+    }
+  }
+  false
+}
+
+fn trailing_integer_format_suffix(section: &str) -> String {
+  let integer = split_number_format_decimal(section)
+    .map(|split| split.0)
+    .unwrap_or(section);
+  let mut last_placeholder_end = None;
+  let mut in_quote = false;
+  let mut escaped = false;
+  for (index, ch) in integer.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      '0' | '#' | '?' if !in_quote => last_placeholder_end = Some(index + ch.len_utf8()),
+      _ => {}
+    }
+  }
+  let Some(start) = last_placeholder_end else {
+    return String::new();
+  };
+  let mut suffix = String::new();
+  let mut chars = integer[start..].chars().peekable();
+  let mut in_quote = false;
+  while let Some(ch) = chars.next() {
+    match ch {
+      '\\' => {
+        if let Some(next) = chars.next() {
+          suffix.push(next);
+        }
+      }
+      '_' => {
+        if let Some(next) = chars.next()
+          && matches!(next, '$' | '€' | '£' | '¥')
+        {
+          suffix.push(next);
+        }
+      }
+      '*' => {
+        chars.next();
+      }
+      '"' => in_quote = !in_quote,
+      '[' if !in_quote => {
+        for next in chars.by_ref() {
+          if next == ']' {
+            break;
+          }
+        }
+      }
+      ch if in_quote => suffix.push(ch),
+      ch if matches!(ch, '$' | '€' | '£' | '¥' | '%' | ' ') => suffix.push(ch),
+      _ => {}
+    }
+  }
+  suffix
+}
+
+fn integer_placeholder_count(section: &str) -> usize {
+  let mut count = 0usize;
+  let mut in_quote = false;
+  let mut escaped = false;
+  for ch in section.chars() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      '0' | '#' | '?' if !in_quote => count += 1,
+      _ => {}
+    }
+  }
+  count
+}
+
+fn render_integer_pattern(pattern: &str, digits: &str) -> String {
+  let tokens = integer_pattern_tokens(pattern);
+  let mut output = Vec::new();
+  let mut digit_iter = digits.chars().rev();
+  for token in tokens.iter().rev() {
+    match *token {
+      IntegerPatternToken::Placeholder(ch) => {
+        if let Some(digit) = digit_iter.next() {
+          output.push(digit);
+        } else if ch == '0' {
+          output.push('0');
+        } else if ch == '?' {
+          output.push(' ');
+        }
+      }
+      IntegerPatternToken::Literal(ch) => output.push(ch),
+    }
+  }
+  output.extend(digit_iter);
+  output
+    .into_iter()
+    .rev()
+    .collect::<String>()
+    .trim()
+    .to_string()
+}
+
+#[derive(Clone, Copy, Debug)]
+enum IntegerPatternToken {
+  Placeholder(char),
+  Literal(char),
+}
+
+fn integer_pattern_tokens(pattern: &str) -> Vec<IntegerPatternToken> {
+  let mut tokens = Vec::new();
+  let mut chars = pattern.chars().peekable();
+  let mut in_quote = false;
+  while let Some(ch) = chars.next() {
+    match ch {
+      '\\' => {
+        if let Some(next) = chars.next() {
+          tokens.push(IntegerPatternToken::Literal(next));
+        }
+      }
+      '_' | '*' => {
+        chars.next();
+      }
+      '"' => in_quote = !in_quote,
+      '[' if !in_quote => {
+        for next in chars.by_ref() {
+          if next == ']' {
+            break;
+          }
+        }
+      }
+      '0' | '#' | '?' if !in_quote => tokens.push(IntegerPatternToken::Placeholder(ch)),
+      ch => tokens.push(IntegerPatternToken::Literal(ch)),
+    }
+  }
+  tokens
 }
 
 fn group_integer(value: &str) -> String {
@@ -1072,7 +1354,7 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
 }
 
 fn fraction_placeholder_count(section: &str) -> Option<usize> {
-  let fraction = section.split_once('.')?.1;
+  let fraction = split_number_format_decimal(section)?.1;
   Some(
     fraction
       .chars()
@@ -1082,7 +1364,7 @@ fn fraction_placeholder_count(section: &str) -> Option<usize> {
 }
 
 fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
-  let fraction = section.split_once('.')?.1;
+  let fraction = split_number_format_decimal(section)?.1;
   let mut output = String::new();
   let mut chars = fraction.chars().peekable();
   let mut digit_index = 0usize;
@@ -1126,6 +1408,24 @@ fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
   } else {
     Some(format!(".{}", output.trim_end()))
   }
+}
+
+fn split_number_format_decimal(section: &str) -> Option<(&str, &str)> {
+  let mut in_quote = false;
+  let mut escaped = false;
+  for (index, ch) in section.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      '.' if !in_quote => return Some((&section[..index], &section[index + 1..])),
+      _ => {}
+    }
+  }
+  None
 }
 
 fn has_required_or_nonzero_fraction_digit(digits: &[char], start: usize) -> bool {

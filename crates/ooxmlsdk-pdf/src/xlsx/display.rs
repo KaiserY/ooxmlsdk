@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use crate::docx::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
@@ -5,6 +7,7 @@ use crate::layout::{
   self, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem, PageItem,
   PdfTextSegmentation, RectItem, TextItem,
 };
+use crate::render::{diagram as shared_diagram, emf_wmf};
 use crate::units;
 
 use super::import::ExcelImport;
@@ -122,6 +125,12 @@ fn print_page_items(
     zoom_scale,
   ));
   items.extend(print_page_shape_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
+  items.extend(print_page_diagram_items(
     page,
     body_origin_x + repeat_width,
     body_origin_y + repeat_height,
@@ -617,6 +626,15 @@ fn print_page_image_items(
         floating: false,
         behind_text: false,
       }));
+      render_metafile_texts(
+        &mut items,
+        resource,
+        origin_x_pt + x_pt * zoom_scale,
+        origin_y_pt + y_pt * zoom_scale,
+        width_pt * zoom_scale,
+        height_pt * zoom_scale,
+        drawing_object_hyperlink_url(drawing, &anchor.object),
+      );
     }
   }
   for drawing in &page.sheet.resources.object_resources.vml_drawings {
@@ -654,6 +672,15 @@ fn print_page_image_items(
         floating: false,
         behind_text: false,
       }));
+      render_metafile_texts(
+        &mut items,
+        resource,
+        origin_x_pt + x_pt * zoom_scale,
+        origin_y_pt + y_pt * zoom_scale,
+        width_pt * zoom_scale,
+        height_pt * zoom_scale,
+        None,
+      );
     }
   }
   items
@@ -705,6 +732,151 @@ fn print_page_shape_items(
     }));
   }
   items
+}
+
+fn print_page_diagram_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  for drawing in &page.sheet.resources.drawings {
+    let styles = diagram_styles(&drawing.diagrams);
+    for anchor in &drawing.anchors {
+      if anchor.object.hidden
+        || !anchor.print_with_sheet
+        || anchor.object.kind != super::drawing::DrawingObjectKind::GraphicFrame
+      {
+        continue;
+      }
+      let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
+        continue;
+      };
+      let Some(data) = drawing
+        .diagrams
+        .data_parts
+        .iter()
+        .find(|data| data.relationship_id.as_deref() == Some(relationship_id))
+        .or_else(|| drawing.diagrams.data_parts.first())
+      else {
+        continue;
+      };
+      let Some(data_model) = data.data_model.as_deref() else {
+        continue;
+      };
+      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+        continue;
+      };
+      if width_pt <= 0.0 || height_pt <= 0.0 {
+        continue;
+      }
+      let (x_pt, y_pt) =
+        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      let bounds = shared_diagram::DiagramBounds {
+        x: origin_x_pt + x_pt * zoom_scale,
+        y: origin_y_pt + y_pt * zoom_scale,
+        width: width_pt * zoom_scale,
+        height: height_pt * zoom_scale,
+      };
+      for shape in shared_diagram::layout_shapes(
+        data_model,
+        drawing
+          .diagrams
+          .layout_parts
+          .iter()
+          .find_map(|layout| layout.layout.as_deref()),
+        styles.as_ref(),
+        None,
+        bounds,
+        RgbColor {
+          r: 0x4f,
+          g: 0x81,
+          b: 0xbd,
+        },
+      ) {
+        push_diagram_shape_items(&mut items, &shape);
+      }
+    }
+  }
+  items
+}
+
+fn diagram_styles(
+  diagrams: &super::drawing::DiagramResourceCatalog,
+) -> Option<shared_diagram::DiagramStyles> {
+  let style_by_label: HashMap<String, _> = diagrams
+    .style_parts
+    .iter()
+    .filter_map(|part| part.style.as_deref())
+    .flat_map(|style| style.style_label.iter())
+    .filter_map(|label| Some((label.name.clone(), label.style.clone()?)))
+    .collect();
+  (!style_by_label.is_empty()).then_some(shared_diagram::DiagramStyles { style_by_label })
+}
+
+fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::DiagramShape) {
+  if shape.is_connector {
+    items.push(PageItem::Line(diagram_connector_line_item(shape)));
+  } else {
+    items.push(PageItem::Rect(RectItem {
+      x_pt: shape.x,
+      y_pt: shape.y,
+      width_pt: shape.width,
+      height_pt: shape.height,
+      fill_color: Some(shape.fill),
+      fill_opacity: 1.0,
+      stroke: Some(BorderStyle::default()),
+      stroke_opacity: 1.0,
+    }));
+  }
+  let text = diagram_text_body_text(&shape.text_body);
+  if !text.trim().is_empty() {
+    render_drawing_text(
+      items,
+      &text,
+      shape.x,
+      shape.y,
+      shape.width,
+      shape.height,
+      None,
+    );
+  }
+}
+
+fn diagram_connector_line_item(shape: &shared_diagram::DiagramShape) -> LineItem {
+  let center_x = shape.x + shape.width / 2.0;
+  let center_y = shape.y + shape.height / 2.0;
+  let length = shape.width.max(shape.height).max(1.0);
+  let radians = shape.connector_angle_deg.to_radians();
+  let dx = radians.cos() * length / 2.0;
+  let dy = radians.sin() * length / 2.0;
+  LineItem {
+    x1_pt: center_x - dx,
+    y1_pt: center_y - dy,
+    x2_pt: center_x + dx,
+    y2_pt: center_y + dy,
+    width_pt: 1.0,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    kind: LineItemKind::Stroke,
+  }
+}
+
+fn diagram_text_body_text(text_body: &shared_diagram::DiagramTextBody) -> String {
+  text_body
+    .paragraphs
+    .iter()
+    .map(|paragraph| {
+      paragraph
+        .runs
+        .iter()
+        .map(|run| run.text.as_str())
+        .collect::<String>()
+    })
+    .filter(|line| !line.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join("\n")
 }
 
 fn print_page_drawing_text_items(
@@ -811,6 +983,30 @@ fn render_drawing_text(
       pdf_text_segmentation: PdfTextSegmentation::Line,
     }));
   }
+}
+
+fn render_metafile_texts(
+  items: &mut Vec<PageItem>,
+  resource: &super::drawing::ImageResource,
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  hyperlink_url: Option<String>,
+) {
+  let texts = emf_wmf::extract_metafile_texts(&resource.data, resource.content_type.as_deref());
+  if texts.is_empty() {
+    return;
+  }
+  render_drawing_text(
+    items,
+    &texts.join("\n"),
+    x_pt,
+    y_pt,
+    width_pt,
+    height_pt,
+    hyperlink_url,
+  );
 }
 
 fn print_page_vml_text_items(

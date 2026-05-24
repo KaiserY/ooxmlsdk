@@ -214,15 +214,7 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
         } else if name.as_ref().ends_with(b"textbox") {
           in_textbox = true;
         } else if name.as_ref().ends_with(b"imagedata") {
-          if let Some(shape) = current.as_mut() {
-            for attr in event.attributes().flatten() {
-              let key = attr.key.as_ref();
-              if key.ends_with(b"relid") || key.ends_with(b"id") {
-                shape.image_relationship_id =
-                  Some(String::from_utf8_lossy(attr.value.as_ref()).into_owned());
-              }
-            }
-          }
+          collect_vml_image_relationship(current.as_mut(), event.attributes().flatten());
         } else if name.as_ref().ends_with(b"Anchor") {
           in_anchor = true;
         } else if name.as_ref().ends_with(b"PrintObject") {
@@ -255,6 +247,11 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
           );
         }
       }
+      Ok(Event::Empty(event)) => {
+        if event.name().as_ref().ends_with(b"imagedata") {
+          collect_vml_image_relationship(current.as_mut(), event.attributes().flatten());
+        }
+      }
       Ok(Event::End(event)) => {
         let name = event.name();
         if name.as_ref().ends_with(b"textbox") {
@@ -278,6 +275,21 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
     }
   }
   shapes
+}
+
+fn collect_vml_image_relationship<'a>(
+  shape: Option<&mut VmlShapeModel>,
+  attributes: impl Iterator<Item = quick_xml::events::attributes::Attribute<'a>>,
+) {
+  let Some(shape) = shape else {
+    return;
+  };
+  for attr in attributes {
+    let key = attr.key.as_ref();
+    if key.ends_with(b"relid") || key.ends_with(b"id") {
+      shape.image_relationship_id = Some(String::from_utf8_lossy(attr.value.as_ref()).into_owned());
+    }
+  }
 }
 
 fn collect_vml_image_resources(

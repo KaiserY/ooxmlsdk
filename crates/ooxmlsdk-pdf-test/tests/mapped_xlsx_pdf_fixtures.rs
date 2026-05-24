@@ -1677,3 +1677,168 @@ fn mapped_xlsx_tdf119565_keeps_themed_textbox_text_visible() {
   assert_page_contains(&summary, 0, "Lorem ipsum dolor");
   assert_page_contains(&summary, 0, "Maecenas porttitor");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testSheetCharacterKerningSpaceXLSX
+fn mapped_xlsx_textbox_char_kerning_space_keeps_textbox_text_visible() {
+  let summary = render_summary("textbox-CharKerningSpace.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "AVAIL");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testSheetCondensedCharacterSpaceXLSX
+fn mapped_xlsx_textbox_condensed_character_space_keeps_textbox_text_visible() {
+  let summary = render_summary("textbox-CondensedCharacterSpace.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "AvaiL");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTextBoxBodyRotateAngle
+fn mapped_xlsx_tdf141644_keeps_rotated_textbox_body_text_visible() {
+  let summary = render_summary("tdf141644.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Textdir: 270 deg");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf142881
+fn mapped_xlsx_tdf142881_keeps_rotated_shape_labels_visible() {
+  let summary = render_summary("tdf142881.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Rotated:");
+  assert_page_contains(&summary, 0, "35");
+  assert_page_contains(&summary, 1, "25");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf145057
+fn mapped_xlsx_tdf145057_keeps_color_filtered_row_visible() {
+  let summary = render_summary("tdf145057.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Numbers Names abc def fgh");
+  assert_page_contains(&summary, 0, "4.00 s 3 4 1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf161365
+fn mapped_xlsx_tdf161365_keeps_checkbox_fixture_text_visible() {
+  let summary = render_summary("tdf161365.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(
+    &summary,
+    0,
+    "This spreadsheet contains checkbox which dissapeared after re-export",
+  );
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf115192XLSX
+fn mapped_xlsx_tdf115192_keeps_drawing_hyperlink_labels_visible() {
+  let summary = render_summary("test_115192.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Hyperlink: test.xlxs");
+  assert_page_contains(&summary, 0, "Hyperlink: Sheet2!A1");
+  assert_page_contains(&summary, 0, "Hyperlink: Bug 115192");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:many-fields-in-cache import check
+fn mapped_xlsx_pivot_many_fields_in_cache_keeps_pivot_result_visible() {
+  let summary = render_summary("pivot-table/many-fields-in-cache.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "F1 F2 F3 F4 F5 F6 F7 F8");
+  assert_page_contains(&summary, 0, "Sum of F10 F4");
+  assert_page_contains(&summary, 0, "Total Result 5 6 11");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableDuplicatedMemberFilterXLSX
+fn mapped_xlsx_pivottable_duplicated_member_filter_keeps_page_field_pivot_visible() {
+  let summary = render_summary("pivottable_duplicated_member_filter.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "pwdLastSet (empty)");
+  assert_page_contains(&summary, 0, "First type 4");
+  assert_page_contains(&summary, 0, "Second type 9");
+  assert_page_contains(&summary, 0, "Total Result 13");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf104310_x14
+fn mapped_xlsx_tdf104310_keeps_x14_validation_list_values_visible() {
+  let summary = render_summary("tdf104310.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 2 3 4 5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTextLengthDataValidityXLSX
+fn mapped_xlsx_text_length_data_validity_keeps_checked_values_visible() {
+  let summary = render_summary("textLengthDataValidity.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1234");
+  assert_page_contains(&summary, 0, "1234.00");
+  assert_page_contains(&summary, 0, "12.3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf120168
+fn mapped_xlsx_tdf120168_keeps_alignment_sample_text_visible() {
+  let summary = render_summary("tdf120168.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 2");
+  assert_page_text_occurrences(&summary, 0, "Te", 2);
+  assert_page_text_occurrences(&summary, 0, "xt", 4);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf129985
+fn mapped_xlsx_tdf129985_keeps_custom_date_format_visible() {
+  let summary = render_summary("tdf129985.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Érvényesség kezdete");
+  assert_page_text_occurrences(&summary, 0, "1/13/2020", 2);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf73063
+fn mapped_xlsx_tdf73063_keeps_localized_long_date_visible() {
+  let summary = render_summary("tdf73063.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Saturday, 17. June 1972");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testExtCondFormatXLSX
+fn mapped_xlsx_tdf139021_keeps_ext_cond_format_sample_text_visible() {
+  let summary = render_summary("tdf139021.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "hello hello");
+  assert_page_contains(&summary, 0, "hello bye");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testTdf139394
+fn mapped_xlsx_tdf139394_keeps_conditional_format_marker_text_visible() {
+  let summary = render_summary("tdf139394.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(&summary, 0, "+", 3);
+  assert_page_text_occurrences(&summary, 0, "-", 1);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf55417
+fn mapped_xlsx_tdf55417_keeps_alignment_style_sample_value_visible() {
+  let summary = render_summary("tdf55417.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "29");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testTdf139167
+fn mapped_xlsx_tdf139167_keeps_conditional_style_sample_text_visible() {
+  let summary = render_summary("tdf139167.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Hello");
+}

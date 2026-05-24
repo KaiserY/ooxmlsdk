@@ -2000,3 +2000,186 @@ fn mapped_xlsx_row_index_1_based_keeps_first_row_and_multiline_text_visible() {
   assert_page_contains(&summary, 0, "Second line.");
   assert_page_contains(&summary, 0, "Third line.");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot1_Row
+fn mapped_xlsx_pivot1_row_keeps_row_field_items_visible() {
+  let summary = render_summary("pivot/Pivot1_Row.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Name Type Sum of Price");
+  assert_page_contains(&summary, 1, "X1 A 100");
+  assert_page_contains(&summary, 1, "X5 A 50");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot1_Row_Grand
+fn mapped_xlsx_pivot1_row_grand_keeps_grand_total_visible() {
+  let summary = render_summary("pivot/Pivot1_Row_Grand.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Name Type Sum of Price");
+  assert_page_contains(&summary, 1, "Total Result 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot1_Row_Grand_Subtotals
+fn mapped_xlsx_pivot1_row_grand_subtotals_keeps_item_subtotals_visible() {
+  let summary = render_summary("pivot/Pivot1_Row_Grand_Subtotals.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "X1 Result 100");
+  assert_page_contains(&summary, 1, "X5 Result 50");
+  assert_page_contains(&summary, 1, "Total Result 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row
+fn mapped_xlsx_pivot2_row_keeps_nested_row_items_visible() {
+  let summary = render_summary("pivot/Pivot2_Row.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Type Name Sum of Price");
+  assert_page_contains(&summary, 1, "A X1 100");
+  assert_page_contains(&summary, 1, "B X2 200");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row_Compact
+fn mapped_xlsx_pivot2_row_compact_keeps_compact_labels_visible() {
+  let summary = render_summary("pivot/Pivot2_Row_Compact.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Row Labels Sum of Price");
+  assert_page_contains(&summary, 1, "X1 100");
+  assert_page_contains(&summary, 1, "X4 100");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row_Grand
+fn mapped_xlsx_pivot2_row_grand_keeps_nested_grand_total_visible() {
+  let summary = render_summary("pivot/Pivot2_Row_Grand.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Type Name Sum of Price");
+  assert_page_contains(&summary, 1, "Total Result 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row_Grand_Subtotals
+fn mapped_xlsx_pivot2_row_grand_subtotals_keeps_group_subtotals_visible() {
+  let summary = render_summary("pivot/Pivot2_Row_Grand_Subtotals.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "A Result 150");
+  assert_page_contains(&summary, 1, "B Result 350");
+  assert_page_contains(&summary, 1, "Total Result 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row_Subtotals
+fn mapped_xlsx_pivot2_row_subtotals_keeps_group_subtotals_without_grand_total() {
+  let summary = render_summary("pivot/Pivot2_Row_Subtotals.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "A Result 150");
+  assert_page_contains(&summary, 1, "B Result 350");
+  assert_page_contains(&summary, 1, "C Result 100");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot2_Row_Subtotals_SortDescendingAll
+fn mapped_xlsx_pivot2_row_subtotals_sort_descending_keeps_sorted_groups_visible() {
+  let summary = render_summary("pivot/Pivot2_Row_Subtotals_SortDescendingAll.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "C X4 100");
+  assert_page_contains(&summary, 1, "B X3 150");
+  assert_page_contains(&summary, 1, "A X5 50");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot3_Column_Grand_Subtotals
+fn mapped_xlsx_pivot3_column_grand_subtotals_keeps_column_totals_visible() {
+  let summary = render_summary("pivot/Pivot3_Column_Grand_Subtotals.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Type Name");
+  assert_page_contains(&summary, 1, "Total Result");
+  assert_page_contains(&summary, 1, "100 50 150 200 150 350 100 100 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTable_FieldsAndItemsExport.cxx:Pivot4_Column_Grand_Subtotals_SortDescending
+fn mapped_xlsx_pivot4_column_grand_subtotals_sort_descending_keeps_column_totals_visible() {
+  let summary = render_summary("pivot/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Type Name");
+  assert_page_contains(&summary, 1, "Total Result");
+  assert_page_contains(&summary, 1, "100 100 200 150 350 100 50### 600");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_1_DataFieldInRow_RowLabelColor
+fn mapped_xlsx_pivot_format_data_field_in_row_keeps_values_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_1_DataFieldInRow_RowLabelColor.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Values 1 2 3");
+  assert_page_contains(&summary, 0, "Sum of C 3 3 4");
+  assert_page_contains(&summary, 0, "Sum of D 7 2 6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_4_DataFieldInColumn_DataColor
+fn mapped_xlsx_pivot_format_data_field_in_column_keeps_totals_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_4_DataFieldInColumn_DataColor.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "A Sum of C Sum of D");
+  assert_page_contains(&summary, 0, "Total Result 15 25");
+  assert_page_contains(&summary, 0, "Grand Total 15 25");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_8_DataFieldInRow_DataColor
+fn mapped_xlsx_pivot_format_data_field_row_data_color_keeps_values_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_8_DataFieldInRow_DataColor.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Data 1 2");
+  assert_page_contains(&summary, 0, "Sum of C 3 3");
+  assert_page_contains(&summary, 0, "Sum of D 7 2");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_9_MultipleSelections
+fn mapped_xlsx_pivot_format_multiple_selections_keeps_totals_visible() {
+  let summary = render_summary("pivot-table/PivotTableCellFormatsTest_9_MultipleSelections.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "A Sum of C Sum of D");
+  assert_page_contains(&summary, 0, "Total Result 15 25");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_11_WholeDataColumnSelected
+fn mapped_xlsx_pivot_format_whole_data_column_keeps_totals_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_11_WholeDataColumnSelected.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "A Sum of B");
+  assert_page_contains(&summary, 0, "Total Result 60");
+  assert_page_contains(&summary, 0, "Grand Total 60");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_12_WholeLabelColumnSelected
+fn mapped_xlsx_pivot_format_whole_label_column_keeps_totals_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_12_WholeLabelColumnSelected.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "A Sum of B");
+  assert_page_contains(&summary, 0, "Total Result 60");
+  assert_page_contains(&summary, 0, "Grand Total 60");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/PivotTableFormatsImportExport.cxx:PivotTableCellFormatsTest_13_SelectionInLabelAndData
+fn mapped_xlsx_pivot_format_label_and_data_selection_keeps_values_visible() {
+  let summary =
+    render_summary("pivot-table/PivotTableCellFormatsTest_13_SelectionInLabelAndData.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "A B C A Sum of B");
+  assert_page_contains(&summary, 0, "a 1 15 a 5");
+  assert_page_contains(&summary, 0, "f 1 10 f 5");
+}

@@ -642,3 +642,217 @@ fn mapped_xlsx_tdf161301_keeps_japanese_era_date_strings_visible() {
   assert_eq!(summary.page_count, 2);
   assert_page_text_occurrences(&summary, 1, "CE784年2月20日", 2);
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testDataBarXLSX
+fn mapped_xlsx_databar_keeps_conditional_format_sample_values_visible() {
+  let summary = render_summary("databar.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "1 1 1");
+  assert_page_contains(&summary, 0, "-2 4 4");
+  assert_page_contains(&summary, 1, "1 2 3 4");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testColorScaleXLSX
+fn mapped_xlsx_colorscale_keeps_two_sheet_color_scale_values_visible() {
+  let summary = render_summary("colorscale.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Sheet1");
+  assert_page_contains(&summary, 1, "Sheet2");
+  assert_page_contains(&summary, 1, "4 4 4");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testComplexIconSetsXLSX
+fn mapped_xlsx_complex_icon_set_keeps_icon_set_source_values_visible() {
+  let summary = render_summary("complex_icon_set.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "1 1 1");
+  assert_page_contains(&summary, 0, "4 4 4 5");
+  assert_page_contains(&summary, 1, "1 1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testNewCondFormatXLSX
+fn mapped_xlsx_new_cond_format_keeps_rule_sample_table_visible() {
+  let summary = render_summary("new_cond_format_test.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(
+    &summary,
+    0,
+    "top n elements bottom n elements top n percent bottom n percent above average",
+  );
+  assert_page_contains(
+    &summary,
+    1,
+    "below average above equal average below equal average",
+  );
+  assert_page_contains(&summary, 2, "2.00 2 1 1.000 4.00 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf167019
+fn mapped_xlsx_tdf167019_keeps_pressure_table_values_visible() {
+  let summary = render_summary("tdf167019.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Maurice Pitot - Tension Artérielle");
+  assert_page_contains(&summary, 0, "PAS PAD Pouls");
+  assert_page_contains(&summary, 0, "25/10/2014 06:30 127 77");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf83671_SmartArt_import
+fn mapped_xlsx_tdf83671_smartart_import_keeps_diagram_text_visible() {
+  let summary = render_summary("tdf83671_SmartArt_import.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "start");
+  assert_page_contains(&summary, 0, "back middle front end");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf151818_SmartArtFontColor
+fn mapped_xlsx_tdf151818_smartart_theme_font_text_stays_visible() {
+  let summary = render_summary("tdf151818_SmartartThemeFontColor.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "One Two Three");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/SparklineImportExportTest.cxx:testSparklinesRoundtripXLSX
+fn mapped_xlsx_sparklines_keep_source_values_visible() {
+  let summary = render_summary("Sparklines.xlsx");
+  assert_eq!(summary.page_count, 5);
+  assert_page_contains(&summary, 0, "4 2 7 -2 -5");
+  assert_page_contains(&summary, 1, "4 3 6 -2 0 -3 1");
+  assert_page_contains(&summary, 3, "3.337809 2.684713 4.390088");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotCacheExportXLSX
+fn mapped_xlsx_pivot_cache_mixed_types_keeps_visible_pivot_values() {
+  let summary = render_summary("pivot-table/with-strings-integers-and-dates.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(
+    &summary,
+    0,
+    "mixed strings a Sum of all fields are integers",
+  );
+  assert_page_contains(&summary, 0, "Total Result 16665");
+  assert_page_contains(&summary, 2, "tekst 6/7/09 10:53 AM");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableTwoDataFields
+fn mapped_xlsx_two_data_fields_keeps_pivot_data_field_results_visible() {
+  let summary = render_summary("pivot-table/two-data-fields.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Name Sum of Value Count of Value2");
+  assert_page_contains(&summary, 0, "Total Result 3.6512482152 7");
+  assert_page_contains(&summary, 1, "Name Value");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableCompactLayoutXLSX
+fn mapped_xlsx_pivotcompact_keeps_compact_layout_output_visible() {
+  let summary = render_summary("pivot-table/pivotcompact.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Sum of Val D");
+  assert_page_contains(&summary, 1, "Row Labels ddd ddx Total Result");
+  assert_page_contains(&summary, 1, "Total Result 40 41 81");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testFirstHeaderRowZero
+fn mapped_xlsx_first_header_row_zero_keeps_under_text_visible() {
+  let summary = render_summary("pivot-table/first_header_row_zero.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "A Suma de N Suma de V");
+  assert_page_contains(&summary, 1, "Total Result 12 12");
+  assert_page_contains(&summary, 1, "under");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testCalcFields1XLSX
+fn mapped_xlsx_calcfields_keeps_calculated_field_pivot_totals_visible() {
+  let summary = render_summary("pivot-table/calcfields.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 2, "Pivot Table_Sheet1_1");
+  assert_page_contains(&summary, 2, "TATA 24 6.00 Ft");
+  assert_page_contains(&summary, 2, "Total Result 114 18.00 Ft");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testCalcFields2XLSX
+fn mapped_xlsx_onlycalcfields_keeps_calculated_only_pivot_visible() {
+  let summary = render_summary("pivot-table/onlycalcfields.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 2, "Name (empty)");
+  assert_page_contains(&summary, 2, "TATA TITI TOTO Total Result");
+  assert_page_contains(&summary, 3, "5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testGroupAndCalcFieldXLSX
+fn mapped_xlsx_groupwithcalcfields_keeps_grouped_calculated_totals_visible() {
+  let summary = render_summary("pivot-table/groupwithcalcfields.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "Data");
+  assert_page_contains(&summary, 0, "Group1 45 54 63");
+  assert_page_contains(&summary, 0, "Total Result 171 189 207");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testCalcFieldSingleDataDimXLSX
+fn mapped_xlsx_tdf126858_keeps_single_calculated_pivot_fixture_visible() {
+  let summary = render_summary("pivot-table/tdf126858-1.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "товар (empty)");
+  assert_page_contains(&summary, 0, "апельсин банан вишня Total Result");
+  assert_page_contains(&summary, 1, "товар кол-во цена за ед стоимость");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testCalcFieldDiffAggregationXLSX
+fn mapped_xlsx_test_diff_aggregation_keeps_sum_and_count_pivots_visible() {
+  let summary = render_summary("pivot-table/test_diff_aggregation.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 1, "Pivot Table_Sheet1_1");
+  assert_page_contains(&summary, 1, "2010 78");
+  assert_page_contains(&summary, 2, "Pivot Table_Sheet1_2");
+  assert_page_contains(&summary, 2, "Total Result 6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableDoubleFieldFilterXLSX
+fn mapped_xlsx_pivottable_double_field_filter_keeps_filtered_items_visible() {
+  let summary = render_summary("pivottable_double_field_filter.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(
+    &summary,
+    0,
+    "Double field1 Double field2 Double field3 Datas",
+  );
+  assert_page_contains(&summary, 0, "2 2.00 20,000.00 12");
+  assert_page_contains(&summary, 1, "10,000.00 22");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableStringFieldFilterXLSX
+fn mapped_xlsx_pivottable_string_field_filter_keeps_country_filter_visible() {
+  let summary = render_summary("pivottable_string_field_filter.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Order ID Country Sum - Amount");
+  assert_page_contains(&summary, 0, "United States");
+  assert_page_not_contains(&summary, 0, "United Kingdom");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableDateFieldFilterXLSX
+fn mapped_xlsx_pivottable_date_field_filter_keeps_visible_date_members() {
+  let summary = render_summary("pivottable_date_field_filter.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "Date Date2 Date3 Sum - Amount");
+  assert_page_contains(&summary, 1, "2016/ January 7/");
+  assert_page_contains(&summary, 2, "2016/ 1/ 8. 0:00");
+}

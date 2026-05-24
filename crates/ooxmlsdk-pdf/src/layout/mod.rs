@@ -4020,7 +4020,8 @@ fn estimated_paragraph_content_height(
       }
       InlineItem::Image(image) => {
         if let crate::docx::ImagePlacement::Floating(placement) = image.placement
-          && (placement.layout_in_cell || flow.text_segmentation == TextSegmentation::RepeatingSlot)
+          && (effective_layout_in_cell(placement, flow)
+            || flow.text_segmentation == TextSegmentation::RepeatingSlot)
           && matches!(
             flow.text_segmentation,
             TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
@@ -4053,7 +4054,8 @@ fn estimated_paragraph_content_height(
       }
       InlineItem::Shape(shape) => {
         if let crate::docx::ImagePlacement::Floating(placement) = shape.placement
-          && (placement.layout_in_cell || flow.text_segmentation == TextSegmentation::RepeatingSlot)
+          && (effective_layout_in_cell(placement, flow)
+            || flow.text_segmentation == TextSegmentation::RepeatingSlot)
           && matches!(
             flow.text_segmentation,
             TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
@@ -8794,7 +8796,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       height_pt: (height - top_margin_for_lowers - bottom_margin_for_lowers).max(0.0),
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
-    compatibility_mode: 12,
+    compatibility_mode,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -9581,7 +9583,7 @@ fn floating_image_position(
   image_width: f32,
   image_height: f32,
 ) -> (f32, f32) {
-  if placement.layout_in_cell && flow.text_segmentation == TextSegmentation::TableCell {
+  if effective_layout_in_cell(placement, flow) {
     let cell_bounds = flow.layout_cell_bounds.unwrap_or(FrameBounds {
       x_pt: flow.content_left_pt,
       y_pt: current_y,
@@ -9798,6 +9800,13 @@ fn effective_vertical_reference(placement: FloatingImagePlacement) -> VerticalIm
     }
     reference => reference,
   }
+}
+
+fn effective_layout_in_cell(placement: FloatingImagePlacement, flow: FlowContext) -> bool {
+  // Source: LibreOffice sw/source/filter/ww8/wrtw8esh.cxx notes that Word
+  // compat15 ignores layoutInCell="0" and always lays out shapes in the cell.
+  flow.text_segmentation == TextSegmentation::TableCell
+    && (placement.layout_in_cell || flow.compatibility_mode >= 15)
 }
 
 fn relative_floating_width(placement: FloatingImagePlacement, flow: FlowContext) -> Option<f32> {
@@ -10993,7 +11002,7 @@ impl<'a> TextFrameLayout<'a> {
               floating: true,
               behind_text: placement.behind_text,
             }));
-            if placement.layout_in_cell && flow.text_segmentation == TextSegmentation::TableCell {
+            if effective_layout_in_cell(placement, flow) {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt: image_x,
                 y_pt: image_y,
@@ -11299,8 +11308,7 @@ impl<'a> TextFrameLayout<'a> {
               let shape_y = shape_y + shape.offset_y_pt + text_anchor_offset;
               let shape_x = adjusted_floating_shape_x(placement, shape, shape_x);
               let shape_y = adjusted_floating_shape_y(placement, shape, shape_y);
-              let shape_paint_y = if placement.layout_in_cell
-                && flow.text_segmentation == TextSegmentation::TableCell
+              let shape_paint_y = if effective_layout_in_cell(placement, flow)
                 && matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)
                 && shape.text_box_blocks.is_empty()
               {
@@ -11394,8 +11402,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_height = base_line_height;
                 }
                 ImageWrapMode::Square | ImageWrapMode::Tight
-                  if placement.layout_in_cell
-                    && flow.text_segmentation == TextSegmentation::TableCell =>
+                  if effective_layout_in_cell(placement, flow) =>
                 {
                   if !placement.behind_text {
                     append_vertical_wrap_exclusion(

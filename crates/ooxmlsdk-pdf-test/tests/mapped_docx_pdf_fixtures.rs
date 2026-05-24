@@ -4401,7 +4401,6 @@ fn mapped_fixture_tdf153136_preserves_space_character_line_height_rules() {
 }
 
 #[test]
-#[ignore = "ooxmlsdk parser fidelity: mc:AlternateContent shape text is not preserved for the PDF importer yet"]
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:testTdf135943_shapeWithText_L0c15
 fn mapped_fixture_tdf135943_shape_text_stays_inside_frame_boundaries() {
   let summary = render_summary("tdf135943_shapeWithText_LayoutInCell0_compat15.docx");

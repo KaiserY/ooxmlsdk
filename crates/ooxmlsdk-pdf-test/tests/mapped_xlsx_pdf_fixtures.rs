@@ -1511,3 +1511,169 @@ fn mapped_xlsx_tdf165503_keeps_chart_date_cache_source_values_visible() {
   assert_page_contains(&summary, 0, "1/3/2021 3");
   assert_page_contains(&summary, 0, "10/10/2022 9");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf137091
+fn mapped_xlsx_tdf137091_keeps_turkish_locale_formula_result_visible() {
+  let summary = render_summary("tdf137091.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "SG STOKKODU Sütun2");
+  assert_page_contains(&summary, 0, "IP 1 B J7 0280 4 4 08 YY MR0084 28/4");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf70455
+fn mapped_xlsx_tdf70455_keeps_bet_history_returns_visible() {
+  let summary = render_summary("tdf70455.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Bet History");
+  assert_page_contains(&summary, 0, "Gross: €780.00");
+  assert_page_contains(&summary, 0, "€130.00 No 7/1 8.0000 Win €1,040.00 €910.00");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf98481
+fn mapped_xlsx_tdf98481_keeps_cross_sheet_sum_results_visible() {
+  let summary = render_summary("tdf98481.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(
+    &summary,
+    0,
+    "Horizontal and vertical Sums with source as separate sheet.",
+  );
+  assert_page_contains(&summary, 0, "Sum 4 0 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf115022
+fn mapped_xlsx_tdf115022_keeps_recalculated_sum_visible() {
+  let summary = render_summary("tdf115022.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Index amount");
+  assert_page_contains(&summary, 0, "a 1 a 2 a 3");
+  assert_page_contains(&summary, 0, "6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf164895
+fn mapped_xlsx_tdf164895_keeps_horizontal_range_operator_result_visible() {
+  let summary = render_summary("tdf164895.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "a 1");
+  assert_page_contains(&summary, 0, "8 30 5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testTdf162093
+fn mapped_xlsx_tdf162093_keeps_structured_reference_outputs_visible() {
+  let summary = render_summary("tdf162093.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Surname Count Region Surname Count Region");
+  assert_page_contains(&summary, 0, "Murray 15 North Murray 15 North");
+  assert_page_contains(&summary, 0, "Total 296 Total 296");
+  assert_page_contains(&summary, 1, "{=myData[#Headers]} =myData[#Headers]");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testTdf147955
+fn mapped_xlsx_tdf147955_keeps_profit_and_loss_totals_visible() {
+  let summary = render_summary("tdf147955.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Leasingham Community Benefit Society Ltd");
+  assert_page_contains(&summary, 0, "Sales 892.75");
+  assert_page_contains(&summary, 0, "Food - CoS 130.25");
+  assert_page_contains(&summary, 0, "Cleaning 10.98");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testTdf155046
+fn mapped_xlsx_tdf155046_keeps_boolean_publication_results_visible() {
+  let summary = render_summary("tdf155046.xlsx");
+  assert_eq!(summary.page_count, 5);
+  assert_page_contains(
+    &summary,
+    0,
+    "Respondent ID Publication ID Submitted Submitted Time",
+  );
+  assert_page_contains(&summary, 0, "89nre8cuc7i3 69lue27dr864 TRUE");
+  assert_page_contains(&summary, 1, "Publication Consent");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf136364
+fn mapped_xlsx_tdf136364_keeps_union_formula_results_visible() {
+  let summary = render_summary("tdf136364.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 1 1 1 27");
+  assert_page_contains(&summary, 0, "2 2 2 2 12");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTdf157689
+fn mapped_xlsx_tdf157689_keeps_multisheet_autofilter_output_visible() {
+  let summary = render_summary("tdf157689.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "col1 col2");
+  assert_page_contains(&summary, 0, "1 2 2 3");
+  assert_page_contains(&summary, 1, "col3 col4");
+  assert_page_contains(&summary, 1, "2 2 4 2");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testTdf142905
+fn mapped_xlsx_tdf142905_keeps_space_padded_text_visible() {
+  let summary = render_summary("tdf142905.xlsx");
+  assert_eq!(summary.page_count, 1);
+  let text = page_text(&summary, 0);
+  assert!(
+    text.contains("3M   3M"),
+    "missing space-padded text pair; page text:\n{text}"
+  );
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf119190
+fn mapped_xlsx_tdf119190_keeps_visible_comment_caption() {
+  let summary = render_summary("tdf119190.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Kelemen Gábor 2:");
+  assert_page_contains(&summary, 0, "Comment!");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf141495
+fn mapped_xlsx_tdf141495_keeps_turkish_locale_date_serial_visible() {
+  let summary = render_summary("tdf141495.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "44227 44255 44286 44316");
+  assert_page_contains(&summary, 1, "44804 44834 44865 44895 44926");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf79972XLSX
+fn mapped_xlsx_tdf79972_keeps_bugzilla_hyperlink_visible() {
+  let summary = render_summary("tdf79972.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "123");
+  assert_link_target(
+    &summary,
+    "https://bugs.documentfoundation.org/show_bug.cgi?id=79972",
+  );
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testTdf111876
+fn mapped_xlsx_tdf111876_keeps_relative_hyperlink_text_visible() {
+  let summary = render_summary("tdf111876.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "..\\xls\\bug-fixes.xls");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf119565
+fn mapped_xlsx_tdf119565_keeps_themed_textbox_text_visible() {
+  let summary = render_summary("tdf119565.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Lorem ipsum dolor");
+  assert_page_contains(&summary, 0, "Maecenas porttitor");
+}

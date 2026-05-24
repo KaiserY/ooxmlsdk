@@ -169,14 +169,14 @@ Landed owner modules:
   numFmt/font/fill/border/style-XF references, quote/pivot flags, apply flags,
   alignment/protection/extension markers, `Xf::createPattern`-style parent
   XF used-flag resolution, display font records, `Fill::finalizeImport`
-  pattern/gradient color mixing, outer border records, and `_xlnm.Print_Area`
-  / `_xlnm.Print_Titles` / `_xlnm._FilterDatabase` classification. Theme,
-  indexed/palette color resolution, conditional formatting, and the rest of
-  the locale-sensitive `SvNumberFormatter` surface remain in this owner before
-  broad PDF text parity. The current display-string bridge resolves
-  built-in/custom numFmtId strings and covers the Calc print path for General,
-  text, boolean, numeric, grouped numeric, percent, currency-prefix, and
-  serial date/time branches.
+  pattern/gradient color mixing, indexed palette lookup for style colors,
+  outer border records, differential format records, and `_xlnm.Print_Area`
+  / `_xlnm.Print_Titles` / `_xlnm._FilterDatabase` classification. Theme color
+  and the rest of the locale-sensitive `SvNumberFormatter` surface remain in
+  this owner before broad PDF text parity. The current display-string bridge
+  resolves built-in/custom numFmtId strings and covers the Calc print path for
+  General, text, boolean, numeric, grouped numeric, percent, currency-prefix,
+  serial date/time branches, and positive/negative/zero format sections.
 - `xlsx/table.rs`: typed table definition catalog from `TableDefinitionPart`,
   preserving table id/name/displayName/ref/type, header/totals row counts,
   table columns, style flags, auto-filter/sort-state presence, query-table
@@ -779,6 +779,9 @@ Required behavior:
   lessons; debug/release overflow differences are rendering bugs
 - implement number-format display before asserting PDF text parity
 - preserve rich text run formatting separately from cell XF defaults
+- keep `dxfs` as style-owned records and let conditional-format evaluation
+  consume the resolved differential paint, instead of duplicating fill/color
+  parsing in the display layer
 
 Number formatting is a rendering-critical import behavior. Do not render raw
 `<v>` values into tests unless the test is explicitly for raw cached values.
@@ -1087,8 +1090,8 @@ Initial implementation order should be conservative:
 
 1. exact grid geometry, page setup, print range, and text values
 2. resolved number formats and basic font/fill/border paint
-3. merged cells and alignment/wrap
-4. conditional formatting and rich text run styling
+3. merged cells and alignment/wrap/vertical alignment/text rotation
+4. conditional-format dxf paint for evaluated rules and rich text run styling
 5. rotated/stacked text, shrink-to-fit, and precise text clipping
 
 Do not add a renderer-only width heuristic for Excel column widths. Port the
@@ -1198,6 +1201,10 @@ theme logic where possible, but through the Excel owner:
 - Preserve unresolved color/fill/line/effect variants even when display cannot
   paint them yet. The XLSX display bridge should consume cached actual
   properties, like PPTX, rather than recomputing inheritance or theme refs.
+- Conditional formatting follows the Calc owner split: worksheet import keeps
+  sqref/rule/operator/formula/priority, styles import owns `dxfs`, and display
+  may only paint a differential format when the rule can be evaluated against
+  the current cell state.
 
 ### Comments, Controls, and Form Widgets
 

@@ -9,7 +9,7 @@ use crate::units;
 
 use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
-use super::worksheet::{CalcSheet, CellRect, SheetType};
+use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect, SheetType};
 
 const XLSX_DEBUG_LINE_HEIGHT_PT: f32 = 12.0;
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
@@ -187,7 +187,9 @@ fn render_cell_area(
     let y_pt = origin_y_pt + (rect.y_pt - area_rect.y_pt) * zoom_scale;
     let width_pt = rect.width_pt * zoom_scale;
     let height_pt = rect.height_pt * zoom_scale;
-    if let Some(fill_color) = import.styles.fill_color_for_cell(cell.style_index) {
+    if let Some(fill_color) = conditional_fill_color(import, page.sheet, cell)
+      .or_else(|| import.styles.fill_color_for_cell(cell.style_index))
+    {
       items.push(PageItem::Rect(RectItem {
         x_pt,
         y_pt,
@@ -213,23 +215,19 @@ fn render_cell_area(
       continue;
     }
     let hyperlink_url = hyperlink_for_cell(page, cell.address);
-    items.push(PageItem::Text(TextItem {
-      x_pt: x_pt + XLSX_CELL_TEXT_INSET_PT,
-      y_pt,
-      line_height_pt: height_pt,
-      text: cell.rendered_text.clone(),
-      style: import.styles.text_style_for_cell(cell.style_index),
-      rotation_center_pt: None,
-      hyperlink_url: hyperlink_url.clone(),
-      dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: false,
-      decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Line,
-    }));
+    render_cell_text(
+      items,
+      &cell.rendered_text,
+      CellRect {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
+      import.styles.text_style_for_cell(cell.style_index),
+      import.styles.alignment_for_cell(cell.style_index),
+      hyperlink_url.clone(),
+    );
     if let Some(hyperlink_url) = hyperlink_url {
       items.push(PageItem::LinkArea(LinkAreaItem {
         x_pt,
@@ -242,6 +240,181 @@ fn render_cell_area(
   }
   if page.page_settings.print_grid_lines {
     render_grid(items, page, area, origin_x_pt, origin_y_pt, zoom_scale);
+  }
+}
+
+fn conditional_fill_color(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  cell: &super::print::CalcPrintCell<'_>,
+) -> Option<RgbColor> {
+  let mut rules = sheet
+    .metrics
+    .conditions
+    .conditional_formats
+    .iter()
+    .filter(|format| conditional_format_contains_cell(format, cell.address))
+    .flat_map(|format| format.rules.iter())
+    .collect::<Vec<_>>();
+  rules.sort_by_key(|rule| rule.priority);
+  for rule in rules {
+    if !conditional_rule_matches(rule, cell) {
+      continue;
+    }
+    if let Some(color) = rule
+      .format_id
+      .and_then(|format_id| import.styles.differential_fill_color(format_id))
+    {
+      return Some(color);
+    }
+    if rule.stop_if_true {
+      break;
+    }
+  }
+  None
+}
+
+fn conditional_format_contains_cell(
+  format: &super::sheet_conditions::ConditionalFormatModel,
+  address: CellAddress,
+) -> bool {
+  format.sequence_of_references.iter().any(|references| {
+    references
+      .split_whitespace()
+      .filter_map(CellRange::parse_a1_range)
+      .any(|range| range.contains(address))
+  })
+}
+
+fn conditional_rule_matches(
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  cell: &super::print::CalcPrintCell<'_>,
+) -> bool {
+  match rule.rule_type {
+    x::ConditionalFormatValues::CellIs => conditional_cell_is_matches(rule, cell),
+    x::ConditionalFormatValues::ContainsText => rule
+      .text
+      .as_ref()
+      .is_some_and(|needle| cell.rendered_text.contains(needle) || cell.text.contains(needle)),
+    x::ConditionalFormatValues::NotContainsText => rule
+      .text
+      .as_ref()
+      .is_some_and(|needle| !cell.rendered_text.contains(needle) && !cell.text.contains(needle)),
+    x::ConditionalFormatValues::BeginsWith => rule.text.as_ref().is_some_and(|needle| {
+      cell.rendered_text.starts_with(needle) || cell.text.starts_with(needle)
+    }),
+    x::ConditionalFormatValues::EndsWith => rule
+      .text
+      .as_ref()
+      .is_some_and(|needle| cell.rendered_text.ends_with(needle) || cell.text.ends_with(needle)),
+    x::ConditionalFormatValues::ContainsBlanks => {
+      cell.text.is_empty() && cell.rendered_text.is_empty()
+    }
+    x::ConditionalFormatValues::NotContainsBlanks => {
+      !cell.text.is_empty() || !cell.rendered_text.is_empty()
+    }
+    x::ConditionalFormatValues::Expression => expression_rule_matches(rule),
+    _ => false,
+  }
+}
+
+fn conditional_cell_is_matches(
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  cell: &super::print::CalcPrintCell<'_>,
+) -> bool {
+  let Some(value) = cell.text.parse::<f64>().ok() else {
+    return false;
+  };
+  let first = rule
+    .formulas
+    .first()
+    .and_then(|formula| formula.trim().parse::<f64>().ok());
+  let second = rule
+    .formulas
+    .get(1)
+    .and_then(|formula| formula.trim().parse::<f64>().ok());
+  match rule.operator.unwrap_or_default() {
+    x::ConditionalFormattingOperatorValues::LessThan => first.is_some_and(|limit| value < limit),
+    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
+      first.is_some_and(|limit| value <= limit)
+    }
+    x::ConditionalFormattingOperatorValues::Equal => first.is_some_and(|limit| value == limit),
+    x::ConditionalFormattingOperatorValues::NotEqual => first.is_some_and(|limit| value != limit),
+    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
+      first.is_some_and(|limit| value >= limit)
+    }
+    x::ConditionalFormattingOperatorValues::GreaterThan => first.is_some_and(|limit| value > limit),
+    x::ConditionalFormattingOperatorValues::Between => first
+      .zip(second)
+      .is_some_and(|(low, high)| value >= low.min(high) && value <= low.max(high)),
+    x::ConditionalFormattingOperatorValues::NotBetween => first
+      .zip(second)
+      .is_some_and(|(low, high)| value < low.min(high) || value > low.max(high)),
+    _ => false,
+  }
+}
+
+fn expression_rule_matches(rule: &super::sheet_conditions::ConditionalFormatRuleModel) -> bool {
+  rule.formulas.first().is_some_and(|formula| {
+    matches!(
+      formula.trim().to_ascii_uppercase().as_str(),
+      "TRUE" | "1" | "=TRUE" | "=1"
+    )
+  })
+}
+
+fn render_cell_text(
+  items: &mut Vec<PageItem>,
+  text: &str,
+  rect: CellRect,
+  mut style: TextStyle,
+  alignment: Option<super::styles::AlignmentRecord>,
+  hyperlink_url: Option<String>,
+) {
+  let line_height = (style.font_size_pt * 1.15).max(1.0);
+  let lines = if alignment.is_some_and(|alignment| alignment.wrap_text) {
+    text.lines().collect::<Vec<_>>()
+  } else {
+    vec![text.lines().next().unwrap_or(text)]
+  };
+  let text_height = line_height * lines.len().max(1) as f32;
+  let mut y_pt = match alignment.and_then(|alignment| alignment.vertical) {
+    Some(x::VerticalAlignmentValues::Center) => {
+      rect.y_pt + ((rect.height_pt - text_height) / 2.0).max(0.0)
+    }
+    Some(x::VerticalAlignmentValues::Bottom) => rect.y_pt + (rect.height_pt - text_height).max(0.0),
+    _ => rect.y_pt,
+  };
+  if let Some(rotation) = alignment.and_then(|alignment| alignment.text_rotation) {
+    style.rotation_deg = match rotation {
+      1..=90 => rotation as f32,
+      91..=180 => 90.0 - rotation as f32,
+      255 => 90.0,
+      _ => 0.0,
+    };
+  }
+  for line in lines {
+    items.push(PageItem::Text(TextItem {
+      x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+      y_pt,
+      line_height_pt: line_height,
+      text: line.to_string(),
+      style: style.clone(),
+      rotation_center_pt: (style.rotation_deg != 0.0).then_some((
+        rect.x_pt + rect.width_pt / 2.0,
+        rect.y_pt + rect.height_pt / 2.0,
+      )),
+      hyperlink_url: hyperlink_url.clone(),
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+    y_pt += line_height;
   }
 }
 
@@ -1340,7 +1513,7 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
       })
       .sum::<usize>();
     lines.push(format!(
-      "styles numFmts={} fonts={} fills={} borders={} cellStyleXfs={} styleXfFlags={} cellXfs={} cellXfFlags={} cellXfRefs={} cellStyles={} dxfs={} tableStyles={} defaultTableStyle={} defaultPivotStyle={} colors={} extensions={}",
+      "styles numFmts={} fonts={} fills={} borders={} cellStyleXfs={} styleXfFlags={} cellXfs={} cellXfFlags={} cellXfRefs={} cellStyles={} dxfs={} dxfFlags={} tableStyles={} defaultTableStyle={} defaultPivotStyle={} colors={} indexedColors={} extensions={}",
       import.styles.custom_number_formats.len(),
       import.styles.fonts,
       import.styles.fills,
@@ -1352,10 +1525,12 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
       cell_xf_refs,
       import.styles.cell_styles,
       import.styles.differential_formats,
+      import.styles.differential_format_flag_count(),
       import.styles.table_styles,
       import.styles.default_table_style.as_deref().unwrap_or(""),
       import.styles.default_pivot_style.as_deref().unwrap_or(""),
       import.styles.has_colors,
+      import.styles.indexed_colors.len(),
       import.styles.has_extensions
     ));
   }

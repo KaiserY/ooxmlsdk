@@ -306,10 +306,16 @@ fn print_scale_state(
     );
     if sheet.page_settings.fit_to_width > 0
       && sheet.page_settings.fit_to_height == 0
-      && auto_page_rows > 1
+      && actual_row_page_count(sheet, areas, named_ranges, zoom) > 1
     {
-      tdf103516_adjusted = true;
-      zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
+      let adjusted_zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
+      if adjusted_zoom < zoom
+        && actual_row_page_count(sheet, areas, named_ranges, adjusted_zoom)
+          < actual_row_page_count(sheet, areas, named_ranges, zoom)
+      {
+        tdf103516_adjusted = true;
+        zoom = adjusted_zoom;
+      }
     }
   } else if sheet.page_settings.scale > 0 {
     mode = if sheet.page_settings.scale == 100 {
@@ -334,6 +340,29 @@ fn print_scale_state(
         | None
     ),
   }
+}
+
+fn actual_row_page_count(
+  sheet: &CalcSheet,
+  areas: &[CellRange],
+  named_ranges: &CalcPrintNamedRanges<'_>,
+  zoom: u32,
+) -> usize {
+  areas
+    .iter()
+    .map(|area| {
+      split_range_by_page_metrics(
+        sheet,
+        *area,
+        &sheet.metrics.row_breaks,
+        true,
+        named_ranges.repeat_rows,
+        zoom,
+      )
+      .len()
+    })
+    .sum::<usize>()
+    .max(1)
 }
 
 fn fit_zoom_to_pages(
@@ -811,7 +840,7 @@ fn rendered_number_text(
       NumberFormatRenderState::UnsupportedFormatCode,
     );
   };
-  let format = NumberFormatPattern::parse(format_code);
+  let format = NumberFormatPattern::parse(format_code, value);
   if format.date_time {
     return (
       format_serial_date_time(value, format_code, date_1904),
@@ -843,12 +872,26 @@ struct NumberFormatPattern {
   date_time: bool,
   prefix: String,
   suffix: String,
+  suppress_negative_sign: bool,
 }
 
 impl NumberFormatPattern {
-  fn parse(code: &str) -> Self {
-    let section = code.split(';').next().unwrap_or(code);
-    let mut pattern = Self::default();
+  fn parse(code: &str, value: f64) -> Self {
+    let sections = code.split(';').collect::<Vec<_>>();
+    let section_index = if value.is_sign_negative() && sections.len() > 1 {
+      1
+    } else if value == 0.0 && sections.len() > 2 {
+      2
+    } else {
+      0
+    };
+    let cleaned_section =
+      strip_number_format_markers(sections.get(section_index).copied().unwrap_or(code));
+    let section = cleaned_section.as_str();
+    let mut pattern = Self {
+      suppress_negative_sign: section_index == 1,
+      ..Self::default()
+    };
     let mut in_quote = false;
     let mut escaped = false;
     let mut after_decimal = false;
@@ -858,7 +901,7 @@ impl NumberFormatPattern {
       if escaped {
         if literal_prefix {
           pattern.prefix.push(ch);
-        } else if !seen_digit {
+        } else if seen_digit {
           pattern.suffix.push(ch);
         }
         escaped = false;
@@ -870,7 +913,7 @@ impl NumberFormatPattern {
         _ if in_quote => {
           if literal_prefix {
             pattern.prefix.push(ch);
-          } else if !seen_digit {
+          } else if seen_digit {
             pattern.suffix.push(ch);
           }
         }
@@ -896,11 +939,49 @@ impl NumberFormatPattern {
           literal_prefix = false;
         }
         _ if !ch.is_whitespace() && literal_prefix => pattern.prefix.push(ch),
+        _ if !ch.is_whitespace() && seen_digit => pattern.suffix.push(ch),
         _ => {}
       }
     }
     pattern
   }
+}
+
+fn strip_number_format_markers(section: &str) -> String {
+  let mut output = String::new();
+  let mut rest = section;
+  while let Some(start) = rest.find('[') {
+    output.push_str(&rest[..start]);
+    let Some(end) = rest[start + 1..].find(']') else {
+      output.push_str(&rest[start..]);
+      return output;
+    };
+    let marker = &rest[start + 1..start + 1 + end];
+    if !is_ignored_number_format_marker(marker) {
+      output.push('[');
+      output.push_str(marker);
+      output.push(']');
+    }
+    rest = &rest[start + end + 2..];
+  }
+  output.push_str(rest);
+  output
+}
+
+fn is_ignored_number_format_marker(marker: &str) -> bool {
+  let marker = marker.trim();
+  marker.eq_ignore_ascii_case("red")
+    || marker.eq_ignore_ascii_case("black")
+    || marker.eq_ignore_ascii_case("blue")
+    || marker.eq_ignore_ascii_case("cyan")
+    || marker.eq_ignore_ascii_case("green")
+    || marker.eq_ignore_ascii_case("magenta")
+    || marker.eq_ignore_ascii_case("white")
+    || marker.eq_ignore_ascii_case("yellow")
+    || marker.starts_with('<')
+    || marker.starts_with('>')
+    || marker.starts_with('=')
+    || marker.to_ascii_lowercase().starts_with("color")
 }
 
 fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
@@ -909,7 +990,12 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   } else {
     value
   };
-  let sign = if value.is_sign_negative() { "-" } else { "" };
+  let sign =
+    if value.is_sign_negative() && !pattern.suppress_negative_sign && pattern.prefix.is_empty() {
+      "-"
+    } else {
+      ""
+    };
   let formatted = format!("{:.*}", pattern.decimals, value.abs());
   let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
   let integer = if pattern.grouping {

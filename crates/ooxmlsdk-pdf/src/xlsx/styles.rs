@@ -14,6 +14,8 @@ pub(crate) struct StylesCatalog {
   pub(crate) font_records: Vec<FontRecord>,
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
+  pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
+  pub(crate) indexed_colors: Vec<RgbColor>,
   pub(crate) fonts: usize,
   pub(crate) fills: usize,
   pub(crate) borders: usize,
@@ -50,6 +52,7 @@ pub(crate) struct CellFormatRecord {
   pub(crate) apply_alignment: bool,
   pub(crate) apply_protection: bool,
   pub(crate) has_alignment: bool,
+  pub(crate) alignment: Option<AlignmentRecord>,
   pub(crate) has_protection: bool,
   pub(crate) has_extensions: bool,
 }
@@ -76,6 +79,30 @@ pub(crate) struct BorderRecord {
   pub(crate) right: Option<BorderStyle>,
   pub(crate) top: Option<BorderStyle>,
   pub(crate) bottom: Option<BorderStyle>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct DifferentialFormatRecord {
+  pub(crate) font: Option<FontRecord>,
+  pub(crate) fill: Option<FillRecord>,
+  pub(crate) border: Option<BorderRecord>,
+  pub(crate) alignment: Option<AlignmentRecord>,
+  pub(crate) number_format: Option<NumberFormatRecord>,
+  pub(crate) has_protection: bool,
+  pub(crate) has_extensions: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct AlignmentRecord {
+  pub(crate) horizontal: Option<x::HorizontalAlignmentValues>,
+  pub(crate) vertical: Option<x::VerticalAlignmentValues>,
+  pub(crate) text_rotation: Option<u32>,
+  pub(crate) wrap_text: bool,
+  pub(crate) indent: Option<u32>,
+  pub(crate) relative_indent: Option<i32>,
+  pub(crate) justify_last_line: bool,
+  pub(crate) shrink_to_fit: bool,
+  pub(crate) reading_order: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -106,6 +133,18 @@ impl StylesCatalog {
 
   fn from_stylesheet(stylesheet: &x::Stylesheet) -> Self {
     let table_styles = stylesheet.table_styles.as_ref();
+    let indexed_colors = stylesheet
+      .colors
+      .as_ref()
+      .and_then(|colors| colors.indexed_colors.as_ref())
+      .map(|colors| {
+        colors
+          .rgb_color
+          .iter()
+          .filter_map(|color| color_from_ooxml(color.rgb.as_deref()))
+          .collect::<Vec<_>>()
+      })
+      .unwrap_or_default();
     Self {
       custom_number_formats: stylesheet
         .numbering_formats
@@ -146,12 +185,24 @@ impl StylesCatalog {
       font_records: stylesheet
         .fonts
         .as_ref()
-        .map(|fonts| fonts.font.iter().map(FontRecord::from_font).collect())
+        .map(|fonts| {
+          fonts
+            .font
+            .iter()
+            .map(|font| FontRecord::from_font_with_colors(font, &indexed_colors))
+            .collect()
+        })
         .unwrap_or_default(),
       fill_records: stylesheet
         .fills
         .as_ref()
-        .map(|fills| fills.fill.iter().map(FillRecord::from_fill).collect())
+        .map(|fills| {
+          fills
+            .fill
+            .iter()
+            .map(|fill| FillRecord::from_fill_with_colors(fill, &indexed_colors))
+            .collect()
+        })
         .unwrap_or_default(),
       border_records: stylesheet
         .borders
@@ -160,10 +211,27 @@ impl StylesCatalog {
           borders
             .border
             .iter()
-            .map(BorderRecord::from_border)
+            .map(|border| BorderRecord::from_border_with_colors(border, &indexed_colors))
             .collect()
         })
         .unwrap_or_default(),
+      differential_format_records: stylesheet
+        .differential_formats
+        .as_ref()
+        .map(|formats| {
+          formats
+            .differential_format
+            .iter()
+            .map(|format| {
+              DifferentialFormatRecord::from_differential_format_with_colors(
+                format,
+                &indexed_colors,
+              )
+            })
+            .collect()
+        })
+        .unwrap_or_default(),
+      indexed_colors,
       fonts: stylesheet
         .fonts
         .as_ref()
@@ -281,6 +349,30 @@ impl StylesCatalog {
       .and_then(|fill| fill.color)
   }
 
+  pub(crate) fn alignment_for_cell(&self, style_index: Option<u32>) -> Option<AlignmentRecord> {
+    let format = self.effective_cell_format(style_index)?;
+    if !format.apply_alignment {
+      return None;
+    }
+    format.alignment
+  }
+
+  pub(crate) fn differential_fill_color(&self, format_id: u32) -> Option<RgbColor> {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.fill.as_ref())
+      .and_then(|fill| fill.color)
+  }
+
+  pub(crate) fn differential_format_flag_count(&self) -> usize {
+    self
+      .differential_format_records
+      .iter()
+      .map(DifferentialFormatRecord::used_flag_count)
+      .sum()
+  }
+
   pub(crate) fn borders_for_cell(&self, style_index: Option<u32>) -> BorderRecord {
     let Some(format) = self.effective_cell_format(style_index) else {
       return BorderRecord::default();
@@ -366,6 +458,10 @@ impl CellFormatRecord {
         .apply_protection
         .map_or(apply_default, |value| value.as_bool()),
       has_alignment: format.alignment.is_some(),
+      alignment: format
+        .alignment
+        .as_ref()
+        .map(AlignmentRecord::from_alignment),
       has_protection: format.protection.is_some(),
       has_extensions: format.extension_list.is_some(),
     }
@@ -387,7 +483,7 @@ impl CellFormatRecord {
 }
 
 impl FontRecord {
-  fn from_font(font: &x::Font) -> Self {
+  fn from_font_with_colors(font: &x::Font, indexed_colors: &[RgbColor]) -> Self {
     let mut record = Self::default();
     for choice in &font.font_choice {
       match choice {
@@ -407,7 +503,7 @@ impl FontRecord {
           record.size_pt = Some(OrderedF64::new(value.val));
         }
         x::FontChoice::Color(value) => {
-          record.color = color_from_ooxml(value.rgb.as_deref());
+          record.color = color_from_color(value, indexed_colors);
         }
         x::FontChoice::FontName(value) => {
           record.name = Some(Arc::from(value.val.as_str()));
@@ -417,43 +513,150 @@ impl FontRecord {
     }
     record
   }
+
+  fn used_flag_count(&self) -> usize {
+    usize::from(self.name.is_some())
+      + usize::from(self.size_pt.is_some())
+      + usize::from(self.color.is_some())
+      + usize::from(self.bold)
+      + usize::from(self.italic)
+      + usize::from(self.underline)
+      + usize::from(self.strikethrough)
+  }
 }
 
 impl FillRecord {
-  fn from_fill(fill: &x::Fill) -> Self {
+  fn from_fill_with_colors(fill: &x::Fill, indexed_colors: &[RgbColor]) -> Self {
     let color = match &fill.fill_choice {
-      Some(x::FillChoice::PatternFill(pattern)) => color_from_pattern_fill(pattern),
-      Some(x::FillChoice::GradientFill(gradient)) => color_from_gradient_fill(gradient),
+      Some(x::FillChoice::PatternFill(pattern)) => color_from_pattern_fill(pattern, indexed_colors),
+      Some(x::FillChoice::GradientFill(gradient)) => {
+        color_from_gradient_fill(gradient, indexed_colors)
+      }
       None => None,
     };
     Self { color }
   }
+
+  fn used_flag_count(&self) -> usize {
+    usize::from(self.color.is_some())
+  }
 }
 
 impl BorderRecord {
-  fn from_border(border: &x::Border) -> Self {
+  fn from_border_with_colors(border: &x::Border, indexed_colors: &[RgbColor]) -> Self {
     Self {
       left: border
         .left_border
         .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref())),
+        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
       right: border
         .right_border
         .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref())),
+        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
       top: border
         .top_border
         .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref())),
+        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
       bottom: border
         .bottom_border
         .as_deref()
-        .and_then(|border| border_style(border.style, border.color.as_ref())),
+        .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
     }
+  }
+
+  fn used_flag_count(&self) -> usize {
+    usize::from(self.left.is_some())
+      + usize::from(self.right.is_some())
+      + usize::from(self.top.is_some())
+      + usize::from(self.bottom.is_some())
   }
 }
 
-fn color_from_pattern_fill(pattern: &x::PatternFill) -> Option<RgbColor> {
+impl DifferentialFormatRecord {
+  fn from_differential_format_with_colors(
+    format: &x::DifferentialFormat,
+    indexed_colors: &[RgbColor],
+  ) -> Self {
+    Self {
+      font: format
+        .font
+        .as_ref()
+        .map(|font| FontRecord::from_font_with_colors(font, indexed_colors)),
+      fill: format
+        .fill
+        .as_deref()
+        .map(|fill| FillRecord::from_fill_with_colors(fill, indexed_colors)),
+      border: format
+        .border
+        .as_deref()
+        .map(|border| BorderRecord::from_border_with_colors(border, indexed_colors)),
+      alignment: format
+        .alignment
+        .as_ref()
+        .map(AlignmentRecord::from_alignment),
+      number_format: format
+        .numbering_format
+        .as_ref()
+        .map(|format| NumberFormatRecord {
+          id: format.number_format_id,
+          code: format.format_code.clone(),
+        }),
+      has_protection: format.protection.is_some(),
+      has_extensions: format.extension_list.is_some(),
+    }
+  }
+
+  fn used_flag_count(&self) -> usize {
+    self.font.as_ref().map_or(0, FontRecord::used_flag_count)
+      + self.fill.as_ref().map_or(0, FillRecord::used_flag_count)
+      + self
+        .border
+        .as_ref()
+        .map_or(0, BorderRecord::used_flag_count)
+      + self
+        .alignment
+        .as_ref()
+        .map_or(0, AlignmentRecord::used_flag_count)
+      + usize::from(self.number_format.is_some())
+      + usize::from(self.has_protection)
+      + usize::from(self.has_extensions)
+  }
+}
+
+impl AlignmentRecord {
+  fn from_alignment(alignment: &x::Alignment) -> Self {
+    Self {
+      horizontal: alignment.horizontal,
+      vertical: alignment.vertical,
+      text_rotation: alignment.text_rotation,
+      wrap_text: alignment.wrap_text.is_some_and(|value| value.as_bool()),
+      indent: alignment.indent,
+      relative_indent: alignment.relative_indent,
+      justify_last_line: alignment
+        .justify_last_line
+        .is_some_and(|value| value.as_bool()),
+      shrink_to_fit: alignment.shrink_to_fit.is_some_and(|value| value.as_bool()),
+      reading_order: alignment.reading_order,
+    }
+  }
+
+  fn used_flag_count(&self) -> usize {
+    usize::from(self.horizontal.is_some())
+      + usize::from(self.vertical.is_some())
+      + usize::from(self.text_rotation.is_some())
+      + usize::from(self.wrap_text)
+      + usize::from(self.indent.is_some())
+      + usize::from(self.relative_indent.is_some())
+      + usize::from(self.justify_last_line)
+      + usize::from(self.shrink_to_fit)
+      + usize::from(self.reading_order.is_some())
+  }
+}
+
+fn color_from_pattern_fill(
+  pattern: &x::PatternFill,
+  indexed_colors: &[RgbColor],
+) -> Option<RgbColor> {
   let pattern_type = pattern.pattern_type.unwrap_or_default();
   if matches!(pattern_type, x::PatternValues::None) {
     return None;
@@ -461,11 +664,11 @@ fn color_from_pattern_fill(pattern: &x::PatternFill) -> Option<RgbColor> {
   let pattern_color = pattern
     .foreground_color
     .as_ref()
-    .and_then(|color| color_from_ooxml(color.rgb.as_deref()));
+    .and_then(|color| color_from_foreground_color(color, indexed_colors));
   let fill_color = pattern
     .background_color
     .as_ref()
-    .and_then(|color| color_from_ooxml(color.rgb.as_deref()));
+    .and_then(|color| color_from_background_color(color, indexed_colors));
   match pattern_type {
     x::PatternValues::Solid => pattern_color.or(fill_color),
     _ => Some(mix_colors(
@@ -480,12 +683,15 @@ fn color_from_pattern_fill(pattern: &x::PatternFill) -> Option<RgbColor> {
   }
 }
 
-fn color_from_gradient_fill(gradient: &x::GradientFill) -> Option<RgbColor> {
+fn color_from_gradient_fill(
+  gradient: &x::GradientFill,
+  indexed_colors: &[RgbColor],
+) -> Option<RgbColor> {
   let mut colors = gradient
     .gradient_stop
     .iter()
     .map(|stop| &stop.color)
-    .filter_map(|color| color_from_ooxml(color.rgb.as_deref()));
+    .filter_map(|color| color_from_color(color, indexed_colors));
   let first = colors.next()?;
   let Some(second) = colors.next() else {
     return Some(first);
@@ -530,6 +736,7 @@ fn mix_color_component(pattern: u8, fill: u8, alpha: i32) -> u8 {
 fn border_style(
   style: Option<x::BorderStyleValues>,
   color: Option<&x::Color>,
+  indexed_colors: &[RgbColor],
 ) -> Option<BorderStyle> {
   let style = style?;
   if matches!(style, x::BorderStyleValues::None) {
@@ -538,7 +745,7 @@ fn border_style(
   Some(BorderStyle {
     width_pt: border_width_pt(style),
     color: color
-      .and_then(|color| color_from_ooxml(color.rgb.as_deref()))
+      .and_then(|color| color_from_color(color, indexed_colors))
       .unwrap_or(RgbColor { r: 0, g: 0, b: 0 }),
     compound: matches!(style, x::BorderStyleValues::Double),
     ..BorderStyle::default()
@@ -564,6 +771,36 @@ fn border_width_pt(style: x::BorderStyleValues) -> f32 {
     x::BorderStyleValues::Thick => 1.5,
     x::BorderStyleValues::None => 0.0,
   }
+}
+
+fn color_from_color(color: &x::Color, indexed_colors: &[RgbColor]) -> Option<RgbColor> {
+  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
+    color
+      .indexed
+      .and_then(|index| indexed_colors.get(index as usize).copied())
+  })
+}
+
+fn color_from_foreground_color(
+  color: &x::ForegroundColor,
+  indexed_colors: &[RgbColor],
+) -> Option<RgbColor> {
+  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
+    color
+      .indexed
+      .and_then(|index| indexed_colors.get(index as usize).copied())
+  })
+}
+
+fn color_from_background_color(
+  color: &x::BackgroundColor,
+  indexed_colors: &[RgbColor],
+) -> Option<RgbColor> {
+  color_from_ooxml(color.rgb.as_deref()).or_else(|| {
+    color
+      .indexed
+      .and_then(|index| indexed_colors.get(index as usize).copied())
+  })
 }
 
 fn color_from_ooxml(rgb: Option<&str>) -> Option<RgbColor> {

@@ -136,6 +136,6 @@ fn collect_office_documents(root: &Path, fixtures: &mut Vec<PathBuf>) {
 fn is_pdf_fixture_document(path: &Path) -> bool {
   matches!(
     path.extension().and_then(|extension| extension.to_str()),
-    Some("docx" | "docm" | "dotx" | "dotm" | "pptx" | "pptm" | "ppsx" | "ppsm")
+    Some("docx" | "docm" | "dotx" | "dotm" | "pptx" | "pptm" | "ppsx" | "ppsm" | "xlsx" | "xlsm",)
   )
 }

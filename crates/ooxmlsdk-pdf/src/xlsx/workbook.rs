@@ -135,7 +135,7 @@ fn chartsheet(
   active: bool,
 ) -> Result<CalcSheet> {
   let chartsheet = part.root_element(package)?.clone();
-  let resources = SheetResourceCatalog::from_chartsheet_part(package, part);
+  let resources = SheetResourceCatalog::from_chartsheet_part(package, part)?;
   Ok(CalcSheet::from_chartsheet(
     workbook_index,
     sheet.name.as_str().to_string(),

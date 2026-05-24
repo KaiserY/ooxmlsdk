@@ -174,6 +174,9 @@ Landed owner modules:
   import now preserves typed formula state for normal/shared/array/data-table
   formulas, shared ids, formula refs, calculation flags, data-table inputs,
   cached values, cell/value metadata, phonetic flags, and extension markers.
+  Chartsheet import preserves `ChartsheetFragment` properties, protection,
+  chart sheet views, custom chart views, web publish items, and extension
+  markers.
 - `xlsx/sheet_objects.rs`: typed worksheet OLE/control catalog mirroring
   `WorksheetFragment::importOleObject` / `importControl`, preserving shape ids,
   relationship ids, linked/embedded markers, progIds, update/icon/autoload
@@ -182,8 +185,13 @@ Landed owner modules:
   single-cell XML tables, named sheet views, slicers, timelines, worksheet sort
   maps, custom properties, printer settings, model3D relationships, and
   ActiveX binary relationships.
-- `xlsx/drawing.rs`: typed drawing/chart resource catalog from `DrawingsPart`,
-  `ChartPart`, and `ExtendedChartPart` child relationships.
+- `xlsx/drawing.rs`: typed `DrawingFragment`-shaped drawing/chart resource
+  catalog from `DrawingsPart`, `ChartPart`, and `ExtendedChartPart`. Drawing
+  import now preserves `twoCellAnchor` / `oneCellAnchor` / `absoluteAnchor`,
+  from/to markers, extents, `editAs`, client data flags, object kind,
+  non-visual id/name/description/hidden state, picture relationship ids,
+  graphic frame URIs, content-part relationships, and child chart/diagram/media
+  resources.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
   worksheet/chartsheet page setup import, including header/footer text
   channels, header/footer drawing and legacy drawing relationships, background

@@ -27,6 +27,7 @@ pub(crate) struct CalcSheet {
   pub(crate) active: bool,
   pub(crate) page_settings: CalcPageSettings,
   pub(crate) metrics: SheetMetrics,
+  pub(crate) chartsheet_metrics: Option<ChartsheetMetrics>,
   pub(crate) resources: SheetResourceCatalog,
   pub(crate) rows: Vec<CalcRow>,
 }
@@ -70,6 +71,22 @@ pub(crate) struct SheetMetrics {
   pub(crate) objects: SheetObjectCatalog,
   pub(crate) protected_ranges: usize,
   pub(crate) scenarios: usize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct ChartsheetMetrics {
+  pub(crate) published: bool,
+  pub(crate) code_name: Option<String>,
+  pub(crate) has_tab_color: bool,
+  pub(crate) views: usize,
+  pub(crate) selected_views: usize,
+  pub(crate) zoom_to_fit_views: usize,
+  pub(crate) view_extensions: usize,
+  pub(crate) custom_views: usize,
+  pub(crate) custom_view_flags: usize,
+  pub(crate) protection_flags: usize,
+  pub(crate) web_publish_items: usize,
+  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -177,6 +194,7 @@ impl CalcSheet {
       active,
       page_settings,
       metrics,
+      chartsheet_metrics: None,
       resources,
       rows: worksheet_rows(&worksheet, shared_strings),
     }
@@ -203,6 +221,7 @@ impl CalcSheet {
       active,
       page_settings,
       metrics: SheetMetrics::default(),
+      chartsheet_metrics: Some(ChartsheetMetrics::from_chartsheet(&chartsheet)),
       resources,
       rows: Vec::new(),
     }
@@ -226,6 +245,7 @@ impl CalcSheet {
       active,
       page_settings: CalcPageSettings::default(),
       metrics: SheetMetrics::default(),
+      chartsheet_metrics: None,
       resources: SheetResourceCatalog::default(),
       rows: Vec::new(),
     }
@@ -237,6 +257,79 @@ impl CalcSheet {
         self.state,
         Some(x::SheetStateValues::Hidden | x::SheetStateValues::VeryHidden)
       )
+  }
+}
+
+impl ChartsheetMetrics {
+  fn from_chartsheet(chartsheet: &x::Chartsheet) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/chartsheetfragment.cxx imports
+    // chartsheet properties/protection/views through WorksheetSettings and
+    // SheetViewSettings before final worksheet import.
+    let properties = chartsheet.chart_sheet_properties.as_deref();
+    let protection = chartsheet.chart_sheet_protection.as_ref();
+    Self {
+      published: properties
+        .and_then(|properties| properties.published)
+        .is_some_and(|value| value.as_bool()),
+      code_name: properties.and_then(|properties| properties.code_name.clone()),
+      has_tab_color: properties.is_some_and(|properties| properties.tab_color.is_some()),
+      views: chartsheet.chart_sheet_views.chart_sheet_view.len(),
+      selected_views: chartsheet
+        .chart_sheet_views
+        .chart_sheet_view
+        .iter()
+        .filter(|view| view.tab_selected.is_some_and(|value| value.as_bool()))
+        .count(),
+      zoom_to_fit_views: chartsheet
+        .chart_sheet_views
+        .chart_sheet_view
+        .iter()
+        .filter(|view| view.zoom_to_fit.is_some_and(|value| value.as_bool()))
+        .count(),
+      view_extensions: usize::from(chartsheet.chart_sheet_views.extension_list.is_some())
+        + chartsheet
+          .chart_sheet_views
+          .chart_sheet_view
+          .iter()
+          .filter(|view| view.extension_list.is_some())
+          .count(),
+      custom_views: chartsheet
+        .custom_chartsheet_views
+        .as_ref()
+        .map_or(0, |views| views.custom_chartsheet_view.len()),
+      custom_view_flags: chartsheet
+        .custom_chartsheet_views
+        .as_ref()
+        .map_or(0, |views| {
+          views
+            .custom_chartsheet_view
+            .iter()
+            .map(|view| {
+              usize::from(view.scale.is_some())
+                + usize::from(view.state.is_some())
+                + usize::from(view.zoom_to_fit.is_some_and(|value| value.as_bool()))
+                + usize::from(view.page_margins.is_some())
+                + usize::from(view.chart_sheet_page_setup.is_some())
+                + usize::from(view.header_footer.is_some())
+                + view.guid.len()
+            })
+            .sum()
+        }),
+      protection_flags: protection.map_or(0, |protection| {
+        usize::from(protection.password.is_some())
+          + usize::from(protection.algorithm_name.is_some())
+          + usize::from(protection.hash_value.is_some())
+          + usize::from(protection.salt_value.is_some())
+          + usize::from(protection.spin_count.is_some())
+          + usize::from(protection.content.is_some_and(|value| value.as_bool()))
+          + usize::from(protection.objects.is_some_and(|value| value.as_bool()))
+      }),
+      web_publish_items: chartsheet
+        .web_publish_items
+        .as_ref()
+        .map_or(0, |items| items.web_publish_item.len()),
+      has_extensions: chartsheet.extension_list.is_some(),
+    }
   }
 }
 
@@ -387,7 +480,9 @@ impl SheetResourceCatalog {
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
-      .map(|drawing| vec![DrawingResourceCatalog::from_part(package, &drawing)])
+      .map(|drawing| DrawingResourceCatalog::from_part(package, &drawing))
+      .transpose()?
+      .map(|drawing| vec![drawing])
       .unwrap_or_default();
     let table_parts = part.table_definition_parts(package).collect::<Vec<_>>();
     let tables = table_parts
@@ -425,17 +520,19 @@ impl SheetResourceCatalog {
   pub(crate) fn from_chartsheet_part(
     package: &mut SpreadsheetDocument,
     part: &ChartsheetPart,
-  ) -> Self {
+  ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
-      .map(|drawing| vec![DrawingResourceCatalog::from_part(package, &drawing)])
+      .map(|drawing| DrawingResourceCatalog::from_part(package, &drawing))
+      .transpose()?
+      .map(|drawing| vec![drawing])
       .unwrap_or_default();
-    Self {
+    Ok(Self {
       drawings,
       vml_drawings: part.vml_drawing_parts(package).count(),
       images: part.image_parts(package).count(),
       ..Self::default()
-    }
+    })
   }
 }
 

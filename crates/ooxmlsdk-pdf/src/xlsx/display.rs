@@ -536,6 +536,23 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
 
   if sheet.sheet_type == SheetType::Chartsheet {
     lines.push("Chartsheet".to_string());
+    if let Some(metrics) = &sheet.chartsheet_metrics {
+      lines.push(format!(
+        "chartsheet published={} codeName={} tabColor={} views={} selectedViews={} zoomToFitViews={} viewExt={} customViews={} customViewFlags={} protectionFlags={} webPublishItems={} extensions={}",
+        metrics.published,
+        metrics.code_name.as_deref().unwrap_or(""),
+        metrics.has_tab_color,
+        metrics.views,
+        metrics.selected_views,
+        metrics.zoom_to_fit_views,
+        metrics.view_extensions,
+        metrics.custom_views,
+        metrics.custom_view_flags,
+        metrics.protection_flags,
+        metrics.web_publish_items,
+        metrics.has_extensions
+      ));
+    }
   }
 
   let drawing_count = sheet.resources.drawings.len();
@@ -557,6 +574,12 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     .iter()
     .map(|drawing| drawing.images)
     .sum::<usize>();
+  let drawing_anchor_count = sheet
+    .resources
+    .drawings
+    .iter()
+    .map(|drawing| drawing.anchors.len())
+    .sum::<usize>();
   let chart_child_resource_count = sheet
     .resources
     .drawings
@@ -577,8 +600,9 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     || sheet_relationship_count(sheet) > 0
   {
     lines.push(format!(
-      "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={} oleObjects={} controls={} unknownControls={} sheetRelationships={}",
+      "resources drawings={} anchors={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={} oleObjects={} controls={} unknownControls={} sheetRelationships={}",
       drawing_count,
+      drawing_anchor_count,
       chart_count,
       chart_child_resource_count,
       diagram_count,
@@ -593,6 +617,94 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       sheet.metrics.objects.controls.len(),
       sheet.metrics.objects.unknown_controls,
       sheet_relationship_count(sheet)
+    ));
+  }
+
+  if drawing_anchor_count > 0 {
+    let mut two_cell = 0usize;
+    let mut one_cell = 0usize;
+    let mut absolute = 0usize;
+    let mut pictures = 0usize;
+    let mut graphic_frames = 0usize;
+    let mut shapes = 0usize;
+    let mut groups = 0usize;
+    let mut connectors = 0usize;
+    let mut content_parts = 0usize;
+    let mut unknown = 0usize;
+    let mut flags = 0usize;
+    let mut ref_len = 0usize;
+    for anchor in sheet
+      .resources
+      .drawings
+      .iter()
+      .flat_map(|drawing| drawing.anchors.iter())
+    {
+      match anchor.kind {
+        super::drawing::DrawingAnchorKind::TwoCell => two_cell += 1,
+        super::drawing::DrawingAnchorKind::OneCell => one_cell += 1,
+        super::drawing::DrawingAnchorKind::Absolute => absolute += 1,
+      }
+      match anchor.object.kind {
+        super::drawing::DrawingObjectKind::Shape => shapes += 1,
+        super::drawing::DrawingObjectKind::GroupShape => groups += 1,
+        super::drawing::DrawingObjectKind::GraphicFrame => graphic_frames += 1,
+        super::drawing::DrawingObjectKind::ConnectionShape => connectors += 1,
+        super::drawing::DrawingObjectKind::Picture => pictures += 1,
+        super::drawing::DrawingObjectKind::ContentPart => content_parts += 1,
+        super::drawing::DrawingObjectKind::Unknown => unknown += 1,
+      }
+      flags += usize::from(anchor.edit_as.is_some())
+        + usize::from(anchor.lock_with_sheet)
+        + usize::from(anchor.print_with_sheet)
+        + usize::from(anchor.object.hidden)
+        + usize::from(anchor.object.has_style);
+      ref_len += anchor.object.id.unwrap_or_default() as usize
+        + anchor.object.name.as_ref().map_or(0, |value| value.len())
+        + anchor
+          .object
+          .description
+          .as_ref()
+          .map_or(0, |value| value.len())
+        + anchor
+          .object
+          .macro_name
+          .as_ref()
+          .map_or(0, |value| value.len())
+        + anchor
+          .object
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+        + anchor
+          .object
+          .graphic_uri
+          .as_ref()
+          .map_or(0, |value| value.len())
+        + anchor.object.text_len
+        + anchor.object.child_objects
+        + drawing_marker_len(anchor.from.as_ref())
+        + drawing_marker_len(anchor.to.as_ref())
+        + anchor.position.map_or(0, |(x, y)| {
+          x.unsigned_abs() as usize + y.unsigned_abs() as usize
+        })
+        + anchor.extent.map_or(0, |(cx, cy)| {
+          cx.unsigned_abs() as usize + cy.unsigned_abs() as usize
+        });
+    }
+    lines.push(format!(
+      "drawing anchors twoCell={} oneCell={} absolute={} pictures={} graphicFrames={} shapes={} groups={} connectors={} contentParts={} unknown={} flags={} refLen={}",
+      two_cell,
+      one_cell,
+      absolute,
+      pictures,
+      graphic_frames,
+      shapes,
+      groups,
+      connectors,
+      content_parts,
+      unknown,
+      flags,
+      ref_len
     ));
   }
 
@@ -1731,4 +1843,13 @@ fn sheet_relationship_count(sheet: &CalcSheet) -> usize {
     + relationships.timeline_relationships
     + relationships.model3d_relationships
     + relationships.active_x_binary_relationships
+}
+
+fn drawing_marker_len(marker: Option<&super::drawing::DrawingMarkerModel>) -> usize {
+  marker.map_or(0, |marker| {
+    marker.column.unsigned_abs() as usize
+      + marker.row.unsigned_abs() as usize
+      + marker.column_offset_emu.unsigned_abs() as usize
+      + marker.row_offset_emu.unsigned_abs() as usize
+  })
 }

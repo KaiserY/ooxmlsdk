@@ -165,8 +165,12 @@ Landed owner modules:
 - `xlsx/styles.rs`: typed stylesheet and defined-name catalogs from
   `WorkbookStylesPart` and `workbook.definedNames`, including custom number
   formats, font/fill/border/XF/table-style counts, default table/pivot style
-  names, and `_xlnm.Print_Area` / `_xlnm.Print_Titles` /
-  `_xlnm._FilterDatabase` classification.
+  names, style XF and cell XF records with numFmt/font/fill/border/style-XF
+  references, quote/pivot flags, apply flags, alignment/protection/extension
+  markers, and `_xlnm.Print_Area` / `_xlnm.Print_Titles` /
+  `_xlnm._FilterDatabase` classification. Full `StylesBuffer` inheritance,
+  theme/palette color resolution, and number-format string rendering remain in
+  this owner before broad PDF text parity.
 - `xlsx/table.rs`: typed table definition catalog from `TableDefinitionPart`,
   preserving table id/name/displayName/ref/type, header/totals row counts,
   table columns, style flags, auto-filter/sort-state presence, query-table
@@ -223,6 +227,16 @@ Landed owner modules:
   worksheet/chartsheet page setup import, including header/footer text
   channels, header/footer drawing and legacy drawing relationships, background
   picture relationships, and header/footer flags for the later token parser.
+- `xlsx/print.rs`: first `ScPrintFunc`-shaped page model beyond one-page-per
+  sheet. It now resolves simple typed `_xlnm.Print_Area` A1 ranges, records
+  print-title row/column ranges, falls back to the worksheet used area for
+  visible sheets without explicit print ranges, splits page areas at manual row
+  and column breaks, and snapshots page-local cells, hidden row/column hits,
+  merged-range intersections, formula/style/text markers, and page-local
+  drawing-anchor fallback counts for the later `PrintPage` / `PrintArea` paint
+  bridge. Formula-token range conversion, automatic page sizing, fit-to-page
+  zoom, skip-empty page counting, repeated title painting, drawing-layer paint,
+  and header/footer token layout remain in this owner.
 - `xlsx/pivot.rs`: typed pivot cache and pivot table catalogs. Workbook cache
   definitions preserve workbook cache ids/relationships, cache field counts,
   record counts, refresh/save/invalid flags, records part presence, optional
@@ -565,9 +579,10 @@ styles from the theme next, styles next, shared strings after styles.
 The current Rust importer has the typed `StylesCatalog` and
 `DefinedNamesCatalog` entry points wired. `_xlnm.Print_Area`,
 `_xlnm.Print_Titles`, and `_xlnm._FilterDatabase` are classified and attached
-to print pages, but formula-token range extraction remains a structured gap
-until the Calc formula parser owner lands. Theme/default-table-style
-materialization also remains a structured gap before `StylesCatalog`.
+to print pages. Simple A1 print-area and print-title row/column references are
+resolved in `xlsx/print.rs`; full formula-token range extraction remains a
+structured gap until the Calc formula parser owner lands. Theme/default-table-
+style materialization also remains a structured gap before `StylesCatalog`.
 
 ### `WorkbookFragment`
 

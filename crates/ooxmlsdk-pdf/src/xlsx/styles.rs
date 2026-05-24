@@ -7,6 +7,8 @@ use crate::error::Result;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct StylesCatalog {
   pub(crate) custom_number_formats: Vec<NumberFormatRecord>,
+  pub(crate) style_xfs: Vec<CellFormatRecord>,
+  pub(crate) cell_xfs: Vec<CellFormatRecord>,
   pub(crate) fonts: usize,
   pub(crate) fills: usize,
   pub(crate) borders: usize,
@@ -25,6 +27,26 @@ pub(crate) struct StylesCatalog {
 pub(crate) struct NumberFormatRecord {
   pub(crate) id: u32,
   pub(crate) code: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct CellFormatRecord {
+  pub(crate) number_format_id: Option<u32>,
+  pub(crate) font_id: Option<u32>,
+  pub(crate) fill_id: Option<u32>,
+  pub(crate) border_id: Option<u32>,
+  pub(crate) style_xf_id: Option<u32>,
+  pub(crate) quote_prefix: bool,
+  pub(crate) pivot_button: bool,
+  pub(crate) apply_number_format: bool,
+  pub(crate) apply_font: bool,
+  pub(crate) apply_fill: bool,
+  pub(crate) apply_border: bool,
+  pub(crate) apply_alignment: bool,
+  pub(crate) apply_protection: bool,
+  pub(crate) has_alignment: bool,
+  pub(crate) has_protection: bool,
+  pub(crate) has_extensions: bool,
 }
 
 impl StylesCatalog {
@@ -54,6 +76,28 @@ impl StylesCatalog {
               id: format.number_format_id,
               code: format.format_code.clone(),
             })
+            .collect()
+        })
+        .unwrap_or_default(),
+      style_xfs: stylesheet
+        .cell_style_formats
+        .as_ref()
+        .map(|formats| {
+          formats
+            .cell_format
+            .iter()
+            .map(|format| CellFormatRecord::from_cell_format(format, true))
+            .collect()
+        })
+        .unwrap_or_default(),
+      cell_xfs: stylesheet
+        .cell_formats
+        .as_ref()
+        .map(|formats| {
+          formats
+            .cell_format
+            .iter()
+            .map(|format| CellFormatRecord::from_cell_format(format, false))
             .collect()
         })
         .unwrap_or_default(),
@@ -91,6 +135,70 @@ impl StylesCatalog {
       has_colors: stylesheet.colors.is_some(),
       has_extensions: stylesheet.stylesheet_extension_list.is_some(),
     }
+  }
+}
+
+impl CellFormatRecord {
+  fn from_cell_format(format: &x::CellFormat, style_xf: bool) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
+    // Xf::importXf. Office effectively lets explicit xf properties apply by
+    // default; cellXf records with xfId are the branch where apply defaults to
+    // false unless an id makes the property used.
+    let apply_default = style_xf || format.format_id.is_none();
+    let number_format_id = format.number_format_id;
+    let font_id = format.font_id;
+    let fill_id = format.fill_id;
+    let border_id = format.border_id;
+    Self {
+      number_format_id,
+      font_id,
+      fill_id,
+      border_id,
+      style_xf_id: format.format_id,
+      quote_prefix: format.quote_prefix.is_some_and(|value| value.as_bool()),
+      pivot_button: format.pivot_button.is_some_and(|value| value.as_bool()),
+      apply_number_format: format.apply_number_format.map_or(
+        apply_default || number_format_id.is_some_and(|id| id > 0),
+        |value| value.as_bool(),
+      ),
+      apply_font: format
+        .apply_font
+        .map_or(apply_default || font_id.is_some_and(|id| id > 0), |value| {
+          value.as_bool()
+        }),
+      apply_fill: format
+        .apply_fill
+        .map_or(apply_default || fill_id.is_some_and(|id| id > 0), |value| {
+          value.as_bool()
+        }),
+      apply_border: format.apply_border.map_or(
+        apply_default || border_id.is_some_and(|id| id > 0),
+        |value| value.as_bool(),
+      ),
+      apply_alignment: format
+        .apply_alignment
+        .map_or(apply_default, |value| value.as_bool()),
+      apply_protection: format
+        .apply_protection
+        .map_or(apply_default, |value| value.as_bool()),
+      has_alignment: format.alignment.is_some(),
+      has_protection: format.protection.is_some(),
+      has_extensions: format.extension_list.is_some(),
+    }
+  }
+
+  pub(crate) fn used_flag_count(&self) -> usize {
+    usize::from(self.apply_number_format)
+      + usize::from(self.apply_font)
+      + usize::from(self.apply_fill)
+      + usize::from(self.apply_border)
+      + usize::from(self.apply_alignment)
+      + usize::from(self.apply_protection)
+      + usize::from(self.quote_prefix)
+      + usize::from(self.pivot_button)
+      + usize::from(self.has_alignment)
+      + usize::from(self.has_protection)
+      + usize::from(self.has_extensions)
   }
 }
 

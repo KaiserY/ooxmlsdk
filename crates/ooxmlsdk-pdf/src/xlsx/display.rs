@@ -525,14 +525,41 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
   }
 
   if import.workbook_resources.has_styles {
+    let style_xf_flags = import
+      .styles
+      .style_xfs
+      .iter()
+      .map(|format| format.used_flag_count())
+      .sum::<usize>();
+    let cell_xf_flags = import
+      .styles
+      .cell_xfs
+      .iter()
+      .map(|format| format.used_flag_count())
+      .sum::<usize>();
+    let cell_xf_refs = import
+      .styles
+      .cell_xfs
+      .iter()
+      .map(|format| {
+        usize::from(format.number_format_id.is_some())
+          + usize::from(format.font_id.is_some())
+          + usize::from(format.fill_id.is_some())
+          + usize::from(format.border_id.is_some())
+          + usize::from(format.style_xf_id.is_some())
+      })
+      .sum::<usize>();
     lines.push(format!(
-      "styles numFmts={} fonts={} fills={} borders={} cellStyleXfs={} cellXfs={} cellStyles={} dxfs={} tableStyles={} defaultTableStyle={} defaultPivotStyle={} colors={} extensions={}",
+      "styles numFmts={} fonts={} fills={} borders={} cellStyleXfs={} styleXfFlags={} cellXfs={} cellXfFlags={} cellXfRefs={} cellStyles={} dxfs={} tableStyles={} defaultTableStyle={} defaultPivotStyle={} colors={} extensions={}",
       import.styles.custom_number_formats.len(),
       import.styles.fonts,
       import.styles.fills,
       import.styles.borders,
       import.styles.cell_style_formats,
+      style_xf_flags,
       import.styles.cell_formats,
+      cell_xf_flags,
+      cell_xf_refs,
       import.styles.cell_styles,
       import.styles.differential_formats,
       import.styles.table_styles,
@@ -729,15 +756,81 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
       page.page_settings.header_footer.drawing_slot_count
     ),
   );
+  lines.insert(
+    2,
+    format!(
+      "print area={} explicit={} cells={} textLen={} formulas={} hiddenRows={} hiddenCols={} merges={} repeatRows={} repeatCols={} cellHint={}",
+      format_print_area(page.area),
+      page.explicit_print_area,
+      page.cells.len(),
+      page.cells.iter().map(|cell| cell.text.len()).sum::<usize>(),
+      page.cells.iter().filter(|cell| cell.formula).count(),
+      page.hidden_rows,
+      page.hidden_columns,
+      page.merged_ranges,
+      format_print_area(page.repeated_rows),
+      format_print_area(page.repeated_columns),
+      page.area.map_or(0, |area| area.cell_count_hint())
+    ),
+  );
+  if !page.cells.is_empty() {
+    lines.insert(
+      3,
+      format!(
+        "print cells first={} last={} styled={} formatted={}",
+        page
+          .cells
+          .first()
+          .map_or(String::new(), |cell| format_cell_address(cell.address)),
+        page
+          .cells
+          .last()
+          .map_or(String::new(), |cell| format_cell_address(cell.address)),
+        page
+          .cells
+          .iter()
+          .filter(|cell| cell.style_index.is_some())
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| cell.number_format_id.is_some())
+          .count()
+      ),
+    );
+  }
+  if page.drawing_summary.anchors > 0 || page.drawing_summary.charts > 0 {
+    lines.insert(
+      if page.cells.is_empty() { 3 } else { 4 },
+      format!(
+        "print drawings anchors={} printable={} hidden={} pictures={} charts={} graphicFrames={} shapes={} groups={} connectors={} contentParts={} textLen={}",
+        page.drawing_summary.anchors,
+        page.drawing_summary.printable,
+        page.drawing_summary.hidden,
+        page.drawing_summary.pictures,
+        page.drawing_summary.charts,
+        page.drawing_summary.graphic_frames,
+        page.drawing_summary.shapes,
+        page.drawing_summary.groups,
+        page.drawing_summary.connectors,
+        page.drawing_summary.content_parts,
+        page.drawing_summary.text_len
+      ),
+    );
+  }
   if !page.named_ranges.print_areas.is_empty()
     || !page.named_ranges.print_titles.is_empty()
     || !page.named_ranges.filter_databases.is_empty()
   {
+    let insert_index = 3
+      + usize::from(!page.cells.is_empty())
+      + usize::from(page.drawing_summary.anchors > 0 || page.drawing_summary.charts > 0);
     lines.insert(
-      2,
+      insert_index,
       format!(
-        "print names areas={} titles={} filters={} unresolvedFormulas={}",
+        "print names areas={} resolvedAreas={} titles={} filters={} unresolvedFormulas={}",
         page.named_ranges.print_areas.len(),
+        page.named_ranges.resolved_print_areas.len(),
         page.named_ranges.print_titles.len(),
         page.named_ranges.filter_databases.len(),
         page.named_ranges.unresolved_formula_count()
@@ -745,6 +838,19 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
     );
   }
   lines
+}
+
+fn format_print_area(area: Option<super::worksheet::CellRange>) -> String {
+  area.map_or(String::new(), |area| {
+    format!(
+      "R{}C{}:R{}C{}",
+      area.start.row, area.start.col, area.end.row, area.end.col
+    )
+  })
+}
+
+fn format_cell_address(address: super::worksheet::CellAddress) -> String {
+  format!("R{}C{}", address.row, address.col)
 }
 
 fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {

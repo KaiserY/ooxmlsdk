@@ -33,6 +33,18 @@ pub(crate) struct CalcSheet {
   pub(crate) rows: Vec<CalcRow>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CellAddress {
+  pub(crate) col: u32,
+  pub(crate) row: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CellRange {
+  pub(crate) start: CellAddress,
+  pub(crate) end: CellAddress,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SheetType {
   Worksheet,
@@ -252,6 +264,124 @@ impl CalcSheet {
         self.state,
         Some(x::SheetStateValues::Hidden | x::SheetStateValues::VeryHidden)
       )
+  }
+
+  pub(crate) fn used_range(&self) -> Option<CellRange> {
+    if let Some(reference) = &self.metrics.dimension
+      && let Some(range) = CellRange::parse_a1_range(reference)
+    {
+      return Some(range);
+    }
+
+    let mut used: Option<CellRange> = None;
+    for (row_position, row) in self.rows.iter().enumerate() {
+      let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+      for (cell_position, cell) in row.cells.iter().enumerate() {
+        let address = cell.address().unwrap_or(CellAddress {
+          col: cell_position as u32 + 1,
+          row: row_index,
+        });
+        used = Some(match used {
+          Some(range) => range.union_address(address),
+          None => CellRange::single(address),
+        });
+      }
+    }
+    used
+  }
+}
+
+impl CellAddress {
+  pub(crate) fn parse_a1(reference: &str) -> Option<Self> {
+    let reference = reference
+      .rsplit(['!', ':'])
+      .next()
+      .unwrap_or(reference)
+      .trim_matches('\'')
+      .trim_start_matches('$');
+    let mut col = 0u32;
+    let mut row = 0u32;
+    let mut seen_digit = false;
+    for ch in reference.chars().filter(|ch| *ch != '$') {
+      if ch.is_ascii_alphabetic() && !seen_digit {
+        col = col
+          .saturating_mul(26)
+          .saturating_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
+      } else if ch.is_ascii_digit() {
+        seen_digit = true;
+        row = row
+          .saturating_mul(10)
+          .saturating_add(ch as u32 - '0' as u32);
+      } else {
+        return None;
+      }
+    }
+    (col > 0 && row > 0).then_some(Self { col, row })
+  }
+}
+
+impl CellRange {
+  pub(crate) fn single(address: CellAddress) -> Self {
+    Self {
+      start: address,
+      end: address,
+    }
+  }
+
+  pub(crate) fn parse_a1_range(reference: &str) -> Option<Self> {
+    let reference = reference.trim();
+    let reference = reference
+      .rsplit_once('!')
+      .map_or(reference, |(_, range)| range)
+      .trim_matches('\'');
+    let (start, end) = reference.split_once(':').unwrap_or((reference, reference));
+    let start = CellAddress::parse_a1(start)?;
+    let end = CellAddress::parse_a1(end)?;
+    Some(Self::new(start, end))
+  }
+
+  pub(crate) fn new(start: CellAddress, end: CellAddress) -> Self {
+    Self {
+      start: CellAddress {
+        col: start.col.min(end.col),
+        row: start.row.min(end.row),
+      },
+      end: CellAddress {
+        col: start.col.max(end.col),
+        row: start.row.max(end.row),
+      },
+    }
+  }
+
+  pub(crate) fn contains(&self, address: CellAddress) -> bool {
+    address.col >= self.start.col
+      && address.col <= self.end.col
+      && address.row >= self.start.row
+      && address.row <= self.end.row
+  }
+
+  pub(crate) fn intersects(&self, other: Self) -> bool {
+    self.start.col <= other.end.col
+      && self.end.col >= other.start.col
+      && self.start.row <= other.end.row
+      && self.end.row >= other.start.row
+  }
+
+  pub(crate) fn union_address(self, address: CellAddress) -> Self {
+    Self {
+      start: CellAddress {
+        col: self.start.col.min(address.col),
+        row: self.start.row.min(address.row),
+      },
+      end: CellAddress {
+        col: self.end.col.max(address.col),
+        row: self.end.row.max(address.row),
+      },
+    }
+  }
+
+  pub(crate) fn cell_count_hint(&self) -> u64 {
+    u64::from(self.end.col - self.start.col + 1) * u64::from(self.end.row - self.start.row + 1)
   }
 }
 
@@ -543,6 +673,10 @@ fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[String]) -> Vec<Ca
 }
 
 impl CalcCell {
+  pub(crate) fn address(&self) -> Option<CellAddress> {
+    self.reference.as_deref().and_then(CellAddress::parse_a1)
+  }
+
   fn from_cell(cell: &x::Cell, shared_strings: &[String]) -> Self {
     let cached_value = cell
       .cell_value

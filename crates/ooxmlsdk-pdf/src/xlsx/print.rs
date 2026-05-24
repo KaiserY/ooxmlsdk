@@ -3,9 +3,14 @@ use super::page_settings::CalcPageSettings;
 use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, SheetType};
 
+// Source: LibreOffice sc/source/ui/view/printfun.cxx defines ZOOM_MIN.
+const ZOOM_MIN: u32 = 10;
+
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
   pub(crate) pages: Vec<CalcPrintPage<'a>>,
+  pub(crate) skipped_empty_pages: usize,
+  pub(crate) top_down: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -20,11 +25,19 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) repeated_rows: Option<CellRange>,
   pub(crate) repeated_columns: Option<CellRange>,
   pub(crate) cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) all_cells: usize,
   pub(crate) hidden_rows: usize,
   pub(crate) hidden_columns: usize,
+  pub(crate) empty: bool,
   pub(crate) merged_ranges: usize,
   pub(crate) explicit_print_area: bool,
   pub(crate) drawing_summary: CalcPrintDrawingSummary,
+  pub(crate) scale_mode: CalcPrintScaleMode,
+  pub(crate) auto_page_columns: usize,
+  pub(crate) auto_page_rows: usize,
+  pub(crate) forced_break_min_pages: usize,
+  pub(crate) tdf103516_adjusted: bool,
+  pub(crate) paint_ops: Vec<CalcPrintPaintOp>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -43,9 +56,31 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) text: &'a str,
   pub(crate) style_index: Option<u32>,
   pub(crate) number_format_id: Option<u32>,
+  pub(crate) number_format_code: Option<&'a str>,
+  pub(crate) rendered_text: String,
+  pub(crate) number_format_state: NumberFormatRenderState,
   pub(crate) hidden_row: bool,
   pub(crate) hidden_column: bool,
   pub(crate) formula: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum NumberFormatRenderState {
+  Raw,
+  General,
+  Text,
+  Boolean,
+  Number,
+  Percent,
+  DateTime,
+  UnsupportedFormatCode,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CalcPrintScaleMode {
+  None,
+  ScaleAll,
+  FitToWidthHeight,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -63,23 +98,49 @@ pub(crate) struct CalcPrintDrawingSummary {
   pub(crate) text_len: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CalcPrintPaintOp {
+  BackDrawingLayer,
+  RepeatedColumns,
+  RepeatedRows,
+  CellArea,
+  Grid,
+  FrontDrawingLayer,
+}
+
 impl<'a> CalcPrintDocument<'a> {
   pub(crate) fn from_import(import: &'a ExcelImport) -> Self {
     // Source: LibreOffice sc/source/ui/view/printfun.cxx
     // This is the first ScPrintFunc-shaped owner. Full range, break, and page
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
+    let mut skipped_empty_pages = 0usize;
+    let mut document_top_down = true;
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
+      let scale = print_scale_state(sheet, &areas);
+      document_top_down &= scale.top_down;
+      let mut page_areas = page_areas_for_sheet(sheet, &areas);
+      if !scale.top_down {
+        page_areas.sort_by_key(|area| area.map_or((0, 0), |area| (area.start.row, area.start.col)));
+      }
       let mut sheet_page_index = 0usize;
-      for area in page_areas_for_sheet(sheet, &areas) {
-        let cells = area
-          .map(|area| print_cells_for_area(import, sheet, area))
+      for area in page_areas {
+        let all_cells = area
+          .map(|area| print_cells_for_area(import, sheet, area, false))
           .unwrap_or_default();
-        let hidden_rows = cells.iter().filter(|cell| cell.hidden_row).count();
-        let hidden_columns = cells.iter().filter(|cell| cell.hidden_column).count();
+        let cells = area
+          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .unwrap_or_default();
+        let empty = all_cells.is_empty();
+        if scale.skip_empty && empty {
+          skipped_empty_pages += 1;
+          continue;
+        }
+        let hidden_rows = all_cells.iter().filter(|cell| cell.hidden_row).count();
+        let hidden_columns = all_cells.iter().filter(|cell| cell.hidden_column).count();
         let merged_ranges = area.map_or(0, |area| {
           sheet
             .metrics
@@ -93,24 +154,200 @@ impl<'a> CalcPrintDocument<'a> {
           sheet,
           sheet_page_index,
           page_number: pages.len() + 1,
-          zoom: sheet.page_settings.scale,
+          zoom: scale.zoom,
           page_settings: &sheet.page_settings,
           repeated_rows: named_ranges.repeat_rows,
           repeated_columns: named_ranges.repeat_columns,
           named_ranges: named_ranges.clone(),
           area,
+          all_cells: all_cells.len(),
           cells,
           hidden_rows,
           hidden_columns,
+          empty,
           merged_ranges,
           explicit_print_area,
           drawing_summary: drawing_summary_for_area(sheet, area),
+          scale_mode: scale.mode,
+          auto_page_columns: scale.auto_page_columns,
+          auto_page_rows: scale.auto_page_rows,
+          forced_break_min_pages: scale.forced_break_min_pages,
+          tdf103516_adjusted: scale.tdf103516_adjusted,
+          paint_ops: paint_ops_for_page(
+            named_ranges.repeat_columns.is_some(),
+            named_ranges.repeat_rows.is_some(),
+            drawing_summary_for_area(sheet, area).anchors > 0,
+            sheet.page_settings.print_grid_lines,
+          ),
         });
         sheet_page_index += 1;
       }
     }
-    Self { pages }
+    Self {
+      pages,
+      skipped_empty_pages,
+      top_down: document_top_down,
+    }
   }
+}
+
+fn paint_ops_for_page(
+  has_repeat_columns: bool,
+  has_repeat_rows: bool,
+  has_drawing_layer: bool,
+  has_grid: bool,
+) -> Vec<CalcPrintPaintOp> {
+  // Source: LibreOffice sc/source/ui/view/printfun.cxx PrintPage and
+  // PrintArea route back drawing layer before cell output, repeated areas
+  // before page-local data, grid through ScOutputData, and front drawing after.
+  let mut ops = Vec::new();
+  if has_drawing_layer {
+    ops.push(CalcPrintPaintOp::BackDrawingLayer);
+  }
+  if has_repeat_columns {
+    ops.push(CalcPrintPaintOp::RepeatedColumns);
+  }
+  if has_repeat_rows {
+    ops.push(CalcPrintPaintOp::RepeatedRows);
+  }
+  ops.push(CalcPrintPaintOp::CellArea);
+  if has_grid {
+    ops.push(CalcPrintPaintOp::Grid);
+  }
+  if has_drawing_layer {
+    ops.push(CalcPrintPaintOp::FrontDrawingLayer);
+  }
+  ops
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CalcPrintScaleState {
+  mode: CalcPrintScaleMode,
+  zoom: u32,
+  auto_page_columns: usize,
+  auto_page_rows: usize,
+  forced_break_min_pages: usize,
+  tdf103516_adjusted: bool,
+  skip_empty: bool,
+  top_down: bool,
+}
+
+fn print_scale_state(sheet: &CalcSheet, areas: &[CellRange]) -> CalcPrintScaleState {
+  // Source: LibreOffice sc/source/ui/view/printfun.cxx InitParam,
+  // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
+  // this keeps the exact branch ownership and forced-break constraints.
+  let forced_break_min_columns = sheet
+    .metrics
+    .column_breaks
+    .iter()
+    .filter(|br| br.manual)
+    .count()
+    + 1;
+  let forced_break_min_rows = sheet
+    .metrics
+    .row_breaks
+    .iter()
+    .filter(|br| br.manual)
+    .count()
+    + 1;
+  let forced_break_min_pages = forced_break_min_columns * forced_break_min_rows;
+  let fit_to_page = sheet.metrics.settings.properties.page_setup.fit_to_page;
+  let mut mode = CalcPrintScaleMode::None;
+  let mut zoom = sheet.page_settings.scale;
+  let mut auto_page_columns = forced_break_min_columns.max(1);
+  let mut auto_page_rows = forced_break_min_rows.max(1);
+  let mut tdf103516_adjusted = false;
+
+  if fit_to_page && (sheet.page_settings.fit_to_width > 0 || sheet.page_settings.fit_to_height > 0)
+  {
+    mode = CalcPrintScaleMode::FitToWidthHeight;
+    auto_page_columns = usize::try_from(sheet.page_settings.fit_to_width)
+      .ok()
+      .filter(|value| *value > 0)
+      .unwrap_or(auto_page_columns)
+      .max(forced_break_min_columns);
+    auto_page_rows = usize::try_from(sheet.page_settings.fit_to_height)
+      .ok()
+      .filter(|value| *value > 0)
+      .unwrap_or(auto_page_rows)
+      .max(forced_break_min_rows);
+    zoom = fit_zoom_to_pages(areas, auto_page_columns, auto_page_rows);
+    if sheet.page_settings.fit_to_width > 0
+      && sheet.page_settings.fit_to_height == 0
+      && auto_page_rows > 1
+    {
+      tdf103516_adjusted = true;
+      zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
+    }
+  } else if sheet.page_settings.scale > 0 {
+    mode = if sheet.page_settings.scale == 100 {
+      CalcPrintScaleMode::None
+    } else {
+      CalcPrintScaleMode::ScaleAll
+    };
+    zoom = sheet.page_settings.scale.max(ZOOM_MIN);
+  }
+
+  CalcPrintScaleState {
+    mode,
+    zoom,
+    auto_page_columns,
+    auto_page_rows,
+    forced_break_min_pages,
+    tdf103516_adjusted,
+    skip_empty: false,
+    top_down: matches!(
+      sheet.page_settings.page_order,
+      Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageOrderValues::DownThenOver)
+        | None
+    ),
+  }
+}
+
+fn fit_zoom_to_pages(areas: &[CellRange], page_columns: usize, page_rows: usize) -> u32 {
+  let Some(area) = areas.first().copied() else {
+    return 100;
+  };
+  let mut zoom = 100u32;
+  let mut last_fit = 0u32;
+  let mut last_non_fit = 0u32;
+  loop {
+    if zoom <= ZOOM_MIN {
+      break;
+    }
+    let fits = estimated_pages_at_zoom(area, zoom, page_columns, page_rows);
+    if fits {
+      if zoom == 100 {
+        break;
+      }
+      last_fit = zoom;
+      zoom = (last_non_fit + zoom) / 2;
+      if last_fit == zoom {
+        break;
+      }
+    } else {
+      if zoom.saturating_sub(last_fit) <= 1 {
+        zoom = last_fit.max(ZOOM_MIN);
+        break;
+      }
+      last_non_fit = zoom;
+      zoom = (last_fit + zoom) / 2;
+    }
+  }
+  zoom.max(ZOOM_MIN)
+}
+
+fn estimated_pages_at_zoom(
+  area: CellRange,
+  zoom: u32,
+  page_columns: usize,
+  page_rows: usize,
+) -> bool {
+  let zoom = zoom.max(ZOOM_MIN);
+  let scaled_cols = (area.end.col - area.start.col + 1) as usize * zoom as usize;
+  let scaled_rows = (area.end.row - area.start.row + 1) as usize * zoom as usize;
+  (page_columns == 0 || scaled_cols <= page_columns * 100)
+    && (page_rows == 0 || scaled_rows <= page_rows * 100)
 }
 
 fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcPrintDrawingSummary {
@@ -309,6 +546,7 @@ fn print_cells_for_area<'a>(
   import: &'a ExcelImport,
   sheet: &'a CalcSheet,
   area: CellRange,
+  include_hidden: bool,
 ) -> Vec<CalcPrintCell<'a>> {
   let mut cells = Vec::new();
   for (row_position, row) in sheet.rows.iter().enumerate() {
@@ -321,21 +559,238 @@ fn print_cells_for_area<'a>(
       if !area.contains(address) {
         continue;
       }
+      let hidden_column = column_hidden(sheet, address.col);
+      if !include_hidden && (row.hidden || hidden_column) {
+        continue;
+      }
+      let number_format_id = cell
+        .style_index
+        .and_then(|index| import.styles.cell_xfs.get(index as usize))
+        .and_then(|format| format.number_format_id);
+      let number_format_code = number_format_id.and_then(|id| import.styles.number_format_code(id));
+      let (rendered_text, number_format_state) = rendered_number_text(
+        cell.display_text.as_str(),
+        number_format_code,
+        cell.data_type,
+        import.globals.settings.date_1904,
+      );
       cells.push(CalcPrintCell {
         address,
         text: cell.display_text.as_str(),
         style_index: cell.style_index,
-        number_format_id: cell
-          .style_index
-          .and_then(|index| import.styles.cell_xfs.get(index as usize))
-          .and_then(|format| format.number_format_id),
+        number_format_id,
+        number_format_code,
+        rendered_text,
+        number_format_state,
         hidden_row: row.hidden,
-        hidden_column: column_hidden(sheet, address.col),
+        hidden_column,
         formula: cell.formula.is_some(),
       });
     }
   }
   cells
+}
+
+fn rendered_number_text(
+  raw: &str,
+  format_code: Option<&str>,
+  data_type: Option<
+    ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues,
+  >,
+  date_1904: bool,
+) -> (String, NumberFormatRenderState) {
+  match data_type {
+    Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
+      return (raw.to_string(), NumberFormatRenderState::Boolean);
+    }
+    Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::String)
+    | Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::InlineString)
+    | Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::SharedString) => {
+      return (raw.to_string(), NumberFormatRenderState::Text);
+    }
+    _ => {}
+  }
+
+  let Some(format_code) = format_code else {
+    return (raw.to_string(), NumberFormatRenderState::Raw);
+  };
+  if format_code.eq_ignore_ascii_case("General") {
+    return (raw.to_string(), NumberFormatRenderState::General);
+  }
+  if format_code == "@" {
+    return (raw.to_string(), NumberFormatRenderState::Text);
+  }
+  let Some(value) = raw.parse::<f64>().ok() else {
+    return (
+      raw.to_string(),
+      NumberFormatRenderState::UnsupportedFormatCode,
+    );
+  };
+  let format = NumberFormatPattern::parse(format_code);
+  if format.date_time {
+    return (
+      format_serial_date_time(value, format_code, date_1904),
+      NumberFormatRenderState::DateTime,
+    );
+  }
+  if format.numeric {
+    return (
+      format_decimal_value(value, &format),
+      if format.percent {
+        NumberFormatRenderState::Percent
+      } else {
+        NumberFormatRenderState::Number
+      },
+    );
+  }
+  (
+    raw.to_string(),
+    NumberFormatRenderState::UnsupportedFormatCode,
+  )
+}
+
+#[derive(Clone, Debug, Default)]
+struct NumberFormatPattern {
+  numeric: bool,
+  percent: bool,
+  grouping: bool,
+  decimals: usize,
+  date_time: bool,
+  prefix: String,
+  suffix: String,
+}
+
+impl NumberFormatPattern {
+  fn parse(code: &str) -> Self {
+    let section = code.split(';').next().unwrap_or(code);
+    let mut pattern = Self::default();
+    let mut in_quote = false;
+    let mut escaped = false;
+    let mut after_decimal = false;
+    let mut seen_digit = false;
+    let mut literal_prefix = true;
+    for ch in section.chars() {
+      if escaped {
+        if literal_prefix {
+          pattern.prefix.push(ch);
+        } else if !seen_digit {
+          pattern.suffix.push(ch);
+        }
+        escaped = false;
+        continue;
+      }
+      match ch {
+        '\\' => escaped = true,
+        '"' => in_quote = !in_quote,
+        _ if in_quote => {
+          if literal_prefix {
+            pattern.prefix.push(ch);
+          } else if !seen_digit {
+            pattern.suffix.push(ch);
+          }
+        }
+        '[' => literal_prefix = false,
+        '0' | '#' | '?' => {
+          pattern.numeric = true;
+          seen_digit = true;
+          literal_prefix = false;
+          if after_decimal {
+            pattern.decimals += 1;
+          }
+        }
+        '.' if pattern.numeric => after_decimal = true,
+        ',' if pattern.numeric => pattern.grouping = true,
+        '%' => {
+          pattern.percent = true;
+          pattern.suffix.push('%');
+          literal_prefix = false;
+        }
+        '$' | '€' | '£' | '¥' if literal_prefix => pattern.prefix.push(ch),
+        'd' | 'D' | 'm' | 'M' | 'y' | 'Y' | 'h' | 'H' | 's' | 'S' => {
+          pattern.date_time = true;
+          literal_prefix = false;
+        }
+        _ if !ch.is_whitespace() && literal_prefix => pattern.prefix.push(ch),
+        _ => {}
+      }
+    }
+    pattern
+  }
+}
+
+fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
+  let value = if pattern.percent {
+    value * 100.0
+  } else {
+    value
+  };
+  let sign = if value.is_sign_negative() { "-" } else { "" };
+  let formatted = format!("{:.*}", pattern.decimals, value.abs());
+  let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
+  let integer = if pattern.grouping {
+    group_integer(integer)
+  } else {
+    integer.to_string()
+  };
+  let mut output = String::new();
+  output.push_str(sign);
+  output.push_str(&pattern.prefix);
+  output.push_str(&integer);
+  if pattern.decimals > 0 {
+    output.push('.');
+    output.push_str(fraction);
+  }
+  output.push_str(&pattern.suffix);
+  output
+}
+
+fn group_integer(value: &str) -> String {
+  let mut out = String::new();
+  for (index, ch) in value.chars().rev().enumerate() {
+    if index > 0 && index % 3 == 0 {
+      out.push(',');
+    }
+    out.push(ch);
+  }
+  out.chars().rev().collect()
+}
+
+fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
+  let days = value.floor() as i64;
+  let seconds = ((value - value.floor()) * 86_400.0).round() as i64;
+  let days_since_unix = if date_1904 {
+    days - 24_107
+  } else if days < 60 {
+    days - 25_568
+  } else {
+    days - 25_569
+  };
+  let (year, month, day) = civil_from_days(days_since_unix);
+  let hour = seconds / 3_600;
+  let minute = (seconds % 3_600) / 60;
+  let second = seconds % 60;
+  let lower = code.to_ascii_lowercase();
+  if lower.contains('h') || lower.contains('s') {
+    format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}")
+  } else if lower.contains("mmm") {
+    format!("{year:04}-{month:02}-{day:02}")
+  } else {
+    format!("{year:04}-{month:02}-{day:02}")
+  }
+}
+
+fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
+  let z = days_since_unix_epoch + 719_468;
+  let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+  let doe = z - era * 146_097;
+  let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+  let y = yoe + era * 400;
+  let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  let mp = (5 * doy + 2) / 153;
+  let day = doy - (153 * mp + 2) / 5 + 1;
+  let month = mp + if mp < 10 { 3 } else { -9 };
+  let year = y + i64::from(month <= 2);
+  (year, month as u32, day as u32)
 }
 
 fn column_hidden(sheet: &CalcSheet, col: u32) -> bool {

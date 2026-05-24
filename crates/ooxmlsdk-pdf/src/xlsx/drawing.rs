@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ooxmlsdk::parts::chart_part::ChartPart;
 use ooxmlsdk::parts::diagram_colors_part::DiagramColorsPart;
 use ooxmlsdk::parts::diagram_data_part::DiagramDataPart;
@@ -6,6 +8,7 @@ use ooxmlsdk::parts::diagram_persist_layout_part::DiagramPersistLayoutPart;
 use ooxmlsdk::parts::diagram_style_part::DiagramStylePart;
 use ooxmlsdk::parts::drawings_part::DrawingsPart;
 use ooxmlsdk::parts::extended_chart_part::ExtendedChartPart;
+use ooxmlsdk::parts::image_part::ImagePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
@@ -23,8 +26,15 @@ pub(crate) struct DrawingResourceCatalog {
   pub(crate) extended_charts: Vec<ChartResourceCatalog>,
   pub(crate) diagrams: DiagramResourceCatalog,
   pub(crate) images: usize,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
   pub(crate) custom_xml_parts: usize,
   pub(crate) web_extensions: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ImageResource {
+  pub(crate) data: Vec<u8>,
+  pub(crate) content_type: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -215,6 +225,8 @@ impl DrawingResourceCatalog {
     let chart_parts = part.chart_parts(package).collect::<Vec<_>>();
     let extended_chart_parts = part.extended_chart_parts(package).collect::<Vec<_>>();
     let diagrams = DiagramResourceCatalog::from_part(package, part)?;
+    let image_resources = collect_image_resources(package, part);
+    let images = image_resources.len();
     Ok(Self {
       anchors,
       charts: chart_parts
@@ -226,7 +238,8 @@ impl DrawingResourceCatalog {
         .map(|chart| ChartResourceCatalog::from_extended_chart_part(package, &chart))
         .collect::<Result<Vec<_>>>()?,
       diagrams,
-      images: part.image_parts(package).count(),
+      images,
+      image_resources,
       custom_xml_parts: part.custom_xml_parts(package).count(),
       web_extensions: part.web_extension_parts(package).count(),
     })
@@ -248,6 +261,27 @@ impl DrawingResourceCatalog {
       .map(ChartResourceCatalog::child_resource_count)
       .sum()
   }
+}
+
+fn collect_image_resources(
+  package: &SpreadsheetDocument,
+  part: &DrawingsPart,
+) -> HashMap<String, ImageResource> {
+  part
+    .related_parts_of_type::<_, ImagePart>(package)
+    .filter_map(|related_part| {
+      Some((
+        related_part.relationship_id().to_string(),
+        ImageResource {
+          data: related_part.part().data_to_vec(package)?,
+          content_type: related_part
+            .part()
+            .content_type(package)
+            .map(str::to_string),
+        },
+      ))
+    })
+    .collect()
 }
 
 impl DrawingAnchorModel {

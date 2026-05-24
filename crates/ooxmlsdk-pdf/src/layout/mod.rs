@@ -20,7 +20,7 @@ use crate::options::PdfOptions;
 use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
 use crate::units;
 
-pub(crate) use simple_text::text_pages;
+pub(crate) use simple_text::item_pages;
 
 // Word document defaults used by LibreOffice import/export are 11pt text,
 // 0.5in tab stops, and widow/orphan control of two lines.

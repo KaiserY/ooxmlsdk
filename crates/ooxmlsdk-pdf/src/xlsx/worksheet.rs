@@ -16,6 +16,10 @@ use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
 use crate::error::Result;
+use crate::units;
+
+const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
+const CALC_BASE_COLUMN_PADDING_PX: f32 = 5.0;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcSheet {
@@ -43,6 +47,14 @@ pub(crate) struct CellAddress {
 pub(crate) struct CellRange {
   pub(crate) start: CellAddress,
   pub(crate) end: CellAddress,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct CellRect {
+  pub(crate) x_pt: f32,
+  pub(crate) y_pt: f32,
+  pub(crate) width_pt: f32,
+  pub(crate) height_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -142,6 +154,9 @@ pub(crate) struct PageBreakModel {
 #[derive(Clone, Debug)]
 pub(crate) struct CalcRow {
   pub(crate) row_index: Option<u32>,
+  pub(crate) height: Option<f64>,
+  pub(crate) custom_height: bool,
+  pub(crate) style_index: Option<u32>,
   pub(crate) hidden: bool,
   pub(crate) cells: Vec<CalcCell>,
 }
@@ -288,6 +303,91 @@ impl CalcSheet {
       }
     }
     used
+  }
+
+  pub(crate) fn cell_rect(&self, address: CellAddress) -> CellRect {
+    let x_pt = (1..address.col)
+      .map(|column| self.column_width_pt(column))
+      .sum();
+    let y_pt = (1..address.row).map(|row| self.row_height_pt(row)).sum();
+    CellRect {
+      x_pt,
+      y_pt,
+      width_pt: self.column_width_pt(address.col),
+      height_pt: self.row_height_pt(address.row),
+    }
+  }
+
+  pub(crate) fn range_rect(&self, range: CellRange) -> CellRect {
+    let start = self.cell_rect(range.start);
+    let width_pt = (range.start.col..=range.end.col)
+      .map(|column| self.column_width_pt(column))
+      .sum();
+    let height_pt = (range.start.row..=range.end.row)
+      .map(|row| self.row_height_pt(row))
+      .sum();
+    CellRect {
+      width_pt,
+      height_pt,
+      ..start
+    }
+  }
+
+  pub(crate) fn marker_position_pt(
+    &self,
+    marker: &super::drawing::DrawingMarkerModel,
+  ) -> (f32, f32) {
+    let column = u32::try_from(marker.column).unwrap_or(0).saturating_add(1);
+    let row = u32::try_from(marker.row).unwrap_or(0).saturating_add(1);
+    let base = self.cell_rect(CellAddress { col: column, row });
+    (
+      base.x_pt + units::emu_to_points(marker.column_offset_emu),
+      base.y_pt + units::emu_to_points(marker.row_offset_emu),
+    )
+  }
+
+  pub(crate) fn column_width_pt(&self, column: u32) -> f32 {
+    if let Some(model) = self
+      .metrics
+      .columns
+      .iter()
+      .find(|model| column >= model.first && column <= model.last)
+    {
+      if model.hidden {
+        return 0.0;
+      }
+      if let Some(width) = model.width {
+        return digit_width_to_points(width as f32);
+      }
+    }
+    if self
+      .metrics
+      .columns
+      .iter()
+      .any(|model| model.hidden && column >= model.first && column <= model.last)
+    {
+      return 0.0;
+    }
+    digit_width_to_points(self.metrics.format.default_column_width_digits())
+  }
+
+  pub(crate) fn row_height_pt(&self, row_index: u32) -> f32 {
+    if self.metrics.format.zero_height {
+      return 0.0;
+    }
+    if let Some(row) = self
+      .rows
+      .iter()
+      .find(|row| row.row_index.unwrap_or(0) == row_index)
+    {
+      if row.hidden {
+        return 0.0;
+      }
+      if let Some(height) = row.height {
+        return height as f32;
+      }
+    }
+    self.metrics.format.default_row_height as f32
   }
 }
 
@@ -550,6 +650,19 @@ impl SheetFormatModel {
       thick_bottom: format.thick_bottom.is_some_and(|value| value.as_bool()),
     }
   }
+
+  fn default_column_width_digits(&self) -> f32 {
+    if let Some(width) = self.default_column_width {
+      return width as f32;
+    }
+    // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx
+    // setBaseColumnWidth() uses baseColWidth plus 5 screen pixels converted
+    // through UnitConverter; UnitConverter initializes 1 digit = 2mm.
+    let base = self.base_column_width.unwrap_or(8) as f32;
+    base
+      + CALC_BASE_COLUMN_PADDING_PX * units::POINTS_PER_CSS_PIXEL
+        / units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
+  }
 }
 
 impl ColumnModel {
@@ -662,6 +775,9 @@ fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[String]) -> Vec<Ca
     .iter()
     .map(|row| CalcRow {
       row_index: row.row_index,
+      height: row.height,
+      custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
+      style_index: row.style_index,
       hidden: row.hidden.is_some_and(|value| value.as_bool()),
       cells: row
         .cell
@@ -670,6 +786,12 @@ fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[String]) -> Vec<Ca
         .collect(),
     })
     .collect()
+}
+
+fn digit_width_to_points(value: f32) -> f32 {
+  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx:
+  // maCoeffs[Unit::Digit] = convert(2.0mm, emu).
+  units::millimeters_to_points(value * CALC_DIGIT_WIDTH_MM)
 }
 
 impl CalcCell {

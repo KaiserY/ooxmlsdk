@@ -128,12 +128,12 @@ xlsx::layout
   -> WorkbookFragment::finalize_import
   -> CalcSheet resource/catalog records
   -> CalcPrintDocument / CalcPrintPage
-  -> display bridge into LayoutDocument/PageItem text pages
+  -> display bridge into LayoutDocument/PageItem text and image primitives
 ```
 
 This is still not Calc print parity. The visible output remains a temporary
-text-page bridge, but the import entry no longer grows from worksheet-part
-iteration directly.
+paint bridge, but the import entry no longer grows from worksheet-part
+iteration directly and drawing image bytes flow through imported resources.
 
 Landed owner modules:
 
@@ -169,8 +169,11 @@ Landed owner modules:
   references, quote/pivot flags, apply flags, alignment/protection/extension
   markers, and `_xlnm.Print_Area` / `_xlnm.Print_Titles` /
   `_xlnm._FilterDatabase` classification. Full `StylesBuffer` inheritance,
-  theme/palette color resolution, and number-format string rendering remain in
-  this owner before broad PDF text parity.
+  theme/palette color resolution, and the rest of the locale-sensitive
+  `SvNumberFormatter` surface remain in this owner before broad PDF text
+  parity. The current display-string bridge resolves built-in/custom numFmtId
+  strings and covers the Calc print path for General, text, boolean, numeric,
+  grouped numeric, percent, currency-prefix, and serial date/time branches.
 - `xlsx/table.rs`: typed table definition catalog from `TableDefinitionPart`,
   preserving table id/name/displayName/ref/type, header/totals row counts,
   table columns, style flags, auto-filter/sort-state presence, query-table
@@ -183,7 +186,11 @@ Landed owner modules:
   worksheet `extLst` condition resources. Cell import now preserves typed
   formula state for normal/shared/array/data-table formulas, shared ids,
   formula refs, calculation flags, data-table inputs, cached values,
-  cell/value metadata, phonetic flags, and extension markers.
+  cell/value metadata, phonetic flags, row height/custom-height/style flags,
+  and extension markers. Worksheet metrics now expose Calc-shaped cell
+  rectangles and spreadsheet drawing marker coordinates; column width follows
+  LibreOffice's `Unit::Digit -> Twip` path with the upstream default
+  `1 digit = 2mm`, and row height follows the Calc point-to-twip import path.
 - `xlsx/sheet_conditions.rs`: typed condition catalog for base
   `conditionalFormatting` / `dataValidations` plus `extLst` x14
   conditional-formatting, x14 data-validation, sparkline groups, ignored
@@ -232,11 +239,14 @@ Landed owner modules:
   print-title row/column ranges, falls back to the worksheet used area for
   visible sheets without explicit print ranges, splits page areas at manual row
   and column breaks, and snapshots page-local cells, hidden row/column hits,
-  merged-range intersections, formula/style/text markers, and page-local
-  drawing-anchor fallback counts for the later `PrintPage` / `PrintArea` paint
-  bridge. Formula-token range conversion, automatic page sizing, fit-to-page
-  zoom, skip-empty page counting, repeated title painting, drawing-layer paint,
-  and header/footer token layout remain in this owner.
+  merged-range intersections, formula/style/text markers, number-format render
+  state, page-local drawing-anchor fallback counts, and `PrintArea`-ordered
+  paint operations. `CalcZoom` state now preserves scale-all versus
+  fit-to-width/height branches, `ZOOM_MIN`, forced-break minimum page counts,
+  tdf#103516 fit-to-width adjustment state, skip-empty accounting, and
+  top-down/over-then-down traversal ordering. Formula-token range conversion,
+  scale-to-page-count input, repeated title painting, full shape/chart drawing
+  paint, and header/footer token layout remain in this owner.
 - `xlsx/pivot.rs`: typed pivot cache and pivot table catalogs. Workbook cache
   definitions preserve workbook cache ids/relationships, cache field counts,
   record counts, refresh/save/invalid flags, records part presence, optional
@@ -278,7 +288,7 @@ SpreadsheetDocument
   -> workbook_part.worksheet_parts(package)
   -> worksheet.sheet_data.row
   -> shared-string/plain cell text
-  -> layout::text_pages
+  -> layout text pages
 ```
 
 This path is intentionally insufficient for Calc parity:
@@ -999,6 +1009,12 @@ style name. Do not restrict this to the current sheet.
   behavior; document and port the branch as-is rather than introducing a local
   replacement constant
 
+The current Rust `CalcPrintDocument` records these branches and emits page
+models in LibreOffice traversal order. Calc row/column metric coordinates are
+now available to print/display, but exact `CalcPages` sizing still needs the
+remaining upstream page-break and repeated-title branches before broad
+fit/skip-empty assertions should be treated as final.
+
 `DoPrint` owns page traversal:
 
 - apply print settings and output map modes before constructing page strings
@@ -1021,6 +1037,14 @@ style name. Do not restrict this to the current sheet.
 - grid and page-break line painting must account for hidden rows/columns,
   merges, covered cells, and page breaks through the Calc output-data model,
   not by drawing a uniform rectangle grid
+
+The current paint bridge records the `PrintArea` operation order (back drawing
+layer, repeated columns/rows, cell area, grid, front drawing layer), lowers
+page-local cell text through Calc row/column metrics, and paints spreadsheet
+pictures from imported drawing `ImagePart` bytes. Shape geometry, chart output,
+and complete front/back drawing-layer paint must be fed from the imported
+worksheet/drawing resources; display lowering must not reopen OOXML
+relationships to synthesize them.
 
 ---
 

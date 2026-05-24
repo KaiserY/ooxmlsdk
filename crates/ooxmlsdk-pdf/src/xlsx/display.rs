@@ -1,14 +1,19 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
-use crate::docx::PageSetup;
-use crate::layout::{self, LayoutDocument};
+use crate::docx::{ImageCrop, PageSetup, TextStyle};
+use crate::layout::{self, ImageItem, LayoutDocument, PageItem, PdfTextSegmentation, TextItem};
+use crate::units;
 
 use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, SheetType};
 
+const XLSX_DEBUG_LINE_HEIGHT_PT: f32 = 12.0;
+const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
+
 pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
   let mut pages = Vec::new();
+  let print_document = CalcPrintDocument::from_import(import);
   if import.workbook_resources.has_theme
     || import.workbook_resources.has_styles
     || import.workbook_resources.external_workbooks > 0
@@ -18,15 +23,189 @@ pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
     || import.workbook_catalog.xml_maps.is_some()
     || import.workbook_catalog.revisions.is_some()
   {
-    pages.push((PageSetup::default(), workbook_lines(import)));
+    let mut lines = workbook_lines(import);
+    lines.push(format!(
+      "printDocument pages={} skippedEmpty={} topDown={}",
+      print_document.pages.len(),
+      print_document.skipped_empty_pages,
+      print_document.top_down
+    ));
+    let setup = PageSetup::default();
+    pages.push((setup, summary_items(setup, lines)));
   }
-  pages.extend(
-    CalcPrintDocument::from_import(import)
-      .pages
-      .iter()
-      .map(|page| (PageSetup::default(), print_page_lines(import, page))),
-  );
-  layout::text_pages(pages)
+  pages.extend(print_document.pages.iter().map(|page| {
+    let setup = PageSetup::default();
+    (setup, print_page_items(import, page, setup))
+  }));
+  layout::item_pages(pages)
+}
+
+fn print_page_items(
+  import: &ExcelImport,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+) -> Vec<PageItem> {
+  let mut items = summary_items(setup, print_page_lines(import, page));
+  let grid_origin_y = setup.margin_top_pt + XLSX_DEBUG_LINE_HEIGHT_PT * 6.0;
+  let area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let zoom_scale = page.zoom as f32 / 100.0;
+  for cell in &page.cells {
+    if cell.rendered_text.is_empty() {
+      continue;
+    }
+    let rect = page.sheet.cell_rect(cell.address);
+    if rect.width_pt <= 0.0 || rect.height_pt <= 0.0 {
+      continue;
+    }
+    if let Some(area_rect) = area_rect
+      && (rect.x_pt + rect.width_pt < area_rect.x_pt
+        || rect.y_pt + rect.height_pt < area_rect.y_pt
+        || rect.x_pt > area_rect.x_pt + area_rect.width_pt
+        || rect.y_pt > area_rect.y_pt + area_rect.height_pt)
+    {
+      continue;
+    }
+    items.push(PageItem::Text(TextItem {
+      x_pt: setup.margin_left_pt + rect.x_pt * zoom_scale + XLSX_CELL_TEXT_INSET_PT,
+      y_pt: grid_origin_y + rect.y_pt * zoom_scale,
+      line_height_pt: rect.height_pt * zoom_scale,
+      text: cell.rendered_text.clone(),
+      style: TextStyle::default(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+  }
+
+  items.extend(print_page_image_items(
+    page,
+    setup.margin_left_pt,
+    grid_origin_y,
+    zoom_scale,
+  ));
+  items
+}
+
+fn summary_items(setup: PageSetup, lines: Vec<String>) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let mut y = setup.margin_top_pt;
+  let content_bottom = setup.height_pt - setup.margin_bottom_pt;
+  for line in lines {
+    if y + XLSX_DEBUG_LINE_HEIGHT_PT > content_bottom {
+      break;
+    }
+    if !line.is_empty() {
+      items.push(PageItem::Text(TextItem {
+        x_pt: setup.margin_left_pt,
+        y_pt: y,
+        line_height_pt: XLSX_DEBUG_LINE_HEIGHT_PT,
+        text: line,
+        style: TextStyle::default(),
+        rotation_center_pt: None,
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        preserve_text_portion: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }));
+    }
+    y += XLSX_DEBUG_LINE_HEIGHT_PT;
+  }
+  items
+}
+
+fn print_page_image_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  for drawing in &page.sheet.resources.drawings {
+    for anchor in &drawing.anchors {
+      if anchor.object.hidden || !anchor.print_with_sheet {
+        continue;
+      }
+      if anchor.object.kind != super::drawing::DrawingObjectKind::Picture {
+        continue;
+      }
+      let Some(relationship_id) = anchor.object.relationship_id.as_deref() else {
+        continue;
+      };
+      let Some(resource) = drawing.image_resources.get(relationship_id) else {
+        continue;
+      };
+      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+        continue;
+      };
+      if width_pt <= 0.0 || height_pt <= 0.0 {
+        continue;
+      }
+      items.push(PageItem::Image(ImageItem {
+        x_pt: origin_x_pt + x_pt * zoom_scale,
+        y_pt: origin_y_pt + y_pt * zoom_scale,
+        width_pt: width_pt * zoom_scale,
+        height_pt: height_pt * zoom_scale,
+        crop: ImageCrop::default(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: resource.data.clone(),
+        content_type: resource.content_type.clone(),
+        alt_text: anchor
+          .object
+          .description
+          .clone()
+          .or_else(|| anchor.object.name.clone()),
+        hyperlink_url: None,
+        floating: false,
+        behind_text: false,
+      }));
+    }
+  }
+  items
+}
+
+fn anchor_rect_pt(
+  sheet: &CalcSheet,
+  anchor: &super::drawing::DrawingAnchorModel,
+) -> Option<(f32, f32, f32, f32)> {
+  match anchor.kind {
+    super::drawing::DrawingAnchorKind::TwoCell => {
+      let from = anchor.from.as_ref()?;
+      let to = anchor.to.as_ref()?;
+      let (x1, y1) = sheet.marker_position_pt(from);
+      let (x2, y2) = sheet.marker_position_pt(to);
+      Some((x1.min(x2), y1.min(y2), (x2 - x1).abs(), (y2 - y1).abs()))
+    }
+    super::drawing::DrawingAnchorKind::OneCell => {
+      let from = anchor.from.as_ref()?;
+      let (x, y) = sheet.marker_position_pt(from);
+      let (cx, cy) = anchor.extent?;
+      Some((x, y, units::emu_to_points(cx), units::emu_to_points(cy)))
+    }
+    super::drawing::DrawingAnchorKind::Absolute => {
+      let (x, y) = anchor.position?;
+      let (cx, cy) = anchor.extent?;
+      Some((
+        units::emu_to_points(x),
+        units::emu_to_points(y),
+        units::emu_to_points(cx),
+        units::emu_to_points(cy),
+      ))
+    }
+  }
 }
 
 fn workbook_lines(import: &ExcelImport) -> Vec<String> {
@@ -738,10 +917,15 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
   lines.insert(
     1,
     format!(
-      "print page={} sheetPage={} zoom={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={} headerFooterFlags={} headerFooterTextLen={} headerFooterDrawings={}",
+      "print page={} sheetPage={} zoom={} scaleMode={:?} autoPages={}x{} forcedBreakMinPages={} tdf103516={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={} headerFooterFlags={} headerFooterTextLen={} headerFooterDrawings={}",
       page.page_number,
       page.sheet_page_index + 1,
       page.zoom,
+      page.scale_mode,
+      page.auto_page_columns,
+      page.auto_page_rows,
+      page.forced_break_min_pages,
+      page.tdf103516_adjusted,
       page.page_settings.paper_size,
       page.page_settings.scale,
       page.page_settings.fit_to_width,
@@ -759,11 +943,18 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
   lines.insert(
     2,
     format!(
-      "print area={} explicit={} cells={} textLen={} formulas={} hiddenRows={} hiddenCols={} merges={} repeatRows={} repeatCols={} cellHint={}",
+      "print area={} explicit={} cells={} allCells={} empty={} textLen={} renderedTextLen={} formulas={} hiddenRows={} hiddenCols={} merges={} repeatRows={} repeatCols={} cellHint={}",
       format_print_area(page.area),
       page.explicit_print_area,
       page.cells.len(),
+      page.all_cells,
+      page.empty,
       page.cells.iter().map(|cell| cell.text.len()).sum::<usize>(),
+      page
+        .cells
+        .iter()
+        .map(|cell| cell.rendered_text.len())
+        .sum::<usize>(),
       page.cells.iter().filter(|cell| cell.formula).count(),
       page.hidden_rows,
       page.hidden_columns,
@@ -777,7 +968,7 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
     lines.insert(
       3,
       format!(
-        "print cells first={} last={} styled={} formatted={}",
+        "print cells first={} last={} styled={} formatted={} formatCodes={} general={} textFmt={} boolFmt={} unsupportedFmt={}",
         page
           .cells
           .first()
@@ -795,6 +986,38 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
           .cells
           .iter()
           .filter(|cell| cell.number_format_id.is_some())
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| cell.number_format_code.is_some())
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| {
+            cell.number_format_state == super::print::NumberFormatRenderState::General
+          })
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| cell.number_format_state == super::print::NumberFormatRenderState::Text)
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| {
+            cell.number_format_state == super::print::NumberFormatRenderState::Boolean
+          })
+          .count(),
+        page
+          .cells
+          .iter()
+          .filter(|cell| {
+            cell.number_format_state
+              == super::print::NumberFormatRenderState::UnsupportedFormatCode
+          })
           .count()
       ),
     );
@@ -803,7 +1026,7 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
     lines.insert(
       if page.cells.is_empty() { 3 } else { 4 },
       format!(
-        "print drawings anchors={} printable={} hidden={} pictures={} charts={} graphicFrames={} shapes={} groups={} connectors={} contentParts={} textLen={}",
+      "print drawings anchors={} printable={} hidden={} pictures={} charts={} graphicFrames={} shapes={} groups={} connectors={} contentParts={} textLen={}",
         page.drawing_summary.anchors,
         page.drawing_summary.printable,
         page.drawing_summary.hidden,
@@ -818,13 +1041,56 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
       ),
     );
   }
+  if !page.paint_ops.is_empty() {
+    let insert_index = 3
+      + usize::from(!page.cells.is_empty())
+      + usize::from(page.drawing_summary.anchors > 0 || page.drawing_summary.charts > 0);
+    lines.insert(
+      insert_index,
+      format!(
+        "print paintOps={} backDrawing={} repeatCols={} repeatRows={} cellArea={} grid={} frontDrawing={}",
+        page.paint_ops.len(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::BackDrawingLayer)
+          .count(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::RepeatedColumns)
+          .count(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::RepeatedRows)
+          .count(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::CellArea)
+          .count(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::Grid)
+          .count(),
+        page
+          .paint_ops
+          .iter()
+          .filter(|op| **op == super::print::CalcPrintPaintOp::FrontDrawingLayer)
+          .count()
+      ),
+    );
+  }
   if !page.named_ranges.print_areas.is_empty()
     || !page.named_ranges.print_titles.is_empty()
     || !page.named_ranges.filter_databases.is_empty()
   {
     let insert_index = 3
       + usize::from(!page.cells.is_empty())
-      + usize::from(page.drawing_summary.anchors > 0 || page.drawing_summary.charts > 0);
+      + usize::from(page.drawing_summary.anchors > 0 || page.drawing_summary.charts > 0)
+      + usize::from(!page.paint_ops.is_empty());
     lines.insert(
       insert_index,
       format!(
@@ -1900,6 +2166,12 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       .iter()
       .filter(|column| column.style_index.is_some())
       .count();
+    let styled_rows = sheet
+      .rows
+      .iter()
+      .filter(|row| row.style_index.is_some())
+      .count();
+    let custom_height_rows = sheet.rows.iter().filter(|row| row.custom_height).count();
     let custom_width_columns = sheet
       .metrics
       .columns
@@ -2119,7 +2391,7 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
         .and_then(|auto_filter| auto_filter.sort_state.as_ref())
         .map_or(0, sort_state_flag_count);
     lines.push(format!(
-      "sheet metrics dimension={} settingsCode={} propertyFlags={} protectionFlags={} autoFilterColumns={} autoFilterFlags={} sortFlags={} views={} selectedViews={} panes={} selections={} pivotSelections={} viewFlags={} viewExt={} viewRefLen={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} merges={} hyperlinks={} hyperlinkRels={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
+      "sheet metrics dimension={} settingsCode={} propertyFlags={} protectionFlags={} autoFilterColumns={} autoFilterFlags={} sortFlags={} views={} selectedViews={} panes={} selections={} pivotSelections={} viewFlags={} viewExt={} viewRefLen={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} styledRows={} customHeightRows={} merges={} hyperlinks={} hyperlinkRels={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
       sheet.metrics.dimension.as_deref().unwrap_or(""),
       sheet
         .metrics
@@ -2166,6 +2438,8 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       phonetic_columns,
       max_outline,
       custom_width_sum,
+      styled_rows,
+      custom_height_rows,
       sheet.metrics.merged_ranges.len(),
       sheet.metrics.hyperlinks.len(),
       relationship_hyperlinks,
@@ -2596,11 +2870,24 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       })
       .collect::<Vec<_>>();
     if values.iter().any(|value| !value.is_empty()) {
-      let prefix = match (row.row_index, row.hidden) {
-        (Some(index), true) => format!("row {index} hidden: "),
-        (Some(index), false) => format!("row {index}: "),
-        (None, true) => "row hidden: ".to_string(),
-        (None, false) => String::new(),
+      let mut row_flags = Vec::new();
+      if row.hidden {
+        row_flags.push("hidden".to_string());
+      }
+      if row.custom_height {
+        row_flags.push("customHeight".to_string());
+      }
+      if let Some(style_index) = row.style_index {
+        row_flags.push(format!("s={style_index}"));
+      }
+      if let Some(height) = row.height {
+        row_flags.push(format!("ht={height}"));
+      }
+      let prefix = match (row.row_index, row_flags.is_empty()) {
+        (Some(index), true) => format!("row {index}: "),
+        (Some(index), false) => format!("row {index} {}: ", row_flags.join("/")),
+        (None, true) => String::new(),
+        (None, false) => format!("row {}: ", row_flags.join("/")),
       };
       lines.push(format!("{prefix}{}", values.join("    ")));
     }

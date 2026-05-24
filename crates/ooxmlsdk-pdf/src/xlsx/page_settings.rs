@@ -1,5 +1,110 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
+use crate::units;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum PaperMeasure {
+  Inches(f32, f32),
+  Millimeters(f32, f32),
+  Undefined,
+}
+
+// Source: LibreOffice filter/source/msfilter/util.cxx
+// PaperSizeConv::spPaperSizeTable, indices are MS paperSize values.
+const MS_PAPER_SIZE_TABLE: [PaperMeasure; 91] = [
+  PaperMeasure::Undefined,
+  PaperMeasure::Inches(8.5, 11.0),
+  PaperMeasure::Inches(8.5, 11.0),
+  PaperMeasure::Inches(11.0, 17.0),
+  PaperMeasure::Inches(17.0, 11.0),
+  PaperMeasure::Inches(8.5, 14.0),
+  PaperMeasure::Inches(5.5, 8.5),
+  PaperMeasure::Inches(7.25, 10.5),
+  PaperMeasure::Millimeters(297.0, 420.0),
+  PaperMeasure::Millimeters(210.0, 297.0),
+  PaperMeasure::Millimeters(210.0, 297.0),
+  PaperMeasure::Millimeters(148.0, 210.0),
+  PaperMeasure::Millimeters(257.0, 364.0),
+  PaperMeasure::Millimeters(182.0, 257.0),
+  PaperMeasure::Inches(8.5, 13.0),
+  PaperMeasure::Millimeters(215.0, 275.0),
+  PaperMeasure::Inches(10.0, 14.0),
+  PaperMeasure::Inches(11.0, 17.0),
+  PaperMeasure::Inches(8.5, 11.0),
+  PaperMeasure::Inches(3.875, 8.875),
+  PaperMeasure::Inches(4.125, 9.5),
+  PaperMeasure::Inches(4.5, 10.375),
+  PaperMeasure::Inches(4.75, 11.0),
+  PaperMeasure::Inches(5.0, 11.5),
+  PaperMeasure::Inches(17.0, 22.0),
+  PaperMeasure::Inches(22.0, 34.0),
+  PaperMeasure::Inches(34.0, 44.0),
+  PaperMeasure::Millimeters(110.0, 220.0),
+  PaperMeasure::Millimeters(162.0, 229.0),
+  PaperMeasure::Millimeters(324.0, 458.0),
+  PaperMeasure::Millimeters(229.0, 324.0),
+  PaperMeasure::Millimeters(114.0, 162.0),
+  PaperMeasure::Millimeters(114.0, 229.0),
+  PaperMeasure::Millimeters(250.0, 353.0),
+  PaperMeasure::Millimeters(176.0, 250.0),
+  PaperMeasure::Millimeters(176.0, 125.0),
+  PaperMeasure::Millimeters(110.0, 230.0),
+  PaperMeasure::Inches(3.875, 7.5),
+  PaperMeasure::Inches(3.625, 6.5),
+  PaperMeasure::Inches(14.875, 11.0),
+  PaperMeasure::Inches(8.5, 12.0),
+  PaperMeasure::Inches(8.5, 13.0),
+  PaperMeasure::Millimeters(250.0, 353.0),
+  PaperMeasure::Millimeters(200.0, 148.0),
+  PaperMeasure::Inches(9.0, 11.0),
+  PaperMeasure::Inches(10.0, 11.0),
+  PaperMeasure::Inches(15.0, 11.0),
+  PaperMeasure::Millimeters(220.0, 220.0),
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Inches(9.5, 12.0),
+  PaperMeasure::Inches(9.5, 15.0),
+  PaperMeasure::Inches(11.69, 18.0),
+  PaperMeasure::Millimeters(235.0, 322.0),
+  PaperMeasure::Inches(8.5, 11.0),
+  PaperMeasure::Millimeters(210.0, 297.0),
+  PaperMeasure::Inches(9.5, 12.0),
+  PaperMeasure::Millimeters(227.0, 356.0),
+  PaperMeasure::Millimeters(305.0, 487.0),
+  PaperMeasure::Inches(8.5, 12.69),
+  PaperMeasure::Millimeters(210.0, 330.0),
+  PaperMeasure::Millimeters(148.0, 210.0),
+  PaperMeasure::Millimeters(182.0, 257.0),
+  PaperMeasure::Millimeters(322.0, 445.0),
+  PaperMeasure::Millimeters(174.0, 235.0),
+  PaperMeasure::Millimeters(201.0, 276.0),
+  PaperMeasure::Millimeters(420.0, 594.0),
+  PaperMeasure::Millimeters(297.0, 420.0),
+  PaperMeasure::Millimeters(322.0, 445.0),
+  PaperMeasure::Millimeters(200.0, 148.0),
+  PaperMeasure::Millimeters(105.0, 148.0),
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Inches(11.0, 8.5),
+  PaperMeasure::Millimeters(420.0, 297.0),
+  PaperMeasure::Millimeters(297.0, 210.0),
+  PaperMeasure::Millimeters(210.0, 148.0),
+  PaperMeasure::Millimeters(364.0, 257.0),
+  PaperMeasure::Millimeters(257.0, 182.0),
+  PaperMeasure::Millimeters(148.0, 100.0),
+  PaperMeasure::Millimeters(148.0, 200.0),
+  PaperMeasure::Millimeters(148.0, 105.0),
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Undefined,
+  PaperMeasure::Millimeters(128.0, 182.0),
+  PaperMeasure::Millimeters(182.0, 128.0),
+  PaperMeasure::Inches(12.0, 11.0),
+];
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CalcPageSettings {
   pub(crate) has_margins: bool,
@@ -134,6 +239,37 @@ impl CalcPageSettings {
     self.print_grid_lines = print_options
       .grid_lines
       .is_some_and(|value| value.as_bool());
+  }
+
+  pub(crate) fn page_size_pt(&self) -> (f32, f32) {
+    let mut size = match MS_PAPER_SIZE_TABLE
+      .get(self.paper_size as usize)
+      .copied()
+      .unwrap_or(PaperMeasure::Undefined)
+    {
+      PaperMeasure::Inches(width, height) => (
+        width * units::POINTS_PER_INCH,
+        height * units::POINTS_PER_INCH,
+      ),
+      PaperMeasure::Millimeters(width, height) => (
+        units::millimeters_to_points(width),
+        units::millimeters_to_points(height),
+      ),
+      PaperMeasure::Undefined => {
+        let default = MS_PAPER_SIZE_TABLE[1];
+        match default {
+          PaperMeasure::Inches(width, height) => (
+            width * units::POINTS_PER_INCH,
+            height * units::POINTS_PER_INCH,
+          ),
+          _ => unreachable!("MS paper size table index 1 is Letter"),
+        }
+      }
+    };
+    if matches!(self.orientation, Some(x::OrientationValues::Landscape)) {
+      std::mem::swap(&mut size.0, &mut size.1);
+    }
+    size
   }
 }
 

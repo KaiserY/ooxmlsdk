@@ -14,9 +14,11 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2014_chartex as cx;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart as c;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing as xdr;
 use ooxmlsdk::sdk::SdkPart;
 
+use crate::docx::RgbColor;
 use crate::error::Result;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -78,6 +80,10 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) graphic_uri: Option<String>,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
+  pub(crate) fill_color: Option<RgbColor>,
+  pub(crate) line_color: Option<RgbColor>,
+  pub(crate) line_width_emu: Option<i32>,
+  pub(crate) no_line: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -445,6 +451,10 @@ impl DrawingObjectModel {
       graphic_uri: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
+      fill_color: shape_fill_color(&shape.shape_properties),
+      line_color: shape_line_color(&shape.shape_properties),
+      line_width_emu: shape_line_width_emu(&shape.shape_properties),
+      no_line: shape_no_line(&shape.shape_properties),
     }
   }
 
@@ -464,6 +474,10 @@ impl DrawingObjectModel {
       graphic_uri: None,
       child_objects: group.group_shape_choice.len(),
       has_style: false,
+      fill_color: None,
+      line_color: None,
+      line_width_emu: None,
+      no_line: false,
     }
   }
 
@@ -483,6 +497,10 @@ impl DrawingObjectModel {
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
+      fill_color: None,
+      line_color: None,
+      line_width_emu: None,
+      no_line: false,
     }
   }
 
@@ -502,6 +520,10 @@ impl DrawingObjectModel {
       graphic_uri: None,
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
+      fill_color: shape_fill_color(&shape.shape_properties),
+      line_color: shape_line_color(&shape.shape_properties),
+      line_width_emu: shape_line_width_emu(&shape.shape_properties),
+      no_line: shape_no_line(&shape.shape_properties),
     }
   }
 
@@ -525,6 +547,10 @@ impl DrawingObjectModel {
       graphic_uri: None,
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
+      fill_color: None,
+      line_color: None,
+      line_width_emu: None,
+      no_line: false,
     }
   }
 
@@ -549,8 +575,67 @@ impl DrawingObjectModel {
       graphic_uri: None,
       child_objects: 0,
       has_style: false,
+      fill_color: None,
+      line_color: None,
+      line_width_emu: None,
+      no_line: false,
     }
   }
+}
+
+fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
+  match properties.shape_properties_choice2.as_ref()? {
+    xdr::ShapePropertiesChoice2::SolidFill(fill) => solid_fill_color(fill),
+    xdr::ShapePropertiesChoice2::NoFill(_)
+    | xdr::ShapePropertiesChoice2::GradientFill(_)
+    | xdr::ShapePropertiesChoice2::BlipFill(_)
+    | xdr::ShapePropertiesChoice2::PatternFill(_)
+    | xdr::ShapePropertiesChoice2::GroupFill => None,
+  }
+}
+
+fn shape_line_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
+  let outline = properties.outline.as_deref()?;
+  match outline.outline_choice1.as_ref()? {
+    a::OutlineChoice::SolidFill(fill) => solid_fill_color(fill),
+    a::OutlineChoice::NoFill(_)
+    | a::OutlineChoice::GradientFill(_)
+    | a::OutlineChoice::PatternFill(_) => None,
+  }
+}
+
+fn shape_line_width_emu(properties: &xdr::ShapeProperties) -> Option<i32> {
+  properties.outline.as_deref().and_then(|line| line.width)
+}
+
+fn shape_no_line(properties: &xdr::ShapeProperties) -> bool {
+  properties
+    .outline
+    .as_deref()
+    .and_then(|line| line.outline_choice1.as_ref())
+    .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
+}
+
+fn solid_fill_color(fill: &a::SolidFill) -> Option<RgbColor> {
+  match fill.solid_fill_choice.as_ref()? {
+    a::SolidFillChoice::RgbColorModelHex(color) => rgb_hex_color(&color.val),
+    _ => None,
+  }
+}
+
+fn rgb_hex_color(value: &str) -> Option<RgbColor> {
+  let value = value.strip_prefix('#').unwrap_or(value);
+  let value = match value.len() {
+    8 => &value[2..],
+    6 => value,
+    _ => return None,
+  };
+  let color = u32::from_str_radix(value, 16).ok()?;
+  Some(RgbColor {
+    r: ((color >> 16) & 0xff) as u8,
+    g: ((color >> 8) & 0xff) as u8,
+    b: (color & 0xff) as u8,
+  })
 }
 
 impl DiagramResourceCatalog {

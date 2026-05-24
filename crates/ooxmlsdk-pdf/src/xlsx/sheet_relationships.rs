@@ -25,6 +25,7 @@ pub(crate) struct SheetRelationshipCatalog {
   pub(crate) timeline_relationships: usize,
   pub(crate) model3d_relationships: usize,
   pub(crate) active_x_binary_relationships: usize,
+  pub(crate) hyperlink_targets: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -122,6 +123,15 @@ impl SheetRelationshipCatalog {
       active_x_binary_relationships: part
         .embedded_control_persistence_binary_data_parts(package)
         .count(),
+      hyperlink_targets: part
+        .hyperlink_relationships(package)
+        .map(|relationship| {
+          (
+            relationship.id().to_string(),
+            relationship.target().to_string(),
+          )
+        })
+        .collect(),
     })
   }
 }
@@ -355,3 +365,4 @@ fn timeline_text_len(timeline: &x15::Timeline) -> usize {
     + timeline.level as usize
     + timeline.selection_level as usize
 }
+use std::collections::HashMap;

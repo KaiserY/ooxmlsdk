@@ -18,6 +18,7 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) sheet: &'a CalcSheet,
   pub(crate) sheet_page_index: usize,
   pub(crate) page_number: usize,
+  pub(crate) total_pages: usize,
   pub(crate) zoom: u32,
   pub(crate) page_settings: &'a CalcPageSettings,
   pub(crate) named_ranges: CalcPrintNamedRanges<'a>,
@@ -25,6 +26,9 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) repeated_rows: Option<CellRange>,
   pub(crate) repeated_columns: Option<CellRange>,
   pub(crate) cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) repeated_row_cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) repeated_column_cells: Vec<CalcPrintCell<'a>>,
+  pub(crate) repeated_corner_cells: Vec<CalcPrintCell<'a>>,
   pub(crate) all_cells: usize,
   pub(crate) hidden_rows: usize,
   pub(crate) hidden_columns: usize,
@@ -120,9 +124,9 @@ impl<'a> CalcPrintDocument<'a> {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
-      let scale = print_scale_state(sheet, &areas);
+      let scale = print_scale_state(sheet, &areas, &named_ranges);
       document_top_down &= scale.top_down;
-      let mut page_areas = page_areas_for_sheet(sheet, &areas);
+      let mut page_areas = page_areas_for_sheet(sheet, &areas, &named_ranges, scale.zoom);
       if !scale.top_down {
         page_areas.sort_by_key(|area| area.map_or((0, 0), |area| (area.start.row, area.start.col)));
       }
@@ -134,6 +138,16 @@ impl<'a> CalcPrintDocument<'a> {
         let cells = area
           .map(|area| print_cells_for_area(import, sheet, area, true))
           .unwrap_or_default();
+        let repeated_row_cells = repeat_rows_for_page(area, named_ranges.repeat_rows)
+          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .unwrap_or_default();
+        let repeated_column_cells = repeat_columns_for_page(area, named_ranges.repeat_columns)
+          .map(|area| print_cells_for_area(import, sheet, area, true))
+          .unwrap_or_default();
+        let repeated_corner_cells =
+          repeat_corner_for_page(named_ranges.repeat_rows, named_ranges.repeat_columns)
+            .map(|area| print_cells_for_area(import, sheet, area, true))
+            .unwrap_or_default();
         let empty = all_cells.is_empty();
         if scale.skip_empty && empty {
           skipped_empty_pages += 1;
@@ -154,6 +168,7 @@ impl<'a> CalcPrintDocument<'a> {
           sheet,
           sheet_page_index,
           page_number: pages.len() + 1,
+          total_pages: 0,
           zoom: scale.zoom,
           page_settings: &sheet.page_settings,
           repeated_rows: named_ranges.repeat_rows,
@@ -162,6 +177,9 @@ impl<'a> CalcPrintDocument<'a> {
           area,
           all_cells: all_cells.len(),
           cells,
+          repeated_row_cells,
+          repeated_column_cells,
+          repeated_corner_cells,
           hidden_rows,
           hidden_columns,
           empty,
@@ -182,6 +200,10 @@ impl<'a> CalcPrintDocument<'a> {
         });
         sheet_page_index += 1;
       }
+    }
+    let total_pages = pages.len();
+    for page in &mut pages {
+      page.total_pages = total_pages;
     }
     Self {
       pages,
@@ -232,7 +254,11 @@ struct CalcPrintScaleState {
   top_down: bool,
 }
 
-fn print_scale_state(sheet: &CalcSheet, areas: &[CellRange]) -> CalcPrintScaleState {
+fn print_scale_state(
+  sheet: &CalcSheet,
+  areas: &[CellRange],
+  named_ranges: &CalcPrintNamedRanges<'_>,
+) -> CalcPrintScaleState {
   // Source: LibreOffice sc/source/ui/view/printfun.cxx InitParam,
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
   // this keeps the exact branch ownership and forced-break constraints.
@@ -271,7 +297,13 @@ fn print_scale_state(sheet: &CalcSheet, areas: &[CellRange]) -> CalcPrintScaleSt
       .filter(|value| *value > 0)
       .unwrap_or(auto_page_rows)
       .max(forced_break_min_rows);
-    zoom = fit_zoom_to_pages(areas, auto_page_columns, auto_page_rows);
+    zoom = fit_zoom_to_pages(
+      sheet,
+      areas,
+      named_ranges,
+      auto_page_columns,
+      auto_page_rows,
+    );
     if sheet.page_settings.fit_to_width > 0
       && sheet.page_settings.fit_to_height == 0
       && auto_page_rows > 1
@@ -304,10 +336,42 @@ fn print_scale_state(sheet: &CalcSheet, areas: &[CellRange]) -> CalcPrintScaleSt
   }
 }
 
-fn fit_zoom_to_pages(areas: &[CellRange], page_columns: usize, page_rows: usize) -> u32 {
+fn fit_zoom_to_pages(
+  sheet: &CalcSheet,
+  areas: &[CellRange],
+  named_ranges: &CalcPrintNamedRanges<'_>,
+  page_columns: usize,
+  page_rows: usize,
+) -> u32 {
   let Some(area) = areas.first().copied() else {
     return 100;
   };
+  let content = print_content_size_pt(sheet);
+  let repeat_width = named_ranges
+    .repeat_columns
+    .map(|range| sheet.range_rect(range).width_pt)
+    .unwrap_or(0.0);
+  let repeat_height = named_ranges
+    .repeat_rows
+    .map(|range| sheet.range_rect(range).height_pt)
+    .unwrap_or(0.0);
+  let page_width = (content.0 - repeat_width).max(1.0);
+  let page_height = (content.1 - repeat_height).max(1.0);
+  let area_rect = sheet.range_rect(area);
+  let width_zoom = if page_columns > 0 && area_rect.width_pt > 0.0 {
+    (page_width * page_columns as f32 * 100.0 / area_rect.width_pt).floor() as u32
+  } else {
+    100
+  };
+  let height_zoom = if page_rows > 0 && area_rect.height_pt > 0.0 {
+    (page_height * page_rows as f32 * 100.0 / area_rect.height_pt).floor() as u32
+  } else {
+    100
+  };
+  let metric_zoom = width_zoom.min(height_zoom).clamp(ZOOM_MIN, 100);
+  if metric_zoom < 100 {
+    return metric_zoom;
+  }
   let mut zoom = 100u32;
   let mut last_fit = 0u32;
   let mut last_non_fit = 0u32;
@@ -348,6 +412,15 @@ fn estimated_pages_at_zoom(
   let scaled_rows = (area.end.row - area.start.row + 1) as usize * zoom as usize;
   (page_columns == 0 || scaled_cols <= page_columns * 100)
     && (page_rows == 0 || scaled_rows <= page_rows * 100)
+}
+
+fn print_content_size_pt(sheet: &CalcSheet) -> (f32, f32) {
+  let (mut width, mut height) = sheet.page_settings.page_size_pt();
+  width -= (sheet.page_settings.margin_left_in + sheet.page_settings.margin_right_in) as f32
+    * crate::units::POINTS_PER_INCH;
+  height -= (sheet.page_settings.margin_top_in + sheet.page_settings.margin_bottom_in) as f32
+    * crate::units::POINTS_PER_INCH;
+  (width.max(1.0), height.max(1.0))
 }
 
 fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcPrintDrawingSummary {
@@ -470,18 +543,37 @@ fn print_areas_for_sheet(
   sheet.used_range().into_iter().collect()
 }
 
-fn page_areas_for_sheet(sheet: &CalcSheet, print_areas: &[CellRange]) -> Vec<Option<CellRange>> {
+fn page_areas_for_sheet(
+  sheet: &CalcSheet,
+  print_areas: &[CellRange],
+  named_ranges: &CalcPrintNamedRanges<'_>,
+  zoom: u32,
+) -> Vec<Option<CellRange>> {
   if sheet.sheet_type == SheetType::Chartsheet {
     return vec![None];
   }
   let mut pages = Vec::new();
   for area in print_areas {
-    let row_slices = split_range_by_breaks(*area, &sheet.metrics.row_breaks, true);
+    let row_slices = split_range_by_page_metrics(
+      sheet,
+      *area,
+      &sheet.metrics.row_breaks,
+      true,
+      named_ranges.repeat_rows,
+      zoom,
+    );
     for row_slice in row_slices {
       pages.extend(
-        split_range_by_breaks(row_slice, &sheet.metrics.column_breaks, false)
-          .into_iter()
-          .map(Some),
+        split_range_by_page_metrics(
+          sheet,
+          row_slice,
+          &sheet.metrics.column_breaks,
+          false,
+          named_ranges.repeat_columns,
+          zoom,
+        )
+        .into_iter()
+        .map(Some),
       );
     }
   }
@@ -491,55 +583,148 @@ fn page_areas_for_sheet(sheet: &CalcSheet, print_areas: &[CellRange]) -> Vec<Opt
   pages
 }
 
-fn split_range_by_breaks(
+fn split_range_by_page_metrics(
+  sheet: &CalcSheet,
   area: CellRange,
   breaks: &[super::worksheet::PageBreakModel],
   by_row: bool,
+  repeat: Option<CellRange>,
+  zoom: u32,
 ) -> Vec<CellRange> {
-  let mut starts = vec![if by_row {
+  let start = if by_row {
     area.start.row
   } else {
     area.start.col
-  }];
+  };
   let end = if by_row { area.end.row } else { area.end.col };
-  for page_break in breaks.iter().filter(|page_break| page_break.manual) {
-    let id = page_break.id;
-    if id > *starts.last().unwrap_or(&0) && id <= end {
-      starts.push(id);
-    }
-  }
-  starts
-    .iter()
-    .enumerate()
-    .map(|(index, start)| {
-      let slice_end = starts
-        .get(index + 1)
-        .map_or(end, |next| next.saturating_sub(1));
+  let mut slices = Vec::new();
+  let content_size = print_content_size_pt(sheet);
+  let repeat_size = repeat
+    .map(|range| {
       if by_row {
-        CellRange::new(
-          CellAddress {
-            col: area.start.col,
-            row: *start,
-          },
-          CellAddress {
-            col: area.end.col,
-            row: slice_end,
-          },
-        )
+        sheet.range_rect(range).height_pt
       } else {
-        CellRange::new(
-          CellAddress {
-            col: *start,
-            row: area.start.row,
-          },
-          CellAddress {
-            col: slice_end,
-            row: area.end.row,
-          },
-        )
+        sheet.range_rect(range).width_pt
       }
     })
-    .collect()
+    .unwrap_or(0.0);
+  let available = ((if by_row {
+    content_size.1
+  } else {
+    content_size.0
+  }) - repeat_size)
+    .max(1.0)
+    * 100.0
+    / zoom.max(ZOOM_MIN) as f32;
+  let mut current_start = start;
+  let mut current = start;
+  let mut used = 0.0f32;
+  while current <= end {
+    if breaks
+      .iter()
+      .any(|page_break| page_break.manual && page_break.id == current && current > current_start)
+    {
+      slices.push(axis_slice(area, by_row, current_start, current - 1));
+      current_start = current;
+      used = 0.0;
+    }
+    let size = if by_row {
+      sheet.row_height_pt(current)
+    } else {
+      sheet.column_width_pt(current)
+    };
+    if used > 0.0 && used + size > available {
+      slices.push(axis_slice(area, by_row, current_start, current - 1));
+      current_start = current;
+      used = 0.0;
+    }
+    used += size;
+    current += 1;
+  }
+  if current_start <= end {
+    slices.push(axis_slice(area, by_row, current_start, end));
+  }
+  slices
+}
+
+fn axis_slice(area: CellRange, by_row: bool, start: u32, end: u32) -> CellRange {
+  if by_row {
+    CellRange::new(
+      CellAddress {
+        col: area.start.col,
+        row: start,
+      },
+      CellAddress {
+        col: area.end.col,
+        row: end,
+      },
+    )
+  } else {
+    CellRange::new(
+      CellAddress {
+        col: start,
+        row: area.start.row,
+      },
+      CellAddress {
+        col: end,
+        row: area.end.row,
+      },
+    )
+  }
+}
+
+fn repeat_rows_for_page(
+  area: Option<CellRange>,
+  repeat_rows: Option<CellRange>,
+) -> Option<CellRange> {
+  let area = area?;
+  let repeat_rows = repeat_rows?;
+  Some(CellRange::new(
+    CellAddress {
+      col: area.start.col,
+      row: repeat_rows.start.row,
+    },
+    CellAddress {
+      col: area.end.col,
+      row: repeat_rows.end.row,
+    },
+  ))
+}
+
+fn repeat_columns_for_page(
+  area: Option<CellRange>,
+  repeat_columns: Option<CellRange>,
+) -> Option<CellRange> {
+  let area = area?;
+  let repeat_columns = repeat_columns?;
+  Some(CellRange::new(
+    CellAddress {
+      col: repeat_columns.start.col,
+      row: area.start.row,
+    },
+    CellAddress {
+      col: repeat_columns.end.col,
+      row: area.end.row,
+    },
+  ))
+}
+
+fn repeat_corner_for_page(
+  repeat_rows: Option<CellRange>,
+  repeat_columns: Option<CellRange>,
+) -> Option<CellRange> {
+  let repeat_rows = repeat_rows?;
+  let repeat_columns = repeat_columns?;
+  Some(CellRange::new(
+    CellAddress {
+      col: repeat_columns.start.col,
+      row: repeat_rows.start.row,
+    },
+    CellAddress {
+      col: repeat_columns.end.col,
+      row: repeat_rows.end.row,
+    },
+  ))
 }
 
 fn print_cells_for_area<'a>(
@@ -563,8 +748,8 @@ fn print_cells_for_area<'a>(
       if !include_hidden && (row.hidden || hidden_column) {
         continue;
       }
-      let number_format_id = cell
-        .style_index
+      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let number_format_id = style_index
         .and_then(|index| import.styles.cell_xfs.get(index as usize))
         .and_then(|format| format.number_format_id);
       let number_format_code = number_format_id.and_then(|id| import.styles.number_format_code(id));
@@ -577,7 +762,7 @@ fn print_cells_for_area<'a>(
       cells.push(CalcPrintCell {
         address,
         text: cell.display_text.as_str(),
-        style_index: cell.style_index,
+        style_index,
         number_format_id,
         number_format_code,
         rendered_text,

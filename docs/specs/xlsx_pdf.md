@@ -164,16 +164,19 @@ Landed owner modules:
   of remaining workbook-global bare counters.
 - `xlsx/styles.rs`: typed stylesheet and defined-name catalogs from
   `WorkbookStylesPart` and `workbook.definedNames`, including custom number
-  formats, font/fill/border/XF/table-style counts, default table/pivot style
-  names, style XF and cell XF records with numFmt/font/fill/border/style-XF
-  references, quote/pivot flags, apply flags, alignment/protection/extension
-  markers, and `_xlnm.Print_Area` / `_xlnm.Print_Titles` /
-  `_xlnm._FilterDatabase` classification. Full `StylesBuffer` inheritance,
-  theme/palette color resolution, and the rest of the locale-sensitive
-  `SvNumberFormatter` surface remain in this owner before broad PDF text
-  parity. The current display-string bridge resolves built-in/custom numFmtId
-  strings and covers the Calc print path for General, text, boolean, numeric,
-  grouped numeric, percent, currency-prefix, and serial date/time branches.
+  formats, font/fill/border/XF/table-style counts and records, default
+  table/pivot style names, style XF and cell XF records with
+  numFmt/font/fill/border/style-XF references, quote/pivot flags, apply flags,
+  alignment/protection/extension markers, `Xf::createPattern`-style parent
+  XF used-flag resolution, display font records, `Fill::finalizeImport`
+  pattern/gradient color mixing, outer border records, and `_xlnm.Print_Area`
+  / `_xlnm.Print_Titles` / `_xlnm._FilterDatabase` classification. Theme,
+  indexed/palette color resolution, conditional formatting, and the rest of
+  the locale-sensitive `SvNumberFormatter` surface remain in this owner before
+  broad PDF text parity. The current display-string bridge resolves
+  built-in/custom numFmtId strings and covers the Calc print path for General,
+  text, boolean, numeric, grouped numeric, percent, currency-prefix, and
+  serial date/time branches.
 - `xlsx/table.rs`: typed table definition catalog from `TableDefinitionPart`,
   preserving table id/name/displayName/ref/type, header/totals row counts,
   table columns, style flags, auto-filter/sort-state presence, query-table
@@ -219,7 +222,8 @@ Landed owner modules:
   import now preserves `twoCellAnchor` / `oneCellAnchor` / `absoluteAnchor`,
   from/to markers, extents, `editAs`, client data flags, object kind,
   non-visual id/name/description/hidden state, picture relationship ids,
-  graphic frame URIs, content-part relationships, and child chart/diagram/media
+  graphic frame URIs, content-part relationships, xdr solid shape fill,
+  no-line, solid line color and line width, and child chart/diagram/media
   resources. Chart import preserves `chartSpace` / `chartEx` root state,
   external-data relationships, pivot/source/protection/title/legend/3D/axis
   markers, chart type groups, print/user-shape markers, extension markers,
@@ -231,22 +235,29 @@ Landed owner modules:
   shapes/groups, child images, and extension markers for the later
   `oox::drawingml::diagram`-shaped bridge.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
-  worksheet/chartsheet page setup import, including header/footer text
+  worksheet/chartsheet page setup import, including LibreOffice's
+  `PaperSizeConv::spPaperSizeTable` MS paper-size mapping, header/footer text
   channels, header/footer drawing and legacy drawing relationships, background
-  picture relationships, and header/footer flags for the later token parser.
+  picture relationships, and header/footer flags. Display lowering now consumes
+  the text channels through a Calc-shaped `&L` / `&C` / `&R` section parser and
+  expands page number, page count, sheet name, escaped ampersand, font-name, and
+  font-size tokens without reopening worksheet XML.
 - `xlsx/print.rs`: first `ScPrintFunc`-shaped page model beyond one-page-per
   sheet. It now resolves simple typed `_xlnm.Print_Area` A1 ranges, records
   print-title row/column ranges, falls back to the worksheet used area for
   visible sheets without explicit print ranges, splits page areas at manual row
-  and column breaks, and snapshots page-local cells, hidden row/column hits,
-  merged-range intersections, formula/style/text markers, number-format render
-  state, page-local drawing-anchor fallback counts, and `PrintArea`-ordered
-  paint operations. `CalcZoom` state now preserves scale-all versus
-  fit-to-width/height branches, `ZOOM_MIN`, forced-break minimum page counts,
-  tdf#103516 fit-to-width adjustment state, skip-empty accounting, and
+  and column breaks and page content dimensions from the page-style paper size,
+  subtracts repeated row/column extents from page-local data areas, and
+  snapshots page-local cells with cell/row/column style fallback, repeated
+  row/column/corner cells, hidden row/column hits, merged-range intersections,
+  formula/style/text markers, number-format render state, page-local
+  drawing-anchor fallback counts, and `PrintArea`-ordered paint operations.
+  `CalcZoom` state now preserves scale-all versus fit-to-width/height
+  branches, `ZOOM_MIN`, forced-break minimum page counts, tdf#103516
+  fit-to-width adjustment state, skip-empty accounting, and
   top-down/over-then-down traversal ordering. Formula-token range conversion,
-  scale-to-page-count input, repeated title painting, full shape/chart drawing
-  paint, and header/footer token layout remain in this owner.
+  scale-to-page-count input, full chart/SmartArt/VML/comment drawing paint, and
+  theme/indexed/conditional color materialization remain in this owner.
 - `xlsx/pivot.rs`: typed pivot cache and pivot table catalogs. Workbook cache
   definitions preserve workbook cache ids/relationships, cache field counts,
   record counts, refresh/save/invalid flags, records part presence, optional
@@ -1010,10 +1021,12 @@ style name. Do not restrict this to the current sheet.
   replacement constant
 
 The current Rust `CalcPrintDocument` records these branches and emits page
-models in LibreOffice traversal order. Calc row/column metric coordinates are
-now available to print/display, but exact `CalcPages` sizing still needs the
-remaining upstream page-break and repeated-title branches before broad
-fit/skip-empty assertions should be treated as final.
+models in LibreOffice traversal order. Calc row/column metric coordinates and
+LibreOffice's MS `paperSize` table now drive page-body dimensions, automatic
+page slices, manual-break slices, repeat-row/repeat-column reserved space,
+fit-to-width/height zoom, and display placement. Exact `CalcPages` still needs
+the remaining scale-to-page-count branch and the full Calc hidden-page/notes
+behavior before broad fit/skip-empty assertions should be treated as final.
 
 `DoPrint` owns page traversal:
 
@@ -1040,11 +1053,18 @@ fit/skip-empty assertions should be treated as final.
 
 The current paint bridge records the `PrintArea` operation order (back drawing
 layer, repeated columns/rows, cell area, grid, front drawing layer), lowers
-page-local cell text through Calc row/column metrics, and paints spreadsheet
-pictures from imported drawing `ImagePart` bytes. Shape geometry, chart output,
-and complete front/back drawing-layer paint must be fed from the imported
-worksheet/drawing resources; display lowering must not reopen OOXML
-relationships to synthesize them.
+page-local and repeated-title cell text through Calc row/column metrics,
+expands merged master-cell rectangles and suppresses covered merged cells,
+paints resolved font/fill/outer-border state from the stylesheet catalog,
+paints grid lines and row/column headings when print options request them,
+emits worksheet hyperlinks as `LinkArea` items from relationship-scoped
+targets, paints spreadsheet pictures from imported drawing `ImagePart` bytes,
+and emits anchored xdr shape rectangles from imported anchors plus resolved
+solid fill/solid line/no-line paint. Chart output, SmartArt/VML/comments,
+conditional formatting, theme/indexed/scheme color resolution, preset geometry
+paths, diagonal/inner border conflict behavior, and complete front/back
+drawing-layer paint must be fed from the imported worksheet/drawing resources;
+display lowering must not reopen OOXML relationships to synthesize them.
 
 ---
 

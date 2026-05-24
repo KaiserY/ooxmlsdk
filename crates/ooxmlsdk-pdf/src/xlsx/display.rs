@@ -1,15 +1,19 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
-use crate::docx::{ImageCrop, PageSetup, TextStyle};
-use crate::layout::{self, ImageItem, LayoutDocument, PageItem, PdfTextSegmentation, TextItem};
+use crate::docx::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
+use crate::layout::{
+  self, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem, PageItem,
+  PdfTextSegmentation, RectItem, TextItem,
+};
 use crate::units;
 
 use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
-use super::worksheet::{CalcSheet, SheetType};
+use super::worksheet::{CalcSheet, CellRect, SheetType};
 
 const XLSX_DEBUG_LINE_HEIGHT_PT: f32 = 12.0;
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
+const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 
 pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
   let mut pages = Vec::new();
@@ -34,7 +38,7 @@ pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
     pages.push((setup, summary_items(setup, lines)));
   }
   pages.extend(print_document.pages.iter().map(|page| {
-    let setup = PageSetup::default();
+    let setup = page_setup_from_calc(page);
     (setup, print_page_items(import, page, setup))
   }));
   layout::item_pages(pages)
@@ -46,33 +50,177 @@ fn print_page_items(
   setup: PageSetup,
 ) -> Vec<PageItem> {
   let mut items = summary_items(setup, print_page_lines(import, page));
-  let grid_origin_y = setup.margin_top_pt + XLSX_DEBUG_LINE_HEIGHT_PT * 6.0;
-  let area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  let body_origin_y = setup.margin_top_pt + XLSX_DEBUG_LINE_HEIGHT_PT * 6.0;
   let zoom_scale = page.zoom as f32 / 100.0;
-  for cell in &page.cells {
-    if cell.rendered_text.is_empty() {
+  let heading_width = if page.page_settings.print_headings {
+    page.sheet.column_width_pt(1) * zoom_scale
+  } else {
+    0.0
+  };
+  let heading_height = if page.page_settings.print_headings {
+    page.sheet.row_height_pt(1) * zoom_scale
+  } else {
+    0.0
+  };
+  let body_origin_x = setup.margin_left_pt + heading_width;
+  let body_origin_y = body_origin_y + heading_height;
+  let repeat_width = page
+    .repeated_columns
+    .map(|range| page.sheet.range_rect(range).width_pt * zoom_scale)
+    .unwrap_or(0.0);
+  let repeat_height = page
+    .repeated_rows
+    .map(|range| page.sheet.range_rect(range).height_pt * zoom_scale)
+    .unwrap_or(0.0);
+
+  if let Some(area) = repeat_corner_for_page(page) {
+    render_cell_area(
+      &mut items,
+      import,
+      page,
+      &page.repeated_corner_cells,
+      area,
+      body_origin_x,
+      body_origin_y,
+      zoom_scale,
+    );
+  }
+  if let Some(area) = repeat_rows_for_page(page) {
+    render_cell_area(
+      &mut items,
+      import,
+      page,
+      &page.repeated_row_cells,
+      area,
+      body_origin_x + repeat_width,
+      body_origin_y,
+      zoom_scale,
+    );
+  }
+  if let Some(area) = repeat_columns_for_page(page) {
+    render_cell_area(
+      &mut items,
+      import,
+      page,
+      &page.repeated_column_cells,
+      area,
+      body_origin_x,
+      body_origin_y + repeat_height,
+      zoom_scale,
+    );
+  }
+  if let Some(area) = page.area {
+    render_cell_area(
+      &mut items,
+      import,
+      page,
+      &page.cells,
+      area,
+      body_origin_x + repeat_width,
+      body_origin_y + repeat_height,
+      zoom_scale,
+    );
+    if page.page_settings.print_headings {
+      render_headings(
+        &mut items,
+        page,
+        area,
+        setup.margin_left_pt,
+        body_origin_y + repeat_height,
+        body_origin_x + repeat_width,
+        body_origin_y - heading_height,
+        zoom_scale,
+      );
+    }
+  }
+
+  items.extend(print_page_image_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
+  items.extend(print_page_shape_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
+  render_header_footer(&mut items, page, setup);
+  items
+}
+
+fn page_setup_from_calc(page: &CalcPrintPage<'_>) -> PageSetup {
+  let mut setup = PageSetup::default();
+  let (width_pt, height_pt) = page.page_settings.page_size_pt();
+  setup.width_pt = width_pt;
+  setup.height_pt = height_pt;
+  setup.margin_left_pt = page.page_settings.margin_left_in as f32 * units::POINTS_PER_INCH;
+  setup.margin_right_pt = page.page_settings.margin_right_in as f32 * units::POINTS_PER_INCH;
+  setup.margin_top_pt = page.page_settings.margin_top_in as f32 * units::POINTS_PER_INCH;
+  setup.margin_bottom_pt = page.page_settings.margin_bottom_in as f32 * units::POINTS_PER_INCH;
+  setup.header_distance_pt = page.page_settings.margin_header_in as f32 * units::POINTS_PER_INCH;
+  setup.footer_distance_pt = page.page_settings.margin_footer_in as f32 * units::POINTS_PER_INCH;
+  setup
+}
+
+fn render_cell_area(
+  items: &mut Vec<PageItem>,
+  import: &ExcelImport,
+  page: &CalcPrintPage<'_>,
+  cells: &[super::print::CalcPrintCell<'_>],
+  area: super::worksheet::CellRange,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) {
+  let area_rect = page.sheet.range_rect(area);
+  for cell in cells {
+    if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
     }
     let rect = page.sheet.cell_rect(cell.address);
     if rect.width_pt <= 0.0 || rect.height_pt <= 0.0 {
       continue;
     }
-    if let Some(area_rect) = area_rect
-      && (rect.x_pt + rect.width_pt < area_rect.x_pt
-        || rect.y_pt + rect.height_pt < area_rect.y_pt
-        || rect.x_pt > area_rect.x_pt + area_rect.width_pt
-        || rect.y_pt > area_rect.y_pt + area_rect.height_pt)
-    {
+    let x_pt = origin_x_pt + (rect.x_pt - area_rect.x_pt) * zoom_scale;
+    let y_pt = origin_y_pt + (rect.y_pt - area_rect.y_pt) * zoom_scale;
+    let width_pt = rect.width_pt * zoom_scale;
+    let height_pt = rect.height_pt * zoom_scale;
+    if let Some(fill_color) = import.styles.fill_color_for_cell(cell.style_index) {
+      items.push(PageItem::Rect(RectItem {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+        fill_color: Some(fill_color),
+        fill_opacity: 1.0,
+        stroke: None,
+        stroke_opacity: 1.0,
+      }));
+    }
+    render_cell_borders(
+      items,
+      CellRect {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+      },
+      import.styles.borders_for_cell(cell.style_index),
+    );
+    if cell.rendered_text.is_empty() {
       continue;
     }
+    let hyperlink_url = hyperlink_for_cell(page, cell.address);
     items.push(PageItem::Text(TextItem {
-      x_pt: setup.margin_left_pt + rect.x_pt * zoom_scale + XLSX_CELL_TEXT_INSET_PT,
-      y_pt: grid_origin_y + rect.y_pt * zoom_scale,
-      line_height_pt: rect.height_pt * zoom_scale,
+      x_pt: x_pt + XLSX_CELL_TEXT_INSET_PT,
+      y_pt,
+      line_height_pt: height_pt,
       text: cell.rendered_text.clone(),
-      style: TextStyle::default(),
+      style: import.styles.text_style_for_cell(cell.style_index),
       rotation_center_pt: None,
-      hyperlink_url: None,
+      hyperlink_url: hyperlink_url.clone(),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
@@ -82,15 +230,175 @@ fn print_page_items(
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Line,
     }));
+    if let Some(hyperlink_url) = hyperlink_url {
+      items.push(PageItem::LinkArea(LinkAreaItem {
+        x_pt,
+        y_pt,
+        width_pt,
+        height_pt,
+        hyperlink_url,
+      }));
+    }
   }
+  if page.page_settings.print_grid_lines {
+    render_grid(items, page, area, origin_x_pt, origin_y_pt, zoom_scale);
+  }
+}
 
-  items.extend(print_page_image_items(
-    page,
-    setup.margin_left_pt,
-    grid_origin_y,
-    zoom_scale,
-  ));
-  items
+fn render_cell_borders(
+  items: &mut Vec<PageItem>,
+  rect: CellRect,
+  borders: super::styles::BorderRecord,
+) {
+  if let Some(border) = borders.left {
+    items.push(PageItem::Line(LineItem {
+      x1_pt: rect.x_pt,
+      y1_pt: rect.y_pt,
+      x2_pt: rect.x_pt,
+      y2_pt: rect.y_pt + rect.height_pt,
+      width_pt: border.width_pt,
+      color: border.color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+  if let Some(border) = borders.right {
+    items.push(PageItem::Line(LineItem {
+      x1_pt: rect.x_pt + rect.width_pt,
+      y1_pt: rect.y_pt,
+      x2_pt: rect.x_pt + rect.width_pt,
+      y2_pt: rect.y_pt + rect.height_pt,
+      width_pt: border.width_pt,
+      color: border.color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+  if let Some(border) = borders.top {
+    items.push(PageItem::Line(LineItem {
+      x1_pt: rect.x_pt,
+      y1_pt: rect.y_pt,
+      x2_pt: rect.x_pt + rect.width_pt,
+      y2_pt: rect.y_pt,
+      width_pt: border.width_pt,
+      color: border.color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+  if let Some(border) = borders.bottom {
+    items.push(PageItem::Line(LineItem {
+      x1_pt: rect.x_pt,
+      y1_pt: rect.y_pt + rect.height_pt,
+      x2_pt: rect.x_pt + rect.width_pt,
+      y2_pt: rect.y_pt + rect.height_pt,
+      width_pt: border.width_pt,
+      color: border.color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+}
+
+fn render_grid(
+  items: &mut Vec<PageItem>,
+  page: &CalcPrintPage<'_>,
+  area: super::worksheet::CellRange,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) {
+  let width = page.sheet.range_rect(area).width_pt * zoom_scale;
+  let height = page.sheet.range_rect(area).height_pt * zoom_scale;
+  let color = RgbColor { r: 0, g: 0, b: 0 };
+  let mut x = origin_x_pt;
+  for col in area.start.col..=area.end.col + 1 {
+    if col > area.start.col {
+      x += page.sheet.column_width_pt(col - 1) * zoom_scale;
+    }
+    items.push(PageItem::Line(LineItem {
+      x1_pt: x,
+      y1_pt: origin_y_pt,
+      x2_pt: x,
+      y2_pt: origin_y_pt + height,
+      width_pt: XLSX_GRID_LINE_WIDTH_PT,
+      color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+  let mut y = origin_y_pt;
+  for row in area.start.row..=area.end.row + 1 {
+    if row > area.start.row {
+      y += page.sheet.row_height_pt(row - 1) * zoom_scale;
+    }
+    items.push(PageItem::Line(LineItem {
+      x1_pt: origin_x_pt,
+      y1_pt: y,
+      x2_pt: origin_x_pt + width,
+      y2_pt: y,
+      width_pt: XLSX_GRID_LINE_WIDTH_PT,
+      color,
+      kind: LineItemKind::Stroke,
+    }));
+  }
+}
+
+fn render_headings(
+  items: &mut Vec<PageItem>,
+  page: &CalcPrintPage<'_>,
+  area: super::worksheet::CellRange,
+  row_header_x_pt: f32,
+  row_header_y_pt: f32,
+  col_header_x_pt: f32,
+  col_header_y_pt: f32,
+  zoom_scale: f32,
+) {
+  let mut x = col_header_x_pt;
+  for col in area.start.col..=area.end.col {
+    let width = page.sheet.column_width_pt(col) * zoom_scale;
+    items.push(header_text(
+      x + XLSX_CELL_TEXT_INSET_PT,
+      col_header_y_pt,
+      column_label(col),
+    ));
+    x += width;
+  }
+  let mut y = row_header_y_pt;
+  for row in area.start.row..=area.end.row {
+    let height = page.sheet.row_height_pt(row) * zoom_scale;
+    items.push(header_text(
+      row_header_x_pt + XLSX_CELL_TEXT_INSET_PT,
+      y,
+      row.to_string(),
+    ));
+    y += height;
+  }
+}
+
+fn header_text(x_pt: f32, y_pt: f32, text: String) -> PageItem {
+  PageItem::Text(TextItem {
+    x_pt,
+    y_pt,
+    line_height_pt: XLSX_DEBUG_LINE_HEIGHT_PT,
+    text,
+    style: TextStyle::default(),
+    rotation_center_pt: None,
+    hyperlink_url: None,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    preserve_text_portion: false,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: PdfTextSegmentation::Line,
+  })
+}
+
+fn column_label(mut col: u32) -> String {
+  let mut label = Vec::new();
+  while col > 0 {
+    col -= 1;
+    label.push((b'A' + (col % 26) as u8) as char);
+    col /= 26;
+  }
+  label.iter().rev().collect()
 }
 
 fn summary_items(setup: PageSetup, lines: Vec<String>) -> Vec<PageItem> {
@@ -132,6 +440,7 @@ fn print_page_image_items(
   zoom_scale: f32,
 ) -> Vec<PageItem> {
   let mut items = Vec::new();
+  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
   for drawing in &page.sheet.resources.drawings {
     for anchor in &drawing.anchors {
       if anchor.object.hidden || !anchor.print_with_sheet {
@@ -152,6 +461,8 @@ fn print_page_image_items(
       if width_pt <= 0.0 || height_pt <= 0.0 {
         continue;
       }
+      let (x_pt, y_pt) =
+        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
       items.push(PageItem::Image(ImageItem {
         x_pt: origin_x_pt + x_pt * zoom_scale,
         y_pt: origin_y_pt + y_pt * zoom_scale,
@@ -175,6 +486,69 @@ fn print_page_image_items(
     }
   }
   items
+}
+
+fn print_page_shape_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  for anchor in page
+    .sheet
+    .resources
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.anchors.iter())
+  {
+    if anchor.object.hidden || !anchor.print_with_sheet {
+      continue;
+    }
+    if !matches!(
+      anchor.object.kind,
+      super::drawing::DrawingObjectKind::Shape
+        | super::drawing::DrawingObjectKind::GroupShape
+        | super::drawing::DrawingObjectKind::ConnectionShape
+    ) {
+      continue;
+    }
+    let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+      continue;
+    };
+    if width_pt <= 0.0 || height_pt <= 0.0 {
+      continue;
+    }
+    let (x_pt, y_pt) =
+      page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+    items.push(PageItem::Rect(RectItem {
+      x_pt: origin_x_pt + x_pt * zoom_scale,
+      y_pt: origin_y_pt + y_pt * zoom_scale,
+      width_pt: width_pt * zoom_scale,
+      height_pt: height_pt * zoom_scale,
+      fill_color: anchor.object.fill_color,
+      fill_opacity: 1.0,
+      stroke: shape_stroke(&anchor.object),
+      stroke_opacity: 1.0,
+    }));
+  }
+  items
+}
+
+fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderStyle> {
+  if object.no_line {
+    return None;
+  }
+  let color = object.line_color?;
+  Some(BorderStyle {
+    width_pt: object
+      .line_width_emu
+      .map(|value| units::emu_to_points(i64::from(value)))
+      .unwrap_or(0.75),
+    color,
+    ..BorderStyle::default()
+  })
 }
 
 fn anchor_rect_pt(
@@ -206,6 +580,243 @@ fn anchor_rect_pt(
       ))
     }
   }
+}
+
+fn repeat_rows_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
+  let area = page.area?;
+  let repeat_rows = page.repeated_rows?;
+  Some(super::worksheet::CellRange::new(
+    super::worksheet::CellAddress {
+      col: area.start.col,
+      row: repeat_rows.start.row,
+    },
+    super::worksheet::CellAddress {
+      col: area.end.col,
+      row: repeat_rows.end.row,
+    },
+  ))
+}
+
+fn repeat_columns_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
+  let area = page.area?;
+  let repeat_columns = page.repeated_columns?;
+  Some(super::worksheet::CellRange::new(
+    super::worksheet::CellAddress {
+      col: repeat_columns.start.col,
+      row: area.start.row,
+    },
+    super::worksheet::CellAddress {
+      col: repeat_columns.end.col,
+      row: area.end.row,
+    },
+  ))
+}
+
+fn repeat_corner_for_page(page: &CalcPrintPage<'_>) -> Option<super::worksheet::CellRange> {
+  let repeat_rows = page.repeated_rows?;
+  let repeat_columns = page.repeated_columns?;
+  Some(super::worksheet::CellRange::new(
+    super::worksheet::CellAddress {
+      col: repeat_columns.start.col,
+      row: repeat_rows.start.row,
+    },
+    super::worksheet::CellAddress {
+      col: repeat_columns.end.col,
+      row: repeat_rows.end.row,
+    },
+  ))
+}
+
+fn hyperlink_for_cell(
+  page: &CalcPrintPage<'_>,
+  address: super::worksheet::CellAddress,
+) -> Option<String> {
+  page
+    .sheet
+    .metrics
+    .hyperlinks
+    .iter()
+    .find(|hyperlink| {
+      super::worksheet::CellRange::parse_a1_range(&hyperlink.reference)
+        .is_some_and(|range| range.contains(address))
+    })
+    .and_then(|hyperlink| {
+      hyperlink
+        .relationship_id
+        .as_deref()
+        .and_then(|id| page.sheet.resources.relationships.hyperlink_targets.get(id))
+        .cloned()
+        .or_else(|| {
+          hyperlink
+            .location
+            .as_ref()
+            .map(|location| format!("#{location}"))
+        })
+    })
+}
+
+fn render_header_footer(items: &mut Vec<PageItem>, page: &CalcPrintPage<'_>, setup: PageSetup) {
+  let header = header_footer_text(page, true);
+  let footer = header_footer_text(page, false);
+  if let Some(header) = header {
+    render_header_footer_line(
+      items,
+      setup.margin_left_pt,
+      setup.header_distance_pt,
+      page,
+      setup,
+      &header,
+    );
+  }
+  if let Some(footer) = footer {
+    render_header_footer_line(
+      items,
+      setup.margin_left_pt,
+      setup.height_pt - setup.footer_distance_pt - XLSX_DEBUG_LINE_HEIGHT_PT,
+      page,
+      setup,
+      &footer,
+    );
+  }
+}
+
+fn header_footer_text(page: &CalcPrintPage<'_>, header: bool) -> Option<String> {
+  let model = &page.page_settings.header_footer;
+  let text = if page.sheet_page_index == 0 && model.different_first {
+    if header {
+      model.first_header.as_ref()
+    } else {
+      model.first_footer.as_ref()
+    }
+  } else if page.sheet_page_index % 2 == 1 && model.different_odd_even {
+    if header {
+      model.even_header.as_ref()
+    } else {
+      model.even_footer.as_ref()
+    }
+  } else if header {
+    model.odd_header.as_ref()
+  } else {
+    model.odd_footer.as_ref()
+  }?;
+  Some(expand_header_footer_tokens(text, page))
+}
+
+fn render_header_footer_line(
+  items: &mut Vec<PageItem>,
+  x_pt: f32,
+  y_pt: f32,
+  page: &CalcPrintPage<'_>,
+  setup: PageSetup,
+  text: &str,
+) {
+  for (align, value) in split_header_footer_sections(text) {
+    if value.is_empty() {
+      continue;
+    }
+    let x = match align {
+      HeaderFooterAlign::Left => x_pt,
+      HeaderFooterAlign::Center => setup.width_pt / 2.0,
+      HeaderFooterAlign::Right => setup.width_pt - setup.margin_right_pt,
+    };
+    items.push(header_text(x, y_pt, value));
+  }
+  if page.page_settings.header_footer.drawing_slot_count > 0 {
+    items.push(header_text(
+      x_pt,
+      y_pt + XLSX_DEBUG_LINE_HEIGHT_PT,
+      format!(
+        "headerFooterDrawings={}",
+        page.page_settings.header_footer.drawing_slot_count
+      ),
+    ));
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HeaderFooterAlign {
+  Left,
+  Center,
+  Right,
+}
+
+fn split_header_footer_sections(text: &str) -> Vec<(HeaderFooterAlign, String)> {
+  let mut output = Vec::new();
+  let mut current = HeaderFooterAlign::Center;
+  let mut buffer = String::new();
+  let mut chars = text.chars().peekable();
+  while let Some(ch) = chars.next() {
+    if ch == '&' {
+      match chars.peek().copied() {
+        Some('L') => {
+          chars.next();
+          push_header_footer_section(&mut output, current, &mut buffer);
+          current = HeaderFooterAlign::Left;
+          continue;
+        }
+        Some('C') => {
+          chars.next();
+          push_header_footer_section(&mut output, current, &mut buffer);
+          current = HeaderFooterAlign::Center;
+          continue;
+        }
+        Some('R') => {
+          chars.next();
+          push_header_footer_section(&mut output, current, &mut buffer);
+          current = HeaderFooterAlign::Right;
+          continue;
+        }
+        _ => {}
+      }
+    }
+    buffer.push(ch);
+  }
+  push_header_footer_section(&mut output, current, &mut buffer);
+  output
+}
+
+fn push_header_footer_section(
+  output: &mut Vec<(HeaderFooterAlign, String)>,
+  align: HeaderFooterAlign,
+  buffer: &mut String,
+) {
+  if !buffer.is_empty() {
+    output.push((align, buffer.trim().to_string()));
+    buffer.clear();
+  }
+}
+
+fn expand_header_footer_tokens(text: &str, page: &CalcPrintPage<'_>) -> String {
+  let mut output = String::new();
+  let mut chars = text.chars().peekable();
+  while let Some(ch) = chars.next() {
+    if ch != '&' {
+      output.push(ch);
+      continue;
+    }
+    match chars.next() {
+      Some('P') => output.push_str(&page.page_number.to_string()),
+      Some('N') => output.push_str(&page.total_pages.to_string()),
+      Some('A') => output.push_str(&page.sheet.name),
+      Some('&') => output.push('&'),
+      Some('L' | 'C' | 'R') => {}
+      Some('"') => {
+        for next in chars.by_ref() {
+          if next == '"' {
+            break;
+          }
+        }
+      }
+      Some(ch) if ch.is_ascii_digit() => {
+        while chars.peek().is_some_and(|peek| peek.is_ascii_digit()) {
+          chars.next();
+        }
+      }
+      Some(ch) => output.push(ch),
+      None => output.push('&'),
+    }
+  }
+  output
 }
 
 fn workbook_lines(import: &ExcelImport) -> Vec<String> {
@@ -917,8 +1528,9 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
   lines.insert(
     1,
     format!(
-      "print page={} sheetPage={} zoom={} scaleMode={:?} autoPages={}x{} forcedBreakMinPages={} tdf103516={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={} headerFooterFlags={} headerFooterTextLen={} headerFooterDrawings={}",
+      "print page={} totalPages={} sheetPage={} zoom={} scaleMode={:?} autoPages={}x{} forcedBreakMinPages={} tdf103516={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={} headerFooterFlags={} headerFooterTextLen={} headerFooterDrawings={}",
       page.page_number,
+      page.total_pages,
       page.sheet_page_index + 1,
       page.zoom,
       page.scale_mode,
@@ -943,10 +1555,13 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
   lines.insert(
     2,
     format!(
-      "print area={} explicit={} cells={} allCells={} empty={} textLen={} renderedTextLen={} formulas={} hiddenRows={} hiddenCols={} merges={} repeatRows={} repeatCols={} cellHint={}",
+      "print area={} explicit={} cells={} repeatRowCells={} repeatColCells={} repeatCornerCells={} allCells={} empty={} textLen={} renderedTextLen={} formulas={} hiddenRows={} hiddenCols={} merges={} repeatRows={} repeatCols={} cellHint={}",
       format_print_area(page.area),
       page.explicit_print_area,
       page.cells.len(),
+      page.repeated_row_cells.len(),
+      page.repeated_column_cells.len(),
+      page.repeated_corner_cells.len(),
       page.all_cells,
       page.empty,
       page.cells.iter().map(|cell| cell.text.len()).sum::<usize>(),
@@ -2391,7 +3006,7 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
         .and_then(|auto_filter| auto_filter.sort_state.as_ref())
         .map_or(0, sort_state_flag_count);
     lines.push(format!(
-      "sheet metrics dimension={} settingsCode={} propertyFlags={} protectionFlags={} autoFilterColumns={} autoFilterFlags={} sortFlags={} views={} selectedViews={} panes={} selections={} pivotSelections={} viewFlags={} viewExt={} viewRefLen={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} styledRows={} customHeightRows={} merges={} hyperlinks={} hyperlinkRels={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
+      "sheet metrics dimension={} settingsCode={} propertyFlags={} protectionFlags={} autoFilterColumns={} autoFilterFlags={} sortFlags={} views={} selectedViews={} panes={} selections={} pivotSelections={} viewFlags={} viewExt={} viewRefLen={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} styledRows={} customHeightRows={} merges={} hyperlinks={} hyperlinkRels={} hyperlinkTargets={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
       sheet.metrics.dimension.as_deref().unwrap_or(""),
       sheet
         .metrics
@@ -2443,6 +3058,7 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       sheet.metrics.merged_ranges.len(),
       sheet.metrics.hyperlinks.len(),
       relationship_hyperlinks,
+      sheet.resources.relationships.hyperlink_targets.len(),
       local_hyperlinks,
       displayed_hyperlinks,
       hyperlink_ref_len,

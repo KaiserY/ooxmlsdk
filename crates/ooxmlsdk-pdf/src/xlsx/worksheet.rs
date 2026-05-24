@@ -306,20 +306,55 @@ impl CalcSheet {
   }
 
   pub(crate) fn cell_rect(&self, address: CellAddress) -> CellRect {
+    self.cell_rect_with_merge(address, true)
+  }
+
+  pub(crate) fn cell_rect_with_merge(
+    &self,
+    address: CellAddress,
+    include_merged_cell: bool,
+  ) -> CellRect {
     let x_pt = (1..address.col)
       .map(|column| self.column_width_pt(column))
       .sum();
     let y_pt = (1..address.row).map(|row| self.row_height_pt(row)).sum();
+    let end = if include_merged_cell {
+      self
+        .merged_range_for_cell(address)
+        .filter(|range| range.start == address)
+        .map_or(address, |range| range.end)
+    } else {
+      address
+    };
     CellRect {
       x_pt,
       y_pt,
-      width_pt: self.column_width_pt(address.col),
-      height_pt: self.row_height_pt(address.row),
+      width_pt: (address.col..=end.col)
+        .map(|column| self.column_width_pt(column))
+        .sum(),
+      height_pt: (address.row..=end.row)
+        .map(|row| self.row_height_pt(row))
+        .sum(),
     }
   }
 
+  pub(crate) fn merged_range_for_cell(&self, address: CellAddress) -> Option<CellRange> {
+    self
+      .metrics
+      .merged_ranges
+      .iter()
+      .filter_map(|reference| CellRange::parse_a1_range(reference))
+      .find(|range| range.contains(address))
+  }
+
+  pub(crate) fn is_covered_merged_cell(&self, address: CellAddress) -> bool {
+    self
+      .merged_range_for_cell(address)
+      .is_some_and(|range| range.start != address)
+  }
+
   pub(crate) fn range_rect(&self, range: CellRange) -> CellRect {
-    let start = self.cell_rect(range.start);
+    let start = self.cell_rect_with_merge(range.start, false);
     let width_pt = (range.start.col..=range.end.col)
       .map(|column| self.column_width_pt(column))
       .sum();
@@ -388,6 +423,27 @@ impl CalcSheet {
       }
     }
     self.metrics.format.default_row_height as f32
+  }
+
+  pub(crate) fn column_style_index(&self, column: u32) -> Option<u32> {
+    self
+      .metrics
+      .columns
+      .iter()
+      .find(|model| column >= model.first && column <= model.last)
+      .and_then(|model| model.style_index)
+  }
+
+  pub(crate) fn effective_cell_style_index(
+    &self,
+    row: &CalcRow,
+    cell: &CalcCell,
+    address: CellAddress,
+  ) -> Option<u32> {
+    cell
+      .style_index
+      .or(row.style_index)
+      .or_else(|| self.column_style_index(address.col))
   }
 }
 

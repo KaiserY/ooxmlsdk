@@ -588,7 +588,7 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     .sum::<usize>();
 
   if drawing_count > 0
-    || sheet.resources.vml_drawings > 0
+    || !sheet.resources.object_resources.vml_drawings.is_empty()
     || sheet.resources.comments.legacy_count() > 0
     || sheet.resources.comments.threaded_count() > 0
     || !sheet.resources.tables.is_empty()
@@ -607,7 +607,7 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       chart_child_resource_count,
       diagram_count,
       drawing_image_count,
-      sheet.resources.vml_drawings,
+      sheet.resources.object_resources.vml_drawings.len(),
       sheet.resources.comments.legacy_count(),
       sheet.resources.comments.threaded_count(),
       sheet.resources.tables.len(),
@@ -1084,6 +1084,123 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       control_flags,
       control_ref_len,
       anchor_count
+    ));
+  }
+
+  if !sheet.resources.object_resources.vml_drawings.is_empty()
+    || !sheet.resources.object_resources.controls.is_empty()
+    || !sheet
+      .resources
+      .object_resources
+      .control_properties
+      .is_empty()
+    || !sheet.resources.object_resources.embedded_objects.is_empty()
+    || !sheet
+      .resources
+      .object_resources
+      .embedded_packages
+      .is_empty()
+  {
+    let resources = &sheet.resources.object_resources;
+    let vml_images = resources
+      .vml_drawings
+      .iter()
+      .map(|part| part.images)
+      .sum::<usize>();
+    let vml_legacy_diagram_texts = resources
+      .vml_drawings
+      .iter()
+      .map(|part| part.legacy_diagram_texts)
+      .sum::<usize>();
+    let control_binaries = resources
+      .controls
+      .iter()
+      .map(|part| part.binary_data_parts.len())
+      .sum::<usize>();
+    let control_property_flags = resources
+      .control_properties
+      .iter()
+      .map(|part| {
+        usize::from(part.has_object_type)
+          + usize::from(part.has_checked)
+          + part.boolean_flags
+          + part.numeric_fields
+          + part.formula_fields
+          + part.alignment_fields
+          + part.list_items
+          + usize::from(part.has_extension_list)
+      })
+      .sum::<usize>();
+    let relationship_count = resources
+      .vml_drawings
+      .iter()
+      .filter(|part| part.relationship_id.is_some())
+      .count()
+      + resources
+        .controls
+        .iter()
+        .filter(|part| part.relationship_id.is_some())
+        .count()
+      + resources
+        .control_properties
+        .iter()
+        .filter(|part| part.relationship_id.is_some())
+        .count()
+      + resources
+        .embedded_objects
+        .iter()
+        .filter(|part| part.relationship_id.is_some())
+        .count()
+      + resources
+        .embedded_packages
+        .iter()
+        .filter(|part| part.relationship_id.is_some())
+        .count();
+    let text_len = resources
+      .vml_drawings
+      .iter()
+      .map(|part| part.relationship_id.as_ref().map_or(0, |value| value.len()))
+      .sum::<usize>()
+      + resources
+        .controls
+        .iter()
+        .map(|part| {
+          part.relationship_id.as_ref().map_or(0, |value| value.len())
+            + part
+              .binary_data_parts
+              .iter()
+              .map(|part| part.relationship_id.as_ref().map_or(0, |value| value.len()))
+              .sum::<usize>()
+        })
+        .sum::<usize>()
+      + resources
+        .control_properties
+        .iter()
+        .map(|part| part.relationship_id.as_ref().map_or(0, |value| value.len()) + part.text_len)
+        .sum::<usize>()
+      + resources
+        .embedded_objects
+        .iter()
+        .map(|part| part.relationship_id.as_ref().map_or(0, |value| value.len()))
+        .sum::<usize>()
+      + resources
+        .embedded_packages
+        .iter()
+        .map(|part| part.relationship_id.as_ref().map_or(0, |value| value.len()))
+        .sum::<usize>();
+    lines.push(format!(
+      "objectResources vml={} vmlImages={} legacyDiagramTexts={} controls={} controlBinaries={} controlProps={} controlPropFlags={} embeddedObjects={} embeddedPackages={} relationships={} textLen={}",
+      resources.vml_drawings.len(),
+      vml_images,
+      vml_legacy_diagram_texts,
+      resources.controls.len(),
+      control_binaries,
+      resources.control_properties.len(),
+      control_property_flags,
+      resources.embedded_objects.len(),
+      resources.embedded_packages.len(),
+      relationship_count,
+      text_len
     ));
   }
 
@@ -1740,6 +1857,30 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
 
   if !sheet.metrics.conditions.conditional_formats.is_empty()
     || !sheet.metrics.conditions.data_validations.is_empty()
+    || !sheet
+      .metrics
+      .conditions
+      .extension_conditions
+      .conditional_formats
+      .is_empty()
+    || !sheet
+      .metrics
+      .conditions
+      .extension_conditions
+      .data_validations
+      .is_empty()
+    || !sheet
+      .metrics
+      .conditions
+      .extension_conditions
+      .sparkline_groups
+      .is_empty()
+    || !sheet
+      .metrics
+      .conditions
+      .extension_conditions
+      .ignored_errors
+      .is_empty()
   {
     let cf_rules = sheet
       .metrics
@@ -1883,6 +2024,133 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
         .validation_window
         .map_or(String::new(), |(x, y)| format!("{x},{y}"))
     ));
+
+    let ext = &sheet.metrics.conditions.extension_conditions;
+    if !ext.conditional_formats.is_empty()
+      || !ext.data_validations.is_empty()
+      || !ext.sparkline_groups.is_empty()
+      || !ext.ignored_errors.is_empty()
+      || ext.slicer_refs > 0
+      || ext.protected_ranges > 0
+      || ext.web_extensions > 0
+      || ext.timeline_refs > 0
+      || ext.unknown_extensions > 0
+    {
+      let ext_cf_rules = ext
+        .conditional_formats
+        .iter()
+        .map(|format| format.rules.len())
+        .sum::<usize>();
+      let ext_cf_formulas = ext
+        .conditional_formats
+        .iter()
+        .flat_map(|format| &format.rules)
+        .map(|rule| rule.formulas.len())
+        .sum::<usize>();
+      let ext_cf_visual = ext
+        .conditional_formats
+        .iter()
+        .flat_map(|format| &format.rules)
+        .filter(|rule| rule.has_color_scale || rule.has_data_bar || rule.has_icon_set)
+        .count();
+      let ext_cf_flags = ext
+        .conditional_formats
+        .iter()
+        .map(|format| {
+          usize::from(format.pivot)
+            + format.sequence_of_references.len()
+            + usize::from(format.has_extensions)
+            + format
+              .rules
+              .iter()
+              .map(|rule| {
+                usize::from(rule.rule_type.is_some())
+                  + usize::from(rule.priority.is_some())
+                  + usize::from(rule.stop_if_true)
+                  + rule.boolean_flags
+                  + usize::from(rule.operator.is_some())
+                  + usize::from(rule.text.is_some())
+                  + usize::from(rule.time_period.is_some())
+                  + usize::from(rule.rank.is_some())
+                  + usize::from(rule.std_dev.is_some())
+                  + usize::from(rule.id.is_some())
+                  + usize::from(rule.has_differential_format)
+                  + usize::from(rule.has_extensions)
+              })
+              .sum::<usize>()
+        })
+        .sum::<usize>();
+      let ext_validation_flags = ext
+        .data_validations
+        .iter()
+        .map(|validation| {
+          usize::from(validation.validation_type.is_some())
+            + usize::from(validation.error_style.is_some())
+            + usize::from(validation.ime_mode.is_some())
+            + usize::from(validation.operator.is_some())
+            + usize::from(validation.allow_blank)
+            + usize::from(validation.no_drop_down)
+            + usize::from(validation.show_input_message)
+            + usize::from(validation.show_error_message)
+            + usize::from(validation.error_title.is_some())
+            + usize::from(validation.error.is_some())
+            + usize::from(validation.prompt_title.is_some())
+            + usize::from(validation.prompt.is_some())
+            + usize::from(validation.formula1.is_some())
+            + usize::from(validation.formula2.is_some())
+            + validation.sequence_of_references.len()
+        })
+        .sum::<usize>();
+      let sparklines = ext
+        .sparkline_groups
+        .iter()
+        .map(|group| group.sparklines)
+        .sum::<usize>();
+      let sparkline_flags = ext
+        .sparkline_groups
+        .iter()
+        .map(|group| {
+          usize::from(group.formula.is_some())
+            + group.color_count
+            + group.flag_count
+            + group.sparkline_formula_text_len
+            + group.reference_text_len
+        })
+        .sum::<usize>();
+      let ignored_errors = ext
+        .ignored_errors
+        .iter()
+        .map(|errors| errors.ignored_errors)
+        .sum::<usize>();
+      let ignored_error_flags = ext
+        .ignored_errors
+        .iter()
+        .map(|errors| {
+          errors.flag_count + errors.reference_text_len + usize::from(errors.has_extensions)
+        })
+        .sum::<usize>();
+      lines.push(format!(
+        "conditionExt cf={} cfRules={} cfFormulas={} cfVisual={} cfFlags={} validations={} validationFlags={} sparklineGroups={} sparklines={} sparklineFlags={} ignoredErrors={} ignoredErrorFlags={} slicerRefs={} protectedRanges={} webExtensions={} timelineRefs={} unknown={} uriLen={}",
+        ext.conditional_formats.len(),
+        ext_cf_rules,
+        ext_cf_formulas,
+        ext_cf_visual,
+        ext_cf_flags,
+        ext.data_validations.len(),
+        ext_validation_flags,
+        ext.sparkline_groups.len(),
+        sparklines,
+        sparkline_flags,
+        ignored_errors,
+        ignored_error_flags,
+        ext.slicer_refs,
+        ext.protected_ranges,
+        ext.web_extensions,
+        ext.timeline_refs,
+        ext.unknown_extensions,
+        ext.uri_text_len
+      ));
+    }
   }
 
   let formula_cells = sheet

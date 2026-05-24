@@ -170,10 +170,17 @@ Landed owner modules:
   page settings, worksheet/chartsheet resource catalogs, and first
   `WorksheetFragment`-shaped sheet metrics: dimension, `sheetFormatPr`,
   column spans, merged ranges, hyperlinks, row/column page breaks,
-  conditional-format/data-validation/protected-range/scenario counts. Cell
-  import now preserves typed formula state for normal/shared/array/data-table
-  formulas, shared ids, formula refs, calculation flags, data-table inputs,
-  cached values, cell/value metadata, phonetic flags, and extension markers.
+  conditional-format/data-validation/protected-range/scenario counts, and
+  worksheet `extLst` condition resources. Cell import now preserves typed
+  formula state for normal/shared/array/data-table formulas, shared ids,
+  formula refs, calculation flags, data-table inputs, cached values,
+  cell/value metadata, phonetic flags, and extension markers.
+- `xlsx/sheet_conditions.rs`: typed condition catalog for base
+  `conditionalFormatting` / `dataValidations` plus `extLst` x14
+  conditional-formatting, x14 data-validation, sparkline groups, ignored
+  errors, slicer refs, protected ranges, web extensions, and timeline refs.
+  This follows `ExtLstGlobalContext` instead of treating worksheet extensions
+  as display-only unknown XML.
   Chartsheet import preserves `ChartsheetFragment` properties, protection,
   chart sheet views, custom chart views, web publish items, and extension
   markers.
@@ -181,6 +188,12 @@ Landed owner modules:
   `WorksheetFragment::importOleObject` / `importControl`, preserving shape ids,
   relationship ids, linked/embedded markers, progIds, update/icon/autoload
   flags, control names, x14 object/control properties, and object anchors.
+- `xlsx/object_resources.rs`: worksheet object resource catalog for VML drawing
+  relationships, VML child images/legacy diagram text, embedded control
+  persistence parts, ActiveX binary children, typed `x14:formControlPr`
+  records, embedded OLE object binaries, and embedded package binaries. This
+  keeps worksheet XML object records separate from relationship-owned payloads,
+  matching Calc's worksheet helper/VML owner split.
 - `xlsx/sheet_relationships.rs`: typed worksheet relationship catalog for
   single-cell XML tables, named sheet views, slicers, timelines, worksheet sort
   maps, custom properties, printer settings, model3D relationships, and
@@ -1132,7 +1145,8 @@ Calc comments and controls are drawing-backed objects:
   and are finalized after ordinary comments
 - form controls preserve object type, drop style, macro/event metadata, linked
   cell/list-fill range, caption text, font, foreground/background colors, and
-  cell anchor
+  cell anchor; relationship-owned payloads preserve control persistence
+  binaries, ActiveX binary children, and typed `x14:formControlPr`
 - OLE/package objects preserve linked/embedded identity, relationship ids,
   preview/icon metadata, and embedded data bytes
 

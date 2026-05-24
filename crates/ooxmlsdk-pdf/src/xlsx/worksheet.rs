@@ -5,6 +5,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use super::comments::CommentsCatalog;
 use super::drawing::DrawingResourceCatalog;
+use super::object_resources::WorksheetObjectResourceCatalog;
 use super::page_settings::CalcPageSettings;
 use super::pivot::PivotTableCatalog;
 use super::query::QueryTableCatalog;
@@ -42,17 +43,11 @@ pub(crate) enum SheetType {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SheetResourceCatalog {
   pub(crate) drawings: Vec<DrawingResourceCatalog>,
-  pub(crate) vml_drawings: usize,
+  pub(crate) object_resources: WorksheetObjectResourceCatalog,
   pub(crate) comments: CommentsCatalog,
   pub(crate) tables: Vec<TableResourceCatalog>,
   pub(crate) pivot_tables: PivotTableCatalog,
   pub(crate) query_tables: QueryTableCatalog,
-  pub(crate) controls: usize,
-  pub(crate) control_properties: usize,
-  pub(crate) embedded_objects: usize,
-  pub(crate) embedded_packages: usize,
-  pub(crate) images: usize,
-  pub(crate) named_sheet_views: usize,
   pub(crate) relationships: SheetRelationshipCatalog,
 }
 
@@ -500,19 +495,14 @@ impl SheetResourceCatalog {
     let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
     let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
     let relationships = SheetRelationshipCatalog::from_worksheet_part(package, part)?;
+    let object_resources = WorksheetObjectResourceCatalog::from_worksheet_part(package, part)?;
     Ok(Self {
       drawings,
-      vml_drawings: part.vml_drawing_parts(package).count(),
+      object_resources,
       comments,
       tables,
       pivot_tables,
       query_tables,
-      controls: part.embedded_control_persistence_parts(package).count(),
-      control_properties: part.control_properties_parts(package).count(),
-      embedded_objects: part.embedded_object_parts(package).count(),
-      embedded_packages: part.embedded_package_parts(package).count(),
-      images: part.image_parts(package).count(),
-      named_sheet_views: part.named_sheet_views_parts(package).count(),
       relationships,
     })
   }
@@ -529,8 +519,7 @@ impl SheetResourceCatalog {
       .unwrap_or_default();
     Ok(Self {
       drawings,
-      vml_drawings: part.vml_drawing_parts(package).count(),
-      images: part.image_parts(package).count(),
+      object_resources: WorksheetObjectResourceCatalog::from_chartsheet_part(package, part),
       ..Self::default()
     })
   }

@@ -2,6 +2,7 @@ mod comments;
 mod display;
 mod drawing;
 mod import;
+mod object_resources;
 mod page_settings;
 mod pivot;
 mod print;

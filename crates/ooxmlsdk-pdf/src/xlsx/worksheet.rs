@@ -3,8 +3,14 @@ use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
+use super::comments::CommentsCatalog;
 use super::drawing::DrawingResourceCatalog;
 use super::page_settings::CalcPageSettings;
+use super::pivot::PivotTableCatalog;
+use super::query::QueryTableCatalog;
+use super::sheet_conditions::SheetConditionCatalog;
+use super::sheet_settings::SheetSettingsCatalog;
+use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
 use crate::error::Result;
 
@@ -34,11 +40,10 @@ pub(crate) enum SheetType {
 pub(crate) struct SheetResourceCatalog {
   pub(crate) drawings: Vec<DrawingResourceCatalog>,
   pub(crate) vml_drawings: usize,
-  pub(crate) comments: usize,
-  pub(crate) threaded_comments: usize,
+  pub(crate) comments: CommentsCatalog,
   pub(crate) tables: Vec<TableResourceCatalog>,
-  pub(crate) pivot_tables: usize,
-  pub(crate) query_tables: usize,
+  pub(crate) pivot_tables: PivotTableCatalog,
+  pub(crate) query_tables: QueryTableCatalog,
   pub(crate) controls: usize,
   pub(crate) control_properties: usize,
   pub(crate) embedded_objects: usize,
@@ -50,14 +55,15 @@ pub(crate) struct SheetResourceCatalog {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SheetMetrics {
   pub(crate) dimension: Option<String>,
+  pub(crate) settings: SheetSettingsCatalog,
+  pub(crate) views: SheetViewCatalog,
   pub(crate) format: SheetFormatModel,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
   pub(crate) row_breaks: Vec<PageBreakModel>,
   pub(crate) column_breaks: Vec<PageBreakModel>,
-  pub(crate) conditional_formats: usize,
-  pub(crate) data_validations: usize,
+  pub(crate) conditions: SheetConditionCatalog,
   pub(crate) protected_ranges: usize,
   pub(crate) scenarios: usize,
 }
@@ -116,9 +122,31 @@ pub(crate) struct CalcRow {
 pub(crate) struct CalcCell {
   pub(crate) reference: Option<String>,
   pub(crate) style_index: Option<u32>,
-  pub(crate) formula: Option<String>,
+  pub(crate) data_type: Option<x::CellValues>,
+  pub(crate) cell_meta_index: Option<u32>,
+  pub(crate) value_meta_index: Option<u32>,
+  pub(crate) show_phonetic: bool,
+  pub(crate) formula: Option<FormulaModel>,
   pub(crate) cached_value: Option<String>,
   pub(crate) display_text: String,
+  pub(crate) has_extensions: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FormulaModel {
+  pub(crate) formula_type: x::CellFormulaValues,
+  pub(crate) reference: Option<String>,
+  pub(crate) shared_index: Option<u32>,
+  pub(crate) text: String,
+  pub(crate) always_calculate_array: bool,
+  pub(crate) calculate_cell: bool,
+  pub(crate) data_table_2d: bool,
+  pub(crate) data_table_row: bool,
+  pub(crate) input1_deleted: bool,
+  pub(crate) input2_deleted: bool,
+  pub(crate) input1_reference: Option<String>,
+  pub(crate) input2_reference: Option<String>,
+  pub(crate) assigns_value_to_name: bool,
 }
 
 impl CalcSheet {
@@ -218,6 +246,8 @@ impl SheetMetrics {
         .sheet_dimension
         .as_ref()
         .map(|dimension| dimension.reference.clone()),
+      settings: SheetSettingsCatalog::from_worksheet(worksheet),
+      views: SheetViewCatalog::from_worksheet(worksheet),
       format: worksheet
         .sheet_format_properties
         .as_ref()
@@ -272,11 +302,7 @@ impl SheetMetrics {
             .collect()
         })
         .unwrap_or_default(),
-      conditional_formats: worksheet.conditional_formatting.len(),
-      data_validations: worksheet
-        .data_validations
-        .as_ref()
-        .map_or(0, |validations| validations.data_validation.len()),
+      conditions: SheetConditionCatalog::from_worksheet(worksheet),
       protected_ranges: worksheet
         .protected_ranges
         .as_ref()
@@ -363,14 +389,23 @@ impl SheetResourceCatalog {
       .iter()
       .map(|table| TableResourceCatalog::from_part(package, table))
       .collect::<Result<Vec<_>>>()?;
+    let comments_part = part.worksheet_comments_part(package);
+    let threaded_comment_parts = part
+      .worksheet_threaded_comments_parts(package)
+      .collect::<Vec<_>>();
+    let comments =
+      CommentsCatalog::from_worksheet_part(package, comments_part, threaded_comment_parts)?;
+    let pivot_table_parts = part.pivot_table_parts(package).collect::<Vec<_>>();
+    let pivot_tables = PivotTableCatalog::from_parts(package, &pivot_table_parts)?;
+    let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
+    let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
     Ok(Self {
       drawings,
       vml_drawings: part.vml_drawing_parts(package).count(),
-      comments: usize::from(part.worksheet_comments_part(package).is_some()),
-      threaded_comments: part.worksheet_threaded_comments_parts(package).count(),
+      comments,
       tables,
-      pivot_tables: part.pivot_table_parts(package).count(),
-      query_tables: part.query_table_parts(package).count(),
+      pivot_tables,
+      query_tables,
       controls: part.embedded_control_persistence_parts(package).count(),
       control_properties: part.control_properties_parts(package).count(),
       embedded_objects: part.embedded_object_parts(package).count(),
@@ -424,13 +459,40 @@ impl CalcCell {
     Self {
       reference: cell.cell_reference.as_ref().map(ToString::to_string),
       style_index: cell.style_index,
-      formula: cell
-        .cell_formula
-        .as_ref()
-        .and_then(|formula| formula.xml_content.as_deref())
-        .map(ToString::to_string),
+      data_type: cell.data_type,
+      cell_meta_index: cell.cell_meta_index,
+      value_meta_index: cell.value_meta_index,
+      show_phonetic: cell.show_phonetic.is_some_and(|value| value.as_bool()),
+      formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
       cached_value,
       display_text: cell_text(cell, shared_strings),
+      has_extensions: cell.extension_list.is_some(),
+    }
+  }
+}
+
+impl FormulaModel {
+  fn from_formula(formula: &x::CellFormula) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx and
+    // sheetdatabuffer.cxx. These fields decide whether the cell is imported
+    // as a normal formula, shared formula, array formula, or data-table
+    // operation. Token conversion is a later FormulaBuffer responsibility.
+    Self {
+      formula_type: formula.formula_type.unwrap_or_default(),
+      reference: formula.reference.clone(),
+      shared_index: formula.shared_index,
+      text: formula.xml_content.clone().unwrap_or_default(),
+      always_calculate_array: formula
+        .always_calculate_array
+        .is_some_and(|value| value.as_bool()),
+      calculate_cell: formula.calculate_cell.is_some_and(|value| value.as_bool()),
+      data_table_2d: formula.data_table2_d.is_some_and(|value| value.as_bool()),
+      data_table_row: formula.data_table_row.is_some_and(|value| value.as_bool()),
+      input1_deleted: formula.input1_deleted.is_some_and(|value| value.as_bool()),
+      input2_deleted: formula.input2_deleted.is_some_and(|value| value.as_bool()),
+      input1_reference: formula.r1.clone(),
+      input2_reference: formula.r2.clone(),
+      assigns_value_to_name: formula.bx.is_some_and(|value| value.as_bool()),
     }
   }
 }

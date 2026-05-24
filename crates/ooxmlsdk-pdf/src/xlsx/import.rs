@@ -4,6 +4,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 use crate::error::Result;
 
+use super::pivot::PivotCacheCatalog;
+use super::query::ConnectionsCatalog;
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::workbook::WorkbookFragment;
 use super::workbook_settings::WorkbookGlobals;
@@ -15,6 +17,8 @@ pub(crate) struct ExcelImport {
   pub(crate) sheets: Vec<CalcSheet>,
   pub(crate) shared_strings: Vec<String>,
   pub(crate) globals: WorkbookGlobals,
+  pub(crate) pivot_caches: PivotCacheCatalog,
+  pub(crate) connections: ConnectionsCatalog,
   pub(crate) styles: StylesCatalog,
   pub(crate) defined_names: DefinedNamesCatalog,
   pub(crate) workbook_resources: WorkbookResourceCatalog,
@@ -45,6 +49,9 @@ impl ExcelImport {
     let workbook_part = package.workbook_part()?;
     let workbook = workbook_part.root_element(package)?.clone();
     let globals = WorkbookGlobals::from_workbook(&workbook);
+    let pivot_caches = PivotCacheCatalog::from_workbook_part(package, &workbook_part, &workbook)?;
+    let connections =
+      ConnectionsCatalog::from_part(package, workbook_part.connections_part(package))?;
     let workbook_resources = WorkbookResourceCatalog::from_part(package, &workbook_part);
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
@@ -55,6 +62,8 @@ impl ExcelImport {
       sheets,
       shared_strings: fragment.shared_strings,
       globals,
+      pivot_caches,
+      connections,
       styles: fragment.styles,
       defined_names: fragment.defined_names,
       workbook_resources,

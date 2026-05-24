@@ -1,3 +1,5 @@
+use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+
 use crate::docx::PageSetup;
 use crate::layout::{self, LayoutDocument};
 
@@ -36,6 +38,113 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
     import.workbook_resources.pivot_cache_definitions,
     import.workbook_resources.workbook_persons
   )];
+
+  if !import.pivot_caches.caches.is_empty() {
+    let cache_fields = import
+      .pivot_caches
+      .caches
+      .iter()
+      .map(|cache| cache.cache_fields)
+      .sum::<usize>();
+    let cache_records = import
+      .pivot_caches
+      .caches
+      .iter()
+      .filter_map(|cache| cache.record_count)
+      .sum::<u32>();
+    let cache_flags = import
+      .pivot_caches
+      .caches
+      .iter()
+      .filter(|cache| {
+        cache.refresh_on_load
+          || cache.save_data.is_some()
+          || cache.invalid
+          || cache.has_records_part
+          || cache.has_cache_source
+          || cache.has_extensions
+      })
+      .count();
+    let cache_ref_len = import
+      .pivot_caches
+      .caches
+      .iter()
+      .map(|cache| {
+        cache
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + cache.workbook_cache_id.unwrap_or_default() as usize
+          + cache
+            .workbook_relationship_id
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + cache
+            .definition_relationship_id
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + cache.optional_child_count
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "pivotCaches caches={} fields={} records={} flags={} refLen={}",
+      import.pivot_caches.caches.len(),
+      cache_fields,
+      cache_records,
+      cache_flags,
+      cache_ref_len
+    ));
+  }
+
+  if !import.connections.connections.is_empty() {
+    let connection_flags = import
+      .connections
+      .connections
+      .iter()
+      .filter(|connection| {
+        connection.refresh_on_load
+          || connection.save_data.is_some()
+          || connection.has_database_properties
+          || connection.has_olap_properties
+          || connection.has_web_query_properties
+          || connection.has_text_properties
+          || connection.has_extensions
+      })
+      .count();
+    let parameter_count = import
+      .connections
+      .connections
+      .iter()
+      .map(|connection| connection.parameter_count)
+      .sum::<usize>();
+    let connection_ref_len = import
+      .connections
+      .connections
+      .iter()
+      .map(|connection| {
+        connection.id as usize
+          + connection.name.as_ref().map_or(0, |value| value.len())
+          + connection.connection_type.unwrap_or_default() as usize
+          + connection
+            .source_file
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + connection
+            .connection_file
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + connection.refreshed_version as usize
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "connections rel={} count={} flags={} parameters={} refLen={}",
+      import.connections.relationship_id.as_deref().unwrap_or(""),
+      import.connections.connections.len(),
+      connection_flags,
+      parameter_count,
+      connection_ref_len
+    ));
+  }
 
   if import.workbook_resources.has_styles {
     lines.push(format!(
@@ -283,11 +392,11 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
 
   if drawing_count > 0
     || sheet.resources.vml_drawings > 0
-    || sheet.resources.comments > 0
-    || sheet.resources.threaded_comments > 0
+    || sheet.resources.comments.legacy_count() > 0
+    || sheet.resources.comments.threaded_count() > 0
     || !sheet.resources.tables.is_empty()
-    || sheet.resources.pivot_tables > 0
-    || sheet.resources.query_tables > 0
+    || !sheet.resources.pivot_tables.tables.is_empty()
+    || !sheet.resources.query_tables.query_tables.is_empty()
   {
     lines.push(format!(
       "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={}",
@@ -297,11 +406,245 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       diagram_count,
       drawing_image_count,
       sheet.resources.vml_drawings,
-      sheet.resources.comments,
-      sheet.resources.threaded_comments,
+      sheet.resources.comments.legacy_count(),
+      sheet.resources.comments.threaded_count(),
       sheet.resources.tables.len(),
-      sheet.resources.pivot_tables,
-      sheet.resources.query_tables
+      sheet.resources.pivot_tables.tables.len(),
+      sheet.resources.query_tables.query_tables.len()
+    ));
+  }
+
+  if !sheet.resources.query_tables.query_tables.is_empty() {
+    let refresh_fields = sheet
+      .resources
+      .query_tables
+      .query_tables
+      .iter()
+      .map(|query| query.refresh_fields)
+      .sum::<usize>();
+    let deleted_fields = sheet
+      .resources
+      .query_tables
+      .query_tables
+      .iter()
+      .map(|query| query.deleted_fields)
+      .sum::<usize>();
+    let query_flags = sheet
+      .resources
+      .query_tables
+      .query_tables
+      .iter()
+      .map(|query| {
+        query.flag_count
+          + usize::from(query.has_sort_state)
+          + usize::from(query.has_refresh_extensions)
+          + usize::from(query.has_extensions)
+      })
+      .sum::<usize>();
+    let query_ref_len = sheet
+      .resources
+      .query_tables
+      .query_tables
+      .iter()
+      .map(|query| {
+        query
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + query.name.len()
+          + query.connection_id as usize
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "queryTables count={} refreshFields={} deletedFields={} flags={} refLen={}",
+      sheet.resources.query_tables.query_tables.len(),
+      refresh_fields,
+      deleted_fields,
+      query_flags,
+      query_ref_len
+    ));
+  }
+
+  if !sheet.resources.pivot_tables.tables.is_empty() {
+    let pivot_fields = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| pivot.pivot_fields)
+      .sum::<usize>();
+    let axis_fields = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| pivot.row_fields + pivot.column_fields + pivot.page_fields + pivot.data_fields)
+      .sum::<usize>();
+    let filters = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| pivot.filters)
+      .sum::<usize>();
+    let formats = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| pivot.formats)
+      .sum::<usize>();
+    let pivot_flags = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| {
+        pivot.flag_count
+          + usize::from(pivot.style_name.is_some())
+          + usize::from(pivot.has_cache_definition_part)
+          + usize::from(pivot.has_extensions)
+      })
+      .sum::<usize>();
+    let pivot_ref_len = sheet
+      .resources
+      .pivot_tables
+      .tables
+      .iter()
+      .map(|pivot| {
+        pivot
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + pivot.name.len()
+          + pivot.location_reference.len()
+          + pivot.cache_id as usize
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "pivots fields={} axisFields={} filters={} formats={} flags={} refLen={}",
+      pivot_fields, axis_fields, filters, formats, pivot_flags, pivot_ref_len
+    ));
+  }
+
+  if sheet.resources.comments.legacy_count() > 0 || sheet.resources.comments.threaded_count() > 0 {
+    let legacy_authors = sheet
+      .resources
+      .comments
+      .legacy
+      .as_ref()
+      .map_or(0, |legacy| legacy.authors.len());
+    let legacy_text_len = sheet
+      .resources
+      .comments
+      .legacy
+      .as_ref()
+      .map_or(0, |legacy| {
+        legacy
+          .comments
+          .iter()
+          .map(|comment| {
+            comment.reference.len()
+              + comment.author.as_ref().map_or(0, |author| author.len())
+              + comment.guid.as_ref().map_or(0, |guid| guid.len())
+              + comment.text.len()
+              + comment.shape_id.unwrap_or_default() as usize
+              + comment.author_id as usize
+              + comment.rich_runs
+              + comment.phonetic_runs
+              + usize::from(comment.has_comment_properties)
+          })
+          .sum()
+      });
+    let legacy_extensions = sheet
+      .resources
+      .comments
+      .legacy
+      .as_ref()
+      .is_some_and(|legacy| legacy.has_extensions);
+    let legacy_rel = sheet
+      .resources
+      .comments
+      .legacy
+      .as_ref()
+      .and_then(|legacy| legacy.relationship_id.as_deref())
+      .unwrap_or("");
+    let threaded_roots = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .flat_map(|threaded| &threaded.comments)
+      .filter(|comment| comment.parent_id.is_none())
+      .count();
+    let threaded_replies = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .flat_map(|threaded| &threaded.comments)
+      .filter(|comment| comment.parent_id.is_some())
+      .count();
+    let threaded_done = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .flat_map(|threaded| &threaded.comments)
+      .filter(|comment| comment.done)
+      .count();
+    let threaded_mentions = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .flat_map(|threaded| &threaded.comments)
+      .map(|comment| comment.mentions)
+      .sum::<usize>();
+    let threaded_text_len = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .flat_map(|threaded| &threaded.comments)
+      .map(|comment| {
+        comment.reference.as_ref().map_or(0, |value| value.len())
+          + comment.id.len()
+          + comment.parent_id.as_ref().map_or(0, |value| value.len())
+          + comment.person_id.len()
+          + comment.date_time.as_ref().map_or(0, |value| value.len())
+          + comment.text.as_ref().map_or(0, |value| value.len())
+          + usize::from(comment.has_extensions)
+      })
+      .sum::<usize>();
+    let threaded_extensions = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .filter(|threaded| threaded.has_extensions)
+      .count();
+    let threaded_rel_len = sheet
+      .resources
+      .comments
+      .threaded
+      .iter()
+      .map(|threaded| threaded.relationship_id.as_ref().map_or(0, |id| id.len()))
+      .sum::<usize>();
+    lines.push(format!(
+      "comments legacyAuthors={} legacyRel={} legacyExt={} legacyTextLen={} threadedParts={} threadedRoots={} threadedReplies={} threadedDone={} threadedMentions={} threadedExt={} threadedRelLen={} threadedTextLen={}",
+      legacy_authors,
+      legacy_rel,
+      legacy_extensions,
+      legacy_text_len,
+      sheet.resources.comments.threaded.len(),
+      threaded_roots,
+      threaded_replies,
+      threaded_done,
+      threaded_mentions,
+      threaded_extensions,
+      threaded_rel_len,
+      threaded_text_len
     ));
   }
 
@@ -411,13 +754,18 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
   }
 
   if sheet.metrics.dimension.is_some()
+    || sheet.metrics.settings.properties.code_name.is_some()
+    || sheet.metrics.settings.auto_filter.is_some()
+    || sheet.metrics.settings.sort_state.is_some()
+    || sheet.metrics.settings.protection.sheet
+    || !sheet.metrics.views.views.is_empty()
     || !sheet.metrics.columns.is_empty()
     || !sheet.metrics.merged_ranges.is_empty()
     || !sheet.metrics.hyperlinks.is_empty()
     || !sheet.metrics.row_breaks.is_empty()
     || !sheet.metrics.column_breaks.is_empty()
-    || sheet.metrics.conditional_formats > 0
-    || sheet.metrics.data_validations > 0
+    || !sheet.metrics.conditions.conditional_formats.is_empty()
+    || !sheet.metrics.conditions.data_validations.is_empty()
     || sheet.metrics.protected_ranges > 0
     || sheet.metrics.scenarios > 0
   {
@@ -521,9 +869,159 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       .iter()
       .map(|hyperlink| hyperlink.reference.len())
       .sum::<usize>();
+    let selected_views = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .filter(|view| view.tab_selected == Some(true))
+      .count();
+    let panes = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .filter(|view| view.pane.is_some())
+      .count();
+    let selections = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .map(|view| view.selections.len())
+      .sum::<usize>();
+    let pivot_selections = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .map(|view| view.pivot_selections)
+      .sum::<usize>();
+    let view_flags = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .filter(|view| {
+        view.window_protection.is_some()
+          || view.show_formulas.is_some()
+          || view.show_grid_lines.is_some()
+          || view.show_row_col_headers.is_some()
+          || view.show_zeros.is_some()
+          || view.right_to_left.is_some()
+          || view.show_outline_symbols.is_some()
+          || view.default_grid_color.is_some()
+          || view.has_extensions
+      })
+      .count();
+    let view_ref_len = sheet
+      .metrics
+      .views
+      .views
+      .iter()
+      .map(|view| {
+        view.top_left_cell.as_ref().map_or(0, |value| value.len())
+          + view.color_id.unwrap_or_default() as usize
+          + view.zoom_scale.unwrap_or_default() as usize
+          + view.zoom_scale_normal.unwrap_or_default() as usize
+          + view.zoom_scale_sheet_layout_view.unwrap_or_default() as usize
+          + view.zoom_scale_page_layout_view.unwrap_or_default() as usize
+          + view.workbook_view_id as usize
+          + usize::from(view.view_type.is_some())
+          + view.pane.as_ref().map_or(0, |pane| {
+            pane.top_left_cell.as_ref().map_or(0, |value| value.len())
+              + pane.horizontal_split.unwrap_or_default() as usize
+              + pane.vertical_split.unwrap_or_default() as usize
+              + usize::from(pane.active_pane.is_some())
+              + usize::from(pane.state.is_some())
+          })
+          + view
+            .selections
+            .iter()
+            .map(|selection| {
+              selection
+                .active_cell
+                .as_ref()
+                .map_or(0, |value| value.len())
+                + selection.active_cell_id.unwrap_or_default() as usize
+                + selection.sequence_of_references.len()
+                + usize::from(selection.pane.is_some())
+            })
+            .sum::<usize>()
+      })
+      .sum::<usize>();
+    let settings = &sheet.metrics.settings;
+    let property_flags = usize::from(settings.properties.filter_mode)
+      + usize::from(settings.properties.published.is_some())
+      + usize::from(settings.properties.sync_horizontal.is_some())
+      + usize::from(settings.properties.sync_vertical.is_some())
+      + usize::from(settings.properties.sync_reference.is_some())
+      + usize::from(settings.properties.transition_evaluation.is_some())
+      + usize::from(settings.properties.transition_entry.is_some())
+      + usize::from(
+        settings
+          .properties
+          .enable_format_conditions_calculation
+          .is_some(),
+      )
+      + usize::from(settings.properties.has_tab_color)
+      + usize::from(settings.properties.outline.apply_styles)
+      + usize::from(settings.properties.outline.summary_below.is_some())
+      + usize::from(settings.properties.outline.summary_right.is_some())
+      + usize::from(settings.properties.outline.show_outline_symbols.is_some())
+      + usize::from(settings.properties.page_setup.auto_page_breaks.is_some())
+      + usize::from(settings.properties.page_setup.fit_to_page);
+    let protection_flags = usize::from(settings.protection.has_password)
+      + usize::from(settings.protection.has_hash)
+      + usize::from(settings.protection.algorithm_name.is_some())
+      + usize::from(settings.protection.spin_count.is_some())
+      + usize::from(settings.protection.sheet)
+      + usize::from(settings.protection.objects)
+      + usize::from(settings.protection.scenarios)
+      + settings.protection.locked_options
+      + usize::from(settings.protection.unlocked_selection)
+      + usize::from(settings.protection.locked_selection);
+    let auto_filter_columns = settings
+      .auto_filter
+      .as_ref()
+      .map_or(0, |auto_filter| auto_filter.filter_columns);
+    let auto_filter_flags = settings.auto_filter.as_ref().map_or(0, |auto_filter| {
+      usize::from(auto_filter.reference.is_some())
+        + usize::from(auto_filter.sort_state.is_some())
+        + usize::from(auto_filter.has_extensions)
+    });
+    let sort_flags = settings
+      .sort_state
+      .as_ref()
+      .map_or(0, sort_state_flag_count)
+      + settings
+        .auto_filter
+        .as_ref()
+        .and_then(|auto_filter| auto_filter.sort_state.as_ref())
+        .map_or(0, sort_state_flag_count);
     lines.push(format!(
-      "sheet metrics dimension={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} merges={} hyperlinks={} hyperlinkRels={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
+      "sheet metrics dimension={} settingsCode={} propertyFlags={} protectionFlags={} autoFilterColumns={} autoFilterFlags={} sortFlags={} views={} selectedViews={} panes={} selections={} pivotSelections={} viewFlags={} viewExt={} viewRefLen={} baseColWidth={} defaultColWidth={} defaultRowHeight={} customHeight={} zeroHeight={} thickTop={} thickBottom={} columns={} columnSpans={} hiddenColumns={} styledColumns={} customWidthColumns={} bestFitColumns={} collapsedColumns={} phoneticColumns={} maxOutline={} widthSum={} merges={} hyperlinks={} hyperlinkRels={} localHyperlinks={} displayedHyperlinks={} hyperlinkRefLen={} rowBreaks={} colBreaks={} manualBreaks={} pivotBreaks={} breakExtentSum={} condFmt={} validations={} protectedRanges={} scenarios={}",
       sheet.metrics.dimension.as_deref().unwrap_or(""),
+      sheet
+        .metrics
+        .settings
+        .properties
+        .code_name
+        .as_deref()
+        .unwrap_or(""),
+      property_flags,
+      protection_flags,
+      auto_filter_columns,
+      auto_filter_flags,
+      sort_flags,
+      sheet.metrics.views.views.len(),
+      selected_views,
+      panes,
+      selections,
+      pivot_selections,
+      view_flags,
+      sheet.metrics.views.has_extensions,
+      view_ref_len,
       sheet
         .metrics
         .format
@@ -560,10 +1058,228 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       manual_breaks,
       pivot_breaks,
       break_extent_sum,
-      sheet.metrics.conditional_formats,
-      sheet.metrics.data_validations,
+      sheet.metrics.conditions.conditional_formats.len(),
+      sheet.metrics.conditions.data_validations.len(),
       sheet.metrics.protected_ranges,
       sheet.metrics.scenarios
+    ));
+  }
+
+  if !sheet.metrics.conditions.conditional_formats.is_empty()
+    || !sheet.metrics.conditions.data_validations.is_empty()
+  {
+    let cf_rules = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .map(|format| format.rules.len())
+      .sum::<usize>();
+    let cf_formulas = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .flat_map(|conditional_format| &conditional_format.rules)
+      .map(|rule| rule.formulas.len())
+      .sum::<usize>();
+    let cf_extensions = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .filter(|format| format.has_extensions)
+      .count()
+      + sheet
+        .metrics
+        .conditions
+        .conditional_formats
+        .iter()
+        .flat_map(|format| &format.rules)
+        .filter(|rule| rule.has_extensions)
+        .count();
+    let cf_visual_rules = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .flat_map(|conditional_format| &conditional_format.rules)
+      .filter(|rule| rule.has_color_scale || rule.has_data_bar || rule.has_icon_set)
+      .count();
+    let cf_pivot = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .filter(|format| format.pivot)
+      .count();
+    let cf_ref_count = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .map(|conditional_format| conditional_format.sequence_of_references.len())
+      .sum::<usize>();
+    let cf_priority_sum = sheet
+      .metrics
+      .conditions
+      .conditional_formats
+      .iter()
+      .flat_map(|conditional_format| &conditional_format.rules)
+      .map(|rule| {
+        rule.priority as i64
+          + rule.format_id.unwrap_or_default() as i64
+          + rule.rank.unwrap_or_default() as i64
+          + rule.std_dev.unwrap_or_default() as i64
+          + i64::from(rule.stop_if_true)
+          + i64::from(rule.operator.is_some())
+          + i64::from(rule.time_period.is_some())
+          + i64::from(rule.text.is_some())
+          + format!("{:?}", rule.rule_type).len() as i64
+      })
+      .sum::<i64>();
+    let validation_formulas = sheet
+      .metrics
+      .conditions
+      .data_validations
+      .iter()
+      .filter(|validation| validation.formula1.is_some() || validation.formula2.is_some())
+      .count();
+    let validation_messages = sheet
+      .metrics
+      .conditions
+      .data_validations
+      .iter()
+      .filter(|validation| {
+        validation.error_title.is_some()
+          || validation.error.is_some()
+          || validation.prompt_title.is_some()
+          || validation.prompt.is_some()
+      })
+      .count();
+    let validation_lists = sheet
+      .metrics
+      .conditions
+      .data_validations
+      .iter()
+      .filter(|validation| validation.list.is_some())
+      .count();
+    let validation_flags = sheet
+      .metrics
+      .conditions
+      .data_validations
+      .iter()
+      .filter(|validation| {
+        validation.allow_blank
+          || validation.no_drop_down
+          || validation.show_input_message
+          || validation.show_error_message
+          || validation.error_style.is_some()
+          || validation.ime_mode.is_some()
+          || validation.operator.is_some()
+          || validation.validation_type.is_some()
+      })
+      .count();
+    let validation_ref_count = sheet
+      .metrics
+      .conditions
+      .data_validations
+      .iter()
+      .map(|validation| validation.sequence_of_references.len())
+      .sum::<usize>();
+    lines.push(format!(
+      "conditions cf={} cfRules={} cfFormulas={} cfVisual={} cfPivot={} cfRefs={} cfExt={} cfPrioritySum={} validations={} validationRefs={} validationFormulas={} validationLists={} validationMessages={} validationFlags={} disablePrompts={} validationWindow={}",
+      sheet.metrics.conditions.conditional_formats.len(),
+      cf_rules,
+      cf_formulas,
+      cf_visual_rules,
+      cf_pivot,
+      cf_ref_count,
+      cf_extensions,
+      cf_priority_sum,
+      sheet.metrics.conditions.data_validations.len(),
+      validation_ref_count,
+      validation_formulas,
+      validation_lists,
+      validation_messages,
+      validation_flags,
+      sheet.metrics.conditions.validations_disable_prompts,
+      sheet
+        .metrics
+        .conditions
+        .validation_window
+        .map_or(String::new(), |(x, y)| format!("{x},{y}"))
+    ));
+  }
+
+  let formula_cells = sheet
+    .rows
+    .iter()
+    .flat_map(|row| &row.cells)
+    .filter_map(|cell| cell.formula.as_ref())
+    .collect::<Vec<_>>();
+  if !formula_cells.is_empty() {
+    let shared = formula_cells
+      .iter()
+      .filter(|formula| formula.formula_type == x::CellFormulaValues::Shared)
+      .count();
+    let arrays = formula_cells
+      .iter()
+      .filter(|formula| formula.formula_type == x::CellFormulaValues::Array)
+      .count();
+    let data_tables = formula_cells
+      .iter()
+      .filter(|formula| formula.formula_type == x::CellFormulaValues::DataTable)
+      .count();
+    let normal = formula_cells
+      .iter()
+      .filter(|formula| formula.formula_type == x::CellFormulaValues::Normal)
+      .count();
+    let shared_ids = formula_cells
+      .iter()
+      .filter(|formula| formula.shared_index.is_some())
+      .count();
+    let references = formula_cells
+      .iter()
+      .filter(|formula| formula.reference.is_some())
+      .count();
+    let formula_flags = formula_cells
+      .iter()
+      .filter(|formula| {
+        formula.always_calculate_array
+          || formula.calculate_cell
+          || formula.data_table_2d
+          || formula.data_table_row
+          || formula.input1_deleted
+          || formula.input2_deleted
+          || formula.assigns_value_to_name
+      })
+      .count();
+    let formula_text_len = formula_cells
+      .iter()
+      .map(|formula| {
+        formula.text.len()
+          + formula
+            .input1_reference
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + formula
+            .input2_reference
+            .as_ref()
+            .map_or(0, |value| value.len())
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "formulas total={} normal={} shared={} arrays={} dataTables={} sharedIds={} refs={} flags={} textLen={}",
+      formula_cells.len(),
+      normal,
+      shared,
+      arrays,
+      data_tables,
+      shared_ids,
+      references,
+      formula_flags,
+      formula_text_len
     ));
   }
 
@@ -586,6 +1302,21 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
         }
         if let Some(style_index) = cell.style_index {
           parts.push(format!("s={style_index}"));
+        }
+        if let Some(data_type) = cell.data_type {
+          parts.push(format!("t={data_type:?}"));
+        }
+        if let Some(cell_meta_index) = cell.cell_meta_index {
+          parts.push(format!("cm={cell_meta_index}"));
+        }
+        if let Some(value_meta_index) = cell.value_meta_index {
+          parts.push(format!("vm={value_meta_index}"));
+        }
+        if cell.show_phonetic {
+          parts.push("ph".to_string());
+        }
+        if cell.has_extensions {
+          parts.push("ext".to_string());
         }
         if parts.is_empty() || text.is_empty() {
           text
@@ -610,4 +1341,13 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
   }
 
   lines
+}
+
+fn sort_state_flag_count(sort_state: &super::sheet_settings::SortStateModel) -> usize {
+  sort_state.reference.len()
+    + usize::from(sort_state.column_sort)
+    + usize::from(sort_state.case_sensitive)
+    + usize::from(sort_state.sort_method.is_some())
+    + usize::from(sort_state.has_sort_condition)
+    + usize::from(sort_state.has_extensions)
 }

@@ -139,6 +139,12 @@ Landed owner modules:
 
 - `xlsx/import.rs`: `ExcelImport` entry plus workbook resource catalog from
   typed `WorkbookPart` children.
+- `xlsx/comments.rs`: typed legacy worksheet comments and threaded comments
+  catalogs. Legacy comments preserve authors, note references, author ids,
+  GUIDs, shape ids, rich/phonetic run counts, text, and comment properties;
+  threaded comments preserve flat root/reply ids, parent ids, person ids,
+  timestamps, done state, text, mentions, and extension markers for later
+  attachment to legacy notes.
 - `xlsx/workbook.rs`: workbook sheet-order traversal through
   `workbook.sheets.sheet`, relationship id matching to typed sheet parts, and
   the first `finalizeImport` ordering for styles, shared strings, and defined
@@ -160,16 +166,43 @@ Landed owner modules:
   page settings, worksheet/chartsheet resource catalogs, and first
   `WorksheetFragment`-shaped sheet metrics: dimension, `sheetFormatPr`,
   column spans, merged ranges, hyperlinks, row/column page breaks,
-  conditional-format/data-validation/protected-range/scenario counts.
+  conditional-format/data-validation/protected-range/scenario counts. Cell
+  import now preserves typed formula state for normal/shared/array/data-table
+  formulas, shared ids, formula refs, calculation flags, data-table inputs,
+  cached values, cell/value metadata, phonetic flags, and extension markers.
 - `xlsx/drawing.rs`: typed drawing/chart resource catalog from `DrawingsPart`,
   `ChartPart`, and `ExtendedChartPart` child relationships.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
   worksheet/chartsheet page setup import.
+- `xlsx/pivot.rs`: typed pivot cache and pivot table catalogs. Workbook cache
+  definitions preserve workbook cache ids/relationships, cache field counts,
+  record counts, refresh/save/invalid flags, records part presence, optional
+  cache children, and extension markers. Worksheet pivot tables preserve
+  name/cache id/location/style, field buckets, filters, formats, cache
+  definition relationships, flags, and extension markers.
+- `xlsx/query.rs`: typed workbook connections and worksheet query-table
+  catalogs. Connections preserve ids, names, source/connection files, refresh
+  flags, database/OLAP/web/text property markers, parameters, and extensions;
+  query tables preserve names, connection ids, refresh field counts, deleted
+  fields, sort state, formatting/refresh flags, and extension markers.
 - `xlsx/print.rs`: first `ScPrintFunc`-shaped `CalcPrintDocument` /
   `CalcPrintPage` owner before display lowering, with built-in defined-name
   print inputs attached to print pages as structured records. Range extraction
   remains pending on the Calc formula parser owner, matching LibreOffice's
   `DefinedName::convertFormula` path instead of parsing formulas in display.
+- `xlsx/sheet_conditions.rs`: typed `CondFormatBuffer` /
+  `DataValidationsContext` inputs for conditional-format sqrefs, pivot flags,
+  rule type/priority/dxf/operator/time/text/formulas, color scale/data bar/icon
+  set markers, validation type/operator/error/prompt/list/formulas, prompt
+  suppression, and validation window coordinates.
+- `xlsx/sheet_settings.rs`: typed `WorksheetSettings` and
+  `AutoFilterBuffer` inputs for `sheetPr`, outline/page setup properties,
+  sheet protection flags, auto-filter refs/filter column counts, and sheet or
+  auto-filter sort state markers.
+- `xlsx/sheet_view.rs`: typed `SheetViewSettings` inputs for worksheet views,
+  pane splits, active pane/state, selections, pivot selections, zooms,
+  top-left cells, selected/right-to-left/grid/header/zero/formula flags, and
+  extension markers.
 - `xlsx/display.rs`: temporary observation bridge to `LayoutDocument`.
 
 `convert_xlsx` now opens packages with MCE processing settings aligned with the

@@ -1,8 +1,14 @@
+mod comments;
 mod display;
 mod drawing;
 mod import;
 mod page_settings;
+mod pivot;
 mod print;
+mod query;
+mod sheet_conditions;
+mod sheet_settings;
+mod sheet_view;
 mod styles;
 mod table;
 mod workbook;

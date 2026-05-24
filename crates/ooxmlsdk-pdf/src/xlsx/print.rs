@@ -125,18 +125,7 @@ impl<'a> CalcPrintDocument<'a> {
     let mut pages = Vec::new();
     let mut skipped_empty_pages = 0usize;
     let mut document_top_down = true;
-    let any_selected_visible_sheet = import
-      .sheets
-      .iter()
-      .any(|sheet| sheet.visible() && sheet.selected());
-    for sheet in import.sheets.iter().filter(|sheet| {
-      sheet.visible()
-        && if any_selected_visible_sheet {
-          sheet.selected()
-        } else {
-          sheet.active
-        }
-    }) {
+    for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
@@ -164,7 +153,10 @@ impl<'a> CalcPrintDocument<'a> {
           repeat_corner_for_page(named_ranges.repeat_rows, named_ranges.repeat_columns)
             .map(|area| print_cells_for_area(import, sheet, area, true))
             .unwrap_or_default();
-        let empty = all_cells.is_empty();
+        let drawing_summary = drawing_summary_for_area(sheet, area);
+        let empty = all_cells.is_empty()
+          && drawing_summary.printable == 0
+          && !sheet.page_settings.header_footer.has_print_content();
         if scale.skip_empty && empty {
           skipped_empty_pages += 1;
           continue;
@@ -201,7 +193,7 @@ impl<'a> CalcPrintDocument<'a> {
           empty,
           merged_ranges,
           explicit_print_area,
-          drawing_summary: drawing_summary_for_area(sheet, area),
+          drawing_summary: drawing_summary.clone(),
           scale_mode: scale.mode,
           auto_page_columns: scale.auto_page_columns,
           auto_page_rows: scale.auto_page_rows,
@@ -210,7 +202,7 @@ impl<'a> CalcPrintDocument<'a> {
           paint_ops: paint_ops_for_page(
             named_ranges.repeat_columns.is_some(),
             named_ranges.repeat_rows.is_some(),
-            drawing_summary_for_area(sheet, area).anchors > 0,
+            drawing_summary.anchors > 0,
             sheet.page_settings.print_grid_lines,
           ),
         });
@@ -349,7 +341,7 @@ fn print_scale_state(
     auto_page_rows,
     forced_break_min_pages,
     tdf103516_adjusted,
-    skip_empty: false,
+    skip_empty: true,
     top_down: matches!(
       sheet.page_settings.page_order,
       Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageOrderValues::DownThenOver)
@@ -605,6 +597,9 @@ fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> Ce
     if row_index < range.start.row || row_index > range.end.row || row.hidden {
       continue;
     }
+    let Some(row_last_print_col) = row_last_print_data_col(row, range) else {
+      continue;
+    };
     for (cell_position, cell) in row.cells.iter().enumerate() {
       if cell.display_text.is_empty() || cell.display_text.parse::<f64>().is_ok() {
         continue;
@@ -614,6 +609,9 @@ fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> Ce
         row: row_index,
       });
       if address.col < range.start.col || address.col > range.end.col {
+        continue;
+      }
+      if address.col != row_last_print_col {
         continue;
       }
       if row_cell_has_print_data_at(row, address.col + 1) {
@@ -640,6 +638,28 @@ fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> Ce
     }
   }
   range
+}
+
+fn row_last_print_data_col(row: &CalcRow, range: CellRange) -> Option<u32> {
+  row
+    .cells
+    .iter()
+    .enumerate()
+    .filter_map(|(cell_position, cell)| {
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row.row_index.unwrap_or(1),
+      });
+      (address.col >= range.start.col
+        && address.col <= range.end.col
+        && (!cell.display_text.is_empty()
+          || !cell.rich_text_runs.is_empty()
+          || cell.formula.is_some()
+          || cell.cached_value.is_some()
+          || cell.data_type.is_some()))
+      .then_some(address.col)
+    })
+    .max()
 }
 
 fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
@@ -1071,22 +1091,67 @@ fn conditional_reference_values(
 }
 
 fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> String {
-  if !is_pivot_table_cell(sheet, address) {
+  let Some(pivot) = pivot_table_for_cell(sheet, address) else {
+    if !sheet.resources.pivot_tables.tables.is_empty() && text == "(blank)" {
+      return "(empty)".to_string();
+    }
     return text;
-  }
-  // Source: LibreOffice DataPilot output uses STR_PIVOT_TOTAL ("Total Result")
-  // for Calc-rendered grand totals after OOXML pivot import.
+  };
+  // Source: LibreOffice sc/source/core/data/dpoutput.cxx emits DataPilot
+  // field/member result captions from the imported pivot source instead of
+  // keeping Excel's persisted generic "Row Labels"/"(blank)" strings.
   match text.as_str() {
-    "Grand Total" | "Total general" => "Total Result".to_string(),
-    _ => text,
+    "Grand Total" => {
+      if pivot.formats == 0 {
+        "Total Result".to_string()
+      } else {
+        text
+      }
+    }
+    "Total general" => "Total Result".to_string(),
+    "Total" => pivot
+      .data_field_names
+      .first()
+      .cloned()
+      .unwrap_or_else(|| text),
+    "Row Labels" => pivot_row_label_text(pivot).unwrap_or(text),
+    "Column Labels" => pivot_column_label_text(pivot).unwrap_or(text),
+    "(blank)" => "(empty)".to_string(),
+    _ => {
+      if let Some(prefix) = text
+        .strip_suffix(" Total")
+        .filter(|prefix| !prefix.is_empty())
+      {
+        format!("{prefix} Result")
+      } else {
+        text
+      }
+    }
   }
 }
 
-fn is_pivot_table_cell(sheet: &CalcSheet, address: CellAddress) -> bool {
-  sheet.resources.pivot_tables.tables.iter().any(|pivot| {
+fn pivot_table_for_cell(
+  sheet: &CalcSheet,
+  address: CellAddress,
+) -> Option<&super::pivot::PivotTableModel> {
+  sheet.resources.pivot_tables.tables.iter().find(|pivot| {
     CellRange::parse_a1_range(&pivot.location_reference)
       .is_some_and(|range| range.contains(address))
   })
+}
+
+fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {
+  if pivot.row_field_names.is_empty() {
+    return None;
+  }
+  if pivot.compact && pivot.row_field_names.len() > 1 {
+    return None;
+  }
+  Some(pivot.row_field_names.join(" "))
+}
+
+fn pivot_column_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {
+  (!pivot.column_field_names.is_empty()).then(|| pivot.column_field_names.join(" "))
 }
 
 fn rendered_number_text(
@@ -1145,6 +1210,9 @@ fn rendered_number_text(
   }
   let format = NumberFormatPattern::parse(format_code, value);
   if format.date_time {
+    if let Some(text) = render_elapsed_date_time(value, format_code) {
+      return (text, NumberFormatRenderState::DateTime);
+    }
     return (
       format_serial_date_time(value, format_code, date_1904),
       NumberFormatRenderState::DateTime,
@@ -1721,6 +1789,149 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
   render_date_time_format(code, year, month, day, hour, minute, second)
+}
+
+fn render_elapsed_date_time(value: f64, code: &str) -> Option<String> {
+  let clean = strip_number_format_markers(code);
+  let lower = clean.to_ascii_lowercase();
+  let elapsed = if lower.contains("[hh]") {
+    ElapsedDateTimeUnit::Hour
+  } else if lower.contains("[mm]") {
+    ElapsedDateTimeUnit::Minute
+  } else if lower.contains("[ss]") {
+    ElapsedDateTimeUnit::Second
+  } else {
+    return None;
+  };
+  let total_seconds = value.abs() * 86_400.0;
+  let rounded_seconds = total_seconds.round() as i64;
+  let sign = if value.is_sign_negative() { "-" } else { "" };
+  let total_hours = rounded_seconds / 3_600;
+  let total_minutes = rounded_seconds / 60;
+  let seconds = rounded_seconds % 60;
+  let minutes = (rounded_seconds / 60) % 60;
+  let hours = (rounded_seconds / 3_600) % 24;
+  let mut output = String::new();
+  output.push_str(sign);
+  let mut rest = clean.as_str();
+  let mut bracket_written = false;
+  while let Some(ch) = rest.chars().next() {
+    let lower_rest = rest.to_ascii_lowercase();
+    if lower_rest.starts_with("[hh]") {
+      output.push_str(&total_hours.to_string());
+      rest = &rest[4..];
+      bracket_written = true;
+    } else if lower_rest.starts_with("[mm]") {
+      output.push_str(&total_minutes.to_string());
+      rest = &rest[4..];
+      bracket_written = true;
+    } else if lower_rest.starts_with("[ss]") {
+      let consumed = render_elapsed_second_token(rest, total_seconds, &mut output);
+      rest = &rest[consumed..];
+      bracket_written = true;
+    } else if ch == 'h' || ch == 'H' {
+      let count = repeated_char_count(rest, ch);
+      if bracket_written {
+        output.push_str(&format_padded_number(hours, count));
+      }
+      rest = &rest[count..];
+    } else if ch == 'm' || ch == 'M' {
+      let count = repeated_char_count(rest, ch);
+      if bracket_written {
+        output.push_str(&format_padded_number(minutes, count));
+      }
+      rest = &rest[count..];
+    } else if ch == 's' || ch == 'S' {
+      let count = repeated_char_count(rest, ch);
+      if bracket_written {
+        output.push_str(&format_padded_number(seconds, count));
+      }
+      rest = &rest[count..];
+    } else if ch == '"' {
+      let consumed = push_quoted_number_format_literal(rest, &mut output);
+      rest = &rest[consumed..];
+    } else if ch == '\\' {
+      let consumed = push_escaped_number_format_literal(rest, &mut output);
+      rest = &rest[consumed..];
+    } else if matches!(ch, '_' | '*') {
+      rest = rest.get(ch.len_utf8() * 2..).unwrap_or("");
+    } else {
+      output.push(ch);
+      rest = &rest[ch.len_utf8()..];
+    }
+  }
+  if elapsed == ElapsedDateTimeUnit::Second || bracket_written {
+    Some(output)
+  } else {
+    None
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ElapsedDateTimeUnit {
+  Hour,
+  Minute,
+  Second,
+}
+
+fn render_elapsed_second_token(rest: &str, total_seconds: f64, output: &mut String) -> usize {
+  let mut consumed = 4usize;
+  if let Some(fraction) = rest
+    .get(consumed..)
+    .and_then(|suffix| suffix.strip_prefix('.'))
+  {
+    let decimals = fraction
+      .chars()
+      .take_while(|ch| matches!(ch, '0' | '#' | '?'))
+      .count();
+    if decimals > 0 {
+      output.push_str(&format!("{total_seconds:.decimals$}"));
+      consumed += 1 + decimals;
+      return consumed;
+    }
+  }
+  output.push_str(&(total_seconds.round() as i64).to_string());
+  consumed
+}
+
+fn repeated_char_count(value: &str, first: char) -> usize {
+  value
+    .chars()
+    .take_while(|ch| ch.eq_ignore_ascii_case(&first))
+    .map(char::len_utf8)
+    .sum()
+}
+
+fn format_padded_number(value: i64, width: usize) -> String {
+  if width >= 2 {
+    format!("{value:02}")
+  } else {
+    value.to_string()
+  }
+}
+
+fn push_quoted_number_format_literal(rest: &str, output: &mut String) -> usize {
+  let mut consumed = 1usize;
+  for ch in rest[1..].chars() {
+    consumed += ch.len_utf8();
+    if ch == '"' {
+      return consumed;
+    }
+    output.push(ch);
+  }
+  consumed
+}
+
+fn push_escaped_number_format_literal(rest: &str, output: &mut String) -> usize {
+  let mut chars = rest.chars();
+  let Some(first) = chars.next() else {
+    return 0;
+  };
+  let Some(second) = chars.next() else {
+    return first.len_utf8();
+  };
+  output.push(second);
+  first.len_utf8() + second.len_utf8()
 }
 
 fn fraction_placeholder_count(section: &str) -> Option<usize> {

@@ -47,6 +47,10 @@ pub(crate) struct PivotTableModel {
   pub(crate) data_fields: usize,
   pub(crate) filters: usize,
   pub(crate) formats: usize,
+  pub(crate) compact: bool,
+  pub(crate) row_field_names: Vec<String>,
+  pub(crate) column_field_names: Vec<String>,
+  pub(crate) data_field_names: Vec<String>,
   pub(crate) has_cache_definition_part: bool,
   pub(crate) has_extensions: bool,
   pub(crate) flag_count: usize,
@@ -132,8 +136,15 @@ impl PivotTableCatalog {
 
 impl PivotTableModel {
   fn from_part(package: &mut SpreadsheetDocument, part: &PivotTablePart) -> Result<Self> {
-    let has_cache_definition_part = part.pivot_table_cache_definition_part(package).is_some();
+    let cache_field_names = {
+      part
+        .pivot_table_cache_definition_part(package)
+        .and_then(|part| part.root_element(package).ok())
+        .map(|cache| pivot_cache_field_names(cache))
+        .unwrap_or_default()
+    };
     let definition = part.root_element(package)?;
+    let has_cache_definition_part = !cache_field_names.is_empty();
     Ok(Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
       name: definition.name.clone(),
@@ -172,11 +183,72 @@ impl PivotTableModel {
         .formats
         .as_ref()
         .map_or(0, |formats| formats.format.len()),
+      compact: definition.compact.is_none_or(|value| value.as_bool()),
+      row_field_names: row_field_names(definition.row_fields.as_ref(), &cache_field_names),
+      column_field_names: column_field_names(definition.column_fields.as_ref(), &cache_field_names),
+      data_field_names: data_field_names(definition.data_fields.as_ref(), &cache_field_names),
       has_cache_definition_part,
       has_extensions: definition.pivot_table_definition_extension_list.is_some(),
       flag_count: pivot_table_flag_count(definition),
     })
   }
+}
+
+fn pivot_cache_field_names(cache: &x::PivotCacheDefinition) -> Vec<String> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| field.caption.clone().unwrap_or_else(|| field.name.clone()))
+    .collect()
+}
+
+fn row_field_names(fields: Option<&x::RowFields>, cache_field_names: &[String]) -> Vec<String> {
+  fields
+    .map(|fields| {
+      fields
+        .field
+        .iter()
+        .filter_map(|field| usize::try_from(field.index).ok())
+        .filter_map(|index| cache_field_names.get(index).cloned())
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn column_field_names(
+  fields: Option<&x::ColumnFields>,
+  cache_field_names: &[String],
+) -> Vec<String> {
+  fields
+    .map(|fields| {
+      fields
+        .field
+        .iter()
+        .filter_map(|field| usize::try_from(field.index).ok())
+        .filter_map(|index| cache_field_names.get(index).cloned())
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn data_field_names(fields: Option<&x::DataFields>, cache_field_names: &[String]) -> Vec<String> {
+  fields
+    .map(|fields| {
+      fields
+        .data_field
+        .iter()
+        .map(|field| {
+          field
+            .name
+            .clone()
+            .or_else(|| cache_field_names.get(field.field as usize).cloned())
+            .unwrap_or_default()
+        })
+        .filter(|name| !name.is_empty())
+        .collect()
+    })
+    .unwrap_or_default()
 }
 
 fn pivot_table_flag_count(definition: &x::PivotTableDefinition) -> usize {

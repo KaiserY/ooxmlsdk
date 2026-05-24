@@ -300,15 +300,6 @@ impl CalcSheet {
       )
   }
 
-  pub(crate) fn selected(&self) -> bool {
-    self
-      .metrics
-      .views
-      .views
-      .iter()
-      .any(|view| view.tab_selected.unwrap_or(false))
-  }
-
   pub(crate) fn used_range(&self) -> Option<CellRange> {
     let mut used: Option<CellRange> = None;
     for (row_position, row) in self.rows.iter().enumerate() {

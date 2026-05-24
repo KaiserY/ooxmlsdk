@@ -322,7 +322,6 @@ fn calc_row_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
     || next.pdf_text_segmentation != PdfTextSegmentation::Line
     || current.preserve_text_portion
     || next.preserve_text_portion
-    || current.style != next.style
     || (current.y_pt - next.y_pt).abs() >= 0.01
     || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
   {
@@ -399,43 +398,53 @@ fn render_cell_rich_text(
   base_style: TextStyle,
   hyperlink_url: Option<String>,
 ) {
-  let mut x_pt = rect.x_pt + XLSX_CELL_TEXT_INSET_PT;
-  let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
+  let mut text = String::new();
+  let mut style = base_style;
+  let mut style_initialized = false;
   for run in runs.iter().filter(|run| !run.text.is_empty()) {
-    let mut style = base_style.clone();
-    if let Some(font_size_pt) = run.font_size_pt {
-      style.font_size_pt = font_size_pt;
+    if !style_initialized {
+      if let Some(font_size_pt) = run.font_size_pt {
+        style.font_size_pt = font_size_pt;
+      }
+      if let Some(color) = run.color {
+        style.color = color;
+      }
+      style.bold = run.bold;
+      style.italic = run.italic;
+      style.underline = run.underline;
+      style.strikethrough = run.strikethrough;
+      style_initialized = true;
     }
-    if let Some(color) = run.color {
-      style.color = color;
-    }
-    style.bold = run.bold;
-    style.italic = run.italic;
-    style.underline = run.underline;
-    style.strikethrough = run.strikethrough;
-    let line_height = (style.font_size_pt * 1.15).max(1.0);
-    items.push(PageItem::Text(TextItem {
-      x_pt,
-      y_pt,
-      line_height_pt: line_height,
-      text: run.text.clone(),
-      style: style.clone(),
-      rotation_center_pt: None,
-      hyperlink_url: hyperlink_url.clone(),
-      dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      form_widget_id: None,
-      paragraph_bidi: false,
-      preserve_text_portion: true,
-      decoration_span_start_x_pt: None,
-      pdf_text_segmentation: PdfTextSegmentation::Portion,
-    }));
-    x_pt += approximate_text_width_pt(&run.text, style.font_size_pt);
-    if x_pt > rect.x_pt + rect.width_pt {
-      break;
-    }
+    text.push_str(&run.text.replace(['\r', '\n'], ""));
   }
+  if text.is_empty() {
+    return;
+  }
+  let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
+  let line_height = (style.font_size_pt * 1.15).max(1.0);
+  let preserve_text_portion =
+    text.chars().any(|ch| !ch.is_ascii()) && !calc_text_can_shape_as_line(&text);
+  items.push(PageItem::Text(TextItem {
+    x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+    y_pt,
+    line_height_pt: line_height,
+    text,
+    style,
+    rotation_center_pt: None,
+    hyperlink_url,
+    dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
+    form_widget_id: None,
+    paragraph_bidi: false,
+    preserve_text_portion,
+    decoration_span_start_x_pt: None,
+    pdf_text_segmentation: if preserve_text_portion {
+      PdfTextSegmentation::Portion
+    } else {
+      PdfTextSegmentation::Line
+    },
+  }));
 }
 
 fn approximate_text_width_pt(text: &str, font_size_pt: f32) -> f32 {

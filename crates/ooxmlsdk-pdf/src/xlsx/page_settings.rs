@@ -400,4 +400,12 @@ impl HeaderFooterModel {
       + usize::from(self.drawing_relationship_id.is_some())
       + usize::from(self.background_picture_relationship_id.is_some())
   }
+
+  pub(crate) fn has_print_content(&self) -> bool {
+    self.text_len() > 0
+      || self.legacy_drawing_relationship_id.is_some()
+      || self.drawing_relationship_id.is_some()
+      || self.drawing_slot_count > 0
+      || self.background_picture_relationship_id.is_some()
+  }
 }

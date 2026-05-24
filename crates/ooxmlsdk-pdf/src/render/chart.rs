@@ -122,6 +122,7 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
     }
     if let Some(data_labels) = series.data_labels {
       push_data_label_texts(&mut texts, data_labels);
+      push_series_data_label_value_texts(&mut texts, series, data_labels);
     }
   }
 
@@ -577,6 +578,112 @@ fn push_data_label_texts(texts: &mut Vec<String>, data_labels: &c::DataLabels) {
   {
     push_unique_text(texts, "100%");
   }
+}
+
+fn push_series_data_label_value_texts(
+  texts: &mut Vec<String>,
+  series: ChartSeriesRef<'_>,
+  data_labels: &c::DataLabels,
+) {
+  let categories = series
+    .category_axis_data
+    .map(category_axis_text_values)
+    .unwrap_or_default();
+  let values = series.values.map(values_text_values).unwrap_or_default();
+  if categories.is_empty() || values.is_empty() {
+    return;
+  }
+  let group = match data_labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Sequence(sequence)) => Some(sequence),
+    _ => None,
+  };
+  for label in &data_labels.data_label {
+    let label_sequence = match label.data_label_choice.as_ref() {
+      Some(c::DataLabelChoice::Sequence(sequence)) => Some(sequence.as_ref()),
+      _ => None,
+    };
+    let show_category = label_sequence
+      .and_then(|sequence| sequence.show_category_name.as_ref())
+      .and_then(|show| show.val)
+      .or_else(|| {
+        group
+          .and_then(|sequence| sequence.show_category_name.as_ref())
+          .and_then(|show| show.val)
+      })
+      .is_some_and(|value| value.as_bool());
+    let show_value = label_sequence
+      .and_then(|sequence| sequence.show_value.as_ref())
+      .and_then(|show| show.val)
+      .or_else(|| {
+        group
+          .and_then(|sequence| sequence.show_value.as_ref())
+          .and_then(|show| show.val)
+      })
+      .is_some_and(|value| value.as_bool());
+    if !show_category || !show_value {
+      continue;
+    }
+    let index = label.index.val as usize;
+    let Some(category) = categories.get(index) else {
+      continue;
+    };
+    let Some(value) = values.get(index) else {
+      continue;
+    };
+    let separator = label_sequence
+      .and_then(|sequence| sequence.separator.as_deref())
+      .or_else(|| group.and_then(|sequence| sequence.separator.as_deref()))
+      .unwrap_or("; ");
+    push_unique_text(texts, &format!("{category}{separator}{value}"));
+  }
+}
+
+fn category_axis_text_values(data: &c::CategoryAxisData) -> Vec<String> {
+  match data.category_axis_data_choice.as_ref() {
+    Some(c::CategoryAxisDataChoice::StringReference(reference)) => reference
+      .string_cache
+      .as_deref()
+      .map(string_cache_text_values)
+      .unwrap_or_default(),
+    Some(c::CategoryAxisDataChoice::StringLiteral(literal)) => literal
+      .string_point
+      .iter()
+      .map(|point| point.numeric_value.trim().to_string())
+      .collect(),
+    _ => Vec::new(),
+  }
+}
+
+fn values_text_values(values: &c::Values) -> Vec<String> {
+  match values.values_choice.as_ref() {
+    Some(c::ValuesChoice::NumberReference(reference)) => reference
+      .numbering_cache
+      .as_deref()
+      .map(numbering_cache_text_values)
+      .unwrap_or_default(),
+    Some(c::ValuesChoice::NumberLiteral(literal)) => literal
+      .numeric_point
+      .iter()
+      .map(|point| point.numeric_value.trim().to_string())
+      .collect(),
+    None => Vec::new(),
+  }
+}
+
+fn string_cache_text_values(cache: &c::StringCache) -> Vec<String> {
+  cache
+    .string_point
+    .iter()
+    .map(|point| point.numeric_value.trim().to_string())
+    .collect()
+}
+
+fn numbering_cache_text_values(cache: &c::NumberingCache) -> Vec<String> {
+  cache
+    .numeric_point
+    .iter()
+    .map(|point| point.numeric_value.trim().to_string())
+    .collect()
 }
 
 fn push_string_reference_texts(texts: &mut Vec<String>, reference: &c::StringReference) {

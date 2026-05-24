@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use rustybuzz::{Direction, Face, Script, UnicodeBuffer};
+use rustybuzz::{Direction, Face as RbFace, Script, UnicodeBuffer};
+use ttf_parser::Face as TtfFace;
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
 use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 
 use crate::docx::TextStyle;
-use crate::fonts::{FontFaceData, load_text_face};
+use crate::fonts::{FontFaceData, load_text_faces};
 
 // Last-resort vertical metrics when no usable font face can be loaded. Keep
 // this out of horizontal measurement: LibreOffice and Typst both shape with
@@ -29,6 +30,7 @@ const LO_SMALL_CAPS_FONT_SCALE: f32 = 0.80;
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedText {
   pub glyphs: Vec<ShapedGlyph>,
+  pub font_faces: Vec<FontFaceData>,
   pub width_pt: f32,
 }
 
@@ -63,6 +65,7 @@ pub(crate) struct TextDecorationMetrics {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedGlyph {
+  pub font_index: usize,
   pub glyph_id: u32,
   pub text_range: std::ops::Range<usize>,
   pub x_advance_em: f32,
@@ -83,6 +86,7 @@ pub(crate) fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
   if text.is_empty() {
     return Some(ShapedText {
       glyphs: Vec::new(),
+      font_faces: Vec::new(),
       width_pt: 0.0,
     });
   }
@@ -161,7 +165,7 @@ struct FontKey {
 
 #[derive(Default)]
 struct FontMetricsCache {
-  fonts: Mutex<HashMap<FontKey, Option<FontMetrics>>>,
+  fonts: Mutex<HashMap<FontKey, Vec<FontMetrics>>>,
 }
 
 impl FontMetricsCache {
@@ -171,60 +175,77 @@ impl FontMetricsCache {
   }
 
   fn measure(&self, text: &str, style: &TextStyle) -> Option<f32> {
-    let font = self.select(style)?;
+    let fonts = self.select(style)?;
     let mut width = 0.0;
     for run in case_mapped_script_runs(text, style) {
-      width += font.measure(
-        &run.text,
-        run.font_size_pt,
-        style.character_spacing_pt,
-        run.script,
-      )?;
-    }
-    Some(width)
-  }
-
-  fn shape(&self, text: &str, style: &TextStyle) -> Option<ShapedText> {
-    let font = self.select(style)?;
-    let mut glyphs = Vec::new();
-    let mut width_pt = 0.0;
-    for run in case_mapped_script_runs(text, style) {
-      let shaped = font.shape(
+      let shaped = shape_with_fallback(
+        &fonts,
         &run.text,
         run.font_size_pt,
         style.character_spacing_pt,
         run.script,
         run.source_start,
       )?;
-      width_pt += shaped.width_pt;
-      glyphs.extend(shaped.glyphs);
+      width += shaped.width_pt;
     }
-    Some(ShapedText { glyphs, width_pt })
+    Some(width)
+  }
+
+  fn shape(&self, text: &str, style: &TextStyle) -> Option<ShapedText> {
+    let fonts = self.select(style)?;
+    let mut glyphs = Vec::new();
+    let mut font_faces = Vec::new();
+    let mut width_pt = 0.0;
+    for run in case_mapped_script_runs(text, style) {
+      let shaped = shape_with_fallback(
+        &fonts,
+        &run.text,
+        run.font_size_pt,
+        style.character_spacing_pt,
+        run.script,
+        run.source_start,
+      )?;
+      let font_offset = font_faces.len();
+      width_pt += shaped.width_pt;
+      font_faces.extend(shaped.font_faces);
+      glyphs.extend(shaped.glyphs.into_iter().map(|mut glyph| {
+        glyph.font_index += font_offset;
+        glyph
+      }));
+    }
+    Some(ShapedText {
+      glyphs,
+      font_faces,
+      width_pt,
+    })
   }
 
   fn vertical_metrics(&self, style: &TextStyle) -> Option<TextVerticalMetrics> {
-    let font = self.select(style)?;
+    let font = self.select(style)?.into_iter().next()?;
     Some(font.vertical_metrics(style.font_size_pt))
   }
 
   fn decoration_metrics(&self, style: &TextStyle) -> Option<TextDecorationMetrics> {
-    let font = self.select(style)?;
+    let font = self.select(style)?.into_iter().next()?;
     font.decoration_metrics(style.font_size_pt)
   }
 
-  fn select(&self, style: &TextStyle) -> Option<FontMetrics> {
+  fn select(&self, style: &TextStyle) -> Option<Vec<FontMetrics>> {
     let key = FontKey {
       family: style.font_family.as_deref().map(str::to_string),
       bold: style.bold,
       italic: style.italic,
     };
-    let mut fonts = self.fonts.lock().ok()?;
-    if let Some(font) = fonts.get(&key) {
-      return font.clone();
+    if let Ok(fonts) = self.fonts.lock()
+      && let Some(font) = fonts.get(&key)
+    {
+      return Some(font.clone());
     }
-    let font = load_font_metrics(style);
-    fonts.insert(key, font.clone());
-    font
+
+    let loaded = load_font_metrics(style);
+    let mut fonts = self.fonts.lock().ok()?;
+    let font = fonts.entry(key).or_insert(loaded);
+    Some(font.clone())
   }
 }
 
@@ -235,20 +256,6 @@ struct FontMetrics {
 }
 
 impl FontMetrics {
-  fn measure(
-    &self,
-    text: &str,
-    font_size: f32,
-    character_spacing_pt: f32,
-    script: UnicodeScriptValue,
-  ) -> Option<f32> {
-    Some(
-      self
-        .shape(text, font_size, character_spacing_pt, script, 0)?
-        .width_pt,
-    )
-  }
-
   fn shape(
     &self,
     text: &str,
@@ -257,7 +264,7 @@ impl FontMetrics {
     script: UnicodeScriptValue,
     text_offset: usize,
   ) -> Option<ShapedText> {
-    let face = Face::from_slice(&self.face.data, self.face.index)?;
+    let face = RbFace::from_slice(self.face.data.as_slice(), self.face.index)?;
     let units_per_em = face.units_per_em().max(1) as f32;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);
@@ -289,6 +296,7 @@ impl FontMetrics {
       }
       width_pt += x_advance_em * font_size;
       glyphs.push(ShapedGlyph {
+        font_index: 0,
         glyph_id: infos[index].glyph_id,
         text_range: glyph_text_range(text, infos, index, text_offset),
         x_advance_em,
@@ -298,7 +306,11 @@ impl FontMetrics {
       });
     }
 
-    Some(ShapedText { glyphs, width_pt })
+    Some(ShapedText {
+      glyphs,
+      font_faces: vec![self.face.clone()],
+      width_pt,
+    })
   }
 
   fn vertical_metrics(&self, font_size: f32) -> TextVerticalMetrics {
@@ -311,7 +323,7 @@ impl FontMetrics {
   }
 
   fn decoration_metrics(&self, font_size: f32) -> Option<TextDecorationMetrics> {
-    let face = ttf_parser::Face::parse(&self.face.data, self.face.index).ok()?;
+    let face = ttf_parser::Face::parse(self.face.data.as_slice(), self.face.index).ok()?;
     let scale = font_size / face.units_per_em().max(1) as f32;
     let underline = face.underline_metrics()?;
     let strikethrough = face.strikeout_metrics()?;
@@ -329,14 +341,124 @@ impl FontMetrics {
   }
 }
 
-fn load_font_metrics(style: &TextStyle) -> Option<FontMetrics> {
-  load_text_face(style).and_then(|face| {
-    let parsed = Face::from_slice(&face.data, face.index)?;
-    Some(FontMetrics {
-      vertical: FaceVerticalMetrics::from_face(&parsed),
-      face,
-    })
+fn shape_with_fallback(
+  fonts: &[FontMetrics],
+  text: &str,
+  font_size: f32,
+  character_spacing_pt: f32,
+  script: UnicodeScriptValue,
+  text_offset: usize,
+) -> Option<ShapedText> {
+  let mut glyphs = Vec::new();
+  let mut font_faces = Vec::new();
+  let mut width_pt = 0.0;
+  let mut start = 0usize;
+  let mut active_font = None;
+  let parsed_faces: Vec<_> = fonts
+    .iter()
+    .map(|font| TtfFace::parse(font.face.data.as_slice(), font.face.index).ok())
+    .collect();
+
+  for (index, ch) in text.char_indices() {
+    let font_index = font_for_char(&parsed_faces, ch)?;
+    if active_font.is_some_and(|active| active != font_index) {
+      shape_fallback_segment(
+        fonts,
+        text,
+        start,
+        index,
+        active_font.unwrap_or(font_index),
+        font_size,
+        character_spacing_pt,
+        script,
+        text_offset,
+        &mut glyphs,
+        &mut font_faces,
+        &mut width_pt,
+      )?;
+      start = index;
+    }
+    active_font = Some(font_index);
+  }
+  if start < text.len() {
+    shape_fallback_segment(
+      fonts,
+      text,
+      start,
+      text.len(),
+      active_font?,
+      font_size,
+      character_spacing_pt,
+      script,
+      text_offset,
+      &mut glyphs,
+      &mut font_faces,
+      &mut width_pt,
+    )?;
+  }
+
+  Some(ShapedText {
+    glyphs,
+    font_faces,
+    width_pt,
   })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shape_fallback_segment(
+  fonts: &[FontMetrics],
+  text: &str,
+  start: usize,
+  end: usize,
+  source_font_index: usize,
+  font_size: f32,
+  character_spacing_pt: f32,
+  script: UnicodeScriptValue,
+  text_offset: usize,
+  glyphs: &mut Vec<ShapedGlyph>,
+  font_faces: &mut Vec<FontFaceData>,
+  width_pt: &mut f32,
+) -> Option<()> {
+  let font = fonts.get(source_font_index)?;
+  let target_font_index = font_faces.len();
+  font_faces.push(font.face.clone());
+  let mut shaped = font.shape(
+    &text[start..end],
+    font_size,
+    character_spacing_pt,
+    script,
+    text_offset + start,
+  )?;
+  *width_pt += shaped.width_pt;
+  glyphs.extend(shaped.glyphs.drain(..).map(|mut glyph| {
+    glyph.font_index = target_font_index;
+    glyph
+  }));
+  Some(())
+}
+
+fn font_for_char(faces: &[Option<TtfFace<'_>>], ch: char) -> Option<usize> {
+  faces
+    .iter()
+    .position(|face| {
+      face
+        .as_ref()
+        .is_some_and(|face| face.glyph_index(ch).is_some())
+    })
+    .or_else(|| (!faces.is_empty()).then_some(0))
+}
+
+fn load_font_metrics(style: &TextStyle) -> Vec<FontMetrics> {
+  load_text_faces(style)
+    .into_iter()
+    .filter_map(|face| {
+      let parsed = TtfFace::parse(face.data.as_slice(), face.index).ok()?;
+      Some(FontMetrics {
+        vertical: FaceVerticalMetrics::from_face(&parsed),
+        face,
+      })
+    })
+    .collect()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -348,7 +470,7 @@ struct FaceVerticalMetrics {
 }
 
 impl FaceVerticalMetrics {
-  fn from_face(face: &Face<'_>) -> Self {
+  fn from_face(face: &TtfFace<'_>) -> Self {
     let units_per_em = face.units_per_em().max(1) as f32;
     let ascent_units = face.ascender().max(0) as f32;
     let descent_units = (-face.descender()).max(0) as f32;
@@ -510,14 +632,10 @@ fn glyph_text_range(
   text_offset: usize,
 ) -> std::ops::Range<usize> {
   let cluster = infos[index].cluster as usize;
-  if infos
-    .iter()
-    .take(index)
-    .any(|info| info.cluster as usize == cluster)
-  {
-    let offset = text_offset + cluster.min(text.len());
-    return offset..offset;
-  }
+  // Source: Typst typst-layout/src/inline/shaping.rs keeps the full source
+  // text range on every glyph in the same cluster. Krilla uses these ranges
+  // for ActualText/ToUnicode mapping, so empty follow-up ranges make complex
+  // and mixed-script PDF text extraction lose or reorder characters.
   let next_cluster = infos
     .iter()
     .enumerate()

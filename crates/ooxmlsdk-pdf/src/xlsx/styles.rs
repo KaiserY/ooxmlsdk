@@ -367,6 +367,14 @@ impl StylesCatalog {
       .and_then(|fill| fill.color)
   }
 
+  pub(crate) fn differential_number_format_code(&self, format_id: u32) -> Option<&str> {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.number_format.as_ref())
+      .map(|format| format.code.as_str())
+  }
+
   pub(crate) fn differential_format_flag_count(&self) -> usize {
     self
       .differential_format_records
@@ -400,11 +408,18 @@ impl StylesCatalog {
     // Xf::createPattern enables a cell XF property when it differs from the
     // parent style XF, even if the cell XF apply flag was initially false.
     if !format.apply_font {
-      format.apply_font = !style_xf.apply_font || format.font_id != style_xf.font_id;
+      format.apply_font = if format.font_id == style_xf.font_id {
+        style_xf.apply_font
+      } else {
+        !style_xf.apply_font || format.font_id != style_xf.font_id
+      }
     }
     if !format.apply_number_format {
-      format.apply_number_format =
-        !style_xf.apply_number_format || format.number_format_id != style_xf.number_format_id;
+      format.apply_number_format = if format.number_format_id == style_xf.number_format_id {
+        style_xf.apply_number_format
+      } else {
+        !style_xf.apply_number_format || format.number_format_id != style_xf.number_format_id
+      }
     }
     if !format.apply_border {
       format.apply_border = !style_xf.apply_border || format.border_id != style_xf.border_id;

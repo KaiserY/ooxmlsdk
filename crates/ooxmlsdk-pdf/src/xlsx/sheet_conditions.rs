@@ -29,6 +29,10 @@ pub(crate) struct ConditionalFormatRuleModel {
   pub(crate) time_period: Option<x::TimePeriodValues>,
   pub(crate) rank: Option<u32>,
   pub(crate) std_dev: Option<i32>,
+  pub(crate) above_average: bool,
+  pub(crate) percent: bool,
+  pub(crate) bottom: bool,
+  pub(crate) equal_average: bool,
   pub(crate) formulas: Vec<String>,
   pub(crate) has_color_scale: bool,
   pub(crate) has_data_bar: bool,
@@ -253,6 +257,10 @@ impl ConditionalFormatRuleModel {
       time_period: rule.time_period,
       rank: rule.rank,
       std_dev: rule.std_dev,
+      above_average: rule.above_average.is_none_or(|value| value.as_bool()),
+      percent: rule.percent.is_some_and(|value| value.as_bool()),
+      bottom: rule.bottom.is_some_and(|value| value.as_bool()),
+      equal_average: rule.equal_average.is_some_and(|value| value.as_bool()),
       formulas: rule
         .formula
         .iter()

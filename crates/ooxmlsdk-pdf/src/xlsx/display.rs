@@ -22,6 +22,13 @@ const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 
+#[derive(Clone, Debug)]
+struct CalcCellTextFragment {
+  address: CellAddress,
+  rect: CellRect,
+  text: TextItem,
+}
+
 pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
   let mut pages = Vec::new();
   let print_document = CalcPrintDocument::from_import(import);
@@ -229,9 +236,10 @@ fn render_cell_area(
       height_pt,
     };
     let base_style = import.styles.text_style_for_cell(cell.style_index);
+    let mut rendered_text_items = Vec::new();
     if !cell.rich_text_runs.is_empty() && cell.rendered_text == cell.text {
       render_cell_rich_text(
-        &mut cell_text_items,
+        &mut rendered_text_items,
         cell.rich_text_runs,
         cell_rect,
         base_style,
@@ -239,14 +247,25 @@ fn render_cell_area(
       );
     } else {
       render_cell_text(
-        &mut cell_text_items,
+        &mut rendered_text_items,
         &cell.rendered_text,
         cell_rect,
         base_style,
         import.styles.alignment_for_cell(cell.style_index),
         hyperlink_url.clone(),
+        cell.formula,
       );
     }
+    cell_text_items.extend(rendered_text_items.into_iter().filter_map(|item| {
+      let PageItem::Text(text) = item else {
+        return None;
+      };
+      Some(CalcCellTextFragment {
+        address: cell.address,
+        rect: cell_rect,
+        text,
+      })
+    }));
     if let Some(hyperlink_url) = hyperlink_url {
       items.push(PageItem::LinkArea(LinkAreaItem {
         x_pt,
@@ -263,28 +282,29 @@ fn render_cell_area(
   }
 }
 
-fn coalesced_calc_row_text_items(items: Vec<PageItem>) -> Vec<PageItem> {
+fn coalesced_calc_row_text_items(items: Vec<CalcCellTextFragment>) -> Vec<PageItem> {
   let mut output = Vec::with_capacity(items.len());
+  let mut previous_source: Option<CalcCellTextFragment> = None;
   let mut items = items.into_iter().peekable();
   while let Some(item) = items.next() {
-    let PageItem::Text(text) = item else {
-      output.push(item);
-      continue;
-    };
+    let text = item.text.clone();
     let next_is_row_end = !matches!(
       items.peek(),
-      Some(PageItem::Text(following)) if (following.y_pt - text.y_pt).abs() < 0.01
+      Some(following) if (following.text.y_pt - text.y_pt).abs() < 0.01
     );
     if let Some(PageItem::Text(previous)) = output.last_mut()
+      && let Some(source) = previous_source.as_ref()
       && calc_row_text_items_coalesce(previous, &text)
     {
-      let spaces = calc_row_inter_cell_spaces(previous, &text, next_is_row_end);
+      let spaces = calc_row_inter_cell_spaces(source, &item, next_is_row_end);
       previous.text.extend(std::iter::repeat(' ').take(spaces));
       previous.text.push_str(&text.text);
       previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
+      previous_source = Some(item);
       continue;
     }
     output.push(PageItem::Text(text));
+    previous_source = Some(item);
   }
   output
 }
@@ -311,15 +331,38 @@ fn calc_row_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
   next.x_pt > current.x_pt
 }
 
-fn calc_row_inter_cell_spaces(current: &TextItem, next: &TextItem, next_is_row_end: bool) -> usize {
-  if calc_text_number_like(&current.text) && calc_text_number_like(&next.text) {
+fn calc_row_inter_cell_spaces(
+  current: &CalcCellTextFragment,
+  next: &CalcCellTextFragment,
+  next_is_row_end: bool,
+) -> usize {
+  let current_text = &current.text;
+  let next_text = &next.text;
+  if calc_text_number_like(&current_text.text) && calc_text_number_like(&next_text.text) {
     return 1;
   }
-  let current_right = current.x_pt + text_metrics::measure_text(&current.text, &current.style);
-  let gap = (next.x_pt - current_right).max(0.0);
-  let space_width = text_metrics::measure_text(" ", &current.style)
-    .max(current.style.font_size_pt * 0.25)
+  let current_right =
+    current_text.x_pt + text_metrics::measure_text(&current_text.text, &current_text.style);
+  let current_layout_right = current_text.x_pt
+    + approximate_text_width_pt(&current_text.text, current_text.style.font_size_pt);
+  let current_cell_right = current.rect.x_pt + current.rect.width_pt;
+  let gap = next_text.x_pt - current_right;
+  let space_width = text_metrics::measure_text(" ", &current_text.style)
+    .max(current_text.style.font_size_pt * 0.25)
     .max(1.0);
+  if current.address.row == next.address.row
+    && current.address.col != next.address.col
+    && (current_text.text.contains(char::is_whitespace)
+      || next_text.text.contains(char::is_whitespace))
+  {
+    return 1;
+  }
+  if current.address.row == next.address.row
+    && current.address.col != next.address.col
+    && current_layout_right <= current_cell_right + space_width * 0.25
+  {
+    return 1;
+  }
   if gap <= 0.0 {
     return usize::from(next_is_row_end);
   }
@@ -341,6 +384,12 @@ fn calc_text_number_like(text: &str) -> bool {
     && trimmed
       .chars()
       .all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ',' | '-' | '+' | '%' | '/' | ':'))
+}
+
+fn calc_text_can_shape_as_line(text: &str) -> bool {
+  text
+    .chars()
+    .all(|ch| ch.is_ascii_alphanumeric() || !ch.is_ascii())
 }
 
 fn render_cell_rich_text(
@@ -524,12 +573,13 @@ fn render_cell_text(
   mut style: TextStyle,
   alignment: Option<super::styles::AlignmentRecord>,
   hyperlink_url: Option<String>,
+  formula: bool,
 ) {
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
   let rendered_text;
   let lines = if text.contains('\n') || text.contains('\r') {
-    rendered_text = if wrap_text {
+    rendered_text = if wrap_text || formula {
       text.lines().collect::<Vec<_>>().join(" ")
     } else {
       text.lines().collect::<String>()
@@ -568,7 +618,8 @@ fn render_cell_text(
     } else {
       line
     };
-    let preserve_text_portion = line.chars().any(|ch| !ch.is_ascii());
+    let preserve_text_portion =
+      line.chars().any(|ch| !ch.is_ascii()) && !calc_text_can_shape_as_line(line);
     items.push(PageItem::Text(TextItem {
       x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT + line_x_offset_pt,
       y_pt,
@@ -1812,7 +1863,7 @@ fn render_header_footer_line(
     if value.is_empty() {
       continue;
     }
-    let value = expand_header_footer_tokens(&value, page);
+    let value = expand_header_footer_tokens(&value, page, align);
     if value.is_empty() {
       continue;
     }
@@ -1878,7 +1929,11 @@ fn push_header_footer_section(
   }
 }
 
-fn expand_header_footer_tokens(text: &str, page: &CalcPrintPage<'_>) -> String {
+fn expand_header_footer_tokens(
+  text: &str,
+  page: &CalcPrintPage<'_>,
+  align: HeaderFooterAlign,
+) -> String {
   let mut output = String::new();
   let mut chars = text.chars().peekable();
   while let Some(ch) = chars.next() {
@@ -1898,10 +1953,24 @@ fn expand_header_footer_tokens(text: &str, page: &CalcPrintPage<'_>) -> String {
             break;
           }
         }
+        if align == HeaderFooterAlign::Left && !output.ends_with(' ') && !output.is_empty() {
+          output.push(' ');
+        }
+      }
+      Some('K') => {
+        for _ in 0..6 {
+          if !chars.peek().is_some_and(|peek| peek.is_ascii_hexdigit()) {
+            break;
+          }
+          chars.next();
+        }
       }
       Some(ch) if ch.is_ascii_digit() => {
         while chars.peek().is_some_and(|peek| peek.is_ascii_digit()) {
           chars.next();
+        }
+        if align == HeaderFooterAlign::Left && !output.ends_with(' ') && !output.is_empty() {
+          output.push(' ');
         }
       }
       Some(ch) => output.push(ch),

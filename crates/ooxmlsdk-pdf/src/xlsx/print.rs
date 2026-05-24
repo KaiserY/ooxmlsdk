@@ -1,10 +1,14 @@
 use super::import::ExcelImport;
 use super::page_settings::CalcPageSettings;
 use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
-use super::worksheet::{CalcSheet, CellAddress, CellRange, SheetType};
+use super::worksheet::{CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
+use crate::docx::TextStyle;
+use crate::text_metrics;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 // Source: LibreOffice sc/source/ui/view/printfun.cxx defines ZOOM_MIN.
 const ZOOM_MIN: u32 = 10;
+const XLSX_MAX_COLUMN: u32 = 16_384;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
@@ -121,14 +125,14 @@ impl<'a> CalcPrintDocument<'a> {
     let mut pages = Vec::new();
     let mut skipped_empty_pages = 0usize;
     let mut document_top_down = true;
-    let any_visible_used_sheet = import
+    let any_selected_visible_sheet = import
       .sheets
       .iter()
-      .any(|sheet| sheet.visible() && sheet.used_range().is_some());
+      .any(|sheet| sheet.visible() && sheet.selected());
     for sheet in import.sheets.iter().filter(|sheet| {
       sheet.visible()
-        && if any_visible_used_sheet {
-          sheet.used_range().is_some()
+        && if any_selected_visible_sheet {
+          sheet.selected()
         } else {
           sheet.active
         }
@@ -582,12 +586,75 @@ fn print_areas_for_sheet(
     return named_ranges.resolved_print_areas.clone();
   }
   match sheet.used_range() {
-    Some(range) => vec![range],
+    Some(range) => vec![extend_print_area_for_overflow(sheet, range)],
     // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea(true).
     // With skip-empty disabled, a missing document print area still leaves the
     // default start/end range printable, so header/footer-only sheets export a page.
     None => vec![CellRange::single(CellAddress { col: 1, row: 1 })],
   }
+}
+
+fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
+  // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea and
+  // sc/source/core/data/table1.cxx ExtendPrintArea/MaybeAddExtraColumn.
+  // A text cell can extend the implicit print area to the right when the next
+  // cells are empty and the string does not fit into its own column.
+  let style = TextStyle::default();
+  for (row_position, row) in sheet.rows.iter().enumerate() {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    if row_index < range.start.row || row_index > range.end.row || row.hidden {
+      continue;
+    }
+    for (cell_position, cell) in row.cells.iter().enumerate() {
+      if cell.display_text.is_empty() || cell.display_text.parse::<f64>().is_ok() {
+        continue;
+      }
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row_index,
+      });
+      if address.col < range.start.col || address.col > range.end.col {
+        continue;
+      }
+      if row_cell_has_print_data_at(row, address.col + 1) {
+        continue;
+      }
+      let mut missing =
+        text_metrics::measure_text(&cell.display_text, &style) - sheet.column_width_pt(address.col);
+      let mut column = address.col;
+      while missing > 0.0 && column < XLSX_MAX_COLUMN {
+        let next = column.saturating_add(1);
+        if row_cell_has_print_data_at(row, next) {
+          break;
+        }
+        column = next;
+        let width = sheet.column_width_pt(column);
+        if width <= f32::EPSILON {
+          break;
+        }
+        missing -= width;
+      }
+      if column > range.end.col {
+        range.end.col = column;
+      }
+    }
+  }
+  range
+}
+
+fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
+  row.cells.iter().enumerate().any(|(cell_position, cell)| {
+    let address = cell.address().unwrap_or(CellAddress {
+      col: cell_position as u32 + 1,
+      row: row.row_index.unwrap_or(1),
+    });
+    address.col == col
+      && (!cell.display_text.is_empty()
+        || !cell.rich_text_runs.is_empty()
+        || cell.formula.is_some()
+        || cell.cached_value.is_some()
+        || cell.data_type.is_some())
+  })
 }
 
 fn page_areas_for_sheet(
@@ -797,9 +864,12 @@ fn print_cells_for_area<'a>(
         .and_then(|index| import.styles.cell_xfs.get(index as usize))
         .and_then(|format| format.number_format_id);
       let number_format_code = number_format_id.and_then(|id| import.styles.number_format_code(id));
+      let conditional_number_format_code =
+        conditional_number_format_code(import, sheet, address, cell.display_text.as_str());
+      let effective_number_format_code = conditional_number_format_code.or(number_format_code);
       let (rendered_text, number_format_state) = rendered_number_text(
         cell.display_text.as_str(),
-        number_format_code,
+        effective_number_format_code,
         cell.data_type,
         import.globals.settings.date_1904,
       );
@@ -820,6 +890,184 @@ fn print_cells_for_area<'a>(
     }
   }
   cells
+}
+
+fn conditional_number_format_code<'a>(
+  import: &'a ExcelImport,
+  sheet: &CalcSheet,
+  address: CellAddress,
+  raw: &str,
+) -> Option<&'a str> {
+  let value = raw.parse::<f64>().ok()?;
+  let mut rules = sheet
+    .metrics
+    .conditions
+    .conditional_formats
+    .iter()
+    .filter(|format| conditional_format_contains_cell(format, address))
+    .flat_map(|format| {
+      format
+        .rules
+        .iter()
+        .map(move |rule| (format.sequence_of_references.as_slice(), rule))
+    })
+    .collect::<Vec<_>>();
+  rules.sort_by_key(|(_, rule)| rule.priority);
+  for (references, rule) in rules {
+    if !conditional_numeric_rule_matches(sheet, references, rule, address, value) {
+      if rule.stop_if_true {
+        break;
+      }
+      continue;
+    }
+    if let Some(code) = rule
+      .format_id
+      .and_then(|format_id| import.styles.differential_number_format_code(format_id))
+    {
+      return Some(code);
+    }
+    if rule.stop_if_true {
+      break;
+    }
+  }
+  None
+}
+
+fn conditional_format_contains_cell(
+  format: &super::sheet_conditions::ConditionalFormatModel,
+  address: CellAddress,
+) -> bool {
+  format.sequence_of_references.iter().any(|references| {
+    references
+      .split_whitespace()
+      .filter_map(CellRange::parse_a1_range)
+      .any(|range| range.contains(address))
+  })
+}
+
+fn conditional_numeric_rule_matches(
+  sheet: &CalcSheet,
+  references: &[String],
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+  value: f64,
+) -> bool {
+  match rule.rule_type {
+    x::ConditionalFormatValues::Top10 => {
+      conditional_top10_matches(sheet, references, rule, address, value)
+    }
+    x::ConditionalFormatValues::AboveAverage => {
+      conditional_average_matches(sheet, references, rule, address, value)
+    }
+    x::ConditionalFormatValues::CellIs => conditional_cell_is_matches(rule, value),
+    _ => false,
+  }
+}
+
+fn conditional_top10_matches(
+  sheet: &CalcSheet,
+  references: &[String],
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+  value: f64,
+) -> bool {
+  let values = conditional_reference_values(sheet, references, address);
+  if values.is_empty() {
+    return false;
+  }
+  let mut rank = (rule.rank.unwrap_or(10) as usize).max(1);
+  if rule.percent {
+    rank = ((values.len() as f64 * rank as f64 / 100.0).ceil() as usize).max(1);
+  }
+  rank = rank.min(values.len());
+  let mut sorted = values;
+  if rule.bottom {
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    value <= sorted[rank - 1]
+  } else {
+    sorted.sort_by(|a, b| b.total_cmp(a));
+    value >= sorted[rank - 1]
+  }
+}
+
+fn conditional_average_matches(
+  sheet: &CalcSheet,
+  references: &[String],
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+  value: f64,
+) -> bool {
+  let values = conditional_reference_values(sheet, references, address);
+  if values.is_empty() {
+    return false;
+  }
+  let average = values.iter().sum::<f64>() / values.len() as f64;
+  let equal = rule.equal_average;
+  if rule.above_average {
+    value > average || (equal && (value - average).abs() <= f64::EPSILON)
+  } else {
+    value < average || (equal && (value - average).abs() <= f64::EPSILON)
+  }
+}
+
+fn conditional_cell_is_matches(
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  value: f64,
+) -> bool {
+  let first = rule
+    .formulas
+    .first()
+    .and_then(|formula| formula.trim().parse::<f64>().ok());
+  let second = rule
+    .formulas
+    .get(1)
+    .and_then(|formula| formula.trim().parse::<f64>().ok());
+  match rule.operator.unwrap_or_default() {
+    x::ConditionalFormattingOperatorValues::LessThan => first.is_some_and(|limit| value < limit),
+    x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
+      first.is_some_and(|limit| value <= limit)
+    }
+    x::ConditionalFormattingOperatorValues::Equal => first.is_some_and(|limit| value == limit),
+    x::ConditionalFormattingOperatorValues::NotEqual => first.is_some_and(|limit| value != limit),
+    x::ConditionalFormattingOperatorValues::GreaterThanOrEqual => {
+      first.is_some_and(|limit| value >= limit)
+    }
+    x::ConditionalFormattingOperatorValues::GreaterThan => first.is_some_and(|limit| value > limit),
+    x::ConditionalFormattingOperatorValues::Between => first
+      .zip(second)
+      .is_some_and(|(low, high)| value >= low.min(high) && value <= low.max(high)),
+    x::ConditionalFormattingOperatorValues::NotBetween => first
+      .zip(second)
+      .is_some_and(|(low, high)| value < low.min(high) || value > low.max(high)),
+    _ => false,
+  }
+}
+
+fn conditional_reference_values(
+  sheet: &CalcSheet,
+  references: &[String],
+  address: CellAddress,
+) -> Vec<f64> {
+  references
+    .iter()
+    .flat_map(|references| references.split_whitespace())
+    .filter_map(CellRange::parse_a1_range)
+    .find(|range| range.contains(address))
+    .map(|range| {
+      sheet
+        .rows
+        .iter()
+        .flat_map(|row| row.cells.iter())
+        .filter_map(|cell| {
+          let cell_address = cell.address()?;
+          if !range.contains(cell_address) {
+            return None;
+          }
+          cell.display_text.parse::<f64>().ok()
+        })
+        .collect()
+    })
+    .unwrap_or_default()
 }
 
 fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> String {

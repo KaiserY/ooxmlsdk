@@ -24,7 +24,7 @@ use super::emf_wmf;
 use super::form_widgets::inject_form_widget_annotations;
 use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
-use crate::fonts::load_text_face;
+use crate::fonts::{FontFaceData, load_text_face};
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem,
   OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
@@ -203,10 +203,12 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
                   .clip
                   .as_ref()
                   .is_none_or(|clip| clip.width_pt >= 0.0 && clip.height_pt >= 0.0)
-                && portion
-                  .glyphs
-                  .as_ref()
-                  .is_none_or(|glyphs| glyphs.iter().all(|glyph| glyph.x_advance >= 0.0))
+                && portion.glyphs.as_ref().is_none_or(|glyphs| {
+                  glyphs
+                    .iter()
+                    .flat_map(|run| run.glyphs.iter())
+                    .all(|glyph| glyph.x_advance >= 0.0)
+                })
                 && portion
                   .highlight
                   .as_ref()
@@ -312,7 +314,7 @@ struct PaintTextPortion {
   baseline_y: f32,
   width_pt: f32,
   clip: Option<PaintClipRect>,
-  glyphs: Option<Vec<KrillaGlyph>>,
+  glyphs: Option<Vec<PaintGlyphFontRun>>,
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
@@ -330,6 +332,13 @@ enum PaintTextPortionKind {
 #[derive(Clone, Debug)]
 struct PaintGlyphRun {
   width_pt: f32,
+  font_runs: Vec<PaintGlyphFontRun>,
+}
+
+#[derive(Clone, Debug)]
+struct PaintGlyphFontRun {
+  font_face: FontFaceData,
+  x_offset_pt: f32,
   glyphs: Vec<KrillaGlyph>,
 }
 
@@ -589,10 +598,10 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
 
 impl PaintText {
   fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
-    let glyphs = if text.style.small_caps {
-      None
-    } else {
+    let glyphs = if should_shape_pdf_glyphs(text) {
       shaped_pdf_glyphs(&text.text, &text.style)
+    } else {
+      None
     };
     let width_pt = glyphs
       .as_ref()
@@ -655,7 +664,7 @@ impl PaintText {
         width_pt,
         page_width_pt,
         clip: owner.map(|owner| owner.clip),
-        glyphs: glyphs.map(|run| run.glyphs),
+        glyphs: glyphs.map(|run| run.font_runs),
         highlight,
         underline,
         strikethrough,
@@ -671,7 +680,7 @@ struct PaintTextPortionSource<'a> {
   width_pt: f32,
   page_width_pt: f32,
   clip: Option<PaintClipRect>,
-  glyphs: Option<Vec<KrillaGlyph>>,
+  glyphs: Option<Vec<PaintGlyphFontRun>>,
   highlight: Option<PaintRect>,
   underline: Option<PaintStrokeLine>,
   strikethrough: Option<PaintStrokeLine>,
@@ -698,10 +707,10 @@ fn text_paint_portions(source: PaintTextPortionSource<'_>) -> Vec<PaintTextPorti
     let portion_clip = paint_clip_for_portion(clip, &kind, page_width_pt);
     let portion_glyphs = glyphs
       .as_ref()
-      .map(|glyphs| glyphs_for_text_range(glyphs, range.clone()));
+      .map(|glyphs| glyphs_for_text_range(glyphs, range.clone(), text.style.font_size_pt));
     let portion_width = portion_glyphs
       .as_ref()
-      .map(|glyphs| glyph_width_pt(glyphs, text.style.font_size_pt))
+      .map(|glyphs| glyph_runs_width_pt(glyphs, text.style.font_size_pt))
       .unwrap_or_else(|| measure_text(&text.text[range.clone()], &text.style));
     portions.push(PaintTextPortion {
       kind,
@@ -836,19 +845,41 @@ fn edge_whitespace_text_portion_ranges(
 }
 
 fn glyphs_for_text_range(
-  glyphs: &[KrillaGlyph],
+  glyphs: &[PaintGlyphFontRun],
   range: std::ops::Range<usize>,
-) -> Vec<KrillaGlyph> {
-  glyphs
-    .iter()
-    .filter(|glyph| glyph.text_range.start < range.end && glyph.text_range.end > range.start)
-    .cloned()
-    .collect()
+  font_size_pt: f32,
+) -> Vec<PaintGlyphFontRun> {
+  let mut output = Vec::new();
+  for run in glyphs {
+    let mut x_pt = run.x_offset_pt;
+    let mut active = None::<PaintGlyphFontRun>;
+    for glyph in &run.glyphs {
+      let intersects = glyph.text_range.start < range.end && glyph.text_range.end > range.start;
+      if intersects {
+        active
+          .get_or_insert_with(|| PaintGlyphFontRun {
+            font_face: run.font_face.clone(),
+            x_offset_pt: x_pt,
+            glyphs: Vec::new(),
+          })
+          .glyphs
+          .push(glyph.clone());
+      } else if let Some(active) = active.take() {
+        output.push(active);
+      }
+      x_pt += glyph.x_advance * font_size_pt;
+    }
+    if let Some(active) = active {
+      output.push(active);
+    }
+  }
+  output
 }
 
-fn glyph_width_pt(glyphs: &[KrillaGlyph], font_size_pt: f32) -> f32 {
+fn glyph_runs_width_pt(glyphs: &[PaintGlyphFontRun], font_size_pt: f32) -> f32 {
   glyphs
     .iter()
+    .flat_map(|run| run.glyphs.iter())
     .map(|glyph| glyph.x_advance * font_size_pt)
     .sum()
 }
@@ -1171,15 +1202,17 @@ fn draw_text_item(
         TextDirection::Auto,
       );
     } else if let Some(glyphs) = &portion.glyphs {
-      let font = fonts.select(&item.style);
-      surface.draw_glyphs(
-        Point::from_xy(portion.x_pt, portion.baseline_y),
-        glyphs,
-        font,
-        &item.text,
-        item.style.font_size_pt,
-        false,
-      );
+      for run in glyphs {
+        let font = fonts.select_face(&run.font_face);
+        surface.draw_glyphs(
+          Point::from_xy(portion.x_pt + run.x_offset_pt, portion.baseline_y),
+          &run.glyphs,
+          font,
+          &item.text,
+          item.style.font_size_pt,
+          false,
+        );
+      }
     } else {
       let font = fonts.select(&item.style);
       surface.draw_text(
@@ -1510,11 +1543,25 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
 
 fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
   let shaped = shape_text(text, style)?;
-  let glyphs = shaped
-    .glyphs
-    .into_iter()
-    .map(|glyph| {
-      KrillaGlyph::new(
+  let mut font_runs = Vec::<PaintGlyphFontRun>::new();
+  let mut x_offset_pt = 0.0;
+  for glyph in shaped.glyphs {
+    let font_face = shaped.font_faces.get(glyph.font_index)?.clone();
+    if !font_runs
+      .last()
+      .is_some_and(|run| run.font_face == font_face)
+    {
+      font_runs.push(PaintGlyphFontRun {
+        font_face,
+        x_offset_pt,
+        glyphs: Vec::new(),
+      });
+    }
+    font_runs
+      .last_mut()
+      .expect("font run was just pushed")
+      .glyphs
+      .push(KrillaGlyph::new(
         GlyphId::new(glyph.glyph_id),
         glyph.x_advance_em,
         glyph.x_offset_em,
@@ -1522,13 +1569,33 @@ fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
         glyph.y_advance_em,
         glyph.text_range,
         None,
-      )
-    })
-    .collect();
+      ));
+    x_offset_pt += glyph.x_advance_em * style.font_size_pt;
+  }
   Some(PaintGlyphRun {
     width_pt: shaped.width_pt,
-    glyphs,
+    font_runs,
   })
+}
+
+fn should_shape_pdf_glyphs(text: &TextItem) -> bool {
+  // Source: Typst shapes during layout and PDF rendering consumes the shaped
+  // glyphs. This renderer only has text items at PDF time, so keep ordinary
+  // Latin runs on krilla's text path and reserve explicit glyph painting for
+  // cases where we need fallback faces or complex ActualText ranges.
+  !text.style.small_caps
+    && (text.paragraph_bidi
+      || text.preserve_text_portion && text.text.chars().any(requires_shaped_pdf_glyph)
+      || text.text.chars().any(requires_shaped_pdf_glyph))
+}
+
+fn requires_shaped_pdf_glyph(ch: char) -> bool {
+  !ch.is_ascii()
+}
+
+fn font_from_face(face: &FontFaceData) -> Option<Font> {
+  let data: Arc<dyn AsRef<[u8]> + Send + Sync> = face.data.clone();
+  Font::new(data.into(), face.index)
 }
 
 fn text_vertical_scale(style: &TextStyle) -> f32 {
@@ -1779,6 +1846,7 @@ fn serialize_settings(options: &PdfOptions) -> SerializeSettings {
 struct FontSet {
   fallback: Font,
   fonts: Mutex<HashMap<FontKey, Font>>,
+  face_fonts: Mutex<HashMap<FontFaceData, Font>>,
 }
 
 impl FontSet {
@@ -1787,6 +1855,7 @@ impl FontSet {
     Ok(Self {
       fallback: load_font(&fallback_style)?,
       fonts: Mutex::new(HashMap::new()),
+      face_fonts: Mutex::new(HashMap::new()),
     })
   }
 
@@ -1796,15 +1865,31 @@ impl FontSet {
       bold: style.bold,
       italic: style.italic,
     };
-    let Ok(mut fonts) = self.fonts.lock() else {
-      return self.fallback.clone();
-    };
-    if let Some(font) = fonts.get(&key) {
+    if let Ok(fonts) = self.fonts.lock()
+      && let Some(font) = fonts.get(&key)
+    {
       return font.clone();
     }
-    let font = load_font(style).unwrap_or_else(|_| self.fallback.clone());
-    fonts.insert(key, font.clone());
-    font
+
+    let loaded = load_font(style).unwrap_or_else(|_| self.fallback.clone());
+    let Ok(mut fonts) = self.fonts.lock() else {
+      return loaded;
+    };
+    fonts.entry(key).or_insert(loaded).clone()
+  }
+
+  fn select_face(&self, face: &FontFaceData) -> Font {
+    if let Ok(fonts) = self.face_fonts.lock()
+      && let Some(font) = fonts.get(face)
+    {
+      return font.clone();
+    }
+
+    let loaded = font_from_face(face).unwrap_or_else(|| self.fallback.clone());
+    let Ok(mut fonts) = self.face_fonts.lock() else {
+      return loaded;
+    };
+    fonts.entry(face.clone()).or_insert(loaded).clone()
   }
 }
 
@@ -1817,7 +1902,7 @@ struct FontKey {
 
 fn load_font(style: &TextStyle) -> Result<Font> {
   if let Some(face) = load_text_face(style)
-    && let Some(font) = Font::new(Arc::new(face.data).into(), face.index)
+    && let Some(font) = font_from_face(&face)
   {
     return Ok(font);
   }

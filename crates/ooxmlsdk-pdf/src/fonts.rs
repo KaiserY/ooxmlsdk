@@ -1,19 +1,44 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::docx::TextStyle;
 
 #[derive(Clone, Debug)]
 pub(crate) struct FontFaceData {
-  pub data: Vec<u8>,
+  pub data: Arc<Vec<u8>>,
   pub index: u32,
+  id: Arc<str>,
+}
+
+impl PartialEq for FontFaceData {
+  fn eq(&self, other: &Self) -> bool {
+    self.index == other.index && self.id == other.id
+  }
+}
+
+impl Eq for FontFaceData {}
+
+impl Hash for FontFaceData {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.index.hash(state);
+    self.id.hash(state);
+  }
 }
 
 pub(crate) fn load_text_face(style: &TextStyle) -> Option<FontFaceData> {
   load_face(style.font_family.as_deref(), style.bold, style.italic)
 }
 
+pub(crate) fn load_text_faces(style: &TextStyle) -> Vec<FontFaceData> {
+  load_faces(style.font_family.as_deref(), style.bold, style.italic)
+}
+
 fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceData> {
+  load_faces(family, bold, italic).into_iter().next()
+}
+
+fn load_faces(family: Option<&str>, bold: bool, italic: bool) -> Vec<FontFaceData> {
   let key = FontFaceKey {
     family: family
       .filter(|family| !family.trim().is_empty())
@@ -21,9 +46,10 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     bold,
     italic,
   };
-  let mut cache = font_face_cache().lock().ok()?;
-  if let Some(face) = cache.get(&key) {
-    return face.clone();
+  if let Ok(cache) = font_face_cache().lock()
+    && let Some(faces) = cache.get(&key)
+  {
+    return faces.clone();
   }
 
   let mut families = Vec::new();
@@ -33,9 +59,9 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     push_generic_font_families(&mut families);
   }
 
+  let mut faces = Vec::new();
   if let Some(face) = query_font_face(&families, family, bold, italic) {
-    cache.insert(key, Some(face.clone()));
-    return Some(face);
+    push_unique_font_face(&mut faces, face);
   }
 
   let fallback_paths = family
@@ -47,10 +73,8 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     let Ok(data) = std::fs::read(path) else {
       continue;
     };
-    if ttf_parser::Face::parse(&data, 0).is_ok() {
-      let face = Some(FontFaceData { data, index: 0 });
-      cache.insert(key, face.clone());
-      return face;
+    if ttf_parser::Face::parse(data.as_slice(), 0).is_ok() {
+      push_unique_font_face(&mut faces, font_face_data(data, 0, path.to_string()));
     }
   }
 
@@ -64,8 +88,7 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     let mut fallback_families = Vec::new();
     push_generic_font_families(&mut fallback_families);
     if let Some(face) = query_font_face(&fallback_families, family, bold, italic) {
-      cache.insert(key, Some(face.clone()));
-      return Some(face);
+      push_unique_font_face(&mut faces, face);
     }
   }
 
@@ -74,16 +97,30 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
       let Ok(data) = std::fs::read(path) else {
         continue;
       };
-      if ttf_parser::Face::parse(&data, 0).is_ok() {
-        let face = Some(FontFaceData { data, index: 0 });
-        cache.insert(key, face.clone());
-        return face;
+      if ttf_parser::Face::parse(data.as_slice(), 0).is_ok() {
+        push_unique_font_face(&mut faces, font_face_data(data, 0, path.to_string()));
       }
     }
   }
 
-  cache.insert(key, None);
-  None
+  if let Ok(mut cache) = font_face_cache().lock() {
+    cache.insert(key, faces.clone());
+  }
+  faces
+}
+
+fn push_unique_font_face(faces: &mut Vec<FontFaceData>, face: FontFaceData) {
+  if !faces.contains(&face) {
+    faces.push(face);
+  }
+}
+
+fn font_face_data(data: Vec<u8>, index: u32, id: String) -> FontFaceData {
+  FontFaceData {
+    data: Arc::new(data),
+    index,
+    id: Arc::from(id),
+  }
 }
 
 fn query_font_face(
@@ -104,7 +141,11 @@ fn query_font_face(
   }) && let Some((data, index)) =
     font_db().with_face_data(id, |data, index| (data.to_vec(), index))
   {
-    return Some(FontFaceData { data, index });
+    return Some(font_face_data(
+      data,
+      index,
+      format!("fontdb:{id:?}:{index}"),
+    ));
   }
 
   None
@@ -126,8 +167,8 @@ fn font_db() -> &'static fontdb::Database {
   })
 }
 
-fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, Option<FontFaceData>>> {
-  static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, Option<FontFaceData>>>> = OnceLock::new();
+fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, Vec<FontFaceData>>> {
+  static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, Vec<FontFaceData>>>> = OnceLock::new();
   CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -185,6 +226,16 @@ fn push_font_aliases<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str
       fontdb::Family::Name("Arial"),
       fontdb::Family::Name("Liberation Sans"),
     ]),
+    "游ゴシック" | "yu gothic" => families.extend([
+      fontdb::Family::Name("Yu Gothic"),
+      fontdb::Family::Name("Noto Sans CJK JP"),
+    ]),
+    "biz ud明朝" | "biz ud明朝 medium" | "biz udmincho" | "biz udmincho medium" => families
+      .extend([
+        fontdb::Family::Name("BIZ UDMincho"),
+        fontdb::Family::Name("BIZ UDMincho Medium"),
+        fontdb::Family::Name("Noto Serif CJK JP"),
+      ]),
     _ => {}
   }
 }
@@ -303,6 +354,42 @@ fn specific_fallback_font_paths(family: &str, bold: bool, italic: bool) -> &'sta
     };
   }
 
+  if family.eq_ignore_ascii_case("Yu Gothic") || family.eq_ignore_ascii_case("游ゴシック") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothB.ttc",
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothB.ttc",
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      ],
+    };
+  }
+
+  if family.eq_ignore_ascii_case("BIZ UD明朝 Medium")
+    || family.eq_ignore_ascii_case("BIZ UD明朝")
+    || family.eq_ignore_ascii_case("BIZ UDMincho Medium")
+    || family.eq_ignore_ascii_case("BIZ UDMincho")
+  {
+    return match (bold, italic) {
+      (true, true) | (true, false) | (false, true) | (false, false) => &[
+        "/usr/share/fonts/truetype/Fonts/BIZ-UDMinchoM.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+      ],
+    };
+  }
+
   &[]
 }
 
@@ -311,18 +398,24 @@ fn generic_fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static s
     (true, true) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ],
     (true, false) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ],
     (false, true) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ],
     (false, false) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
       "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
       "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
       "/usr/share/fonts/truetype/ubuntu/Ubuntu[wdth,wght].ttf",

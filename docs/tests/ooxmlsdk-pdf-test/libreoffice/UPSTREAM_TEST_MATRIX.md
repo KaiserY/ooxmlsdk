@@ -1,13 +1,13 @@
-# LibreOffice DOCX/PPTX -> PDF Upstream Test Matrix
+# LibreOffice OOXML -> PDF Upstream Test Matrix
 
 This matrix tracks LibreOffice upstream tests that are useful for calibrating
-`ooxmlsdk-pdf` DOCX/PPTX -> PDF rendering. The source of truth is the local
+`ooxmlsdk-pdf` DOCX/PPTX/XLSX -> PDF rendering. The source of truth is the local
 LibreOffice checkout at `../core`.
 
-This is intentionally not a DOCX/PPTX parser/import matrix. Pure UNO model checks,
-OOXML export XML checks, round-trip checks, editing mechanics, and package/security
-tests stay out unless the upstream assertion can be faithfully projected to a
-PDF-visible property.
+This is intentionally not a DOCX/PPTX/XLSX parser/import matrix. Pure UNO model
+checks, OOXML export XML checks, round-trip checks, editing mechanics, and
+package/security tests stay out unless the upstream assertion can be faithfully
+projected to a PDF-visible property.
 
 ## Inclusion Rules
 
@@ -16,11 +16,11 @@ PDF-visible property.
   and a Rust PDF test asserts the upstream-backed behavior.
 - `planned` means the upstream test already exports or inspects PDF output, but
   no local Rust PDF test exists yet.
-- `mapped` means the upstream assertion is DOCX -> PDF visible-output evidence
-  and is an active long-term TDD target. It may still need projection to PDF
-  text/path/image/color/bounds/raster assertions before a concrete Rust test is
-  written.
-- `review` means the broad scan found a DOCX test with PDF/layout/metafile/
+- `mapped` means the upstream assertion is source OOXML -> PDF visible-output
+  evidence and is an active long-term TDD target. It may still need projection
+  to PDF text/path/image/color/bounds/raster assertions before a concrete Rust
+  test is written.
+- `review` means the broad scan found an OOXML test with PDF/layout/metafile/
   bitmap signals, but the test still needs semantic review before it is promoted
   to `mapped`.
 - `deferred` means the source is useful background only; do not migrate until a
@@ -31,8 +31,8 @@ PDF-visible property.
 
 ## Rust Portability Gate
 
-This matrix is a DOCX -> rendered PDF matrix, not a LibreOffice UNO model
-matrix. Missing Rust implementation is not an exclusion reason: matching
+This matrix is a source OOXML -> rendered PDF matrix, not a LibreOffice UNO
+model matrix. Missing Rust implementation is not an exclusion reason: matching
 LibreOffice behavior is the point of this suite. A row is safe to keep as an
 active PDF target when the LibreOffice assertion can be represented now or later
 by one of these Rust-side mechanisms:
@@ -46,8 +46,8 @@ by one of these Rust-side mechanisms:
   render/PDF reference artifacts instead of asserting values invented from the
   current Rust output
 
-Keep tests out of the active PDF target set only when they are not source
-DOCX -> visible PDF behavior, or when no faithful observation path is available.
+Keep tests out of the active PDF target set only when they are not source OOXML
+-> visible PDF behavior, or when no faithful observation path is available.
 Do not migrate these as active PDF tests:
 
 - `getShape()`, `XPropertySet`, chart model, style model, importer state, or
@@ -70,7 +70,7 @@ outputs. For this matrix, `covered` direct-PDF rows are the direct analogue;
 |---|---:|---:|---|
 | Direct PDF/object | `Direct PDF Tests` covered rows | 10 | Expressed with current PDF extraction assertions. |
 | Covered supplemental | `Covered Supplemental Tests` rows | 7 | Already represented locally with source-backed visible PDF color/alpha/text assertions. |
-| Projection required | `mapped` rows | 0 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
+| Projection required | `mapped` rows | 0 | Active source OOXML -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
 | Review only | `review` rows | 0 | Broad-scan rows have been item-reviewed in this pass. |
 | Deferred/excluded | `deferred` / `excluded` rows | 36 | Keep out of the active PDF migration queue. |
 
@@ -118,7 +118,7 @@ test harness convenience, not a capability blocker.
   marked `deferred`.
 - Main high-value sources:
   - direct PDF export suites: `vcl/qa/cppunit/pdfexport`, scattered Writer/SVX
-    direct PDF export tests
+    direct PDF export tests, and `sc/qa/extras/scpdfexport.cxx`
   - Writer layout dump and metafile tests: `sw/qa/core/*`,
     `sw/qa/extras/layout/layout*.cxx`
   - tiled bitmap render tests: `sw/qa/extras/tiledrendering`
@@ -816,3 +816,177 @@ unchanged.
 | `sd/qa/unit/activex-controls-tests.cxx` | `deferred` | ActiveX/control UNO state is not PDF output unless a visible rendered-control or PDF widget assertion is defined. |
 | `sd/qa/unit/uiimpress.cxx` | `deferred` | UI command/editor tests are not source PPTX -> static rendered PDF tests. |
 | `sd/qa/unit/TextFittingTest.cxx` | `deferred` | PPTX references are comment-only visual comparison documents, not automated LibreOffice assertions to port. |
+
+## Calc XLSX PDF Candidates
+
+This section is the XLSX -> PDF queue. It uses LibreOffice Calc as the primary
+source, but keeps the same inclusion gate as DOCX/PPTX: an active row needs an
+upstream assertion that can be represented as final output. Calc import/model
+assertions are not copied literally; keep them only when the asserted model
+state changes visible PDF text, page count, path/image geometry, color, raster
+output, annotations, or widgets.
+
+The full local scan currently finds 389 `.xlsx`/`.xlsm` fixture files in
+`../core/sc/qa` fixture roots and 384 direct test references in Calc QA sources.
+The complete XLSX PDF audit is in the same order as DOCX/PPTX, but not every
+fixture becomes a PDF test. After screening against LibreOffice assertions, the
+active test set should be the subset with a visible print/PDF consequence; pure
+formula/model/security/XML-only rows stay deferred. The 30 individually mapped
+rows below are the already-reviewed source-backed examples; the coverage
+buckets define the full audit surface that must be screened before tests are
+written.
+
+### Calc XLSX Inclusion Notes
+
+- Prefer source `.xlsx` / `.xlsm` fixtures under `../core/sc/qa/unit/data/xlsx`
+  or `../core/sc/qa/extras/testdocuments` only when a visible PDF projection
+  exists.
+- Factory-created or ODS-backed direct PDF tests from
+  `sc/qa/extras/scpdfexport.cxx` may seed XLSX fixtures only when the expected
+  value comes directly from the LibreOffice PDF assertion.
+- Selection, UNO-command, PDFUA structure, export XML, and crash-only tests are
+  not active XLSX PDF tests unless a concrete static PDF-visible assertion is
+  added.
+- Do not migrate Calc model checks such as `GetCondFormat()`,
+  `GetRowHeight()`, `GetAnchorType()`, or `assertXPath()` literally. Convert the
+  asserted state to a rendered PDF consequence: text content/order/bounds,
+  page count, path color/count/bounds, image visibility, annotation/link target,
+  or raster region.
+- Each referenced XLSX/XLSM fixture must land in exactly one of the screened
+  rendering buckets or a deferred bucket. Do not add a smoke test just because a
+  fixture opens; that is import coverage, not XLSX -> PDF rendering coverage.
+
+### Calc XLSX Screening Result
+
+The DOCX/PPTX test standard requires source-backed output assertions. For XLSX,
+that means:
+
+- `active`: direct `scpdfexport.cxx` PDF assertions, Calc model assertions with a
+  concrete print consequence, or drawing/chart/theme assertions whose visible
+  result can be observed in PDF text/path/image/color/bounds/raster output.
+- `deferred`: formula correctness without cached display text, export XML,
+  round-trip/package structure, pivot cache/filter internals, external links,
+  XML maps, protection, sheet views, UI workflows, crash-only rows, and ODS/XLS
+  source tests without an XLSX equivalent.
+- `review`: fixture families where the source test is model-only but the fixture
+  may contain a stable visible rendering assertion after manual inspection.
+
+Approximate screened buckets:
+
+| Tier | Approx. rows | Meaning |
+|---|---:|---|
+| Direct Calc PDF assertions | 4 active + 1 planned | Exact page-count/text assertions from `scpdfexport.cxx`; ODS/XLS/PDFUA/crash-only cases remain deferred. |
+| Reviewed seed XLSX rows | 30 | Individually listed below; rows are `mapped` only when the upstream assertion already has a concrete PDF projection, otherwise `review`. |
+| Additional rendering-family review | 200-260 | Needs per-test promotion from the buckets below; likely source of the final large XLSX suite. |
+| Deferred/non-target | 90-140 | Import/model/security/XML/UI rows that should not become PDF tests without a new visible assertion. |
+
+### Calc XLSX Complete Coverage Buckets
+
+These buckets are the full audit target, not an instruction to write one test
+per fixture. Rows list fixture families instead of single tests when
+LibreOffice has many model tests over the same rendering surface. Promote a row
+to a Rust test only after the specific upstream assertion has been checked and
+the PDF projection is concrete.
+
+| Bucket | Fixture/test families | Status | PDF projection |
+|---|---|---|---|
+| Whole-document smoke and page construction | `universal-content.xlsx`, `universal-content-strict.xlsx`, `bug-fixes.xlsx`, `empty.xlsx`, `empty-noconf.xlsx`, `forcepoint97.xlsx`, `too-many-cols-rows.xlsx`, `value-in-column-2000.xlsx`, `row-index-1-based.xlsx`, `forum-mso-en4-134670.xlsx`, `forum-mso-en4-145327.xlsx`, `forum-mso-de-104083.xlsx`, `tdf171828_fail_to_import_file.xlsx`, `tdf82984_zip64XLSXImport.xlsx` | `review` / `deferred` | Promote only if source asserts printed page count, visible first/last text, or blank-page behavior. Crash-only/open-only rows stay deferred. |
+| Print setup, paper, scale, breaks, grid, hidden rows/sheets | `page_scale.xlsx`, `tdf136721_letter_sized_paper.xlsx`, `tdf126541_GridOff.xlsx`, `tdf105840_allRowsHidden.xlsx`, `hidden_sheets.xlsx`, `freezePaneStartCell.xlsx`, `split-panes.xlsx`, `page-view.xlsx`, `NamedSheetViews.xlsx`, `open-as-read-only.xlsx` | `mapped` for paper/grid/page-break rows; otherwise `deferred` | PDF page dimensions/count, printed grid-line paths, hidden sheet/page omission, and page order. Freeze/split/named-sheet-view/read-only rows are UI/model metadata unless printed output differs. |
+| Row, column, and cell metric sizing | `tdf123026_optimalRowHeight.xlsx`, `tdf159581_optimalRowHeight.xlsx`, `tdf144642_RowHeight_10mm_SavedByCalc.xlsx`, `tdf144642_RowHeight_28.35pt_SavedByExcel.xlsx`, `tdf145129_DefaultRowHeight_28.35pt_SavedByExcel.xlsx`, `miscrowheights.xlsx`, `different-column-width-excel2010.xlsx`, `column-style.xlsx`, `column-style-autofilter.xlsx`, `column_style.xlsx`, `RowImportCellStyleIssue.xlsx`, `tdf110440.xlsx`, `tdf130104_indent.xlsx`, `tdf153767.xlsx`, `tdf161301.xlsx` | `mapped` / `review` | Promote row/column metric assertions when they affect PDF text/path bounds: clipped wrapped text, over-expanded rows, indentation/alignment positions, or grid geometry. Pure `GetRowHeight()` equality with no visible fixture text stays review. |
+| Cell values, shared strings, formulas as cached display text | `cell-value.xlsx`, `check-boolean.xlsx`, `ref_string.xlsx`, `shared-formula/basic.xlsx`, `shared-formula/refupdate.xlsx`, `shared-formula/3d-reference.xlsx`, `shared-formula/text-results.xlsx`, `functions-excel-2010.xlsx`, `ceiling-floor.xlsx`, `matrix-multiplication.xlsx`, `tdf169072_illegalDates.xlsx`, `tdf165180_date1904.xlsx`, `tdf169326_ignore_line_breaks_in_referenced_cells.xlsx`, `escape-unicode.xlsx`, `tdf120301_xmlSpaceParsing.xlsx`, `preserve-whitespace.xlsx`, `preserve_space.xlsx`, `cell-multi-line.xlsx` | `mapped` only for cached display text; formula/model rows `deferred` | PDF text content/order, multiline segmentation, Unicode/space preservation, and date-system display. Do not port formula token/value correctness without visible cached string evidence. |
+| Number format rendering | `formats.xlsx`, `seconds-without-truncate-and-decimals.xlsx`, `embedded-text-in-decimal.xlsx`, `orderOfCNumFmtElements.xlsx`, `tdf165503.xlsx`, `tdf165655.xlsx`, `tdf165886.xlsx`, `tdf166413.xlsx`, `tdf166712.xlsx`, `tdf142929.xlsx`, `tdf144397.xlsx`, `tdf148820.xlsx`, `tdf58243.xlsx` | `mapped` / `review` | Rendered cell strings for built-in/custom formats, sections, literal text, seconds/decimals, date/time, percent/currency, and no `###` fallback. Rows whose source only checks XML order or defined-name metadata stay deferred. |
+| Fonts, text style, rich text, and text effects | `fontSize.xlsx`, `TextColor.xlsx`, `underlineColor.xlsx`, `strike-through.xlsx`, `textbox-CharKerningSpace.xlsx`, `textbox-CondensedCharacterSpace.xlsx`, `tdf122716_font_with_charset.xlsx`, `tdf137000_export_upright.xlsx`, `tdf106197_import_upright.xlsx`, `writingMode.xlsx`, `tdf151818_SmartartThemeFontColor.xlsx`, `Test_ThemeColor_Text_Background_Border.xlsx`, `CalcThemeTest.xlsx` | `mapped` / `review` | PDF text font size/family where extractable, fill color, underline/strikeout paths, kerning/condensed bounds, upright/rotated text, and theme-derived colors. Promote only source assertions about visible glyph style/position/color. |
+| Fills, borders, colors, and themes | `cell-borders.xlsx`, `tdf152581_bordercolorNotExportedToXLSX.xlsx`, `tdf135828_Shape_Rect.xlsx`, `tdf123139_applyAlignment.xlsx`, `tdf151755_stylesLostOnXLSXExport.xlsx`, `xf_default_values.xlsx`, `Book1_custom.xlsx`, `CalcThemeTest.xlsx`, `Test_ThemeColor_Text_Background_Border.xlsx`, `tdf134459_HeaderFooterColor.xlsx`, `tdf134817_HeaderFooterTextWith2Section.xlsx`, `tdf134826.xlsx` | `mapped` / `review` | PDF path stroke/fill color and bounds, inherited style effects, header/footer text/color, and theme/palette/tint resolution. XML style defaults without a rendered consequence stay deferred. |
+| Conditional formatting | `condFormat_cellis.xlsx`, `cond_parent.xlsx`, `cond_format_theme_color2.xlsx`, `cond_format_theme_color3.xlsx`, `condformat_theme_color.xlsx`, `colorscale.xlsx`, `colorscale_num_with_ref.xlsx`, `databar.xlsx`, `condformat_databar.xlsx`, `conditional_fmt_checkpriority.xlsx`, `conditional_fmt_origin.xlsx`, `complex_icon_set.xlsx`, `new_cond_format_test.xlsx`, `new_cond_format_test_export.xlsx`, `tdf167019.xlsx`, `tdf170298.xlsx`, `tdf162948.xlsx`, `tdf155321.xlsx`, `tdf156028.xlsx`, `tdf138601.xlsx`, `tdf139928.xlsx`, `tdf113013.xlsx`, `tdf120749.xlsx`, `tdf122102.xlsx`, `tdf169379.xlsx` | `review`, promote visible formatting rows | Active only when the rule changes final PDF fill/text/border/icon/data-bar output. Rule count, operator, priority, sqref, and x14 XML/model assertions remain deferred unless the row names final rendered cells. |
+| Hyperlinks, annotations, comments, and cell notes | `hyperlinks.xlsx`, `hyperlink.xlsx`, `hyperlink_export.xlsx`, `hyperlink_formula.xlsx`, `image_hyperlink.xlsx`, `chart_hyperlink.xlsx`, `textbox-hyperlink.xlsx`, `cell-note.xlsx`, `threadedComment.xlsx`, `tdf117287_comment.xlsx` | `mapped` / `review` | PDF link annotations and target URIs, visible linked text/image bounds, and comment/note annotation output. Threaded-comment/model-only rows stay deferred unless exported PDF annotations are asserted. |
+| Drawings, images, shapes, controls, and anchors | `groupShape.xlsx`, `hiddenShape.xlsx`, `cell-anchored-hidden-shapes.xlsx`, `tdf169496_hidden_graphic.xlsx`, `tdf166724_cellAnchor.xlsx`, `testShapeAutofit.xlsx`, `testShapeRotationImport.xlsx`, `testShapeDisplacementOnRotationImport.xlsx`, `tdf139763ShapeAnchor.xlsx`, `twoCellAnchor_editAs_oneCell.xlsx`, `tdf135828_Shape_Rect.xlsx`, `tdf111980_radioButtons.xlsx`, `singlecontrol.xlsx`, `button-form-control.xlsx`, `checkbox-form-control.xlsx`, `activex_checkbox.xlsx`, `hiddenButton.xlsx`, `shape-macro-ext-ref.xlsx`, `tdf60673.xlsx`, `tdf70455.xlsx`, `tdf119190.xlsx`, `tdf147014.xlsx`, `tdf141644.xlsx`, `tdf104310.xlsx`, `tdf104310-2.xlsx` | `mapped` / `review` | PDF shape/image/control visibility, object bounds from cell anchors, hidden object omission, rotation/autofit geometry, and form-control rendered/widget output. Macro reference and control model properties without visible output stay deferred. |
+| Charts, SmartArt, sparklines, and graphic frames | `tdf83671_SmartArt_import.xlsx`, `tdf151818_SmartartThemeFontColor.xlsx`, `Sparklines.xlsx`, `tdf142851.xlsx`, `tdf64086.xlsx`, `chart_hyperlink.xlsx`, `pivot_dark1.xlsx` | `review`, promote rendered-output rows | Visible SmartArt/chart/sparkline text, shape colors, line/path geometry, and link annotations. Chart model XML/cache assertions stay deferred. |
+| Tables, autofilter, database ranges, and visible table style | `TableStyleTest.xlsx`, `TableEmptyHeaders.xlsx`, `totalsRowFunction.xlsx`, `totalsRowShown.xlsx`, `tdf162963_TableWithTotalsEnabled.xlsx`, `autofilter.xlsx`, `autofilterShowButton.xlsx`, `autofilter-colors.xlsx`, `autofilter-colors-fg.xlsx`, `autofilternamedrange.xlsx`, `dateAutofilter.xlsx`, `tdf143068_top10filter.xlsx`, `database.xlsx`, `tablerefsnamed.xlsx`, `column-style-autofilter.xlsx`, `tdf116818.xlsx`, `tdf137626.xlsx`, `tdf140469.xlsx`, `tdf140968.xlsx`, `tdf142579.xlsx`, `tdf142580.xlsx`, `time_value.xlsx` | `review` / `deferred` | Promote only visible filtered/table rows, table style fills/borders, hidden rows, totals-row text, and printable filter buttons. Filter XML/model rows stay deferred. |
+| Pivot tables and pivot formatting | `pivot/*.xlsx`, `pivot-table/*.xlsx`, `tdf89139_pivot_table.xlsx`, `pivot_table_first_header_row.xlsx`, `pivottable_*.xlsx`, `PivotTable_CachedDefinitionAndData*.xlsx`, `PivotTableWithNoSourceData.xlsx`, `Pivot_Table_with_Cell_Protection.xlsx` | `review` / `deferred` | Promote rendered pivot table text/order/style and visible pivot formatting only. Cache definitions, filters, calculated fields, grouping internals, and source-data sync assertions stay deferred. |
+| Workbook metadata, protection, external links, XML maps, query tables | `external-refs.xlsx`, `XlStartupExternal.xlsx`, `MissingPathExternal.xlsx`, `tdf76047_externalLink.xlsx`, `tdf138741_externalLinkSkipUnusedsCrash.xlsx`, `customxml.xlsx`, `tdf167689_xmlMaps_and_xmlColumnPr.xlsx`, `tdf167689_x15_namespace.xlsx`, `queryTableExport.xlsx`, `enhanced-protection.xlsx`, `enhancedProtectionRangeShorthand.xlsx`, `ProtecteSheet1234Pass.xlsx`, `tdfSheetProts.xlsx`, `open-as-read-only.xlsx`, `NamedSheetViews.xlsx`, `sheet-names.xlsx`, `sheet-tab-color.xlsx` | `deferred` | Import/package evidence only unless a separate source assertion names visible worksheet output. Do not add PDF tests for metadata alone. |
+| Change tracking, revisions, macros, VBA, security, malformed packages | `change-tracking.xlsx`, `track-changes/simple-cell-changes.xlsx`, `*.xlsm` fixtures, `forcepoint107.xlsx`, `pass/CVE-*.xlsx`, `tdf131575.xlsx`, `tdf76115.xlsx`, `tdf121887.xlsx`, `tdf124525.xlsx`, `tdf130959.xlsx`, `tdf131380.xlsx`, `hashIncompatible.xlsx`, password/read-only UI fixtures | `deferred` unless final visible output is specified | Security/crash/macro/change-tracking workflows are not static PDF rendering tests. Promote only rows with a concrete visible PDF assertion. |
+
+### Calc XLSX Full Fixture Audit
+
+The complete fixture audit currently covers these roots:
+
+- `sc/qa/unit/data/xlsx`: 300+ XLSX files, including subdirectories
+  `pivot/`, `pivot-table/`, `shared-formula/`, `data-table/`, `track-changes/`,
+  and `pass/`.
+- `sc/qa/uitest/data`: UI-owned XLSX fixtures such as autofilter, chart, grid,
+  password/read-only, conditional-format copy/paste, and validity samples.
+- `sc/qa/unit/uicalc/data` and `sc/qa/unit/tiledrendering/data`: view/layout
+  fixtures such as grid visibility, page view, split panes, locale formatting,
+  and validation samples.
+- `sc/qa/extras/testdocuments`: XLSM/VBA and direct PDF export fixtures, with
+  only `forcepoint97.xlsx` currently source-XLSX in `scpdfexport.cxx`.
+
+When adding tests, preserve this ownership split in fixture paths under
+`test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/`. Do not flatten unrelated
+families into a single smoke file; the matrix target is broad fixture evidence,
+not a small hand-picked compatibility set.
+
+### Calc Direct PDF Tests
+
+| Upstream test | Fixture | Upstream source | Status | PDF assertion to port |
+|---|---|---|---|---|
+| `scpdfexport.cxx::testExportFitToPage_Tdf103516` | `xlsx/tdf103516-fit-to-page.xlsx` to author from upstream scenario | `../core/sc/qa/extras/scpdfexport.cxx:288` | `planned` | With normal scaling, selected ranges export as 2 and 4 pages; after fit-to-width with automatic height, both selected ranges export as 1 page. |
+| `scpdfexport.cxx::testTdf143978` | `xlsx/tdf143978-pdf-text.xlsx` to author from upstream scenario | `../core/sc/qa/extras/scpdfexport.cxx:698` | `mapped` | One-page PDF has two text objects: `Dies ist viel zu viel Text` and `2021-11-17`; the date must not become `###`. |
+| `scpdfexport.cxx::testTdf120190` | `xlsx/tdf120190-newline-value.xlsx` to author from upstream scenario | `../core/sc/qa/extras/scpdfexport.cxx:739` | `mapped` | One-page PDF text objects include header/footer text and separate cell text objects `5` and `6`; the newline value must not collapse to `56`. |
+| `scpdfexport.cxx::testTdf84012` | `xlsx/tdf84012-long-parenthesized-text.xlsx` to author from upstream scenario | `../core/sc/qa/extras/scpdfexport.cxx:806` | `mapped` | Extracted PDF text is `Blah blah (blah, blah)`, not clipped to `Blah blah`. |
+| `scpdfexport.cxx::testTdf64703_hiddenPageBreak` | `xlsx/tdf64703-hidden-page-break.xlsx` to author from upstream scenario | `../core/sc/qa/extras/scpdfexport.cxx:400` | `mapped` | Selected `A1:A11` range exports as 4 pages, preserving hidden/manual page-break behavior. |
+
+### Calc XLSX Mapped Rendering Candidates
+
+| Upstream test | Fixture | Source file | Status | PDF projection |
+|---|---|---|---|---|
+| `ScFiltersTest2::testTdf123026_optimalRowHeight` | `xlsx/tdf123026_optimalRowHeight.xlsx` | `../core/sc/qa/unit/subsequent_filters_test2.cxx:153` | `mapped` | Project optimal imported row height to PDF text bounds: wrapped/multiline text must fit inside the row and remain visible. |
+| `ScFiltersTest2::testTdf159581_optimalRowHeight` | `xlsx/tdf159581_optimalRowHeight.xlsx` | `../core/sc/qa/unit/subsequent_filters_test2.cxx:164` | `mapped` | Project imported optimal row height to PDF row geometry: the first row on sheet 2 should not be over-expanded. |
+| `ScExportTest4::testTdf144642_RowHeightRounding_saveByCalc` | `xlsx/tdf144642_RowHeight_10mm_SavedByCalc.xlsx` | `../core/sc/qa/unit/subsequent_export_test4.cxx:982` | `mapped` | Project Calc-saved 10 mm row-height preservation to PDF grid/text vertical positions. |
+| `ScExportTest4::testTdf144642_RowHeightRounding_saveByExcel` | `xlsx/tdf144642_RowHeight_28.35pt_SavedByExcel.xlsx` | `../core/sc/qa/unit/subsequent_export_test4.cxx:991` | `mapped` | Project Excel-saved 27.75 pt rounded row height to PDF grid/text vertical positions. |
+| `ScExportTest::testMiscRowHeightExport` | `xlsx/miscrowheights.xlsx` | `../core/sc/qa/unit/subsequent_export_test.cxx:1141` | `mapped` | Project distributed explicit/default row heights to PDF row positions and visible text order. |
+| `ScFiltersTest4::testRowImportCellStyleIssue` | `xlsx/RowImportCellStyleIssue.xlsx` | `../core/sc/qa/unit/subsequent_filters_test4.cxx:1719` | `review` | Source checks row/cell style inheritance; promote only if the fixture exposes a stable PDF text style or filled-cell consequence. |
+| `ScExportTest4::testTdf123139XLSX` | `xlsx/tdf123139_applyAlignment.xlsx` | `../core/sc/qa/unit/subsequent_export_test4.cxx:568` | `mapped` | Project `applyAlignment` inheritance to PDF text placement: alignment/wrap should affect cell text bounds. |
+| `ScExportTest5::testSecondsWithoutTruncateAndDecimals` | `xlsx/seconds-without-truncate-and-decimals.xlsx` | `../core/sc/qa/unit/subsequent_export_test5.cxx:577` | `mapped` | Project `[SS].00` number format to rendered PDF text with seconds and decimals preserved. |
+| `ScExportTest5::testEmbeddedTextInDecimal` | `xlsx/embedded-text-in-decimal.xlsx` | `../core/sc/qa/unit/subsequent_export_test5.cxx:623` | `mapped` | Project embedded literal text in decimal number format to PDF cell text. |
+| `ScExportTest::testCellBordersXLSX` | `xlsx/cell-borders.xlsx` | `../core/sc/qa/unit/subsequent_export_test.cxx:2272` | `mapped` | Project imported cell borders to PDF path count, stroke colors, and bounds. |
+| `CondFormatTest::testCondFormatImportCellIs` | `xlsx/condFormat_cellis.xlsx` | `../core/sc/qa/unit/cond_format.cxx:453` | `review` | Source checks conditional-format operations and expressions. Promote only if the tested rules produce stable PDF dxf paint on named cells. |
+| `CondFormatTest::testCondFormatParentXLSX` | `xlsx/cond_parent.xlsx` | `../core/sc/qa/unit/cond_format.cxx:566` | `review` | Source checks conditional-format parent/alignment model. Promote only with a PDF text vertical-alignment assertion. |
+| `CondFormatTest::testCondFormatThemeColor2XLSX` | `xlsx/cond_format_theme_color2.xlsx` | `../core/sc/qa/unit/cond_format.cxx:434` | `review` | Source checks theme-derived data-bar/axis colors in the model. Promote only with PDF path/raster color samples. |
+| `CondFormatTest::testCondFormatThemeColor3XLSX` | `xlsx/cond_format_theme_color3.xlsx` | `../core/sc/qa/unit/cond_format.cxx:363` | `review` | Source checks theme-derived color-scale/data-bar colors in the model. Promote only with PDF path/raster color samples. |
+| `CondFormatTest::testColorScaleNumWithRefXLSX` | `xlsx/colorscale_num_with_ref.xlsx` | `../core/sc/qa/unit/cond_format.cxx:345` | `review` | Source checks formula reference in the color-scale entry. Promote only if rendered PDF cell colors distinguish the referenced value. |
+| `CondFormatTest::testColorScaleXLSX` | `xlsx/colorscale.xlsx` | `../core/sc/qa/unit/cond_format.cxx:603` | `review` | Source checks color-scale model entries. Promote only with PDF/raster background-color assertions. |
+| `CondFormatTest::testDataBarXLSX` | `xlsx/databar.xlsx` | `../core/sc/qa/unit/cond_format.cxx:585` | `review` | Source checks data-bar model. Promote only with PDF bar geometry and fill-color assertions. |
+| `CondFormatTest::testCondFormatCfvoScaleValueXLSX` | `xlsx/condformat_databar.xlsx` | `../core/sc/qa/unit/cond_format.cxx:1039` | `review` | Source checks explicit data-bar lower/upper values. Promote only when PDF bar widths are asserted. |
+| `CondFormatTest::testConditionalFormatPriorityCheckXLSX` | `xlsx/conditional_fmt_checkpriority.xlsx` | `../core/sc/qa/unit/cond_format.cxx:1109` | `review` | Source checks normal vs x14 conditional-format priority. Promote only with final rendered cell fill selection. |
+| `ScExportTest2::testGroupShape` | `xlsx/groupShape.xlsx` | `../core/sc/qa/unit/subsequent_export_test2.cxx:51` | `mapped` | Project group shape import to visible PDF shape/text items and grouped bounds. |
+| `ScExportTest2::testTdf166724_cellAnchor` | `xlsx/tdf166724_cellAnchor.xlsx` | `../core/sc/qa/unit/subsequent_export_test2.cxx:89` | `mapped` | Project cell-anchored control position to PDF object bounds derived from row/column metrics. |
+| `ScExportTest2::testTdf91634XLSX` | `xlsx/image_hyperlink.xlsx` | `../core/sc/qa/unit/subsequent_export_test2.cxx:1208` | `mapped` | Project image hyperlink to visible image object and PDF link annotation target. |
+| `ScExportTest3::testHiddenShapeXLSX` | `xlsx/hiddenShape.xlsx` | `../core/sc/qa/unit/subsequent_export_test3.cxx:1589` | `mapped` | Project hidden shape state to PDF object absence while visible shapes remain. |
+| `ScExportTest4::testtdf169496_hidden_graphic` | `xlsx/tdf169496_hidden_graphic.xlsx` | `../core/sc/qa/unit/subsequent_export_test4.cxx:939` | `mapped` | Project hidden picture state to PDF image absence/presence by graphic name order. |
+| `ScExportTest3::testShapeAutofitXLSX` | `xlsx/testShapeAutofit.xlsx` | `../core/sc/qa/unit/subsequent_export_test3.cxx:1608` | `review` | Source checks exported DrawingML autofit XML. Promote only after confirming a PDF text-inside-shape assertion on the source fixture. |
+| `ScFiltersTest3::testTdf83671_SmartArt_import` | `xlsx/tdf83671_SmartArt_import.xlsx` | `../core/sc/qa/unit/subsequent_filters_test3.cxx:1475` | `review` | Source checks SmartArt import model/fallback. Promote only with visible PDF text/shape geometry. |
+| `ScExportTest4::testTdf136721_paper_size` | `xlsx/tdf136721_letter_sized_paper.xlsx` | `../core/sc/qa/unit/subsequent_export_test4.cxx:914` | `mapped` | Project imported paper size to PDF page dimensions. |
+| `ScFiltersTest::testHyperlinksXLSX` | `xlsx/hyperlinks.xlsx` | `../core/sc/qa/unit/subsequent_filters_test.cxx:635` | `mapped` | Project cell hyperlinks to PDF link annotations and visible linked text. |
+| `ScUiCalcTest::testTdf142854_GridVisibilityImportXlsxInHeadlessMode` | `tdf126541_GridOff.xlsx` | `../core/sc/qa/unit/uicalc/uicalc.cxx:66` | `review` | Source checks view grid visibility. Promote only if Calc PDF export prints or suppresses grid-line paths from that setting. |
+| `calc_tests9/tdf126541_GridVisibilityImportXlsx.py` | `tdf126541_GridOff.xlsx` | `../core/sc/qa/uitest/calc_tests9/tdf126541_GridVisibilityImportXlsx.py:24` | `deferred` | Duplicate UI workflow for the same grid-visibility fixture; keep out unless it adds a distinct PDF-visible assertion. |
+
+### Calc XLSX Deferrals And Non-Targets
+
+| Source or fixture | Status | Reason |
+|---|---|---|
+| `scpdfexport.cxx::testForcepoint97` and `forcepoint97.xlsx` | `deferred` | Source XLSX exists, but the upstream assertion is crash-free PDF export only; no visible PDF behavior is asserted. |
+| `scpdfexport.cxx::testExportRange_Tdf120161` | `deferred` | Factory-created document plus selection export. Promote only after `ooxmlsdk-pdf` exposes a selection/range PDF option or a source XLSX fixture with equivalent print-area semantics. |
+| `scpdfexport.cxx::testUnoCommands_Tdf120161` and `tdf120161.ods` | `deferred` | UNO command/UI workflow and ODS source; not a source XLSX -> static PDF fixture. |
+| `scpdfexport.cxx::testTdf78897` and `tdf78897.xls` | `deferred` | Binary XLS source. The expected text ` 11.00 11.00` is useful evidence for text width/number display, but it needs an XLSX source fixture before entering this lane. |
+| `scpdfexport.cxx::testMediaShapeScreen_Tdf159094` | `deferred` | ODS source and crash-only export. |
+| `scpdfexport.cxx::testPopupRectangleSize_Tdf162955` | `deferred` | ODS comment popup annotation; useful PDF behavior, but no XLSX source fixture identified in this pass. |
+| `scpdfexport.cxx::testTdf159068` | `deferred` | ODS/PDFUA artifact structure assertion. Keep out until XLSX PDF tagging is a target and a source XLSX fixture exists. |
+| `scpdfexport.cxx::testTdf159067` | `deferred` | ODS/PDFUA artifact structure assertion for textbox tagging, not current XLSX visible-rendering scope. |
+| `scpdfexport.cxx::testTdf159066` | `deferred` | ODS OLE alt-text PDF structure assertion, not source XLSX visible rendering. |
+| `scpdfexport.cxx::testTdf159065` | `deferred` | ODS tagged-link marked-content assertion; prefer visible link annotation tests for XLSX first. |
+| `scpdfexport.cxx::testTdf123870` | `deferred` | ODS tagged PDF structure/artifact nesting assertion; not current XLSX PDF rendering surface. |
+| `scpdfexport.cxx::testTdf156893` | `deferred` | FODS + `SinglePageSheets` option and PDF import guard; add only after XLSX option support and a source XLSX fixture exist. |
+| `sc/qa/unit/subsequent_export_test*.cxx` XML-only rows | `deferred` | Export XML assertions such as `assertXPath()` are not PDF-visible unless a row above names the rendered consequence. |
+| `sc/qa/unit/*` formula, pivot, external-link, validation, table, metadata, or protection rows | `deferred` | Import/model behavior. Promote only when final static PDF output has a concrete text/path/image/annotation/page assertion. |
+| `sc/qa/uitest/*` UI workflow rows | `deferred` | UI command/editor state is not source XLSX -> static PDF rendering unless tied to a source fixture and visible PDF assertion. |

@@ -191,7 +191,16 @@ Landed owner modules:
   from/to markers, extents, `editAs`, client data flags, object kind,
   non-visual id/name/description/hidden state, picture relationship ids,
   graphic frame URIs, content-part relationships, and child chart/diagram/media
-  resources.
+  resources. Chart import preserves `chartSpace` / `chartEx` root state,
+  external-data relationships, pivot/source/protection/title/legend/3D/axis
+  markers, chart type groups, print/user-shape markers, extension markers,
+  chartex data/series counts, and chart drawing/package/theme/style/color-style
+  child relationships for the later `ExcelChartConverter`-shaped bridge.
+  SmartArt import preserves the diagram data/layout/style/color/persisted
+  drawing roots, relationship ids, data points/connections, layout node
+  algorithm/control-flow stats, style/color labels, persisted drawing
+  shapes/groups, child images, and extension markers for the later
+  `oox::drawingml::diagram`-shaped bridge.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
   worksheet/chartsheet page setup import, including header/footer text
   channels, header/footer drawing and legacy drawing relationships, background
@@ -1087,7 +1096,9 @@ scope:
   parser/current sheet, while literal series data stays as chart-local cached
   data. Do not route XLSX charts through a presentation-only converter.
 - SmartArt/diagram records must preserve dm/lo/qs/cs relationship ids and the
-  resolved typed diagram resources. Excel has a specific `tdf#83671` path where
+  resolved typed diagram resources: data points/connections, layout
+  definitions, style/color transforms, persisted drawing shape trees, child
+  images, and extension markers. Excel has a specific `tdf#83671` path where
   diagram import may need the anchor-derived size before regenerating shapes;
   model this as a worksheet drawing finalization branch, not as display repair.
 - VML/comment/control/OLE drawing state must stay in worksheet/VML owners. VML

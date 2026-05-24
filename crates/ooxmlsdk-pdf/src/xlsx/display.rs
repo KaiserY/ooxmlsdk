@@ -708,6 +708,201 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     ));
   }
 
+  if chart_count > 0 {
+    let charts = sheet
+      .resources
+      .drawings
+      .iter()
+      .flat_map(|drawing| drawing.charts.iter().chain(drawing.extended_charts.iter()));
+    let mut extended = 0usize;
+    let mut chart_types = 0usize;
+    let mut axes = 0usize;
+    let mut flags = 0usize;
+    let mut relationships = 0usize;
+    let mut text_len = 0usize;
+    let mut data_sets = 0usize;
+    let mut series = 0usize;
+    for chart in charts {
+      extended += usize::from(chart.extended);
+      chart_types += chart.chart_type_groups;
+      axes += chart.axes;
+      flags += usize::from(chart.has_fallback_image)
+        + usize::from(chart.date1904)
+        + usize::from(chart.rounded_corners)
+        + usize::from(chart.has_style)
+        + usize::from(chart.has_pivot_source)
+        + chart.protection_flags
+        + usize::from(chart.has_title)
+        + usize::from(chart.has_3d_view)
+        + usize::from(chart.has_legend)
+        + chart.chart_flags
+        + usize::from(chart.has_root_shape_properties)
+        + usize::from(chart.has_text_properties)
+        + usize::from(chart.external_data_auto_update)
+        + usize::from(chart.has_print_settings)
+        + usize::from(chart.has_user_shapes_reference)
+        + chart.extension_markers;
+      relationships += usize::from(chart.relationship_id.is_some())
+        + usize::from(chart.external_data_relationship_id.is_some())
+        + usize::from(chart.has_chart_drawing)
+        + usize::from(chart.has_embedded_package)
+        + chart.images
+        + usize::from(chart.has_theme_override)
+        + chart.styles
+        + chart.color_styles;
+      text_len += chart
+        .relationship_id
+        .as_ref()
+        .map_or(0, |value| value.len())
+        + chart.version_len
+        + chart.feature_list_len
+        + chart
+          .external_data_relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len());
+      data_sets += chart.chartex_data_sets;
+      series += chart.chartex_series;
+    }
+    lines.push(format!(
+      "charts total={} extended={} typeGroups={} axes={} flags={} relationships={} textLen={} chartexData={} chartexSeries={}",
+      chart_count,
+      extended,
+      chart_types,
+      axes,
+      flags,
+      relationships,
+      text_len,
+      data_sets,
+      series
+    ));
+  }
+
+  if diagram_count > 0 {
+    let diagrams = sheet
+      .resources
+      .drawings
+      .iter()
+      .map(|drawing| &drawing.diagrams);
+    let mut data_parts = 0usize;
+    let mut layout_parts = 0usize;
+    let mut style_parts = 0usize;
+    let mut color_parts = 0usize;
+    let mut drawing_parts = 0usize;
+    let mut points = 0usize;
+    let mut connections = 0usize;
+    let mut layout_nodes = 0usize;
+    let mut algorithms = 0usize;
+    let mut persisted_shapes = 0usize;
+    let mut flags = 0usize;
+    let mut relationships = 0usize;
+    let mut images = 0usize;
+    let mut text_len = 0usize;
+    for diagram in diagrams {
+      data_parts += diagram.data_parts.len();
+      layout_parts += diagram.layout_parts.len();
+      style_parts += diagram.style_parts.len();
+      color_parts += diagram.color_parts.len();
+      drawing_parts += diagram.drawing_parts.len();
+      for data in &diagram.data_parts {
+        points += data.points + data.unknown_points;
+        connections += data.connections;
+        flags += data.text_points
+          + data.property_sets
+          + data.shape_properties
+          + usize::from(data.background)
+          + usize::from(data.whole)
+          + data.extension_markers;
+        relationships +=
+          usize::from(data.relationship_id.is_some()) + data.slides + data.worksheets;
+        images += data.images;
+        text_len += data.relationship_id.as_ref().map_or(0, |value| value.len()) + data.text_len;
+      }
+      for layout in &diagram.layout_parts {
+        layout_nodes += layout.layout_nodes;
+        algorithms += layout.algorithms;
+        flags += layout.titles
+          + layout.descriptions
+          + usize::from(layout.has_category_list)
+          + usize::from(layout.has_sample_data)
+          + usize::from(layout.has_style_data)
+          + usize::from(layout.has_color_data)
+          + layout.shapes
+          + layout.presentation_of
+          + layout.constraints
+          + layout.rules
+          + layout.variables
+          + layout.for_each
+          + layout.choose
+          + layout.extension_markers;
+        relationships += usize::from(layout.relationship_id.is_some());
+        images += layout.images;
+        text_len += layout
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + layout.text_len;
+      }
+      for style in &diagram.style_parts {
+        flags += style.titles
+          + style.descriptions
+          + usize::from(style.has_categories)
+          + usize::from(style.has_scene3d)
+          + style.labels
+          + style.extension_markers;
+        relationships += usize::from(style.relationship_id.is_some());
+        text_len += style
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + style.text_len;
+      }
+      for color in &diagram.color_parts {
+        flags += color.titles
+          + color.descriptions
+          + usize::from(color.has_categories)
+          + color.labels
+          + color.extension_markers;
+        relationships += usize::from(color.relationship_id.is_some());
+        text_len += color
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + color.text_len;
+      }
+      for drawing in &diagram.drawing_parts {
+        persisted_shapes += drawing.shapes + drawing.groups;
+        flags += drawing.text_shapes
+          + drawing.styled_shapes
+          + drawing.transformed_shapes
+          + drawing.extension_markers;
+        relationships += usize::from(drawing.relationship_id.is_some());
+        images += drawing.images;
+        text_len += drawing
+          .relationship_id
+          .as_ref()
+          .map_or(0, |value| value.len())
+          + drawing.text_len;
+      }
+    }
+    lines.push(format!(
+      "diagrams data={} layouts={} styles={} colors={} drawings={} points={} connections={} layoutNodes={} algorithms={} persistedShapes={} flags={} relationships={} images={} textLen={}",
+      data_parts,
+      layout_parts,
+      style_parts,
+      color_parts,
+      drawing_parts,
+      points,
+      connections,
+      layout_nodes,
+      algorithms,
+      persisted_shapes,
+      flags,
+      relationships,
+      images,
+      text_len
+    ));
+  }
+
   if sheet_relationship_count(sheet) > 0 {
     let relationships = &sheet.resources.relationships;
     let single_xml_cells = relationships

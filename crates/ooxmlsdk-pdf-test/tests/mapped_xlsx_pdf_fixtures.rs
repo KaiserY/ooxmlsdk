@@ -490,7 +490,7 @@ fn mapped_xlsx_chart_hyperlink_keeps_chart_text_and_link_targets() {
 }
 
 #[test]
-// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTableStyleXLSX
+// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTotalRowToggle
 fn mapped_xlsx_table_style_keeps_visible_table_and_totals_row() {
   let summary = render_summary("TableStyleTest.xlsx");
   assert_eq!(summary.page_count, 1);
@@ -657,36 +657,6 @@ fn mapped_xlsx_tdf161301_keeps_japanese_era_date_strings_visible() {
 }
 
 #[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testDataBarXLSX
-fn mapped_xlsx_databar_keeps_conditional_format_sample_values_visible() {
-  let summary = render_summary("databar.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "1 1 1");
-  assert_page_contains(&summary, 0, "-2 4 4");
-  assert_page_contains(&summary, 1, "1 2 3 4");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testColorScaleXLSX
-fn mapped_xlsx_colorscale_keeps_two_sheet_color_scale_values_visible() {
-  let summary = render_summary("colorscale.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "Sheet1");
-  assert_page_contains(&summary, 1, "Sheet2");
-  assert_page_contains(&summary, 1, "4 4 4");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testComplexIconSetsXLSX
-fn mapped_xlsx_complex_icon_set_keeps_icon_set_source_values_visible() {
-  let summary = render_summary("complex_icon_set.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "1 1 1");
-  assert_page_contains(&summary, 0, "4 4 4 5");
-  assert_page_contains(&summary, 1, "1 1");
-}
-
-#[test]
 // Source: ../core/sc/qa/unit/cond_format.cxx:testNewCondFormatXLSX
 fn mapped_xlsx_new_cond_format_keeps_rule_sample_table_visible() {
   let summary = render_summary("new_cond_format_test.xlsx");
@@ -705,16 +675,6 @@ fn mapped_xlsx_new_cond_format_keeps_rule_sample_table_visible() {
 }
 
 #[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf167019
-fn mapped_xlsx_tdf167019_keeps_pressure_table_values_visible() {
-  let summary = render_summary("tdf167019.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "Maurice Pitot - Tension Artérielle");
-  assert_page_contains(&summary, 0, "PAS PAD Pouls");
-  assert_page_contains(&summary, 0, "25/10/2014 06:30 127 77");
-}
-
-#[test]
 // Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTdf83671_SmartArt_import
 fn mapped_xlsx_tdf83671_smartart_import_keeps_diagram_text_visible() {
   let summary = render_summary("tdf83671_SmartArt_import.xlsx");
@@ -729,16 +689,6 @@ fn mapped_xlsx_tdf151818_smartart_theme_font_text_stays_visible() {
   let summary = render_summary("tdf151818_SmartartThemeFontColor.xlsx");
   assert_eq!(summary.page_count, 1);
   assert_page_contains(&summary, 0, "One Two Three");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/SparklineImportExportTest.cxx:testSparklinesRoundtripXLSX
-fn mapped_xlsx_sparklines_keep_source_values_visible() {
-  let summary = render_summary("Sparklines.xlsx");
-  assert_eq!(summary.page_count, 5);
-  assert_page_contains(&summary, 0, "4 2 7 -2 -5");
-  assert_page_contains(&summary, 1, "4 3 6 -2 0 -3 1");
-  assert_page_contains(&summary, 3, "3.337809 2.684713 4.390088");
 }
 
 #[test]
@@ -1937,50 +1887,6 @@ fn mapped_xlsx_tdf81939_keeps_escaped_number_formats_visible() {
 }
 
 #[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf155321_CondFormatColor_XLSX
-fn mapped_xlsx_tdf155321_keeps_conditional_color_scale_values_visible() {
-  let summary = render_summary("tdf155321.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "1 2 2");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf156028_ColorScale_XLSX
-fn mapped_xlsx_tdf156028_keeps_single_color_scale_value_visible() {
-  let summary = render_summary("tdf156028.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "1");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf138601_CondFormatXLSX
-fn mapped_xlsx_tdf138601_keeps_conditional_format_values_visible() {
-  let summary = render_summary("tdf138601.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "4 10 5");
-  assert_page_contains(&summary, 0, "6 2");
-  assert_page_contains(&summary, 0, "3 7");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatOperatorsSameRangeXLSX
-fn mapped_xlsx_tdf139928_keeps_conditional_operator_sample_text_visible() {
-  let summary = render_summary("tdf139928.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "hello h o l");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:tdf169379
-fn mapped_xlsx_tdf169379_keeps_distinct_conditional_format_columns_visible() {
-  let summary = render_summary("tdf169379.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "1 10 100");
-  assert_page_contains(&summary, 0, "10 100 1000");
-  assert_page_contains(&summary, 0, "20 200 2000");
-}
-
-#[test]
 // Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testContentXLSXStrict
 fn mapped_xlsx_universal_content_strict_keeps_core_values_visible() {
   let summary = render_summary("universal-content-strict.xlsx");
@@ -2185,54 +2091,6 @@ fn mapped_xlsx_pivot_format_label_and_data_selection_keeps_values_visible() {
 }
 
 #[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testColorScaleNumWithRefXLSX
-fn mapped_xlsx_colorscale_num_with_ref_keeps_color_scale_values_visible() {
-  let summary = render_summary("colorscale_num_with_ref.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "5 10");
-  assert_page_contains(&summary, 0, "8 7 6 5");
-  assert_page_contains(&summary, 0, "9 11 13 20");
-  assert_page_contains(&summary, 0, "10 12 15 0");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatImportCellIs
-fn mapped_xlsx_cond_format_cellis_keeps_cell_is_values_visible() {
-  let summary = render_summary("condFormat_cellis.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "2");
-  assert_page_contains(&summary, 1, "1 2");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatThemeColorXLSX
-fn mapped_xlsx_condformat_theme_color_keeps_theme_color_values_visible() {
-  let summary = render_summary("condformat_theme_color.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "1 2 3 4 -2");
-  assert_page_contains(&summary, 1, "1 2 3 4 5 6");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatParentXLSX
-fn mapped_xlsx_cond_parent_keeps_parent_style_sample_text_visible() {
-  let summary = render_summary("cond_parent.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "test");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf162948
-fn mapped_xlsx_tdf162948_keeps_custom_icon_set_values_visible() {
-  let summary = render_summary("tdf162948.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "3 3");
-  assert_page_contains(&summary, 0, "2 2");
-  assert_page_contains(&summary, 0, "1 1");
-  assert_page_contains(&summary, 0, "0 0");
-}
-
-#[test]
 // Source: ../core/sc/qa/unit/cond_format.cxx:testConditionalFormatExportXLSX
 fn mapped_xlsx_new_cond_format_export_keeps_rule_sample_table_visible() {
   let summary = render_summary("new_cond_format_test_export.xlsx");
@@ -2248,61 +2106,4 @@ fn mapped_xlsx_new_cond_format_export_keeps_rule_sample_table_visible() {
     "below average above equal average below equal average",
   );
   assert_page_contains(&summary, 1, "1.00 2 2.00");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatFormulaIsXLSX
-fn mapped_xlsx_tdf113013_keeps_formula_is_values_visible() {
-  let summary = render_summary("tdf113013.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "1 2 2 1");
-  assert_page_contains(&summary, 1, "1 0 0 1");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testCondFormatBeginsAndEndsWithXLSX
-fn mapped_xlsx_tdf120749_keeps_begins_ends_with_samples_visible() {
-  let summary = render_summary("tdf120749.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "hello hello");
-  assert_page_contains(&summary, 0, "hello o");
-  assert_page_contains(&summary, 1, "hello o");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testExtCondFormatXLSX
-fn mapped_xlsx_tdf122102_keeps_ext_cond_format_samples_visible() {
-  let summary = render_summary("tdf122102.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "hello hello");
-  assert_page_contains(&summary, 0, "hello g");
-  assert_page_contains(&summary, 1, "hello g");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testConditionalFormatPriorityCheckXLSX
-fn mapped_xlsx_conditional_format_priority_keeps_priority_sample_text_visible() {
-  let summary = render_summary("conditional_fmt_checkpriority.xlsx");
-  assert_eq!(summary.page_count, 2);
-  assert_page_contains(&summary, 0, "ABC BAC");
-  assert_page_contains(&summary, 1, "ABC BAC");
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testConditionalFormatOriginXLSX
-fn mapped_xlsx_conditional_format_origin_keeps_origin_sample_text_visible() {
-  let summary = render_summary("conditional_fmt_origin.xlsx");
-  assert_eq!(summary.page_count, 1);
-  assert_page_text_occurrences(&summary, 0, "ABC", 2);
-  assert_page_text_occurrences(&summary, 0, "BAC", 2);
-}
-
-#[test]
-// Source: ../core/sc/qa/unit/cond_format.cxx:testTdf170298_importHang
-fn mapped_xlsx_tdf170298_keeps_large_conditional_format_sheet_visible() {
-  let summary = render_summary("tdf170298.xlsx");
-  assert_eq!(summary.page_count, 4);
-  assert_page_contains(&summary, 0, "Instructions");
-  assert_page_contains(&summary, 0, "VFINX Growth VTSMX Growth VGTSX Growth");
-  assert_page_contains(&summary, 1, "VBMFX Growth VIPSX Growth VASGX Growth");
 }

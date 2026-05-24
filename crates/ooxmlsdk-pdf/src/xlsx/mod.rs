@@ -8,6 +8,7 @@ mod print;
 mod query;
 mod sheet_conditions;
 mod sheet_objects;
+mod sheet_relationships;
 mod sheet_settings;
 mod sheet_view;
 mod styles;

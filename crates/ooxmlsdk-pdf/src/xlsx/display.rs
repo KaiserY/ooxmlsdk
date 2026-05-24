@@ -488,7 +488,7 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
   lines.insert(
     1,
     format!(
-      "print page={} sheetPage={} zoom={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={}",
+      "print page={} sheetPage={} zoom={} paper={} scale={} fit={}x{} dpi={}x{} margins={} grid={} headings={} headerFooterFlags={} headerFooterTextLen={} headerFooterDrawings={}",
       page.page_number,
       page.sheet_page_index + 1,
       page.zoom,
@@ -500,7 +500,10 @@ fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<Strin
       page.page_settings.vertical_dpi,
       page.page_settings.has_margins,
       page.page_settings.print_grid_lines,
-      page.page_settings.print_headings
+      page.page_settings.print_headings,
+      page.page_settings.header_footer.flag_count(),
+      page.page_settings.header_footer.text_len(),
+      page.page_settings.header_footer.drawing_slot_count
     ),
   );
   if !page.named_ranges.print_areas.is_empty()
@@ -571,9 +574,10 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     || !sheet.metrics.objects.ole_objects.is_empty()
     || !sheet.metrics.objects.controls.is_empty()
     || sheet.metrics.objects.unknown_controls > 0
+    || sheet_relationship_count(sheet) > 0
   {
     lines.push(format!(
-      "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={} oleObjects={} controls={} unknownControls={}",
+      "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={} oleObjects={} controls={} unknownControls={} sheetRelationships={}",
       drawing_count,
       chart_count,
       chart_child_resource_count,
@@ -587,7 +591,114 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       sheet.resources.query_tables.query_tables.len(),
       sheet.metrics.objects.ole_objects.len(),
       sheet.metrics.objects.controls.len(),
-      sheet.metrics.objects.unknown_controls
+      sheet.metrics.objects.unknown_controls,
+      sheet_relationship_count(sheet)
+    ));
+  }
+
+  if sheet_relationship_count(sheet) > 0 {
+    let relationships = &sheet.resources.relationships;
+    let single_xml_cells = relationships
+      .single_xml_cells
+      .iter()
+      .map(|part| part.cells)
+      .sum::<usize>();
+    let single_xml_len = relationships
+      .single_xml_cells
+      .iter()
+      .map(|part| {
+        part.relationship_id.as_ref().map_or(0, |value| value.len())
+          + part.ref_text_len
+          + part.unique_name_len
+          + part.xpath_len
+          + part.id_sum
+          + part.extension_cells
+      })
+      .sum::<usize>();
+    let named_views = relationships
+      .named_sheet_views
+      .iter()
+      .map(|part| part.views)
+      .sum::<usize>();
+    let named_view_filters = relationships
+      .named_sheet_views
+      .iter()
+      .map(|part| part.filters + part.column_filters + part.sort_rules)
+      .sum::<usize>();
+    let named_view_len = relationships
+      .named_sheet_views
+      .iter()
+      .map(|part| {
+        part.relationship_id.as_ref().map_or(0, |value| value.len())
+          + part.text_len
+          + part.extensions
+      })
+      .sum::<usize>();
+    let slicers = relationships
+      .slicers
+      .iter()
+      .map(|part| part.slicers)
+      .sum::<usize>();
+    let slicer_len = relationships
+      .slicers
+      .iter()
+      .map(|part| {
+        part.relationship_id.as_ref().map_or(0, |value| value.len())
+          + part.text_len
+          + part.flags
+          + part.extensions
+      })
+      .sum::<usize>();
+    let timelines = relationships
+      .timelines
+      .iter()
+      .map(|part| part.timelines)
+      .sum::<usize>();
+    let timeline_len = relationships
+      .timelines
+      .iter()
+      .map(|part| {
+        part.relationship_id.as_ref().map_or(0, |value| value.len())
+          + part.text_len
+          + part.flags
+          + part.extensions
+      })
+      .sum::<usize>();
+    let sort_map_items = relationships
+      .sort_map
+      .as_ref()
+      .map_or(0, |sort_map| sort_map.row_items + sort_map.column_items);
+    let sort_map_len = relationships.sort_map.as_ref().map_or(0, |sort_map| {
+      sort_map
+        .relationship_id
+        .as_ref()
+        .map_or(0, |value| value.len())
+        + sort_map.ref_text_len
+        + sort_map.declared_count
+    });
+    lines.push(format!(
+      "sheet relationships singleXmlParts={} singleXmlCells={} singleXmlLen={} namedViewParts={} namedViews={} namedViewFilters={} namedViewLen={} slicerParts={} slicers={} slicerLen={} timelineParts={} timelines={} timelineLen={} sortMapItems={} sortMapLen={} customProps={} printerSettings={} slicerRels={} timelineRels={} model3dRels={} activeXBinaryRels={}",
+      relationships.single_xml_cells.len(),
+      single_xml_cells,
+      single_xml_len,
+      relationships.named_sheet_views.len(),
+      named_views,
+      named_view_filters,
+      named_view_len,
+      relationships.slicers.len(),
+      slicers,
+      slicer_len,
+      relationships.timelines.len(),
+      timelines,
+      timeline_len,
+      sort_map_items,
+      sort_map_len,
+      relationships.custom_properties,
+      relationships.printer_settings,
+      relationships.slicer_relationships,
+      relationships.timeline_relationships,
+      relationships.model3d_relationships,
+      relationships.active_x_binary_relationships
     ));
   }
 
@@ -1605,4 +1716,19 @@ fn sort_state_flag_count(sort_state: &super::sheet_settings::SortStateModel) -> 
     + usize::from(sort_state.sort_method.is_some())
     + usize::from(sort_state.has_sort_condition)
     + usize::from(sort_state.has_extensions)
+}
+
+fn sheet_relationship_count(sheet: &CalcSheet) -> usize {
+  let relationships = &sheet.resources.relationships;
+  relationships.single_xml_cells.len()
+    + relationships.named_sheet_views.len()
+    + relationships.slicers.len()
+    + relationships.timelines.len()
+    + usize::from(relationships.sort_map.is_some())
+    + relationships.custom_properties
+    + relationships.printer_settings
+    + relationships.slicer_relationships
+    + relationships.timeline_relationships
+    + relationships.model3d_relationships
+    + relationships.active_x_binary_relationships
 }

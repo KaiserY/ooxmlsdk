@@ -178,10 +178,16 @@ Landed owner modules:
   `WorksheetFragment::importOleObject` / `importControl`, preserving shape ids,
   relationship ids, linked/embedded markers, progIds, update/icon/autoload
   flags, control names, x14 object/control properties, and object anchors.
+- `xlsx/sheet_relationships.rs`: typed worksheet relationship catalog for
+  single-cell XML tables, named sheet views, slicers, timelines, worksheet sort
+  maps, custom properties, printer settings, model3D relationships, and
+  ActiveX binary relationships.
 - `xlsx/drawing.rs`: typed drawing/chart resource catalog from `DrawingsPart`,
   `ChartPart`, and `ExtendedChartPart` child relationships.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
-  worksheet/chartsheet page setup import.
+  worksheet/chartsheet page setup import, including header/footer text
+  channels, header/footer drawing and legacy drawing relationships, background
+  picture relationships, and header/footer flags for the later token parser.
 - `xlsx/pivot.rs`: typed pivot cache and pivot table catalogs. Workbook cache
   definitions preserve workbook cache ids/relationships, cache field counts,
   record counts, refresh/save/invalid flags, records part presence, optional

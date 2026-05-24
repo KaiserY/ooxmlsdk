@@ -21,6 +21,25 @@ pub(crate) struct CalcPageSettings {
   pub(crate) vertical_centered: bool,
   pub(crate) print_headings: bool,
   pub(crate) print_grid_lines: bool,
+  pub(crate) header_footer: HeaderFooterModel,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct HeaderFooterModel {
+  pub(crate) different_odd_even: bool,
+  pub(crate) different_first: bool,
+  pub(crate) scale_with_doc: bool,
+  pub(crate) align_with_margins: bool,
+  pub(crate) odd_header: Option<String>,
+  pub(crate) odd_footer: Option<String>,
+  pub(crate) even_header: Option<String>,
+  pub(crate) even_footer: Option<String>,
+  pub(crate) first_header: Option<String>,
+  pub(crate) first_footer: Option<String>,
+  pub(crate) legacy_drawing_relationship_id: Option<String>,
+  pub(crate) drawing_relationship_id: Option<String>,
+  pub(crate) drawing_slot_count: usize,
+  pub(crate) background_picture_relationship_id: Option<String>,
 }
 
 impl Default for CalcPageSettings {
@@ -47,6 +66,7 @@ impl Default for CalcPageSettings {
       vertical_centered: false,
       print_headings: false,
       print_grid_lines: false,
+      header_footer: HeaderFooterModel::default(),
     }
   }
 }
@@ -63,6 +83,7 @@ impl CalcPageSettings {
     if let Some(print_options) = &worksheet.print_options {
       settings.apply_print_options(print_options);
     }
+    settings.header_footer = HeaderFooterModel::from_worksheet(worksheet);
     settings
   }
 
@@ -77,6 +98,7 @@ impl CalcPageSettings {
       settings.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(settings.horizontal_dpi);
       settings.vertical_dpi = page_setup.vertical_dpi.unwrap_or(settings.vertical_dpi);
     }
+    settings.header_footer = HeaderFooterModel::from_chartsheet(chartsheet);
     settings
   }
 
@@ -112,5 +134,134 @@ impl CalcPageSettings {
     self.print_grid_lines = print_options
       .grid_lines
       .is_some_and(|value| value.as_bool());
+  }
+}
+
+impl HeaderFooterModel {
+  fn from_worksheet(worksheet: &x::Worksheet) -> Self {
+    let mut model = worksheet
+      .header_footer
+      .as_deref()
+      .map(Self::from_header_footer)
+      .unwrap_or_default();
+    model.legacy_drawing_relationship_id = worksheet
+      .legacy_drawing_header_footer
+      .as_ref()
+      .map(|drawing| drawing.id.clone());
+    model.apply_drawing_header_footer(worksheet.drawing_header_footer.as_ref());
+    model.background_picture_relationship_id =
+      worksheet.picture.as_ref().map(|picture| picture.id.clone());
+    model
+  }
+
+  fn from_chartsheet(chartsheet: &x::Chartsheet) -> Self {
+    let mut model = chartsheet
+      .header_footer
+      .as_deref()
+      .map(Self::from_header_footer)
+      .unwrap_or_default();
+    model.legacy_drawing_relationship_id = chartsheet
+      .legacy_drawing_header_footer
+      .as_ref()
+      .map(|drawing| drawing.id.clone());
+    model.apply_drawing_header_footer(chartsheet.drawing_header_footer.as_ref());
+    model.background_picture_relationship_id = chartsheet
+      .picture
+      .as_ref()
+      .map(|picture| picture.id.clone());
+    model
+  }
+
+  fn from_header_footer(header_footer: &x::HeaderFooter) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
+    // HeaderFooterParser tokenizes these strings later; page settings owns the
+    // six text channels and picture relationship state.
+    Self {
+      different_odd_even: header_footer
+        .different_odd_even
+        .is_some_and(|value| value.as_bool()),
+      different_first: header_footer
+        .different_first
+        .is_some_and(|value| value.as_bool()),
+      scale_with_doc: header_footer
+        .scale_with_doc
+        .is_some_and(|value| value.as_bool()),
+      align_with_margins: header_footer
+        .align_with_margins
+        .is_some_and(|value| value.as_bool()),
+      odd_header: header_footer
+        .odd_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      odd_footer: header_footer
+        .odd_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      even_header: header_footer
+        .even_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      even_footer: header_footer
+        .even_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      first_header: header_footer
+        .first_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      first_footer: header_footer
+        .first_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone()),
+      ..Self::default()
+    }
+  }
+
+  fn apply_drawing_header_footer(&mut self, drawing: Option<&x::DrawingHeaderFooter>) {
+    if let Some(drawing) = drawing {
+      self.drawing_relationship_id = Some(drawing.r_id.clone());
+      self.drawing_slot_count = [
+        drawing.lho,
+        drawing.lhe,
+        drawing.lhf,
+        drawing.cho,
+        drawing.che,
+        drawing.chf,
+        drawing.rho,
+        drawing.rhe,
+        drawing.rhf,
+        drawing.lfo,
+        drawing.lfe,
+        drawing.lff,
+        drawing.cfo,
+        drawing.cfe,
+        drawing.cff,
+        drawing.rfo,
+        drawing.rfe,
+        drawing.rff,
+      ]
+      .into_iter()
+      .flatten()
+      .count();
+    }
+  }
+
+  pub(crate) fn text_len(&self) -> usize {
+    self.odd_header.as_ref().map_or(0, |value| value.len())
+      + self.odd_footer.as_ref().map_or(0, |value| value.len())
+      + self.even_header.as_ref().map_or(0, |value| value.len())
+      + self.even_footer.as_ref().map_or(0, |value| value.len())
+      + self.first_header.as_ref().map_or(0, |value| value.len())
+      + self.first_footer.as_ref().map_or(0, |value| value.len())
+  }
+
+  pub(crate) fn flag_count(&self) -> usize {
+    usize::from(self.different_odd_even)
+      + usize::from(self.different_first)
+      + usize::from(self.scale_with_doc)
+      + usize::from(self.align_with_margins)
+      + usize::from(self.legacy_drawing_relationship_id.is_some())
+      + usize::from(self.drawing_relationship_id.is_some())
+      + usize::from(self.background_picture_relationship_id.is_some())
   }
 }

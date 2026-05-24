@@ -10,6 +10,7 @@ use super::pivot::PivotTableCatalog;
 use super::query::QueryTableCatalog;
 use super::sheet_conditions::SheetConditionCatalog;
 use super::sheet_objects::SheetObjectCatalog;
+use super::sheet_relationships::SheetRelationshipCatalog;
 use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
@@ -51,6 +52,7 @@ pub(crate) struct SheetResourceCatalog {
   pub(crate) embedded_packages: usize,
   pub(crate) images: usize,
   pub(crate) named_sheet_views: usize,
+  pub(crate) relationships: SheetRelationshipCatalog,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -402,6 +404,7 @@ impl SheetResourceCatalog {
     let pivot_tables = PivotTableCatalog::from_parts(package, &pivot_table_parts)?;
     let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
     let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
+    let relationships = SheetRelationshipCatalog::from_worksheet_part(package, part)?;
     Ok(Self {
       drawings,
       vml_drawings: part.vml_drawing_parts(package).count(),
@@ -415,6 +418,7 @@ impl SheetResourceCatalog {
       embedded_packages: part.embedded_package_parts(package).count(),
       images: part.image_parts(package).count(),
       named_sheet_views: part.named_sheet_views_parts(package).count(),
+      relationships,
     })
   }
 

@@ -4,6 +4,7 @@ use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
+use quick_xml::events::Event;
 
 use super::comments::CommentsCatalog;
 use super::drawing::DrawingResourceCatalog;
@@ -17,6 +18,7 @@ use super::sheet_relationships::SheetRelationshipCatalog;
 use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
+use super::text::decode_excel_escaped_text;
 use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
 use crate::units;
@@ -207,6 +209,7 @@ impl CalcSheet {
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
+    raw_values: &HashMap<String, String>,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
     let metrics = SheetMetrics::from_worksheet(&worksheet);
@@ -222,7 +225,7 @@ impl CalcSheet {
       metrics,
       chartsheet_metrics: None,
       resources,
-      rows: worksheet_rows(&worksheet, shared_strings),
+      rows: worksheet_rows(&worksheet, shared_strings, raw_values),
     }
   }
 
@@ -906,7 +909,55 @@ impl SheetResourceCatalog {
   }
 }
 
-fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[SharedStringModel]) -> Vec<CalcRow> {
+pub(crate) fn worksheet_raw_cell_values(xml: &str) -> HashMap<String, String> {
+  let mut reader = quick_xml::Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  let mut values = HashMap::new();
+  let mut current_cell: Option<String> = None;
+  let mut in_value = false;
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let name = event.name();
+        if name.as_ref().ends_with(b"c") {
+          current_cell = event
+            .attributes()
+            .flatten()
+            .find(|attr| attr.key.as_ref().ends_with(b"r"))
+            .map(|attr| String::from_utf8_lossy(attr.value.as_ref()).into_owned());
+        } else if name.as_ref().ends_with(b"v") {
+          in_value = current_cell.is_some();
+        }
+      }
+      Ok(Event::Text(event)) if in_value => {
+        if let Some(cell) = &current_cell {
+          values.insert(
+            cell.clone(),
+            super::text::decode_excel_escaped_text(&String::from_utf8_lossy(event.as_ref())),
+          );
+        }
+      }
+      Ok(Event::End(event)) => {
+        let name = event.name();
+        if name.as_ref().ends_with(b"v") {
+          in_value = false;
+        } else if name.as_ref().ends_with(b"c") {
+          current_cell = None;
+        }
+      }
+      Ok(Event::Eof) => break,
+      Err(_) => break,
+      _ => {}
+    }
+  }
+  values
+}
+
+fn worksheet_rows(
+  worksheet: &x::Worksheet,
+  shared_strings: &[SharedStringModel],
+  raw_values: &HashMap<String, String>,
+) -> Vec<CalcRow> {
   let mut rows = worksheet
     .sheet_data
     .row
@@ -920,7 +971,7 @@ fn worksheet_rows(worksheet: &x::Worksheet, shared_strings: &[SharedStringModel]
       cells: row
         .cell
         .iter()
-        .map(|cell| CalcCell::from_cell(cell, shared_strings))
+        .map(|cell| CalcCell::from_cell(cell, shared_strings, raw_values))
         .collect(),
     })
     .collect::<Vec<_>>();
@@ -1139,12 +1190,20 @@ impl CalcCell {
     self.reference.as_deref().and_then(CellAddress::parse_a1)
   }
 
-  fn from_cell(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> Self {
+  fn from_cell(
+    cell: &x::Cell,
+    shared_strings: &[SharedStringModel],
+    raw_values: &HashMap<String, String>,
+  ) -> Self {
+    let raw_value = cell
+      .cell_reference
+      .as_ref()
+      .and_then(|reference| raw_values.get(reference.as_str()));
     let cached_value = cell
       .cell_value
       .as_ref()
       .and_then(|value| value.xml_content.as_deref())
-      .map(ToString::to_string);
+      .map(|value| raw_value.cloned().unwrap_or_else(|| value.to_string()));
     Self {
       reference: cell.cell_reference.as_ref().map(ToString::to_string),
       style_index: cell.style_index,
@@ -1154,7 +1213,7 @@ impl CalcCell {
       show_phonetic: cell.show_phonetic.is_some_and(|value| value.as_bool()),
       formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
       cached_value,
-      display_text: cell_text(cell, shared_strings),
+      display_text: cell_text(cell, shared_strings, raw_value.map(String::as_str)),
       rich_text_runs: cell_rich_text_runs(cell, shared_strings),
       has_extensions: cell.extension_list.is_some(),
     }
@@ -1191,17 +1250,23 @@ fn inline_string_text(value: &x::InlineString) -> String {
   if let Some(text) = &value.text
     && let Some(content) = &text.xml_content
   {
-    return content.to_string();
+    return decode_excel_escaped_text(content);
   }
 
-  value
-    .run
-    .iter()
-    .filter_map(|run| run.text.xml_content.as_deref())
-    .collect()
+  decode_excel_escaped_text(
+    &value
+      .run
+      .iter()
+      .filter_map(|run| run.text.xml_content.as_deref())
+      .collect::<String>(),
+  )
 }
 
-fn cell_text(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> String {
+fn cell_text(
+  cell: &x::Cell,
+  shared_strings: &[SharedStringModel],
+  raw_value: Option<&str>,
+) -> String {
   match cell.data_type {
     Some(x::CellValues::SharedString) => cell
       .cell_value
@@ -1225,11 +1290,15 @@ fn cell_text(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> String {
       Some(_) => "FALSE".to_string(),
       None => String::new(),
     },
-    _ => cell
-      .cell_value
-      .as_ref()
-      .and_then(|value| value.xml_content.as_deref())
+    _ => raw_value
       .map(ToString::to_string)
+      .or_else(|| {
+        cell
+          .cell_value
+          .as_ref()
+          .and_then(|value| value.xml_content.as_deref())
+          .map(ToString::to_string)
+      })
       .unwrap_or_default(),
   }
 }
@@ -1255,7 +1324,12 @@ fn cell_rich_text_runs(
           .run
           .iter()
           .map(|run| SharedStringRun {
-            text: run.text.xml_content.clone().unwrap_or_default(),
+            text: run
+              .text
+              .xml_content
+              .as_deref()
+              .map(decode_excel_escaped_text)
+              .unwrap_or_default(),
             ..SharedStringRun::default()
           })
           .collect()

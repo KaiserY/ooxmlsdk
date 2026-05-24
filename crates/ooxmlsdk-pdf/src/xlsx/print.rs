@@ -814,6 +814,15 @@ fn rendered_number_text(
 ) -> (String, NumberFormatRenderState) {
   match data_type {
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
+      if let Some(format_code) = format_code
+        && !format_code.eq_ignore_ascii_case("General")
+        && format_code != "@"
+      {
+        let value = if boolean_raw_value(raw) { 1.0 } else { 0.0 };
+        if let Some(text) = render_literal_section_number_format(format_code, value) {
+          return (text, NumberFormatRenderState::Boolean);
+        }
+      }
       return (
         if boolean_raw_value(raw) {
           "TRUE".to_string()
@@ -846,6 +855,9 @@ fn rendered_number_text(
       NumberFormatRenderState::UnsupportedFormatCode,
     );
   };
+  if let Some(text) = render_literal_section_number_format(format_code, value) {
+    return (text, NumberFormatRenderState::Boolean);
+  }
   let format = NumberFormatPattern::parse(format_code, value);
   if format.date_time {
     return (
@@ -867,6 +879,77 @@ fn rendered_number_text(
     raw.to_string(),
     NumberFormatRenderState::UnsupportedFormatCode,
   )
+}
+
+fn render_literal_section_number_format(code: &str, value: f64) -> Option<String> {
+  let sections = split_number_format_sections(code);
+  if sections.len() < 3 {
+    return None;
+  }
+  let section_index = if value.is_sign_negative() && sections.len() > 1 {
+    1
+  } else if value == 0.0 && sections.len() > 2 {
+    2
+  } else {
+    0
+  };
+  let section = strip_number_format_markers(sections.get(section_index).copied().unwrap_or(code));
+  literal_number_format_section(&section)
+}
+
+fn split_number_format_sections(code: &str) -> Vec<&str> {
+  let mut sections = Vec::new();
+  let mut start = 0;
+  let mut in_quote = false;
+  let mut escaped = false;
+  for (index, ch) in code.char_indices() {
+    if escaped {
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => in_quote = !in_quote,
+      ';' if !in_quote => {
+        sections.push(&code[start..index]);
+        start = index + ch.len_utf8();
+      }
+      _ => {}
+    }
+  }
+  sections.push(&code[start..]);
+  sections
+}
+
+fn literal_number_format_section(section: &str) -> Option<String> {
+  let mut output = String::new();
+  let mut in_quote = false;
+  let mut escaped = false;
+  let mut has_quoted_literal = false;
+  for ch in section.chars() {
+    if escaped {
+      if in_quote {
+        output.push(ch);
+      }
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '"' => {
+        in_quote = !in_quote;
+        has_quoted_literal = true;
+      }
+      '_' | '*' if !in_quote => escaped = true,
+      _ if in_quote => output.push(ch),
+      _ if ch.is_whitespace() => {}
+      _ => return None,
+    }
+  }
+  if in_quote || !has_quoted_literal {
+    return None;
+  }
+  Some(output)
 }
 
 #[derive(Clone, Debug, Default)]

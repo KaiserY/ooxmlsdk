@@ -11,6 +11,7 @@ use crate::layout::{
   PdfTextSegmentation, RectItem, TextItem,
 };
 use crate::render::{diagram as shared_diagram, emf_wmf};
+use crate::text_metrics;
 use crate::units;
 
 use super::import::ExcelImport;
@@ -180,6 +181,7 @@ fn render_cell_area(
   zoom_scale: f32,
 ) {
   let area_rect = page.sheet.range_rect(area);
+  let mut cell_text_items = Vec::new();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
       continue;
@@ -229,7 +231,7 @@ fn render_cell_area(
     let base_style = import.styles.text_style_for_cell(cell.style_index);
     if !cell.rich_text_runs.is_empty() && cell.rendered_text == cell.text {
       render_cell_rich_text(
-        items,
+        &mut cell_text_items,
         cell.rich_text_runs,
         cell_rect,
         base_style,
@@ -237,7 +239,7 @@ fn render_cell_area(
       );
     } else {
       render_cell_text(
-        items,
+        &mut cell_text_items,
         &cell.rendered_text,
         cell_rect,
         base_style,
@@ -255,9 +257,87 @@ fn render_cell_area(
       }));
     }
   }
+  items.extend(coalesced_calc_row_text_items(cell_text_items));
   if page.page_settings.print_grid_lines {
     render_grid(items, page, area, origin_x_pt, origin_y_pt, zoom_scale);
   }
+}
+
+fn coalesced_calc_row_text_items(items: Vec<PageItem>) -> Vec<PageItem> {
+  let mut output = Vec::with_capacity(items.len());
+  let mut items = items.into_iter().peekable();
+  while let Some(item) = items.next() {
+    let PageItem::Text(text) = item else {
+      output.push(item);
+      continue;
+    };
+    let next_is_row_end = !matches!(
+      items.peek(),
+      Some(PageItem::Text(following)) if (following.y_pt - text.y_pt).abs() < 0.01
+    );
+    if let Some(PageItem::Text(previous)) = output.last_mut()
+      && calc_row_text_items_coalesce(previous, &text)
+    {
+      let spaces = calc_row_inter_cell_spaces(previous, &text, next_is_row_end);
+      previous.text.extend(std::iter::repeat(' ').take(spaces));
+      previous.text.push_str(&text.text);
+      previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
+      continue;
+    }
+    output.push(PageItem::Text(text));
+  }
+  output
+}
+
+fn calc_row_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
+  if current.form_widget_id.is_some()
+    || next.form_widget_id.is_some()
+    || current.hyperlink_url != next.hyperlink_url
+    || current.dynamic_field != next.dynamic_field
+    || current.paragraph_bidi != next.paragraph_bidi
+    || current.rotation_center_pt.is_some()
+    || next.rotation_center_pt.is_some()
+    || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
+    || current.pdf_text_segmentation != PdfTextSegmentation::Line
+    || next.pdf_text_segmentation != PdfTextSegmentation::Line
+    || current.preserve_text_portion
+    || next.preserve_text_portion
+    || current.style != next.style
+    || (current.y_pt - next.y_pt).abs() >= 0.01
+    || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
+  {
+    return false;
+  }
+  next.x_pt > current.x_pt
+}
+
+fn calc_row_inter_cell_spaces(current: &TextItem, next: &TextItem, next_is_row_end: bool) -> usize {
+  if calc_text_number_like(&current.text) && calc_text_number_like(&next.text) {
+    return 1;
+  }
+  let current_right = current.x_pt + text_metrics::measure_text(&current.text, &current.style);
+  let gap = (next.x_pt - current_right).max(0.0);
+  let space_width = text_metrics::measure_text(" ", &current.style)
+    .max(current.style.font_size_pt * 0.25)
+    .max(1.0);
+  if gap < space_width * 1.5 {
+    1
+  } else {
+    let spaces = (gap / space_width).round() as usize;
+    if next_is_row_end {
+      spaces.max(1)
+    } else {
+      spaces
+    }
+  }
+}
+
+fn calc_text_number_like(text: &str) -> bool {
+  let trimmed = text.trim();
+  !trimmed.is_empty()
+    && trimmed
+      .chars()
+      .all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ',' | '-' | '+' | '%' | '/' | ':'))
 }
 
 fn render_cell_rich_text(
@@ -443,7 +523,16 @@ fn render_cell_text(
   hyperlink_url: Option<String>,
 ) {
   let line_height = (style.font_size_pt * 1.15).max(1.0);
-  let lines = if alignment.is_some_and(|alignment| alignment.wrap_text) {
+  let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
+  let rendered_text;
+  let lines = if text.contains('\n') || text.contains('\r') {
+    rendered_text = if wrap_text {
+      text.lines().collect::<Vec<_>>().join(" ")
+    } else {
+      text.lines().collect::<String>()
+    };
+    vec![rendered_text.as_str()]
+  } else if wrap_text {
     text.lines().collect::<Vec<_>>()
   } else {
     vec![text.lines().next().unwrap_or(text)]
@@ -465,9 +554,20 @@ fn render_cell_text(
     };
   }
   for line in lines {
+    let leading_spaces = line.len() - line.trim_start_matches(' ').len();
+    let line_x_offset_pt = if leading_spaces > 0 {
+      text_metrics::measure_text(&line[..leading_spaces], &style)
+    } else {
+      0.0
+    };
+    let line = if leading_spaces > 0 {
+      &line[leading_spaces..]
+    } else {
+      line
+    };
     let preserve_text_portion = line.chars().any(|ch| !ch.is_ascii());
     items.push(PageItem::Text(TextItem {
-      x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+      x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT + line_x_offset_pt,
       y_pt,
       line_height_pt: line_height,
       text: line.to_string(),

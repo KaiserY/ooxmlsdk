@@ -14,6 +14,7 @@ mod sheet_settings;
 mod sheet_view;
 mod styles;
 mod table;
+mod text;
 mod workbook;
 mod workbook_catalog;
 mod workbook_settings;

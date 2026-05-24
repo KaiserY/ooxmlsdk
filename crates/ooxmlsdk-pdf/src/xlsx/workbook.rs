@@ -9,6 +9,7 @@ use crate::docx::RgbColor;
 use crate::error::Result;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
+use super::text::decode_excel_escaped_text;
 use super::worksheet::{CalcSheet, SheetResourceCatalog};
 
 #[derive(Debug)]
@@ -129,6 +130,12 @@ fn worksheet_sheet(
   active: bool,
   shared_strings: &[SharedStringModel],
 ) -> Result<CalcSheet> {
+  let raw_values = part
+    .data_as_str(package)
+    .ok()
+    .flatten()
+    .map(super::worksheet::worksheet_raw_cell_values)
+    .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_worksheet_part(package, part)?;
   Ok(CalcSheet::from_worksheet(
@@ -141,6 +148,7 @@ fn worksheet_sheet(
     worksheet,
     resources,
     shared_strings,
+    &raw_values,
   ))
 }
 
@@ -187,14 +195,16 @@ fn shared_string_item_text(item: &x::SharedStringItem) -> String {
   if let Some(text) = &item.text
     && let Some(content) = &text.xml_content
   {
-    return content.to_string();
+    return decode_excel_escaped_text(content);
   }
 
-  item
-    .run
-    .iter()
-    .filter_map(|run| run.text.xml_content.as_deref())
-    .collect()
+  decode_excel_escaped_text(
+    &item
+      .run
+      .iter()
+      .filter_map(|run| run.text.xml_content.as_deref())
+      .collect::<String>(),
+  )
 }
 
 fn shared_string_item_model(item: &x::SharedStringItem) -> SharedStringModel {
@@ -205,7 +215,12 @@ fn shared_string_item_model(item: &x::SharedStringItem) -> SharedStringModel {
 
 fn shared_string_run(run: &x::Run) -> SharedStringRun {
   let mut model = SharedStringRun {
-    text: run.text.xml_content.clone().unwrap_or_default(),
+    text: run
+      .text
+      .xml_content
+      .as_deref()
+      .map(decode_excel_escaped_text)
+      .unwrap_or_default(),
     ..SharedStringRun::default()
   };
   if let Some(properties) = &run.run_properties {

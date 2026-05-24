@@ -83,6 +83,16 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
 
   if let Some(title) = chart_space.chart.title.as_deref() {
     push_title_texts(&mut texts, title);
+    if title.chart_text.is_none()
+      && chart_space
+        .chart
+        .auto_title_deleted
+        .as_ref()
+        .and_then(|value| value.val)
+        .is_none_or(|value| !value.as_bool())
+    {
+      push_unique_text(&mut texts, "Chart Title");
+    }
   }
   for title in axis_titles(chart_space) {
     push_title_texts(&mut texts, title);

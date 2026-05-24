@@ -92,6 +92,19 @@ fn assert_page_image_count(summary: &PdfSummary, page_index: usize, expected: us
   );
 }
 
+fn assert_page_path_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index)
+    .count();
+  assert!(
+    count >= expected,
+    "expected at least {expected} paths on page {page_index}, got {count}; paths={:?}",
+    summary.paths
+  );
+}
+
 fn assert_link_target(summary: &PdfSummary, expected_target: &str) {
   assert!(
     summary.links.iter().any(|link| {
@@ -1039,4 +1052,142 @@ fn mapped_xlsx_pivot_calcfield_nameerror_keeps_source_and_pivot_rows_visible() {
   assert_page_contains(&summary, 0, "Bez Werte Hilfe + Hilfe -");
   assert_page_contains(&summary, 2, "Bez bezeichnung von deinen Pluswerten");
   assert_page_contains(&summary, 2, "Total Result 1300 -1678");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testTdf169326_ignoreLineBreaksInReferencedCells
+fn mapped_xlsx_tdf169326_keeps_referenced_line_break_display_visible() {
+  let summary = render_summary("tdf169326_ignore_line_breaks_in_referenced_cells.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Hello World Hello World");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testtdf120301_xmlSpaceParsingXLSX
+fn mapped_xlsx_tdf120301_keeps_control_labels_with_xml_space_visible() {
+  let summary = render_summary("tdf120301_xmlSpaceParsing.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Check Box 1");
+  assert_page_contains(&summary, 0, "Option Button 2");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testFunctionsExcel2010XLSX
+fn mapped_xlsx_functions_excel_2010_keeps_function_result_table_visible() {
+  let summary = render_summary("functions-excel-2010.xlsx");
+  assert_eq!(summary.page_count, 6);
+  assert_page_contains(
+    &summary,
+    0,
+    "Function Formula Result should be Equal? All equal?",
+  );
+  assert_page_contains(&summary, 0, "BETA.DIST");
+  assert_page_contains(&summary, 0, "TRUE");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testCeilingFloorXLSX
+fn mapped_xlsx_ceiling_floor_keeps_formula_check_values_visible() {
+  let summary = render_summary("ceiling-floor.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "23.5 -23.5");
+  assert_page_contains(&summary, 0, "Err:502");
+  assert_page_contains(&summary, 0, "#DIV/0!");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf126024XLSX
+fn mapped_xlsx_hyperlink_formula_keeps_formula_link_text_visible() {
+  let summary = render_summary("hyperlink_formula.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(&summary, 0, "formula", 2);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf126177XLSX
+fn mapped_xlsx_hyperlink_export_keeps_external_location_visible() {
+  let summary = render_summary("hyperlink_export.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "C:\\TEMP\\test.xlsx#Munka1!A5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf135828_Shape_Rect
+fn mapped_xlsx_tdf135828_shape_rect_keeps_visible_shape_path() {
+  let summary = render_summary("tdf135828_Shape_Rect.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf137000_handle_upright
+fn mapped_xlsx_tdf137000_export_upright_keeps_textbox_text_visible() {
+  let summary = render_summary("tdf137000_export_upright.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Simple Text");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testTextBoxBodyUpright
+fn mapped_xlsx_tdf106197_import_upright_keeps_textbox_text_visible() {
+  let summary = render_summary("tdf106197_import_upright.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Simple Text");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testActiveXCheckboxXLSX
+fn mapped_xlsx_activex_checkbox_keeps_custom_caption_visible() {
+  let summary = render_summary("activex_checkbox.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Custom Caption");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testCellAnchoredHiddenShapesXLSX
+fn mapped_xlsx_cell_anchored_hidden_shapes_keeps_visible_sheet_text() {
+  let summary = render_summary("cell-anchored-hidden-shapes.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "TAIWAN PROMOTION AIRFARES");
+  assert_page_contains(&summary, 0, "BUSINESS CLASS");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test3.cxx:testShapeRotationImport
+fn mapped_xlsx_shape_rotation_import_keeps_rotated_shape_text_visible() {
+  let summary = render_summary("testShapeRotationImport.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "jo");
+  assert_page_contains(&summary, 0, "bb");
+  assert_page_contains(&summary, 0, "ra");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf134455
+fn mapped_xlsx_tdf134455_keeps_timevalue_results_visible() {
+  let summary = render_summary("tdf134455.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "00:05");
+  assert_page_contains(&summary, 0, "01:05");
+  assert_page_contains(&summary, 0, "04:00");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf131424
+fn mapped_xlsx_tdf131424_keeps_structured_reference_sums_visible() {
+  let summary = render_summary("tdf131424.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "This is the first column");
+  assert_page_contains(&summary, 0, "12 23 35");
+  assert_page_contains(&summary, 0, "36 45 81");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTdf122336
+fn mapped_xlsx_tdf122336_keeps_imported_date_and_job_fields_visible() {
+  let summary = render_summary("tdf122336.xlsx");
+  assert_eq!(summary.page_count, 9);
+  assert_page_contains(&summary, 0, "UitvoeringsdatumStarttijd");
+  assert_page_contains(&summary, 0, "12/25/2018 11:30");
+  assert_page_contains(&summary, 2, "Van Rompaey Marcus");
 }

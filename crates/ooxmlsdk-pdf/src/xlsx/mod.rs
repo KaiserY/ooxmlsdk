@@ -1,0 +1,26 @@
+mod display;
+mod drawing;
+mod import;
+mod page_settings;
+mod print;
+mod styles;
+mod table;
+mod workbook;
+mod workbook_settings;
+mod worksheet;
+
+use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+
+use crate::error::Result;
+use crate::layout::LayoutDocument;
+use crate::options::PdfOptions;
+
+use import::ExcelImport;
+
+pub(crate) fn layout(
+  package: &mut SpreadsheetDocument,
+  _options: &PdfOptions,
+) -> Result<LayoutDocument> {
+  let import = ExcelImport::import_document(package)?;
+  Ok(display::lower_to_layout_document(&import))
+}

@@ -120,7 +120,62 @@ Rules:
 
 ## 2. Current State
 
-`crates/ooxmlsdk-pdf/src/xlsx.rs` is currently a smoke bridge:
+`crates/ooxmlsdk-pdf/src/xlsx/` now has the first LibreOffice-shaped skeleton:
+
+```text
+xlsx::layout
+  -> ExcelImport::import_document
+  -> WorkbookFragment::finalize_import
+  -> CalcSheet resource/catalog records
+  -> CalcPrintDocument / CalcPrintPage
+  -> display bridge into LayoutDocument/PageItem text pages
+```
+
+This is still not Calc print parity. The visible output remains a temporary
+text-page bridge, but the import entry no longer grows from worksheet-part
+iteration directly.
+
+Landed owner modules:
+
+- `xlsx/import.rs`: `ExcelImport` entry plus workbook resource catalog from
+  typed `WorkbookPart` children.
+- `xlsx/workbook.rs`: workbook sheet-order traversal through
+  `workbook.sheets.sheet`, relationship id matching to typed sheet parts, and
+  the first `finalizeImport` ordering for styles, shared strings, and defined
+  names.
+- `xlsx/workbook_settings.rs`: typed workbook-global settings for
+  `workbookPr`, `bookViews`, `calcPr`, workbook/file sharing/protection
+  markers, external-reference/function-group/pivot-cache counts, custom views,
+  recovery properties, extensions, and OLE size references.
+- `xlsx/styles.rs`: typed stylesheet and defined-name catalogs from
+  `WorkbookStylesPart` and `workbook.definedNames`, including custom number
+  formats, font/fill/border/XF/table-style counts, default table/pivot style
+  names, and `_xlnm.Print_Area` / `_xlnm.Print_Titles` /
+  `_xlnm._FilterDatabase` classification.
+- `xlsx/table.rs`: typed table definition catalog from `TableDefinitionPart`,
+  preserving table id/name/displayName/ref/type, header/totals row counts,
+  table columns, style flags, auto-filter/sort-state presence, query-table
+  child relationships, formulas/XML column markers, and extension markers.
+- `xlsx/worksheet.rs`: `CalcSheet`, worksheet/chartsheet identity, rows/cells,
+  page settings, worksheet/chartsheet resource catalogs, and first
+  `WorksheetFragment`-shaped sheet metrics: dimension, `sheetFormatPr`,
+  column spans, merged ranges, hyperlinks, row/column page breaks,
+  conditional-format/data-validation/protected-range/scenario counts.
+- `xlsx/drawing.rs`: typed drawing/chart resource catalog from `DrawingsPart`,
+  `ChartPart`, and `ExtendedChartPart` child relationships.
+- `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed
+  worksheet/chartsheet page setup import.
+- `xlsx/print.rs`: first `ScPrintFunc`-shaped `CalcPrintDocument` /
+  `CalcPrintPage` owner before display lowering, with built-in defined-name
+  print inputs attached to print pages as structured records. Range extraction
+  remains pending on the Calc formula parser owner, matching LibreOffice's
+  `DefinedName::convertFormula` path instead of parsing formulas in display.
+- `xlsx/display.rs`: temporary observation bridge to `LayoutDocument`.
+
+`convert_xlsx` now opens packages with MCE processing settings aligned with the
+DOCX/PPTX entries.
+
+The previous smoke bridge was:
 
 ```text
 SpreadsheetDocument
@@ -142,8 +197,9 @@ This path is intentionally insufficient for Calc parity:
 - formulas are rendered as raw cached values without retaining formula identity
 - output is a text page per worksheet, not a Calc print page sequence
 
-Treat the current file as a placeholder to be replaced by a module tree, not as
-the foundation for incremental feature checks.
+Treat the current display bridge as temporary. New behavior should extend the
+LibreOffice-shaped owners under `xlsx/`, not reintroduce a direct
+`worksheet.xml -> text lines -> PDF` path.
 
 ### Repository Reuse Points
 
@@ -424,6 +480,12 @@ Important methods:
 
 Theme/style import order must match LibreOffice: theme first, default table
 styles from the theme next, styles next, shared strings after styles.
+The current Rust importer has the typed `StylesCatalog` and
+`DefinedNamesCatalog` entry points wired. `_xlnm.Print_Area`,
+`_xlnm.Print_Titles`, and `_xlnm._FilterDatabase` are classified and attached
+to print pages, but formula-token range extraction remains a structured gap
+until the Calc formula parser owner lands. Theme/default-table-style
+materialization also remains a structured gap before `StylesCatalog`.
 
 ### `WorkbookFragment`
 

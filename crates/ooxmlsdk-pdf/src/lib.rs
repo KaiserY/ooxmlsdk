@@ -245,7 +245,14 @@ pub fn convert_xlsx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
 where
   R: Read + Seek,
 {
-  let mut document = SpreadsheetDocument::new(reader)?;
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = SpreadsheetDocument::new_with_settings(reader, settings)?;
   convert_spreadsheet_document(&mut document, options)
 }
 

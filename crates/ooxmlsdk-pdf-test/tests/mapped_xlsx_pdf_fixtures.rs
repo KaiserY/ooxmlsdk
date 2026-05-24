@@ -856,3 +856,187 @@ fn mapped_xlsx_pivottable_date_field_filter_keeps_visible_date_members() {
   assert_page_contains(&summary, 1, "2016/ January 7/");
   assert_page_contains(&summary, 2, "2016/ 1/ 8. 0:00");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableSharedGroupXLSX
+fn mapped_xlsx_shared_group_field_keeps_group_labels_and_totals_visible() {
+  let summary = render_summary("pivot-table/shared-group-field.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "a2 Összeg / a Összeg / b");
+  assert_page_contains(&summary, 0, "Csoport1 15 20 25");
+  assert_page_contains(&summary, 0, "Total Result 171 189 207");
+  assert_page_contains(&summary, 1, "Összeg / h Összeg / i");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableSharedDateGroupXLSX
+fn mapped_xlsx_shared_dategroup_keeps_year_groups_visible() {
+  let summary = render_summary("pivot-table/shared-dategroup.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 2, "a Összeg / c Összeg / d Összeg / e");
+  assert_page_contains(&summary, 2, "1965 163877 212212 262738");
+  assert_page_contains(&summary, 2, "Total Result 1113132 1301928 2042856");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableSharedNestedDateGroupXLSX
+fn mapped_xlsx_shared_nested_dategroup_keeps_nested_year_quarter_months_visible() {
+  let summary = render_summary("pivot-table/shared-nested-dategroup.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 2, "Row Labels Összeg / c Összeg / e");
+  assert_page_contains(&summary, 2, "1965");
+  assert_page_contains(&summary, 2, "Jan 53274 87176");
+  assert_page_contains(&summary, 2, "Total Result 1113132 2042856");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableSharedNumGroupXLSX
+fn mapped_xlsx_shared_numgroup_keeps_number_group_ranges_visible() {
+  let summary = render_summary("pivot-table/shared-numgroup.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 2, "f Összeg / c Összeg / d Összeg / e");
+  assert_page_contains(&summary, 2, "32674-47673 193380 194190 414100");
+  assert_page_contains(&summary, 2, "Total Result 1113132 1301928 2042856");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableBoolFieldFilterXLSX
+fn mapped_xlsx_pivottable_bool_field_filter_keeps_true_member_visible() {
+  let summary = render_summary("pivottable_bool_field_filter.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Bool field Sum of Amount");
+  assert_page_contains(&summary, 0, "TRUE");
+  assert_page_not_contains(&summary, 0, "FALSE");
+  assert_page_contains(&summary, 1, "FALSE");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableRowColPageFieldFilterXLSX
+fn mapped_xlsx_pivottable_row_col_page_filter_keeps_filtered_fields_visible() {
+  let summary = render_summary("pivottable_rowcolpage_field_filter.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "Double3 field - multiple -");
+  assert_page_contains(&summary, 0, "Order ID 2");
+  assert_page_contains(&summary, 0, "1 $4,270");
+  assert_page_contains(&summary, 2, "Double3 field Double4 field");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableErrorItemFilterXLSX
+fn mapped_xlsx_pivottable_error_item_filter_keeps_error_member_visible_in_source() {
+  let summary = render_summary("pivottable_error_item_filter.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "a b b Sum of a");
+  assert_page_contains(&summary, 0, "2 #DIV/0! Total Result 4");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testTdf125046
+fn mapped_xlsx_pivottable_long_text_keeps_long_cache_text_visible() {
+  let summary = render_summary("pivottable_long_text.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "n (empty)");
+  assert_page_contains(&summary, 1, "A very-very long");
+  assert_page_contains(&summary, 1, "greater than wto hundred fifty five character");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testTdf125055
+fn mapped_xlsx_pivottable_one_second_difference_keeps_distinct_time_members_visible() {
+  let summary = render_summary("pivottable_1s_difference.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "n d n (empty)");
+  assert_page_contains(&summary, 0, "a 7/10/2017 9:11");
+  assert_page_contains(&summary, 0, "b 7/10/2017 9:11");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableXLSX_OutOfSyncPivotTableCachedDefinitionImport
+fn mapped_xlsx_pivot_cached_definition_in_sync_keeps_visible_pivot_values() {
+  let summary = render_summary("PivotTable_CachedDefinitionAndDataInSync.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "K Sum of A");
+  assert_page_contains(&summary, 0, "1 5");
+  assert_page_contains(&summary, 0, "Total Result 10");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableXLSX_OutOfSyncPivotTableCachedDefinitionImport2
+fn mapped_xlsx_pivot_cached_definition_with_cache_data_keeps_visible_pivot_values() {
+  let summary = render_summary(
+    "PivotTable_CachedDefinitionAndDataNotInSync_SheetColumnsRemoved_WithCacheData.xlsx",
+  );
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "K Sum of A");
+  assert_page_contains(&summary, 0, "2 5");
+  assert_page_contains(&summary, 1, "A K");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableXLSX_OutOfSyncPivotTableCachedDefinitionImport3
+fn mapped_xlsx_pivot_cached_definition_without_cache_data_keeps_visible_pivot_values() {
+  let summary = render_summary(
+    "PivotTable_CachedDefinitionAndDataNotInSync_SheetColumnsRemoved_WithoutCacheData.xlsx",
+  );
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "K Sum of A");
+  assert_page_contains(&summary, 0, "Total Result 10");
+  assert_page_contains(&summary, 1, "1 1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test6.cxx:testTableStyleCustomRoundtripXLSX
+fn mapped_xlsx_book1_custom_keeps_custom_table_data_and_summary_visible() {
+  let summary = render_summary("Book1_custom.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Names Numbers Dates Age");
+  assert_page_contains(&summary, 0, "Summary 382");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf165180_date1904_XLSX
+fn mapped_xlsx_tdf165180_date1904_keeps_early_mac_dates_visible() {
+  let summary = render_summary("tdf165180_date1904.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Tuesday, March 1, 1904 Mar 1 1904");
+  assert_page_contains(&summary, 0, "Monday, September 12, 2005 Sept 12 2005");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf122191
+fn mapped_xlsx_tdf122191_keeps_hungarian_boolean_text_visible() {
+  let summary = render_summary("tdf122191.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "IGAZ");
+  assert_page_not_contains(&summary, 0, "BOOL00AN");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf123139XLSX
+fn mapped_xlsx_tdf123139_apply_alignment_keeps_alignment_samples_visible() {
+  let summary = render_summary("tdf123139_applyAlignment.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "foofoofoofoofoofoofoofoofoofoo");
+  assert_page_contains(&summary, 0, "bar");
+  assert_page_contains(&summary, 1, "hidden formula");
+  assert_page_contains(&summary, 1, "unlocked distributed");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testShapeAutofitXLSX
+fn mapped_xlsx_test_shape_autofit_keeps_shape_text_visible() {
+  let summary = render_summary("testShapeAutofit.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "This one is autofit.");
+  assert_page_contains(&summary, 0, "This one is not autofit.");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testCalcFieldNameErrorXLSX
+fn mapped_xlsx_pivot_calcfield_nameerror_keeps_source_and_pivot_rows_visible() {
+  let summary = render_summary("pivot-table/pivot_calcfield_nameerror.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "Bez Werte Hilfe + Hilfe -");
+  assert_page_contains(&summary, 2, "Bez bezeichnung von deinen Pluswerten");
+  assert_page_contains(&summary, 2, "Total Result 1300 -1678");
+}

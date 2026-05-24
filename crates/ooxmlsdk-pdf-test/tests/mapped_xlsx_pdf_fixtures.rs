@@ -475,3 +475,170 @@ fn mapped_xlsx_chart_hyperlink_keeps_chart_text_and_link_targets() {
     "https://bugs.documentfoundation.org/show_bug.cgi?id=123645",
   );
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTableStyleXLSX
+fn mapped_xlsx_table_style_keeps_visible_table_and_totals_row() {
+  let summary = render_summary("TableStyleTest.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "A B C");
+  assert_page_contains(&summary, 0, "Total 3 2.75 Ft");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTotalsRowFunction
+fn mapped_xlsx_totals_row_function_keeps_sum_total_visible() {
+  let summary = render_summary("totalsRowFunction.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 792.0, 612.0);
+  assert_page_contains(&summary, 0, "PRESENT PLANNER");
+  assert_page_contains(&summary, 0, "Total £350.00");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTotalsRowShown
+fn mapped_xlsx_totals_row_shown_keeps_table_data_without_extra_total_row() {
+  let summary = render_summary("totalsRowShown.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Desc Corn Hay Soy");
+  assert_page_contains(&summary, 0, "Price $ 1.00 $ 2.00 $ 3.00");
+  assert_page_contains(&summary, 0, "Unit ton bushel pound");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testAutofilterHiddenButton
+fn mapped_xlsx_hidden_button_keeps_autofilter_header_row_visible() {
+  let summary = render_summary("hiddenButton.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Col 1 Col 2 Col 3 Col 4 Col 5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testAutofilterShowButton
+fn mapped_xlsx_autofilter_show_button_keeps_filtered_columns_visible() {
+  let summary = render_summary("autofilterShowButton.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "a b c DDD g h III");
+  assert_page_contains(&summary, 0, "1 def example");
+  assert_page_contains(&summary, 1, "III");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testDateAutofilterXLSX
+fn mapped_xlsx_date_autofilter_keeps_filtered_date_rows_visible() {
+  let summary = render_summary("dateAutofilter.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "ID Date");
+  assert_page_contains(&summary, 0, "one 3/2/2017");
+  assert_page_contains(&summary, 0, "three 10/1/2014");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testAutofilterColorsOOXML
+fn mapped_xlsx_autofilter_colors_keeps_background_filtered_rows() {
+  let summary = render_summary("autofilter-colors.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  assert_page_contains(&summary, 0, "2 2 2");
+  assert_page_contains(&summary, 0, "3 3 3");
+  assert_page_not_contains(&summary, 0, "1 1 1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testAutofilterColorsOOXML2
+fn mapped_xlsx_autofilter_colors_fg_keeps_foreground_filtered_rows() {
+  let summary = render_summary("autofilter-colors-fg.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  assert_page_contains(&summary, 0, "1 1 1");
+  assert_page_contains(&summary, 0, "2 2 2");
+  assert_page_contains(&summary, 0, "3 3 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf130104_XLSXIndent
+fn mapped_xlsx_tdf130104_keeps_imported_indent_positions_visible() {
+  let summary = render_summary("tdf130104_indent.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Indent by 0 缩进0");
+  assert_page_contains(&summary, 0, "Indent by 5 缩进5");
+  assert_page_contains(&summary, 0, "Indent by 10 缩进10");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testHeaderFontStyleXLSX
+fn mapped_xlsx_tdf134826_keeps_header_font_style_text_visible() {
+  let summary = render_summary("tdf134826.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Bold");
+  assert_page_contains(&summary, 0, "Italic");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf151755_stylesLostOnXLSXExport
+fn mapped_xlsx_tdf151755_keeps_daily_calendar_template_visible() {
+  let summary = render_summary("tdf151755_stylesLostOnXLSXExport.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Daily Calendar Date");
+  assert_page_contains(&summary, 0, "Time Appointment To Do Errands Calls");
+  assert_page_contains(&summary, 0, "07:00:00");
+  assert_page_contains(&summary, 0, "18:30:00");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf152581_bordercolorNotExportedToXLSX
+fn mapped_xlsx_tdf152581_keeps_conditional_border_fixture_text_visible() {
+  let summary = render_summary("tdf152581_bordercolorNotExportedToXLSX.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "test");
+  assert_page_contains(&summary, 0, "x");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testCheckboxFormControlXlsxExport
+fn mapped_xlsx_checkbox_form_control_keeps_label_visible() {
+  let summary = render_summary("checkbox-form-control.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1");
+  assert_page_contains(&summary, 0, "Check Box 1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testControlImport
+fn mapped_xlsx_singlecontrol_keeps_form_control_sheet_text_visible() {
+  let summary = render_summary("singlecontrol.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "form control inside cell b517");
+  assert_page_contains(&summary, 1, "adfa");
+  assert_page_contains(&summary, 2, "adfad");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testActiveXOptionButtonGroup
+fn mapped_xlsx_radio_buttons_keep_grouped_button_labels_visible() {
+  let summary = render_summary("tdf111980_radioButtons.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Group Box 7");
+  assert_page_contains(&summary, 0, "ActiveX button1");
+  assert_page_contains(&summary, 0, "Form button2");
+  assert_page_contains(&summary, 1, "ActiveX 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf153767
+fn mapped_xlsx_tdf153767_keeps_boolean_strings_visible() {
+  let summary = render_summary("tdf153767.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "Contact Name Address City Postal Code Country");
+  assert_page_contains(&summary, 1, "TRUE");
+  assert_page_contains(&summary, 1, "FALSE");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf161301
+fn mapped_xlsx_tdf161301_keeps_japanese_era_date_strings_visible() {
+  let summary = render_summary("tdf161301.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_text_occurrences(&summary, 1, "CE784年2月20日", 2);
+}

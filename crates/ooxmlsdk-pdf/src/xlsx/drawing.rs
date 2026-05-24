@@ -30,6 +30,7 @@ pub(crate) struct DrawingResourceCatalog {
   pub(crate) diagrams: DiagramResourceCatalog,
   pub(crate) images: usize,
   pub(crate) image_resources: HashMap<String, ImageResource>,
+  pub(crate) hyperlink_targets: HashMap<String, String>,
   pub(crate) custom_xml_parts: usize,
   pub(crate) web_extensions: usize,
 }
@@ -78,6 +79,9 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) macro_name: Option<String>,
   pub(crate) text_len: usize,
   pub(crate) relationship_id: Option<String>,
+  pub(crate) hyperlink_relationship_id: Option<String>,
+  pub(crate) hyperlink_invalid_url: Option<String>,
+  pub(crate) hyperlink_action: Option<String>,
   pub(crate) graphic_uri: Option<String>,
   pub(crate) text: String,
   pub(crate) child_objects: usize,
@@ -147,6 +151,7 @@ pub(crate) struct DiagramResourceCatalog {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct DiagramDataCatalog {
   pub(crate) relationship_id: Option<String>,
+  pub(crate) visible_texts: Vec<String>,
   pub(crate) points: usize,
   pub(crate) unknown_points: usize,
   pub(crate) connections: usize,
@@ -235,6 +240,7 @@ impl DrawingResourceCatalog {
     let extended_chart_parts = part.extended_chart_parts(package).collect::<Vec<_>>();
     let diagrams = DiagramResourceCatalog::from_part(package, part)?;
     let image_resources = collect_image_resources(package, part);
+    let hyperlink_targets = collect_hyperlink_targets(package, part);
     let images = image_resources.len();
     Ok(Self {
       anchors,
@@ -249,6 +255,7 @@ impl DrawingResourceCatalog {
       diagrams,
       images,
       image_resources,
+      hyperlink_targets,
       custom_xml_parts: part.custom_xml_parts(package).count(),
       web_extensions: part.web_extension_parts(package).count(),
     })
@@ -289,6 +296,21 @@ fn collect_image_resources(
             .map(str::to_string),
         },
       ))
+    })
+    .collect()
+}
+
+fn collect_hyperlink_targets(
+  package: &SpreadsheetDocument,
+  part: &DrawingsPart,
+) -> HashMap<String, String> {
+  part
+    .hyperlink_relationships(package)
+    .map(|relationship| {
+      (
+        relationship.id().to_string(),
+        relationship.target().to_string(),
+      )
     })
     .collect()
 }
@@ -455,6 +477,11 @@ impl DrawingObjectModel {
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: shape.r#macro.clone(),
       relationship_id: None,
+      hyperlink_relationship_id: hyperlink_relationship_id(
+        properties.hyperlink_on_click.as_deref(),
+      ),
+      hyperlink_invalid_url: hyperlink_invalid_url(properties.hyperlink_on_click.as_deref()),
+      hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: shape
         .text_body
@@ -484,6 +511,11 @@ impl DrawingObjectModel {
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: None,
       relationship_id: None,
+      hyperlink_relationship_id: hyperlink_relationship_id(
+        properties.hyperlink_on_click.as_deref(),
+      ),
+      hyperlink_invalid_url: hyperlink_invalid_url(properties.hyperlink_on_click.as_deref()),
+      hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: group_shape_text(group),
       text_len: group_shape_text_len(group),
@@ -509,6 +541,11 @@ impl DrawingObjectModel {
       macro_name: frame.r#macro.clone(),
       text_len: 0,
       relationship_id: graphic_frame_relationship_id(frame),
+      hyperlink_relationship_id: hyperlink_relationship_id(
+        properties.hyperlink_on_click.as_deref(),
+      ),
+      hyperlink_invalid_url: hyperlink_invalid_url(properties.hyperlink_on_click.as_deref()),
+      hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
       text: String::new(),
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
@@ -533,6 +570,11 @@ impl DrawingObjectModel {
       macro_name: shape.r#macro.clone(),
       text_len: 0,
       relationship_id: None,
+      hyperlink_relationship_id: hyperlink_relationship_id(
+        properties.hyperlink_on_click.as_deref(),
+      ),
+      hyperlink_invalid_url: hyperlink_invalid_url(properties.hyperlink_on_click.as_deref()),
+      hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
       child_objects: 0,
@@ -561,6 +603,11 @@ impl DrawingObjectModel {
         .blip
         .as_ref()
         .and_then(|blip| blip.embed.clone().or_else(|| blip.link.clone())),
+      hyperlink_relationship_id: hyperlink_relationship_id(
+        properties.hyperlink_on_click.as_deref(),
+      ),
+      hyperlink_invalid_url: hyperlink_invalid_url(properties.hyperlink_on_click.as_deref()),
+      hyperlink_action: hyperlink_action(properties.hyperlink_on_click.as_deref()),
       graphic_uri: None,
       text: String::new(),
       child_objects: 0,
@@ -576,6 +623,9 @@ impl DrawingObjectModel {
     Self {
       kind: DrawingObjectKind::ContentPart,
       relationship_id: Some(relationship_id.to_string()),
+      hyperlink_relationship_id: None,
+      hyperlink_invalid_url: None,
+      hyperlink_action: None,
       text: String::new(),
       ..Self::unknown()
     }
@@ -591,6 +641,9 @@ impl DrawingObjectModel {
       macro_name: None,
       text_len: 0,
       relationship_id: None,
+      hyperlink_relationship_id: None,
+      hyperlink_invalid_url: None,
+      hyperlink_action: None,
       graphic_uri: None,
       text: String::new(),
       child_objects: 0,
@@ -601,6 +654,18 @@ impl DrawingObjectModel {
       no_line: false,
     }
   }
+}
+
+fn hyperlink_relationship_id(hyperlink: Option<&a::HyperlinkOnClick>) -> Option<String> {
+  hyperlink.and_then(|hyperlink| hyperlink.id.clone())
+}
+
+fn hyperlink_invalid_url(hyperlink: Option<&a::HyperlinkOnClick>) -> Option<String> {
+  hyperlink.and_then(|hyperlink| hyperlink.invalid_url.clone())
+}
+
+fn hyperlink_action(hyperlink: Option<&a::HyperlinkOnClick>) -> Option<String> {
+  hyperlink.and_then(|hyperlink| hyperlink.action.clone())
 }
 
 fn graphic_frame_relationship_id(frame: &xdr::GraphicFrame) -> Option<String> {
@@ -653,8 +718,15 @@ fn xdr_text_body_text_len(text_body: &xdr::TextBody) -> usize {
 }
 
 fn xdr_text_body_text(text_body: &xdr::TextBody) -> String {
-  text_body
-    .paragraph
+  dml_paragraphs_text(&text_body.paragraph)
+}
+
+fn dgm_text_body_text(text_body: &dgm::TextBody) -> String {
+  dml_paragraphs_text(&text_body.paragraph)
+}
+
+fn dml_paragraphs_text(paragraphs: &[a::Paragraph]) -> String {
+  paragraphs
     .iter()
     .filter_map(dml_paragraph_text)
     .collect::<Vec<_>>()
@@ -807,6 +879,12 @@ impl DiagramDataCatalog {
         dgm::PointListChoice::Point(point) => {
           catalog.points += 1;
           catalog.text_len += point.model_id.len();
+          if let Some(text_body) = point.text_body.as_deref() {
+            let text = dgm_text_body_text(text_body);
+            if !text.is_empty() {
+              catalog.visible_texts.push(text);
+            }
+          }
           if let Some(connection_id) = point.connection_id.as_ref() {
             catalog.text_len += connection_id.len();
           }

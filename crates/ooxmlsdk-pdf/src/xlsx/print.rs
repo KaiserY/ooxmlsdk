@@ -1144,8 +1144,22 @@ fn render_date_time_format(
   let clean = strip_number_format_markers(code);
   let lower = clean.to_ascii_lowercase();
   if lower.contains("dddd") && lower.contains("mmmm") {
+    if lower.contains("[$-407]")
+      || lower.contains("[$-0407]")
+      || lower.contains("[$-1c1a]")
+      || lower.contains("[$-de")
+      || lower.find('d') < lower.find('m') && lower.contains("\\.")
+    {
+      return format!(
+        "{}, {}. {} {}",
+        weekday_name(year, month, day),
+        day,
+        month_name(month),
+        year
+      );
+    }
     return format!(
-      "{}, {} {} {}",
+      "{}, {} {}, {}",
       weekday_name(year, month, day),
       month_name(month),
       day,

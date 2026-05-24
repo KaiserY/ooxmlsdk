@@ -316,6 +316,24 @@ impl CalcSheet {
         None => range,
       });
     }
+    for shape in self
+      .resources
+      .object_resources
+      .vml_drawings
+      .iter()
+      .flat_map(|drawing| drawing.shapes.iter())
+    {
+      if shape.hidden || !shape.print_object {
+        continue;
+      }
+      let Some(anchor) = shape.anchor else {
+        continue;
+      };
+      used = Some(match used {
+        Some(used) => used.union(anchor.cell_range()),
+        None => anchor.cell_range(),
+      });
+    }
     used
   }
 

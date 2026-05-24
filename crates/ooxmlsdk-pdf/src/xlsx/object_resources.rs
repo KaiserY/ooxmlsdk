@@ -1,5 +1,8 @@
 use ooxmlsdk::parts::control_properties_part::ControlPropertiesPart;
 use ooxmlsdk::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart;
+use std::collections::HashMap;
+
+use ooxmlsdk::parts::image_part::ImagePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::vml_drawing_part::VmlDrawingPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
@@ -7,6 +10,8 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main as
 use ooxmlsdk::sdk::SdkPart;
 use quick_xml::events::Event;
 
+use super::drawing::ImageResource;
+use super::worksheet::{CellAddress, CellRange};
 use crate::error::Result;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -24,15 +29,61 @@ pub(crate) struct WorksheetObjectResourceCatalog {
 pub(crate) struct VmlDrawingResourceCatalog {
   pub(crate) relationship_id: Option<String>,
   pub(crate) images: usize,
+  pub(crate) image_resources: HashMap<String, ImageResource>,
   pub(crate) legacy_diagram_texts: usize,
   pub(crate) shapes: Vec<VmlShapeModel>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct VmlShapeModel {
   pub(crate) text: String,
   pub(crate) style: Option<String>,
+  pub(crate) image_relationship_id: Option<String>,
+  pub(crate) anchor: Option<VmlClientAnchor>,
+  pub(crate) print_object: bool,
+  pub(crate) visible: bool,
   pub(crate) hidden: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct VmlClientAnchor {
+  pub(crate) from_col: u32,
+  pub(crate) from_col_offset_px: i32,
+  pub(crate) from_row: u32,
+  pub(crate) from_row_offset_px: i32,
+  pub(crate) to_col: u32,
+  pub(crate) to_col_offset_px: i32,
+  pub(crate) to_row: u32,
+  pub(crate) to_row_offset_px: i32,
+}
+
+impl VmlClientAnchor {
+  pub(crate) fn cell_range(self) -> CellRange {
+    CellRange::new(
+      CellAddress {
+        col: self.from_col.saturating_add(1),
+        row: self.from_row.saturating_add(1),
+      },
+      CellAddress {
+        col: self.to_col.saturating_add(1),
+        row: self.to_row.saturating_add(1),
+      },
+    )
+  }
+}
+
+impl Default for VmlShapeModel {
+  fn default() -> Self {
+    Self {
+      text: String::new(),
+      style: None,
+      image_relationship_id: None,
+      anchor: None,
+      print_object: true,
+      visible: false,
+      hidden: false,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -121,6 +172,7 @@ impl VmlDrawingResourceCatalog {
     Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
       images: part.image_parts(package).count(),
+      image_resources: collect_vml_image_resources(package, part),
       legacy_diagram_texts: part.legacy_diagram_text_parts(package).count(),
       shapes,
     }
@@ -133,6 +185,9 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
   let mut shapes = Vec::new();
   let mut current: Option<VmlShapeModel> = None;
   let mut in_textbox = false;
+  let mut in_anchor = false;
+  let mut in_print_object = false;
+  let mut in_visible = false;
   loop {
     match reader.read_event() {
       Ok(Event::Start(event)) => {
@@ -158,28 +213,58 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
           current = Some(shape);
         } else if name.as_ref().ends_with(b"textbox") {
           in_textbox = true;
+        } else if name.as_ref().ends_with(b"imagedata") {
+          if let Some(shape) = current.as_mut() {
+            for attr in event.attributes().flatten() {
+              let key = attr.key.as_ref();
+              if key.ends_with(b"relid") || key.ends_with(b"id") {
+                shape.image_relationship_id =
+                  Some(String::from_utf8_lossy(attr.value.as_ref()).into_owned());
+              }
+            }
+          }
+        } else if name.as_ref().ends_with(b"Anchor") {
+          in_anchor = true;
+        } else if name.as_ref().ends_with(b"PrintObject") {
+          in_print_object = true;
+        } else if name.as_ref().ends_with(b"Visible") {
+          in_visible = true;
         }
       }
       Ok(Event::Text(text)) => {
-        if in_textbox
-          && let Some(shape) = current.as_mut()
-          && let Ok(value) = text.decode()
-        {
-          shape.text.push_str(&value);
+        if let Ok(value) = text.decode() {
+          collect_vml_shape_text(
+            current.as_mut(),
+            &value,
+            in_textbox,
+            in_anchor,
+            in_print_object,
+            in_visible,
+          );
         }
       }
       Ok(Event::CData(text)) => {
-        if in_textbox
-          && let Some(shape) = current.as_mut()
-          && let Ok(value) = text.decode()
-        {
-          shape.text.push_str(&value);
+        if let Ok(value) = text.decode() {
+          collect_vml_shape_text(
+            current.as_mut(),
+            &value,
+            in_textbox,
+            in_anchor,
+            in_print_object,
+            in_visible,
+          );
         }
       }
       Ok(Event::End(event)) => {
         let name = event.name();
         if name.as_ref().ends_with(b"textbox") {
           in_textbox = false;
+        } else if name.as_ref().ends_with(b"Anchor") {
+          in_anchor = false;
+        } else if name.as_ref().ends_with(b"PrintObject") {
+          in_print_object = false;
+        } else if name.as_ref().ends_with(b"Visible") {
+          in_visible = false;
         } else if name.as_ref().ends_with(b"shape")
           && let Some(mut shape) = current.take()
         {
@@ -193,6 +278,77 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
     }
   }
   shapes
+}
+
+fn collect_vml_image_resources(
+  package: &SpreadsheetDocument,
+  part: &VmlDrawingPart,
+) -> HashMap<String, ImageResource> {
+  part
+    .related_parts_of_type::<_, ImagePart>(package)
+    .filter_map(|related_part| {
+      Some((
+        related_part.relationship_id().to_string(),
+        ImageResource {
+          data: related_part.part().data_to_vec(package)?,
+          content_type: related_part
+            .part()
+            .content_type(package)
+            .map(str::to_string),
+        },
+      ))
+    })
+    .collect()
+}
+
+fn collect_vml_shape_text(
+  shape: Option<&mut VmlShapeModel>,
+  value: &str,
+  in_textbox: bool,
+  in_anchor: bool,
+  in_print_object: bool,
+  in_visible: bool,
+) {
+  let Some(shape) = shape else {
+    return;
+  };
+  if in_textbox {
+    shape.text.push_str(value);
+  } else if in_anchor {
+    shape.anchor = parse_vml_client_anchor(value);
+  } else if in_print_object {
+    shape.print_object = decode_vml_bool(value, true);
+  } else if in_visible {
+    shape.visible = decode_vml_bool(value, true);
+  }
+}
+
+fn parse_vml_client_anchor(value: &str) -> Option<VmlClientAnchor> {
+  let values = value
+    .split(',')
+    .map(|part| part.trim().parse::<i32>().ok())
+    .collect::<Option<Vec<_>>>()?;
+  if values.len() != 8 {
+    return None;
+  }
+  Some(VmlClientAnchor {
+    from_col: u32::try_from(values[0]).ok()?,
+    from_col_offset_px: values[1],
+    from_row: u32::try_from(values[2]).ok()?,
+    from_row_offset_px: values[3],
+    to_col: u32::try_from(values[4]).ok()?,
+    to_col_offset_px: values[5],
+    to_row: u32::try_from(values[6]).ok()?,
+    to_row_offset_px: values[7],
+  })
+}
+
+fn decode_vml_bool(value: &str, default: bool) -> bool {
+  let value = value.trim();
+  if value.is_empty() {
+    return default;
+  }
+  !matches!(value, "false" | "False" | "FALSE" | "0" | "f" | "F")
 }
 
 fn normalize_vml_text(text: &str) -> String {

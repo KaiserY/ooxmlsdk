@@ -613,6 +613,43 @@ fn print_page_image_items(
           .description
           .clone()
           .or_else(|| anchor.object.name.clone()),
+        hyperlink_url: drawing_object_hyperlink_url(drawing, &anchor.object),
+        floating: false,
+        behind_text: false,
+      }));
+    }
+  }
+  for drawing in &page.sheet.resources.object_resources.vml_drawings {
+    for shape in &drawing.shapes {
+      if shape.hidden || !shape.print_object {
+        continue;
+      }
+      let Some(relationship_id) = shape.image_relationship_id.as_deref() else {
+        continue;
+      };
+      let Some(resource) = drawing.image_resources.get(relationship_id) else {
+        continue;
+      };
+      let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
+        continue;
+      };
+      if width_pt <= 0.0 || height_pt <= 0.0 {
+        continue;
+      }
+      let (x_pt, y_pt) =
+        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      items.push(PageItem::Image(ImageItem {
+        x_pt: origin_x_pt + x_pt * zoom_scale,
+        y_pt: origin_y_pt + y_pt * zoom_scale,
+        width_pt: width_pt * zoom_scale,
+        height_pt: height_pt * zoom_scale,
+        crop: ImageCrop::default(),
+        rotation_deg: 0.0,
+        flip_horizontal: false,
+        flip_vertical: false,
+        data: resource.data.clone(),
+        content_type: resource.content_type.clone(),
+        alt_text: None,
         hyperlink_url: None,
         floating: false,
         behind_text: false,
@@ -702,6 +739,7 @@ fn print_page_drawing_text_items(
         origin_y_pt + y_pt * zoom_scale,
         width_pt * zoom_scale,
         height_pt * zoom_scale,
+        drawing_object_hyperlink_url(drawing, &anchor.object),
       );
     }
   }
@@ -718,12 +756,22 @@ fn drawing_anchor_text(
   if anchor.object.kind == super::drawing::DrawingObjectKind::GraphicFrame
     && let Some(relationship_id) = anchor.object.relationship_id.as_deref()
   {
-    return drawing
+    let chart_text = drawing
       .charts
       .iter()
       .chain(drawing.extended_charts.iter())
       .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))
       .map(|chart| chart.visible_texts.join("\n"))
+      .unwrap_or_default();
+    if !chart_text.is_empty() {
+      return chart_text;
+    }
+    return drawing
+      .diagrams
+      .data_parts
+      .iter()
+      .find(|data| data.relationship_id.as_deref() == Some(relationship_id))
+      .map(|data| data.visible_texts.join("\n"))
       .unwrap_or_default();
   }
   String::new()
@@ -736,6 +784,7 @@ fn render_drawing_text(
   y_pt: f32,
   _width_pt: f32,
   height_pt: f32,
+  hyperlink_url: Option<String>,
 ) {
   let style = TextStyle::default();
   let line_height = (style.font_size_pt * 1.15).max(1.0);
@@ -751,7 +800,7 @@ fn render_drawing_text(
       text: line.to_string(),
       style: style.clone(),
       rotation_center_pt: None,
-      hyperlink_url: None,
+      hyperlink_url: hyperlink_url.clone(),
       dynamic_field: None,
       style_ref_keys: Vec::new(),
       style_ref_text: None,
@@ -780,11 +829,10 @@ fn print_page_vml_text_items(
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
   {
-    if shape.hidden || shape.text.trim().is_empty() {
+    if shape.hidden || !shape.print_object || shape.text.trim().is_empty() {
       continue;
     }
-    let Some((x_pt, y_pt, width_pt, height_pt)) = shape.style.as_deref().and_then(vml_style_rect)
-    else {
+    let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
       continue;
     };
     let (x_pt, y_pt) =
@@ -796,9 +844,84 @@ fn print_page_vml_text_items(
       origin_y_pt + y_pt * zoom_scale,
       width_pt * zoom_scale,
       height_pt * zoom_scale,
+      None,
     );
   }
   items
+}
+
+fn drawing_object_hyperlink_url(
+  drawing: &super::drawing::DrawingResourceCatalog,
+  object: &super::drawing::DrawingObjectModel,
+) -> Option<String> {
+  object
+    .hyperlink_relationship_id
+    .as_deref()
+    .and_then(|relationship_id| drawing.hyperlink_targets.get(relationship_id))
+    .cloned()
+    .or_else(|| object.hyperlink_invalid_url.clone())
+    .or_else(|| {
+      object
+        .hyperlink_action
+        .clone()
+        .and_then(drawing_hyperlink_action_url)
+    })
+}
+
+fn drawing_hyperlink_action_url(action: String) -> Option<String> {
+  action
+    .strip_prefix("ppaction://hlinkshowjump?jump=")
+    .map(|jump| format!("ooxmlsdk-pdf-action://hlinkshowjump/{jump}"))
+}
+
+fn vml_shape_rect(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<(f32, f32, f32, f32)> {
+  shape
+    .anchor
+    .and_then(|anchor| vml_anchor_rect(sheet, anchor))
+    .or_else(|| shape.style.as_deref().and_then(vml_style_rect))
+}
+
+fn vml_anchor_rect(
+  sheet: &CalcSheet,
+  anchor: super::object_resources::VmlClientAnchor,
+) -> Option<(f32, f32, f32, f32)> {
+  let x1 = vml_anchor_x(sheet, anchor.from_col, anchor.from_col_offset_px);
+  let y1 = vml_anchor_y(sheet, anchor.from_row, anchor.from_row_offset_px);
+  let x2 = vml_anchor_x(sheet, anchor.to_col, anchor.to_col_offset_px);
+  let y2 = vml_anchor_y(sheet, anchor.to_row, anchor.to_row_offset_px);
+  if x2 < x1 || y2 < y1 {
+    return None;
+  }
+  Some((x1, y1, x2 - x1, y2 - y1))
+}
+
+fn vml_anchor_x(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f32 {
+  let col = zero_based_col.saturating_add(1);
+  let cell = sheet.cell_rect(super::worksheet::CellAddress { col, row: 1 });
+  let next_cell = sheet.cell_rect(super::worksheet::CellAddress {
+    col: col.saturating_add(1),
+    row: 1,
+  });
+  let x = cell.x_pt + vml_screen_pixel_to_pt(offset_px);
+  x.min(next_cell.x_pt - units::twips_to_points(1.0))
+}
+
+fn vml_anchor_y(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
+  let row = zero_based_row.saturating_add(1);
+  let cell = sheet.cell_rect(super::worksheet::CellAddress { col: 1, row });
+  let next_cell = sheet.cell_rect(super::worksheet::CellAddress {
+    col: 1,
+    row: row.saturating_add(1),
+  });
+  let y = cell.y_pt + vml_screen_pixel_to_pt(offset_px);
+  y.min(next_cell.y_pt - units::twips_to_points(1.0))
+}
+
+fn vml_screen_pixel_to_pt(value: i32) -> f32 {
+  value as f32 * units::POINTS_PER_INCH / 96.0
 }
 
 fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {

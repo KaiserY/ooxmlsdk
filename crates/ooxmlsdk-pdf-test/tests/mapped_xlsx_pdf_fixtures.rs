@@ -103,6 +103,39 @@ fn assert_link_target(summary: &PdfSummary, expected_target: &str) {
   );
 }
 
+fn assert_any_link_target(summary: &PdfSummary, expected_target: &str) {
+  assert!(
+    summary
+      .links
+      .iter()
+      .any(|link| link.target.as_deref() == Some(expected_target)),
+    "missing link target {expected_target:?}; links={:?}",
+    summary.links
+  );
+}
+
+fn assert_text_object_font_size(summary: &PdfSummary, expected_text: &str, expected_size: &str) {
+  assert!(
+    summary.text_objects.iter().any(
+      |object| normalize_space(&object.text).contains(expected_text)
+        && object.scaled_font_size == expected_size
+    ),
+    "missing text object {expected_text:?} with font size {expected_size}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
+fn assert_text_object_fill_color(summary: &PdfSummary, expected_text: &str, expected_color: &str) {
+  assert!(
+    summary.text_objects.iter().any(|object| {
+      normalize_space(&object.text).contains(expected_text)
+        && object.fill_color.as_deref() == Some(expected_color)
+    }),
+    "missing text object {expected_text:?} with fill color {expected_color}; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
 #[test]
 // Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf123026_optimalRowHeight
 fn mapped_xlsx_tdf123026_optimal_row_height_keeps_wrapped_text_visible() {
@@ -257,4 +290,188 @@ fn mapped_xlsx_image_hyperlink_does_not_emit_unrelated_cell_text() {
   let summary = render_summary("image_hyperlink.xlsx");
   assert_eq!(summary.page_count, 1);
   assert_page_not_contains(&summary, 0, "https://www.google.com/");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testPreserveTextWhitespaceXLSX
+fn mapped_xlsx_preserve_whitespace_keeps_visible_text() {
+  let summary = render_summary("preserve-whitespace.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "abc");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testPreserveTextWhitespace2XLSX
+fn mapped_xlsx_preserve_space_keeps_single_line_with_inner_spaces() {
+  let summary = render_summary("preserve_space.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "abc 123456 456");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testEscapedUnicodeXLSX
+fn mapped_xlsx_escape_unicode_keeps_newline_text_without_literal_escape() {
+  let summary = render_summary("escape-unicode.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Line 1");
+  assert_page_contains(&summary, 0, "Line 2");
+  assert_page_contains(&summary, 0, "Line 3");
+  assert_page_contains(&summary, 0, "Line 4");
+  assert_page_not_contains(&summary, 0, "_x000D_");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testSingleLine_xlsx
+fn mapped_xlsx_cell_multi_line_keeps_single_and_multi_paragraph_cells() {
+  let summary = render_summary("cell-multi-line.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Line1Line2Line3");
+  assert_page_contains(&summary, 0, "Line1 Line2 Line3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testBooleanFormatXLSX
+fn mapped_xlsx_check_boolean_renders_boolean_values() {
+  let summary = render_summary("check-boolean.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_text_occurrences(&summary, 0, "TRUE", 2);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testCellValueXLSX
+fn mapped_xlsx_cell_value_keeps_imported_visible_values() {
+  let summary = render_summary("cell-value.xlsx");
+  assert_eq!(summary.page_count, 8);
+  assert_page_contains(&summary, 0, "-2012");
+  assert_page_contains(&summary, 0, "-3.14");
+  assert_page_contains(&summary, 0, "Hello, Calc!");
+  assert_page_contains(
+    &summary,
+    0,
+    "Calc is the spreadsheet program you've always needed.",
+  );
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testFontSizeXLSX
+fn mapped_xlsx_font_size_keeps_18pt_textbox_text() {
+  let summary = render_summary("fontSize.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "sardfasef");
+  assert_text_object_font_size(&summary, "sardfasef", "18.00");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testSheetRunParagraphPropertyXLSX
+fn mapped_xlsx_text_color_keeps_red_and_green_rich_text() {
+  let summary = render_summary("TextColor.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Red Green");
+  assert_text_object_fill_color(&summary, "Red", "#ff0000@ff");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testTextUnderlineColorXLSX
+fn mapped_xlsx_underline_color_keeps_two_textbox_labels_visible() {
+  let summary = render_summary("underlineColor.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(&summary, 0, "Text Box", 2);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testEditEngStrikeThroughXLSX
+fn mapped_xlsx_strike_through_keeps_rich_text_content_visible() {
+  let summary = render_summary("strike-through.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "this is strike through this not");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testHiddenSheetsXLSX
+fn mapped_xlsx_hidden_sheets_prints_only_visible_sheet() {
+  let summary = render_summary("hidden_sheets.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "Sheet2");
+  assert_page_not_contains(&summary, 0, "Sheet1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf121715_FirstPageHeaderFooterXLSX
+fn mapped_xlsx_tdf121715_keeps_first_and_even_page_headers_footers() {
+  let summary = render_summary("tdf121715.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "First Page Header");
+  assert_page_contains(&summary, 0, "First Page Footer");
+  assert_page_contains(&summary, 1, "Even Header");
+  assert_page_contains(&summary, 1, "Even Footer");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf134459_HeaderFooterColorXLSX
+fn mapped_xlsx_tdf134459_keeps_colored_header_footer_text() {
+  let summary = render_summary("tdf134459_HeaderFooterColor.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_text_occurrences(&summary, 0, "l c r", 2);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test4.cxx:testTdf134817_HeaderFooterTextWith2SectionXLSX
+fn mapped_xlsx_tdf134817_keeps_multi_section_header_footer_text() {
+  let summary = render_summary("tdf134817_HeaderFooterTextWith2Section.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_media_box(&summary, 0, 612.0, 792.0);
+  assert_page_contains(&summary, 0, "aaa bbb");
+  assert_page_contains(&summary, 0, "cambdant");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTextDirectionXLSX
+fn mapped_xlsx_writing_mode_keeps_visible_text_direction_samples() {
+  let summary = render_summary("writingMode.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "English (Yes).");
+  assert_page_contains(&summary, 0, "English(Yes).");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testHyperlinkXLSX
+fn mapped_xlsx_hyperlink_keeps_internal_sheet_link_annotation() {
+  let summary = render_summary("hyperlink.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, ">");
+  assert_any_link_target(&summary, "#Sheet2!A1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testSheetTextBoxHyperlinkXLSX
+fn mapped_xlsx_textbox_hyperlink_keeps_visible_text_and_link_annotation() {
+  let summary = render_summary("textbox-hyperlink.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "text");
+  assert!(
+    summary.link_annotation_count >= 1,
+    "expected textbox hyperlink annotation; links={:?}",
+    summary.links
+  );
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf123645XLSX
+fn mapped_xlsx_chart_hyperlink_keeps_chart_text_and_link_targets() {
+  let summary = render_summary("chart_hyperlink.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "Chart Title");
+  assert_page_contains(&summary, 1, "Row 1");
+  assert_link_target(&summary, "file:///C:/TEMP/test.xlsx");
+  assert_any_link_target(&summary, "#Sheet2!A1");
+  assert_link_target(
+    &summary,
+    "https://bugs.documentfoundation.org/show_bug.cgi?id=123645",
+  );
 }

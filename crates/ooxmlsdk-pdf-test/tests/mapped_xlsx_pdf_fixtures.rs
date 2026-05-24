@@ -1191,3 +1191,148 @@ fn mapped_xlsx_tdf122336_keeps_imported_date_and_job_fields_visible() {
   assert_page_contains(&summary, 0, "12/25/2018 11:30");
   assert_page_contains(&summary, 2, "Van Rompaey Marcus");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:shared-formula 3D reference assertions
+fn mapped_xlsx_shared_formula_3d_reference_keeps_same_and_another_sheet_values_visible() {
+  let summary = render_summary("shared-formula/3d-reference.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(
+    &summary,
+    0,
+    "Value Same sheet Another sheet Same sheet but sheet name shown",
+  );
+  assert_page_contains(&summary, 0, "1 1 10 1");
+  assert_page_contains(&summary, 1, "10 20 30 40 50 60");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test4.cxx:testSharedFormulaXLSX
+fn mapped_xlsx_shared_formula_basic_keeps_formula_values_visible() {
+  let summary = render_summary("shared-formula/basic.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Value Formula");
+  assert_page_contains(&summary, 0, "1 10");
+  assert_page_contains(&summary, 0, "18 180");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testSharedFormulaStringResultExportXLSX
+fn mapped_xlsx_shared_formula_text_results_keep_cached_strings_visible() {
+  let summary = render_summary("shared-formula/text-results.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Text Same Sheet Another Sheet");
+  assert_page_contains(&summary, 0, "A A AA");
+  assert_page_contains(&summary, 0, "F F FF");
+  assert_page_contains(&summary, 1, "AA BB CC DD EE FF");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testExternalRefCacheXLSX
+fn mapped_xlsx_external_refs_keep_cached_external_values_visible() {
+  let summary = render_summary("external-refs.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Name Andy Bruce Charlie");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testRefStringXLSX
+fn mapped_xlsx_ref_string_keeps_cached_value_visible() {
+  let summary = render_summary("ref_string.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 2 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testTdf139934
+fn mapped_xlsx_tdf139934_keeps_imported_date_strings_visible() {
+  let summary = render_summary("tdf139934.xlsx");
+  assert_eq!(summary.page_count, 9);
+  assert_page_contains(&summary, 0, "Absence Requests");
+  assert_page_contains(&summary, 0, "1/20/2021 Wednesday Annual Leave");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testNonAsciiWithDotXLSX
+fn mapped_xlsx_tdf100154_keeps_non_ascii_sheet_formula_value_visible() {
+  let summary = render_summary("tdf100154.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "5");
+  assert_page_contains(&summary, 1, "5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf160371
+fn mapped_xlsx_tdf160371_keeps_indirect_intersection_value_visible() {
+  let summary = render_summary("tdf160371.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Intersection Example Data Table");
+  assert_page_contains(&summary, 0, "Value 1 Row_2 4 5 6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf100709XLSX
+fn mapped_xlsx_tdf100709_keeps_plain_218_values_visible() {
+  let summary = render_summary("tdf100709.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "65 218");
+  assert_page_contains(&summary, 0, "05-Mar-00 218");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf105272
+fn mapped_xlsx_tdf105272_keeps_structured_reference_table_visible() {
+  let summary = render_summary("tdf105272.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Gold Silver Bronze Total");
+  assert_page_contains(&summary, 0, "13 11 9 33");
+  assert_page_contains(&summary, 0, "232 0.14");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testTdf119292
+fn mapped_xlsx_tdf119292_keeps_rotated_text_samples_visible() {
+  let summary = render_summary("tdf119292.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "text rotated by 270 degrees");
+  assert_page_contains(&summary, 0, "text rotated by 90 degrees");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf131536
+fn mapped_xlsx_tdf131536_keeps_comparison_formula_display_visible() {
+  let summary = render_summary("tdf131536.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Excel - true Calc -true");
+  assert_page_contains(&summary, 0, "L0001 L0001");
+  assert_page_contains(&summary, 1, "MMR/HEV/LIC/000001");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf137543XLSX
+fn mapped_xlsx_tdf137543_keeps_let_function_results_visible() {
+  let summary = render_summary("tdf137543.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "25");
+  assert_page_contains(&summary, 0, "Source array");
+  assert_page_contains(&summary, 1, "A B E F I J M N Q R U V");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf170201_empty_values_in_array_formulas
+fn mapped_xlsx_tdf170201_keeps_array_formula_non_empty_values_visible() {
+  let summary = render_summary("tdf170201.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Sheet1");
+  assert_page_contains(&summary, 0, "1 3");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/jumbosheets-test.cxx:testTdf134553
+fn mapped_xlsx_tdf134553_keeps_chart_labels_visible() {
+  let summary = render_summary("tdf134553.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Chart Title");
+  assert_page_contains(&summary, 0, "First data point; 2");
+  assert_page_contains(&summary, 0, "Third data point; 8");
+}

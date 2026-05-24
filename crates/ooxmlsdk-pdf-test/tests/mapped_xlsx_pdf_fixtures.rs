@@ -1336,3 +1336,178 @@ fn mapped_xlsx_tdf134553_keeps_chart_labels_visible() {
   assert_page_contains(&summary, 0, "First data point; 2");
   assert_page_contains(&summary, 0, "Third data point; 8");
 }
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf142929_filterLessThanXLSX
+fn mapped_xlsx_tdf142929_filter_less_than_keeps_filtered_number_visible() {
+  let summary = render_summary("tdf142929.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Numbers");
+  assert_page_contains(&summary, 0, "1");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testAutofilterTop10XLSX
+fn mapped_xlsx_tdf143068_top10_filter_keeps_top_four_numbers_visible() {
+  let summary = render_summary("tdf143068_top10filter.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Numbers");
+  assert_page_contains(&summary, 0, "7 8 9 10");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testExternalDefinedNameXLSX
+fn mapped_xlsx_tdf144397_keeps_external_defined_name_results_visible() {
+  let summary = render_summary("tdf144397.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Strings With Range name:");
+  assert_page_contains(&summary, 0, "January January");
+  assert_page_contains(&summary, 0, "May #N/A");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test.cxx:testTdf162963
+fn mapped_xlsx_tdf162963_keeps_table_totals_row_visible() {
+  let summary = render_summary("tdf162963_TableWithTotalsEnabled.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Name Sales");
+  assert_page_contains(&summary, 0, "Miller 23");
+  assert_page_contains(&summary, 0, "All 115");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testAutofilterXLSX
+fn mapped_xlsx_autofilter_keeps_filtered_area_rows_visible() {
+  let summary = render_summary("autofilter.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "column1 column2 column3");
+  assert_page_contains(&summary, 0, "2 3 4");
+  assert_page_contains(&summary, 0, "4 5 4");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testNamedTableRef
+fn mapped_xlsx_tablerefsnamed_keeps_named_table_formula_results_visible() {
+  let summary = render_summary("tablerefsnamed.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Name Score ScoreNames");
+  assert_page_contains(&summary, 0, "aaa 3.5 ScoreNames aaa TRUE");
+  assert_page_contains(&summary, 0, "fff 4.1 ScoreNames fff TRUE");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testDatabaseRangesXLSX
+fn mapped_xlsx_database_ranges_keep_named_and_unnamed_results_visible() {
+  let summary = render_summary("database.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Col1 Col2 Col3 Col4");
+  assert_page_contains(&summary, 1, "Using named db range Using unnamed db range");
+  assert_page_contains(&summary, 1, "Name Age Children");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testMatrixMultiplicationXLSX
+fn mapped_xlsx_matrix_multiplication_keeps_array_formula_results_visible() {
+  let summary = render_summary("matrix-multiplication.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "1 2 4 5.2");
+  assert_page_contains(&summary, 0, "49.2");
+  assert_page_contains(&summary, 0, "103.6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:testTdf118990
+fn mapped_xlsx_tdf118990_keeps_external_vlookup_results_visible() {
+  let summary = render_summary("tdf118990.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "333 C");
+  assert_page_text_occurrences(&summary, 0, "333", 3);
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf163554
+fn mapped_xlsx_tdf163554_keeps_quoted_3d_range_sum_visible() {
+  let summary = render_summary("tdf163554.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "time (misc) - last");
+  assert_page_contains(&summary, 0, "7 7");
+  assert_page_contains(&summary, 1, "time (pnrst)");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:testTdf85617
+fn mapped_xlsx_tdf85617_keeps_sheet_local_name_result_visible() {
+  let summary = render_summary("tdf85617.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Code name Quantity Price");
+  assert_page_contains(&summary, 0, "Товар 1 1 4.5");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTdf118668
+fn mapped_xlsx_tdf118668_prints_visible_second_sheet() {
+  let summary = render_summary("tdf118668.xlsx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 0, "ПУТЕВОЙ ЛИСТ ТРАКТОРА");
+  assert_page_contains(&summary, 1, "Результат работы автомобиля за смену");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableOutlineModeXLSX
+fn mapped_xlsx_pivottable_outline_mode_keeps_outline_pivot_visible() {
+  let summary = render_summary("pivottable_outline_mode.xlsx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "field1 field2 field3");
+  assert_page_contains(&summary, 0, "Sum of field3");
+  assert_page_contains(&summary, 0, "Total Result 6");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableTabularModeXLSX
+fn mapped_xlsx_pivottable_tabular_mode_keeps_tabular_pivot_visible() {
+  let summary = render_summary("pivottable_tabular_mode.xlsx");
+  assert_eq!(summary.page_count, 4);
+  assert_page_contains(&summary, 0, "pwdLastSet (empty)");
+  assert_page_contains(&summary, 0, "company employeeID Count - mail");
+  assert_page_contains(&summary, 0, "Total Result 13");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testTdf124810_pivotDark
+fn mapped_xlsx_pivot_dark1_keeps_dark_style_pivot_output_visible() {
+  let summary = render_summary("pivot_dark1.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "name date value");
+  assert_page_contains(&summary, 0, "Count of v date");
+  assert_page_contains(&summary, 1, "Total Result");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testInvalidFormats
+fn mapped_xlsx_pivottable_invalid_formats_keeps_formatted_source_rows_visible() {
+  let summary = render_summary("pivottable_invalid_formats.xlsx");
+  assert_eq!(summary.page_count, 5);
+  assert_page_contains(&summary, 0, "Spalte 1 Spalte 2 Spalte 3");
+  assert_page_contains(&summary, 0, "A Ur 600 0.65");
+  assert_page_contains(&summary, 1, "H Th 1144 149.89");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/pivottable_filters_test.cxx:testPivotTableExportXLSX
+fn mapped_xlsx_tdf89139_pivot_table_keeps_hidden_item_pivot_output_visible() {
+  let summary = render_summary("tdf89139_pivot_table.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Name Id Dept Date");
+  assert_page_contains(&summary, 1, "Dept Count of Id");
+  assert_page_contains(&summary, 1, "Total Result 17");
+}
+
+#[test]
+// Source: ../core/sc/qa/unit/subsequent_export_test5.cxx:testTdf165503
+fn mapped_xlsx_tdf165503_keeps_chart_date_cache_source_values_visible() {
+  let summary = render_summary("tdf165503.xlsx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Date Val");
+  assert_page_contains(&summary, 0, "1/3/2021 3");
+  assert_page_contains(&summary, 0, "10/10/2022 9");
+}

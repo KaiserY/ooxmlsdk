@@ -155,8 +155,13 @@ Landed owner modules:
   recovery properties, extensions, and OLE size references.
 - `xlsx/workbook_catalog.rs`: typed workbook relationship catalog for external
   links, XML maps, workbook persons, revision headers/logs, custom XML, slicer
-  and timeline caches, rich values, VBA, attached toolbars, calc chain,
-  metadata, volatile dependencies, and feature/property-bag markers.
+  and timeline caches, rich values, rich-value structures, rich arrays, rich
+  styles, supporting property bags/structures, rich-value types, rich-value web
+  images, custom data properties, workbook user data, VBA, attached toolbars,
+  calc chain, cell metadata, volatile dependencies, and feature-property bags.
+  Relationship-owned roots preserve relationship ids, child relationship
+  markers, declared/root counts, text-bearing ids, and extension flags instead
+  of remaining workbook-global bare counters.
 - `xlsx/styles.rs`: typed stylesheet and defined-name catalogs from
   `WorkbookStylesPart` and `workbook.definedNames`, including custom number
   formats, font/fill/border/XF/table-style counts, default table/pivot style

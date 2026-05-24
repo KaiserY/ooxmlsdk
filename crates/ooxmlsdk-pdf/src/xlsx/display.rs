@@ -257,47 +257,270 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
   }
 
   let relationship_resources = &import.workbook_catalog.relationship_resources;
-  let relationship_resource_count = relationship_resources.custom_xml_parts
-    + relationship_resources.custom_data_properties
-    + relationship_resources.slicer_caches
-    + relationship_resources.timeline_caches
-    + relationship_resources.rich_value_parts
-    + relationship_resources.rich_value_structure_parts
-    + relationship_resources.rd_array_parts
-    + relationship_resources.rich_styles_parts
-    + relationship_resources.supporting_property_bags
-    + relationship_resources.supporting_property_bag_structures
-    + relationship_resources.rich_value_types
-    + usize::from(relationship_resources.has_rich_value_web_image)
-    + usize::from(relationship_resources.has_feature_property_bags)
+  let relationship_resource_count = relationship_resources.custom_xml_parts.len()
+    + relationship_resources.custom_data_properties.len()
+    + relationship_resources.slicer_caches.len()
+    + relationship_resources.timeline_caches.len()
+    + relationship_resources.rich_values.len()
+    + relationship_resources.rich_value_structures.len()
+    + relationship_resources.arrays.len()
+    + relationship_resources.rich_styles.len()
+    + relationship_resources.supporting_property_bags.len()
+    + relationship_resources
+      .supporting_property_bag_structures
+      .len()
+    + relationship_resources.rich_value_types.len()
+    + usize::from(relationship_resources.rich_value_web_image.is_some())
+    + usize::from(relationship_resources.feature_property_bags.is_some())
     + usize::from(relationship_resources.has_vba_project)
     + usize::from(relationship_resources.has_attached_toolbars)
-    + usize::from(relationship_resources.has_user_data)
-    + usize::from(relationship_resources.has_calculation_chain)
-    + usize::from(relationship_resources.has_cell_metadata)
-    + usize::from(relationship_resources.has_volatile_dependencies);
+    + usize::from(relationship_resources.user_data.is_some())
+    + usize::from(relationship_resources.calculation_chain.is_some())
+    + usize::from(relationship_resources.cell_metadata.is_some())
+    + usize::from(relationship_resources.volatile_dependencies.is_some());
   if relationship_resource_count > 0 {
+    let custom_xml_flags = relationship_resources
+      .custom_xml_parts
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + usize::from(part.has_properties)
+          + part.schema_refs
+          + part.text_len
+      })
+      .sum::<usize>();
+    let custom_data_flags = relationship_resources
+      .custom_data_properties
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + usize::from(part.has_custom_data)
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let slicer_flags = relationship_resources
+      .slicer_caches
+      .iter()
+      .map(|cache| {
+        usize::from(cache.relationship_id.is_some())
+          + cache.name_len
+          + cache.source_name_len
+          + cache.pivot_tables
+          + usize::from(cache.has_data)
+          + cache.extension_markers
+      })
+      .sum::<usize>();
+    let timeline_flags = relationship_resources
+      .timeline_caches
+      .iter()
+      .map(|cache| {
+        usize::from(cache.relationship_id.is_some())
+          + cache.name_len
+          + cache.source_name_len
+          + cache.pivot_tables
+          + cache.state_flags
+          + cache.text_len
+          + cache.extension_markers
+      })
+      .sum::<usize>();
+    let rich_value_items = relationship_resources
+      .rich_values
+      .iter()
+      .map(|part| part.rich_values + part.values + part.fallbacks)
+      .sum::<usize>();
+    let rich_value_flags = relationship_resources
+      .rich_values
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + part.declared_count as usize
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let rich_structure_items = relationship_resources
+      .rich_value_structures
+      .iter()
+      .map(|part| part.structures + part.keys)
+      .sum::<usize>();
+    let rich_structure_flags = relationship_resources
+      .rich_value_structures
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + part.declared_count as usize
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let array_items = relationship_resources
+      .arrays
+      .iter()
+      .map(|part| part.arrays + part.values)
+      .sum::<usize>();
+    let array_flags = relationship_resources
+      .arrays
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + part.declared_count as usize
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let rich_style_flags = relationship_resources
+      .rich_styles
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + usize::from(part.has_dxfs)
+          + usize::from(part.has_properties)
+          + part.styles
+          + part.style_values
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let property_bag_flags = relationship_resources
+      .supporting_property_bags
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + part.arrays
+          + part.bags
+          + part.values
+          + part.extension_markers
+      })
+      .sum::<usize>();
+    let property_bag_structure_flags = relationship_resources
+      .supporting_property_bag_structures
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + part.declared_count as usize
+          + part.structures
+          + part.keys
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let rich_value_type_flags = relationship_resources
+      .rich_value_types
+      .iter()
+      .map(|part| {
+        usize::from(part.relationship_id.is_some())
+          + usize::from(part.has_global_type)
+          + part.types
+          + part.key_flags
+          + part.reserved_keys
+          + part.reserved_key_flags
+          + part.text_len
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    let web_image_flags = relationship_resources
+      .rich_value_web_image
+      .as_ref()
+      .map_or(0, |part| {
+        usize::from(part.relationship_id.is_some())
+          + part.images
+          + part.address_relationships
+          + part.more_images_relationships
+          + part.blip_relationships
+          + usize::from(part.has_extensions)
+      });
+    let feature_bag_flags = relationship_resources
+      .feature_property_bags
+      .as_ref()
+      .map_or(0, |part| {
+        usize::from(part.relationship_id.is_some())
+          + part.declared_count as usize
+          + part.bag_extensions
+          + part.bags
+          + part.values
+          + part.text_len
+          + part.extension_markers
+      });
+    let user_data_flags = relationship_resources.user_data.as_ref().map_or(0, |part| {
+      usize::from(part.relationship_id.is_some())
+        + part.declared_count as usize
+        + part.users
+        + part.text_len
+        + part.extension_markers
+    });
+    let calculation_chain_flags =
+      relationship_resources
+        .calculation_chain
+        .as_ref()
+        .map_or(0, |part| {
+          usize::from(part.relationship_id.is_some())
+            + part.cells
+            + part.flag_count
+            + part.text_len
+            + usize::from(part.has_extensions)
+        });
+    let cell_metadata_flags = relationship_resources
+      .cell_metadata
+      .as_ref()
+      .map_or(0, |part| {
+        usize::from(part.relationship_id.is_some())
+          + part.metadata_types
+          + part.metadata_strings
+          + part.mdx_records
+          + part.future_metadata
+          + part.cell_blocks
+          + part.value_blocks
+          + part.records
+          + part.text_len
+          + part.extension_markers
+      });
+    let volatile_dependency_flags = relationship_resources
+      .volatile_dependencies
+      .as_ref()
+      .map_or(0, |part| {
+        usize::from(part.relationship_id.is_some()) + part.types + usize::from(part.has_extensions)
+      });
     lines.push(format!(
-      "workbook relationshipResources customXml={} customDataProps={} slicers={} timelines={} richValues={} richValueStructs={} arrays={} richStyles={} propBags={} propBagStructs={} richValueTypes={} webImage={} featureBags={} vba={} toolbars={} users={} calcChain={} cellMetadata={} volatileDeps={}",
-      relationship_resources.custom_xml_parts,
-      relationship_resources.custom_data_properties,
-      relationship_resources.slicer_caches,
-      relationship_resources.timeline_caches,
-      relationship_resources.rich_value_parts,
-      relationship_resources.rich_value_structure_parts,
-      relationship_resources.rd_array_parts,
-      relationship_resources.rich_styles_parts,
-      relationship_resources.supporting_property_bags,
-      relationship_resources.supporting_property_bag_structures,
-      relationship_resources.rich_value_types,
-      relationship_resources.has_rich_value_web_image,
-      relationship_resources.has_feature_property_bags,
+      "workbook relationshipResources customXml={} customXmlFlags={} customDataProps={} customDataFlags={} slicers={} slicerFlags={} timelines={} timelineFlags={} richValues={} richValueItems={} richValueFlags={} richValueStructs={} richStructItems={} richStructFlags={} arrays={} arrayItems={} arrayFlags={} richStyles={} richStyleFlags={} propBags={} propBagFlags={} propBagStructs={} propBagStructFlags={} richValueTypes={} richValueTypeFlags={} webImage={} webImageFlags={} featureBags={} featureBagFlags={} vba={} toolbars={} users={} userFlags={} calcChain={} calcChainFlags={} cellMetadata={} cellMetadataFlags={} volatileDeps={} volatileDepFlags={}",
+      relationship_resources.custom_xml_parts.len(),
+      custom_xml_flags,
+      relationship_resources.custom_data_properties.len(),
+      custom_data_flags,
+      relationship_resources.slicer_caches.len(),
+      slicer_flags,
+      relationship_resources.timeline_caches.len(),
+      timeline_flags,
+      relationship_resources.rich_values.len(),
+      rich_value_items,
+      rich_value_flags,
+      relationship_resources.rich_value_structures.len(),
+      rich_structure_items,
+      rich_structure_flags,
+      relationship_resources.arrays.len(),
+      array_items,
+      array_flags,
+      relationship_resources.rich_styles.len(),
+      rich_style_flags,
+      relationship_resources.supporting_property_bags.len(),
+      property_bag_flags,
+      relationship_resources.supporting_property_bag_structures.len(),
+      property_bag_structure_flags,
+      relationship_resources.rich_value_types.len(),
+      rich_value_type_flags,
+      relationship_resources.rich_value_web_image.is_some(),
+      web_image_flags,
+      relationship_resources.feature_property_bags.is_some(),
+      feature_bag_flags,
       relationship_resources.has_vba_project,
       relationship_resources.has_attached_toolbars,
-      relationship_resources.has_user_data,
-      relationship_resources.has_calculation_chain,
-      relationship_resources.has_cell_metadata,
-      relationship_resources.has_volatile_dependencies
+      relationship_resources.user_data.is_some(),
+      user_data_flags,
+      relationship_resources.calculation_chain.is_some(),
+      calculation_chain_flags,
+      relationship_resources.cell_metadata.is_some(),
+      cell_metadata_flags,
+      relationship_resources.volatile_dependencies.is_some(),
+      volatile_dependency_flags
     ));
   }
 

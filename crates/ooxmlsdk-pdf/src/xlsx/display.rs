@@ -14,6 +14,9 @@ pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
     || import.workbook_resources.external_workbooks > 0
     || import.workbook_resources.pivot_cache_definitions > 0
     || import.workbook_resources.workbook_persons > 0
+    || !import.workbook_catalog.external_links.is_empty()
+    || import.workbook_catalog.xml_maps.is_some()
+    || import.workbook_catalog.revisions.is_some()
   {
     pages.push((PageSetup::default(), workbook_lines(import)));
   }
@@ -143,6 +146,158 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
       connection_flags,
       parameter_count,
       connection_ref_len
+    ));
+  }
+
+  if !import.workbook_catalog.external_links.is_empty() {
+    let external_book_links = import
+      .workbook_catalog
+      .external_links
+      .iter()
+      .filter(|link| {
+        matches!(
+          link.kind,
+          super::workbook_catalog::ExternalLinkKind::ExternalBook { .. }
+        )
+      })
+      .count();
+    let dde_links = import
+      .workbook_catalog
+      .external_links
+      .iter()
+      .filter(|link| {
+        matches!(
+          link.kind,
+          super::workbook_catalog::ExternalLinkKind::Dde { .. }
+        )
+      })
+      .count();
+    let ole_links = import
+      .workbook_catalog
+      .external_links
+      .iter()
+      .filter(|link| {
+        matches!(
+          link.kind,
+          super::workbook_catalog::ExternalLinkKind::Ole { .. }
+        )
+      })
+      .count();
+    let external_items = import
+      .workbook_catalog
+      .external_links
+      .iter()
+      .map(|link| {
+        link.sheet_names
+          + link.defined_names
+          + link.cached_sheet_data
+          + link.item_count
+          + usize::from(link.has_extensions)
+          + link.relationship_id.as_ref().map_or(0, |value| value.len())
+          + external_link_kind_len(&link.kind)
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "externalLinks links={} books={} dde={} ole={} items={}",
+      import.workbook_catalog.external_links.len(),
+      external_book_links,
+      dde_links,
+      ole_links,
+      external_items
+    ));
+  }
+
+  if let Some(xml_maps) = &import.workbook_catalog.xml_maps {
+    lines.push(format!(
+      "xmlMaps rel={} schemas={} maps={} schemaRefs={} mapFlags={} namespaceLen={}",
+      xml_maps.relationship_id.as_deref().unwrap_or(""),
+      xml_maps.schemas,
+      xml_maps.maps,
+      xml_maps.schema_ref_count,
+      xml_maps.map_flag_count,
+      xml_maps.selection_namespaces.len()
+    ));
+  }
+
+  if !import.workbook_catalog.persons.is_empty() {
+    let person_count = import
+      .workbook_catalog
+      .persons
+      .iter()
+      .map(|part| part.persons)
+      .sum::<usize>();
+    let person_text_len = import
+      .workbook_catalog
+      .persons
+      .iter()
+      .map(|part| {
+        part.id_text_len
+          + part.relationship_id.as_ref().map_or(0, |value| value.len())
+          + usize::from(part.has_extensions)
+      })
+      .sum::<usize>();
+    lines.push(format!(
+      "persons parts={} persons={} textLen={}",
+      import.workbook_catalog.persons.len(),
+      person_count,
+      person_text_len
+    ));
+  }
+
+  if let Some(revisions) = &import.workbook_catalog.revisions {
+    lines.push(format!(
+      "revisions rel={} headers={} logs={} flags={} textLen={} guidLen={}",
+      revisions.relationship_id.as_deref().unwrap_or(""),
+      revisions.headers,
+      revisions.revision_logs,
+      revisions.flag_count,
+      revisions.user_text_len,
+      revisions.guid.len() + revisions.last_guid.as_ref().map_or(0, |value| value.len())
+    ));
+  }
+
+  let relationship_resources = &import.workbook_catalog.relationship_resources;
+  let relationship_resource_count = relationship_resources.custom_xml_parts
+    + relationship_resources.custom_data_properties
+    + relationship_resources.slicer_caches
+    + relationship_resources.timeline_caches
+    + relationship_resources.rich_value_parts
+    + relationship_resources.rich_value_structure_parts
+    + relationship_resources.rd_array_parts
+    + relationship_resources.rich_styles_parts
+    + relationship_resources.supporting_property_bags
+    + relationship_resources.supporting_property_bag_structures
+    + relationship_resources.rich_value_types
+    + usize::from(relationship_resources.has_rich_value_web_image)
+    + usize::from(relationship_resources.has_feature_property_bags)
+    + usize::from(relationship_resources.has_vba_project)
+    + usize::from(relationship_resources.has_attached_toolbars)
+    + usize::from(relationship_resources.has_user_data)
+    + usize::from(relationship_resources.has_calculation_chain)
+    + usize::from(relationship_resources.has_cell_metadata)
+    + usize::from(relationship_resources.has_volatile_dependencies);
+  if relationship_resource_count > 0 {
+    lines.push(format!(
+      "workbook relationshipResources customXml={} customDataProps={} slicers={} timelines={} richValues={} richValueStructs={} arrays={} richStyles={} propBags={} propBagStructs={} richValueTypes={} webImage={} featureBags={} vba={} toolbars={} users={} calcChain={} cellMetadata={} volatileDeps={}",
+      relationship_resources.custom_xml_parts,
+      relationship_resources.custom_data_properties,
+      relationship_resources.slicer_caches,
+      relationship_resources.timeline_caches,
+      relationship_resources.rich_value_parts,
+      relationship_resources.rich_value_structure_parts,
+      relationship_resources.rd_array_parts,
+      relationship_resources.rich_styles_parts,
+      relationship_resources.supporting_property_bags,
+      relationship_resources.supporting_property_bag_structures,
+      relationship_resources.rich_value_types,
+      relationship_resources.has_rich_value_web_image,
+      relationship_resources.has_feature_property_bags,
+      relationship_resources.has_vba_project,
+      relationship_resources.has_attached_toolbars,
+      relationship_resources.has_user_data,
+      relationship_resources.has_calculation_chain,
+      relationship_resources.has_cell_metadata,
+      relationship_resources.has_volatile_dependencies
     ));
   }
 
@@ -312,6 +467,22 @@ fn workbook_lines(import: &ExcelImport) -> Vec<String> {
   lines
 }
 
+fn external_link_kind_len(kind: &super::workbook_catalog::ExternalLinkKind) -> usize {
+  match kind {
+    super::workbook_catalog::ExternalLinkKind::ExternalBook { relationship_id } => {
+      relationship_id.len()
+    }
+    super::workbook_catalog::ExternalLinkKind::Dde { service, topic } => {
+      service.len() + topic.len()
+    }
+    super::workbook_catalog::ExternalLinkKind::Ole {
+      relationship_id,
+      prog_id,
+    } => relationship_id.len() + prog_id.len(),
+    super::workbook_catalog::ExternalLinkKind::Unknown => 0,
+  }
+}
+
 fn print_page_lines(import: &ExcelImport, page: &CalcPrintPage<'_>) -> Vec<String> {
   let mut lines = sheet_lines(import, page.sheet);
   lines.insert(
@@ -397,9 +568,12 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
     || !sheet.resources.tables.is_empty()
     || !sheet.resources.pivot_tables.tables.is_empty()
     || !sheet.resources.query_tables.query_tables.is_empty()
+    || !sheet.metrics.objects.ole_objects.is_empty()
+    || !sheet.metrics.objects.controls.is_empty()
+    || sheet.metrics.objects.unknown_controls > 0
   {
     lines.push(format!(
-      "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={}",
+      "resources drawings={} charts={} chartResources={} diagrams={} drawingImages={} vml={} comments={} threadedComments={} tables={} pivots={} queries={} oleObjects={} controls={} unknownControls={}",
       drawing_count,
       chart_count,
       chart_child_resource_count,
@@ -410,7 +584,88 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       sheet.resources.comments.threaded_count(),
       sheet.resources.tables.len(),
       sheet.resources.pivot_tables.tables.len(),
-      sheet.resources.query_tables.query_tables.len()
+      sheet.resources.query_tables.query_tables.len(),
+      sheet.metrics.objects.ole_objects.len(),
+      sheet.metrics.objects.controls.len(),
+      sheet.metrics.objects.unknown_controls
+    ));
+  }
+
+  if !sheet.metrics.objects.ole_objects.is_empty() || !sheet.metrics.objects.controls.is_empty() {
+    let ole_flags = sheet
+      .metrics
+      .objects
+      .ole_objects
+      .iter()
+      .map(|object| {
+        object.property_flags
+          + usize::from(object.auto_load)
+          + usize::from(object.show_as_icon)
+          + usize::from(object.has_embedded_properties)
+          + usize::from(object.link.is_some())
+          + usize::from(object.relationship_id.is_some())
+      })
+      .sum::<usize>();
+    let ole_ref_len = sheet
+      .metrics
+      .objects
+      .ole_objects
+      .iter()
+      .map(|object| {
+        object.shape_id as usize
+          + object
+            .relationship_id
+            .as_ref()
+            .map_or(0, |value| value.len())
+          + object.prog_id.as_ref().map_or(0, |value| value.len())
+          + object.link.as_ref().map_or(0, |value| value.len())
+          + object.property_text_len
+          + usize::from(object.data_or_view_aspect.is_some())
+          + usize::from(object.ole_update.is_some())
+      })
+      .sum::<usize>();
+    let control_flags = sheet
+      .metrics
+      .objects
+      .controls
+      .iter()
+      .map(|control| control.property_flags + usize::from(control.has_control_properties))
+      .sum::<usize>();
+    let control_ref_len = sheet
+      .metrics
+      .objects
+      .controls
+      .iter()
+      .map(|control| {
+        control.shape_id as usize
+          + control.relationship_id.len()
+          + control.name.as_ref().map_or(0, |value| value.len())
+          + control.property_text_len
+      })
+      .sum::<usize>();
+    let anchor_count = sheet
+      .metrics
+      .objects
+      .ole_objects
+      .iter()
+      .filter(|object| object.anchor.is_some())
+      .count()
+      + sheet
+        .metrics
+        .objects
+        .controls
+        .iter()
+        .filter(|control| control.anchor.is_some())
+        .count();
+    lines.push(format!(
+      "objects ole={} oleFlags={} oleRefLen={} controls={} controlFlags={} controlRefLen={} anchors={}",
+      sheet.metrics.objects.ole_objects.len(),
+      ole_flags,
+      ole_ref_len,
+      sheet.metrics.objects.controls.len(),
+      control_flags,
+      control_ref_len,
+      anchor_count
     ));
   }
 

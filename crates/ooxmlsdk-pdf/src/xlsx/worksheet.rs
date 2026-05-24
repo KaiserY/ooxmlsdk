@@ -9,6 +9,7 @@ use super::page_settings::CalcPageSettings;
 use super::pivot::PivotTableCatalog;
 use super::query::QueryTableCatalog;
 use super::sheet_conditions::SheetConditionCatalog;
+use super::sheet_objects::SheetObjectCatalog;
 use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
 use super::table::TableResourceCatalog;
@@ -64,6 +65,7 @@ pub(crate) struct SheetMetrics {
   pub(crate) row_breaks: Vec<PageBreakModel>,
   pub(crate) column_breaks: Vec<PageBreakModel>,
   pub(crate) conditions: SheetConditionCatalog,
+  pub(crate) objects: SheetObjectCatalog,
   pub(crate) protected_ranges: usize,
   pub(crate) scenarios: usize,
 }
@@ -303,6 +305,7 @@ impl SheetMetrics {
         })
         .unwrap_or_default(),
       conditions: SheetConditionCatalog::from_worksheet(worksheet),
+      objects: SheetObjectCatalog::from_worksheet(worksheet),
       protected_ranges: worksheet
         .protected_ranges
         .as_ref()

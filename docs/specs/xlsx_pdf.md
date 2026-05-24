@@ -153,6 +153,10 @@ Landed owner modules:
   `workbookPr`, `bookViews`, `calcPr`, workbook/file sharing/protection
   markers, external-reference/function-group/pivot-cache counts, custom views,
   recovery properties, extensions, and OLE size references.
+- `xlsx/workbook_catalog.rs`: typed workbook relationship catalog for external
+  links, XML maps, workbook persons, revision headers/logs, custom XML, slicer
+  and timeline caches, rich values, VBA, attached toolbars, calc chain,
+  metadata, volatile dependencies, and feature/property-bag markers.
 - `xlsx/styles.rs`: typed stylesheet and defined-name catalogs from
   `WorkbookStylesPart` and `workbook.definedNames`, including custom number
   formats, font/fill/border/XF/table-style counts, default table/pivot style
@@ -170,6 +174,10 @@ Landed owner modules:
   import now preserves typed formula state for normal/shared/array/data-table
   formulas, shared ids, formula refs, calculation flags, data-table inputs,
   cached values, cell/value metadata, phonetic flags, and extension markers.
+- `xlsx/sheet_objects.rs`: typed worksheet OLE/control catalog mirroring
+  `WorksheetFragment::importOleObject` / `importControl`, preserving shape ids,
+  relationship ids, linked/embedded markers, progIds, update/icon/autoload
+  flags, control names, x14 object/control properties, and object anchors.
 - `xlsx/drawing.rs`: typed drawing/chart resource catalog from `DrawingsPart`,
   `ChartPart`, and `ExtendedChartPart` child relationships.
 - `xlsx/page_settings.rs`: first `PageSettingsModel`-shaped defaults and typed

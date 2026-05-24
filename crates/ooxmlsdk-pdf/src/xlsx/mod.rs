@@ -7,11 +7,13 @@ mod pivot;
 mod print;
 mod query;
 mod sheet_conditions;
+mod sheet_objects;
 mod sheet_settings;
 mod sheet_view;
 mod styles;
 mod table;
 mod workbook;
+mod workbook_catalog;
 mod workbook_settings;
 mod worksheet;
 

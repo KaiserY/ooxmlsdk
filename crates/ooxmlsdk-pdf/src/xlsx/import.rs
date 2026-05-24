@@ -8,6 +8,7 @@ use super::pivot::PivotCacheCatalog;
 use super::query::ConnectionsCatalog;
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::workbook::WorkbookFragment;
+use super::workbook_catalog::WorkbookCatalog;
 use super::workbook_settings::WorkbookGlobals;
 use super::worksheet::CalcSheet;
 
@@ -22,6 +23,7 @@ pub(crate) struct ExcelImport {
   pub(crate) styles: StylesCatalog,
   pub(crate) defined_names: DefinedNamesCatalog,
   pub(crate) workbook_resources: WorkbookResourceCatalog,
+  pub(crate) workbook_catalog: WorkbookCatalog,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -53,6 +55,7 @@ impl ExcelImport {
     let connections =
       ConnectionsCatalog::from_part(package, workbook_part.connections_part(package))?;
     let workbook_resources = WorkbookResourceCatalog::from_part(package, &workbook_part);
+    let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
     let sheets = fragment.finalize_import(package)?;
@@ -67,6 +70,7 @@ impl ExcelImport {
       styles: fragment.styles,
       defined_names: fragment.defined_names,
       workbook_resources,
+      workbook_catalog,
     })
   }
 }

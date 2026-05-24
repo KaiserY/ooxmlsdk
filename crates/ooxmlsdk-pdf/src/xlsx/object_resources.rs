@@ -5,6 +5,7 @@ use ooxmlsdk::parts::vml_drawing_part::VmlDrawingPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main as x14;
 use ooxmlsdk::sdk::SdkPart;
+use quick_xml::events::Event;
 
 use crate::error::Result;
 
@@ -24,6 +25,14 @@ pub(crate) struct VmlDrawingResourceCatalog {
   pub(crate) relationship_id: Option<String>,
   pub(crate) images: usize,
   pub(crate) legacy_diagram_texts: usize,
+  pub(crate) shapes: Vec<VmlShapeModel>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct VmlShapeModel {
+  pub(crate) text: String,
+  pub(crate) style: Option<String>,
+  pub(crate) hidden: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -105,12 +114,94 @@ impl WorksheetObjectResourceCatalog {
 
 impl VmlDrawingResourceCatalog {
   fn from_part(package: &mut SpreadsheetDocument, part: &VmlDrawingPart) -> Self {
+    let shapes = part
+      .data_to_vec(package)
+      .map(|data| vml_shapes(&data))
+      .unwrap_or_default();
     Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
       images: part.image_parts(package).count(),
       legacy_diagram_texts: part.legacy_diagram_text_parts(package).count(),
+      shapes,
     }
   }
+}
+
+fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
+  let mut reader = quick_xml::Reader::from_reader(data);
+  reader.config_mut().trim_text(false);
+  let mut shapes = Vec::new();
+  let mut current: Option<VmlShapeModel> = None;
+  let mut in_textbox = false;
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let name = event.name();
+        if name.as_ref().ends_with(b"shape") {
+          let mut shape = VmlShapeModel::default();
+          for attr in event.attributes().flatten() {
+            let key = attr.key.as_ref();
+            let value = String::from_utf8_lossy(attr.value.as_ref()).into_owned();
+            if key.ends_with(b"style") {
+              shape.style = Some(value);
+            } else if key.ends_with(b"hidden") {
+              shape.hidden = matches!(value.as_str(), "true" | "1" | "t");
+            }
+          }
+          if shape
+            .style
+            .as_deref()
+            .is_some_and(|style| style.contains("visibility:hidden"))
+          {
+            shape.hidden = true;
+          }
+          current = Some(shape);
+        } else if name.as_ref().ends_with(b"textbox") {
+          in_textbox = true;
+        }
+      }
+      Ok(Event::Text(text)) => {
+        if in_textbox
+          && let Some(shape) = current.as_mut()
+          && let Ok(value) = text.decode()
+        {
+          shape.text.push_str(&value);
+        }
+      }
+      Ok(Event::CData(text)) => {
+        if in_textbox
+          && let Some(shape) = current.as_mut()
+          && let Ok(value) = text.decode()
+        {
+          shape.text.push_str(&value);
+        }
+      }
+      Ok(Event::End(event)) => {
+        let name = event.name();
+        if name.as_ref().ends_with(b"textbox") {
+          in_textbox = false;
+        } else if name.as_ref().ends_with(b"shape")
+          && let Some(mut shape) = current.take()
+        {
+          shape.text = normalize_vml_text(&shape.text);
+          shapes.push(shape);
+        }
+      }
+      Ok(Event::Eof) => break,
+      Err(_) => break,
+      _ => {}
+    }
+  }
+  shapes
+}
+
+fn normalize_vml_text(text: &str) -> String {
+  text
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ")
+    .trim()
+    .to_string()
 }
 
 impl ControlPersistenceResourceCatalog {

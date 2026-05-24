@@ -11,32 +11,13 @@ use super::import::ExcelImport;
 use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect, SheetType};
 
-const XLSX_DEBUG_LINE_HEIGHT_PT: f32 = 12.0;
+const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 
 pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
   let mut pages = Vec::new();
   let print_document = CalcPrintDocument::from_import(import);
-  if import.workbook_resources.has_theme
-    || import.workbook_resources.has_styles
-    || import.workbook_resources.external_workbooks > 0
-    || import.workbook_resources.pivot_cache_definitions > 0
-    || import.workbook_resources.workbook_persons > 0
-    || !import.workbook_catalog.external_links.is_empty()
-    || import.workbook_catalog.xml_maps.is_some()
-    || import.workbook_catalog.revisions.is_some()
-  {
-    let mut lines = workbook_lines(import);
-    lines.push(format!(
-      "printDocument pages={} skippedEmpty={} topDown={}",
-      print_document.pages.len(),
-      print_document.skipped_empty_pages,
-      print_document.top_down
-    ));
-    let setup = PageSetup::default();
-    pages.push((setup, summary_items(setup, lines)));
-  }
   pages.extend(print_document.pages.iter().map(|page| {
     let setup = page_setup_from_calc(page);
     (setup, print_page_items(import, page, setup))
@@ -49,8 +30,8 @@ fn print_page_items(
   page: &CalcPrintPage<'_>,
   setup: PageSetup,
 ) -> Vec<PageItem> {
-  let mut items = summary_items(setup, print_page_lines(import, page));
-  let body_origin_y = setup.margin_top_pt + XLSX_DEBUG_LINE_HEIGHT_PT * 6.0;
+  let mut items = Vec::new();
+  let body_origin_y = setup.margin_top_pt;
   let zoom_scale = page.zoom as f32 / 100.0;
   let heading_width = if page.page_settings.print_headings {
     page.sheet.column_width_pt(1) * zoom_scale
@@ -141,6 +122,18 @@ fn print_page_items(
     zoom_scale,
   ));
   items.extend(print_page_shape_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
+  items.extend(print_page_drawing_text_items(
+    page,
+    body_origin_x + repeat_width,
+    body_origin_y + repeat_height,
+    zoom_scale,
+  ));
+  items.extend(print_page_vml_text_items(
     page,
     body_origin_x + repeat_width,
     body_origin_y + repeat_height,
@@ -548,7 +541,7 @@ fn header_text(x_pt: f32, y_pt: f32, text: String) -> PageItem {
   PageItem::Text(TextItem {
     x_pt,
     y_pt,
-    line_height_pt: XLSX_DEBUG_LINE_HEIGHT_PT,
+    line_height_pt: XLSX_HEADER_FOOTER_LINE_HEIGHT_PT,
     text,
     style: TextStyle::default(),
     rotation_center_pt: None,
@@ -572,38 +565,6 @@ fn column_label(mut col: u32) -> String {
     col /= 26;
   }
   label.iter().rev().collect()
-}
-
-fn summary_items(setup: PageSetup, lines: Vec<String>) -> Vec<PageItem> {
-  let mut items = Vec::new();
-  let mut y = setup.margin_top_pt;
-  let content_bottom = setup.height_pt - setup.margin_bottom_pt;
-  for line in lines {
-    if y + XLSX_DEBUG_LINE_HEIGHT_PT > content_bottom {
-      break;
-    }
-    if !line.is_empty() {
-      items.push(PageItem::Text(TextItem {
-        x_pt: setup.margin_left_pt,
-        y_pt: y,
-        line_height_pt: XLSX_DEBUG_LINE_HEIGHT_PT,
-        text: line,
-        style: TextStyle::default(),
-        rotation_center_pt: None,
-        hyperlink_url: None,
-        dynamic_field: None,
-        style_ref_keys: Vec::new(),
-        style_ref_text: None,
-        form_widget_id: None,
-        paragraph_bidi: false,
-        preserve_text_portion: false,
-        decoration_span_start_x_pt: None,
-        pdf_text_segmentation: PdfTextSegmentation::Line,
-      }));
-    }
-    y += XLSX_DEBUG_LINE_HEIGHT_PT;
-  }
-  items
 }
 
 fn print_page_image_items(
@@ -707,6 +668,172 @@ fn print_page_shape_items(
     }));
   }
   items
+}
+
+fn print_page_drawing_text_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  for drawing in &page.sheet.resources.drawings {
+    for anchor in &drawing.anchors {
+      if anchor.object.hidden || !anchor.print_with_sheet {
+        continue;
+      }
+      let Some((x_pt, y_pt, width_pt, height_pt)) = anchor_rect_pt(page.sheet, anchor) else {
+        continue;
+      };
+      if width_pt <= 0.0 || height_pt <= 0.0 {
+        continue;
+      }
+      let text = drawing_anchor_text(drawing, anchor);
+      if text.trim().is_empty() {
+        continue;
+      }
+      let (x_pt, y_pt) =
+        page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+      render_drawing_text(
+        &mut items,
+        &text,
+        origin_x_pt + x_pt * zoom_scale,
+        origin_y_pt + y_pt * zoom_scale,
+        width_pt * zoom_scale,
+        height_pt * zoom_scale,
+      );
+    }
+  }
+  items
+}
+
+fn drawing_anchor_text(
+  drawing: &super::drawing::DrawingResourceCatalog,
+  anchor: &super::drawing::DrawingAnchorModel,
+) -> String {
+  if !anchor.object.text.is_empty() {
+    return anchor.object.text.clone();
+  }
+  if anchor.object.kind == super::drawing::DrawingObjectKind::GraphicFrame
+    && let Some(relationship_id) = anchor.object.relationship_id.as_deref()
+  {
+    return drawing
+      .charts
+      .iter()
+      .chain(drawing.extended_charts.iter())
+      .find(|chart| chart.relationship_id.as_deref() == Some(relationship_id))
+      .map(|chart| chart.visible_texts.join("\n"))
+      .unwrap_or_default();
+  }
+  String::new()
+}
+
+fn render_drawing_text(
+  items: &mut Vec<PageItem>,
+  text: &str,
+  x_pt: f32,
+  y_pt: f32,
+  _width_pt: f32,
+  height_pt: f32,
+) {
+  let style = TextStyle::default();
+  let line_height = (style.font_size_pt * 1.15).max(1.0);
+  for (index, line) in text.lines().filter(|line| !line.is_empty()).enumerate() {
+    let y = y_pt + XLSX_CELL_TEXT_INSET_PT + index as f32 * line_height;
+    if y > y_pt + height_pt {
+      break;
+    }
+    items.push(PageItem::Text(TextItem {
+      x_pt: x_pt + XLSX_CELL_TEXT_INSET_PT,
+      y_pt: y,
+      line_height_pt: line_height,
+      text: line.to_string(),
+      style: style.clone(),
+      rotation_center_pt: None,
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+  }
+}
+
+fn print_page_vml_text_items(
+  page: &CalcPrintPage<'_>,
+  origin_x_pt: f32,
+  origin_y_pt: f32,
+  zoom_scale: f32,
+) -> Vec<PageItem> {
+  let mut items = Vec::new();
+  let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
+  for shape in page
+    .sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+  {
+    if shape.hidden || shape.text.trim().is_empty() {
+      continue;
+    }
+    let Some((x_pt, y_pt, width_pt, height_pt)) = shape.style.as_deref().and_then(vml_style_rect)
+    else {
+      continue;
+    };
+    let (x_pt, y_pt) =
+      page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
+    render_drawing_text(
+      &mut items,
+      &shape.text,
+      origin_x_pt + x_pt * zoom_scale,
+      origin_y_pt + y_pt * zoom_scale,
+      width_pt * zoom_scale,
+      height_pt * zoom_scale,
+    );
+  }
+  items
+}
+
+fn vml_style_rect(style: &str) -> Option<(f32, f32, f32, f32)> {
+  let x = vml_style_length_pt(style, "margin-left")?;
+  let y = vml_style_length_pt(style, "margin-top")?;
+  let width = vml_style_length_pt(style, "width")?;
+  let height = vml_style_length_pt(style, "height")?;
+  Some((x, y, width, height))
+}
+
+fn vml_style_length_pt(style: &str, key: &str) -> Option<f32> {
+  style.split(';').find_map(|part| {
+    let (name, value) = part.split_once(':')?;
+    if name.trim() != key {
+      return None;
+    }
+    parse_vml_length_pt(value.trim())
+  })
+}
+
+fn parse_vml_length_pt(value: &str) -> Option<f32> {
+  if let Some(value) = value.strip_suffix("pt") {
+    return value.trim().parse::<f32>().ok();
+  }
+  if let Some(value) = value.strip_suffix("in") {
+    return value
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value * units::POINTS_PER_INCH);
+  }
+  if let Some(value) = value.strip_suffix("px") {
+    return value.trim().parse::<f32>().ok().map(|value| value * 0.75);
+  }
+  value.parse::<f32>().ok()
 }
 
 fn shape_stroke(object: &super::drawing::DrawingObjectModel) -> Option<BorderStyle> {
@@ -845,7 +972,7 @@ fn render_header_footer(items: &mut Vec<PageItem>, page: &CalcPrintPage<'_>, set
     render_header_footer_line(
       items,
       setup.margin_left_pt,
-      setup.height_pt - setup.footer_distance_pt - XLSX_DEBUG_LINE_HEIGHT_PT,
+      setup.height_pt - setup.footer_distance_pt - XLSX_HEADER_FOOTER_LINE_HEIGHT_PT,
       page,
       setup,
       &footer,
@@ -879,7 +1006,7 @@ fn render_header_footer_line(
   items: &mut Vec<PageItem>,
   x_pt: f32,
   y_pt: f32,
-  page: &CalcPrintPage<'_>,
+  _page: &CalcPrintPage<'_>,
   setup: PageSetup,
   text: &str,
 ) {
@@ -893,16 +1020,6 @@ fn render_header_footer_line(
       HeaderFooterAlign::Right => setup.width_pt - setup.margin_right_pt,
     };
     items.push(header_text(x, y_pt, value));
-  }
-  if page.page_settings.header_footer.drawing_slot_count > 0 {
-    items.push(header_text(
-      x_pt,
-      y_pt + XLSX_DEBUG_LINE_HEIGHT_PT,
-      format!(
-        "headerFooterDrawings={}",
-        page.page_settings.header_footer.drawing_slot_count
-      ),
-    ));
   }
 }
 

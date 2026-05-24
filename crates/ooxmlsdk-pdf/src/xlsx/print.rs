@@ -606,9 +606,6 @@ fn page_areas_for_sheet(
       );
     }
   }
-  if pages.is_empty() {
-    pages.push(None);
-  }
   pages
 }
 
@@ -815,7 +812,14 @@ fn rendered_number_text(
 ) -> (String, NumberFormatRenderState) {
   match data_type {
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::Boolean) => {
-      return (raw.to_string(), NumberFormatRenderState::Boolean);
+      return (
+        if boolean_raw_value(raw) {
+          "TRUE".to_string()
+        } else {
+          "FALSE".to_string()
+        },
+        NumberFormatRenderState::Boolean,
+      );
     }
     Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::String)
     | Some(ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues::InlineString)
@@ -873,6 +877,7 @@ struct NumberFormatPattern {
   prefix: String,
   suffix: String,
   suppress_negative_sign: bool,
+  section: String,
 }
 
 impl NumberFormatPattern {
@@ -890,6 +895,7 @@ impl NumberFormatPattern {
     let section = cleaned_section.as_str();
     let mut pattern = Self {
       suppress_negative_sign: section_index == 1,
+      section: section.to_string(),
       ..Self::default()
     };
     let mut in_quote = false;
@@ -909,6 +915,7 @@ impl NumberFormatPattern {
       }
       match ch {
         '\\' => escaped = true,
+        '_' | '*' => escaped = true,
         '"' => in_quote = !in_quote,
         _ if in_quote => {
           if literal_prefix {
@@ -933,7 +940,13 @@ impl NumberFormatPattern {
           pattern.suffix.push('%');
           literal_prefix = false;
         }
-        '$' | '€' | '£' | '¥' if literal_prefix => pattern.prefix.push(ch),
+        '$' | '€' | '£' | '¥' => {
+          if literal_prefix {
+            pattern.prefix.push(ch);
+          } else if seen_digit {
+            pattern.suffix.push(ch);
+          }
+        }
         'd' | 'D' | 'm' | 'M' | 'y' | 'Y' | 'h' | 'H' | 's' | 'S' => {
           pattern.date_time = true;
           literal_prefix = false;
@@ -944,6 +957,14 @@ impl NumberFormatPattern {
       }
     }
     pattern
+  }
+}
+
+fn boolean_raw_value(raw: &str) -> bool {
+  match raw.trim().to_ascii_lowercase().as_str() {
+    "true" => true,
+    "false" | "" => false,
+    value => value.parse::<f64>().is_ok_and(|number| number != 0.0),
   }
 }
 
@@ -996,23 +1017,30 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
     } else {
       ""
     };
-  let formatted = format!("{:.*}", pattern.decimals, value.abs());
+  let decimals = fraction_placeholder_count(&pattern.section).unwrap_or(pattern.decimals);
+  let formatted = format!("{:.*}", decimals, value.abs());
   let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
   let integer = if pattern.grouping {
     group_integer(integer)
   } else {
     integer.to_string()
   };
+  let fraction = render_fraction_pattern(&pattern.section, fraction).unwrap_or_else(|| {
+    if pattern.decimals > 0 {
+      let mut output = String::from(".");
+      output.push_str(fraction);
+      output
+    } else {
+      String::new()
+    }
+  });
   let mut output = String::new();
   output.push_str(sign);
   output.push_str(&pattern.prefix);
   output.push_str(&integer);
-  if pattern.decimals > 0 {
-    output.push('.');
-    output.push_str(fraction);
-  }
+  output.push_str(&fraction);
   output.push_str(&pattern.suffix);
-  output
+  output.trim_end().to_string()
 }
 
 fn group_integer(value: &str) -> String {
@@ -1040,13 +1068,178 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
   let hour = seconds / 3_600;
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
-  let lower = code.to_ascii_lowercase();
-  if lower.contains('h') || lower.contains('s') {
-    format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}")
-  } else if lower.contains("mmm") {
-    format!("{year:04}-{month:02}-{day:02}")
+  render_date_time_format(code, year, month, day, hour, minute, second)
+}
+
+fn fraction_placeholder_count(section: &str) -> Option<usize> {
+  let fraction = section.split_once('.')?.1;
+  Some(
+    fraction
+      .chars()
+      .filter(|ch| matches!(ch, '0' | '#' | '?'))
+      .count(),
+  )
+}
+
+fn render_fraction_pattern(section: &str, digits: &str) -> Option<String> {
+  let fraction = section.split_once('.')?.1;
+  let mut output = String::new();
+  let mut chars = fraction.chars().peekable();
+  let mut digit_index = 0usize;
+  let mut in_quote = false;
+  let mut escaped = false;
+  let digit_chars = digits.chars().collect::<Vec<_>>();
+  while let Some(ch) = chars.next() {
+    if escaped {
+      output.push(ch);
+      escaped = false;
+      continue;
+    }
+    match ch {
+      '\\' => escaped = true,
+      '_' | '*' => {
+        chars.next();
+      }
+      '"' => in_quote = !in_quote,
+      '[' if !in_quote => {
+        for next in chars.by_ref() {
+          if next == ']' {
+            break;
+          }
+        }
+      }
+      '0' | '#' | '?' if !in_quote => {
+        let digit = digit_chars.get(digit_index).copied().unwrap_or('0');
+        digit_index += 1;
+        if ch == '0'
+          || digit != '0'
+          || has_required_or_nonzero_fraction_digit(&digit_chars, digit_index)
+        {
+          output.push(digit);
+        }
+      }
+      _ => output.push(ch),
+    }
+  }
+  if output.is_empty() {
+    None
   } else {
-    format!("{year:04}-{month:02}-{day:02}")
+    Some(format!(".{}", output.trim_end()))
+  }
+}
+
+fn has_required_or_nonzero_fraction_digit(digits: &[char], start: usize) -> bool {
+  digits.iter().skip(start).any(|digit| *digit != '0')
+}
+
+fn render_date_time_format(
+  code: &str,
+  year: i64,
+  month: u32,
+  day: u32,
+  hour: i64,
+  minute: i64,
+  second: i64,
+) -> String {
+  let clean = strip_number_format_markers(code);
+  let lower = clean.to_ascii_lowercase();
+  if lower.contains("dddd") && lower.contains("mmmm") {
+    return format!(
+      "{}, {} {} {}",
+      weekday_name(year, month, day),
+      month_name(month),
+      day,
+      year
+    );
+  }
+  if lower.contains("mmmm") {
+    return format!("{} {} {}", month_name(month), day, year);
+  }
+  if lower.contains("mmm") && lower.contains("yy") {
+    let yy = (year % 100) as u32;
+    return format!("{day}-{}-{yy:02}", short_month_name(month));
+  }
+  if lower.contains('h') || lower.contains('s') {
+    if lower.contains("am/pm") {
+      let suffix = if hour >= 12 { "PM" } else { "AM" };
+      let hour12 = match hour % 12 {
+        0 => 12,
+        value => value,
+      };
+      return format!("{hour12}:{minute:02} {suffix}");
+    }
+    if lower.contains("yyyy") || lower.contains("yy") || lower.contains('d') {
+      return format!("{month}/{day}/{year} {hour:02}:{minute:02}");
+    }
+    return format!("{hour:02}:{minute:02}:{second:02}");
+  }
+  if lower.contains("yyyy") {
+    if lower.find('d') < lower.find('m') {
+      return format!("{day}/{month}/{year}");
+    }
+    return format!("{month}/{day}/{year}");
+  }
+  if lower.contains("yy") {
+    let yy = (year % 100) as u32;
+    if lower.find('d') < lower.find('m') {
+      return format!("{day}/{month}/{yy:02}");
+    }
+    return format!("{month}/{day}/{yy:02}");
+  }
+  format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn month_name(month: u32) -> &'static str {
+  match month {
+    1 => "January",
+    2 => "February",
+    3 => "March",
+    4 => "April",
+    5 => "May",
+    6 => "June",
+    7 => "July",
+    8 => "August",
+    9 => "September",
+    10 => "October",
+    11 => "November",
+    12 => "December",
+    _ => "",
+  }
+}
+
+fn short_month_name(month: u32) -> &'static str {
+  match month {
+    1 => "Jan",
+    2 => "Feb",
+    3 => "Mar",
+    4 => "Apr",
+    5 => "May",
+    6 => "Jun",
+    7 => "Jul",
+    8 => "Aug",
+    9 => "Sep",
+    10 => "Oct",
+    11 => "Nov",
+    12 => "Dec",
+    _ => "",
+  }
+}
+
+fn weekday_name(year: i64, month: u32, day: u32) -> &'static str {
+  let y = if month < 3 { year - 1 } else { year };
+  let m = if month < 3 { month + 12 } else { month } as i64;
+  let k = y % 100;
+  let j = y / 100;
+  let h = (i64::from(day) + ((13 * (m + 1)) / 5) + k + (k / 4) + (j / 4) + (5 * j)) % 7;
+  match h {
+    0 => "Saturday",
+    1 => "Sunday",
+    2 => "Monday",
+    3 => "Tuesday",
+    4 => "Wednesday",
+    5 => "Thursday",
+    6 => "Friday",
+    _ => "",
   }
 }
 

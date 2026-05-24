@@ -282,16 +282,13 @@ impl CalcSheet {
   }
 
   pub(crate) fn used_range(&self) -> Option<CellRange> {
-    if let Some(reference) = &self.metrics.dimension
-      && let Some(range) = CellRange::parse_a1_range(reference)
-    {
-      return Some(range);
-    }
-
     let mut used: Option<CellRange> = None;
     for (row_position, row) in self.rows.iter().enumerate() {
       let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
       for (cell_position, cell) in row.cells.iter().enumerate() {
+        if !cell.has_print_data() {
+          continue;
+        }
         let address = cell.address().unwrap_or(CellAddress {
           col: cell_position as u32 + 1,
           row: row_index,
@@ -302,7 +299,41 @@ impl CalcSheet {
         });
       }
     }
+    for anchor in self
+      .resources
+      .drawings
+      .iter()
+      .flat_map(|drawing| drawing.anchors.iter())
+    {
+      if anchor.object.hidden || !anchor.print_with_sheet {
+        continue;
+      }
+      let Some(range) = self.drawing_anchor_range(anchor) else {
+        continue;
+      };
+      used = Some(match used {
+        Some(used) => used.union(range),
+        None => range,
+      });
+    }
     used
+  }
+
+  fn drawing_anchor_range(&self, anchor: &super::drawing::DrawingAnchorModel) -> Option<CellRange> {
+    match anchor.kind {
+      super::drawing::DrawingAnchorKind::TwoCell => {
+        let start = marker_address(anchor.from.as_ref()?);
+        let end = marker_address(anchor.to.as_ref()?);
+        Some(CellRange::new(start, end))
+      }
+      super::drawing::DrawingAnchorKind::OneCell => {
+        let start = marker_address(anchor.from.as_ref()?);
+        Some(CellRange::single(start))
+      }
+      super::drawing::DrawingAnchorKind::Absolute => {
+        Some(CellRange::single(CellAddress { col: 1, row: 1 }))
+      }
+    }
   }
 
   pub(crate) fn cell_rect(&self, address: CellAddress) -> CellRect {
@@ -447,6 +478,22 @@ impl CalcSheet {
   }
 }
 
+fn marker_address(marker: &super::drawing::DrawingMarkerModel) -> CellAddress {
+  CellAddress {
+    col: u32::try_from(marker.column).unwrap_or(0).saturating_add(1),
+    row: u32::try_from(marker.row).unwrap_or(0).saturating_add(1),
+  }
+}
+
+impl CalcCell {
+  fn has_print_data(&self) -> bool {
+    self.formula.is_some()
+      || self.cached_value.is_some()
+      || !self.display_text.is_empty()
+      || self.data_type.is_some()
+  }
+}
+
 impl CellAddress {
   pub(crate) fn parse_a1(reference: &str) -> Option<Self> {
     let reference = reference
@@ -532,6 +579,19 @@ impl CellRange {
       end: CellAddress {
         col: self.end.col.max(address.col),
         row: self.end.row.max(address.row),
+      },
+    }
+  }
+
+  pub(crate) fn union(self, other: Self) -> Self {
+    Self {
+      start: CellAddress {
+        col: self.start.col.min(other.start.col),
+        row: self.start.row.min(other.start.row),
+      },
+      end: CellAddress {
+        col: self.end.col.max(other.end.col),
+        row: self.end.row.max(other.end.row),
       },
     }
   }
@@ -936,9 +996,8 @@ fn cell_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       .as_ref()
       .and_then(|value| value.xml_content.as_deref())
     {
-      Some("1") => "TRUE".to_string(),
-      Some("0") => "FALSE".to_string(),
-      Some(value) => value.to_string(),
+      Some(value) if boolean_cell_value(value) => "TRUE".to_string(),
+      Some(_) => "FALSE".to_string(),
       None => String::new(),
     },
     _ => cell
@@ -947,5 +1006,13 @@ fn cell_text(cell: &x::Cell, shared_strings: &[String]) -> String {
       .and_then(|value| value.xml_content.as_deref())
       .map(ToString::to_string)
       .unwrap_or_default(),
+  }
+}
+
+fn boolean_cell_value(value: &str) -> bool {
+  match value.trim().to_ascii_lowercase().as_str() {
+    "true" => true,
+    "false" | "" => false,
+    value => value.parse::<f64>().is_ok_and(|number| number != 0.0),
   }
 }

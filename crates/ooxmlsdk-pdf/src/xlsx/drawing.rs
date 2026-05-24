@@ -20,6 +20,7 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::docx::RgbColor;
 use crate::error::Result;
+use crate::render::chart as shared_chart;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct DrawingResourceCatalog {
@@ -78,6 +79,7 @@ pub(crate) struct DrawingObjectModel {
   pub(crate) text_len: usize,
   pub(crate) relationship_id: Option<String>,
   pub(crate) graphic_uri: Option<String>,
+  pub(crate) text: String,
   pub(crate) child_objects: usize,
   pub(crate) has_style: bool,
   pub(crate) fill_color: Option<RgbColor>,
@@ -121,6 +123,7 @@ pub(crate) struct ChartResourceCatalog {
   pub(crate) external_data_auto_update: bool,
   pub(crate) has_print_settings: bool,
   pub(crate) has_user_shapes_reference: bool,
+  pub(crate) visible_texts: Vec<String>,
   pub(crate) extension_markers: usize,
   pub(crate) chartex_data_sets: usize,
   pub(crate) chartex_series: usize,
@@ -308,11 +311,13 @@ impl DrawingAnchorModel {
         lock_with_sheet: anchor
           .client_data
           .lock_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::OneCellAnchor(anchor) => Self {
         kind: DrawingAnchorKind::OneCell,
@@ -329,11 +334,13 @@ impl DrawingAnchorModel {
         lock_with_sheet: anchor
           .client_data
           .lock_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::AbsoluteAnchor(anchor) => Self {
         kind: DrawingAnchorKind::Absolute,
@@ -350,11 +357,13 @@ impl DrawingAnchorModel {
         lock_with_sheet: anchor
           .client_data
           .lock_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
-          .is_some_and(|value| value.as_bool()),
+          .as_ref()
+          .map_or(true, |value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::XmlAny(value) => Self {
         kind: DrawingAnchorKind::Absolute,
@@ -445,10 +454,15 @@ impl DrawingObjectModel {
       description: properties.description.clone(),
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: shape.r#macro.clone(),
-      text_len: shape.text_link.as_ref().map_or(0, |value| value.len())
-        + usize::from(shape.text_body.is_some()),
       relationship_id: None,
       graphic_uri: None,
+      text: shape
+        .text_body
+        .as_deref()
+        .map(xdr_text_body_text)
+        .unwrap_or_default(),
+      text_len: shape.text_link.as_ref().map_or(0, |value| value.len())
+        + shape.text_body.as_deref().map_or(0, xdr_text_body_text_len),
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties),
@@ -469,9 +483,10 @@ impl DrawingObjectModel {
       description: properties.description.clone(),
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: None,
-      text_len: 0,
       relationship_id: None,
       graphic_uri: None,
+      text: group_shape_text(group),
+      text_len: group_shape_text_len(group),
       child_objects: group.group_shape_choice.len(),
       has_style: false,
       fill_color: None,
@@ -493,8 +508,9 @@ impl DrawingObjectModel {
       hidden: properties.hidden.is_some_and(|value| value.as_bool()),
       macro_name: frame.r#macro.clone(),
       text_len: 0,
-      relationship_id: None,
+      relationship_id: graphic_frame_relationship_id(frame),
       graphic_uri: Some(frame.graphic.graphic_data.uri.clone()),
+      text: String::new(),
       child_objects: frame.graphic.graphic_data.graphic_data_choice.len(),
       has_style: false,
       fill_color: None,
@@ -518,6 +534,7 @@ impl DrawingObjectModel {
       text_len: 0,
       relationship_id: None,
       graphic_uri: None,
+      text: String::new(),
       child_objects: 0,
       has_style: shape.shape_style.is_some(),
       fill_color: shape_fill_color(&shape.shape_properties),
@@ -545,6 +562,7 @@ impl DrawingObjectModel {
         .as_ref()
         .and_then(|blip| blip.embed.clone().or_else(|| blip.link.clone())),
       graphic_uri: None,
+      text: String::new(),
       child_objects: 0,
       has_style: picture.shape_style.is_some(),
       fill_color: None,
@@ -558,6 +576,7 @@ impl DrawingObjectModel {
     Self {
       kind: DrawingObjectKind::ContentPart,
       relationship_id: Some(relationship_id.to_string()),
+      text: String::new(),
       ..Self::unknown()
     }
   }
@@ -573,6 +592,7 @@ impl DrawingObjectModel {
       text_len: 0,
       relationship_id: None,
       graphic_uri: None,
+      text: String::new(),
       child_objects: 0,
       has_style: false,
       fill_color: None,
@@ -581,6 +601,81 @@ impl DrawingObjectModel {
       no_line: false,
     }
   }
+}
+
+fn graphic_frame_relationship_id(frame: &xdr::GraphicFrame) -> Option<String> {
+  frame
+    .graphic
+    .graphic_data
+    .graphic_data_choice
+    .iter()
+    .find_map(|choice| match choice {
+      a::GraphicDataChoice::ChartReference(reference) => Some(reference.id.to_string()),
+      a::GraphicDataChoice::RelationshipIds(relationship_ids) => {
+        Some(relationship_ids.data_part.to_string())
+      }
+      _ => None,
+    })
+}
+
+fn group_shape_text(group: &xdr::GroupShape) -> String {
+  let mut parts = Vec::new();
+  for choice in &group.group_shape_choice {
+    collect_group_shape_choice_text(choice, &mut parts);
+  }
+  parts.join("\n")
+}
+
+fn group_shape_text_len(group: &xdr::GroupShape) -> usize {
+  group_shape_text(group).len()
+}
+
+fn collect_group_shape_choice_text(choice: &xdr::GroupShapeChoice, parts: &mut Vec<String>) {
+  match choice {
+    xdr::GroupShapeChoice::Shape(shape) => {
+      if let Some(text) = shape.text_body.as_deref().map(xdr_text_body_text)
+        && !text.trim().is_empty()
+      {
+        parts.push(text);
+      }
+    }
+    xdr::GroupShapeChoice::GroupShape(group) => {
+      for choice in &group.group_shape_choice {
+        collect_group_shape_choice_text(choice, parts);
+      }
+    }
+    _ => {}
+  }
+}
+
+fn xdr_text_body_text_len(text_body: &xdr::TextBody) -> usize {
+  xdr_text_body_text(text_body).len()
+}
+
+fn xdr_text_body_text(text_body: &xdr::TextBody) -> String {
+  text_body
+    .paragraph
+    .iter()
+    .filter_map(dml_paragraph_text)
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn dml_paragraph_text(paragraph: &a::Paragraph) -> Option<String> {
+  let mut text = String::new();
+  for choice in &paragraph.paragraph_choice {
+    match choice {
+      a::ParagraphChoice::Run(run) => text.push_str(&run.text),
+      a::ParagraphChoice::Field(field) => {
+        if let Some(field_text) = &field.text {
+          text.push_str(field_text);
+        }
+      }
+      a::ParagraphChoice::Break(_) => text.push('\n'),
+      a::ParagraphChoice::TextMath(_) => {}
+    }
+  }
+  (!text.is_empty()).then_some(text)
 }
 
 fn shape_fill_color(properties: &xdr::ShapeProperties) -> Option<RgbColor> {
@@ -1008,6 +1103,7 @@ impl ChartResourceCatalog {
         }),
       has_print_settings: chart_space.print_settings.is_some(),
       has_user_shapes_reference: chart_space.user_shapes_reference.is_some(),
+      visible_texts: shared_chart::visible_texts(chart_space),
       extension_markers: usize::from(chart_space.chart_space_extension_list.is_some())
         + usize::from(chart.chart_extension_list.is_some())
         + usize::from(plot_area.extension_list.is_some()),
@@ -1056,6 +1152,7 @@ impl ChartResourceCatalog {
             .is_some_and(|value| value.as_bool())
         }),
       has_print_settings: chart_space.print_settings.is_some(),
+      visible_texts: Vec::new(),
       extension_markers: usize::from(chart_space.extension_list.is_some())
         + usize::from(chart.extension_list.is_some())
         + usize::from(plot_area.extension_list.is_some())

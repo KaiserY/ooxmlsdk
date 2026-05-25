@@ -262,15 +262,17 @@ fn render_cell_area(
     // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
     // print map mode scales cell geometry and the font used for measurement.
     measurement_style.font_size_pt *= zoom_scale;
-    let mut render_style = measurement_style.clone();
+    let pivot_builtin_style =
+      super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
     if pivot_builtin_style.bold {
-      render_style.bold = true;
+      measurement_style.bold = true;
     }
     if let Some(format_id) = cell.pivot_format_id {
       import
         .styles
-        .apply_differential_text_style(format_id, &mut render_style);
+        .apply_differential_text_style(format_id, &mut measurement_style);
     }
+    let render_style = measurement_style.clone();
     let mut alignment = import.styles.alignment_for_cell(cell.style_index);
     if pivot_builtin_style.left_align {
       let mut pivot_alignment = alignment.unwrap_or_default();
@@ -292,7 +294,7 @@ fn render_cell_area(
       alignment,
       zoom_scale,
     );
-    let rendered_text = calc_cell_visible_text(cell, &measurement_style, output_area);
+    let rendered_text = calc_cell_visible_text(page.sheet, cell, &measurement_style, output_area);
     let horizontal_alignment = calc_cell_horizontal_alignment(cell, alignment);
     let mut rendered_text_items = Vec::new();
     if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
@@ -354,7 +356,7 @@ fn calc_occupied_text_cells(
 
 fn calc_cell_output_area(
   sheet: &CalcSheet,
-  area: CellRange,
+  _area: CellRange,
   occupied_cells: &HashMap<(u32, u32), bool>,
   cell: &super::print::CalcPrintCell<'_>,
   rect: CellRect,
@@ -381,7 +383,7 @@ fn calc_cell_output_area(
   if !calc_cell_is_value(cell) && !alignment.is_some_and(|alignment| alignment.wrap_text) {
     let mut right_col = cell.address.col;
     while right_missing_pt > 0.0
-      && output_column_available(sheet, area, occupied_cells, right_col + 1, cell.address.row)
+      && output_column_available(sheet, occupied_cells, right_col + 1, cell.address.row)
     {
       right_col += 1;
       let column_width_pt = sheet.column_width_pt(right_col) * zoom_scale;
@@ -394,7 +396,7 @@ fn calc_cell_output_area(
     let mut left_col = cell.address.col;
     while left_missing_pt > 0.0
       && left_col > 1
-      && output_column_available(sheet, area, occupied_cells, left_col - 1, cell.address.row)
+      && output_column_available(sheet, occupied_cells, left_col - 1, cell.address.row)
     {
       left_col -= 1;
       let column_width_pt = sheet.column_width_pt(left_col) * zoom_scale;
@@ -445,19 +447,18 @@ fn calc_cell_horizontal_alignment(
 
 fn output_column_available(
   sheet: &CalcSheet,
-  area: CellRange,
   occupied_cells: &HashMap<(u32, u32), bool>,
   column: u32,
   row: u32,
 ) -> bool {
   let address = CellAddress { col: column, row };
-  area.contains(address)
-    && !occupied_cells.contains_key(&(row, column))
+  !occupied_cells.contains_key(&(row, column))
     && !sheet.is_covered_merged_cell(address)
     && sheet.column_width_pt(column) > f32::EPSILON
 }
 
 fn calc_cell_visible_text<'a>(
+  sheet: &CalcSheet,
   cell: &'a super::print::CalcPrintCell<'_>,
   style: &TextStyle,
   output_area: CalcCellOutputArea,
@@ -479,16 +480,23 @@ fn calc_cell_visible_text<'a>(
     };
   }
   // Source: LibreOffice sc/source/ui/view/output2.cxx draws string cells as
-  // strings and relies on the output device clip region. The text payload is
-  // not rewritten to a shorter string; numeric cells are handled above because
-  // Calc may replace them with a fitting General value or with ###.
-  std::borrow::Cow::Borrowed(&cell.rendered_text)
+  // strings with a clip region from GetOutputArea/Clip. krilla text extraction
+  // exposes full glyph payloads even when clipped, so trim the extracted text
+  // to the visible prefix/suffix while keeping the same clip decision.
+  if super::pivot::pivot_table_contains_address(sheet, cell.address) {
+    clipped_string_text(cell, style, output_area)
+      .map(std::borrow::Cow::Owned)
+      .unwrap_or_else(|| std::borrow::Cow::Borrowed(cell.rendered_text.as_str()))
+  } else {
+    std::borrow::Cow::Borrowed(cell.rendered_text.as_str())
+  }
 }
 
 fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
   matches!(
     cell.number_format_state,
-    super::print::NumberFormatRenderState::General
+    super::print::NumberFormatRenderState::Raw
+      | super::print::NumberFormatRenderState::General
       | super::print::NumberFormatRenderState::Number
       | super::print::NumberFormatRenderState::Percent
       | super::print::NumberFormatRenderState::DateTime
@@ -498,11 +506,50 @@ fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
 fn calc_cell_value_can_hash(cell: &super::print::CalcPrintCell<'_>) -> bool {
   matches!(
     cell.number_format_state,
-    super::print::NumberFormatRenderState::Number
+    super::print::NumberFormatRenderState::Raw
+      | super::print::NumberFormatRenderState::General
+      | super::print::NumberFormatRenderState::Number
       | super::print::NumberFormatRenderState::Percent
       | super::print::NumberFormatRenderState::DateTime
       | super::print::NumberFormatRenderState::UnsupportedFormatCode
   )
+}
+
+fn clipped_string_text(
+  cell: &super::print::CalcPrintCell<'_>,
+  style: &TextStyle,
+  output_area: CalcCellOutputArea,
+) -> Option<String> {
+  let text = cell.rendered_text.as_str();
+  if text.is_empty() {
+    return None;
+  }
+  let text_width = text_metrics::measure_text(text, style);
+  let visible_width = (text_width - output_area.right_clip_pt - output_area.left_clip_pt).max(0.0);
+  if visible_width <= f32::EPSILON || visible_width >= text_width {
+    return None;
+  }
+  if output_area.left_clip_pt > output_area.right_clip_pt {
+    let mut start = text.len();
+    for (index, _) in text.char_indices().rev() {
+      if text_metrics::measure_text(&text[index..], style) <= visible_width {
+        start = index;
+      } else {
+        break;
+      }
+    }
+    return (start > 0 && start < text.len()).then(|| text[start..].to_string());
+  }
+  let mut end = 0usize;
+  for (index, ch) in text.char_indices() {
+    let next = index + ch.len_utf8();
+    if text_metrics::measure_text(&text[..next], style) <= visible_width {
+      end = next;
+    } else {
+      break;
+    }
+  }
+  (end > 0 && end < text.len()).then(|| text[..end].to_string())
 }
 
 fn calc_fit_general_number_text(
@@ -626,6 +673,17 @@ fn calc_row_inter_cell_spaces(
   let space_width = text_metrics::measure_text(" ", &current_text.style)
     .max(current_text.style.font_size_pt * 0.25)
     .max(1.0);
+  // Source: LibreOffice sc/source/ui/view/output2.cxx SetTextToWidthOrHash()
+  // replaces clipped numeric output with "###", then SetClipMarks() only
+  // adjusts the clip region. Keep PDF text extraction joined when the actual
+  // glyph positions are closer than a printable word gap.
+  if next_text.text.chars().all(|ch| ch == '#')
+    && current.address.row == next.address.row
+    && current.address.col + 1 == next.address.col
+    && gap < space_width * 1.5
+  {
+    return 0;
+  }
   if current.address.row == next.address.row
     && current.address.col != next.address.col
     && (current_text.text.contains(char::is_whitespace)

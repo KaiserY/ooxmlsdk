@@ -174,8 +174,23 @@ fn worksheet_sheet(
     &raw_data.cell_values,
     mso_document,
   );
+  apply_raw_page_setup(&mut sheet, &raw_data);
   apply_raw_header_footer(&mut sheet, &raw_data);
   Ok(sheet)
+}
+
+fn apply_raw_page_setup(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawWorksheetData) {
+  // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
+  // pageSetUpPr fitToPage separately from pageSetup fitToWidth/fitToHeight.
+  if let Some(fit_to_page) = raw_data.fit_to_page {
+    sheet.metrics.settings.properties.page_setup.fit_to_page = fit_to_page;
+  }
+  if let Some(fit_to_width) = raw_data.fit_to_width {
+    sheet.page_settings.fit_to_width = fit_to_width;
+  }
+  if let Some(fit_to_height) = raw_data.fit_to_height {
+    sheet.page_settings.fit_to_height = fit_to_height;
+  }
 }
 
 fn apply_raw_header_footer(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawWorksheetData) {

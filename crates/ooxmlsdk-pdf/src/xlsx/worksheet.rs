@@ -220,6 +220,9 @@ pub(crate) struct FormulaModel {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RawWorksheetData {
   pub(crate) cell_values: HashMap<String, String>,
+  pub(crate) fit_to_page: Option<bool>,
+  pub(crate) fit_to_width: Option<u32>,
+  pub(crate) fit_to_height: Option<u32>,
   pub(crate) odd_header: Option<String>,
   pub(crate) odd_footer: Option<String>,
   pub(crate) even_header: Option<String>,
@@ -994,8 +997,22 @@ pub(crate) fn worksheet_raw_data(xml: &str) -> RawWorksheetData {
             .map(|attr| String::from_utf8_lossy(attr.value.as_ref()).into_owned());
         } else if name.as_ref().ends_with(b"v") {
           in_value = current_cell.is_some();
+        } else if name.as_ref().ends_with(b"pageSetUpPr") {
+          data.fit_to_page = raw_bool_attribute(&event, b"fitToPage");
+        } else if name.as_ref().ends_with(b"pageSetup") {
+          data.fit_to_width = raw_u32_attribute(&event, b"fitToWidth");
+          data.fit_to_height = raw_u32_attribute(&event, b"fitToHeight");
         } else {
           header_footer_tag = raw_header_footer_tag(name.as_ref());
+        }
+      }
+      Ok(Event::Empty(event)) => {
+        let name = event.name();
+        if name.as_ref().ends_with(b"pageSetUpPr") {
+          data.fit_to_page = raw_bool_attribute(&event, b"fitToPage");
+        } else if name.as_ref().ends_with(b"pageSetup") {
+          data.fit_to_width = raw_u32_attribute(&event, b"fitToWidth");
+          data.fit_to_height = raw_u32_attribute(&event, b"fitToHeight");
         }
       }
       Ok(Event::Text(event)) if in_value => {
@@ -1039,6 +1056,26 @@ pub(crate) fn worksheet_raw_data(xml: &str) -> RawWorksheetData {
     }
   }
   data
+}
+
+fn raw_bool_attribute(event: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Option<bool> {
+  event
+    .attributes()
+    .flatten()
+    .find(|attr| attr.key.as_ref().ends_with(name))
+    .and_then(|attr| match attr.value.as_ref() {
+      b"1" | b"true" | b"TRUE" => Some(true),
+      b"0" | b"false" | b"FALSE" => Some(false),
+      _ => None,
+    })
+}
+
+fn raw_u32_attribute(event: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Option<u32> {
+  event
+    .attributes()
+    .flatten()
+    .find(|attr| attr.key.as_ref().ends_with(name))
+    .and_then(|attr| std::str::from_utf8(attr.value.as_ref()).ok()?.parse().ok())
 }
 
 fn raw_header_footer_tag(name: &[u8]) -> Option<&'static str> {
@@ -1112,6 +1149,23 @@ fn worksheet_rows(
       }
     })
     .collect()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn worksheet_raw_data_keeps_page_setup_fit_attributes() {
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
+    // pageSetUpPr fitToPage and pageSetup fitToWidth/fitToHeight independently.
+    let data = worksheet_raw_data(
+      r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><pageSetup fitToWidth="1" fitToHeight="0"/></worksheet>"#,
+    );
+    assert_eq!(data.fit_to_page, Some(true));
+    assert_eq!(data.fit_to_width, Some(1));
+    assert_eq!(data.fit_to_height, Some(0));
+  }
 }
 
 fn mso_row_height_pt(height: f64) -> f64 {

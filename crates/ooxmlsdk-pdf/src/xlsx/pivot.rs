@@ -273,6 +273,15 @@ pub(crate) fn pivot_format_id_for_address(sheet: &CalcSheet, address: CellAddres
   format_id
 }
 
+pub(crate) fn pivot_table_contains_address(sheet: &CalcSheet, address: CellAddress) -> bool {
+  sheet
+    .resources
+    .pivot_tables
+    .tables
+    .iter()
+    .any(|pivot| pivot.output_geometry.table_range.contains(address))
+}
+
 pub(crate) fn pivot_builtin_style_for_address(
   sheet: &CalcSheet,
   address: CellAddress,
@@ -343,6 +352,16 @@ pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Op
       }
       let row_shift = cached_header_row.saturating_sub(pivot.output_geometry.table_start.row);
       print_address.row = address.row.saturating_sub(row_shift);
+    }
+    let cached_data_start_col = location.start.col + pivot.first_data_column;
+    let calc_data_start_col = pivot.output_geometry.table_start.col
+      + pivot.output_geometry.row_field_columns;
+    if cached_data_start_col > calc_data_start_col {
+      let col_shift = cached_data_start_col - calc_data_start_col;
+      if print_address.col < location.start.col + col_shift {
+        return None;
+      }
+      print_address.col = print_address.col.saturating_sub(col_shift);
     }
     if pivot.calculated_only_data_fields
       && pivot.data_layout_axis == PivotDataLayoutAxis::Columns
@@ -2622,24 +2641,25 @@ fn pivot_output_geometry(
   };
   let row_field_columns = pivot_columns_for_row_fields(definition);
   let column_field_rows = pivot_column_field_count(definition);
-  let data_start_col_offset = row_field_columns.max(definition.location.first_data_column);
-  let data_start_row_offset =
-    (header_rows + column_field_rows).max(definition.location.first_data_row);
+  // Source: LibreOffice sc/source/core/data/dpoutput.cxx
+  // ScDPOutput::CalcSizes recomputes mnDataStartCol from the generated row
+  // field column count, and mnDataStartRow from header rows plus column field
+  // levels.  The OOXML firstDataCol/firstDataRow values describe Excel's stale
+  // cached output range and are not used as lower bounds by Calc.
+  let data_start_col_offset = row_field_columns;
+  let data_start_row_offset = header_rows + column_field_rows;
   let data_start = CellAddress {
     col: table_start.col + data_start_col_offset,
     row: table_start.row + data_start_row_offset,
   };
   // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
-  // Calc recomputes the result matrix from the imported DataPilot model.  When
-  // unsupported cached data fields are not emitted by the PDF model, the
-  // printable range is already reduced; keep the generated matrix inside that
-  // recomputed range instead of expanding it back from stale OOXML row/colItems.
-  let data_rows = pivot_data_row_count(definition)
-    .max(1)
-    .min(location.end.row.saturating_sub(data_start.row) + 1);
-  let data_columns = pivot_data_column_count(definition)
-    .max(1)
-    .min(location.end.col.saturating_sub(data_start.col) + 1);
+  // Calc takes mnRowCount/mnColCount from the generated DataPilot result
+  // matrix.  The PDF bridge still prints the imported cached sheetData, so the
+  // printable location range is the closest upstream-backed matrix boundary;
+  // printable_location_reference() has already reduced it for unsupported data
+  // fields.
+  let data_rows = location.end.row.saturating_sub(data_start.row) + 1;
+  let data_columns = location.end.col.saturating_sub(data_start.col) + 1;
   let end = CellAddress {
     col: data_start.col + data_columns - 1,
     row: data_start.row + data_rows - 1,
@@ -2729,44 +2749,6 @@ fn pivot_column_field_count(definition: &x::PivotTableDefinition) -> u32 {
     .column_fields
     .as_ref()
     .map_or(0, |fields| fields.field.len() as u32)
-}
-
-fn pivot_data_row_count(definition: &x::PivotTableDefinition) -> u32 {
-  definition.row_items.as_ref().map_or_else(
-    || location_data_rows(definition),
-    |items| items.row_item.len() as u32,
-  )
-}
-
-fn pivot_data_column_count(definition: &x::PivotTableDefinition) -> u32 {
-  definition.column_items.as_ref().map_or_else(
-    || location_data_columns(definition),
-    |items| items.row_item.len() as u32,
-  )
-}
-
-fn location_data_rows(definition: &x::PivotTableDefinition) -> u32 {
-  CellRange::parse_a1_range(&definition.location.reference)
-    .map(|range| {
-      range
-        .end
-        .row
-        .saturating_sub(range.start.row + definition.location.first_data_row)
-        + 1
-    })
-    .unwrap_or(1)
-}
-
-fn location_data_columns(definition: &x::PivotTableDefinition) -> u32 {
-  CellRange::parse_a1_range(&definition.location.reference)
-    .map(|range| {
-      range
-        .end
-        .col
-        .saturating_sub(range.start.col + definition.location.first_data_column)
-        + 1
-    })
-    .unwrap_or(1)
 }
 
 fn data_layout_axis(definition: &x::PivotTableDefinition) -> PivotDataLayoutAxis {

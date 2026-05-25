@@ -316,7 +316,9 @@ fn print_scale_state(
     .count()
     + 1;
   let forced_break_min_pages = forced_break_min_columns * forced_break_min_rows;
-  let fit_to_page = sheet.metrics.settings.properties.page_setup.fit_to_page;
+  let fit_to_page = sheet.metrics.settings.properties.page_setup.fit_to_page
+    || sheet.page_settings.fit_to_width != 1
+    || sheet.page_settings.fit_to_height != 1;
   let mut mode = CalcPrintScaleMode::None;
   let mut zoom = sheet.page_settings.scale;
   let mut auto_page_columns = forced_break_min_columns.max(1);
@@ -326,16 +328,25 @@ fn print_scale_state(
   if fit_to_page && (sheet.page_settings.fit_to_width > 0 || sheet.page_settings.fit_to_height > 0)
   {
     mode = CalcPrintScaleMode::FitToWidthHeight;
-    auto_page_columns = usize::try_from(sheet.page_settings.fit_to_width)
-      .ok()
-      .filter(|value| *value > 0)
-      .unwrap_or(auto_page_columns)
-      .max(forced_break_min_columns);
-    auto_page_rows = usize::try_from(sheet.page_settings.fit_to_height)
-      .ok()
-      .filter(|value| *value > 0)
-      .unwrap_or(auto_page_rows)
-      .max(forced_break_min_rows);
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
+    // PageSettingsConverter writes OOXML fitToWidth/fitToHeight directly to
+    // ScaleToPagesX/Y with 0 preserved as "unlimited" for that axis.
+    auto_page_columns = if sheet.page_settings.fit_to_width == 0 {
+      0
+    } else {
+      usize::try_from(sheet.page_settings.fit_to_width)
+        .ok()
+        .unwrap_or(auto_page_columns)
+        .max(forced_break_min_columns)
+    };
+    auto_page_rows = if sheet.page_settings.fit_to_height == 0 {
+      0
+    } else {
+      usize::try_from(sheet.page_settings.fit_to_height)
+        .ok()
+        .unwrap_or(auto_page_rows)
+        .max(forced_break_min_rows)
+    };
     zoom = fit_zoom_to_pages(
       sheet,
       areas,
@@ -953,9 +964,6 @@ fn extend_print_area_for_overflow(
     if row_index < range.start.row || row_index > range.end.row || row.hidden {
       continue;
     }
-    let Some(row_last_print_col) = row_last_print_data_col(row, range) else {
-      continue;
-    };
     for (cell_position, cell) in row.cells.iter().enumerate() {
       if cell.display_text.is_empty() || cell.display_text.parse::<f64>().is_ok() {
         continue;
@@ -965,9 +973,6 @@ fn extend_print_area_for_overflow(
         row: row_index,
       });
       if address.col < range.start.col || address.col > range.end.col {
-        continue;
-      }
-      if address.col != row_last_print_col {
         continue;
       }
       if row_cell_has_print_data_at(row, address.col + 1) {
@@ -1035,28 +1040,6 @@ fn print_cell_text_style(
 ) -> TextStyle {
   let style_index = sheet.effective_cell_style_index(row, cell, address);
   import.styles.text_style_for_cell(style_index)
-}
-
-fn row_last_print_data_col(row: &CalcRow, range: CellRange) -> Option<u32> {
-  row
-    .cells
-    .iter()
-    .enumerate()
-    .filter_map(|(cell_position, cell)| {
-      let address = cell.address().unwrap_or(CellAddress {
-        col: cell_position as u32 + 1,
-        row: row.row_index.unwrap_or(1),
-      });
-      (address.col >= range.start.col
-        && address.col <= range.end.col
-        && (!cell.display_text.is_empty()
-          || !cell.rich_text_runs.is_empty()
-          || cell.formula.is_some()
-          || cell.cached_value.is_some()
-          || cell.data_type.is_some()))
-      .then_some(address.col)
-    })
-    .max()
 }
 
 fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {

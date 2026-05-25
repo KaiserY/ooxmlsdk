@@ -218,8 +218,12 @@ impl CalcPageSettings {
   }
 
   fn apply_page_setup(&mut self, page_setup: &x::PageSetup) {
-    self.paper_size = page_setup.paper_size.unwrap_or(self.paper_size);
-    self.scale = page_setup.scale.unwrap_or(self.scale);
+    if let Some(paper_size) = page_setup.paper_size.filter(|paper_size| *paper_size > 0) {
+      self.paper_size = paper_size;
+    }
+    if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
+      self.scale = scale;
+    }
     self.fit_to_width = page_setup.fit_to_width.unwrap_or(self.fit_to_width);
     self.fit_to_height = page_setup.fit_to_height.unwrap_or(self.fit_to_height);
     self.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(self.horizontal_dpi);

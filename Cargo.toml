@@ -57,6 +57,7 @@ icu_segmenter = { version = "2.2", features = ["compiled_data"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 krilla = { version = "0.7.0", default-features = false, features = ["raster-images", "pdf", "simple-text"] }
 krilla-svg = "0.7.0"
+libm = "0.2.16"
 rustybuzz = "0.20.1"
 ttf-parser = "0.25.1"
 unicode-bidi = "0.3.18"

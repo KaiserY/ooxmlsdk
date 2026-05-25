@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use super::import::ExcelImport;
 use super::page_settings::CalcPageSettings;
+use super::pivot::pivot_print_address;
 use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
 use crate::docx::TextStyle;
@@ -176,7 +177,7 @@ impl<'a> CalcPrintDocument<'a> {
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
         let empty = area.map_or(false, |area| print_area_is_empty(import, sheet, area))
-          && drawing_summary.printable == 0
+          && drawing_summary.anchors == 0
           && drawing_summary.charts == 0;
         if scale.skip_empty && empty && !(keep_header_footer_only_page && sheet_page_index == 0) {
           skipped_empty_pages += 1;
@@ -698,7 +699,6 @@ fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
     .drawings
     .iter()
     .flat_map(|drawing| drawing.anchors.iter())
-    .filter(|anchor| !anchor.object.hidden)
     .filter_map(|anchor| drawing_anchor_cell_range(sheet, anchor));
   let vml_ranges = sheet
     .resources
@@ -706,7 +706,6 @@ fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
     .vml_drawings
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
-    .filter(|shape| !shape.hidden)
     .filter_map(|shape| vml_shape_cell_range(sheet, shape));
   xdr_ranges.chain(vml_ranges).reduce(|acc, range| {
     CellRange::new(
@@ -1144,23 +1143,23 @@ fn sheet_area_has_left_text_overflow(
 }
 
 fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
-  let has_printable_drawing = sheet
+  let has_drawing = sheet
     .resources
     .drawings
     .iter()
     .flat_map(|drawing| drawing.anchors.iter())
-    .any(|anchor| anchor.print_with_sheet && !anchor.object.hidden);
-  if has_printable_drawing {
+    .any(|anchor| drawing_anchor_cell_range(sheet, anchor).is_some());
+  if has_drawing {
     return false;
   }
-  let has_printable_vml_drawing = sheet
+  let has_vml_drawing = sheet
     .resources
     .object_resources
     .vml_drawings
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
-    .any(|shape| shape.print_object && !shape.hidden);
-  if has_printable_vml_drawing {
+    .any(|shape| vml_shape_cell_range(sheet, shape).is_some());
+  if has_vml_drawing {
     return false;
   }
   sheet.rows.iter().all(|row| {
@@ -1940,60 +1939,6 @@ fn pivot_table_for_cell(
     .tables
     .iter()
     .find(|pivot| pivot.output_geometry.table_range.contains(address))
-}
-
-fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Option<CellAddress> {
-  for pivot in &sheet.resources.pivot_tables.tables {
-    let Some(location) = CellRange::parse_a1_range(&pivot.location_reference) else {
-      continue;
-    };
-    let printable_location = pivot.output_geometry.table_range;
-    if !location.contains(address) {
-      continue;
-    }
-    let mut print_address = address;
-    if pivot.first_header_row > 1 {
-      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
-      // clears the persisted pivot cache range and inserts ScDPOutput at the
-      // location start. Cached rows before firstHeaderRow are not emitted; the
-      // first cached header row maps to ScDPOutput::mnTabStartRow.
-      let cached_header_row = location.start.row + pivot.first_header_row - 1;
-      if address.row < cached_header_row {
-        return None;
-      }
-      let row_shift = cached_header_row.saturating_sub(pivot.output_geometry.table_start.row);
-      print_address.row = address.row.saturating_sub(row_shift);
-    }
-    if pivot.calculated_only_data_fields
-      && pivot.data_layout_axis == super::pivot::PivotDataLayoutAxis::Columns
-      && print_address.col == location.start.col
-      && print_address.row > location.start.row
-    {
-      let shifted = CellAddress {
-        col: print_address.col,
-        row: print_address.row - 1,
-      };
-      return printable_location.contains(shifted).then_some(shifted);
-    }
-    if !pivot.output_geometry.whole_range.contains(print_address) {
-      return None;
-    }
-    if !pivot.calculated_only_data_fields {
-      return Some(print_address);
-    }
-    let suppress = match pivot.data_layout_axis {
-      super::pivot::PivotDataLayoutAxis::Rows => {
-        print_address.row > printable_location.start.row
-          && print_address.col > printable_location.start.col
-      }
-      super::pivot::PivotDataLayoutAxis::Columns | super::pivot::PivotDataLayoutAxis::Hidden => {
-        print_address.col > printable_location.start.col
-          && print_address.row > printable_location.start.row
-      }
-    };
-    return (!suppress).then_some(print_address);
-  }
-  Some(address)
 }
 
 fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {

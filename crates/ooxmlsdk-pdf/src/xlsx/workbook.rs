@@ -150,8 +150,16 @@ fn worksheet_sheet(
     .map(super::worksheet::worksheet_raw_data)
     .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
-  let resources =
-    SheetResourceCatalog::from_worksheet_part(package, part, shared_strings, styles, date_1904)?;
+  let resources = SheetResourceCatalog::from_worksheet_part(
+    package,
+    part,
+    sheet.name.as_str(),
+    &worksheet,
+    &raw_data.cell_values,
+    shared_strings,
+    styles,
+    date_1904,
+  )?;
   let mut sheet = CalcSheet::from_worksheet(
     workbook_index,
     sheet.name.as_str().to_string(),

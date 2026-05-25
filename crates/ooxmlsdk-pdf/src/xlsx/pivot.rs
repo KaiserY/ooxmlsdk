@@ -322,6 +322,60 @@ pub(crate) fn pivot_builtin_style_for_address(
   style
 }
 
+pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Option<CellAddress> {
+  for pivot in &sheet.resources.pivot_tables.tables {
+    let Some(location) = CellRange::parse_a1_range(&pivot.location_reference) else {
+      continue;
+    };
+    let printable_location = pivot.output_geometry.table_range;
+    if !location.contains(address) {
+      continue;
+    }
+    let mut print_address = address;
+    if pivot.first_header_row > 1 {
+      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
+      // clears the persisted pivot cache range and inserts ScDPOutput at the
+      // location start. Cached rows before firstHeaderRow are not emitted; the
+      // first cached header row maps to ScDPOutput::mnTabStartRow.
+      let cached_header_row = location.start.row + pivot.first_header_row - 1;
+      if address.row < cached_header_row {
+        return None;
+      }
+      let row_shift = cached_header_row.saturating_sub(pivot.output_geometry.table_start.row);
+      print_address.row = address.row.saturating_sub(row_shift);
+    }
+    if pivot.calculated_only_data_fields
+      && pivot.data_layout_axis == PivotDataLayoutAxis::Columns
+      && print_address.col == location.start.col
+      && print_address.row > location.start.row
+    {
+      let shifted = CellAddress {
+        col: print_address.col,
+        row: print_address.row - 1,
+      };
+      return printable_location.contains(shifted).then_some(shifted);
+    }
+    if !pivot.output_geometry.whole_range.contains(print_address) {
+      return None;
+    }
+    if !pivot.calculated_only_data_fields {
+      return Some(print_address);
+    }
+    let suppress = match pivot.data_layout_axis {
+      PivotDataLayoutAxis::Rows => {
+        print_address.row > printable_location.start.row
+          && print_address.col > printable_location.start.col
+      }
+      PivotDataLayoutAxis::Columns | PivotDataLayoutAxis::Hidden => {
+        print_address.col > printable_location.start.col
+          && print_address.row > printable_location.start.row
+      }
+    };
+    return (!suppress).then_some(print_address);
+  }
+  Some(address)
+}
+
 fn pivot_format_line_has_subtotal(line: &PivotFormatLineData) -> bool {
   line.fields.iter().any(|field| field.subtotal)
 }
@@ -859,6 +913,9 @@ impl PivotTableCatalog {
   pub(crate) fn from_parts(
     package: &mut SpreadsheetDocument,
     parts: &[PivotTablePart],
+    current_worksheet: &x::Worksheet,
+    current_raw_values: &HashMap<String, String>,
+    current_sheet_name: &str,
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
     date_1904: bool,
@@ -866,7 +923,18 @@ impl PivotTableCatalog {
     Ok(Self {
       tables: parts
         .iter()
-        .map(|part| PivotTableModel::from_part(package, part, shared_strings, styles, date_1904))
+        .map(|part| {
+          PivotTableModel::from_part(
+            package,
+            part,
+            current_worksheet,
+            current_raw_values,
+            current_sheet_name,
+            shared_strings,
+            styles,
+            date_1904,
+          )
+        })
         .collect::<Result<Vec<_>>>()?,
     })
   }
@@ -876,6 +944,9 @@ impl PivotTableModel {
   fn from_part(
     package: &mut SpreadsheetDocument,
     part: &PivotTablePart,
+    current_worksheet: &x::Worksheet,
+    current_raw_values: &HashMap<String, String>,
+    current_sheet_name: &str,
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
     date_1904: bool,
@@ -907,6 +978,19 @@ impl PivotTableModel {
       .as_ref()
       .map(|cache| pivot_cache_source_number_format_ids(package, cache).unwrap_or_default())
       .unwrap_or_default();
+    let source_field_names = cache_definition.as_ref().map_or(Ok(Vec::new()), |cache| {
+      pivot_cache_current_sheet_source_field_names(
+        cache,
+        current_sheet_name,
+        current_worksheet,
+        current_raw_values,
+        shared_strings,
+      )
+      .map_or_else(
+        || pivot_cache_source_field_names(package, cache, shared_strings),
+        Ok,
+      )
+    })?;
     let source_field_number_format_codes = source_field_number_format_ids
       .iter()
       .map(|id| id.and_then(|id| styles.number_format_code(id).map(ToString::to_string)))
@@ -927,10 +1011,21 @@ impl PivotTableModel {
       .as_ref()
       .map(calculated_cache_field_indexes)
       .unwrap_or_default();
+    let stale_source_data_fields = cache_definition
+      .as_ref()
+      .map(|cache| stale_source_data_field_indexes(cache, &source_field_names))
+      .unwrap_or_default();
     let definition = part.root_element(package)?;
     let has_cache_definition_part = !cache_field_names.is_empty();
-    let (data_fields, unsupported_data_fields) =
-      data_field_counts(definition.data_fields.as_ref(), &calculated_cache_fields);
+    let unsupported_data_field_positions = unsupported_data_field_positions(
+      definition.data_fields.as_ref(),
+      &calculated_cache_fields,
+      &stale_source_data_fields,
+    );
+    let (data_fields, unsupported_data_fields) = data_field_counts(
+      definition.data_fields.as_ref(),
+      &unsupported_data_field_positions,
+    );
     let calculated_only_data_fields = data_fields > 0 && data_fields == unsupported_data_fields;
     let data_layout_axis = data_layout_axis(definition);
     let printable_location_reference = printable_location_reference(
@@ -1042,12 +1137,13 @@ impl PivotTableModel {
       data_field_names: data_field_names(
         definition.data_fields.as_ref(),
         &cache_field_names,
-        &calculated_cache_fields,
+        &unsupported_data_field_positions,
       ),
       data_field_number_format_ids: data_field_number_format_ids(
         definition,
         &cache_field_number_format_ids,
         &source_field_number_format_ids,
+        &unsupported_data_field_positions,
       ),
       data_cell_text_overrides: pivot_count_data_cell_text_overrides(
         definition,
@@ -1078,6 +1174,15 @@ fn pivot_cache_field_names(cache: &x::PivotCacheDefinition) -> Vec<String> {
     .cache_field
     .iter()
     .map(|field| field.caption.clone().unwrap_or_else(|| field.name.clone()))
+    .collect()
+}
+
+fn pivot_cache_field_raw_names(cache: &x::PivotCacheDefinition) -> Vec<String> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| field.name.clone())
     .collect()
 }
 
@@ -1185,6 +1290,117 @@ fn pivot_cache_source_number_format_ids(
     ));
   }
   Ok(field_formats)
+}
+
+fn pivot_cache_source_field_names(
+  package: &mut SpreadsheetDocument,
+  cache: &x::PivotCacheDefinition,
+  shared_strings: &[SharedStringModel],
+) -> Result<Vec<String>> {
+  let Some(x::CacheSourceChoice::WorksheetSource(source)) =
+    cache.cache_source.cache_source_choice.as_ref()
+  else {
+    return Ok(Vec::new());
+  };
+  let (Some(sheet_name), Some(reference)) = (source.sheet.as_deref(), source.reference.as_deref())
+  else {
+    return Ok(Vec::new());
+  };
+  let Some(source_range) = CellRange::parse_a1_range(reference) else {
+    return Ok(Vec::new());
+  };
+  let workbook_part = package.workbook_part()?;
+  let workbook = workbook_part.root_element(package)?.clone();
+  let Some((workbook_sheet_index, workbook_sheet)) = workbook
+    .sheets
+    .sheet
+    .iter()
+    .enumerate()
+    .find(|(_, sheet)| sheet.name == sheet_name)
+  else {
+    return Ok(Vec::new());
+  };
+  let worksheet_parts = workbook_part.worksheet_parts(package).collect::<Vec<_>>();
+  let Some(worksheet_part) = worksheet_parts
+    .iter()
+    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
+    .or_else(|| worksheet_parts.get(workbook_sheet_index))
+  else {
+    return Ok(Vec::new());
+  };
+  let raw_data = worksheet_part
+    .data_as_str(package)
+    .ok()
+    .flatten()
+    .map(super::worksheet::worksheet_raw_data)
+    .unwrap_or_default();
+  let worksheet = worksheet_part.root_element(package)?.clone();
+  Ok(pivot_source_field_names_from_worksheet(
+    &worksheet,
+    source_range,
+    shared_strings,
+    &raw_data.cell_values,
+  ))
+}
+
+fn pivot_cache_current_sheet_source_field_names(
+  cache: &x::PivotCacheDefinition,
+  current_sheet_name: &str,
+  worksheet: &x::Worksheet,
+  raw_values: &HashMap<String, String>,
+  shared_strings: &[SharedStringModel],
+) -> Option<Vec<String>> {
+  let x::CacheSourceChoice::WorksheetSource(source) =
+    cache.cache_source.cache_source_choice.as_ref()?
+  else {
+    return None;
+  };
+  let (Some(sheet_name), Some(reference)) = (source.sheet.as_deref(), source.reference.as_deref())
+  else {
+    return None;
+  };
+  if sheet_name != current_sheet_name {
+    return None;
+  }
+  let source_range = CellRange::parse_a1_range(reference)?;
+  Some(pivot_source_field_names_from_worksheet(
+    worksheet,
+    source_range,
+    shared_strings,
+    raw_values,
+  ))
+}
+
+fn pivot_source_field_names_from_worksheet(
+  worksheet: &x::Worksheet,
+  source_range: CellRange,
+  shared_strings: &[SharedStringModel],
+  raw_values: &HashMap<String, String>,
+) -> Vec<String> {
+  let header_cells = worksheet
+    .sheet_data
+    .row
+    .iter()
+    .flat_map(|row| row.cell.iter())
+    .filter_map(|cell| {
+      let address = cell
+        .cell_reference
+        .as_deref()
+        .and_then(CellAddress::parse_a1)?;
+      (address.row == source_range.start.row
+        && address.col >= source_range.start.col
+        && address.col <= source_range.end.col)
+        .then_some((address.col, cell))
+    })
+    .collect::<HashMap<_, _>>();
+  (source_range.start.col..=source_range.end.col)
+    .map(|col| {
+      header_cells
+        .get(&col)
+        .map(|cell| pivot_source_cell_value(cell, shared_strings, raw_values).text())
+        .unwrap_or_default()
+    })
+    .collect()
 }
 
 fn pivot_source_cache_table(
@@ -2261,20 +2477,63 @@ fn record_cache_item_value(
   }
 }
 
-fn data_field_counts(
+fn stale_source_data_field_indexes(
+  cache: &x::PivotCacheDefinition,
+  source_field_names: &[String],
+) -> Vec<usize> {
+  if source_field_names.is_empty() {
+    return Vec::new();
+  }
+  let cache_field_names = pivot_cache_field_raw_names(cache);
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .enumerate()
+    .filter_map(|(field_index, field)| {
+      let database_field = field.database_field.is_none_or(|value| value.as_bool());
+      let name = cache_field_names.get(field_index)?;
+      (database_field
+        && !name.is_empty()
+        && !source_field_names
+          .iter()
+          .any(|source_name| source_name.eq_ignore_ascii_case(name)))
+      .then_some(field_index)
+    })
+    .collect()
+}
+
+fn unsupported_data_field_positions(
   fields: Option<&x::DataFields>,
   calculated_cache_fields: &[usize],
+  stale_source_data_fields: &[usize],
+) -> Vec<usize> {
+  let Some(fields) = fields else {
+    return Vec::new();
+  };
+  fields
+    .data_field
+    .iter()
+    .enumerate()
+    .filter_map(|(position, field)| {
+      let field_index = field.field as usize;
+      (calculated_cache_fields.contains(&field_index)
+        || stale_source_data_fields.contains(&field_index))
+      .then_some(position)
+    })
+    .collect()
+}
+
+fn data_field_counts(
+  fields: Option<&x::DataFields>,
+  unsupported_data_field_positions: &[usize],
 ) -> (u32, u32) {
   let Some(fields) = fields else {
     return (0, 0);
   };
   let total = fields.data_field.len() as u32;
-  let calculated = fields
-    .data_field
-    .iter()
-    .filter(|field| calculated_cache_fields.contains(&(field.field as usize)))
-    .count() as u32;
-  (total, calculated)
+  let unsupported = unsupported_data_field_positions.len() as u32;
+  (total, unsupported)
 }
 
 fn printable_location_reference(
@@ -2612,14 +2871,16 @@ fn column_field_indexes(fields: Option<&x::ColumnFields>) -> Vec<i32> {
 fn data_field_names(
   fields: Option<&x::DataFields>,
   cache_field_names: &[String],
-  calculated_cache_fields: &[usize],
+  unsupported_data_field_positions: &[usize],
 ) -> Vec<String> {
   fields
     .map(|fields| {
       fields
         .data_field
         .iter()
-        .filter(|field| !calculated_cache_fields.contains(&(field.field as usize)))
+        .enumerate()
+        .filter(|(position, _)| !unsupported_data_field_positions.contains(position))
+        .map(|(_, field)| field)
         .map(|field| {
           field
             .name
@@ -2637,6 +2898,7 @@ fn data_field_number_format_ids(
   definition: &x::PivotTableDefinition,
   cache_field_number_format_ids: &[Option<u32>],
   source_field_number_format_ids: &[Option<u32>],
+  unsupported_data_field_positions: &[usize],
 ) -> Vec<Option<u32>> {
   definition
     .data_fields
@@ -2645,6 +2907,9 @@ fn data_field_number_format_ids(
       fields
         .data_field
         .iter()
+        .enumerate()
+        .filter(|(position, _)| !unsupported_data_field_positions.contains(position))
+        .map(|(_, data_field)| data_field)
         .map(|data_field| {
           data_field
             .number_format_id

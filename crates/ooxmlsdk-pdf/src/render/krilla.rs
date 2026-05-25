@@ -1275,6 +1275,11 @@ fn link_annotation_for_rect(
 }
 
 fn normalize_external_url(url: &str) -> String {
+  // Source: LibreOffice oox/source/core/filterbase.cxx::FilterBase::getAbsoluteUrl.
+  // OOXML relationship targets may contain Windows backslashes even when the
+  // value is already a file URI; LO normalizes them before creating links.
+  let normalized = url.replace('\\', "/");
+  let url = normalized.as_str();
   if let Some(prefix) = url.strip_suffix("://").map(|scheme| format!("{scheme}://")) {
     return prefix;
   }
@@ -1286,7 +1291,7 @@ fn normalize_external_url(url: &str) -> String {
   {
     return format!("{scheme}://{rest}/");
   }
-  url.to_string()
+  normalized
 }
 
 fn push_paint_clip(surface: &mut Surface<'_>, clip: Option<&PaintClipRect>) -> bool {

@@ -103,7 +103,7 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
     if let Some(series_text) = series.series_text {
       push_series_text(&mut texts, series_text);
     } else {
-      texts.push(format!("Series{series_index}"));
+      push_unique_text(&mut texts, &default_series_label(series, series_index));
     }
     if let Some(category_axis_data) = series.category_axis_data {
       push_category_axis_data_texts(&mut texts, category_axis_data);
@@ -130,6 +130,84 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
     push_data_label_texts(&mut texts, data_labels);
   }
   texts
+}
+
+fn default_series_label(series: ChartSeriesRef<'_>, series_index: usize) -> String {
+  // Source: LibreOffice chart2/source/tools/InternalData.cxx
+  // uses the localized STR_ROW_LABEL/STR_COLUMN_LABEL defaults when imported
+  // chart data has no explicit series label. OOXML bar charts with a horizontal
+  // value range map each series to a data row.
+  if let Some(formula) = series_value_formula(series)
+    && let Some(range) = parse_chart_a1_range(formula)
+    && range.start_col == range.end_col
+    && range.start_row != range.end_row
+  {
+    return format!("Column {series_index}");
+  }
+  format!("Row {series_index}")
+}
+
+fn series_value_formula(series: ChartSeriesRef<'_>) -> Option<&str> {
+  series
+    .values
+    .and_then(|values| match values.values_choice.as_ref() {
+      Some(c::ValuesChoice::NumberReference(reference)) => Some(reference.formula.as_str()),
+      _ => None,
+    })
+    .or_else(|| {
+      series
+        .y_values
+        .and_then(|values| match values.y_values_choice.as_ref() {
+          Some(c::YValuesChoice::NumberReference(reference)) => Some(reference.formula.as_str()),
+          _ => None,
+        })
+    })
+}
+
+#[derive(Clone, Copy)]
+struct ChartCellRange {
+  start_col: u32,
+  start_row: u32,
+  end_col: u32,
+  end_row: u32,
+}
+
+fn parse_chart_a1_range(formula: &str) -> Option<ChartCellRange> {
+  let reference = formula.rsplit('!').next().unwrap_or(formula);
+  let (start, end) = reference.split_once(':').unwrap_or((reference, reference));
+  let (start_col, start_row) = parse_chart_a1_cell(start)?;
+  let (end_col, end_row) = parse_chart_a1_cell(end)?;
+  Some(ChartCellRange {
+    start_col: start_col.min(end_col),
+    start_row: start_row.min(end_row),
+    end_col: start_col.max(end_col),
+    end_row: start_row.max(end_row),
+  })
+}
+
+fn parse_chart_a1_cell(reference: &str) -> Option<(u32, u32)> {
+  let reference = reference.trim().trim_matches('\'').trim_start_matches('$');
+  let mut col = 0u32;
+  let mut row = 0u32;
+  let mut seen_digit = false;
+  for ch in reference.chars() {
+    if ch == '$' {
+      continue;
+    }
+    if ch.is_ascii_alphabetic() && !seen_digit {
+      col = col
+        .saturating_mul(26)
+        .saturating_add(u32::from(ch.to_ascii_uppercase() as u8 - b'A' + 1));
+    } else if ch.is_ascii_digit() {
+      seen_digit = true;
+      row = row
+        .saturating_mul(10)
+        .saturating_add(ch.to_digit(10).unwrap_or(0));
+    } else {
+      return None;
+    }
+  }
+  (col > 0 && row > 0).then_some((col, row))
 }
 
 pub(crate) fn axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Title> {

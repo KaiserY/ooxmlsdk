@@ -23,7 +23,6 @@ use super::table::TableResourceCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
-use crate::text_metrics;
 use crate::units;
 
 const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
@@ -224,12 +223,12 @@ impl CalcSheet {
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
-    styles: &StylesCatalog,
+    _styles: &StylesCatalog,
     raw_values: &HashMap<String, String>,
     mso_document: bool,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
+    let metrics = SheetMetrics::from_worksheet(&worksheet, mso_document);
     Self {
       workbook_index,
       name,
@@ -317,9 +316,12 @@ impl CalcSheet {
           col: cell_position as u32 + 1,
           row: row_index,
         });
+        let Some(print_address) = super::pivot::pivot_print_address(self, address) else {
+          continue;
+        };
         used = Some(match used {
-          Some(range) => range.union_address(address),
-          None => CellRange::single(address),
+          Some(range) => range.union_address(print_address),
+          None => CellRange::single(print_address),
         });
       }
     }
@@ -726,7 +728,7 @@ impl ChartsheetMetrics {
 }
 
 impl SheetMetrics {
-  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
+  fn from_worksheet(worksheet: &x::Worksheet, mso_document: bool) -> Self {
     // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
@@ -742,7 +744,7 @@ impl SheetMetrics {
         .as_ref()
         .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
         .unwrap_or_default(),
-      digit_width_pt: default_digit_width_pt(styles),
+      digit_width_pt: default_digit_width_pt(),
       columns: worksheet
         .columns
         .iter()
@@ -889,6 +891,9 @@ impl SheetResourceCatalog {
   pub(crate) fn from_worksheet_part(
     package: &mut SpreadsheetDocument,
     part: &WorksheetPart,
+    sheet_name: &str,
+    worksheet: &x::Worksheet,
+    raw_values: &HashMap<String, String>,
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
     date_1904: bool,
@@ -914,6 +919,9 @@ impl SheetResourceCatalog {
     let pivot_tables = PivotTableCatalog::from_parts(
       package,
       &pivot_table_parts,
+      worksheet,
+      raw_values,
+      sheet_name,
       shared_strings,
       styles,
       date_1904,
@@ -1111,23 +1119,20 @@ fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
     / units::TWIPS_PER_POINT
 }
 
-fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
-  let style = styles.default_font_text_style();
-  let measured = ('0'..='9')
-    .map(|digit| text_metrics::measure_text(&digit.to_string(), &style))
-    .fold(0.0_f32, f32::max);
-  if measured > f32::EPSILON {
-    measured
-  } else {
-    units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
-  }
+fn default_digit_width_pt() -> f32 {
+  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
+  // Unit::Digit to 2mm and only replaces it from the document ReferenceDevice
+  // XFont. ooxmlsdk-pdf has no LO reference device, so keep the LO fallback
+  // instead of measuring through an unrelated local text backend.
+  units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
 }
 
 fn screen_pixel_width_pt() -> f32 {
   // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
-  // Unit::ScreenX from GraphicHelper device pixels, falling back to 0.5mm per
-  // screen pixel when device information is unavailable.
-  units::millimeters_to_points(0.5)
+  // Unit::ScreenX from GraphicHelper device pixels. The headless Calc export
+  // path used by the upstream fixtures has a 96dpi reference device, i.e. one
+  // screen pixel is 0.75pt.
+  units::POINTS_PER_INCH / 96.0
 }
 
 impl CalcCell {

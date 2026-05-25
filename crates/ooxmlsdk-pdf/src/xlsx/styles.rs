@@ -321,7 +321,7 @@ impl StylesCatalog {
   }
 
   pub(crate) fn text_style_for_cell(&self, style_index: Option<u32>) -> TextStyle {
-    let mut style = TextStyle::default();
+    let mut style = self.default_font_text_style();
     let Some(format) = self.effective_cell_format(style_index) else {
       return style;
     };

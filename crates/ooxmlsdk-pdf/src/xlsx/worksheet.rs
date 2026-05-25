@@ -1037,17 +1037,41 @@ fn worksheet_rows(
     .sheet_data
     .row
     .iter()
-    .map(|row| CalcRow {
-      row_index: row.row_index,
-      height: row.height,
-      custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
-      style_index: row.style_index,
-      hidden: row.hidden.is_some_and(|value| value.as_bool()),
-      cells: row
+    .enumerate()
+    .map(|(row_position, row)| {
+      let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+      let mut current_col = 0u32;
+      let cells = row
         .cell
         .iter()
-        .map(|cell| CalcCell::from_cell(cell, shared_strings, raw_values))
-        .collect(),
+        .map(|cell| {
+          // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx
+          // SheetDataContext::importCell falls back to the next column in the
+          // current row when XML_r is missing or cannot be converted to an A1
+          // address. Malformed producer output still imports as ordered cells.
+          let address = cell
+            .cell_reference
+            .as_deref()
+            .and_then(CellAddress::parse_a1)
+            .inspect(|address| current_col = address.col)
+            .unwrap_or_else(|| {
+              current_col = current_col.saturating_add(1);
+              CellAddress {
+                col: current_col,
+                row: row_index,
+              }
+            });
+          CalcCell::from_cell(cell, shared_strings, raw_values, Some(address))
+        })
+        .collect();
+      CalcRow {
+        row_index: Some(row_index),
+        height: row.height,
+        custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
+        style_index: row.style_index,
+        hidden: row.hidden.is_some_and(|value| value.as_bool()),
+        cells,
+      }
     })
     .collect()
 }
@@ -1086,6 +1110,7 @@ impl CalcCell {
     cell: &x::Cell,
     shared_strings: &[SharedStringModel],
     raw_values: &HashMap<String, String>,
+    resolved_address: Option<CellAddress>,
   ) -> Self {
     let raw_value = cell
       .cell_reference
@@ -1097,7 +1122,9 @@ impl CalcCell {
       .and_then(|value| value.xml_content.as_deref())
       .map(|value| raw_value.cloned().unwrap_or_else(|| value.to_string()));
     Self {
-      reference: cell.cell_reference.as_ref().map(ToString::to_string),
+      reference: resolved_address
+        .map(format_cell_address_a1)
+        .or_else(|| cell.cell_reference.as_ref().map(ToString::to_string)),
       style_index: cell.style_index,
       data_type: cell.data_type,
       cell_meta_index: cell.cell_meta_index,
@@ -1110,6 +1137,17 @@ impl CalcCell {
       has_extensions: cell.extension_list.is_some(),
     }
   }
+}
+
+fn format_cell_address_a1(address: CellAddress) -> String {
+  let mut col = address.col;
+  let mut letters = Vec::new();
+  while col > 0 {
+    col -= 1;
+    letters.push(char::from(b'A' + u8::try_from(col % 26).unwrap_or(0)));
+    col /= 26;
+  }
+  letters.iter().rev().collect::<String>() + &address.row.to_string()
 }
 
 impl FormulaModel {

@@ -512,6 +512,29 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
       super::drawing::DrawingObjectKind::Unknown => {}
     }
   }
+  // Source: LibreOffice sc/source/filter/oox/drawingfragment.cxx imports VML
+  // client shapes into the sheet draw layer; sc/source/core/data/documen9.cxx
+  // then treats that draw layer uniformly for print area and page visibility.
+  for shape in sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+  {
+    if !vml_shape_intersects_area(sheet, shape, area) {
+      continue;
+    }
+    summary.anchors += 1;
+    summary.printable += usize::from(shape.print_object && !shape.hidden);
+    summary.hidden += usize::from(shape.hidden);
+    summary.text_len += shape.text.len();
+    if shape.image_relationship_id.is_some() {
+      summary.pictures += 1;
+    } else {
+      summary.shapes += 1;
+    }
+  }
   summary.charts = sheet
     .resources
     .drawings
@@ -639,25 +662,33 @@ fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
   // merges ScDrawLayer::GetPrintArea into the sheet print area, and
   // sc/source/core/data/drwlayer.cxx::ScDrawLayer::GetPrintArea maps object
   // bounds back to start/end cells.
-  sheet
+  let xdr_ranges = sheet
     .resources
     .drawings
     .iter()
     .flat_map(|drawing| drawing.anchors.iter())
     .filter(|anchor| !anchor.object.hidden)
-    .filter_map(|anchor| drawing_anchor_cell_range(sheet, anchor))
-    .reduce(|acc, range| {
-      CellRange::new(
-        CellAddress {
-          col: acc.start.col.min(range.start.col),
-          row: acc.start.row.min(range.start.row),
-        },
-        CellAddress {
-          col: acc.end.col.max(range.end.col),
-          row: acc.end.row.max(range.end.row),
-        },
-      )
-    })
+    .filter_map(|anchor| drawing_anchor_cell_range(sheet, anchor));
+  let vml_ranges = sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+    .filter(|shape| !shape.hidden)
+    .filter_map(|shape| vml_shape_cell_range(sheet, shape));
+  xdr_ranges.chain(vml_ranges).reduce(|acc, range| {
+    CellRange::new(
+      CellAddress {
+        col: acc.start.col.min(range.start.col),
+        row: acc.start.row.min(range.start.row),
+      },
+      CellAddress {
+        col: acc.end.col.max(range.end.col),
+        row: acc.end.row.max(range.end.row),
+      },
+    )
+  })
 }
 
 fn drawing_anchor_cell_range(
@@ -711,6 +742,135 @@ fn drawing_anchor_rect_pt(
       ))
     }
   }
+}
+
+fn vml_shape_intersects_area(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+  area: Option<CellRange>,
+) -> bool {
+  let Some(area) = area else {
+    return true;
+  };
+  vml_shape_cell_range(sheet, shape)
+    .map(|range| range.intersects(area))
+    .unwrap_or(true)
+}
+
+fn vml_shape_cell_range(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<CellRange> {
+  let (x_pt, y_pt, width_pt, height_pt) = vml_shape_rect_pt(sheet, shape)?;
+  Some(CellRange::new(
+    CellAddress {
+      col: sheet_column_for_x(sheet, x_pt),
+      row: sheet_row_for_y(sheet, y_pt),
+    },
+    CellAddress {
+      col: sheet_column_for_x(sheet, x_pt + width_pt),
+      row: sheet_row_for_y(sheet, y_pt + height_pt),
+    },
+  ))
+}
+
+fn vml_shape_rect_pt(
+  sheet: &CalcSheet,
+  shape: &super::object_resources::VmlShapeModel,
+) -> Option<(f32, f32, f32, f32)> {
+  shape
+    .anchor
+    .and_then(|anchor| vml_anchor_rect_pt(sheet, anchor))
+    .or_else(|| shape.style.as_deref().and_then(vml_style_rect_pt))
+}
+
+fn vml_anchor_rect_pt(
+  sheet: &CalcSheet,
+  anchor: super::object_resources::VmlClientAnchor,
+) -> Option<(f32, f32, f32, f32)> {
+  let x1 = vml_anchor_x_pt(sheet, anchor.from_col, anchor.from_col_offset_px);
+  let y1 = vml_anchor_y_pt(sheet, anchor.from_row, anchor.from_row_offset_px);
+  let x2 = vml_anchor_x_pt(sheet, anchor.to_col, anchor.to_col_offset_px);
+  let y2 = vml_anchor_y_pt(sheet, anchor.to_row, anchor.to_row_offset_px);
+  if x2 < x1 || y2 < y1 {
+    return None;
+  }
+  Some((
+    x1,
+    y1,
+    x2 - x1 + units::twips_to_points(1.0),
+    y2 - y1 + units::twips_to_points(1.0),
+  ))
+}
+
+fn vml_anchor_x_pt(sheet: &CalcSheet, zero_based_col: u32, offset_px: i32) -> f32 {
+  let col = zero_based_col.saturating_add(1);
+  let cell = sheet.cell_rect(CellAddress { col, row: 1 });
+  let next_cell = sheet.cell_rect(CellAddress {
+    col: col.saturating_add(1),
+    row: 1,
+  });
+  // Source: LibreOffice sc/source/filter/oox/drawingbase.cxx
+  // ShapeAnchor::importVmlAnchor marks offsets as CellAnchorType::Pixel, and
+  // calcCellAnchorEmu clamps them to the next cell minus one twip.
+  (cell.x_pt + vml_screen_pixel_to_pt(offset_px)).min(next_cell.x_pt - units::twips_to_points(1.0))
+}
+
+fn vml_anchor_y_pt(sheet: &CalcSheet, zero_based_row: u32, offset_px: i32) -> f32 {
+  let row = zero_based_row.saturating_add(1);
+  let cell = sheet.cell_rect(CellAddress { col: 1, row });
+  let next_cell = sheet.cell_rect(CellAddress {
+    col: 1,
+    row: row.saturating_add(1),
+  });
+  (cell.y_pt + vml_screen_pixel_to_pt(offset_px)).min(next_cell.y_pt - units::twips_to_points(1.0))
+}
+
+fn vml_screen_pixel_to_pt(value: i32) -> f32 {
+  value as f32 * units::POINTS_PER_INCH / 96.0
+}
+
+fn vml_style_rect_pt(style: &str) -> Option<(f32, f32, f32, f32)> {
+  let x = vml_style_length_pt(style, "margin-left")?;
+  let y = vml_style_length_pt(style, "margin-top")?;
+  let width = vml_style_length_pt(style, "width")?;
+  let height = vml_style_length_pt(style, "height")?;
+  Some((x, y, width, height))
+}
+
+fn vml_style_length_pt(style: &str, key: &str) -> Option<f32> {
+  style.split(';').find_map(|part| {
+    let (name, value) = part.split_once(':')?;
+    if name.trim() != key {
+      return None;
+    }
+    parse_vml_length_pt(value.trim())
+  })
+}
+
+fn parse_vml_length_pt(value: &str) -> Option<f32> {
+  if let Some(value) = value.strip_suffix("pt") {
+    return value.trim().parse::<f32>().ok();
+  }
+  if let Some(value) = value.strip_suffix("in") {
+    return value
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value * units::POINTS_PER_INCH);
+  }
+  if let Some(value) = value.strip_suffix("px") {
+    return value
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(vml_screen_pixel_to_pt_f32);
+  }
+  value.parse::<f32>().ok()
+}
+
+fn vml_screen_pixel_to_pt_f32(value: f32) -> f32 {
+  value * units::POINTS_PER_INCH / 96.0
 }
 
 fn sheet_column_for_x(sheet: &CalcSheet, x_pt: f32) -> u32 {
@@ -958,6 +1118,16 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
     .flat_map(|drawing| drawing.anchors.iter())
     .any(|anchor| anchor.print_with_sheet && !anchor.object.hidden);
   if has_printable_drawing {
+    return false;
+  }
+  let has_printable_vml_drawing = sheet
+    .resources
+    .object_resources
+    .vml_drawings
+    .iter()
+    .flat_map(|drawing| drawing.shapes.iter())
+    .any(|shape| shape.print_object && !shape.hidden);
+  if has_printable_vml_drawing {
     return false;
   }
   sheet.rows.iter().all(|row| {

@@ -38,8 +38,11 @@ pub(crate) struct VmlDrawingResourceCatalog {
 pub(crate) struct VmlShapeModel {
   pub(crate) text: String,
   pub(crate) style: Option<String>,
+  pub(crate) object_type: Option<String>,
   pub(crate) image_relationship_id: Option<String>,
   pub(crate) anchor: Option<VmlClientAnchor>,
+  pub(crate) note_row: Option<u32>,
+  pub(crate) note_column: Option<u32>,
   pub(crate) print_object: bool,
   pub(crate) visible: bool,
   pub(crate) hidden: bool,
@@ -77,8 +80,11 @@ impl Default for VmlShapeModel {
     Self {
       text: String::new(),
       style: None,
+      object_type: None,
       image_relationship_id: None,
       anchor: None,
+      note_row: None,
+      note_column: None,
       print_object: true,
       visible: false,
       hidden: false,
@@ -185,9 +191,12 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
   let mut shapes = Vec::new();
   let mut current: Option<VmlShapeModel> = None;
   let mut in_textbox = false;
+  let mut in_client_data = false;
   let mut in_anchor = false;
   let mut in_print_object = false;
   let mut in_visible = false;
+  let mut in_note_row = false;
+  let mut in_note_column = false;
   loop {
     match reader.read_event() {
       Ok(Event::Start(event)) => {
@@ -215,12 +224,19 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
           in_textbox = true;
         } else if name.as_ref().ends_with(b"imagedata") {
           collect_vml_image_relationship(current.as_mut(), event.attributes().flatten());
+        } else if name.as_ref().ends_with(b"ClientData") {
+          in_client_data = true;
+          collect_vml_object_type(current.as_mut(), event.attributes().flatten());
         } else if name.as_ref().ends_with(b"Anchor") {
           in_anchor = true;
         } else if name.as_ref().ends_with(b"PrintObject") {
           in_print_object = true;
         } else if name.as_ref().ends_with(b"Visible") {
           in_visible = true;
+        } else if name.as_ref().ends_with(b"Row") {
+          in_note_row = true;
+        } else if name.as_ref().ends_with(b"Column") {
+          in_note_column = true;
         }
       }
       Ok(Event::Text(text)) => {
@@ -229,9 +245,12 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
             current.as_mut(),
             &value,
             in_textbox,
+            in_client_data,
             in_anchor,
             in_print_object,
             in_visible,
+            in_note_row,
+            in_note_column,
           );
         }
       }
@@ -241,27 +260,42 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
             current.as_mut(),
             &value,
             in_textbox,
+            in_client_data,
             in_anchor,
             in_print_object,
             in_visible,
+            in_note_row,
+            in_note_column,
           );
         }
       }
       Ok(Event::Empty(event)) => {
         if event.name().as_ref().ends_with(b"imagedata") {
           collect_vml_image_relationship(current.as_mut(), event.attributes().flatten());
+        } else if event.name().as_ref().ends_with(b"ClientData") {
+          collect_vml_object_type(current.as_mut(), event.attributes().flatten());
+        } else if event.name().as_ref().ends_with(b"Visible")
+          && let Some(shape) = current.as_mut()
+        {
+          shape.visible = true;
         }
       }
       Ok(Event::End(event)) => {
         let name = event.name();
         if name.as_ref().ends_with(b"textbox") {
           in_textbox = false;
+        } else if name.as_ref().ends_with(b"ClientData") {
+          in_client_data = false;
         } else if name.as_ref().ends_with(b"Anchor") {
           in_anchor = false;
         } else if name.as_ref().ends_with(b"PrintObject") {
           in_print_object = false;
         } else if name.as_ref().ends_with(b"Visible") {
           in_visible = false;
+        } else if name.as_ref().ends_with(b"Row") {
+          in_note_row = false;
+        } else if name.as_ref().ends_with(b"Column") {
+          in_note_column = false;
         } else if name.as_ref().ends_with(b"shape")
           && let Some(mut shape) = current.take()
         {
@@ -292,6 +326,20 @@ fn collect_vml_image_relationship<'a>(
   }
 }
 
+fn collect_vml_object_type<'a>(
+  shape: Option<&mut VmlShapeModel>,
+  attributes: impl Iterator<Item = quick_xml::events::attributes::Attribute<'a>>,
+) {
+  let Some(shape) = shape else {
+    return;
+  };
+  for attr in attributes {
+    if attr.key.as_ref().ends_with(b"ObjectType") {
+      shape.object_type = Some(String::from_utf8_lossy(attr.value.as_ref()).into_owned());
+    }
+  }
+}
+
 fn collect_vml_image_resources(
   package: &SpreadsheetDocument,
   part: &VmlDrawingPart,
@@ -317,9 +365,12 @@ fn collect_vml_shape_text(
   shape: Option<&mut VmlShapeModel>,
   value: &str,
   in_textbox: bool,
+  _in_client_data: bool,
   in_anchor: bool,
   in_print_object: bool,
   in_visible: bool,
+  in_note_row: bool,
+  in_note_column: bool,
 ) {
   let Some(shape) = shape else {
     return;
@@ -332,6 +383,10 @@ fn collect_vml_shape_text(
     shape.print_object = decode_vml_bool(value, true);
   } else if in_visible {
     shape.visible = decode_vml_bool(value, true);
+  } else if in_note_row {
+    shape.note_row = value.trim().parse::<u32>().ok();
+  } else if in_note_column {
+    shape.note_column = value.trim().parse::<u32>().ok();
   }
 }
 

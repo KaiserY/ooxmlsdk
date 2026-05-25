@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
@@ -1867,7 +1868,11 @@ fn print_page_vml_text_items(
     .iter()
     .flat_map(|drawing| drawing.shapes.iter())
   {
-    if shape.hidden || !shape.print_object || shape.text.trim().is_empty() {
+    if shape.hidden || !shape.print_object {
+      continue;
+    }
+    let text = vml_shape_visible_text(page.sheet, shape);
+    if text.trim().is_empty() {
       continue;
     }
     let Some((x_pt, y_pt, width_pt, height_pt)) = vml_shape_rect(page.sheet, shape) else {
@@ -1877,7 +1882,7 @@ fn print_page_vml_text_items(
       page_area_rect.map_or((x_pt, y_pt), |rect| (x_pt - rect.x_pt, y_pt - rect.y_pt));
     render_drawing_text(
       &mut items,
-      &shape.text,
+      text.as_ref(),
       origin_x_pt + x_pt * zoom_scale,
       origin_y_pt + y_pt * zoom_scale,
       width_pt * zoom_scale,
@@ -1887,6 +1892,41 @@ fn print_page_vml_text_items(
     );
   }
   items
+}
+
+fn vml_shape_visible_text<'a>(
+  sheet: &'a CalcSheet,
+  shape: &'a super::object_resources::VmlShapeModel,
+) -> Cow<'a, str> {
+  if !shape.text.trim().is_empty() {
+    return Cow::Borrowed(shape.text.as_str());
+  }
+  if shape.object_type.as_deref() != Some("Note") || !shape.visible {
+    return Cow::Borrowed("");
+  }
+  let Some(row) = shape.note_row.and_then(|row| row.checked_add(1)) else {
+    return Cow::Borrowed("");
+  };
+  let Some(col) = shape.note_column.and_then(|col| col.checked_add(1)) else {
+    return Cow::Borrowed("");
+  };
+  let address = super::worksheet::CellAddress { col, row };
+  // Source: LibreOffice sc/source/filter/oox/commentsbuffer.cxx finalizes
+  // legacy comments against the VML note shape map; visible note captions use
+  // the comments part text when the VML textbox itself is empty.
+  sheet
+    .resources
+    .comments
+    .legacy
+    .as_ref()
+    .and_then(|legacy| {
+      legacy.comments.iter().find_map(|comment| {
+        super::worksheet::CellRange::parse_a1_range(&comment.reference)
+          .is_some_and(|range| range.contains(address))
+          .then(|| Cow::Owned(comment.text.clone()))
+      })
+    })
+    .unwrap_or(Cow::Borrowed(""))
 }
 
 fn drawing_object_hyperlink_url(

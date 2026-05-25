@@ -4,11 +4,13 @@ use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
 use super::worksheet::{CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
 use crate::docx::TextStyle;
 use crate::text_metrics;
+use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
 // Source: LibreOffice sc/source/ui/view/printfun.cxx defines ZOOM_MIN.
 const ZOOM_MIN: u32 = 10;
 const XLSX_MAX_COLUMN: u32 = 16_384;
+const XLSX_MAX_ROW: u32 = 1_048_576;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
@@ -482,7 +484,7 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
     .iter()
     .flat_map(|drawing| drawing.anchors.iter())
   {
-    if !anchor_belongs_to_area(anchor.from.as_ref(), area) {
+    if !anchor_intersects_area(sheet, anchor, area) {
       continue;
     }
     summary.anchors += 1;
@@ -584,6 +586,19 @@ impl<'a> CalcPrintNamedRanges<'a> {
   }
 }
 
+fn anchor_intersects_area(
+  sheet: &CalcSheet,
+  anchor: &super::drawing::DrawingAnchorModel,
+  area: Option<CellRange>,
+) -> bool {
+  let Some(area) = area else {
+    return true;
+  };
+  drawing_anchor_cell_range(sheet, anchor)
+    .map(|range| range.intersects(area))
+    .unwrap_or_else(|| anchor_belongs_to_area(anchor.from.as_ref(), Some(area)))
+}
+
 fn print_areas_for_sheet(
   sheet: &CalcSheet,
   named_ranges: &CalcPrintNamedRanges<'_>,
@@ -597,14 +612,121 @@ fn print_areas_for_sheet(
     // supplies the lower-right used cell. Empty leading rows/columns still
     // participate in page-break calculation and are skipped later by
     // ScDocument::IsPrintEmpty.
-    Some(range) => vec![extend_print_area_for_overflow(
-      sheet,
-      CellRange::new(CellAddress { col: 1, row: 1 }, range.end),
-    )],
+    Some(range) => {
+      let mut range = CellRange::new(CellAddress { col: 1, row: 1 }, range.end);
+      if let Some(drawing_range) = drawing_print_area(sheet) {
+        range.end.col = range.end.col.max(drawing_range.end.col);
+        range.end.row = range.end.row.max(drawing_range.end.row);
+      }
+      vec![extend_print_area_for_overflow(sheet, range)]
+    }
     // With skip-empty disabled, a missing document print area still leaves the
     // default start/end range printable, so header/footer-only sheets export a page.
-    None => vec![CellRange::single(CellAddress { col: 1, row: 1 })],
+    None => {
+      vec![drawing_print_area(sheet).unwrap_or(CellRange::single(CellAddress { col: 1, row: 1 }))]
+    }
   }
+}
+
+fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
+  // Source: LibreOffice sc/source/core/data/documen2.cxx::ScDocument::GetPrintArea
+  // merges ScDrawLayer::GetPrintArea into the sheet print area, and
+  // sc/source/core/data/drwlayer.cxx::ScDrawLayer::GetPrintArea maps object
+  // bounds back to start/end cells.
+  sheet
+    .resources
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.anchors.iter())
+    .filter(|anchor| !anchor.object.hidden)
+    .filter_map(|anchor| drawing_anchor_cell_range(sheet, anchor))
+    .reduce(|acc, range| {
+      CellRange::new(
+        CellAddress {
+          col: acc.start.col.min(range.start.col),
+          row: acc.start.row.min(range.start.row),
+        },
+        CellAddress {
+          col: acc.end.col.max(range.end.col),
+          row: acc.end.row.max(range.end.row),
+        },
+      )
+    })
+}
+
+fn drawing_anchor_cell_range(
+  sheet: &CalcSheet,
+  anchor: &super::drawing::DrawingAnchorModel,
+) -> Option<CellRange> {
+  let (x_pt, y_pt, width_pt, height_pt) = drawing_anchor_rect_pt(sheet, anchor)?;
+  Some(CellRange::new(
+    CellAddress {
+      col: sheet_column_for_x(sheet, x_pt),
+      row: sheet_row_for_y(sheet, y_pt),
+    },
+    CellAddress {
+      col: sheet_column_for_x(sheet, x_pt + width_pt),
+      row: sheet_row_for_y(sheet, y_pt + height_pt),
+    },
+  ))
+}
+
+fn drawing_anchor_rect_pt(
+  sheet: &CalcSheet,
+  anchor: &super::drawing::DrawingAnchorModel,
+) -> Option<(f32, f32, f32, f32)> {
+  match anchor.kind {
+    super::drawing::DrawingAnchorKind::TwoCell => {
+      let from = anchor.from.as_ref()?;
+      let to = anchor.to.as_ref()?;
+      let (x1, y1) = sheet.marker_position_pt(from);
+      let (x2, y2) = sheet.marker_position_pt(to);
+      Some((
+        x1.min(x2),
+        y1.min(y2),
+        (x2 - x1).abs() + units::emu_to_points(1),
+        (y2 - y1).abs() + units::emu_to_points(1),
+      ))
+    }
+    super::drawing::DrawingAnchorKind::OneCell => {
+      let from = anchor.from.as_ref()?;
+      let (x, y) = sheet.marker_position_pt(from);
+      let (cx, cy) = anchor.extent?;
+      Some((x, y, units::emu_to_points(cx), units::emu_to_points(cy)))
+    }
+    super::drawing::DrawingAnchorKind::Absolute => {
+      let (x, y) = anchor.position?;
+      let (cx, cy) = anchor.extent?;
+      Some((
+        units::emu_to_points(x),
+        units::emu_to_points(y),
+        units::emu_to_points(cx),
+        units::emu_to_points(cy),
+      ))
+    }
+  }
+}
+
+fn sheet_column_for_x(sheet: &CalcSheet, x_pt: f32) -> u32 {
+  let mut width = 0.0f32;
+  for column in 1..=XLSX_MAX_COLUMN {
+    width += sheet.column_width_pt(column);
+    if width > x_pt {
+      return column;
+    }
+  }
+  XLSX_MAX_COLUMN
+}
+
+fn sheet_row_for_y(sheet: &CalcSheet, y_pt: f32) -> u32 {
+  let mut height = 0.0f32;
+  for row in 1..=XLSX_MAX_ROW {
+    height += sheet.row_height_pt(row);
+    if height > y_pt {
+      return row;
+    }
+  }
+  XLSX_MAX_ROW
 }
 
 fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
@@ -1349,7 +1471,12 @@ fn pivot_data_layout_caption_text(
     .iter()
     .position(|index| *index == -2)
     .is_some_and(|position| {
-      address.row == pivot.output_geometry.data_start.row.saturating_sub(1)
+      // Source: LibreOffice sc/source/core/data/dpoutput.cxx keeps the
+      // persisted dataCaption when the row-axis data layout still has a row
+      // grand-total result; when row grand totals are disabled, the emitted
+      // FieldCell caption comes from the data-layout dimension.
+      !pivot.row_grand_totals
+        && address.row == pivot.output_geometry.data_start.row.saturating_sub(1)
         && address.col == pivot.output_geometry.table_start.col + position as u32
     })
   {
@@ -1360,7 +1487,8 @@ fn pivot_data_layout_caption_text(
     .iter()
     .position(|index| *index == -2)
     .is_some_and(|position| {
-      address.col == pivot.output_geometry.data_start.col + position as u32
+      !pivot.column_grand_totals
+        && address.col == pivot.output_geometry.data_start.col + position as u32
         && address.row == pivot.output_geometry.table_start.row
     })
   {
@@ -1437,32 +1565,47 @@ fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Option<CellAd
     if !location.contains(address) {
       continue;
     }
+    let mut print_address = address;
+    if pivot.first_header_row > 1 {
+      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
+      // clears the persisted pivot cache range and inserts ScDPOutput at the
+      // location start. Cached rows before firstHeaderRow are not emitted; the
+      // first cached header row maps to ScDPOutput::mnTabStartRow.
+      let cached_header_row = location.start.row + pivot.first_header_row - 1;
+      if address.row < cached_header_row {
+        return None;
+      }
+      let row_shift = cached_header_row.saturating_sub(pivot.output_geometry.table_start.row);
+      print_address.row = address.row.saturating_sub(row_shift);
+    }
     if pivot.calculated_only_data_fields
       && pivot.data_layout_axis == super::pivot::PivotDataLayoutAxis::Columns
-      && address.col == location.start.col
-      && address.row > location.start.row
+      && print_address.col == location.start.col
+      && print_address.row > location.start.row
     {
       let shifted = CellAddress {
-        col: address.col,
-        row: address.row - 1,
+        col: print_address.col,
+        row: print_address.row - 1,
       };
       return printable_location.contains(shifted).then_some(shifted);
     }
-    if !pivot.output_geometry.whole_range.contains(address) {
+    if !pivot.output_geometry.whole_range.contains(print_address) {
       return None;
     }
     if !pivot.calculated_only_data_fields {
-      return Some(address);
+      return Some(print_address);
     }
     let suppress = match pivot.data_layout_axis {
       super::pivot::PivotDataLayoutAxis::Rows => {
-        address.row > printable_location.start.row && address.col > printable_location.start.col
+        print_address.row > printable_location.start.row
+          && print_address.col > printable_location.start.col
       }
       super::pivot::PivotDataLayoutAxis::Columns | super::pivot::PivotDataLayoutAxis::Hidden => {
-        address.col > printable_location.start.col && address.row > printable_location.start.row
+        print_address.col > printable_location.start.col
+          && print_address.row > printable_location.start.row
       }
     };
-    return (!suppress).then_some(address);
+    return (!suppress).then_some(print_address);
   }
   Some(address)
 }

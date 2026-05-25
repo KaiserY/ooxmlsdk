@@ -468,29 +468,11 @@ fn calc_cell_visible_text<'a>(
       std::borrow::Cow::Borrowed(&cell.rendered_text)
     };
   }
-  let text_width_pt = text_metrics::measure_text(&cell.rendered_text, style);
-  if text_width_pt <= f32::EPSILON {
-    return std::borrow::Cow::Borrowed(&cell.rendered_text);
-  }
-  let visible_ratio = ((text_width_pt - output_area.left_clip_pt - output_area.right_clip_pt)
-    / text_width_pt)
-    .clamp(0.0, 1.0);
-  if !(0.0..1.0).contains(&visible_ratio) {
-    return std::borrow::Cow::Borrowed(&cell.rendered_text);
-  }
-  let char_count = cell.rendered_text.chars().count();
-  let short_count = ((visible_ratio * char_count as f32) as usize + 1).min(char_count);
-  if output_area.left_clip_pt > 0.0 && output_area.right_clip_pt <= f32::EPSILON {
-    std::borrow::Cow::Owned(
-      cell
-        .rendered_text
-        .chars()
-        .skip(char_count.saturating_sub(short_count))
-        .collect(),
-    )
-  } else {
-    std::borrow::Cow::Owned(cell.rendered_text.chars().take(short_count).collect())
-  }
+  // Source: LibreOffice sc/source/ui/view/output2.cxx draws string cells as
+  // strings and relies on the output device clip region. The text payload is
+  // not rewritten to a shorter string; numeric cells are handled above because
+  // Calc may replace them with a fitting General value or with ###.
+  std::borrow::Cow::Borrowed(&cell.rendered_text)
 }
 
 fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
@@ -1838,20 +1820,34 @@ fn render_metafile_texts(
   height_pt: f32,
   hyperlink_url: Option<String>,
 ) {
-  let texts = emf_wmf::extract_metafile_texts(&resource.data, resource.content_type.as_deref());
-  if texts.is_empty() {
+  let runs = emf_wmf::extract_metafile_text_runs(&resource.data, resource.content_type.as_deref());
+  if runs.is_empty() {
     return;
   }
-  render_drawing_text(
-    items,
-    &texts.join("\n"),
-    x_pt,
-    y_pt,
-    width_pt,
-    height_pt,
-    None,
-    hyperlink_url,
-  );
+  for run in runs {
+    let mut style = TextStyle::default();
+    if let Some(font_size) = run.font_size {
+      style.font_size_pt = (font_size * height_pt).max(1.0);
+    }
+    let line_height = (style.font_size_pt * 1.15).max(1.0);
+    items.push(PageItem::Text(TextItem {
+      x_pt: x_pt + run.x * width_pt,
+      y_pt: y_pt + run.y * height_pt,
+      line_height_pt: line_height,
+      text: run.text,
+      style,
+      rotation_center_pt: None,
+      hyperlink_url: hyperlink_url.clone(),
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      form_widget_id: None,
+      paragraph_bidi: false,
+      preserve_text_portion: false,
+      decoration_span_start_x_pt: None,
+      pdf_text_segmentation: PdfTextSegmentation::Line,
+    }));
+  }
 }
 
 fn print_page_vml_text_items(

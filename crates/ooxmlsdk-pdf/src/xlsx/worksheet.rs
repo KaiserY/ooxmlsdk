@@ -18,10 +18,12 @@ use super::sheet_objects::SheetObjectCatalog;
 use super::sheet_relationships::SheetRelationshipCatalog;
 use super::sheet_settings::SheetSettingsCatalog;
 use super::sheet_view::SheetViewCatalog;
+use super::styles::StylesCatalog;
 use super::table::TableResourceCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::{SharedStringModel, SharedStringRun};
 use crate::error::Result;
+use crate::text_metrics;
 use crate::units;
 
 const CALC_DIGIT_WIDTH_MM: f32 = 2.0;
@@ -87,6 +89,7 @@ pub(crate) struct SheetMetrics {
   pub(crate) settings: SheetSettingsCatalog,
   pub(crate) views: SheetViewCatalog,
   pub(crate) format: SheetFormatModel,
+  pub(crate) digit_width_pt: f32,
   pub(crate) columns: Vec<ColumnModel>,
   pub(crate) merged_ranges: Vec<String>,
   pub(crate) hyperlinks: Vec<HyperlinkModel>,
@@ -221,10 +224,11 @@ impl CalcSheet {
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
+    styles: &StylesCatalog,
     raw_values: &HashMap<String, String>,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let metrics = SheetMetrics::from_worksheet(&worksheet);
+    let metrics = SheetMetrics::from_worksheet(&worksheet, styles);
     Self {
       workbook_index,
       name,
@@ -460,7 +464,7 @@ impl CalcSheet {
         return 0.0;
       }
       if let Some(width) = model.width {
-        return digit_width_to_points(width as f32);
+        return digit_width_to_points(width as f32, self.metrics.digit_width_pt);
       }
     }
     if self
@@ -471,7 +475,10 @@ impl CalcSheet {
     {
       return 0.0;
     }
-    digit_width_to_points(self.metrics.format.default_column_width_digits())
+    self
+      .metrics
+      .format
+      .default_column_width_points(self.metrics.digit_width_pt)
   }
 
   pub(crate) fn row_height_pt(&self, row_index: u32) -> f32 {
@@ -712,7 +719,7 @@ impl ChartsheetMetrics {
 }
 
 impl SheetMetrics {
-  fn from_worksheet(worksheet: &x::Worksheet) -> Self {
+  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog) -> Self {
     // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
@@ -728,6 +735,7 @@ impl SheetMetrics {
         .as_ref()
         .map(SheetFormatModel::from_sheet_format_properties)
         .unwrap_or_default(),
+      digit_width_pt: default_digit_width_pt(styles),
       columns: worksheet
         .columns
         .iter()
@@ -804,17 +812,17 @@ impl SheetFormatModel {
     }
   }
 
-  fn default_column_width_digits(&self) -> f32 {
+  fn default_column_width_points(&self, digit_width_pt: f32) -> f32 {
     if let Some(width) = self.default_column_width {
-      return width as f32;
+      return digit_width_to_points(width as f32, digit_width_pt);
     }
     // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx
     // setBaseColumnWidth() uses baseColWidth plus 5 screen pixels converted
-    // through UnitConverter; UnitConverter initializes 1 digit = 2mm.
+    // through UnitConverter after UnitConverter::finalizeImport() has replaced
+    // Unit::Digit with the default font's maximum digit width.
     let base = self.base_column_width.unwrap_or(8) as f32;
-    base
-      + CALC_BASE_COLUMN_PADDING_PX * units::POINTS_PER_CSS_PIXEL
-        / units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
+    digit_width_to_points(base, digit_width_pt)
+      + CALC_BASE_COLUMN_PADDING_PX * screen_pixel_width_pt()
   }
 }
 
@@ -1029,10 +1037,29 @@ fn worksheet_rows(
     .collect()
 }
 
-fn digit_width_to_points(value: f32) -> f32 {
+fn digit_width_to_points(value: f32, digit_width_pt: f32) -> f32 {
   // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx:
-  // maCoeffs[Unit::Digit] = convert(2.0mm, emu).
-  units::millimeters_to_points(value * CALC_DIGIT_WIDTH_MM)
+  // UnitConverter::scaleValue(value, Unit::Digit, Unit::Twip).
+  value * digit_width_pt
+}
+
+fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
+  let style = styles.default_font_text_style();
+  let measured = ('0'..='9')
+    .map(|digit| text_metrics::measure_text(&digit.to_string(), &style))
+    .fold(0.0_f32, f32::max);
+  if measured > f32::EPSILON {
+    measured
+  } else {
+    units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
+  }
+}
+
+fn screen_pixel_width_pt() -> f32 {
+  // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
+  // Unit::ScreenX from GraphicHelper device pixels, falling back to 0.5mm per
+  // screen pixel when device information is unavailable.
+  units::millimeters_to_points(0.5)
 }
 
 impl CalcCell {

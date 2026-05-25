@@ -340,6 +340,27 @@ impl StylesCatalog {
     style
   }
 
+  pub(crate) fn default_font_text_style(&self) -> TextStyle {
+    let mut style = TextStyle::default();
+    let Some(font) = self.font_records.first() else {
+      return style;
+    };
+    if let Some(name) = &font.name {
+      style.font_family = Some(Arc::clone(name));
+    }
+    if let Some(size_pt) = font.size_pt {
+      style.font_size_pt = size_pt.get() as f32;
+    }
+    if let Some(color) = font.color {
+      style.color = color;
+    }
+    style.bold = font.bold;
+    style.italic = font.italic;
+    style.underline = font.underline;
+    style.strikethrough = font.strikethrough;
+    style
+  }
+
   pub(crate) fn fill_color_for_cell(&self, style_index: Option<u32>) -> Option<RgbColor> {
     let format = self.effective_cell_format(style_index)?;
     if !format.apply_fill {

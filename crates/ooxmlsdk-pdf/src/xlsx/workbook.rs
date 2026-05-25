@@ -91,6 +91,7 @@ impl WorkbookFragment {
             state,
             active_workbook_sheet == Some(workbook_index),
             &self.shared_strings,
+            &self.styles,
           );
         }
 
@@ -129,6 +130,7 @@ fn worksheet_sheet(
   state: Option<x::SheetStateValues>,
   active: bool,
   shared_strings: &[SharedStringModel],
+  styles: &StylesCatalog,
 ) -> Result<CalcSheet> {
   let raw_data = part
     .data_as_str(package)
@@ -148,6 +150,7 @@ fn worksheet_sheet(
     worksheet,
     resources,
     shared_strings,
+    styles,
     &raw_data.cell_values,
   );
   apply_raw_header_footer(&mut sheet, &raw_data);

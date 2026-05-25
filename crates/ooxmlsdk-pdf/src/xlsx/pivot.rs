@@ -45,6 +45,7 @@ pub(crate) struct PivotTableModel {
   pub(crate) location_reference: String,
   pub(crate) printable_location_reference: String,
   pub(crate) output_geometry: PivotOutputGeometry,
+  pub(crate) first_header_row: u32,
   pub(crate) first_data_row: u32,
   pub(crate) first_data_column: u32,
   pub(crate) calculated_only_data_fields: bool,
@@ -58,6 +59,8 @@ pub(crate) struct PivotTableModel {
   pub(crate) filters: usize,
   pub(crate) formats: usize,
   pub(crate) compact: bool,
+  pub(crate) row_grand_totals: bool,
+  pub(crate) column_grand_totals: bool,
   pub(crate) row_field_indexes: Vec<i32>,
   pub(crate) column_field_indexes: Vec<i32>,
   pub(crate) row_field_names: Vec<String>,
@@ -840,6 +843,7 @@ impl PivotTableModel {
       location_reference: definition.location.reference.clone(),
       printable_location_reference,
       output_geometry,
+      first_header_row: definition.location.first_header_row,
       first_data_row: definition.location.first_data_row,
       first_data_column: definition.location.first_data_column,
       calculated_only_data_fields,
@@ -878,6 +882,12 @@ impl PivotTableModel {
         .as_ref()
         .map_or(0, |formats| formats.format.len()),
       compact: definition.compact.is_none_or(|value| value.as_bool()),
+      row_grand_totals: definition
+        .row_grand_totals
+        .is_none_or(|value| value.as_bool()),
+      column_grand_totals: definition
+        .column_grand_totals
+        .is_none_or(|value| value.as_bool()),
       row_field_indexes,
       column_field_indexes,
       row_field_names: row_field_names(definition.row_fields.as_ref(), &cache_field_names),

@@ -116,7 +116,7 @@ pub(crate) struct ChartsheetMetrics {
   pub(crate) has_extensions: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SheetFormatModel {
   pub(crate) base_column_width: Option<u32>,
   pub(crate) default_column_width: Option<f64>,
@@ -125,6 +125,22 @@ pub(crate) struct SheetFormatModel {
   pub(crate) zero_height: bool,
   pub(crate) thick_top: bool,
   pub(crate) thick_bottom: bool,
+}
+
+impl Default for SheetFormatModel {
+  fn default() -> Self {
+    Self {
+      base_column_width: None,
+      default_column_width: None,
+      // Source: LibreOffice sc/source/core/data/global.cxx
+      // ScGlobal::nStdRowHeight = 256 twips.
+      default_row_height: 256.0 / units::TWIPS_PER_POINT as f64,
+      custom_height: false,
+      zero_height: false,
+      thick_top: false,
+      thick_bottom: false,
+    }
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -223,12 +239,12 @@ impl CalcSheet {
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
-    _styles: &StylesCatalog,
+    styles: &StylesCatalog,
     raw_values: &HashMap<String, String>,
     mso_document: bool,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let metrics = SheetMetrics::from_worksheet(&worksheet, mso_document);
+    let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
     Self {
       workbook_index,
       name,
@@ -728,7 +744,7 @@ impl ChartsheetMetrics {
 }
 
 impl SheetMetrics {
-  fn from_worksheet(worksheet: &x::Worksheet, mso_document: bool) -> Self {
+  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
     // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
@@ -744,7 +760,7 @@ impl SheetMetrics {
         .as_ref()
         .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
         .unwrap_or_default(),
-      digit_width_pt: default_digit_width_pt(),
+      digit_width_pt: default_digit_width_pt(styles),
       columns: worksheet
         .columns
         .iter()
@@ -827,7 +843,7 @@ impl SheetFormatModel {
 
   fn default_column_width_points(&self, digit_width_pt: f32) -> f32 {
     if let Some(width) = self.default_column_width {
-      return digit_width_to_points(width as f32, digit_width_pt);
+      return digit_width_to_lo_points(width as f32, digit_width_pt);
     }
     // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx
     // setBaseColumnWidth() uses baseColWidth plus 5 screen pixels converted
@@ -1119,12 +1135,19 @@ fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
     / units::TWIPS_PER_POINT
 }
 
-fn default_digit_width_pt() -> f32 {
+fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {
   // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx initializes
-  // Unit::Digit to 2mm and only replaces it from the document ReferenceDevice
-  // XFont. ooxmlsdk-pdf has no LO reference device, so keep the LO fallback
-  // instead of measuring through an unrelated local text backend.
-  units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
+  // Unit::Digit to 2mm, then UnitConverter::finalizeImport() replaces it with
+  // the default font XFont maximum width across '0'..'9'.
+  let style = styles.default_font_text_style();
+  let digit_width = ('0'..='9')
+    .map(|ch| crate::text_metrics::measure_text(&ch.to_string(), &style))
+    .fold(0.0_f32, f32::max);
+  if digit_width > 0.0 {
+    digit_width
+  } else {
+    units::millimeters_to_points(CALC_DIGIT_WIDTH_MM)
+  }
 }
 
 fn screen_pixel_width_pt() -> f32 {

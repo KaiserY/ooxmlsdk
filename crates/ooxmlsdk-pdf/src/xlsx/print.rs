@@ -146,13 +146,19 @@ impl<'a> CalcPrintDocument<'a> {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(import, sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
-      let scale = print_scale_state(sheet, &areas, &named_ranges);
+      let scale = print_scale_state(import, sheet, &areas, &named_ranges);
       document_top_down &= scale.top_down;
       let keep_header_footer_only_page = visible_sheets_with_body == 0
         && sheet.page_settings.header_footer.has_print_content()
         && sheet_body_is_empty(import, sheet);
-      let page_areas =
-        page_areas_for_sheet(sheet, &areas, &named_ranges, scale.zoom, scale.top_down);
+      let page_areas = page_areas_for_sheet(
+        import,
+        sheet,
+        &areas,
+        &named_ranges,
+        scale.zoom,
+        scale.top_down,
+      );
       let mut sheet_page_index = 0usize;
       for area in page_areas {
         let all_cells = area
@@ -287,6 +293,7 @@ struct CalcPrintScaleState {
 }
 
 fn print_scale_state(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges<'_>,
@@ -338,12 +345,12 @@ fn print_scale_state(
     );
     if sheet.page_settings.fit_to_width > 0
       && sheet.page_settings.fit_to_height == 0
-      && actual_row_page_count(sheet, areas, named_ranges, zoom) > 1
+      && actual_row_page_count(import, sheet, areas, named_ranges, zoom) > 1
     {
       let adjusted_zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
       if adjusted_zoom < zoom
-        && actual_row_page_count(sheet, areas, named_ranges, adjusted_zoom)
-          < actual_row_page_count(sheet, areas, named_ranges, zoom)
+        && actual_row_page_count(import, sheet, areas, named_ranges, adjusted_zoom)
+          < actual_row_page_count(import, sheet, areas, named_ranges, zoom)
       {
         tdf103516_adjusted = true;
         zoom = adjusted_zoom;
@@ -375,6 +382,7 @@ fn print_scale_state(
 }
 
 fn actual_row_page_count(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges<'_>,
@@ -384,6 +392,7 @@ fn actual_row_page_count(
     .iter()
     .map(|area| {
       split_range_by_page_metrics(
+        import,
         sheet,
         *area,
         &sheet.metrics.row_breaks,
@@ -1245,6 +1254,7 @@ fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
 }
 
 fn page_areas_for_sheet(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   print_areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges<'_>,
@@ -1257,6 +1267,7 @@ fn page_areas_for_sheet(
   let mut pages = Vec::new();
   for area in print_areas {
     let row_slices = split_range_by_page_metrics(
+      import,
       sheet,
       *area,
       &sheet.metrics.row_breaks,
@@ -1265,6 +1276,7 @@ fn page_areas_for_sheet(
       zoom,
     );
     let column_slices = split_range_by_page_metrics(
+      import,
       sheet,
       *area,
       &sheet.metrics.column_breaks,
@@ -1305,6 +1317,7 @@ fn intersect_page_slices(row_slice: CellRange, column_slice: CellRange) -> CellR
 }
 
 fn split_range_by_page_metrics(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   area: CellRange,
   breaks: &[super::worksheet::PageBreakModel],
@@ -1350,7 +1363,7 @@ fn split_range_by_page_metrics(
       used = 0.0;
     }
     let size = if by_row {
-      sheet.row_height_pt(current)
+      print_row_height_pt(import, sheet, current)
     } else {
       sheet.column_width_pt(current)
     };
@@ -1380,6 +1393,81 @@ fn split_range_by_page_metrics(
     slices.push(axis_slice(area, by_row, current_start, end));
   }
   slices
+}
+
+fn print_row_height_pt(import: &ExcelImport, sheet: &CalcSheet, row_index: u32) -> f32 {
+  let base = sheet.row_height_pt(row_index);
+  if base <= f32::EPSILON {
+    return base;
+  }
+  let Some(row) = sheet
+    .rows
+    .iter()
+    .find(|row| row.row_index.unwrap_or(0) == row_index)
+  else {
+    return base;
+  };
+  if row.custom_height {
+    return base;
+  }
+  let mut height = base;
+  for (cell_position, cell) in row.cells.iter().enumerate() {
+    if cell.display_text.is_empty() {
+      continue;
+    }
+    let address = cell.address().unwrap_or(CellAddress {
+      col: cell_position as u32 + 1,
+      row: row_index,
+    });
+    let style_index = sheet.effective_cell_style_index(row, cell, address);
+    let Some(alignment) = import.styles.alignment_for_cell(style_index) else {
+      continue;
+    };
+    if !alignment.wrap_text {
+      continue;
+    }
+    let style = import.styles.text_style_for_cell(style_index);
+    let line_count = wrapped_print_line_count(
+      &cell.display_text,
+      sheet.column_width_pt(address.col),
+      &style,
+    );
+    if line_count > 1 {
+      // Source: LibreOffice sc/source/core/data/column2.cxx
+      // ScColumn::GetOptimalHeight uses GetNeededSize() for line-break cells;
+      // one text line follows lcl_GetAttribHeight() at 1.18 * font height.
+      height = height.max(style.font_size_pt * 1.18 * line_count as f32);
+    }
+  }
+  height
+}
+
+fn wrapped_print_line_count(text: &str, column_width_pt: f32, style: &TextStyle) -> usize {
+  let available = (column_width_pt - CALC_CELL_TEXT_MARGIN_PT).max(1.0);
+  let mut lines = 0usize;
+  for paragraph in text.split(['\n', '\r']) {
+    if paragraph.is_empty() {
+      lines += 1;
+      continue;
+    }
+    let mut current_width = 0.0f32;
+    for word in paragraph.split_whitespace() {
+      let word_width = text_metrics::measure_text(word, style);
+      let separator_width = if current_width > 0.0 {
+        text_metrics::measure_text(" ", style)
+      } else {
+        0.0
+      };
+      if current_width > 0.0 && current_width + separator_width + word_width > available {
+        lines += 1;
+        current_width = word_width;
+      } else {
+        current_width += separator_width + word_width;
+      }
+    }
+    lines += 1;
+  }
+  lines.max(1)
 }
 
 fn axis_slice(area: CellRange, by_row: bool, start: u32, end: u32) -> CellRange {
@@ -2361,11 +2449,29 @@ impl NumberFormatPattern {
     };
     let mut in_quote = false;
     let mut escaped = false;
+    let mut skip_next = false;
+    let mut emit_next_fill = false;
     let mut after_decimal = false;
     let mut seen_digit = false;
     let mut literal_prefix = true;
     let mut integer_pattern = String::new();
     for ch in section.chars() {
+      if skip_next {
+        skip_next = false;
+        continue;
+      }
+      if emit_next_fill {
+        if !after_decimal && !literal_prefix {
+          integer_pattern.push(ch);
+        }
+        if literal_prefix {
+          pattern.prefix.push(ch);
+        } else if seen_digit && after_decimal {
+          pattern.suffix.push(ch);
+        }
+        emit_next_fill = false;
+        continue;
+      }
       if escaped {
         if !after_decimal && !literal_prefix {
           integer_pattern.push('\\');
@@ -2381,12 +2487,8 @@ impl NumberFormatPattern {
       }
       match ch {
         '\\' => escaped = true,
-        '_' | '*' => {
-          if !after_decimal {
-            integer_pattern.push(ch);
-          }
-          escaped = true;
-        }
+        '_' => skip_next = true,
+        '*' => emit_next_fill = true,
         '"' => in_quote = !in_quote,
         _ if in_quote => {
           if !after_decimal && !literal_prefix {
@@ -2553,7 +2655,8 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   } else {
     integer.to_string()
   };
-  let fraction = render_fraction_pattern(&pattern.section, fraction).unwrap_or_else(|| {
+  let rendered_fraction = render_fraction_pattern(&pattern.section, fraction);
+  let fraction = rendered_fraction.clone().unwrap_or_else(|| {
     if pattern.decimals > 0 {
       let mut output = String::from(".");
       output.push_str(fraction);
@@ -2567,8 +2670,10 @@ fn format_decimal_value(value: f64, pattern: &NumberFormatPattern) -> String {
   output.push_str(&pattern.prefix);
   output.push_str(&integer);
   output.push_str(&fraction);
-  output.push_str(&pattern.suffix);
-  output.trim_end().to_string()
+  if rendered_fraction.is_none() {
+    output.push_str(&pattern.suffix);
+  }
+  output.trim().to_string()
 }
 
 fn format_fraction_value(value: f64, section: &str) -> Option<String> {
@@ -3461,6 +3566,14 @@ fn column_name_to_index(value: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+  use std::fs::File;
+
+  use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+  use ooxmlsdk::sdk::{
+    FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
+    OpenSettings,
+  };
+
   use super::*;
 
   #[test]
@@ -3506,5 +3619,63 @@ mod tests {
       .0,
       "Tuesday, March 1, 1904"
     );
+  }
+
+  #[test]
+  fn accounting_format_controls_are_not_visible_text() {
+    // Source: LibreOffice SvNumberFormatter treats '_' and '*' as spacing
+    // controls. They reserve width but do not emit the following character.
+    assert_eq!(
+      rendered_number_text(
+        "1",
+        Some("_(\"$\"* #,##0.00_);_(\"$\"* \\(#,##0.00\\);_(\"$\"* \"-\"??_);_(@_)"),
+        None,
+        false
+      )
+      .0,
+      "$ 1.00"
+    );
+    assert_eq!(
+      rendered_number_text(
+        "2.75",
+        Some("_-* #,##0.00\\ \"Ft\"_-;\\-* #,##0.00\\ \"Ft\"_-;_-* \"-\"??\\ \"Ft\"_-;_-@_-"),
+        None,
+        false
+      )
+      .0,
+      "2.75 Ft"
+    );
+  }
+
+  #[test]
+  fn tdf100709_imports_plain_values_in_print_pages() {
+    // Source: ../core/sc/qa/unit/subsequent_filters_test2.cxx:
+    // testTdf100709XLSX asserts that B52 and A75 stay plain "218".
+    let settings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        target_file_format_version: FileFormatVersion::Microsoft365,
+      },
+      ..Default::default()
+    };
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/tdf100709.xlsx");
+    let mut document =
+      SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
+    let import = super::super::import::ExcelImport::import_document(
+      &mut document,
+      &crate::options::PdfOptions::default(),
+    )
+    .unwrap();
+    let print = CalcPrintDocument::from_import(&import);
+    assert_eq!(print.pages.len(), 2);
+    let text = print
+      .pages
+      .iter()
+      .flat_map(|page| page.cells.iter().map(|cell| cell.rendered_text.as_str()))
+      .collect::<Vec<_>>()
+      .join(" ");
+    assert!(text.contains("65 218"));
+    assert!(text.contains("05-Mar-00 218"));
   }
 }

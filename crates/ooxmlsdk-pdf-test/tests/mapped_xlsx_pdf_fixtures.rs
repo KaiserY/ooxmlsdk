@@ -34,6 +34,17 @@ fn assert_page_contains(summary: &PdfSummary, page_index: usize, expected: &str)
   );
 }
 
+fn assert_page_contains_any(summary: &PdfSummary, page_index: usize, expected: &[&str]) {
+  let text = page_text(summary, page_index);
+  let normalized_text = normalize_space(&text);
+  assert!(
+    expected
+      .iter()
+      .any(|item| normalized_text.contains(&normalize_space(item))),
+    "missing page {page_index} text any of {expected:?}; page text:\n{text}"
+  );
+}
+
 fn assert_page_not_contains(summary: &PdfSummary, page_index: usize, unexpected: &str) {
   let text = page_text(summary, page_index);
   let normalized_text = normalize_space(&text);
@@ -551,8 +562,13 @@ fn mapped_xlsx_date_autofilter_keeps_filtered_date_rows_visible() {
 fn mapped_xlsx_autofilter_colors_keeps_background_filtered_rows() {
   let summary = render_summary("autofilter-colors.xlsx");
   assert_eq!(summary.page_count, 1);
-  // LibreOffice PDF text extraction keeps these adjacent header cells joined.
-  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  // LibreOffice pdftotext keeps the first two adjacent header cells joined;
+  // PDFium may segment the same positioned text with an extracted space.
+  assert_page_contains_any(
+    &summary,
+    0,
+    &["BackgroundForeground Both", "Background Foreground Both"],
+  );
   assert_page_contains(&summary, 0, "2 2 2");
   assert_page_contains(&summary, 0, "3 3 3");
   assert_page_not_contains(&summary, 0, "1 1 1");
@@ -563,8 +579,13 @@ fn mapped_xlsx_autofilter_colors_keeps_background_filtered_rows() {
 fn mapped_xlsx_autofilter_colors_fg_keeps_foreground_filtered_rows() {
   let summary = render_summary("autofilter-colors-fg.xlsx");
   assert_eq!(summary.page_count, 1);
-  // LibreOffice PDF text extraction keeps these adjacent header cells joined.
-  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  // LibreOffice pdftotext keeps the first two adjacent header cells joined;
+  // PDFium may segment the same positioned text with an extracted space.
+  assert_page_contains_any(
+    &summary,
+    0,
+    &["BackgroundForeground Both", "Background Foreground Both"],
+  );
   assert_page_contains(&summary, 0, "1 1 1");
   assert_page_contains(&summary, 0, "2 2 2");
   assert_page_contains(&summary, 0, "3 3 3");
@@ -1843,8 +1864,11 @@ fn mapped_xlsx_tdf164417_keeps_autofilter_date_rows_visible() {
   let summary = render_summary("tdf164417.xlsx");
   assert_eq!(summary.page_count, 2);
   assert_page_contains(&summary, 0, "Num Text Date");
-  assert_page_contains(&summary, 0, "1a 31/12/24");
-  assert_page_contains(&summary, 0, "2a 31/12/2024 (text)");
+  // Upstream verifies that both filtered date rows survive export. PDFium
+  // segments the adjacent A/B cell text with a space, unlike LO's pdftotext
+  // output that may join the positioned glyphs as "1a"/"2a".
+  assert_page_contains(&summary, 0, "1 a 31/12/24");
+  assert_page_contains(&summary, 0, "2 a 31/12/2024 (text)");
 }
 
 #[test]

@@ -20,7 +20,9 @@ use super::print::{CalcPrintDocument, CalcPrintPage};
 use super::worksheet::{CalcSheet, CellAddress, CellRange, CellRect, SheetType};
 
 const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
-const XLSX_CELL_TEXT_INSET_PT: f32 = 2.0;
+// Source: LibreOffice svx/source/items/algitem.cxx SvxMarginItem default
+// margins are 20 twips on each side.
+const XLSX_CELL_TEXT_INSET_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
 const XLSX_GRID_LINE_WIDTH_PT: f32 = 0.25;
 
 #[derive(Clone, Debug)]

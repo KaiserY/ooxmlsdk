@@ -39,6 +39,7 @@ pub(crate) struct WorkbookCatalog {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ExternalCachedCell {
+  pub(crate) link_index: usize,
   pub(crate) sheet_name: String,
   pub(crate) reference: String,
   pub(crate) value: String,
@@ -300,9 +301,20 @@ impl WorkbookCatalog {
     // Source: LibreOffice sc/source/filter/oox/workbookfragment.cxx
     // finalizeImport imports persons, connections, custom XML, xmlMaps,
     // external links, revisions, and VBA through workbook-level relationships.
-    let external_parts = workbook_part
-      .external_workbook_parts(package)
-      .collect::<Vec<_>>();
+    let external_reference_ids = workbook_part
+      .root_element(package)?
+      .external_references
+      .as_ref()
+      .map(|references| {
+        references
+          .external_reference
+          .iter()
+          .map(|reference| reference.id.clone())
+          .collect::<Vec<_>>()
+      })
+      .unwrap_or_default();
+    let external_parts =
+      ordered_external_workbook_parts(package, workbook_part, &external_reference_ids);
     let person_parts = workbook_part
       .workbook_person_parts(package)
       .collect::<Vec<_>>();
@@ -317,7 +329,8 @@ impl WorkbookCatalog {
       .collect::<Result<Vec<_>>>()?;
     let external_cached_cells = external_parts
       .iter()
-      .map(|part| external_cached_cells_from_part(package, part))
+      .enumerate()
+      .map(|(index, part)| external_cached_cells_from_part(package, part, index + 1))
       .collect::<Result<Vec<_>>>()?
       .into_iter()
       .flatten()
@@ -343,9 +356,39 @@ impl WorkbookCatalog {
   }
 }
 
+fn ordered_external_workbook_parts(
+  package: &SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+  reference_ids: &[String],
+) -> Vec<ExternalWorkbookPart> {
+  let parts = workbook_part
+    .external_workbook_parts(package)
+    .collect::<Vec<_>>();
+  if reference_ids.is_empty() {
+    return parts;
+  }
+
+  let mut ordered = Vec::with_capacity(parts.len());
+  for reference_id in reference_ids {
+    if let Some(part) = parts
+      .iter()
+      .find(|part| workbook_part.get_id_of_part(package, *part) == Some(reference_id.as_str()))
+    {
+      ordered.push(part.clone());
+    }
+  }
+  for part in parts {
+    if !ordered.iter().any(|ordered_part| ordered_part == &part) {
+      ordered.push(part);
+    }
+  }
+  ordered
+}
+
 fn external_cached_cells_from_part(
   package: &mut SpreadsheetDocument,
   part: &ExternalWorkbookPart,
+  link_index: usize,
 ) -> Result<Vec<ExternalCachedCell>> {
   let link = part.root_element(package)?;
   let Some(x::ExternalLinkChoice::ExternalBook(book)) = &link.external_link_choice else {
@@ -379,6 +422,7 @@ fn external_cached_cells_from_part(
           .and_then(|value| value.xml_content.clone())
         {
           cells.push(ExternalCachedCell {
+            link_index,
             sheet_name: sheet_name.clone(),
             reference: cell.cell_reference.clone(),
             value,

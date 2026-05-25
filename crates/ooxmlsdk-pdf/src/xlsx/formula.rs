@@ -7,6 +7,8 @@ use super::workbook_catalog::WorkbookCatalog;
 use super::worksheet::{CalcCell, CalcSheet, CellAddress, CellRange};
 
 const MAX_EXPANDED_RANGE_CELLS: u64 = 20_000;
+const XLSX_MAX_COLUMN: u32 = 16_384;
+const XLSX_MAX_ROW: u32 = 1_048_576;
 
 pub(crate) fn recalculate_formula_cells(
   sheets: &mut [CalcSheet],
@@ -27,6 +29,7 @@ pub(crate) fn recalculate_formula_cells(
           book: &book,
           sheet_index,
           source_file_name,
+          current_address: Some(formula_cell.address),
           locals: HashMap::new(),
         };
         let Some(value) = evaluator.eval_formula(&formula_cell.formula) else {
@@ -266,7 +269,7 @@ struct FormulaBook {
   formulas: HashMap<(usize, CellAddress), FormulaText>,
   hidden_rows: HashSet<(usize, u32)>,
   filtered_rows: HashSet<(usize, u32)>,
-  external_cells: HashMap<(String, CellAddress), Value>,
+  external_cells: HashMap<(usize, String, CellAddress), Value>,
   tables: HashMap<String, TableModel>,
   defined: DefinedNames,
 }
@@ -396,6 +399,7 @@ impl FormulaBook {
         .filter_map(|cell| {
           Some((
             (
+              cell.link_index,
               cell.sheet_name.to_ascii_uppercase(),
               CellAddress::parse_a1(&cell.reference)?,
             ),
@@ -424,10 +428,18 @@ impl FormulaBook {
       .unwrap_or(Value::Blank)
   }
 
-  fn external_cell(&self, sheet_name: &str, address: CellAddress) -> Value {
+  fn external_cell(
+    &self,
+    link_index: Option<usize>,
+    sheet_name: &str,
+    address: CellAddress,
+  ) -> Value {
+    let Some(link_index) = link_index else {
+      return Value::Blank;
+    };
     self
       .external_cells
-      .get(&(sheet_name.to_ascii_uppercase(), address))
+      .get(&(link_index, sheet_name.to_ascii_uppercase(), address))
       .cloned()
       .unwrap_or(Value::Blank)
   }
@@ -489,6 +501,7 @@ enum Value {
 #[derive(Clone, Debug, PartialEq)]
 struct Reference {
   sheet_index: Option<usize>,
+  external_link_index: Option<usize>,
   external_sheet_name: Option<String>,
   range: CellRange,
 }
@@ -606,7 +619,7 @@ fn first_range_value(book: &FormulaBook, reference: &Reference) -> Value {
 
 fn reference_cell_value(book: &FormulaBook, reference: &Reference, address: CellAddress) -> Value {
   if let Some(sheet_name) = reference.external_sheet_name.as_deref() {
-    return book.external_cell(sheet_name, address);
+    return book.external_cell(reference.external_link_index, sheet_name, address);
   }
   reference
     .sheet_index
@@ -835,6 +848,7 @@ struct Evaluator<'a> {
   book: &'a FormulaBook,
   sheet_index: usize,
   source_file_name: Option<&'a str>,
+  current_address: Option<CellAddress>,
   locals: HashMap<String, Value>,
 }
 
@@ -912,7 +926,9 @@ fn range_intersection_value(book: &FormulaBook, left: Value, right: Value) -> Va
   let (Value::Range(left), Value::Range(right)) = (left, right) else {
     return Value::Error("#VALUE!".to_string());
   };
-  if left.sheet_index != right.sheet_index || left.external_sheet_name != right.external_sheet_name
+  if left.sheet_index != right.sheet_index
+    || left.external_link_index != right.external_link_index
+    || left.external_sheet_name != right.external_sheet_name
   {
     return Value::Error("#VALUE!".to_string());
   }
@@ -1299,6 +1315,7 @@ impl<'a, 'b> Parser<'a, 'b> {
       "TIMEVALUE" => Some(timevalue(&args.first()?.text(self.evaluator.book))),
       "INDIRECT" => self.resolve_indirect(args.first()?),
       "INDEX" => self.eval_index(&args),
+      "OFFSET" => self.eval_offset(&args),
       "SUBTOTAL" => self.eval_subtotal(&args),
       "AGGREGATE" => self.eval_aggregate(&args),
       "MID" => {
@@ -1413,19 +1430,35 @@ impl<'a, 'b> Parser<'a, 'b> {
   }
 
   fn eval_let_raw(&mut self, args: Vec<String>) -> Option<Value> {
-    if args.len() < 3 {
-      return None;
+    // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScInterpreter::ScLet().
+    // LET takes name/value pairs followed by a final calculation. Duplicate
+    // names inside one LET are illegal, and the bindings are scoped to the
+    // current LET expression.
+    if args.len() < 3 || args.len() % 2 == 0 {
+      return Some(Value::Error("#VALUE!".to_string()));
     }
+    let mut local_names = HashSet::new();
+    let mut saved_values = Vec::new();
     let mut index = 0;
     while index + 2 < args.len() {
       let name = args[index]
         .trim_start_matches("_xlpm.")
         .to_ascii_uppercase();
-      let value = self.evaluator.eval_formula(&args[index + 1])?;
-      self.evaluator.locals.insert(name, value);
+      if name.is_empty() || !local_names.insert(name.clone()) {
+        restore_let_locals(&mut self.evaluator.locals, saved_values);
+        return Some(Value::Error("#VALUE!".to_string()));
+      }
+      let Some(value) = self.evaluator.eval_formula(&args[index + 1]) else {
+        restore_let_locals(&mut self.evaluator.locals, saved_values);
+        return None;
+      };
+      let old_value = self.evaluator.locals.insert(name.clone(), value);
+      saved_values.push((name, old_value));
       index += 2;
     }
-    self.evaluator.eval_formula(args.last()?)
+    let result = self.evaluator.eval_formula(args.last()?);
+    restore_let_locals(&mut self.evaluator.locals, saved_values);
+    result
   }
 
   fn eval_if_raw(&mut self, args: Vec<String>) -> Option<Value> {
@@ -2369,6 +2402,56 @@ impl<'a, 'b> Parser<'a, 'b> {
     ))
   }
 
+  fn eval_offset(&self, args: &[Value]) -> Option<Value> {
+    // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScInterpreter::ScOffset().
+    // OFFSET keeps reference identity and shifts/resizes the input reference.
+    if !(3..=5).contains(&args.len()) {
+      return None;
+    }
+    let reference = as_reference(args.first()?)?;
+    let row_offset = args.get(1)?.number(self.evaluator.book)? as i64;
+    let col_offset = args.get(2)?.number(self.evaluator.book)? as i64;
+    let height = args
+      .get(3)
+      .and_then(|value| value.number(self.evaluator.book))
+      .map(|value| value as i64)
+      .unwrap_or_else(|| i64::from(reference.range.end.row - reference.range.start.row + 1));
+    let width = args
+      .get(4)
+      .and_then(|value| value.number(self.evaluator.book))
+      .map(|value| value as i64)
+      .unwrap_or_else(|| i64::from(reference.range.end.col - reference.range.start.col + 1));
+    if width <= 0 || height <= 0 {
+      return Some(Value::Error("#VALUE!".to_string()));
+    }
+    let start_col = i64::from(reference.range.start.col) + col_offset;
+    let start_row = i64::from(reference.range.start.row) + row_offset;
+    let end_col = start_col + width - 1;
+    let end_row = start_row + height - 1;
+    if start_col < 1
+      || start_row < 1
+      || end_col > i64::from(XLSX_MAX_COLUMN)
+      || end_row > i64::from(XLSX_MAX_ROW)
+    {
+      return Some(Value::Error("#VALUE!".to_string()));
+    }
+    Some(Value::Range(Reference {
+      sheet_index: reference.sheet_index,
+      external_link_index: reference.external_link_index,
+      external_sheet_name: reference.external_sheet_name,
+      range: CellRange::new(
+        CellAddress {
+          col: start_col as u32,
+          row: start_row as u32,
+        },
+        CellAddress {
+          col: end_col as u32,
+          row: end_row as u32,
+        },
+      ),
+    }))
+  }
+
   fn eval_vlookup(&self, args: &[Value]) -> Option<Value> {
     let lookup = args.first()?.text(self.evaluator.book);
     let reference = as_reference(args.get(1)?)?;
@@ -2427,6 +2510,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         book: self.evaluator.book,
         sheet_index: self.evaluator.sheet_index,
         source_file_name: self.evaluator.source_file_name,
+        current_address: self.evaluator.current_address,
         locals: self.evaluator.locals.clone(),
       };
       return evaluator.eval_formula(formula);
@@ -2435,8 +2519,13 @@ impl<'a, 'b> Parser<'a, 'b> {
   }
 
   fn resolve_reference(&self, reference: &str) -> Option<Value> {
-    parse_qualified_reference(self.evaluator.book, self.evaluator.sheet_index, reference)
-      .map(Value::Range)
+    parse_qualified_reference(
+      self.evaluator.book,
+      self.evaluator.sheet_index,
+      self.evaluator.current_address,
+      reference,
+    )
+    .map(Value::Range)
   }
 
   fn parse_reference_token(&mut self) -> Option<String> {
@@ -2480,7 +2569,25 @@ impl<'a, 'b> Parser<'a, 'b> {
       }
       self.consume("]");
     }
-    while self.peek().is_some_and(is_ref_char) {
+    let mut table_ref_depth = 0i32;
+    while let Some(ch) = self.peek() {
+      if table_ref_depth > 0 {
+        match ch {
+          '[' => table_ref_depth += 1,
+          ']' => table_ref_depth -= 1,
+          _ => {}
+        }
+        self.position += 1;
+        continue;
+      }
+      if ch == '[' {
+        table_ref_depth += 1;
+        self.position += 1;
+        continue;
+      }
+      if !is_ref_char(ch) {
+        break;
+      }
       self.position += 1;
     }
     if self.position == start {
@@ -2681,6 +2788,19 @@ fn aggregate_options(option: i32) -> Option<AggregateOptions> {
     },
     _ => return None,
   })
+}
+
+fn restore_let_locals(
+  locals: &mut HashMap<String, Value>,
+  saved_values: Vec<(String, Option<Value>)>,
+) {
+  for (name, value) in saved_values.into_iter().rev() {
+    if let Some(value) = value {
+      locals.insert(name, value);
+    } else {
+      locals.remove(&name);
+    }
+  }
 }
 
 fn numeric_values(book: &FormulaBook, args: &[Value]) -> Vec<f64> {
@@ -3140,7 +3260,35 @@ fn expand_values<'a>(book: &'a FormulaBook, args: &'a [Value]) -> impl Iterator<
 
 fn range_values(book: &FormulaBook, reference: &Reference) -> Vec<Value> {
   if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
-    return Vec::new();
+    let mut addresses = if let Some(sheet_index) = reference.sheet_index {
+      book
+        .cells
+        .keys()
+        .filter_map(|(cell_sheet_index, address)| {
+          (*cell_sheet_index == sheet_index && reference.range.contains(*address))
+            .then_some(*address)
+        })
+        .collect::<Vec<_>>()
+    } else if let Some(sheet_name) = reference.external_sheet_name.as_deref() {
+      let sheet_name = sheet_name.to_ascii_uppercase();
+      book
+        .external_cells
+        .keys()
+        .filter_map(|(link_index, cell_sheet_name, address)| {
+          (Some(*link_index) == reference.external_link_index
+            && *cell_sheet_name == sheet_name
+            && reference.range.contains(*address))
+          .then_some(*address)
+        })
+        .collect::<Vec<_>>()
+    } else {
+      Vec::new()
+    };
+    addresses.sort_by_key(|address| (address.row, address.col));
+    return addresses
+      .into_iter()
+      .map(|address| reference_cell_value(book, reference, address))
+      .collect();
   }
   let mut values = Vec::new();
   for row in reference.range.start.row..=reference.range.end.row {
@@ -3785,19 +3933,21 @@ fn as_reference(value: &Value) -> Option<Reference> {
 fn parse_qualified_reference(
   book: &FormulaBook,
   default_sheet: usize,
+  current_address: Option<CellAddress>,
   reference: &str,
 ) -> Option<Reference> {
   let mut text = reference.trim();
-  let is_external = text.starts_with('[');
-  if is_external {
+  let external_link_index = parse_external_reference_index(text);
+  if external_link_index.is_some() {
     text = text.split_once(']')?.1;
   }
   if let Some((sheet, range)) = text.rsplit_once('!') {
     let sheet = sheet.rsplit(':').next().unwrap_or(sheet).trim_matches('\'');
-    let range = CellRange::parse_a1_range(range)?;
-    if is_external {
+    let range = parse_formula_a1_range(range)?;
+    if external_link_index.is_some() {
       return Some(Reference {
         sheet_index: None,
+        external_link_index,
         external_sheet_name: Some(sheet.to_string()),
         range,
       });
@@ -3805,83 +3955,266 @@ fn parse_qualified_reference(
     let sheet_index = book.sheet_index(sheet).unwrap_or(default_sheet);
     return Some(Reference {
       sheet_index: Some(sheet_index),
+      external_link_index: None,
       external_sheet_name: None,
       range,
     });
   }
-  if is_external {
+  if external_link_index.is_some() {
     return None;
   }
-  if let Some(table) = parse_table_reference(book, text) {
+  if let Some(table) = parse_table_reference(book, text, current_address) {
     return Some(table);
   }
-  CellRange::parse_a1_range(text).map(|range| Reference {
+  parse_formula_a1_range(text).map(|range| Reference {
     sheet_index: Some(default_sheet),
+    external_link_index: None,
     external_sheet_name: None,
     range,
   })
 }
 
-fn parse_table_reference(book: &FormulaBook, text: &str) -> Option<Reference> {
+fn parse_external_reference_index(reference: &str) -> Option<usize> {
+  let (index, _) = reference.strip_prefix('[')?.split_once(']')?;
+  let index = index.parse::<usize>().ok()?;
+  (index > 0).then_some(index)
+}
+
+fn parse_formula_a1_range(reference: &str) -> Option<CellRange> {
+  if let Some(range) = CellRange::parse_a1_range(reference) {
+    return Some(range);
+  }
+  let reference = reference.trim();
+  let reference = reference
+    .rsplit_once('!')
+    .map_or(reference, |(_, range)| range)
+    .trim_matches('\'');
+  let (start, end) = reference.split_once(':')?;
+  let start = start.trim_matches('$');
+  let end = end.trim_matches('$');
+  if start.chars().all(|ch| ch.is_ascii_alphabetic())
+    && end.chars().all(|ch| ch.is_ascii_alphabetic())
+  {
+    return Some(CellRange::new(
+      CellAddress {
+        col: column_name_to_index(start)?,
+        row: 1,
+      },
+      CellAddress {
+        col: column_name_to_index(end)?,
+        row: XLSX_MAX_ROW,
+      },
+    ));
+  }
+  if start.chars().all(|ch| ch.is_ascii_digit()) && end.chars().all(|ch| ch.is_ascii_digit()) {
+    let start_row = start.parse::<u32>().ok()?;
+    let end_row = end.parse::<u32>().ok()?;
+    if start_row == 0 || end_row == 0 || start_row > XLSX_MAX_ROW || end_row > XLSX_MAX_ROW {
+      return None;
+    }
+    return Some(CellRange::new(
+      CellAddress {
+        col: 1,
+        row: start_row,
+      },
+      CellAddress {
+        col: XLSX_MAX_COLUMN,
+        row: end_row,
+      },
+    ));
+  }
+  None
+}
+
+fn column_name_to_index(name: &str) -> Option<u32> {
+  let mut col = 0u32;
+  for ch in name.chars() {
+    if !ch.is_ascii_alphabetic() {
+      return None;
+    }
+    col = col
+      .saturating_mul(26)
+      .saturating_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
+  }
+  (col > 0 && col <= XLSX_MAX_COLUMN).then_some(col)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TableReferenceItems(u8);
+
+impl TableReferenceItems {
+  const TABLE: Self = Self(0);
+  const ALL: Self = Self(1);
+  const HEADERS: Self = Self(2);
+  const DATA: Self = Self(4);
+  const TOTALS: Self = Self(8);
+  const THIS_ROW: Self = Self(16);
+
+  fn add(&mut self, item: Self) {
+    self.0 |= item.0;
+  }
+
+  fn contains(self, item: Self) -> bool {
+    self.0 & item.0 != 0
+  }
+}
+
+fn parse_table_reference(
+  book: &FormulaBook,
+  text: &str,
+  current_address: Option<CellAddress>,
+) -> Option<Reference> {
   let (table_name, selector) = text.split_once('[')?;
   let table = book.tables.get(&table_name.to_ascii_uppercase())?;
-  let selector = selector.trim_end_matches(']');
-  if selector.contains("#Headers") {
-    return Some(Reference {
-      sheet_index: Some(table.sheet_index),
-      external_sheet_name: None,
-      range: CellRange::new(
-        table.range.start,
-        CellAddress {
-          col: table.range.end.col,
-          row: table.range.start.row,
-        },
-      ),
-    });
+  let specifiers = table_reference_specifiers(selector)?;
+  let mut items = TableReferenceItems::TABLE;
+  let mut columns = Vec::new();
+  for specifier in specifiers {
+    match specifier.to_ascii_uppercase().as_str() {
+      "#ALL" => items.add(TableReferenceItems::ALL),
+      "#HEADERS" => items.add(TableReferenceItems::HEADERS),
+      "#DATA" => items.add(TableReferenceItems::DATA),
+      "#TOTALS" => items.add(TableReferenceItems::TOTALS),
+      "#THIS ROW" => items.add(TableReferenceItems::THIS_ROW),
+      _ => columns.push(specifier),
+    }
   }
-  if selector.contains("#Totals") {
-    return Some(Reference {
-      sheet_index: Some(table.sheet_index),
-      external_sheet_name: None,
-      range: CellRange::new(
-        CellAddress {
-          col: table.range.start.col,
-          row: table.range.end.row,
-        },
-        table.range.end,
-      ),
-    });
-  }
-  let column = selector
-    .rsplit(',')
-    .next()
-    .unwrap_or(selector)
-    .trim_matches('[')
-    .trim_matches(']')
-    .trim_matches('\'');
-  let column_index = table
-    .columns
-    .iter()
-    .position(|name| name.eq_ignore_ascii_case(column))? as u32;
-  let data_start_row = table.range.start.row + table.header_rows;
-  let data_end_row = table.range.end.row.saturating_sub(table.totals_rows);
-  if data_start_row > data_end_row {
-    return None;
+  let mut range = table_reference_item_range(table, items, current_address)?;
+  if !columns.is_empty() {
+    let start = table_reference_column_offset(table, &columns[0])?;
+    let end = columns
+      .last()
+      .and_then(|column| table_reference_column_offset(table, column))?;
+    let first = start.min(end);
+    let last = start.max(end);
+    range.start.col = table.range.start.col + first;
+    range.end.col = table.range.start.col + last;
   }
   Some(Reference {
     sheet_index: Some(table.sheet_index),
+    external_link_index: None,
     external_sheet_name: None,
-    range: CellRange::new(
-      CellAddress {
-        col: table.range.start.col + column_index,
-        row: data_start_row,
-      },
-      CellAddress {
-        col: table.range.start.col + column_index,
-        row: data_end_row,
-      },
-    ),
+    range,
   })
+}
+
+fn table_reference_item_range(
+  table: &TableModel,
+  items: TableReferenceItems,
+  current_address: Option<CellAddress>,
+) -> Option<CellRange> {
+  let mut start_row = table.range.start.row;
+  let mut end_row = table.range.end.row;
+  if items.contains(TableReferenceItems::THIS_ROW) {
+    let row = current_address?.row;
+    if row < start_row || row > end_row {
+      return None;
+    }
+    start_row = row;
+    end_row = row;
+  } else if items.contains(TableReferenceItems::ALL) {
+  } else if items.contains(TableReferenceItems::HEADERS)
+    && !items.contains(TableReferenceItems::DATA)
+    && !items.contains(TableReferenceItems::TOTALS)
+  {
+    if table.header_rows == 0 {
+      return None;
+    }
+    end_row = start_row + table.header_rows - 1;
+  } else if items.contains(TableReferenceItems::TOTALS)
+    && !items.contains(TableReferenceItems::HEADERS)
+    && !items.contains(TableReferenceItems::DATA)
+  {
+    if table.totals_rows == 0 {
+      return None;
+    }
+    start_row = end_row + 1 - table.totals_rows;
+  } else {
+    if !items.contains(TableReferenceItems::HEADERS) && table.header_rows > 0 {
+      start_row += table.header_rows;
+    }
+    if !items.contains(TableReferenceItems::TOTALS) && table.totals_rows > 0 {
+      end_row = end_row.saturating_sub(table.totals_rows);
+    }
+  }
+  if start_row > end_row {
+    return None;
+  }
+  Some(CellRange::new(
+    CellAddress {
+      col: table.range.start.col,
+      row: start_row,
+    },
+    CellAddress {
+      col: table.range.end.col,
+      row: end_row,
+    },
+  ))
+}
+
+fn table_reference_column_offset(table: &TableModel, column: &str) -> Option<u32> {
+  let column = unescape_table_reference_column(column);
+  table
+    .columns
+    .iter()
+    .position(|name| name.eq_ignore_ascii_case(&column))
+    .map(|index| index as u32)
+}
+
+fn table_reference_specifiers(selector_tail: &str) -> Option<Vec<String>> {
+  let selector = selector_tail.trim();
+  let selector = selector.strip_suffix(']')?;
+  if !selector.starts_with('[') {
+    return Some(vec![unescape_table_reference_column(selector)]);
+  }
+  let mut specifiers = Vec::new();
+  let mut depth = 0i32;
+  let mut start = None;
+  let chars: Vec<char> = selector.chars().collect();
+  for (index, ch) in chars.iter().enumerate() {
+    match ch {
+      '[' => {
+        if depth == 0 {
+          start = Some(index + 1);
+        }
+        depth += 1;
+      }
+      ']' => {
+        depth -= 1;
+        if depth == 0 {
+          let start = start.take()?;
+          specifiers.push(chars[start..index].iter().collect::<String>());
+        }
+      }
+      _ => {}
+    }
+  }
+  if depth != 0 {
+    return None;
+  }
+  if specifiers.is_empty() {
+    Some(vec![unescape_table_reference_column(selector)])
+  } else {
+    Some(specifiers)
+  }
+}
+
+fn unescape_table_reference_column(value: &str) -> String {
+  // Source: LibreOffice sc/source/core/tool/compiler.cxx
+  // unescapeTableRefColumnSpecifier(): '#', '[', ']' and '\'' are escaped with '\''.
+  let mut result = String::new();
+  let mut escaped = false;
+  for ch in value.chars() {
+    if escaped {
+      result.push(ch);
+      escaped = false;
+    } else if ch == '\'' {
+      escaped = true;
+    } else {
+      result.push(ch);
+    }
+  }
+  result
 }
 
 #[cfg(test)]
@@ -4012,6 +4345,7 @@ mod tests {
       book,
       sheet_index,
       source_file_name: None,
+      current_address: None,
       locals: HashMap::new(),
     };
     match evaluator.eval_formula(formula).unwrap() {
@@ -4025,12 +4359,174 @@ mod tests {
       book,
       sheet_index,
       source_file_name: None,
+      current_address: None,
       locals: HashMap::new(),
     };
     match evaluator.eval_formula(formula).unwrap() {
       Value::Bool(value) => value,
       value => panic!("expected bool for {formula}, got {value:?}"),
     }
+  }
+
+  fn eval_value(book: &FormulaBook, sheet_index: usize, formula: &str) -> Value {
+    let mut evaluator = Evaluator {
+      book,
+      sheet_index,
+      source_file_name: None,
+      current_address: None,
+      locals: HashMap::new(),
+    };
+    evaluator.eval_formula(formula).unwrap()
+  }
+
+  #[test]
+  fn structured_reference_this_row_preserves_comma_column_names() {
+    let mut book = test_book();
+    book.tables.insert(
+      "MYTABLE1".to_string(),
+      TableModel {
+        sheet_index: 0,
+        range: CellRange::parse_a1_range("A1:C3").unwrap(),
+        header_rows: 1,
+        totals_rows: 0,
+        columns: vec![
+          "This is the first column".to_string(),
+          "This is the,second column".to_string(),
+          "Summing".to_string(),
+        ],
+      },
+    );
+    for (reference, value) in [("A2", 12.0), ("B2", 23.0), ("A3", 36.0), ("B3", 45.0)] {
+      book.cells.insert(
+        (0, CellAddress::parse_a1(reference).unwrap()),
+        Value::Number(value),
+      );
+    }
+    let mut evaluator = Evaluator {
+      book: &book,
+      sheet_index: 0,
+      source_file_name: None,
+      current_address: Some(CellAddress::parse_a1("C3").unwrap()),
+      locals: HashMap::new(),
+    };
+    assert_eq!(
+      evaluator
+        .eval_formula(
+          "MyTable1[[#This Row],[This is the first column]]+MyTable1[[#This Row],[This is the,second column]]"
+        )
+        .unwrap()
+        .number(&book),
+      Some(81.0)
+    );
+  }
+
+  #[test]
+  fn structured_reference_items_match_table_sections() {
+    let mut book = test_book();
+    book.tables.insert(
+      "MYDATA".to_string(),
+      TableModel {
+        sheet_index: 0,
+        range: CellRange::parse_a1_range("B4:D15").unwrap(),
+        header_rows: 1,
+        totals_rows: 1,
+        columns: vec![
+          "Surname".to_string(),
+          "Count".to_string(),
+          "Region".to_string(),
+        ],
+      },
+    );
+
+    let headers =
+      parse_qualified_reference(&book, 0, None, "myData[#Headers]").expect("headers ref");
+    assert_eq!(headers.range, CellRange::parse_a1_range("B4:D4").unwrap());
+    let data = parse_qualified_reference(&book, 0, None, "myData[#Data]").expect("data ref");
+    assert_eq!(data.range, CellRange::parse_a1_range("B5:D14").unwrap());
+    let totals = parse_qualified_reference(&book, 0, None, "myData[#Totals]").expect("totals ref");
+    assert_eq!(totals.range, CellRange::parse_a1_range("B15:D15").unwrap());
+  }
+
+  #[test]
+  fn offset_counts_whole_column_reference_like_calc() {
+    let mut book = test_book();
+    for (reference, value) in [
+      ("A1", Value::Text("a".to_string())),
+      ("A2", Value::Text("b".to_string())),
+      ("A3", Value::Text("c".to_string())),
+      ("A4", Value::Text("d".to_string())),
+      ("A5", Value::Text("e".to_string())),
+      ("B1", Value::Number(1.0)),
+      ("B2", Value::Number(2.0)),
+      ("B3", Value::Number(3.0)),
+      ("B4", Value::Number(4.0)),
+      ("B5", Value::Number(5.0)),
+      ("B6", Value::Number(6.0)),
+      ("B7", Value::Number(7.0)),
+      ("B8", Value::Number(8.0)),
+    ] {
+      book
+        .cells
+        .insert((0, CellAddress::parse_a1(reference).unwrap()), value);
+    }
+
+    assert_close(eval_number(&book, 0, "COUNTA($A:$A)"), 5.0);
+    assert_close(
+      eval_number(&book, 0, "SUM(OFFSET($B$1,3,0,COUNTA($A:$A)))"),
+      30.0,
+    );
+  }
+
+  #[test]
+  fn external_vlookup_uses_ooxml_external_link_index() {
+    let mut book = test_book();
+    book.cells.insert(
+      (0, CellAddress::parse_a1("B1").unwrap()),
+      Value::Text("C".to_string()),
+    );
+    for (link_index, result) in [(1, 111.0), (2, 222.0)] {
+      for (reference, value) in [
+        ("A1", Value::Text("A".to_string())),
+        ("B1", Value::Number(10.0)),
+        ("A2", Value::Text("B".to_string())),
+        ("B2", Value::Number(20.0)),
+        ("A3", Value::Text("C".to_string())),
+        ("B3", Value::Number(result)),
+      ] {
+        book.external_cells.insert(
+          (
+            link_index,
+            "SHEET1".to_string(),
+            CellAddress::parse_a1(reference).unwrap(),
+          ),
+          value,
+        );
+      }
+    }
+
+    assert_close(
+      eval_number(&book, 0, "VLOOKUP(B1,[1]Sheet1!A1:B3,2)"),
+      111.0,
+    );
+    assert_close(
+      eval_number(&book, 0, "VLOOKUP(B1,[2]Sheet1!A1:B3,2)"),
+      222.0,
+    );
+  }
+
+  #[test]
+  fn let_matches_libreoffice_argument_and_scope_rules() {
+    let book = test_book();
+    assert_close(eval_number(&book, 0, "LET(x,1,x+2)"), 3.0);
+    assert_close(eval_number(&book, 0, "LET(x,1,LET(x,2,x)+x)"), 3.0);
+    assert_eq!(
+      eval_value(&book, 0, "LET(x,1,x,2,x)"),
+      Value::Error("#VALUE!".to_string())
+    );
+    assert_eq!(
+      eval_value(&book, 0, "LET(x,1,y,2)"),
+      Value::Error("#VALUE!".to_string())
+    );
   }
 
   fn assert_close(actual: f64, expected: f64) {

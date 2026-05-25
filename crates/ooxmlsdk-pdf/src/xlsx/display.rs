@@ -254,7 +254,11 @@ fn render_cell_area(
       width_pt,
       height_pt,
     };
-    let measurement_style = import.styles.text_style_for_cell(cell.style_index);
+    let mut measurement_style = import.styles.text_style_for_cell(cell.style_index);
+    // Source: LibreOffice sc/source/ui/view/printfun.cxx InitModes() and
+    // sc/source/ui/view/output2.cxx ScDrawStringsVars::SetPattern(). Calc's
+    // print map mode scales cell geometry and the font used for measurement.
+    measurement_style.font_size_pt *= zoom_scale;
     let mut render_style = measurement_style.clone();
     if pivot_builtin_style.bold {
       render_style.bold = true;

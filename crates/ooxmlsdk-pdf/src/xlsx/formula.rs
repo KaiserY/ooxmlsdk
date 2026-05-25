@@ -47,9 +47,7 @@ pub(crate) fn recalculate_formula_cells(
         if !should_replace_formula_result(old_text, &value) {
           continue;
         }
-        if let Some(text) = value.display_text()
-          && replace_cell_text(&mut sheets[sheet_index], formula_cell.address, text)
-        {
+        if replace_cell_value(&mut sheets[sheet_index], formula_cell.address, &value) {
           changed = true;
         }
       }
@@ -149,9 +147,7 @@ fn apply_named_array_formulas(sheets: &mut [CalcSheet], defined: &DefinedNames) 
             .and_then(|row| row.get(col_offset))
             .cloned()
             .unwrap_or(Value::Blank);
-          if let Some(text) = value.display_text() {
-            replace_cell_text(&mut sheets[sheet_index], CellAddress { col, row }, text);
-          }
+          replace_cell_value(&mut sheets[sheet_index], CellAddress { col, row }, &value);
         }
       }
     }
@@ -196,16 +192,20 @@ fn cell_at_mut(sheet: &mut CalcSheet, address: CellAddress) -> Option<&mut CalcC
   })
 }
 
-fn replace_cell_text(sheet: &mut CalcSheet, address: CellAddress, text: String) -> bool {
+fn replace_cell_value(sheet: &mut CalcSheet, address: CellAddress, value: &Value) -> bool {
   let Some(cell) = cell_at_mut(sheet, address) else {
     return false;
   };
-  if cell.display_text == text {
+  let Some(display_text) = value.clone().display_text() else {
     return false;
+  };
+  let cached_value = value.cached_text();
+  let changed = cell.display_text != display_text || cell.cached_value != cached_value;
+  if changed {
+    cell.display_text = display_text;
+    cell.cached_value = cached_value;
   }
-  cell.display_text = text.clone();
-  cell.cached_value = Some(text);
-  true
+  changed
 }
 
 fn apply_array_formula_result(
@@ -235,10 +235,7 @@ fn apply_array_formula_result(
         ),
         _ => return false,
       };
-      let Some(text) = value.display_text() else {
-        continue;
-      };
-      if replace_cell_text(sheet, CellAddress { col, row }, text) {
+      if replace_cell_value(sheet, CellAddress { col, row }, &value) {
         changed = true;
       }
     }
@@ -268,6 +265,7 @@ struct FormulaBook {
   cells: HashMap<(usize, CellAddress), Value>,
   formulas: HashMap<(usize, CellAddress), FormulaText>,
   hidden_rows: HashSet<(usize, u32)>,
+  filtered_rows: HashSet<(usize, u32)>,
   external_cells: HashMap<(String, CellAddress), Value>,
   tables: HashMap<String, TableModel>,
   defined: DefinedNames,
@@ -324,19 +322,37 @@ impl FormulaBook {
     let mut cells = HashMap::new();
     let mut formulas = HashMap::new();
     let mut hidden_rows = HashSet::new();
+    let mut filtered_rows = HashSet::new();
     let mut tables = HashMap::new();
     for (sheet_index, sheet) in sheets.iter().enumerate() {
+      let filtered_range = sheet
+        .metrics
+        .settings
+        .properties
+        .filter_mode
+        .then(|| {
+          sheet
+            .metrics
+            .settings
+            .auto_filter
+            .as_ref()
+            .and_then(|filter| filter.reference.as_deref())
+            .and_then(CellRange::parse_a1_range)
+        })
+        .flatten();
       for (row_position, row) in sheet.rows.iter().enumerate() {
         let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
         if row.hidden {
           hidden_rows.insert((sheet_index, row_index));
+          if filtered_range
+            .is_some_and(|range| row_index >= range.start.row && row_index <= range.end.row)
+          {
+            filtered_rows.insert((sheet_index, row_index));
+          }
         }
         for cell in &row.cells {
           if let Some(address) = cell.address() {
-            cells.insert(
-              (sheet_index, address),
-              Value::from_cell_text(&cell.display_text),
-            );
+            cells.insert((sheet_index, address), formula_cell_value(cell));
           }
         }
       }
@@ -373,6 +389,7 @@ impl FormulaBook {
       cells,
       formulas,
       hidden_rows,
+      filtered_rows,
       external_cells: workbook_catalog
         .external_cached_cells
         .iter()
@@ -428,6 +445,10 @@ impl FormulaBook {
     self.hidden_rows.contains(&(sheet_index, row))
   }
 
+  fn row_filtered(&self, sheet_index: usize, row: u32) -> bool {
+    self.filtered_rows.contains(&(sheet_index, row))
+  }
+
   fn is_nested_aggregate(&self, sheet_index: usize, address: CellAddress) -> bool {
     self
       .formulas
@@ -441,6 +462,17 @@ impl FormulaBook {
         text.starts_with("SUBTOTAL(") || text.starts_with("AGGREGATE(")
       })
   }
+}
+
+fn formula_cell_value(cell: &CalcCell) -> Value {
+  // Source: LibreOffice sc/source/filter/oox/worksheethelper.cxx and
+  // shared-string import model: for t="s" the raw <v> is an SST index, while
+  // cached numeric/formula values carry the actual scalar value.
+  let text = match cell.data_type {
+    Some(x::CellValues::SharedString | x::CellValues::InlineString) => &cell.display_text,
+    _ => cell.cached_value.as_deref().unwrap_or(&cell.display_text),
+  };
+  Value::from_cell_text(text)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -488,6 +520,17 @@ impl Value {
       Value::Blank => Some(String::new()),
       Value::Range(_) => None,
       Value::Matrix(_) => None,
+    }
+  }
+
+  fn cached_text(&self) -> Option<String> {
+    match self {
+      Value::Number(value) => Some(value.to_string()),
+      Value::Text(value) => Some(value.clone()),
+      Value::Bool(value) => Some(if *value { "TRUE" } else { "FALSE" }.to_string()),
+      Value::Error(value) => Some(value.clone()),
+      Value::Blank => Some(String::new()),
+      Value::Range(_) | Value::Matrix(_) => None,
     }
   }
 
@@ -1207,8 +1250,7 @@ impl<'a, 'b> Parser<'a, 'b> {
           .get(1)
           .and_then(|value| value.number(self.evaluator.book))
           .unwrap_or(0.0);
-        let scale = 10_f64.powi(places as i32);
-        Some(Value::Number((value * scale).round() / scale))
+        Some(Value::Number(rtl_round(value, approx_floor(places) as i32)))
       }
       "ABS" => Some(Value::Number(
         args.first()?.number(self.evaluator.book)?.abs(),
@@ -1488,6 +1530,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     let ignore_hidden = function >= 100;
     let options = AggregateOptions {
       ignore_hidden,
+      ignore_filtered: true,
       ignore_errors: false,
       ignore_nested: true,
     };
@@ -2541,12 +2584,12 @@ fn numeric_binary(book: &FormulaBook, left: Value, right: Value, op: fn(f64, f64
 fn compare_values(book: &FormulaBook, left: &Value, right: &Value, op: &str) -> bool {
   if let (Some(left), Some(right)) = (left.number(book), right.number(book)) {
     return match op {
-      "=" => left == right,
-      "<>" => left != right,
+      "=" => left == right || approx_equal(left, right),
+      "<>" => left != right && !approx_equal(left, right),
       "<" => left < right,
-      "<=" => left <= right,
+      "<=" => left <= right || approx_equal(left, right),
       ">" => left > right,
-      ">=" => left >= right,
+      ">=" => left >= right || approx_equal(left, right),
       _ => false,
     };
   }
@@ -2578,6 +2621,7 @@ enum PercentileKind {
 #[derive(Clone, Copy, Debug)]
 struct AggregateOptions {
   ignore_hidden: bool,
+  ignore_filtered: bool,
   ignore_errors: bool,
   ignore_nested: bool,
 }
@@ -2589,41 +2633,49 @@ fn aggregate_options(option: i32) -> Option<AggregateOptions> {
   Some(match option {
     0 => AggregateOptions {
       ignore_hidden: false,
+      ignore_filtered: false,
       ignore_errors: false,
       ignore_nested: true,
     },
     1 => AggregateOptions {
       ignore_hidden: true,
+      ignore_filtered: false,
       ignore_errors: false,
       ignore_nested: true,
     },
     2 => AggregateOptions {
       ignore_hidden: false,
+      ignore_filtered: false,
       ignore_errors: true,
       ignore_nested: true,
     },
     3 => AggregateOptions {
       ignore_hidden: true,
+      ignore_filtered: false,
       ignore_errors: true,
       ignore_nested: true,
     },
     4 => AggregateOptions {
       ignore_hidden: false,
+      ignore_filtered: false,
       ignore_errors: false,
       ignore_nested: false,
     },
     5 => AggregateOptions {
       ignore_hidden: true,
+      ignore_filtered: false,
       ignore_errors: false,
       ignore_nested: false,
     },
     6 => AggregateOptions {
       ignore_hidden: false,
+      ignore_filtered: false,
       ignore_errors: true,
       ignore_nested: false,
     },
     7 => AggregateOptions {
       ignore_hidden: true,
+      ignore_filtered: false,
       ignore_errors: true,
       ignore_nested: false,
     },
@@ -2963,7 +3015,9 @@ fn collect_aggregate_numbers(
         return Ok(());
       };
       for row in reference.range.start.row..=reference.range.end.row {
-        if options.ignore_hidden && book.row_hidden(sheet_index, row) {
+        if (options.ignore_filtered && book.row_filtered(sheet_index, row))
+          || (options.ignore_hidden && book.row_hidden(sheet_index, row))
+        {
           continue;
         }
         for col in reference.range.start.col..=reference.range.end.col {
@@ -3030,7 +3084,9 @@ fn aggregate_counta_value(
         return Ok(());
       };
       for row in reference.range.start.row..=reference.range.end.row {
-        if options.ignore_hidden && book.row_hidden(sheet_index, row) {
+        if (options.ignore_filtered && book.row_filtered(sheet_index, row))
+          || (options.ignore_hidden && book.row_hidden(sheet_index, row))
+        {
           continue;
         }
         for col in reference.range.start.col..=reference.range.end.col {
@@ -3422,58 +3478,93 @@ fn norm_s_dist(x: f64) -> f64 {
 }
 
 fn norm_s_inv(p: f64) -> f64 {
-  // Peter J. Acklam's rational approximation, commonly used for spreadsheet-compatible inverse CDFs.
-  const A: [f64; 6] = [
-    -3.969683028665376e+01,
-    2.209460984245205e+02,
-    -2.759285104469687e+02,
-    1.383577518672690e+02,
-    -3.066479806614716e+01,
-    2.506628277459239e+00,
-  ];
-  const B: [f64; 5] = [
-    -5.447609879822406e+01,
-    1.615858368580409e+02,
-    -1.556989798598866e+02,
-    6.680131188771972e+01,
-    -1.328068155288572e+01,
-  ];
-  const C: [f64; 6] = [
-    -7.784894002430293e-03,
-    -3.223964580411365e-01,
-    -2.400758277161838e+00,
-    -2.549732539343734e+00,
-    4.374664141464968e+00,
-    2.938163982698783e+00,
-  ];
-  const D: [f64; 4] = [
-    7.784695709041462e-03,
-    3.224671290700398e-01,
-    2.445134137142996e+00,
-    3.754408661907416e+00,
-  ];
+  // Source: LibreOffice sc/source/core/tool/interpr3.cxx
+  // ScInterpreter::gaussinv.
   if p <= 0.0 {
     return f64::NEG_INFINITY;
   }
   if p >= 1.0 {
     return f64::INFINITY;
   }
-  let plow = 0.02425;
-  let phigh = 1.0 - plow;
-  if p < plow {
-    let q = (-2.0 * p.ln()).sqrt();
-    return (((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
-      / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0);
-  }
-  if p > phigh {
-    let q = (-2.0 * (1.0 - p).ln()).sqrt();
-    return -(((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
-      / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0);
-  }
   let q = p - 0.5;
-  let r = q * q;
-  (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5]) * q
-    / (((((B[0] * r + B[1]) * r + B[2]) * r + B[3]) * r + B[4]) * r + 1.0)
+  if q.abs() <= 0.425 {
+    let t = 0.180625 - q * q;
+    return q
+      * (((((((t * 2509.0809287301227 + 33430.57558358813) * t + 67265.7709270087) * t
+        + 45921.95393154987)
+        * t
+        + 13731.69376550946)
+        * t
+        + 1971.5909503065514)
+        * t
+        + 133.14166789178438)
+        * t
+        + 3.3871328727963665)
+      / (((((((t * 5226.495278852855 + 28729.085735721943) * t + 39307.89580009271) * t
+        + 21213.794301586596)
+        * t
+        + 5394.196021424751)
+        * t
+        + 687.1870074920579)
+        * t
+        + 42.31333070160091)
+        * t
+        + 1.0);
+  }
+
+  let mut t = if q > 0.0 { 1.0 - p } else { p };
+  t = (-t.ln()).sqrt();
+  let mut z = if t <= 5.0 {
+    t += -1.6;
+    (((((((t * 7.745450142783414e-4 + 0.022723844989269185) * t + 0.2417807251774506) * t
+      + 1.2704582524523684)
+      * t
+      + 3.6478483247632045)
+      * t
+      + 5.769497221460691)
+      * t
+      + 4.630337846156545)
+      * t
+      + 1.4234371107496835)
+      / (((((((t * 1.0507500716444169e-9 + 5.475938084995345e-4) * t + 0.015198666563616457)
+        * t
+        + 0.14810397642748008)
+        * t
+        + 0.6897673349851)
+        * t
+        + 1.6763848301838038)
+        * t
+        + 2.053191626637759)
+        * t
+        + 1.0)
+  } else {
+    t += -5.0;
+    (((((((t * 2.010334399292288e-7 + 2.7115555687434876e-5) * t + 0.0012426609473880784) * t
+      + 0.026532189526576123)
+      * t
+      + 0.2965605718285049)
+      * t
+      + 1.7848265399172913)
+      * t
+      + 5.463784911164114)
+      * t
+      + 6.657904643501104)
+      / (((((((t * 2.0442631033899397e-15 + 1.4215117583164459e-7) * t + 1.8463183175100547e-5)
+        * t
+        + 7.868691311456133e-4)
+        * t
+        + 0.014875361290850615)
+        * t
+        + 0.1369298809227358)
+        * t
+        + 0.5998322065558879)
+        * t
+        + 1.0)
+  };
+  if q < 0.0 {
+    z = -z;
+  }
+  z
 }
 
 fn erf(x: f64) -> f64 {
@@ -3490,6 +3581,63 @@ fn approx_floor(value: f64) -> f64 {
 
 fn approx_ceil(value: f64) -> f64 {
   approx_value(value).ceil()
+}
+
+fn rtl_round(value: f64, decimal_places: i32) -> f64 {
+  // Source: LibreOffice sal/rtl/math.cxx rtl_math_round with
+  // rtl_math_RoundingMode_Corrected.
+  if !value.is_finite() || value == 0.0 {
+    return value;
+  }
+  let original = value;
+  let sign = value.is_sign_negative();
+  let mut value = value.abs();
+  if decimal_places >= 0 && (value >= 2_f64.powi(52) || is_representable_integer(value)) {
+    return original;
+  }
+  let mut places = decimal_places;
+  let mut factor = 0.0;
+  if places != 0 {
+    if places > 0 {
+      let exponent = ((value.to_bits() >> 52) & 0x7ff) as i32 - 1023;
+      let decimals = 52 - exponent;
+      if decimals <= 0 {
+        return original;
+      }
+      if decimals < places {
+        places = decimals;
+      }
+    }
+    factor = 10_f64.powi(places.abs());
+    if factor == 0.0 || (places < 0 && !factor.is_finite()) {
+      return 0.0;
+    }
+    if !factor.is_finite() {
+      return original;
+    }
+    if places < 0 {
+      value /= factor;
+    } else {
+      value *= factor;
+    }
+    if !value.is_finite() {
+      return original;
+    }
+  }
+  if value < 2_f64.powi(52) {
+    value = approx_floor(value + 0.5);
+  }
+  if places != 0 {
+    if places < 0 {
+      value *= factor;
+    } else {
+      value /= factor;
+    }
+  }
+  if !value.is_finite() {
+    return original;
+  }
+  if sign { -value } else { value }
 }
 
 fn approx_value(value: f64) -> f64 {
@@ -3515,6 +3663,38 @@ fn approx_value(value: f64) -> f64 {
     return value;
   }
   if sign { -rounded } else { rounded }
+}
+
+fn approx_equal(a: f64, b: f64) -> bool {
+  // Source: LibreOffice sal/rtl/math.cxx rtl_math_approxEqual.
+  const E48: f64 = 3.552713678800501e-15;
+  const HALF_15TH_SIGNIFICAND: f64 = 5e-15;
+  if a == b {
+    return true;
+  }
+  if a == 0.0 || b == 0.0 || a.is_sign_negative() != b.is_sign_negative() {
+    return false;
+  }
+  let diff = (a - b).abs();
+  if !diff.is_finite() {
+    return false;
+  }
+  let a_abs = a.abs();
+  let b_abs = b.abs();
+  let min_ab = a_abs.min(b_abs);
+  let threshold1 = min_ab * E48;
+  let threshold2 = 10_f64.powf(min_ab.log10().floor()) * HALF_15TH_SIGNIFICAND;
+  if diff >= threshold1.max(threshold2) {
+    return false;
+  }
+  if is_representable_integer(a_abs) && is_representable_integer(b_abs) {
+    return false;
+  }
+  true
+}
+
+fn is_representable_integer(value: f64) -> bool {
+  value.is_finite() && value.fract() == 0.0
 }
 
 fn fraction_bit_count(value: f64) -> u32 {
@@ -3707,6 +3887,13 @@ fn parse_table_reference(book: &FormulaBook, text: &str) -> Option<Reference> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::fs::File;
+
+  use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+  use ooxmlsdk::sdk::{
+    FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
+    OpenSettings,
+  };
 
   fn test_book() -> FormulaBook {
     let mut cells = HashMap::new();
@@ -3813,6 +4000,7 @@ mod tests {
       cells,
       formulas,
       hidden_rows,
+      filtered_rows: HashSet::new(),
       external_cells: HashMap::new(),
       tables: HashMap::new(),
       defined: DefinedNames::default(),
@@ -3832,11 +4020,30 @@ mod tests {
     }
   }
 
+  fn eval_bool(book: &FormulaBook, sheet_index: usize, formula: &str) -> bool {
+    let mut evaluator = Evaluator {
+      book,
+      sheet_index,
+      source_file_name: None,
+      locals: HashMap::new(),
+    };
+    match evaluator.eval_formula(formula).unwrap() {
+      Value::Bool(value) => value,
+      value => panic!("expected bool for {formula}, got {value:?}"),
+    }
+  }
+
   fn assert_close(actual: f64, expected: f64) {
     assert!(
       (actual - expected).abs() <= 1.0e-9,
       "expected {expected}, got {actual}"
     );
+  }
+
+  fn imported_cell_text(sheet: &CalcSheet, reference: &str) -> String {
+    cell_at(sheet, CellAddress::parse_a1(reference).unwrap())
+      .map(|cell| cell.display_text.clone())
+      .unwrap_or_default()
   }
 
   #[test]
@@ -3860,6 +4067,20 @@ mod tests {
   #[test]
   fn functions_excel_2010_statistical_tests_match_libreoffice() {
     let book = test_book();
+    assert!(eval_bool(
+      &book,
+      0,
+      "ROUND(0.42284813280246891,12)=ROUND(0.42284813280246902,12)"
+    ));
+    assert_eq!(
+      translate_shared_formula(
+        "ROUND(B2,12)=ROUND(C2,12)",
+        CellAddress { col: 4, row: 2 },
+        CellAddress { col: 4, row: 3 }
+      ),
+      "ROUND(B3,12)=ROUND(C3,12)"
+    );
+    assert_close(eval_number(&book, 0, "ISO.CEILING(G6,F5)"), 2.0);
     assert_close(
       eval_number(&book, 0, "CHISQ.TEST(F2:F10,G2:G10)"),
       1.8744045912597986e-8,
@@ -3868,6 +4089,31 @@ mod tests {
       eval_number(&book, 0, "F.TEST(F2:F10,G2:G10)"),
       5.814996997636946e-8,
     );
+  }
+
+  #[test]
+  fn imported_functions_excel_2010_recalculates_equal_column_like_libreoffice() {
+    // Source: ../core/sc/qa/unit/subsequent_export_test3.cxx:testFunctionsExcel2010XLSX
+    let settings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        target_file_format_version: FileFormatVersion::Microsoft365,
+      },
+      ..Default::default()
+    };
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/functions-excel-2010.xlsx");
+    let mut document =
+      SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
+    let import = super::super::import::ExcelImport::import_document(
+      &mut document,
+      &crate::options::PdfOptions::default(),
+    )
+    .unwrap();
+    let sheet = &import.sheets[0];
+    assert_eq!(imported_cell_text(sheet, "B10"), "2");
+    assert_eq!(imported_cell_text(sheet, "D3"), "TRUE");
+    assert_eq!(imported_cell_text(sheet, "D10"), "TRUE");
   }
 
   #[test]

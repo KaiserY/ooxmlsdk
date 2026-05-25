@@ -131,10 +131,8 @@ impl<'a> CalcPrintDocument<'a> {
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
       let scale = print_scale_state(sheet, &areas, &named_ranges);
       document_top_down &= scale.top_down;
-      let mut page_areas = page_areas_for_sheet(sheet, &areas, &named_ranges, scale.zoom);
-      if !scale.top_down {
-        page_areas.sort_by_key(|area| area.map_or((0, 0), |area| (area.start.row, area.start.col)));
-      }
+      let page_areas =
+        page_areas_for_sheet(sheet, &areas, &named_ranges, scale.zoom, scale.top_down);
       let mut sheet_page_index = 0usize;
       for area in page_areas {
         let all_cells = area
@@ -154,9 +152,13 @@ impl<'a> CalcPrintDocument<'a> {
             .map(|area| print_cells_for_area(import, sheet, area, true))
             .unwrap_or_default();
         let drawing_summary = drawing_summary_for_area(sheet, area);
-        let empty = all_cells.is_empty()
+        // Source: LibreOffice sc/source/ui/view/printfun.cxx lcl_SetHidden and
+        // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
+        // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
+        // content is painted only for page ranges that survive that test.
+        let empty = area.map_or(false, |area| print_area_is_empty(import, sheet, area))
           && drawing_summary.printable == 0
-          && !sheet.page_settings.header_footer.has_print_content();
+          && drawing_summary.charts == 0;
         if scale.skip_empty && empty {
           skipped_empty_pages += 1;
           continue;
@@ -677,11 +679,52 @@ fn row_cell_has_print_data_at(row: &CalcRow, col: u32) -> bool {
   })
 }
 
+fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange) -> bool {
+  // Source: LibreOffice sc/source/core/data/documen9.cxx::ScDocument::IsPrintEmpty.
+  // Calc treats a block as printable when it has cell content, border lines, or
+  // drawing content. Drawing content is checked by the caller because it uses
+  // drawing anchors rather than cell records.
+  for (row_position, row) in sheet.rows.iter().enumerate() {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    if row_index < area.start.row || row_index > area.end.row || row.hidden {
+      continue;
+    }
+    for (cell_position, cell) in row.cells.iter().enumerate() {
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row_index,
+      });
+      if !area.contains(address) || column_hidden(sheet, address.col) {
+        continue;
+      }
+      if !cell.display_text.is_empty()
+        || !cell.rich_text_runs.is_empty()
+        || cell.formula.is_some()
+        || cell.cached_value.is_some()
+        || cell.data_type.is_some()
+      {
+        return false;
+      }
+      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let borders = import.styles.borders_for_cell(style_index);
+      if borders.left.is_some()
+        || borders.right.is_some()
+        || borders.top.is_some()
+        || borders.bottom.is_some()
+      {
+        return false;
+      }
+    }
+  }
+  true
+}
+
 fn page_areas_for_sheet(
   sheet: &CalcSheet,
   print_areas: &[CellRange],
   named_ranges: &CalcPrintNamedRanges<'_>,
   zoom: u32,
+  top_down: bool,
 ) -> Vec<Option<CellRange>> {
   if sheet.sheet_type == SheetType::Chartsheet {
     return vec![None];
@@ -696,22 +739,44 @@ fn page_areas_for_sheet(
       named_ranges.repeat_rows,
       zoom,
     );
-    for row_slice in row_slices {
-      pages.extend(
-        split_range_by_page_metrics(
-          sheet,
-          row_slice,
-          &sheet.metrics.column_breaks,
-          false,
-          named_ranges.repeat_columns,
-          zoom,
-        )
-        .into_iter()
-        .map(Some),
-      );
+    let column_slices = split_range_by_page_metrics(
+      sheet,
+      *area,
+      &sheet.metrics.column_breaks,
+      false,
+      named_ranges.repeat_columns,
+      zoom,
+    );
+    if top_down {
+      // Source: LibreOffice sc/source/ui/view/printfun.cxx::ScPrintFunc::DoPrint.
+      // bTopDown prints all Y pages for one X page before advancing rightward.
+      for column_slice in &column_slices {
+        for row_slice in &row_slices {
+          pages.push(Some(intersect_page_slices(*row_slice, *column_slice)));
+        }
+      }
+    } else {
+      for row_slice in &row_slices {
+        for column_slice in &column_slices {
+          pages.push(Some(intersect_page_slices(*row_slice, *column_slice)));
+        }
+      }
     }
   }
   pages
+}
+
+fn intersect_page_slices(row_slice: CellRange, column_slice: CellRange) -> CellRange {
+  CellRange::new(
+    CellAddress {
+      col: column_slice.start.col,
+      row: row_slice.start.row,
+    },
+    CellAddress {
+      col: column_slice.end.col,
+      row: row_slice.end.row,
+    },
+  )
 }
 
 fn split_range_by_page_metrics(

@@ -218,7 +218,7 @@ impl CalcPageSettings {
   }
 
   fn apply_page_setup(&mut self, page_setup: &x::PageSetup) {
-    if let Some(paper_size) = page_setup.paper_size.filter(|paper_size| *paper_size > 0) {
+    if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
     }
     if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
@@ -260,13 +260,17 @@ impl CalcPageSettings {
         units::millimeters_to_points(height),
       ),
       PaperMeasure::Undefined => {
-        let default = MS_PAPER_SIZE_TABLE[1];
+        // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
+        // PageSettingsConverter leaves PROP_Size unchanged for undefined or
+        // invalid paper sizes, and sc/source/ui/view/printfun.cxx InitParam
+        // falls back a null page size to PAPER_A4.
+        let default = MS_PAPER_SIZE_TABLE[9];
         match default {
-          PaperMeasure::Inches(width, height) => (
-            width * units::POINTS_PER_INCH,
-            height * units::POINTS_PER_INCH,
+          PaperMeasure::Millimeters(width, height) => (
+            units::millimeters_to_points(width),
+            units::millimeters_to_points(height),
           ),
-          _ => unreachable!("MS paper size table index 1 is Letter"),
+          _ => unreachable!("MS paper size table index 9 is A4"),
         }
       }
     };

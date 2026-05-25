@@ -546,7 +546,8 @@ impl CellFormatRecord {
       ),
       apply_alignment: format
         .apply_alignment
-        .map_or(apply_default, |value| value.as_bool()),
+        .map_or(apply_default, |value| value.as_bool())
+        || (!style_xf && format.alignment.is_some()),
       apply_protection: format
         .apply_protection
         .map_or(apply_default, |value| value.as_bool()),
@@ -718,8 +719,24 @@ impl DifferentialFormatRecord {
 
 impl AlignmentRecord {
   fn from_alignment(alignment: &x::Alignment) -> Self {
+    let horizontal = alignment.horizontal.or_else(|| {
+      // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
+      // Alignment::importAlignment. Rotated OOXML cells default to left for
+      // rotations below 90 degrees or exactly 180, and to right otherwise.
+      alignment.text_rotation.and_then(|rotation| {
+        if rotation != 0 {
+          Some(if rotation < 90 || rotation == 180 {
+            x::HorizontalAlignmentValues::Left
+          } else {
+            x::HorizontalAlignmentValues::Right
+          })
+        } else {
+          None
+        }
+      })
+    });
     Self {
-      horizontal: alignment.horizontal,
+      horizontal,
       vertical: alignment.vertical,
       text_rotation: alignment.text_rotation,
       wrap_text: alignment.wrap_text.is_some_and(|value| value.as_bool()),
@@ -1005,5 +1022,41 @@ fn defined_name_builtin(name: &str) -> Option<DefinedNameBuiltin> {
     Some(DefinedNameBuiltin::FilterDatabase)
   } else {
     None
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn rotated_alignment_defaults_match_libreoffice_import() {
+    // Source: LibreOffice sc/source/filter/oox/stylesbuffer.cxx
+    // Alignment::importAlignment and
+    // sc/qa/unit/subsequent_export_test2.cxx:testTdf120168.
+    let left = AlignmentRecord::from_alignment(&x::Alignment {
+      text_rotation: Some(45),
+      ..x::Alignment::default()
+    });
+    let right = AlignmentRecord::from_alignment(&x::Alignment {
+      text_rotation: Some(135),
+      ..x::Alignment::default()
+    });
+    let upside_down = AlignmentRecord::from_alignment(&x::Alignment {
+      text_rotation: Some(180),
+      ..x::Alignment::default()
+    });
+    let horizontal = AlignmentRecord::from_alignment(&x::Alignment {
+      text_rotation: Some(0),
+      ..x::Alignment::default()
+    });
+
+    assert_eq!(left.horizontal, Some(x::HorizontalAlignmentValues::Left));
+    assert_eq!(right.horizontal, Some(x::HorizontalAlignmentValues::Right));
+    assert_eq!(
+      upside_down.horizontal,
+      Some(x::HorizontalAlignmentValues::Left)
+    );
+    assert_eq!(horizontal.horizontal, None);
   }
 }

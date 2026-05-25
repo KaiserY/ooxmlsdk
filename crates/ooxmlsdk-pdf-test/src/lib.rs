@@ -54,7 +54,8 @@ pub fn pdfexport_fixtures() -> Vec<PathBuf> {
 }
 
 pub fn pdf_summary_for_fixture(fixture: &Path) -> Result<PdfSummary> {
-  pdf_summary_for_fixture_with_options(fixture, ooxmlsdk_pdf::PdfOptions::default())
+  let pdf = render::render_fixture_pdf(fixture)?;
+  PdfSummary::from_bytes(&pdf).map_err(CalibrationError::PdfiumExtraction)
 }
 
 pub fn pdf_summary_for_fixture_with_options(

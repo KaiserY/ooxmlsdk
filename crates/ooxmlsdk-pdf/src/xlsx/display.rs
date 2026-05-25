@@ -291,6 +291,7 @@ fn render_cell_area(
       zoom_scale,
     );
     let rendered_text = calc_cell_visible_text(cell, &measurement_style, output_area);
+    let horizontal_alignment = calc_cell_horizontal_alignment(cell, alignment);
     let mut rendered_text_items = Vec::new();
     if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
       render_cell_rich_text(
@@ -298,6 +299,7 @@ fn render_cell_area(
         cell.rich_text_runs,
         output_area.align_rect,
         render_style,
+        horizontal_alignment,
         hyperlink_url.clone(),
       );
     } else {
@@ -307,6 +309,7 @@ fn render_cell_area(
         output_area.align_rect,
         render_style,
         alignment,
+        horizontal_alignment,
         hyperlink_url.clone(),
         cell.formula,
       );
@@ -604,6 +607,11 @@ fn calc_row_inter_cell_spaces(
 ) -> usize {
   let current_text = &current.text;
   let next_text = &next.text;
+  if current_text.text.ends_with(char::is_whitespace)
+    || next_text.text.starts_with(char::is_whitespace)
+  {
+    return 0;
+  }
   if calc_text_number_like(&current_text.text) && calc_text_number_like(&next_text.text) {
     return 1;
   }
@@ -663,6 +671,7 @@ fn render_cell_rich_text(
   runs: &[super::workbook::SharedStringRun],
   rect: CellRect,
   base_style: TextStyle,
+  horizontal_alignment: x::HorizontalAlignmentValues,
   hyperlink_url: Option<String>,
 ) {
   let mut text = String::new();
@@ -689,10 +698,12 @@ fn render_cell_rich_text(
   }
   let y_pt = rect.y_pt + XLSX_CELL_TEXT_INSET_PT;
   let line_height = (style.font_size_pt * 1.15).max(1.0);
+  let text_width_pt = text_metrics::measure_text(&text, &style);
+  let x_pt = cell_text_x_pt(rect, text_width_pt, horizontal_alignment, 0.0);
   let preserve_text_portion =
     text.chars().any(|ch| !ch.is_ascii()) && !calc_text_can_shape_as_line(&text);
   items.push(PageItem::Text(TextItem {
-    x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+    x_pt,
     y_pt,
     line_height_pt: line_height,
     text,
@@ -854,11 +865,19 @@ fn render_cell_text(
   rect: CellRect,
   mut style: TextStyle,
   alignment: Option<super::styles::AlignmentRecord>,
+  horizontal_alignment: x::HorizontalAlignmentValues,
   hyperlink_url: Option<String>,
   formula: bool,
 ) {
   let line_height = (style.font_size_pt * 1.15).max(1.0);
   let wrap_text = alignment.is_some_and(|alignment| alignment.wrap_text);
+  let fill_text;
+  let text = if horizontal_alignment == x::HorizontalAlignmentValues::Fill && !wrap_text {
+    fill_text = repeat_cell_text_to_fill(text, rect.width_pt, &style);
+    fill_text.as_str()
+  } else {
+    text
+  };
   let rendered_text;
   let lines = if text.contains('\n') || text.contains('\r') {
     rendered_text = if wrap_text || formula {
@@ -889,21 +908,11 @@ fn render_cell_text(
     };
   }
   for line in lines {
-    let leading_spaces = line.len() - line.trim_start_matches(' ').len();
-    let line_x_offset_pt = if leading_spaces > 0 {
-      text_metrics::measure_text(&line[..leading_spaces], &style)
-    } else {
-      0.0
-    };
-    let line = if leading_spaces > 0 {
-      &line[leading_spaces..]
-    } else {
-      line
-    };
+    let full_line_width_pt = text_metrics::measure_text(line, &style);
     let preserve_text_portion =
       line.chars().any(|ch| !ch.is_ascii()) && !calc_text_can_shape_as_line(line);
     items.push(PageItem::Text(TextItem {
-      x_pt: rect.x_pt + XLSX_CELL_TEXT_INSET_PT + line_x_offset_pt,
+      x_pt: cell_text_x_pt(rect, full_line_width_pt, horizontal_alignment, 0.0),
       y_pt,
       line_height_pt: line_height,
       text: line.to_string(),
@@ -928,6 +937,37 @@ fn render_cell_text(
     }));
     y_pt += line_height;
   }
+}
+
+fn repeat_cell_text_to_fill(text: &str, width_pt: f32, style: &TextStyle) -> String {
+  if text.is_empty() || width_pt <= f32::EPSILON {
+    return text.to_string();
+  }
+  let text_width_pt = text_metrics::measure_text(text, style);
+  if text_width_pt <= f32::EPSILON {
+    return text.to_string();
+  }
+  let repeat_count = (width_pt / text_width_pt).ceil().max(1.0) as usize;
+  text.repeat(repeat_count)
+}
+
+fn cell_text_x_pt(
+  rect: CellRect,
+  text_width_pt: f32,
+  horizontal_alignment: x::HorizontalAlignmentValues,
+  leading_offset_pt: f32,
+) -> f32 {
+  let available_width_pt = (rect.width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0).max(0.0);
+  let text_start_pt = match horizontal_alignment {
+    x::HorizontalAlignmentValues::Right => {
+      rect.x_pt + XLSX_CELL_TEXT_INSET_PT + available_width_pt - text_width_pt
+    }
+    x::HorizontalAlignmentValues::Center | x::HorizontalAlignmentValues::CenterContinuous => {
+      rect.x_pt + XLSX_CELL_TEXT_INSET_PT + (available_width_pt - text_width_pt) / 2.0
+    }
+    _ => rect.x_pt + XLSX_CELL_TEXT_INSET_PT,
+  };
+  text_start_pt + leading_offset_pt
 }
 
 fn render_cell_borders(

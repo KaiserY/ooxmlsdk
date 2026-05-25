@@ -1590,8 +1590,15 @@ fn should_shape_pdf_glyphs(text: &TextItem) -> bool {
   // cases where we need fallback faces or complex ActualText ranges.
   !text.style.small_caps
     && (text.paragraph_bidi
+      || text_has_pdf_significant_spacing(&text.text)
       || text.preserve_text_portion && text.text.chars().any(requires_shaped_pdf_glyph)
       || text.text.chars().any(requires_shaped_pdf_glyph))
+}
+
+fn text_has_pdf_significant_spacing(text: &str) -> bool {
+  text.starts_with(char::is_whitespace)
+    || text.ends_with(char::is_whitespace)
+    || text.as_bytes().windows(2).any(|window| window == b"  ")
 }
 
 fn requires_shaped_pdf_glyph(ch: char) -> bool {

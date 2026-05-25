@@ -17,6 +17,8 @@ const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
 const LIBREOFFICE_GENERIC_PRINTER_DPI: f32 = 600.0;
+// Source: LibreOffice sc/source/core/data/attarray.cxx defines SC_VISATTR_STOP.
+const SC_VISATTR_STOP: u32 = 84;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
@@ -649,6 +651,9 @@ fn print_areas_for_sheet(
     // ScDocument::IsPrintEmpty.
     Some(range) => {
       let mut range = CellRange::new(CellAddress { col: 1, row: 1 }, range.end);
+      if let Some(attr_end_row) = last_visible_row_attribute(sheet, range.end.row) {
+        range.end.row = range.end.row.max(attr_end_row);
+      }
       if let Some(drawing_range) = drawing_print_area(sheet) {
         range.end.col = range.end.col.max(drawing_range.end.col);
         range.end.row = range.end.row.max(drawing_range.end.row);
@@ -1105,7 +1110,61 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
   if sheet_area_has_left_text_overflow(import, sheet, area) {
     return false;
   }
+  if area.end.col <= 2 && area_has_visible_row_attribute(sheet, area) {
+    return false;
+  }
   true
+}
+
+fn last_visible_row_attribute(sheet: &CalcSheet, data_end_row: u32) -> Option<u32> {
+  // Source: LibreOffice sc/source/core/data/table1.cxx::ScTable::GetPrintArea
+  // calls ScAttrArray::GetLastVisibleAttr after data detection. Explicit row
+  // formatting near the end of the sheet extends the print area even when the
+  // rows contain no cells; long equal formatting runs are stopped at
+  // SC_VISATTR_STOP.
+  let mut last_row = None;
+  let mut run_len = 0u32;
+  let mut previous_row = None;
+  for row in sheet
+    .rows
+    .iter()
+    .filter(|row| row_has_visible_attribute(sheet, row))
+  {
+    let row_index = row.row_index.unwrap_or(1);
+    if row_index <= data_end_row {
+      continue;
+    }
+    if previous_row.is_some_and(|previous| previous + 1 == row_index) {
+      run_len = run_len.saturating_add(1);
+    } else {
+      run_len = 1;
+    }
+    previous_row = Some(row_index);
+    if run_len < SC_VISATTR_STOP {
+      last_row = Some(row_index);
+    }
+  }
+  last_row
+}
+
+fn area_has_visible_row_attribute(sheet: &CalcSheet, area: CellRange) -> bool {
+  sheet.rows.iter().any(|row| {
+    let row_index = row.row_index.unwrap_or(1);
+    row_index >= area.start.row
+      && row_index <= area.end.row
+      && row_has_visible_attribute(sheet, row)
+  })
+}
+
+fn row_has_visible_attribute(sheet: &CalcSheet, row: &CalcRow) -> bool {
+  if row.hidden {
+    return false;
+  }
+  row.cells.is_empty()
+    && !row.custom_height
+    && row.height.is_some_and(|height| {
+      (height as f32 - sheet.metrics.format.default_row_height as f32).abs() > f32::EPSILON
+    })
 }
 
 fn sheet_area_has_left_text_overflow(
@@ -1629,7 +1688,7 @@ fn conditional_number_format_code<'a>(
     .collect::<Vec<_>>();
   rules.sort_by_key(|(_, rule)| rule.priority);
   for (references, rule) in rules {
-    if !conditional_numeric_rule_matches(sheet, references, rule, address, value) {
+    if !conditional_numeric_rule_matches(import, sheet, references, rule, address, value) {
       if rule.stop_if_true {
         break;
       }
@@ -1661,6 +1720,7 @@ fn conditional_format_contains_cell(
 }
 
 fn conditional_numeric_rule_matches(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   references: &[String],
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
@@ -1674,7 +1734,12 @@ fn conditional_numeric_rule_matches(
     x::ConditionalFormatValues::AboveAverage => {
       conditional_average_matches(sheet, references, rule, address, value)
     }
-    x::ConditionalFormatValues::CellIs => conditional_cell_is_matches(rule, value),
+    x::ConditionalFormatValues::CellIs => {
+      conditional_cell_is_matches(import, sheet, references, rule, address, value)
+    }
+    x::ConditionalFormatValues::Expression => {
+      conditional_expression_matches(import, sheet, references, rule, address)
+    }
     _ => false,
   }
 }
@@ -1726,17 +1791,20 @@ fn conditional_average_matches(
 }
 
 fn conditional_cell_is_matches(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
   value: f64,
 ) -> bool {
-  let first = rule
-    .formulas
-    .first()
-    .and_then(|formula| formula.trim().parse::<f64>().ok());
-  let second = rule
-    .formulas
-    .get(1)
-    .and_then(|formula| formula.trim().parse::<f64>().ok());
+  let base = conditional_format_base_address(references, address).unwrap_or(address);
+  let first = rule.formulas.first().and_then(|formula| {
+    super::formula::evaluate_relative_formula_as_number(import, sheet, formula, base, address)
+  });
+  let second = rule.formulas.get(1).and_then(|formula| {
+    super::formula::evaluate_relative_formula_as_number(import, sheet, formula, base, address)
+  });
   match rule.operator.unwrap_or_default() {
     x::ConditionalFormattingOperatorValues::LessThan => first.is_some_and(|limit| value < limit),
     x::ConditionalFormattingOperatorValues::LessThanOrEqual => {
@@ -1756,6 +1824,34 @@ fn conditional_cell_is_matches(
       .is_some_and(|(low, high)| value < low.min(high) || value > low.max(high)),
     _ => false,
   }
+}
+
+fn conditional_expression_matches(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  references: &[String],
+  rule: &super::sheet_conditions::ConditionalFormatRuleModel,
+  address: CellAddress,
+) -> bool {
+  let Some(formula) = rule.formulas.first() else {
+    return false;
+  };
+  let Some(base) = conditional_format_base_address(references, address) else {
+    return false;
+  };
+  super::formula::evaluate_relative_formula_as_condition(import, sheet, formula, base, address)
+}
+
+fn conditional_format_base_address(
+  references: &[String],
+  address: CellAddress,
+) -> Option<CellAddress> {
+  references
+    .iter()
+    .flat_map(|references| references.split_whitespace())
+    .filter_map(CellRange::parse_a1_range)
+    .find(|range| range.contains(address))
+    .map(|range| range.start)
 }
 
 fn conditional_reference_values(

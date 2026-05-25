@@ -61,6 +61,62 @@ pub(crate) fn recalculate_formula_cells(
   }
 }
 
+pub(crate) fn evaluate_relative_formula_as_condition(
+  import: &super::import::ExcelImport,
+  sheet: &CalcSheet,
+  formula: &str,
+  base: CellAddress,
+  address: CellAddress,
+) -> bool {
+  evaluate_relative_formula(import, sheet, formula, base, address)
+    .is_some_and(|(book, value)| value.truthy(&book))
+}
+
+pub(crate) fn evaluate_relative_formula_as_number(
+  import: &super::import::ExcelImport,
+  sheet: &CalcSheet,
+  formula: &str,
+  base: CellAddress,
+  address: CellAddress,
+) -> Option<f64> {
+  evaluate_relative_formula(import, sheet, formula, base, address)
+    .and_then(|(book, value)| value.number(&book))
+}
+
+fn evaluate_relative_formula(
+  import: &super::import::ExcelImport,
+  sheet: &CalcSheet,
+  formula: &str,
+  base: CellAddress,
+  address: CellAddress,
+) -> Option<(FormulaBook, Value)> {
+  // Source: LibreOffice sc/source/filter/oox/condformatbuffer.cxx imports
+  // conditional-format formulas with the top-left cell of the conditional
+  // range as base, and sc/source/core/data/conditio.cxx evaluates relative
+  // references from the current cell position.
+  let defined = DefinedNames::from_catalog(&import.defined_names);
+  let book = FormulaBook::from_sheets(&import.sheets, &defined, &import.workbook_catalog);
+  let sheet_index = import
+    .sheets
+    .iter()
+    .position(|candidate| std::ptr::eq(candidate, sheet))
+    .or_else(|| {
+      import.sheets.iter().position(|candidate| {
+        candidate.workbook_index == sheet.workbook_index && candidate.name == sheet.name
+      })
+    })?;
+  let translated = translate_shared_formula(formula.trim(), base, address);
+  let mut evaluator = Evaluator {
+    book: &book,
+    sheet_index,
+    source_file_name: None,
+    current_address: Some(address),
+    locals: HashMap::new(),
+  };
+  let value = evaluator.eval_formula(&translated)?;
+  Some((book, value))
+}
+
 #[derive(Clone, Debug)]
 struct FormulaCell {
   address: CellAddress,
@@ -1329,6 +1385,14 @@ impl<'a, 'b> Parser<'a, 'b> {
             .take(len)
             .collect(),
         ))
+      }
+      "LEFT" => {
+        let text = args.first()?.text(self.evaluator.book);
+        let len = args
+          .get(1)
+          .and_then(|value| value.number(self.evaluator.book))
+          .unwrap_or(1.0) as usize;
+        Some(Value::Text(text.chars().take(len).collect()))
       }
       "RIGHT" => {
         let text = args.first()?.text(self.evaluator.book);

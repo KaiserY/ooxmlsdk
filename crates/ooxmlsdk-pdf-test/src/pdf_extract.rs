@@ -490,7 +490,7 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
 
   for (page_index, page) in document.pages().iter().enumerate() {
     media_boxes.push(format!(
-      "[0.0 0.0 {:.1} {:.1}]",
+      "[0.0 0.0 {:.2} {:.2}]",
       page.width().value,
       page.height().value
     ));

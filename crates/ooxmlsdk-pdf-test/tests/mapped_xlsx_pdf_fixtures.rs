@@ -551,7 +551,7 @@ fn mapped_xlsx_date_autofilter_keeps_filtered_date_rows_visible() {
 fn mapped_xlsx_autofilter_colors_keeps_background_filtered_rows() {
   let summary = render_summary("autofilter-colors.xlsx");
   assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  assert_page_contains(&summary, 0, "Background Foreground Both");
   assert_page_contains(&summary, 0, "2 2 2");
   assert_page_contains(&summary, 0, "3 3 3");
   assert_page_not_contains(&summary, 0, "1 1 1");
@@ -562,7 +562,7 @@ fn mapped_xlsx_autofilter_colors_keeps_background_filtered_rows() {
 fn mapped_xlsx_autofilter_colors_fg_keeps_foreground_filtered_rows() {
   let summary = render_summary("autofilter-colors-fg.xlsx");
   assert_eq!(summary.page_count, 1);
-  assert_page_contains(&summary, 0, "BackgroundForeground Both");
+  assert_page_contains(&summary, 0, "Background Foreground Both");
   assert_page_contains(&summary, 0, "1 1 1");
   assert_page_contains(&summary, 0, "2 2 2");
   assert_page_contains(&summary, 0, "3 3 3");

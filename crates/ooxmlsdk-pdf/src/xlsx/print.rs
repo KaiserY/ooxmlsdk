@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use super::import::ExcelImport;
 use super::page_settings::CalcPageSettings;
 use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
-use super::worksheet::{CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
+use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
 use crate::docx::TextStyle;
 use crate::text_metrics;
 use crate::units;
@@ -14,6 +14,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 const ZOOM_MIN: u32 = 10;
 const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
+const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
+const LIBREOFFICE_GENERIC_PRINTER_DPI: f32 = 600.0;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
@@ -139,7 +141,7 @@ impl<'a> CalcPrintDocument<'a> {
       .count();
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
-      let areas = print_areas_for_sheet(sheet, &named_ranges);
+      let areas = print_areas_for_sheet(import, sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
       let scale = print_scale_state(sheet, &areas, &named_ranges);
       document_top_down &= scale.top_down;
@@ -603,6 +605,7 @@ fn anchor_intersects_area(
 }
 
 fn print_areas_for_sheet(
+  import: &ExcelImport,
   sheet: &CalcSheet,
   named_ranges: &CalcPrintNamedRanges<'_>,
 ) -> Vec<CellRange> {
@@ -621,7 +624,7 @@ fn print_areas_for_sheet(
         range.end.col = range.end.col.max(drawing_range.end.col);
         range.end.row = range.end.row.max(drawing_range.end.row);
       }
-      vec![extend_print_area_for_overflow(sheet, range)]
+      vec![extend_print_area_for_overflow(import, sheet, range)]
     }
     // With skip-empty disabled, a missing document print area still leaves the
     // default start/end range printable, so header/footer-only sheets export a page.
@@ -732,12 +735,15 @@ fn sheet_row_for_y(sheet: &CalcSheet, y_pt: f32) -> u32 {
   XLSX_MAX_ROW
 }
 
-fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
+fn extend_print_area_for_overflow(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  mut range: CellRange,
+) -> CellRange {
   // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea and
   // sc/source/core/data/table1.cxx ExtendPrintArea/MaybeAddExtraColumn.
   // A text cell can extend the implicit print area to the right when the next
   // cells are empty and the string does not fit into its own column.
-  let style = TextStyle::default();
   for (row_position, row) in sheet.rows.iter().enumerate() {
     let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
     if row_index < range.start.row || row_index > range.end.row || row.hidden {
@@ -763,27 +769,68 @@ fn extend_print_area_for_overflow(sheet: &CalcSheet, mut range: CellRange) -> Ce
       if row_cell_has_print_data_at(row, address.col + 1) {
         continue;
       }
-      let mut missing =
-        text_metrics::measure_text(&cell.display_text, &style) - sheet.column_width_pt(address.col);
-      let mut column = address.col;
-      while missing > 0.0 && column < XLSX_MAX_COLUMN {
-        let next = column.saturating_add(1);
-        if row_cell_has_print_data_at(row, next) {
-          break;
-        }
-        column = next;
-        let width = sheet.column_width_pt(column);
-        if width <= f32::EPSILON {
-          break;
-        }
-        missing -= width;
-      }
+      let style = print_cell_text_style(import, sheet, row, cell, address);
+      let column = text_overflow_end_column(sheet, row, cell, address, &style);
       if column > range.end.col {
         range.end.col = column;
       }
     }
   }
   range
+}
+
+fn text_overflow_end_column(
+  sheet: &CalcSheet,
+  row: &CalcRow,
+  cell: &CalcCell,
+  address: CellAddress,
+  style: &TextStyle,
+) -> u32 {
+  let needed_width_pt = calc_cached_print_text_width_pt(
+    text_metrics::measure_text(&cell.display_text, style) + CALC_CELL_TEXT_MARGIN_PT,
+  );
+  let mut missing = needed_width_pt - sheet.column_width_pt(address.col);
+  let mut column = address.col;
+  while missing > 0.0 && column < XLSX_MAX_COLUMN {
+    let next = column.saturating_add(1);
+    if row_cell_has_print_data_at(row, next) {
+      break;
+    }
+    column = next;
+    let width = sheet.column_width_pt(column);
+    if width <= f32::EPSILON {
+      break;
+    }
+    missing -= width;
+  }
+  column
+}
+
+fn calc_cached_print_text_width_pt(width_pt: f32) -> f32 {
+  if width_pt <= 0.0 || !width_pt.is_finite() {
+    return 0.0;
+  }
+  // Source: LibreOffice sc/source/core/data/documen8.cxx stores
+  // GetNeededSize(..., bTotalSize=true) into ScColumnTextWidthIterator as a
+  // sal_uInt16. sc/source/core/data/table1.cxx::MaybeAddExtraColumn then reads
+  // that cached GetTextWidth() pixel value and converts it back through nPPTX.
+  // Calc print layout calls GetPrinter(); the Unix generic printer resolves
+  // its DPI through PPDContext::getRenderResolution(), and LibreOffice's
+  // bundled SGENPRT.PS has *DefaultResolution: 600dpi.
+  let pixels = (width_pt * LIBREOFFICE_GENERIC_PRINTER_DPI / units::POINTS_PER_INCH).round() as i64;
+  let cached_pixels = pixels as u16;
+  f32::from(cached_pixels) * units::POINTS_PER_INCH / LIBREOFFICE_GENERIC_PRINTER_DPI
+}
+
+fn print_cell_text_style(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  row: &CalcRow,
+  cell: &CalcCell,
+  address: CellAddress,
+) -> TextStyle {
+  let style_index = sheet.effective_cell_style_index(row, cell, address);
+  import.styles.text_style_for_cell(style_index)
 }
 
 fn row_last_print_data_col(row: &CalcRow, range: CellRange) -> Option<u32> {
@@ -863,7 +910,44 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
       }
     }
   }
+  if sheet_area_has_left_text_overflow(import, sheet, area) {
+    return false;
+  }
   true
+}
+
+fn sheet_area_has_left_text_overflow(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  area: CellRange,
+) -> bool {
+  if area.start.col <= 1 {
+    return false;
+  }
+  sheet.rows.iter().enumerate().any(|(row_position, row)| {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    if row_index < area.start.row || row_index > area.end.row || row.hidden {
+      return false;
+    }
+    row.cells.iter().enumerate().any(|(cell_position, cell)| {
+      if cell.display_text.is_empty() || cell.display_text.parse::<f64>().is_ok() {
+        return false;
+      }
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row_index,
+      });
+      if address.col >= area.start.col {
+        return false;
+      }
+      // Source: LibreOffice sc/source/core/data/documen9.cxx
+      // ScDocument::IsPrintEmpty calls ExtendPrintArea() for the columns left
+      // of the candidate page. If a left-side string extends into this page,
+      // the page is not empty even when it has no cell bodies of its own.
+      let style = print_cell_text_style(import, sheet, row, cell, address);
+      text_overflow_end_column(sheet, row, cell, address, &style) >= area.start.col
+    })
+  })
 }
 
 fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
@@ -1811,11 +1895,27 @@ pub(crate) fn rendered_number_text(
     _ => {}
   }
 
-  let Some(format_code) = format_code else {
+  let format_code = if let Some(format_code) = format_code {
+    format_code
+  } else if raw
+    .parse::<f64>()
+    .ok()
+    .is_some_and(|value| value.is_finite())
+  {
+    "General"
+  } else {
     return (raw.to_string(), NumberFormatRenderState::Raw);
   };
   if format_code.eq_ignore_ascii_case("General") {
-    return (raw.to_string(), NumberFormatRenderState::General);
+    return (
+      raw
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+        .map(format_general_number)
+        .unwrap_or_else(|| raw.to_string()),
+      NumberFormatRenderState::General,
+    );
   }
   if format_code == "@" {
     return (raw.to_string(), NumberFormatRenderState::Text);
@@ -1853,6 +1953,44 @@ pub(crate) fn rendered_number_text(
     raw.to_string(),
     NumberFormatRenderState::UnsupportedFormatCode,
   )
+}
+
+fn format_general_number(value: f64) -> String {
+  // Source: LibreOffice sc/source/ui/view/output2.cxx uses the General
+  // SvNumberformat output instead of the raw OOXML double text. Fifteen
+  // significant digits match Calc/Excel's normal General precision.
+  if value == 0.0 {
+    return "0".to_string();
+  }
+  let abs = value.abs();
+  if !(1.0e-4..1.0e15).contains(&abs) {
+    let text = format!("{value:.14e}");
+    if let Some((mantissa, exponent)) = text.split_once('e') {
+      let mantissa = trim_general_fraction(mantissa.to_string());
+      let exponent_value = exponent.parse::<i32>().unwrap_or(0);
+      return format!("{mantissa}E{exponent_value:+03}");
+    }
+    return text;
+  }
+  let integer_digits = if abs >= 1.0 {
+    abs.log10().floor() as isize + 1
+  } else {
+    0
+  };
+  let decimals = 15usize.saturating_sub(integer_digits.max(0) as usize);
+  trim_general_fraction(format!("{value:.decimals$}"))
+}
+
+fn trim_general_fraction(mut text: String) -> String {
+  if text.contains('.') {
+    while text.ends_with('0') {
+      text.pop();
+    }
+    if text.ends_with('.') {
+      text.pop();
+    }
+  }
+  if text == "-0" { "0".to_string() } else { text }
 }
 
 fn render_literal_section_number_format(code: &str, value: f64) -> Option<String> {
@@ -2110,6 +2248,9 @@ fn is_ignored_number_format_marker(marker: &str) -> bool {
     || marker.starts_with('<')
     || marker.starts_with('>')
     || marker.starts_with('=')
+    || marker
+      .strip_prefix('$')
+      .is_some_and(|value| value.starts_with('-'))
     || marker.to_ascii_lowercase().starts_with("color")
 }
 
@@ -2409,7 +2550,44 @@ fn format_serial_date_time(value: f64, code: &str, date_1904: bool) -> String {
   let hour = seconds / 3_600;
   let minute = (seconds % 3_600) / 60;
   let second = seconds % 60;
-  render_date_time_format(code, year, month, day, hour, minute, second)
+  if uses_system_long_date_format(code) {
+    // Source: LibreOffice svl/source/numbers/zforlist.cxx maps the system
+    // long date entry (NF_DATE_SYSTEM_LONG) to the current system locale.
+    // The corresponding Calc test fixes the locale to en-US.
+    return format!(
+      "{}, {} {}, {}",
+      weekday_name(year, month, day),
+      month_name(month),
+      day,
+      year
+    );
+  }
+  render_date_time_format(
+    &strip_number_format_markers(code),
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+  )
+}
+
+fn uses_system_long_date_format(code: &str) -> bool {
+  let mut rest = code;
+  while let Some(start) = rest.find('[') {
+    let Some(end) = rest[start + 1..].find(']') else {
+      break;
+    };
+    if rest[start + 1..start + 1 + end]
+      .trim()
+      .eq_ignore_ascii_case("$-F800")
+    {
+      return true;
+    }
+    rest = &rest[start + end + 2..];
+  }
+  false
 }
 
 fn render_elapsed_date_time(value: f64, code: &str) -> Option<String> {
@@ -2819,6 +2997,14 @@ fn render_tokenized_date_time_format(
       }
       index += 1;
       saw_date_or_time = true;
+    } else if lower_rest.starts_with("dddd") {
+      output.push_str(weekday_name(year, month, day));
+      index += 4;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("ddd") {
+      output.push_str(short_weekday_name(year, month, day));
+      index += 3;
+      saw_date_or_time = true;
     } else if lower_rest.starts_with("dd") {
       output.push_str(&format!("{day:02}"));
       index += 2;
@@ -2892,12 +3078,24 @@ fn short_month_name(month: u32) -> &'static str {
 }
 
 fn weekday_name(year: i64, month: u32, day: u32) -> &'static str {
-  let y = if month < 3 { year - 1 } else { year };
-  let m = if month < 3 { month + 12 } else { month } as i64;
-  let k = y % 100;
-  let j = y / 100;
-  let h = (i64::from(day) + ((13 * (m + 1)) / 5) + k + (k / 4) + (j / 4) + (5 * j)) % 7;
-  match h {
+  weekday_name_for_index(weekday_index(year, month, day))
+}
+
+fn short_weekday_name(year: i64, month: u32, day: u32) -> &'static str {
+  match weekday_index(year, month, day) {
+    0 => "Sat",
+    1 => "Sun",
+    2 => "Mon",
+    3 => "Tue",
+    4 => "Wed",
+    5 => "Thu",
+    6 => "Fri",
+    _ => "",
+  }
+}
+
+fn weekday_name_for_index(index: i64) -> &'static str {
+  match index {
     0 => "Saturday",
     1 => "Sunday",
     2 => "Monday",
@@ -2907,6 +3105,14 @@ fn weekday_name(year: i64, month: u32, day: u32) -> &'static str {
     6 => "Friday",
     _ => "",
   }
+}
+
+fn weekday_index(year: i64, month: u32, day: u32) -> i64 {
+  let y = if month < 3 { year - 1 } else { year };
+  let m = if month < 3 { month + 12 } else { month } as i64;
+  let k = y % 100;
+  let j = y / 100;
+  (i64::from(day) + ((13 * (m + 1)) / 5) + k + (k / 4) + (j / 4) + (5 * j)) % 7
 }
 
 fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
@@ -2988,4 +3194,54 @@ fn column_name_to_index(value: &str) -> Option<u32> {
       .saturating_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
   }
   (col > 0).then_some(col)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn general_number_format_uses_calc_significant_digits() {
+    assert_eq!(
+      rendered_number_text("4.0999999999999996", None, None, false).0,
+      "4.1"
+    );
+    assert_eq!(
+      rendered_number_text("4.0999999999999996", Some("General"), None, false).0,
+      "4.1"
+    );
+  }
+
+  #[test]
+  fn date_format_ignores_lcid_marker() {
+    assert_eq!(
+      rendered_number_text("45657", Some("[$-809]dd/mm/yy"), None, false).0,
+      "31/12/24"
+    );
+  }
+
+  #[test]
+  fn long_weekday_date_format_uses_weekday_name() {
+    assert_eq!(
+      rendered_number_text("26467", Some("dddd, d. mmmm yyyy"), None, false).0,
+      "Saturday, 17. June 1972"
+    );
+  }
+
+  #[test]
+  fn system_long_date_format_uses_unpadded_en_us_day() {
+    // Source: ../core/sc/qa/unit/subsequent_export_test2.cxx:
+    // testTdf165180_date1904_XLSX fixes the system locale to en-US and
+    // expects the NF_DATE_SYSTEM_LONG output.
+    assert_eq!(
+      rendered_number_text(
+        "60",
+        Some("[$-F800]dddd\\,\\ mmmm\\ dd\\,\\ yyyy"),
+        None,
+        true
+      )
+      .0,
+      "Tuesday, March 1, 1904"
+    );
+  }
 }

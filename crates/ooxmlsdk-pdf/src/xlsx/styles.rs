@@ -269,6 +269,13 @@ impl StylesCatalog {
   }
 
   pub(crate) fn number_format_code(&self, id: u32) -> Option<&str> {
+    if let Some(format) = self
+      .custom_number_formats
+      .iter()
+      .find(|format| format.id == id)
+    {
+      return Some(format.code.as_str());
+    }
     match id {
       // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx
       // maps OOXML numFmtId 0 to NUMBER_STANDARD (General).
@@ -297,16 +304,19 @@ impl StylesCatalog {
       38 => Some("#,##0 ;[Red](#,##0)"),
       39 => Some("#,##0.00;(#,##0.00)"),
       40 => Some("#,##0.00;[Red](#,##0.00)"),
+      // Source: LibreOffice sc/source/filter/oox/numberformatsbuffer.cxx
+      // maps OOXML builtin ids 41..44 to accounting formats without a
+      // currency symbol in the default OOXML table.
+      41 => Some("_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"),
+      42 => Some("_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"),
+      43 => Some("_-* #,##0.00_-;-* #,##0.00_-;_-* \"-\"??_-;_-@_-"),
+      44 => Some("_-* #,##0.00_-;-* #,##0.00_-;_-* \"-\"??_-;_-@_-"),
       45 => Some("mm:ss"),
       46 => Some("[h]:mm:ss"),
       47 => Some("mmss.0"),
       48 => Some("##0.0E+0"),
       49 => Some("@"),
-      _ => self
-        .custom_number_formats
-        .iter()
-        .find(|format| format.id == id)
-        .map(|format| format.code.as_str()),
+      _ => None,
     }
   }
 

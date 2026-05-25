@@ -876,6 +876,7 @@ impl SheetResourceCatalog {
   pub(crate) fn from_worksheet_part(
     package: &mut SpreadsheetDocument,
     part: &WorksheetPart,
+    shared_strings: &[SharedStringModel],
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
@@ -895,7 +896,7 @@ impl SheetResourceCatalog {
     let comments =
       CommentsCatalog::from_worksheet_part(package, comments_part, threaded_comment_parts)?;
     let pivot_table_parts = part.pivot_table_parts(package).collect::<Vec<_>>();
-    let pivot_tables = PivotTableCatalog::from_parts(package, &pivot_table_parts)?;
+    let pivot_tables = PivotTableCatalog::from_parts(package, &pivot_table_parts, shared_strings)?;
     let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
     let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
     let relationships = SheetRelationshipCatalog::from_worksheet_part(package, part)?;

@@ -2578,6 +2578,11 @@ fn render_date_time_format(
       day.saturating_sub(8)
     );
   }
+  if let Some(text) =
+    render_tokenized_date_time_format(&clean, year, month, day, hour, minute, second)
+  {
+    return text;
+  }
   if lower.contains("dddd") && lower.contains("mmmm") {
     if lower.contains("[$-407]")
       || lower.contains("[$-0407]")
@@ -2651,6 +2656,123 @@ fn render_date_time_format(
     return format!("{month}/{day}/{yy:02}");
   }
   format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn render_tokenized_date_time_format(
+  code: &str,
+  year: i64,
+  month: u32,
+  day: u32,
+  hour: i64,
+  minute: i64,
+  second: i64,
+) -> Option<String> {
+  // Source: LibreOffice svl/source/numbers/zformat.cxx
+  // SvNumberformat::ImpGetDateTimeOutput walks date/time tokens and emits
+  // escaped format characters as literals. This mirrors that token/literal
+  // split for OOXML date formats used by imported pivot fixtures.
+  let lower = code.to_ascii_lowercase();
+  if lower.contains("am/pm") || lower.contains("a/p") {
+    return None;
+  }
+  let mut output = String::new();
+  let mut index = 0usize;
+  let bytes = code.as_bytes();
+  let mut saw_date_or_time = false;
+  let mut time_context = false;
+  while index < bytes.len() {
+    let rest = &code[index..];
+    let lower_rest = &lower[index..];
+    if bytes[index] == b'\\' {
+      if let Some(ch) = rest[1..].chars().next() {
+        output.push(ch);
+        index += 1 + ch.len_utf8();
+      } else {
+        index += 1;
+      }
+      continue;
+    }
+    if bytes[index] == b'"' {
+      let mut consumed = 1usize;
+      for ch in rest[1..].chars() {
+        consumed += ch.len_utf8();
+        if ch == '"' {
+          break;
+        }
+        output.push(ch);
+      }
+      index += consumed;
+      continue;
+    }
+    let Some(ch) = rest.chars().next() else {
+      break;
+    };
+    if lower_rest.starts_with("yyyy") {
+      output.push_str(&format!("{year:04}"));
+      index += 4;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("yy") {
+      output.push_str(&format!("{:02}", (year % 100) as u32));
+      index += 2;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("mmmm") {
+      output.push_str(month_name(month));
+      index += 4;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("mmm") {
+      output.push_str(short_month_name(month));
+      index += 3;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("mm") {
+      if time_context {
+        output.push_str(&format!("{minute:02}"));
+      } else {
+        output.push_str(&format!("{month:02}"));
+      }
+      index += 2;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with('m') {
+      if time_context {
+        output.push_str(&minute.to_string());
+      } else {
+        output.push_str(&month.to_string());
+      }
+      index += 1;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("dd") {
+      output.push_str(&format!("{day:02}"));
+      index += 2;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with('d') {
+      output.push_str(&day.to_string());
+      index += 1;
+      saw_date_or_time = true;
+    } else if lower_rest.starts_with("hh") {
+      output.push_str(&format!("{hour:02}"));
+      index += 2;
+      saw_date_or_time = true;
+      time_context = true;
+    } else if lower_rest.starts_with('h') {
+      output.push_str(&hour.to_string());
+      index += 1;
+      saw_date_or_time = true;
+      time_context = true;
+    } else if lower_rest.starts_with("ss") {
+      output.push_str(&format!("{second:02}"));
+      index += 2;
+      saw_date_or_time = true;
+      time_context = true;
+    } else if lower_rest.starts_with('s') {
+      output.push_str(&second.to_string());
+      index += 1;
+      saw_date_or_time = true;
+      time_context = true;
+    } else {
+      output.push(ch);
+      index += ch.len_utf8();
+    }
+  }
+  saw_date_or_time.then_some(output)
 }
 
 fn month_name(month: u32) -> &'static str {

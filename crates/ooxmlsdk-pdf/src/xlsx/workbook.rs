@@ -139,7 +139,7 @@ fn worksheet_sheet(
     .map(super::worksheet::worksheet_raw_data)
     .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
-  let resources = SheetResourceCatalog::from_worksheet_part(package, part)?;
+  let resources = SheetResourceCatalog::from_worksheet_part(package, part, shared_strings)?;
   let mut sheet = CalcSheet::from_worksheet(
     workbook_index,
     sheet.name.as_str().to_string(),

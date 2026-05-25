@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ooxmlsdk::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart;
 use ooxmlsdk::parts::pivot_table_part::PivotTablePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
@@ -6,6 +8,8 @@ use ooxmlsdk::sdk::SdkPart;
 
 use super::styles::BorderRecord;
 use super::styles::StylesCatalog;
+use super::text::decode_excel_escaped_text;
+use super::workbook::SharedStringModel;
 use super::worksheet::{CalcSheet, CellAddress, CellRange};
 use crate::docx::{BorderStyle, RgbColor};
 use crate::error::Result;
@@ -614,6 +618,45 @@ struct PivotSourceCacheTable {
 }
 
 impl PivotSourceCacheTable {
+  fn from_worksheet_source(
+    worksheet: &x::Worksheet,
+    source_range: CellRange,
+    shared_strings: &[SharedStringModel],
+    raw_values: &HashMap<String, String>,
+  ) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
+    // PivotTable::finalizeImport creates the DataPilot descriptor from the
+    // worksheet source range.  The cache records are supplemental import data,
+    // but source-backed pivots are recalculated from the sheet cells.
+    let cells = worksheet
+      .sheet_data
+      .row
+      .iter()
+      .flat_map(|row| row.cell.iter())
+      .filter_map(|cell| {
+        let address = cell
+          .cell_reference
+          .as_deref()
+          .and_then(CellAddress::parse_a1)?;
+        source_range.contains(address).then_some((address, cell))
+      })
+      .collect::<HashMap<_, _>>();
+    let rows = (source_range.start.row + 1..=source_range.end.row)
+      .map(|row| {
+        (source_range.start.col..=source_range.end.col)
+          .map(|col| {
+            let address = CellAddress { col, row };
+            cells
+              .get(&address)
+              .map(|cell| pivot_source_cell_value(cell, shared_strings, raw_values))
+              .unwrap_or(PivotCacheItemValue::Empty)
+          })
+          .collect()
+      })
+      .collect();
+    Self { rows }
+  }
+
   fn from_records(
     records: &x::PivotCacheRecords,
     cache_field_item_values: &[Vec<PivotCacheItemValue>],
@@ -652,6 +695,83 @@ impl PivotSourceCacheTable {
       row_index -= 1;
     }
   }
+}
+
+fn pivot_source_cell_value(
+  cell: &x::Cell,
+  shared_strings: &[SharedStringModel],
+  raw_values: &HashMap<String, String>,
+) -> PivotCacheItemValue {
+  let text = match cell.data_type {
+    Some(x::CellValues::SharedString) => cell
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.as_deref())
+      .and_then(|index| index.parse::<usize>().ok())
+      .and_then(|index| shared_strings.get(index))
+      .map(|shared| shared.text.clone())
+      .unwrap_or_default(),
+    Some(x::CellValues::InlineString) => cell
+      .inline_string
+      .as_deref()
+      .map(pivot_inline_string_text)
+      .unwrap_or_default(),
+    Some(x::CellValues::Boolean) => {
+      let value = cell
+        .cell_value
+        .as_ref()
+        .and_then(|value| value.xml_content.as_deref())
+        .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
+      return PivotCacheItemValue::Boolean(value);
+    }
+    Some(x::CellValues::Error) => cell
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.as_deref())
+      .map(ToString::to_string)
+      .unwrap_or_default(),
+    _ => cell
+      .cell_reference
+      .as_ref()
+      .and_then(|reference| raw_values.get(reference.as_str()))
+      .cloned()
+      .or_else(|| {
+        cell
+          .cell_value
+          .as_ref()
+          .and_then(|value| value.xml_content.as_deref())
+          .map(ToString::to_string)
+      })
+      .unwrap_or_default(),
+  };
+  if text.is_empty() {
+    PivotCacheItemValue::Empty
+  } else if cell.data_type == Some(x::CellValues::Error) {
+    PivotCacheItemValue::Error(text)
+  } else if cell.data_type.is_none() {
+    text
+      .parse::<f64>()
+      .map(PivotCacheItemValue::Value)
+      .unwrap_or(PivotCacheItemValue::String(text))
+  } else {
+    PivotCacheItemValue::String(text)
+  }
+}
+
+fn pivot_inline_string_text(value: &x::InlineString) -> String {
+  if let Some(text) = &value.text
+    && let Some(content) = &text.xml_content
+  {
+    return decode_excel_escaped_text(content);
+  }
+
+  decode_excel_escaped_text(
+    &value
+      .run
+      .iter()
+      .filter_map(|run| run.text.xml_content.as_deref())
+      .collect::<String>(),
+  )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -729,47 +849,51 @@ impl PivotTableCatalog {
   pub(crate) fn from_parts(
     package: &mut SpreadsheetDocument,
     parts: &[PivotTablePart],
+    shared_strings: &[SharedStringModel],
   ) -> Result<Self> {
     Ok(Self {
       tables: parts
         .iter()
-        .map(|part| PivotTableModel::from_part(package, part))
+        .map(|part| PivotTableModel::from_part(package, part, shared_strings))
         .collect::<Result<Vec<_>>>()?,
     })
   }
 }
 
 impl PivotTableModel {
-  fn from_part(package: &mut SpreadsheetDocument, part: &PivotTablePart) -> Result<Self> {
-    let cache_field_names = {
-      part
-        .pivot_table_cache_definition_part(package)
-        .and_then(|part| part.root_element(package).ok())
-        .map(|cache| pivot_cache_field_names(cache))
-        .unwrap_or_default()
-    };
-    let cache_field_items = part
+  fn from_part(
+    package: &mut SpreadsheetDocument,
+    part: &PivotTablePart,
+    shared_strings: &[SharedStringModel],
+  ) -> Result<Self> {
+    let cache_definition = part
       .pivot_table_cache_definition_part(package)
-      .and_then(|part| part.root_element(package).ok())
-      .map(|cache| pivot_cache_field_items(cache))
+      .and_then(|part| part.root_element(package).ok().cloned());
+    let cache_field_names = cache_definition
+      .as_ref()
+      .map(pivot_cache_field_names)
       .unwrap_or_default();
-    let cache_field_item_values = part
-      .pivot_table_cache_definition_part(package)
-      .and_then(|part| part.root_element(package).ok())
-      .map(|cache| pivot_cache_field_item_values(cache))
+    let cache_field_items = cache_definition
+      .as_ref()
+      .map(pivot_cache_field_items)
       .unwrap_or_default();
-    let cache_field_number_format_ids = part
-      .pivot_table_cache_definition_part(package)
-      .and_then(|part| part.root_element(package).ok())
-      .map(|cache| pivot_cache_field_number_format_ids(cache))
+    let cache_field_item_values = cache_definition
+      .as_ref()
+      .map(pivot_cache_field_item_values)
       .unwrap_or_default();
-    let source_field_number_format_ids =
-      if let Some(cache_part) = part.pivot_table_cache_definition_part(package) {
-        let cache = cache_part.root_element(package)?.clone();
-        pivot_cache_source_number_format_ids(package, &cache).unwrap_or_default()
-      } else {
-        Vec::new()
-      };
+    let cache_field_number_format_ids = cache_definition
+      .as_ref()
+      .map(pivot_cache_field_number_format_ids)
+      .unwrap_or_default();
+    let source_field_number_format_ids = cache_definition
+      .as_ref()
+      .map(|cache| pivot_cache_source_number_format_ids(package, cache).unwrap_or_default())
+      .unwrap_or_default();
+    let source_cache = cache_definition.as_ref().and_then(|cache| {
+      pivot_source_cache_table(package, cache, shared_strings)
+        .ok()
+        .flatten()
+    });
     let cache_records = if let Some(cache_part) = part.pivot_table_cache_definition_part(package) {
       cache_part
         .pivot_table_cache_records_part(package)
@@ -777,10 +901,9 @@ impl PivotTableModel {
     } else {
       None
     };
-    let calculated_cache_fields = part
-      .pivot_table_cache_definition_part(package)
-      .and_then(|part| part.root_element(package).ok())
-      .map(|cache| calculated_cache_field_indexes(cache))
+    let calculated_cache_fields = cache_definition
+      .as_ref()
+      .map(calculated_cache_field_indexes)
       .unwrap_or_default();
     let definition = part.root_element(package)?;
     let has_cache_definition_part = !cache_field_names.is_empty();
@@ -907,6 +1030,7 @@ impl PivotTableModel {
       data_cell_text_overrides: pivot_count_data_cell_text_overrides(
         definition,
         cache_records.as_ref(),
+        source_cache.as_ref(),
         &cache_field_items,
         &cache_field_item_values,
       ),
@@ -1027,6 +1151,57 @@ fn pivot_cache_source_number_format_ids(
     ));
   }
   Ok(field_formats)
+}
+
+fn pivot_source_cache_table(
+  package: &mut SpreadsheetDocument,
+  cache: &x::PivotCacheDefinition,
+  shared_strings: &[SharedStringModel],
+) -> Result<Option<PivotSourceCacheTable>> {
+  let Some(x::CacheSourceChoice::WorksheetSource(source)) =
+    cache.cache_source.cache_source_choice.as_ref()
+  else {
+    return Ok(None);
+  };
+  let (Some(sheet_name), Some(reference)) = (source.sheet.as_deref(), source.reference.as_deref())
+  else {
+    return Ok(None);
+  };
+  let Some(source_range) = CellRange::parse_a1_range(reference) else {
+    return Ok(None);
+  };
+  let workbook_part = package.workbook_part()?;
+  let workbook = workbook_part.root_element(package)?.clone();
+  let Some((workbook_sheet_index, workbook_sheet)) = workbook
+    .sheets
+    .sheet
+    .iter()
+    .enumerate()
+    .find(|(_, sheet)| sheet.name == sheet_name)
+  else {
+    return Ok(None);
+  };
+  let worksheet_parts = workbook_part.worksheet_parts(package).collect::<Vec<_>>();
+  let Some(worksheet_part) = worksheet_parts
+    .iter()
+    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
+    .or_else(|| worksheet_parts.get(workbook_sheet_index))
+  else {
+    return Ok(None);
+  };
+  let raw_data = worksheet_part
+    .data_as_str(package)
+    .ok()
+    .flatten()
+    .map(super::worksheet::worksheet_raw_data)
+    .unwrap_or_default();
+  let worksheet = worksheet_part.root_element(package)?.clone();
+  Ok(Some(PivotSourceCacheTable::from_worksheet_source(
+    &worksheet,
+    source_range,
+    shared_strings,
+    &raw_data.cell_values,
+  )))
 }
 
 fn source_column_number_format_id(
@@ -1631,12 +1806,10 @@ fn page_item_member_text(item: &x::Item, cache_items: Option<&Vec<String>>) -> O
 fn pivot_count_data_cell_text_overrides(
   definition: &x::PivotTableDefinition,
   records: Option<&x::PivotCacheRecords>,
+  source_cache: Option<&PivotSourceCacheTable>,
   cache_field_items: &[Vec<String>],
   cache_field_item_values: &[Vec<PivotCacheItemValue>],
 ) -> Vec<PivotDataCellTextOverride> {
-  let Some(records) = records else {
-    return Vec::new();
-  };
   let Some(location) = CellRange::parse_a1_range(&definition.location.reference) else {
     return Vec::new();
   };
@@ -1666,7 +1839,15 @@ fn pivot_count_data_cell_text_overrides(
     return Vec::new();
   }
   let page_filters = pivot_cache_page_filters(definition, cache_field_item_values);
-  let source_cache = PivotSourceCacheTable::from_records(records, cache_field_item_values);
+  let cache_records_table;
+  let source_cache = if let Some(source_cache) = source_cache {
+    source_cache
+  } else if let Some(records) = records {
+    cache_records_table = PivotSourceCacheTable::from_records(records, cache_field_item_values);
+    &cache_records_table
+  } else {
+    return Vec::new();
+  };
   let row_items = pivot_row_cache_item_order(definition, row_field_index);
   let row_item_values =
     pivot_row_cache_item_values_order(definition, row_field_index, cache_field_item_values);

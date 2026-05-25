@@ -287,7 +287,7 @@ fn render_cell_area(
     );
     let rendered_text = calc_cell_visible_text(cell, &measurement_style, output_area);
     let mut rendered_text_items = Vec::new();
-    if !cell.rich_text_runs.is_empty() && rendered_text == cell.text {
+    if !cell.rich_text_runs.is_empty() && rendered_text.as_ref() == cell.text.as_ref() {
       render_cell_rich_text(
         &mut rendered_text_items,
         cell.rich_text_runs,
@@ -482,7 +482,7 @@ fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
       | super::print::NumberFormatRenderState::Number
       | super::print::NumberFormatRenderState::Percent
       | super::print::NumberFormatRenderState::DateTime
-  ) && cell.text.parse::<f64>().is_ok()
+  ) && cell.text.as_ref().parse::<f64>().is_ok()
 }
 
 fn calc_cell_value_can_hash(cell: &super::print::CalcPrintCell<'_>) -> bool {
@@ -500,7 +500,7 @@ fn calc_fit_general_number_text(
   style: &TextStyle,
   column_width_pt: f32,
 ) -> Option<String> {
-  let value = cell.text.parse::<f64>().ok()?;
+  let value = cell.text.as_ref().parse::<f64>().ok()?;
   if !value.is_finite() {
     return None;
   }
@@ -775,26 +775,23 @@ fn conditional_rule_matches(
 ) -> bool {
   match rule.rule_type {
     x::ConditionalFormatValues::CellIs => conditional_cell_is_matches(rule, cell),
-    x::ConditionalFormatValues::ContainsText => rule
-      .text
-      .as_ref()
-      .is_some_and(|needle| cell.rendered_text.contains(needle) || cell.text.contains(needle)),
-    x::ConditionalFormatValues::NotContainsText => rule
-      .text
-      .as_ref()
-      .is_some_and(|needle| !cell.rendered_text.contains(needle) && !cell.text.contains(needle)),
-    x::ConditionalFormatValues::BeginsWith => rule.text.as_ref().is_some_and(|needle| {
-      cell.rendered_text.starts_with(needle) || cell.text.starts_with(needle)
+    x::ConditionalFormatValues::ContainsText => rule.text.as_ref().is_some_and(|needle| {
+      cell.rendered_text.contains(needle) || cell.text.as_ref().contains(needle)
     }),
-    x::ConditionalFormatValues::EndsWith => rule
-      .text
-      .as_ref()
-      .is_some_and(|needle| cell.rendered_text.ends_with(needle) || cell.text.ends_with(needle)),
+    x::ConditionalFormatValues::NotContainsText => rule.text.as_ref().is_some_and(|needle| {
+      !cell.rendered_text.contains(needle) && !cell.text.as_ref().contains(needle)
+    }),
+    x::ConditionalFormatValues::BeginsWith => rule.text.as_ref().is_some_and(|needle| {
+      cell.rendered_text.starts_with(needle) || cell.text.as_ref().starts_with(needle)
+    }),
+    x::ConditionalFormatValues::EndsWith => rule.text.as_ref().is_some_and(|needle| {
+      cell.rendered_text.ends_with(needle) || cell.text.as_ref().ends_with(needle)
+    }),
     x::ConditionalFormatValues::ContainsBlanks => {
-      cell.text.is_empty() && cell.rendered_text.is_empty()
+      cell.text.as_ref().is_empty() && cell.rendered_text.is_empty()
     }
     x::ConditionalFormatValues::NotContainsBlanks => {
-      !cell.text.is_empty() || !cell.rendered_text.is_empty()
+      !cell.text.as_ref().is_empty() || !cell.rendered_text.is_empty()
     }
     x::ConditionalFormatValues::Expression => expression_rule_matches(rule),
     _ => false,
@@ -805,7 +802,7 @@ fn conditional_cell_is_matches(
   rule: &super::sheet_conditions::ConditionalFormatRuleModel,
   cell: &super::print::CalcPrintCell<'_>,
 ) -> bool {
-  let Some(value) = cell.text.parse::<f64>().ok() else {
+  let Some(value) = cell.text.as_ref().parse::<f64>().ok() else {
     return false;
   };
   let first = rule

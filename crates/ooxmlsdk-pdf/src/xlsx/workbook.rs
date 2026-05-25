@@ -59,6 +59,12 @@ impl WorkbookFragment {
     self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part)?;
     self.shared_strings = shared_strings(package, &self.workbook_part)?;
     self.defined_names = DefinedNamesCatalog::from_workbook(&self.workbook);
+    let date_1904 = self
+      .workbook
+      .workbook_properties
+      .as_ref()
+      .and_then(|properties| properties.date1904)
+      .is_some_and(|value| value.as_bool());
 
     let worksheet_parts = self
       .workbook_part
@@ -92,6 +98,7 @@ impl WorkbookFragment {
             active_workbook_sheet == Some(workbook_index),
             &self.shared_strings,
             &self.styles,
+            date_1904,
           );
         }
 
@@ -131,6 +138,7 @@ fn worksheet_sheet(
   active: bool,
   shared_strings: &[SharedStringModel],
   styles: &StylesCatalog,
+  date_1904: bool,
 ) -> Result<CalcSheet> {
   let raw_data = part
     .data_as_str(package)
@@ -139,7 +147,8 @@ fn worksheet_sheet(
     .map(super::worksheet::worksheet_raw_data)
     .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
-  let resources = SheetResourceCatalog::from_worksheet_part(package, part, shared_strings)?;
+  let resources =
+    SheetResourceCatalog::from_worksheet_part(package, part, shared_strings, styles, date_1904)?;
   let mut sheet = CalcSheet::from_worksheet(
     workbook_index,
     sheet.name.as_str().to_string(),

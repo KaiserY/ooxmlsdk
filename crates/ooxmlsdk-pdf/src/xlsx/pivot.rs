@@ -6,6 +6,7 @@ use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
+use super::print::rendered_number_text;
 use super::styles::BorderRecord;
 use super::styles::StylesCatalog;
 use super::text::decode_excel_escaped_text;
@@ -609,7 +610,6 @@ struct PivotPageRecordFilter {
 #[derive(Clone, Debug, PartialEq)]
 enum PivotSourceFilterKind {
   Group(Vec<PivotCacheItemValue>),
-  Single(PivotCacheItemValue),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -621,6 +621,7 @@ impl PivotSourceCacheTable {
   fn from_worksheet_source(
     worksheet: &x::Worksheet,
     source_range: CellRange,
+    record_count: Option<u32>,
     shared_strings: &[SharedStringModel],
     raw_values: &HashMap<String, String>,
   ) -> Self {
@@ -641,7 +642,16 @@ impl PivotSourceCacheTable {
         source_range.contains(address).then_some((address, cell))
       })
       .collect::<HashMap<_, _>>();
-    let rows = (source_range.start.row + 1..=source_range.end.row)
+    let last_data_row = cells
+      .keys()
+      .map(|address| address.row)
+      .max()
+      .unwrap_or(source_range.start.row);
+    let record_end_row = record_count
+      .map(|count| source_range.start.row.saturating_add(count))
+      .unwrap_or(source_range.end.row);
+    let end_row = source_range.end.row.min(last_data_row).min(record_end_row);
+    let rows = (source_range.start.row + 1..=end_row)
       .map(|row| {
         (source_range.start.col..=source_range.end.col)
           .map(|col| {
@@ -850,11 +860,13 @@ impl PivotTableCatalog {
     package: &mut SpreadsheetDocument,
     parts: &[PivotTablePart],
     shared_strings: &[SharedStringModel],
+    styles: &StylesCatalog,
+    date_1904: bool,
   ) -> Result<Self> {
     Ok(Self {
       tables: parts
         .iter()
-        .map(|part| PivotTableModel::from_part(package, part, shared_strings))
+        .map(|part| PivotTableModel::from_part(package, part, shared_strings, styles, date_1904))
         .collect::<Result<Vec<_>>>()?,
     })
   }
@@ -865,6 +877,8 @@ impl PivotTableModel {
     package: &mut SpreadsheetDocument,
     part: &PivotTablePart,
     shared_strings: &[SharedStringModel],
+    styles: &StylesCatalog,
+    date_1904: bool,
   ) -> Result<Self> {
     let cache_definition = part
       .pivot_table_cache_definition_part(package)
@@ -885,10 +899,18 @@ impl PivotTableModel {
       .as_ref()
       .map(pivot_cache_field_number_format_ids)
       .unwrap_or_default();
+    let cache_field_grouped = cache_definition
+      .as_ref()
+      .map(pivot_cache_field_grouped)
+      .unwrap_or_default();
     let source_field_number_format_ids = cache_definition
       .as_ref()
       .map(|cache| pivot_cache_source_number_format_ids(package, cache).unwrap_or_default())
       .unwrap_or_default();
+    let source_field_number_format_codes = source_field_number_format_ids
+      .iter()
+      .map(|id| id.and_then(|id| styles.number_format_code(id).map(ToString::to_string)))
+      .collect::<Vec<_>>();
     let source_cache = cache_definition.as_ref().and_then(|cache| {
       pivot_source_cache_table(package, cache, shared_strings)
         .ok()
@@ -1033,6 +1055,9 @@ impl PivotTableModel {
         source_cache.as_ref(),
         &cache_field_items,
         &cache_field_item_values,
+        &cache_field_grouped,
+        &source_field_number_format_codes,
+        date_1904,
       ),
       page_field_models: page_field_models(definition, &cache_field_names, &cache_field_items),
       format_models: pivot_table_format_models(definition),
@@ -1104,6 +1129,15 @@ fn pivot_cache_field_number_format_ids(cache: &x::PivotCacheDefinition) -> Vec<O
     .cache_field
     .iter()
     .map(|field| field.number_format_id)
+    .collect()
+}
+
+fn pivot_cache_field_grouped(cache: &x::PivotCacheDefinition) -> Vec<bool> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| field.field_group.is_some())
     .collect()
 }
 
@@ -1199,6 +1233,7 @@ fn pivot_source_cache_table(
   Ok(Some(PivotSourceCacheTable::from_worksheet_source(
     &worksheet,
     source_range,
+    cache.record_count,
     shared_strings,
     &raw_data.cell_values,
   )))
@@ -1809,6 +1844,9 @@ fn pivot_count_data_cell_text_overrides(
   source_cache: Option<&PivotSourceCacheTable>,
   cache_field_items: &[Vec<String>],
   cache_field_item_values: &[Vec<PivotCacheItemValue>],
+  cache_field_grouped: &[bool],
+  source_field_number_format_codes: &[Option<String>],
+  date_1904: bool,
 ) -> Vec<PivotDataCellTextOverride> {
   let Some(location) = CellRange::parse_a1_range(&definition.location.reference) else {
     return Vec::new();
@@ -1838,7 +1876,6 @@ fn pivot_count_data_cell_text_overrides(
   if data_field.subtotal != Some(x::DataConsolidateFunctionValues::Count) {
     return Vec::new();
   }
-  let page_filters = pivot_cache_page_filters(definition, cache_field_item_values);
   let cache_records_table;
   let source_cache = if let Some(source_cache) = source_cache {
     source_cache
@@ -1848,6 +1885,14 @@ fn pivot_count_data_cell_text_overrides(
   } else {
     return Vec::new();
   };
+  let page_filters = pivot_cache_page_filters(
+    definition,
+    source_cache,
+    cache_field_item_values,
+    cache_field_grouped,
+    source_field_number_format_codes,
+    date_1904,
+  );
   let row_items = pivot_row_cache_item_order(definition, row_field_index);
   let row_item_values =
     pivot_row_cache_item_values_order(definition, row_field_index, cache_field_item_values);
@@ -1871,8 +1916,10 @@ fn pivot_count_data_cell_text_overrides(
             .and_then(|items| items.get(*item as usize))
             == Some(&row_value.text())
         })
-      })
-      .unwrap_or_else(|| row_items.len() - 1);
+      });
+    let Some(row_position) = row_position else {
+      continue;
+    };
     total += 1;
     counts[row_position] += 1;
   }
@@ -1903,7 +1950,11 @@ fn pivot_count_data_cell_text_overrides(
 
 fn pivot_cache_page_filters(
   definition: &x::PivotTableDefinition,
+  source_cache: &PivotSourceCacheTable,
   cache_field_item_values: &[Vec<PivotCacheItemValue>],
+  cache_field_grouped: &[bool],
+  source_field_number_format_codes: &[Option<String>],
+  date_1904: bool,
 ) -> Vec<PivotPageRecordFilter> {
   let Some(page_fields) = definition.page_fields.as_ref() else {
     return Vec::new();
@@ -1915,6 +1966,13 @@ fn pivot_cache_page_filters(
       let Some(field_index) = usize::try_from(page_field.field).ok() else {
         return Vec::new();
       };
+      if cache_field_grouped
+        .get(field_index)
+        .copied()
+        .unwrap_or(false)
+      {
+        return Vec::new();
+      }
       let Some(pivot_field) = definition
         .pivot_fields
         .as_ref()
@@ -1922,60 +1980,154 @@ fn pivot_cache_page_filters(
       else {
         return Vec::new();
       };
-      let visible_items = pivot_field_visible_items(
+      let visible_items = pivot_field_source_visible_items(
         pivot_field,
+        source_cache,
+        field_index,
         cache_field_item_values.get(field_index).map(Vec::as_slice),
+        source_field_number_format_codes
+          .get(field_index)
+          .and_then(Option::as_deref),
+        date_1904,
       );
       let visible_filter = visible_items.map(|items| PivotPageRecordFilter {
         field_index,
         kind: PivotSourceFilterKind::Group(items),
       });
-      let selected_filter = page_field.item.and_then(|item_index| {
-        pivot_field
-          .items
-          .as_ref()
-          .and_then(|items| items.item.get(item_index as usize))
-          .and_then(|item| {
-            pivot_item_cache_value(
-              item,
-              cache_field_item_values.get(field_index).map(Vec::as_slice),
-            )
-          })
-          .map(|item| PivotPageRecordFilter {
-            field_index,
-            kind: PivotSourceFilterKind::Single(item),
-          })
-      });
-      [visible_filter, selected_filter]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
+      // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
+      // PivotTableField::convertPageField sets PROP_SelectedPage, which
+      // ScDPSaveDimension::SetCurrentPage applies only to already registered
+      // save members.  The source cache is filtered later from member
+      // visibility in dptabsrc.cxx::FilterCacheByPageDimensions; it is not an
+      // unconditional source-record equality filter.
+      visible_filter.into_iter().collect::<Vec<_>>()
     })
     .collect()
 }
 
-fn pivot_field_visible_items(
+fn pivot_field_source_visible_items(
   pivot_field: &x::PivotField,
+  source_cache: &PivotSourceCacheTable,
+  field_index: usize,
   cache_items: Option<&[PivotCacheItemValue]>,
+  number_format_code: Option<&str>,
+  date_1904: bool,
 ) -> Option<Vec<PivotCacheItemValue>> {
   let items = pivot_field.items.as_ref()?;
-  let mut visible = Vec::new();
-  let mut hidden = 0usize;
-  let mut data_items = 0usize;
+  let mut source_members =
+    pivot_source_field_members(source_cache, field_index, number_format_code, date_1904);
+  if source_members.is_empty() {
+    return None;
+  }
+  let mut changed = false;
   for item in &items.item {
     if !page_item_is_data(item) {
       continue;
     }
-    data_items += 1;
-    if item.hidden.is_some_and(|hidden| hidden.as_bool()) {
-      hidden += 1;
+    let Some(value) = pivot_item_cache_value(item, cache_items) else {
       continue;
-    }
-    if let Some(value) = pivot_item_cache_value(item, cache_items) {
-      visible.push(value);
+    };
+    let text = pivot_member_display_text(&value, number_format_code, date_1904);
+    if let Some(member) = source_members
+      .iter_mut()
+      .rev()
+      .find(|member| member.display_text == text)
+    {
+      member.visible = !item.hidden.is_some_and(|hidden| hidden.as_bool());
+      changed = true;
     }
   }
-  (hidden > 0 && visible.len() < data_items).then_some(visible)
+  changed.then(|| {
+    source_members
+      .into_iter()
+      .filter(|member| member.visible)
+      .map(|member| member.value)
+      .collect()
+  })
+}
+
+#[derive(Clone, Debug)]
+struct PivotSourceFieldMember {
+  value: PivotCacheItemValue,
+  display_text: String,
+  visible: bool,
+}
+
+fn pivot_source_field_members(
+  source_cache: &PivotSourceCacheTable,
+  field_index: usize,
+  number_format_code: Option<&str>,
+  date_1904: bool,
+) -> Vec<PivotSourceFieldMember> {
+  let mut values = Vec::new();
+  for row in &source_cache.rows {
+    let value = row
+      .get(field_index)
+      .cloned()
+      .unwrap_or(PivotCacheItemValue::Empty);
+    if !values.iter().any(|member| *member == value) {
+      values.push(value);
+    }
+  }
+  values.sort_by(pivot_cache_item_compare);
+  values
+    .into_iter()
+    .map(|value| PivotSourceFieldMember {
+      display_text: pivot_member_display_text(&value, number_format_code, date_1904),
+      value,
+      visible: true,
+    })
+    .collect()
+}
+
+fn pivot_member_display_text(
+  value: &PivotCacheItemValue,
+  number_format_code: Option<&str>,
+  date_1904: bool,
+) -> String {
+  match value {
+    PivotCacheItemValue::Value(value) => {
+      rendered_number_text(&value.to_string(), number_format_code, None, date_1904).0
+    }
+    PivotCacheItemValue::DateTime { serial, .. } => {
+      rendered_number_text(&serial.to_string(), number_format_code, None, date_1904).0
+    }
+    _ => value.text(),
+  }
+}
+
+fn pivot_cache_item_compare(
+  left: &PivotCacheItemValue,
+  right: &PivotCacheItemValue,
+) -> std::cmp::Ordering {
+  let left_rank = pivot_cache_item_type_rank(left);
+  let right_rank = pivot_cache_item_type_rank(right);
+  left_rank
+    .cmp(&right_rank)
+    .then_with(|| match (left, right) {
+      (PivotCacheItemValue::Value(left), PivotCacheItemValue::Value(right))
+      | (
+        PivotCacheItemValue::DateTime { serial: left, .. },
+        PivotCacheItemValue::DateTime { serial: right, .. },
+      )
+      | (PivotCacheItemValue::Value(left), PivotCacheItemValue::DateTime { serial: right, .. })
+      | (PivotCacheItemValue::DateTime { serial: left, .. }, PivotCacheItemValue::Value(right)) => {
+        left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal)
+      }
+      (PivotCacheItemValue::String(left), PivotCacheItemValue::String(right))
+      | (PivotCacheItemValue::Error(left), PivotCacheItemValue::Error(right)) => left.cmp(right),
+      (PivotCacheItemValue::Boolean(left), PivotCacheItemValue::Boolean(right)) => left.cmp(right),
+      _ => std::cmp::Ordering::Equal,
+    })
+}
+
+fn pivot_cache_item_type_rank(value: &PivotCacheItemValue) -> u8 {
+  match value {
+    PivotCacheItemValue::Value(_) | PivotCacheItemValue::DateTime { .. } => 0,
+    PivotCacheItemValue::Boolean(_) => 1,
+    PivotCacheItemValue::String(_) | PivotCacheItemValue::Error(_) => 2,
+    PivotCacheItemValue::Empty => 3,
+  }
 }
 
 fn pivot_item_cache_value(
@@ -2053,7 +2205,6 @@ impl PivotSourceFilterKind {
   fn matches(&self, value: &PivotCacheItemValue) -> bool {
     match self {
       Self::Group(items) => items.contains(value),
-      Self::Single(item) => item == value,
     }
   }
 }

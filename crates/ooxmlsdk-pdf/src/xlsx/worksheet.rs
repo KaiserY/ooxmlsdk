@@ -322,6 +322,12 @@ impl CalcSheet {
         });
       }
     }
+    for pivot in &self.resources.pivot_tables.tables {
+      used = Some(match used {
+        Some(used) => used.union(pivot.output_geometry.whole_range),
+        None => pivot.output_geometry.whole_range,
+      });
+    }
     for anchor in self
       .resources
       .drawings
@@ -877,6 +883,8 @@ impl SheetResourceCatalog {
     package: &mut SpreadsheetDocument,
     part: &WorksheetPart,
     shared_strings: &[SharedStringModel],
+    styles: &StylesCatalog,
+    date_1904: bool,
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
@@ -896,7 +904,13 @@ impl SheetResourceCatalog {
     let comments =
       CommentsCatalog::from_worksheet_part(package, comments_part, threaded_comment_parts)?;
     let pivot_table_parts = part.pivot_table_parts(package).collect::<Vec<_>>();
-    let pivot_tables = PivotTableCatalog::from_parts(package, &pivot_table_parts, shared_strings)?;
+    let pivot_tables = PivotTableCatalog::from_parts(
+      package,
+      &pivot_table_parts,
+      shared_strings,
+      styles,
+      date_1904,
+    )?;
     let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
     let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
     let relationships = SheetRelationshipCatalog::from_worksheet_part(package, part)?;

@@ -2629,8 +2629,17 @@ fn pivot_output_geometry(
     col: table_start.col + data_start_col_offset,
     row: table_start.row + data_start_row_offset,
   };
-  let data_rows = pivot_data_row_count(definition).max(1);
-  let data_columns = pivot_data_column_count(definition).max(1);
+  // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
+  // Calc recomputes the result matrix from the imported DataPilot model.  When
+  // unsupported cached data fields are not emitted by the PDF model, the
+  // printable range is already reduced; keep the generated matrix inside that
+  // recomputed range instead of expanding it back from stale OOXML row/colItems.
+  let data_rows = pivot_data_row_count(definition)
+    .max(1)
+    .min(location.end.row.saturating_sub(data_start.row) + 1);
+  let data_columns = pivot_data_column_count(definition)
+    .max(1)
+    .min(location.end.col.saturating_sub(data_start.col) + 1);
   let end = CellAddress {
     col: data_start.col + data_columns - 1,
     row: data_start.row + data_rows - 1,

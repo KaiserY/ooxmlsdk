@@ -226,9 +226,10 @@ impl CalcSheet {
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
     raw_values: &HashMap<String, String>,
+    mso_document: bool,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
-    let metrics = SheetMetrics::from_worksheet(&worksheet, styles);
+    let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
     Self {
       workbook_index,
       name,
@@ -241,7 +242,7 @@ impl CalcSheet {
       metrics,
       chartsheet_metrics: None,
       resources,
-      rows: worksheet_rows(&worksheet, shared_strings, raw_values),
+      rows: worksheet_rows(&worksheet, shared_strings, raw_values, mso_document),
     }
   }
 
@@ -470,7 +471,7 @@ impl CalcSheet {
         return 0.0;
       }
       if let Some(width) = model.width {
-        return digit_width_to_points(width as f32, self.metrics.digit_width_pt);
+        return digit_width_to_lo_points(width as f32, self.metrics.digit_width_pt);
       }
     }
     if self
@@ -725,7 +726,7 @@ impl ChartsheetMetrics {
 }
 
 impl SheetMetrics {
-  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog) -> Self {
+  fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
     // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
     // WorksheetFragment imports dimensions, sheetFormatPr, cols,
     // mergeCells, hyperlinks, rowBreaks, and colBreaks before page layout.
@@ -739,7 +740,7 @@ impl SheetMetrics {
       format: worksheet
         .sheet_format_properties
         .as_ref()
-        .map(SheetFormatModel::from_sheet_format_properties)
+        .map(|format| SheetFormatModel::from_sheet_format_properties(format, mso_document))
         .unwrap_or_default(),
       digit_width_pt: default_digit_width_pt(styles),
       columns: worksheet
@@ -806,11 +807,15 @@ impl SheetMetrics {
 }
 
 impl SheetFormatModel {
-  fn from_sheet_format_properties(format: &x::SheetFormatProperties) -> Self {
+  fn from_sheet_format_properties(format: &x::SheetFormatProperties, mso_document: bool) -> Self {
     Self {
       base_column_width: format.base_column_width,
       default_column_width: format.default_column_width,
-      default_row_height: format.default_row_height,
+      default_row_height: if mso_document {
+        mso_row_height_pt(format.default_row_height)
+      } else {
+        format.default_row_height
+      },
       custom_height: format.custom_height.is_some_and(|value| value.as_bool()),
       zero_height: format.zero_height.is_some_and(|value| value.as_bool()),
       thick_top: format.thick_top.is_some_and(|value| value.as_bool()),
@@ -827,8 +832,10 @@ impl SheetFormatModel {
     // through UnitConverter after UnitConverter::finalizeImport() has replaced
     // Unit::Digit with the default font's maximum digit width.
     let base = self.base_column_width.unwrap_or(8) as f32;
-    digit_width_to_points(base, digit_width_pt)
-      + CALC_BASE_COLUMN_PADDING_PX * screen_pixel_width_pt()
+    digit_width_to_lo_points(
+      base + CALC_BASE_COLUMN_PADDING_PX * screen_pixel_width_pt() / digit_width_pt,
+      digit_width_pt,
+    )
   }
 }
 
@@ -1032,6 +1039,7 @@ fn worksheet_rows(
   worksheet: &x::Worksheet,
   shared_strings: &[SharedStringModel],
   raw_values: &HashMap<String, String>,
+  mso_document: bool,
 ) -> Vec<CalcRow> {
   worksheet
     .sheet_data
@@ -1066,7 +1074,13 @@ fn worksheet_rows(
         .collect();
       CalcRow {
         row_index: Some(row_index),
-        height: row.height,
+        height: row.height.map(|height| {
+          if mso_document {
+            mso_row_height_pt(height)
+          } else {
+            height
+          }
+        }),
         custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
         style_index: row.style_index,
         hidden: row.hidden.is_some_and(|value| value.as_bool()),
@@ -1076,10 +1090,25 @@ fn worksheet_rows(
     .collect()
 }
 
+fn mso_row_height_pt(height: f64) -> f64 {
+  if height > 0.0 {
+    // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx and
+    // worksheetfragment.cxx round MSO OOXML row heights down to 0.75pt.
+    height - height % 0.75
+  } else {
+    height
+  }
+}
+
 fn digit_width_to_points(value: f32, digit_width_pt: f32) -> f32 {
   // Source: LibreOffice sc/source/filter/oox/unitconverter.cxx:
   // UnitConverter::scaleValue(value, Unit::Digit, Unit::Twip).
   value * digit_width_pt
+}
+
+fn digit_width_to_lo_points(value: f32, digit_width_pt: f32) -> f32 {
+  (digit_width_to_points(value, digit_width_pt) * units::TWIPS_PER_POINT).round()
+    / units::TWIPS_PER_POINT
 }
 
 fn default_digit_width_pt(styles: &StylesCatalog) -> f32 {

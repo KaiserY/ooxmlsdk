@@ -59,9 +59,10 @@ impl ExcelImport {
       ConnectionsCatalog::from_part(package, workbook_part.connections_part(package))?;
     let workbook_resources = WorkbookResourceCatalog::from_part(package, &workbook_part);
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
+    let mso_document = is_mso_document(package);
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
-    let mut sheets = fragment.finalize_import(package)?;
+    let mut sheets = fragment.finalize_import(package, mso_document)?;
     super::formula::recalculate_formula_cells(
       &mut sheets,
       &fragment.defined_names,
@@ -82,6 +83,20 @@ impl ExcelImport {
       workbook_catalog,
     })
   }
+}
+
+fn is_mso_document(package: &mut SpreadsheetDocument) -> bool {
+  let extended_properties_part = {
+    package
+      .get_parts_of_type::<
+        ooxmlsdk::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+      >()
+      .next()
+  };
+  let application = extended_properties_part
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|properties| properties.application.as_deref());
+  application.is_some_and(|value| value.contains("Microsoft"))
 }
 
 impl WorkbookResourceCatalog {

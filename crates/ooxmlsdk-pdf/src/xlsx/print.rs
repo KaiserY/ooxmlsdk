@@ -633,7 +633,12 @@ fn print_areas_for_sheet(
   named_ranges: &CalcPrintNamedRanges<'_>,
 ) -> Vec<CellRange> {
   if !named_ranges.resolved_print_areas.is_empty() {
-    return named_ranges.resolved_print_areas.clone();
+    return named_ranges
+      .resolved_print_areas
+      .iter()
+      .copied()
+      .map(|range| extend_print_area_for_merges(sheet, range))
+      .collect();
   }
   match sheet.used_range() {
     // Source: LibreOffice sc/source/ui/view/printfun.cxx::AdjustPrintArea(true).
@@ -647,6 +652,7 @@ fn print_areas_for_sheet(
         range.end.col = range.end.col.max(drawing_range.end.col);
         range.end.row = range.end.row.max(drawing_range.end.row);
       }
+      range = extend_print_area_for_merges(sheet, range);
       vec![extend_print_area_for_overflow(import, sheet, range)]
     }
     // With skip-empty disabled, a missing document print area still leaves the
@@ -655,6 +661,31 @@ fn print_areas_for_sheet(
       vec![drawing_print_area(sheet).unwrap_or(CellRange::single(CellAddress { col: 1, row: 1 }))]
     }
   }
+}
+
+fn extend_print_area_for_merges(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
+  // Source: LibreOffice sc/source/ui/view/printfun.cxx::AdjustPrintArea calls
+  // ScDocument::ExtendMerge before text-overflow expansion, and
+  // sc/source/core/data/table2.cxx extends the print end to any merged-cell
+  // start inside the current area.
+  let old_end_col = range.end.col;
+  let old_end_row = range.end.row;
+  for merged in sheet
+    .metrics
+    .merged_ranges
+    .iter()
+    .filter_map(|reference| CellRange::parse_a1_range(reference))
+  {
+    if merged.start.col >= range.start.col
+      && merged.start.col <= old_end_col
+      && merged.start.row >= range.start.row
+      && merged.start.row <= old_end_row
+    {
+      range.end.col = range.end.col.max(merged.end.col);
+      range.end.row = range.end.row.max(merged.end.row);
+    }
+  }
+  range
 }
 
 fn drawing_print_area(sheet: &CalcSheet) -> Option<CellRange> {
@@ -1048,7 +1079,9 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
       let Some(print_address) = pivot_print_address(sheet, address) else {
         continue;
       };
-      if !area.contains(print_address) || column_hidden(sheet, address.col) {
+      if !print_cell_intersects_area(sheet, address, print_address, area)
+        || column_hidden(sheet, address.col)
+      {
         continue;
       }
       if !cell.display_text.is_empty()
@@ -1355,6 +1388,25 @@ fn cell_has_print_data(cell: &super::worksheet::CalcCell) -> bool {
     || cell.data_type.is_some()
 }
 
+fn print_cell_intersects_area(
+  sheet: &CalcSheet,
+  address: CellAddress,
+  print_address: CellAddress,
+  area: CellRange,
+) -> bool {
+  if area.contains(print_address) {
+    return true;
+  }
+  // Source: LibreOffice sc/source/ui/view/output2.cxx starts cell output one
+  // column before the page and resolves overlapped cells through
+  // ScOutputData::GetMergeOrigin, so a merged cell whose origin is left of the
+  // current page still paints on pages intersecting the merged range.
+  sheet
+    .merged_range_for_cell(address)
+    .filter(|merged| merged.start == address)
+    .is_some_and(|merged| merged.intersects(area))
+}
+
 fn repeat_rows_for_page(
   area: Option<CellRange>,
   repeat_rows: Option<CellRange>,
@@ -1427,7 +1479,7 @@ fn print_cells_for_area<'a>(
       let Some(print_address) = pivot_print_address(sheet, address) else {
         continue;
       };
-      if !area.contains(print_address) {
+      if !print_cell_intersects_area(sheet, address, print_address, area) {
         continue;
       }
       occupied.insert(print_address);

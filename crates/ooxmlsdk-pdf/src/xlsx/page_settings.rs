@@ -115,6 +115,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) margin_header_in: f64,
   pub(crate) margin_footer_in: f64,
   pub(crate) paper_size: u32,
+  pub(crate) valid_printer_settings: bool,
   pub(crate) scale: u32,
   pub(crate) fit_to_width: u32,
   pub(crate) fit_to_height: u32,
@@ -160,6 +161,7 @@ impl Default for CalcPageSettings {
       margin_header_in: 0.512,
       margin_footer_in: 0.512,
       paper_size: 1,
+      valid_printer_settings: true,
       scale: 100,
       fit_to_width: 1,
       fit_to_height: 1,
@@ -199,6 +201,9 @@ impl CalcPageSettings {
     }
     if let Some(page_setup) = &chartsheet.chart_sheet_page_setup {
       settings.paper_size = page_setup.paper_size.unwrap_or(settings.paper_size);
+      settings.valid_printer_settings = page_setup
+        .use_printer_defaults
+        .is_some_and(|value| value.as_bool());
       settings.orientation = page_setup.orientation;
       settings.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(settings.horizontal_dpi);
       settings.vertical_dpi = page_setup.vertical_dpi.unwrap_or(settings.vertical_dpi);
@@ -221,6 +226,9 @@ impl CalcPageSettings {
     if let Some(paper_size) = page_setup.paper_size {
       self.paper_size = paper_size;
     }
+    self.valid_printer_settings = page_setup
+      .use_printer_defaults
+      .is_some_and(|value| value.as_bool());
     if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
       self.scale = scale;
     }
@@ -246,8 +254,18 @@ impl CalcPageSettings {
   }
 
   pub(crate) fn page_size_pt(&self) -> (f32, f32) {
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx keeps
+    // PageSettingsModel::mbValidSettings true until pageSetup says otherwise.
+    // With valid printer defaults, PageSettingsConverter leaves PROP_Size
+    // unchanged, so Calc printing uses the document style default. The LO test
+    // profile default is A4.
+    let paper_size = if self.valid_printer_settings {
+      9
+    } else {
+      self.paper_size
+    };
     let mut size = match MS_PAPER_SIZE_TABLE
-      .get(self.paper_size as usize)
+      .get(paper_size as usize)
       .copied()
       .unwrap_or(PaperMeasure::Undefined)
     {

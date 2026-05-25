@@ -2363,9 +2363,12 @@ fn pivot_output_geometry(
   };
   let row_field_columns = pivot_columns_for_row_fields(definition);
   let column_field_rows = pivot_column_field_count(definition);
+  let data_start_col_offset = row_field_columns.max(definition.location.first_data_column);
+  let data_start_row_offset =
+    (header_rows + column_field_rows).max(definition.location.first_data_row);
   let data_start = CellAddress {
-    col: table_start.col + row_field_columns,
-    row: table_start.row + header_rows + column_field_rows,
+    col: table_start.col + data_start_col_offset,
+    row: table_start.row + data_start_row_offset,
   };
   let data_rows = pivot_data_row_count(definition).max(1);
   let data_columns = pivot_data_column_count(definition).max(1);

@@ -52,6 +52,7 @@ impl WorkbookFragment {
   pub(crate) fn finalize_import(
     &mut self,
     package: &mut SpreadsheetDocument,
+    mso_document: bool,
   ) -> Result<Vec<CalcSheet>> {
     // Source: LibreOffice sc/source/filter/oox/workbookfragment.cxx
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
@@ -99,6 +100,7 @@ impl WorkbookFragment {
             &self.shared_strings,
             &self.styles,
             date_1904,
+            mso_document,
           );
         }
 
@@ -139,6 +141,7 @@ fn worksheet_sheet(
   shared_strings: &[SharedStringModel],
   styles: &StylesCatalog,
   date_1904: bool,
+  mso_document: bool,
 ) -> Result<CalcSheet> {
   let raw_data = part
     .data_as_str(package)
@@ -161,6 +164,7 @@ fn worksheet_sheet(
     shared_strings,
     styles,
     &raw_data.cell_values,
+    mso_document,
   );
   apply_raw_header_footer(&mut sheet, &raw_data);
   Ok(sheet)

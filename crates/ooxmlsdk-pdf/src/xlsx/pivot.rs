@@ -4,7 +4,10 @@ use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
-use super::worksheet::{CellAddress, CellRange};
+use super::styles::BorderRecord;
+use super::styles::StylesCatalog;
+use super::worksheet::{CalcSheet, CellAddress, CellRange};
+use crate::docx::{BorderStyle, RgbColor};
 use crate::error::Result;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -41,6 +44,9 @@ pub(crate) struct PivotTableModel {
   pub(crate) cache_id: u32,
   pub(crate) location_reference: String,
   pub(crate) printable_location_reference: String,
+  pub(crate) output_geometry: PivotOutputGeometry,
+  pub(crate) first_data_row: u32,
+  pub(crate) first_data_column: u32,
   pub(crate) calculated_only_data_fields: bool,
   pub(crate) data_layout_axis: PivotDataLayoutAxis,
   pub(crate) style_name: Option<String>,
@@ -52,12 +58,597 @@ pub(crate) struct PivotTableModel {
   pub(crate) filters: usize,
   pub(crate) formats: usize,
   pub(crate) compact: bool,
+  pub(crate) row_field_indexes: Vec<i32>,
+  pub(crate) column_field_indexes: Vec<i32>,
   pub(crate) row_field_names: Vec<String>,
   pub(crate) column_field_names: Vec<String>,
+  pub(crate) row_field_number_format_ids: Vec<Option<u32>>,
+  pub(crate) column_field_number_format_ids: Vec<Option<u32>>,
   pub(crate) data_field_names: Vec<String>,
+  pub(crate) data_field_number_format_ids: Vec<Option<u32>>,
+  pub(crate) data_cell_text_overrides: Vec<PivotDataCellTextOverride>,
+  pub(crate) page_field_models: Vec<PivotPageFieldModel>,
+  pub(crate) format_models: Vec<PivotTableFormatModel>,
+  pub(crate) format_item_names: Vec<Vec<String>>,
+  pub(crate) format_row_lines: Vec<PivotFormatLineData>,
+  pub(crate) format_column_lines: Vec<PivotFormatLineData>,
+  pub(crate) builtin_frame_ranges: Vec<PivotFrameRange>,
   pub(crate) has_cache_definition_part: bool,
   pub(crate) has_extensions: bool,
   pub(crate) flag_count: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PivotPageFieldModel {
+  pub(crate) field_name: String,
+  pub(crate) value: PivotPageFieldValue,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PivotDataCellTextOverride {
+  pub(crate) address: CellAddress,
+  pub(crate) text: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum PivotPageFieldValue {
+  All,
+  Multiple,
+  Member(String),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PivotOutputGeometry {
+  pub(crate) whole_range: CellRange,
+  pub(crate) table_range: CellRange,
+  pub(crate) result_range: CellRange,
+  pub(crate) output_start: CellAddress,
+  pub(crate) table_start: CellAddress,
+  pub(crate) data_start: CellAddress,
+  pub(crate) row_field_columns: u32,
+  pub(crate) column_field_rows: u32,
+  pub(crate) header_rows: u32,
+  pub(crate) data_rows: u32,
+  pub(crate) data_columns: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PivotTableFormatModel {
+  pub(crate) format_id: Option<u32>,
+  pub(crate) kind: PivotTableFormatKind,
+  pub(crate) data_only: bool,
+  pub(crate) label_only: bool,
+  pub(crate) outline: bool,
+  pub(crate) field_position: Option<u32>,
+  pub(crate) selections: Vec<PivotTableFormatSelection>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum PivotTableFormatKind {
+  #[default]
+  None,
+  Data,
+  Label,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PivotTableFormatSelection {
+  pub(crate) selected: bool,
+  pub(crate) field: u32,
+  pub(crate) item_indexes: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct PivotBuiltinCellStyle {
+  pub(crate) bold: bool,
+  pub(crate) left_align: bool,
+  pub(crate) borders: BorderRecord,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PivotFormatLineData {
+  line: u32,
+  position: u32,
+  fields: Vec<PivotFormatFieldData>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PivotFormatFieldData {
+  dimension: i32,
+  name: String,
+  index: i32,
+  is_set: bool,
+  is_member: bool,
+  subtotal: bool,
+  continues: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PivotFormatOutputField {
+  dimension: i32,
+  name: String,
+  index: i32,
+  matches_all: bool,
+  set: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PivotFrameRange {
+  range: CellRange,
+  horizontal_inner: bool,
+  field_frame: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PivotFormatLineMatch {
+  Exact,
+  Maybe,
+  None,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PivotFormatAxis {
+  Row,
+  Column,
+}
+
+const PIVOT_FORMAT_DATA_DIMENSION: i32 = -2;
+
+#[derive(Clone, Debug)]
+enum PivotCacheItemValue {
+  Empty,
+  String(String),
+  Value(f64),
+  Boolean(bool),
+  DateTime { serial: f64, text: String },
+  Error(String),
+}
+
+impl PivotCacheItemValue {
+  fn text(&self) -> String {
+    match self {
+      Self::Empty => String::new(),
+      Self::String(text) | Self::Error(text) => text.clone(),
+      Self::DateTime { text, .. } => text.clone(),
+      Self::Value(value) => format_pivot_cache_number(*value),
+      Self::Boolean(value) => {
+        if *value {
+          "TRUE".to_string()
+        } else {
+          "FALSE".to_string()
+        }
+      }
+    }
+  }
+
+  fn is_empty(&self) -> bool {
+    matches!(self, Self::Empty)
+  }
+}
+
+impl PartialEq for PivotCacheItemValue {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Self::Empty, Self::Empty) => true,
+      (Self::String(left), Self::String(right)) | (Self::Error(left), Self::Error(right)) => {
+        left == right
+      }
+      (Self::Value(left), Self::Value(right)) => (left - right).abs() <= f64::EPSILON,
+      (Self::DateTime { serial: left, .. }, Self::DateTime { serial: right, .. }) => {
+        (left - right).abs() <= f64::EPSILON
+      }
+      (Self::Boolean(left), Self::Boolean(right)) => left == right,
+      _ => false,
+    }
+  }
+}
+
+impl Eq for PivotCacheItemValue {}
+
+pub(crate) fn pivot_format_id_for_address(sheet: &CalcSheet, address: CellAddress) -> Option<u32> {
+  let mut format_id = None;
+  for pivot in &sheet.resources.pivot_tables.tables {
+    if !pivot.output_geometry.table_range.contains(address) {
+      continue;
+    }
+    for format in &pivot.format_models {
+      if !pivot_format_kind_contains_address(pivot, format.kind, address)
+        || !pivot_format_selection_matches(sheet, pivot, format, address)
+      {
+        continue;
+      }
+      if let Some(id) = format.format_id {
+        format_id = Some(id);
+      }
+    }
+  }
+  format_id
+}
+
+pub(crate) fn pivot_builtin_style_for_address(
+  sheet: &CalcSheet,
+  address: CellAddress,
+) -> PivotBuiltinCellStyle {
+  let Some(pivot) = sheet
+    .resources
+    .pivot_tables
+    .tables
+    .iter()
+    .find(|pivot| pivot.output_geometry.table_range.contains(address))
+  else {
+    return PivotBuiltinCellStyle::default();
+  };
+  let mut style = PivotBuiltinCellStyle::default();
+  if pivot.output_geometry.result_range.contains(address) {
+    style.bold = pivot
+      .format_row_lines
+      .iter()
+      .find(|line| line.line == address.row)
+      .is_some_and(pivot_format_line_has_subtotal)
+      || pivot
+        .format_column_lines
+        .iter()
+        .find(|line| line.line == address.col)
+        .is_some_and(pivot_format_line_has_subtotal);
+    style.borders = pivot_builtin_borders_for_address(pivot, address);
+    return style;
+  }
+  if let Some(line) = pivot
+    .format_row_lines
+    .iter()
+    .find(|line| line.line == address.row && line.position == address.col)
+  {
+    style.left_align = true;
+    style.bold = pivot_format_line_has_subtotal(line);
+    return style;
+  }
+  if let Some(line) = pivot
+    .format_column_lines
+    .iter()
+    .find(|line| line.line == address.col && line.position == address.row)
+  {
+    style.left_align = true;
+    style.bold = pivot_format_line_has_subtotal(line);
+  }
+  style.borders = pivot_builtin_borders_for_address(pivot, address);
+  style
+}
+
+fn pivot_format_line_has_subtotal(line: &PivotFormatLineData) -> bool {
+  line.fields.iter().any(|field| field.subtotal)
+}
+
+fn pivot_builtin_borders_for_address(
+  pivot: &PivotTableModel,
+  address: CellAddress,
+) -> BorderRecord {
+  let mut borders = BorderRecord::default();
+  for frame in &pivot.builtin_frame_ranges {
+    if !frame.range.contains(address) {
+      continue;
+    }
+    let inner = pivot_inner_frame_border();
+    let left = if frame.field_frame {
+      inner
+    } else if frame.range.start.col == pivot.output_geometry.table_start.col {
+      pivot_outer_frame_border()
+    } else {
+      inner
+    };
+    let top = if frame.field_frame {
+      inner
+    } else if frame.range.start.row == pivot.output_geometry.table_start.row {
+      pivot_outer_frame_border()
+    } else {
+      inner
+    };
+    let right = if frame.field_frame {
+      inner
+    } else if frame.range.end.col == pivot.output_geometry.table_range.end.col {
+      pivot_outer_frame_border()
+    } else {
+      inner
+    };
+    let bottom = if frame.field_frame {
+      inner
+    } else if frame.range.end.row == pivot.output_geometry.table_range.end.row {
+      pivot_outer_frame_border()
+    } else {
+      inner
+    };
+    if address.col == frame.range.start.col {
+      borders.left = Some(left);
+    }
+    if address.row == frame.range.start.row {
+      borders.top = Some(top);
+    }
+    if address.col == frame.range.end.col {
+      borders.right = Some(right);
+    }
+    if address.row == frame.range.end.row {
+      borders.bottom = Some(bottom);
+    }
+    if frame.horizontal_inner && address.row > frame.range.start.row {
+      borders.top = Some(inner);
+    }
+  }
+  borders
+}
+
+fn pivot_inner_frame_border() -> BorderStyle {
+  pivot_frame_border(20)
+}
+
+fn pivot_outer_frame_border() -> BorderStyle {
+  pivot_frame_border(40)
+}
+
+fn pivot_frame_border(width_twips: u16) -> BorderStyle {
+  BorderStyle {
+    width_pt: f32::from(width_twips) / 20.0,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+    ..BorderStyle::default()
+  }
+}
+
+fn pivot_format_kind_contains_address(
+  pivot: &PivotTableModel,
+  kind: PivotTableFormatKind,
+  address: CellAddress,
+) -> bool {
+  match kind {
+    PivotTableFormatKind::Data => pivot.output_geometry.result_range.contains(address),
+    PivotTableFormatKind::Label => {
+      pivot.output_geometry.table_range.contains(address)
+        && !pivot.output_geometry.result_range.contains(address)
+    }
+    PivotTableFormatKind::None => false,
+  }
+}
+
+fn pivot_format_selection_matches(
+  _sheet: &CalcSheet,
+  pivot: &PivotTableModel,
+  format: &PivotTableFormatModel,
+  address: CellAddress,
+) -> bool {
+  let max_selection_indexes = format
+    .selections
+    .iter()
+    .map(|selection| selection.item_indexes.len().max(1))
+    .max()
+    .unwrap_or(1);
+  (0..max_selection_indexes).any(|selection_index| {
+    pivot_format_selection_index_matches(pivot, format, address, selection_index)
+  })
+}
+
+fn pivot_format_selection_index_matches(
+  pivot: &PivotTableModel,
+  format: &PivotTableFormatModel,
+  address: CellAddress,
+  selection_index: usize,
+) -> bool {
+  let row_fields =
+    pivot_format_output_fields(&pivot.row_field_indexes, format, pivot, selection_index);
+  let column_fields =
+    pivot_format_output_fields(&pivot.column_field_indexes, format, pivot, selection_index);
+  match format.kind {
+    PivotTableFormatKind::Data => {
+      let row_match = pivot_format_line_match_for_data_axis(
+        pivot
+          .format_row_lines
+          .iter()
+          .find(|line| line.line == address.row),
+        &row_fields,
+        pivot.format_row_lines.is_empty(),
+      );
+      let column_match = pivot_format_line_match_for_data_axis(
+        pivot
+          .format_column_lines
+          .iter()
+          .find(|line| line.line == address.col),
+        &column_fields,
+        pivot.format_column_lines.is_empty(),
+      );
+      row_match != PivotFormatLineMatch::None && column_match != PivotFormatLineMatch::None
+    }
+    PivotTableFormatKind::Label => {
+      pivot_format_label_line_matches(
+        pivot
+          .format_row_lines
+          .iter()
+          .find(|line| line.line == address.row && line.position == address.col),
+        &row_fields,
+      ) || pivot_format_label_line_matches(
+        pivot
+          .format_column_lines
+          .iter()
+          .find(|line| line.line == address.col && line.position == address.row),
+        &column_fields,
+      )
+    }
+    PivotTableFormatKind::None => false,
+  }
+}
+
+fn pivot_format_output_fields(
+  field_indexes: &[i32],
+  format: &PivotTableFormatModel,
+  pivot: &PivotTableModel,
+  selection_index: usize,
+) -> Vec<PivotFormatOutputField> {
+  field_indexes
+    .iter()
+    .map(|dimension| {
+      let mut output = PivotFormatOutputField {
+        dimension: *dimension,
+        name: String::new(),
+        index: -1,
+        matches_all: false,
+        set: false,
+      };
+      let Some(selection) = format
+        .selections
+        .iter()
+        .find(|selection| pivot_format_selection_dimension(selection) == *dimension)
+      else {
+        return output;
+      };
+      if selection.item_indexes.is_empty() {
+        output.matches_all = true;
+      } else {
+        output.index =
+          if selection.item_indexes.len() > 1 && selection.item_indexes.len() > selection_index {
+            selection.item_indexes[selection_index] as i32
+          } else {
+            selection.item_indexes[0] as i32
+          };
+        output.name = if *dimension == PIVOT_FORMAT_DATA_DIMENSION {
+          "DATA".to_string()
+        } else {
+          pivot
+            .format_item_names
+            .get(selection.field as usize)
+            .and_then(|items| items.get(output.index as usize))
+            .cloned()
+            .unwrap_or_default()
+        };
+      }
+      output.set = true;
+      output
+    })
+    .collect()
+}
+
+fn pivot_format_selection_dimension(selection: &PivotTableFormatSelection) -> i32 {
+  if selection.field == (PIVOT_FORMAT_DATA_DIMENSION as u32) {
+    PIVOT_FORMAT_DATA_DIMENSION
+  } else {
+    selection.field as i32
+  }
+}
+
+fn pivot_format_line_match_for_data_axis(
+  line: Option<&PivotFormatLineData>,
+  output_fields: &[PivotFormatOutputField],
+  axis_has_no_fields: bool,
+) -> PivotFormatLineMatch {
+  if axis_has_no_fields {
+    return PivotFormatLineMatch::Exact;
+  }
+  line
+    .map(|line| pivot_format_check_line(line, output_fields, PivotTableFormatKind::Data))
+    .unwrap_or(PivotFormatLineMatch::None)
+}
+
+fn pivot_format_label_line_matches(
+  line: Option<&PivotFormatLineData>,
+  output_fields: &[PivotFormatOutputField],
+) -> bool {
+  line
+    .map(|line| {
+      pivot_format_check_line(line, output_fields, PivotTableFormatKind::Label)
+        == PivotFormatLineMatch::Exact
+    })
+    .unwrap_or(false)
+}
+
+fn pivot_format_check_line(
+  line: &PivotFormatLineData,
+  output_fields: &[PivotFormatOutputField],
+  kind: PivotTableFormatKind,
+) -> PivotFormatLineMatch {
+  if line.fields.is_empty() && output_fields.is_empty() {
+    return PivotFormatLineMatch::Exact;
+  }
+  let mut matches = 0usize;
+  let mut maybe = 0usize;
+  for (field, output) in line.fields.iter().zip(output_fields.iter()) {
+    let mut field_match = false;
+    let mut field_maybe = false;
+    if field.dimension == output.dimension {
+      if output.set {
+        field_match = (output.matches_all && !field.subtotal)
+          || (field.dimension == PIVOT_FORMAT_DATA_DIMENSION && field.index == output.index)
+          || (field.dimension != PIVOT_FORMAT_DATA_DIMENSION && field.name == output.name);
+      } else if kind == PivotTableFormatKind::Data && !field.is_member && !field.continues {
+        field_match = true;
+      } else {
+        field_maybe = true;
+      }
+    }
+    if !field_match && !field_maybe {
+      return PivotFormatLineMatch::None;
+    }
+    matches += usize::from(field_match);
+    maybe += usize::from(field_maybe);
+  }
+  if matches == line.fields.len() {
+    PivotFormatLineMatch::Exact
+  } else if matches + maybe == line.fields.len() {
+    PivotFormatLineMatch::Maybe
+  } else {
+    PivotFormatLineMatch::None
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PivotPageRecordFilter {
+  field_index: usize,
+  kind: PivotSourceFilterKind,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum PivotSourceFilterKind {
+  Group(Vec<PivotCacheItemValue>),
+  Single(PivotCacheItemValue),
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct PivotSourceCacheTable {
+  rows: Vec<Vec<PivotCacheItemValue>>,
+}
+
+impl PivotSourceCacheTable {
+  fn from_records(
+    records: &x::PivotCacheRecords,
+    cache_field_item_values: &[Vec<PivotCacheItemValue>],
+  ) -> Self {
+    // Source: LibreOffice sc/source/filter/oox/pivotcachebuffer.cxx
+    // PivotCacheField::writeSourceDataCell.  Indexed record items are resolved
+    // through shared items; missing items do not write a source cell.
+    let rows = records
+      .pivot_cache_record
+      .iter()
+      .map(|record| {
+        (0..cache_field_item_values.len())
+          .map(|field_index| record_cache_item_value(record, field_index, cache_field_item_values))
+          .collect()
+      })
+      .collect();
+    Self { rows }
+  }
+
+  fn item(
+    &self,
+    mut row_index: usize,
+    field_index: usize,
+    repeat_if_empty: bool,
+  ) -> PivotCacheItemValue {
+    loop {
+      let value = self
+        .rows
+        .get(row_index)
+        .and_then(|row| row.get(field_index))
+        .cloned()
+        .unwrap_or(PivotCacheItemValue::Empty);
+      if !repeat_if_empty || !value.is_empty() || row_index == 0 {
+        return value;
+      }
+      row_index -= 1;
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -154,6 +745,35 @@ impl PivotTableModel {
         .map(|cache| pivot_cache_field_names(cache))
         .unwrap_or_default()
     };
+    let cache_field_items = part
+      .pivot_table_cache_definition_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .map(|cache| pivot_cache_field_items(cache))
+      .unwrap_or_default();
+    let cache_field_item_values = part
+      .pivot_table_cache_definition_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .map(|cache| pivot_cache_field_item_values(cache))
+      .unwrap_or_default();
+    let cache_field_number_format_ids = part
+      .pivot_table_cache_definition_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .map(|cache| pivot_cache_field_number_format_ids(cache))
+      .unwrap_or_default();
+    let source_field_number_format_ids =
+      if let Some(cache_part) = part.pivot_table_cache_definition_part(package) {
+        let cache = cache_part.root_element(package)?.clone();
+        pivot_cache_source_number_format_ids(package, &cache).unwrap_or_default()
+      } else {
+        Vec::new()
+      };
+    let cache_records = if let Some(cache_part) = part.pivot_table_cache_definition_part(package) {
+      cache_part
+        .pivot_table_cache_records_part(package)
+        .and_then(|records_part| records_part.root_element(package).ok().cloned())
+    } else {
+      None
+    };
     let calculated_cache_fields = part
       .pivot_table_cache_definition_part(package)
       .and_then(|part| part.root_element(package).ok())
@@ -171,12 +791,57 @@ impl PivotTableModel {
       calculated_only_data_fields,
       data_layout_axis,
     );
+    let output_geometry = pivot_output_geometry(definition, &printable_location_reference);
+    let row_field_indexes = row_field_indexes(definition.row_fields.as_ref());
+    let column_field_indexes = column_field_indexes(definition.column_fields.as_ref());
+    let format_item_names = cache_field_items.clone();
+    let format_row_lines = pivot_format_axis_lines(
+      definition
+        .row_items
+        .as_ref()
+        .map(|items| items.row_item.as_slice()),
+      &row_field_indexes,
+      &format_item_names,
+      &output_geometry,
+      PivotFormatAxis::Row,
+    );
+    let format_column_lines = pivot_format_axis_lines(
+      definition
+        .column_items
+        .as_ref()
+        .map(|items| items.row_item.as_slice()),
+      &column_field_indexes,
+      &format_item_names,
+      &output_geometry,
+      PivotFormatAxis::Column,
+    );
+    let builtin_frame_ranges = pivot_builtin_frame_ranges(
+      definition,
+      &output_geometry,
+      &format_row_lines,
+      &format_column_lines,
+    );
+    let row_field_number_format_ids = pivot_axis_field_number_format_ids(
+      definition,
+      &row_field_indexes,
+      &cache_field_number_format_ids,
+      &source_field_number_format_ids,
+    );
+    let column_field_number_format_ids = pivot_axis_field_number_format_ids(
+      definition,
+      &column_field_indexes,
+      &cache_field_number_format_ids,
+      &source_field_number_format_ids,
+    );
     Ok(Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
       name: definition.name.clone(),
       cache_id: definition.cache_id,
       location_reference: definition.location.reference.clone(),
       printable_location_reference,
+      output_geometry,
+      first_data_row: definition.location.first_data_row,
+      first_data_column: definition.location.first_data_column,
       calculated_only_data_fields,
       data_layout_axis,
       style_name: definition
@@ -213,13 +878,34 @@ impl PivotTableModel {
         .as_ref()
         .map_or(0, |formats| formats.format.len()),
       compact: definition.compact.is_none_or(|value| value.as_bool()),
+      row_field_indexes,
+      column_field_indexes,
       row_field_names: row_field_names(definition.row_fields.as_ref(), &cache_field_names),
       column_field_names: column_field_names(definition.column_fields.as_ref(), &cache_field_names),
+      row_field_number_format_ids,
+      column_field_number_format_ids,
       data_field_names: data_field_names(
         definition.data_fields.as_ref(),
         &cache_field_names,
         &calculated_cache_fields,
       ),
+      data_field_number_format_ids: data_field_number_format_ids(
+        definition,
+        &cache_field_number_format_ids,
+        &source_field_number_format_ids,
+      ),
+      data_cell_text_overrides: pivot_count_data_cell_text_overrides(
+        definition,
+        cache_records.as_ref(),
+        &cache_field_items,
+        &cache_field_item_values,
+      ),
+      page_field_models: page_field_models(definition, &cache_field_names, &cache_field_items),
+      format_models: pivot_table_format_models(definition),
+      format_item_names,
+      format_row_lines,
+      format_column_lines,
+      builtin_frame_ranges,
       has_cache_definition_part,
       has_extensions: definition.pivot_table_definition_extension_list.is_some(),
       flag_count: pivot_table_flag_count(definition),
@@ -236,6 +922,227 @@ fn pivot_cache_field_names(cache: &x::PivotCacheDefinition) -> Vec<String> {
     .collect()
 }
 
+fn pivot_cache_field_items(cache: &x::PivotCacheDefinition) -> Vec<Vec<String>> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| {
+      field
+        .shared_items
+        .as_ref()
+        .map(|shared| {
+          shared
+            .shared_items_choice
+            .iter()
+            .map(pivot_cache_shared_item_text)
+            .collect()
+        })
+        .unwrap_or_default()
+    })
+    .collect()
+}
+
+fn pivot_cache_field_item_values(cache: &x::PivotCacheDefinition) -> Vec<Vec<PivotCacheItemValue>> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| {
+      field
+        .shared_items
+        .as_ref()
+        .map(|shared| {
+          shared
+            .shared_items_choice
+            .iter()
+            .map(pivot_cache_shared_item_value)
+            .collect()
+        })
+        .unwrap_or_default()
+    })
+    .collect()
+}
+
+fn pivot_cache_field_number_format_ids(cache: &x::PivotCacheDefinition) -> Vec<Option<u32>> {
+  cache
+    .cache_fields
+    .cache_field
+    .iter()
+    .map(|field| field.number_format_id)
+    .collect()
+}
+
+fn pivot_cache_source_number_format_ids(
+  package: &mut SpreadsheetDocument,
+  cache: &x::PivotCacheDefinition,
+) -> Result<Vec<Option<u32>>> {
+  let Some(x::CacheSourceChoice::WorksheetSource(source)) =
+    cache.cache_source.cache_source_choice.as_ref()
+  else {
+    return Ok(Vec::new());
+  };
+  let (Some(sheet_name), Some(reference)) = (source.sheet.as_deref(), source.reference.as_deref())
+  else {
+    return Ok(Vec::new());
+  };
+  let Some(source_range) = CellRange::parse_a1_range(reference) else {
+    return Ok(Vec::new());
+  };
+  let workbook_part = package.workbook_part()?;
+  let workbook = workbook_part.root_element(package)?.clone();
+  let Some(workbook_sheet) = workbook
+    .sheets
+    .sheet
+    .iter()
+    .find(|sheet| sheet.name == sheet_name)
+  else {
+    return Ok(Vec::new());
+  };
+  let Some(worksheet_part) = workbook_part
+    .worksheet_parts(package)
+    .find(|part| part.relationship_id() == Some(workbook_sheet.id.as_str()))
+  else {
+    return Ok(Vec::new());
+  };
+  let styles = StylesCatalog::from_workbook_part(package, &workbook_part)?;
+  let worksheet = worksheet_part.root_element(package)?.clone();
+  let mut field_formats = Vec::new();
+  for column in source_range.start.col..=source_range.end.col {
+    field_formats.push(source_column_number_format_id(
+      &worksheet,
+      &styles,
+      source_range,
+      column,
+    ));
+  }
+  Ok(field_formats)
+}
+
+fn source_column_number_format_id(
+  worksheet: &x::Worksheet,
+  styles: &StylesCatalog,
+  source_range: CellRange,
+  column: u32,
+) -> Option<u32> {
+  worksheet
+    .sheet_data
+    .row
+    .iter()
+    .filter(|row| {
+      row.row_index.is_some_and(|row_index| {
+        row_index > source_range.start.row && row_index <= source_range.end.row
+      })
+    })
+    .flat_map(|row| row.cell.iter())
+    .filter(|cell| {
+      cell
+        .cell_reference
+        .as_deref()
+        .and_then(CellAddress::parse_a1)
+        .is_some_and(|address| address.col == column)
+    })
+    .filter_map(|cell| {
+      cell
+        .style_index
+        .and_then(|style_index| styles.cell_xfs.get(style_index as usize))
+        .and_then(|format| format.number_format_id)
+        .filter(|id| *id != 0)
+    })
+    .next()
+}
+
+fn pivot_cache_shared_item_text(item: &x::SharedItemsChoice) -> String {
+  pivot_cache_shared_item_value(item).text()
+}
+
+fn pivot_cache_shared_item_value(item: &x::SharedItemsChoice) -> PivotCacheItemValue {
+  match item {
+    x::SharedItemsChoice::MissingItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or(PivotCacheItemValue::Empty),
+    x::SharedItemsChoice::NumberItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or(PivotCacheItemValue::Value(item.val)),
+    x::SharedItemsChoice::BooleanItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| PivotCacheItemValue::Boolean(item.val.as_bool())),
+    x::SharedItemsChoice::ErrorItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| PivotCacheItemValue::Error(item.val.clone())),
+    x::SharedItemsChoice::StringItem(item) => {
+      PivotCacheItemValue::String(item.caption.clone().unwrap_or_else(|| item.val.clone()))
+    }
+    x::SharedItemsChoice::DateTimeItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| {
+        pivot_cache_datetime_serial(&item.val)
+          .map(|serial| PivotCacheItemValue::DateTime {
+            serial,
+            text: item.val.clone(),
+          })
+          .unwrap_or_else(|| PivotCacheItemValue::String(item.val.clone()))
+      }),
+  }
+}
+
+fn format_pivot_cache_number(value: f64) -> String {
+  if value.fract() == 0.0 {
+    format!("{value:.0}")
+  } else {
+    let mut text = value.to_string();
+    if text.contains('.') {
+      while text.ends_with('0') {
+        text.pop();
+      }
+      if text.ends_with('.') {
+        text.pop();
+      }
+    }
+    text
+  }
+}
+
+fn pivot_cache_datetime_serial(text: &str) -> Option<f64> {
+  // Source: LibreOffice sc/source/filter/oox/pivotcachebuffer.cxx
+  // PivotCacheItem::readDate/writeItemToSourceDataCell writes an actual
+  // DateTime cell, and DataPilot stores it as a numeric item.
+  let (date, time) = text.split_once('T')?;
+  let mut date_parts = date.split('-');
+  let year = date_parts.next()?.parse::<i64>().ok()?;
+  let month = date_parts.next()?.parse::<i64>().ok()?;
+  let day = date_parts.next()?.parse::<i64>().ok()?;
+  let mut time_parts = time.split(':');
+  let hour = time_parts.next()?.parse::<i64>().ok()?;
+  let minute = time_parts.next()?.parse::<i64>().ok()?;
+  let second = time_parts.next()?.parse::<i64>().ok()?;
+  let unix_days = days_from_civil(year, month, day);
+  let excel_epoch_unix_days = days_from_civil(1899, 12, 30);
+  let day_serial = (unix_days - excel_epoch_unix_days) as f64;
+  let time_serial = (hour * 3_600 + minute * 60 + second) as f64 / 86_400.0;
+  Some(day_serial + time_serial)
+}
+
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+  let year = year - i64::from(month <= 2);
+  let era = if year >= 0 { year } else { year - 399 } / 400;
+  let year_of_era = year - era * 400;
+  let month_prime = month + if month > 2 { -3 } else { 9 };
+  let day_of_year = (153 * month_prime + 2) / 5 + day - 1;
+  let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+  era * 146_097 + day_of_era - 719_468
+}
+
 fn calculated_cache_field_indexes(cache: &x::PivotCacheDefinition) -> Vec<usize> {
   cache
     .cache_fields
@@ -250,6 +1157,766 @@ fn calculated_cache_field_indexes(cache: &x::PivotCacheDefinition) -> Vec<usize>
         .then_some(index)
     })
     .collect()
+}
+
+fn pivot_table_format_models(definition: &x::PivotTableDefinition) -> Vec<PivotTableFormatModel> {
+  let Some(formats) = definition.formats.as_ref() else {
+    return Vec::new();
+  };
+  formats
+    .format
+    .iter()
+    .map(|format| {
+      // Source: LibreOffice sc/source/filter/oox/PivotTableFormat.cxx
+      // PivotTableFormat::importFormat/importPivotArea/finalizeImport.
+      let pivot_area = &format.pivot_area;
+      let data_only = pivot_area.data_only.is_none_or(|value| value.as_bool());
+      let label_only = pivot_area.label_only.is_some_and(|value| value.as_bool());
+      let kind = if data_only {
+        PivotTableFormatKind::Data
+      } else if label_only {
+        PivotTableFormatKind::Label
+      } else {
+        PivotTableFormatKind::None
+      };
+      PivotTableFormatModel {
+        format_id: format.format_id,
+        kind,
+        data_only,
+        label_only,
+        outline: pivot_area.outline.is_none_or(|value| value.as_bool()),
+        field_position: pivot_area.field_position,
+        selections: pivot_area
+          .pivot_area_references
+          .as_ref()
+          .map(|references| {
+            references
+              .pivot_area_reference
+              .iter()
+              .filter_map(|reference| {
+                Some(PivotTableFormatSelection {
+                  selected: reference.selected.is_none_or(|value| value.as_bool()),
+                  field: reference.field?,
+                  item_indexes: reference.field_item.iter().map(|item| item.val).collect(),
+                })
+              })
+              .collect()
+          })
+          .unwrap_or_default(),
+      }
+    })
+    .collect()
+}
+
+fn pivot_format_axis_lines(
+  items: Option<&[x::RowItem]>,
+  field_indexes: &[i32],
+  item_names: &[Vec<String>],
+  geometry: &PivotOutputGeometry,
+  axis: PivotFormatAxis,
+) -> Vec<PivotFormatLineData> {
+  let Some(items) = items else {
+    return Vec::new();
+  };
+  items
+    .iter()
+    .enumerate()
+    .map(|(index, item)| {
+      let (line, position) = match axis {
+        PivotFormatAxis::Row => {
+          let field_position = pivot_format_row_field_position(item, field_indexes);
+          (
+            geometry.data_start.row + index as u32,
+            geometry.table_start.col + field_position,
+          )
+        }
+        PivotFormatAxis::Column => {
+          let field_position = pivot_format_column_field_position(item, field_indexes);
+          (
+            geometry.data_start.col + index as u32,
+            geometry.table_start.row + geometry.header_rows + field_position,
+          )
+        }
+      };
+      PivotFormatLineData {
+        line,
+        position,
+        fields: pivot_format_item_fields(item, field_indexes, item_names),
+      }
+    })
+    .collect()
+}
+
+fn pivot_builtin_frame_ranges(
+  definition: &x::PivotTableDefinition,
+  geometry: &PivotOutputGeometry,
+  row_lines: &[PivotFormatLineData],
+  column_lines: &[PivotFormatLineData],
+) -> Vec<PivotFrameRange> {
+  let mut ranges = Vec::new();
+  let table_end = geometry.table_range.end;
+  if geometry.data_start.col > geometry.table_start.col {
+    if geometry.data_start.row > geometry.table_start.row {
+      ranges.push(PivotFrameRange {
+        range: CellRange::new(
+          geometry.table_start,
+          CellAddress {
+            col: geometry.data_start.col - 1,
+            row: geometry.data_start.row - 1,
+          },
+        ),
+        horizontal_inner: false,
+        field_frame: false,
+      });
+    }
+    ranges.push(PivotFrameRange {
+      range: CellRange::new(
+        CellAddress {
+          col: geometry.table_start.col,
+          row: geometry.data_start.row,
+        },
+        CellAddress {
+          col: geometry.data_start.col - 1,
+          row: table_end.row,
+        },
+      ),
+      horizontal_inner: false,
+      field_frame: false,
+    });
+  }
+  if geometry.data_start.row > geometry.table_start.row {
+    ranges.push(PivotFrameRange {
+      range: CellRange::new(
+        CellAddress {
+          col: geometry.data_start.col,
+          row: geometry.table_start.row,
+        },
+        CellAddress {
+          col: table_end.col,
+          row: geometry.data_start.row - 1,
+        },
+      ),
+      horizontal_inner: false,
+      field_frame: false,
+    });
+  }
+  ranges.extend(pivot_data_block_frame_ranges(
+    geometry,
+    row_lines,
+    column_lines,
+  ));
+  ranges.extend(pivot_field_cell_frame_ranges(definition, geometry));
+  ranges
+}
+
+fn pivot_data_block_frame_ranges(
+  geometry: &PivotOutputGeometry,
+  row_lines: &[PivotFormatLineData],
+  column_lines: &[PivotFormatLineData],
+) -> Vec<PivotFrameRange> {
+  let mut rows = row_lines
+    .iter()
+    .filter(|line| pivot_format_line_adds_block_boundary(line, PivotFormatAxis::Row))
+    .map(|line| line.line)
+    .filter(|row| *row >= geometry.data_start.row && *row <= geometry.table_range.end.row)
+    .collect::<Vec<_>>();
+  rows.sort_unstable();
+  rows.dedup();
+  if rows.first().copied() != Some(geometry.data_start.row) {
+    rows.insert(0, geometry.data_start.row);
+  }
+  rows.push(geometry.table_range.end.row + 1);
+
+  let mut cols = column_lines
+    .iter()
+    .filter(|line| pivot_format_line_adds_block_boundary(line, PivotFormatAxis::Column))
+    .map(|line| line.line)
+    .filter(|col| *col >= geometry.data_start.col && *col <= geometry.table_range.end.col)
+    .collect::<Vec<_>>();
+  cols.sort_unstable();
+  cols.dedup();
+  if cols.first().copied() != Some(geometry.data_start.col) {
+    cols.insert(0, geometry.data_start.col);
+  }
+  cols.push(geometry.table_range.end.col + 1);
+
+  let mut ranges = Vec::new();
+  for row_pair in rows.windows(2) {
+    for col_pair in cols.windows(2) {
+      let start = CellAddress {
+        col: col_pair[0],
+        row: row_pair[0],
+      };
+      let end = CellAddress {
+        col: col_pair[1] - 1,
+        row: row_pair[1] - 1,
+      };
+      if start.col <= end.col && start.row <= end.row {
+        ranges.push(PivotFrameRange {
+          range: CellRange::new(start, end),
+          horizontal_inner: row_pair[1] - row_pair[0] > 1,
+          field_frame: false,
+        });
+      }
+    }
+  }
+  ranges
+}
+
+fn pivot_format_line_adds_block_boundary(
+  line: &PivotFormatLineData,
+  axis: PivotFormatAxis,
+) -> bool {
+  if pivot_format_line_has_subtotal(line) {
+    return true;
+  }
+  let field_count = line.fields.len();
+  line.fields.iter().enumerate().any(|(index, field)| {
+    field.is_member
+      && !field.subtotal
+      && match axis {
+        PivotFormatAxis::Row => index + 1 < field_count,
+        PivotFormatAxis::Column => index + 1 < field_count,
+      }
+  })
+}
+
+fn pivot_field_cell_frame_ranges(
+  definition: &x::PivotTableDefinition,
+  geometry: &PivotOutputGeometry,
+) -> Vec<PivotFrameRange> {
+  let mut ranges = Vec::new();
+  if geometry.header_rows > 0 {
+    let row_field_count = definition
+      .row_fields
+      .as_ref()
+      .map_or(0, |fields| fields.field.len() as u32);
+    if row_field_count == 1 || !pivot_has_compact_row_field(definition) {
+      for offset in 0..row_field_count {
+        let address = CellAddress {
+          col: geometry.table_start.col + offset,
+          row: geometry.data_start.row - 1,
+        };
+        ranges.push(PivotFrameRange {
+          range: CellRange::new(address, address),
+          horizontal_inner: false,
+          field_frame: true,
+        });
+      }
+    }
+    let column_field_count = pivot_column_field_count(definition);
+    if column_field_count == 1 || !pivot_has_compact_row_field(definition) {
+      for offset in 0..column_field_count {
+        let address = CellAddress {
+          col: geometry.data_start.col + offset,
+          row: geometry.table_start.row,
+        };
+        ranges.push(PivotFrameRange {
+          range: CellRange::new(address, address),
+          horizontal_inner: false,
+          field_frame: true,
+        });
+      }
+    }
+  }
+  for offset in 0..definition
+    .page_fields
+    .as_ref()
+    .map_or(0, |fields| fields.page_field.len() as u32)
+  {
+    let address = CellAddress {
+      col: geometry.output_start.col + 1,
+      row: geometry.output_start.row + offset,
+    };
+    ranges.push(PivotFrameRange {
+      range: CellRange::new(address, address),
+      horizontal_inner: false,
+      field_frame: true,
+    });
+  }
+  ranges
+}
+
+fn pivot_format_row_field_position(item: &x::RowItem, field_indexes: &[i32]) -> u32 {
+  let field_count = field_indexes.len().max(1) as u32;
+  item.repeated_item_count.unwrap_or(0).min(field_count - 1)
+}
+
+fn pivot_format_column_field_position(item: &x::RowItem, field_indexes: &[i32]) -> u32 {
+  let field_count = field_indexes.len().max(1) as u32;
+  item.repeated_item_count.unwrap_or(0).min(field_count - 1)
+}
+
+fn pivot_format_item_fields(
+  item: &x::RowItem,
+  field_indexes: &[i32],
+  item_names: &[Vec<String>],
+) -> Vec<PivotFormatFieldData> {
+  field_indexes
+    .iter()
+    .enumerate()
+    .map(|(field_position, dimension)| {
+      let item_type = item.item_type.unwrap_or_default();
+      let continues = pivot_format_item_continues(item, field_position);
+      let index = if *dimension == PIVOT_FORMAT_DATA_DIMENSION {
+        item.index.map(|index| index as i32).unwrap_or(0)
+      } else {
+        pivot_format_member_index(item, field_position)
+      };
+      let name = if *dimension == PIVOT_FORMAT_DATA_DIMENSION {
+        "DATA".to_string()
+      } else {
+        usize::try_from(*dimension)
+          .ok()
+          .and_then(|dimension| item_names.get(dimension))
+          .and_then(|names| {
+            usize::try_from(index)
+              .ok()
+              .and_then(|index| names.get(index))
+          })
+          .cloned()
+          .unwrap_or_default()
+      };
+      PivotFormatFieldData {
+        dimension: *dimension,
+        name,
+        index,
+        is_set: !continues,
+        is_member: item_type == x::ItemValues::Data && !continues,
+        subtotal: pivot_format_item_is_subtotal(item_type),
+        continues,
+      }
+    })
+    .collect()
+}
+
+fn pivot_format_member_index(item: &x::RowItem, field_position: usize) -> i32 {
+  let repeated = item.repeated_item_count.unwrap_or(0) as usize;
+  if field_position < repeated {
+    return -1;
+  }
+  item
+    .member_property_index
+    .get(field_position - repeated)
+    .and_then(|member| member.val)
+    .unwrap_or(0)
+}
+
+fn pivot_format_item_continues(item: &x::RowItem, field_position: usize) -> bool {
+  let repeated = item.repeated_item_count.unwrap_or(0) as usize;
+  field_position < repeated || field_position - repeated >= item.member_property_index.len()
+}
+
+fn pivot_format_item_is_subtotal(item_type: x::ItemValues) -> bool {
+  matches!(
+    item_type,
+    x::ItemValues::Sum
+      | x::ItemValues::CountA
+      | x::ItemValues::Average
+      | x::ItemValues::Maximum
+      | x::ItemValues::Minimum
+      | x::ItemValues::Product
+      | x::ItemValues::Count
+      | x::ItemValues::StandardDeviation
+      | x::ItemValues::StandardDeviationP
+      | x::ItemValues::Variance
+      | x::ItemValues::VarianceP
+      | x::ItemValues::Grand
+  )
+}
+
+fn page_field_models(
+  definition: &x::PivotTableDefinition,
+  cache_field_names: &[String],
+  cache_field_items: &[Vec<String>],
+) -> Vec<PivotPageFieldModel> {
+  let Some(page_fields) = definition.page_fields.as_ref() else {
+    return Vec::new();
+  };
+  page_fields
+    .page_field
+    .iter()
+    .filter_map(|page_field| {
+      let field_index = usize::try_from(page_field.field).ok()?;
+      let field_name = page_field
+        .caption
+        .clone()
+        .or_else(|| page_field.name.clone())
+        .or_else(|| cache_field_names.get(field_index).cloned())
+        .unwrap_or_default();
+      if field_name.is_empty() {
+        return None;
+      }
+      let pivot_field = definition
+        .pivot_fields
+        .as_ref()
+        .and_then(|fields| fields.pivot_field.get(field_index));
+      let value = page_field_value(page_field, pivot_field, cache_field_items.get(field_index));
+      Some(PivotPageFieldModel { field_name, value })
+    })
+    .collect()
+}
+
+fn page_field_value(
+  page_field: &x::PageField,
+  pivot_field: Option<&x::PivotField>,
+  cache_items: Option<&Vec<String>>,
+) -> PivotPageFieldValue {
+  let Some(pivot_field) = pivot_field else {
+    return PivotPageFieldValue::All;
+  };
+  if let Some(item_index) = page_field.item {
+    return pivot_field
+      .items
+      .as_ref()
+      .and_then(|items| items.item.get(item_index as usize))
+      .and_then(|item| page_item_member_text(item, cache_items))
+      .map(PivotPageFieldValue::Member)
+      .unwrap_or(PivotPageFieldValue::All);
+  }
+  let Some(items) = pivot_field.items.as_ref() else {
+    return PivotPageFieldValue::All;
+  };
+  let hidden_data_items = items
+    .item
+    .iter()
+    .filter(|item| page_item_is_data(item) && item.hidden.is_some_and(|hidden| hidden.as_bool()))
+    .count();
+  if hidden_data_items == 0
+    && !pivot_field
+      .multiple_item_selection_allowed
+      .is_some_and(|value| value.as_bool())
+  {
+    return PivotPageFieldValue::All;
+  }
+  let mut visible = items
+    .item
+    .iter()
+    .filter(|item| page_item_is_data(item) && !item.hidden.is_some_and(|hidden| hidden.as_bool()))
+    .filter_map(|item| page_item_member_text(item, cache_items));
+  let Some(first) = visible.next() else {
+    return PivotPageFieldValue::All;
+  };
+  if visible.next().is_some() {
+    PivotPageFieldValue::Multiple
+  } else {
+    PivotPageFieldValue::Member(first)
+  }
+}
+
+fn page_item_is_data(item: &x::Item) -> bool {
+  item
+    .item_type
+    .is_none_or(|item_type| item_type == x::ItemValues::Data)
+}
+
+fn page_item_member_text(item: &x::Item, cache_items: Option<&Vec<String>>) -> Option<String> {
+  if let Some(name) = item.item_name.as_ref().filter(|name| !name.is_empty()) {
+    return Some(name.clone());
+  }
+  let cache_index = item.index? as usize;
+  cache_items.and_then(|items| items.get(cache_index).cloned())
+}
+
+fn pivot_count_data_cell_text_overrides(
+  definition: &x::PivotTableDefinition,
+  records: Option<&x::PivotCacheRecords>,
+  cache_field_items: &[Vec<String>],
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> Vec<PivotDataCellTextOverride> {
+  let Some(records) = records else {
+    return Vec::new();
+  };
+  let Some(location) = CellRange::parse_a1_range(&definition.location.reference) else {
+    return Vec::new();
+  };
+  let Some(row_field_index) = definition
+    .row_fields
+    .as_ref()
+    .and_then(|fields| fields.field.first())
+    .and_then(|field| usize::try_from(field.index).ok())
+  else {
+    return Vec::new();
+  };
+  if definition
+    .column_fields
+    .as_ref()
+    .is_some_and(|fields| !fields.field.is_empty())
+  {
+    return Vec::new();
+  }
+  let Some(data_field) = definition
+    .data_fields
+    .as_ref()
+    .and_then(|fields| fields.data_field.first())
+  else {
+    return Vec::new();
+  };
+  if data_field.subtotal != Some(x::DataConsolidateFunctionValues::Count) {
+    return Vec::new();
+  }
+  let page_filters = pivot_cache_page_filters(definition, cache_field_item_values);
+  let source_cache = PivotSourceCacheTable::from_records(records, cache_field_item_values);
+  let row_items = pivot_row_cache_item_order(definition, row_field_index);
+  let row_item_values =
+    pivot_row_cache_item_values_order(definition, row_field_index, cache_field_item_values);
+  if row_items.is_empty() {
+    return Vec::new();
+  }
+  let mut counts = vec![0u32; row_items.len()];
+  let mut total = 0u32;
+  for record_index in 0..source_cache.rows.len() {
+    if !source_cache_matches_page_filters(&source_cache, record_index, &page_filters, false) {
+      continue;
+    }
+    let row_value = source_cache.item(record_index, row_field_index, false);
+    let row_position = row_item_values
+      .iter()
+      .position(|item| *item == row_value)
+      .or_else(|| {
+        row_items.iter().position(|item| {
+          cache_field_items
+            .get(row_field_index)
+            .and_then(|items| items.get(*item as usize))
+            == Some(&row_value.text())
+        })
+      })
+      .unwrap_or_else(|| row_items.len() - 1);
+    total += 1;
+    counts[row_position] += 1;
+  }
+  let data_col = location.start.col + definition.location.first_data_column;
+  let data_row = location.start.row + definition.location.first_data_row;
+  let mut overrides = counts
+    .into_iter()
+    .enumerate()
+    .map(|(index, count)| PivotDataCellTextOverride {
+      address: CellAddress {
+        col: data_col,
+        row: data_row + index as u32,
+      },
+      text: count.to_string(),
+    })
+    .collect::<Vec<_>>();
+  if total > 0 {
+    overrides.push(PivotDataCellTextOverride {
+      address: CellAddress {
+        col: data_col,
+        row: data_row + row_items.len() as u32,
+      },
+      text: total.to_string(),
+    });
+  }
+  overrides
+}
+
+fn pivot_cache_page_filters(
+  definition: &x::PivotTableDefinition,
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> Vec<PivotPageRecordFilter> {
+  let Some(page_fields) = definition.page_fields.as_ref() else {
+    return Vec::new();
+  };
+  page_fields
+    .page_field
+    .iter()
+    .flat_map(|page_field| {
+      let Some(field_index) = usize::try_from(page_field.field).ok() else {
+        return Vec::new();
+      };
+      let Some(pivot_field) = definition
+        .pivot_fields
+        .as_ref()
+        .and_then(|fields| fields.pivot_field.get(field_index))
+      else {
+        return Vec::new();
+      };
+      let visible_items = pivot_field_visible_items(
+        pivot_field,
+        cache_field_item_values.get(field_index).map(Vec::as_slice),
+      );
+      let visible_filter = visible_items.map(|items| PivotPageRecordFilter {
+        field_index,
+        kind: PivotSourceFilterKind::Group(items),
+      });
+      let selected_filter = page_field.item.and_then(|item_index| {
+        pivot_field
+          .items
+          .as_ref()
+          .and_then(|items| items.item.get(item_index as usize))
+          .and_then(|item| {
+            pivot_item_cache_value(
+              item,
+              cache_field_item_values.get(field_index).map(Vec::as_slice),
+            )
+          })
+          .map(|item| PivotPageRecordFilter {
+            field_index,
+            kind: PivotSourceFilterKind::Single(item),
+          })
+      });
+      [visible_filter, selected_filter]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+    })
+    .collect()
+}
+
+fn pivot_field_visible_items(
+  pivot_field: &x::PivotField,
+  cache_items: Option<&[PivotCacheItemValue]>,
+) -> Option<Vec<PivotCacheItemValue>> {
+  let items = pivot_field.items.as_ref()?;
+  let mut visible = Vec::new();
+  let mut hidden = 0usize;
+  let mut data_items = 0usize;
+  for item in &items.item {
+    if !page_item_is_data(item) {
+      continue;
+    }
+    data_items += 1;
+    if item.hidden.is_some_and(|hidden| hidden.as_bool()) {
+      hidden += 1;
+      continue;
+    }
+    if let Some(value) = pivot_item_cache_value(item, cache_items) {
+      visible.push(value);
+    }
+  }
+  (hidden > 0 && visible.len() < data_items).then_some(visible)
+}
+
+fn pivot_item_cache_value(
+  item: &x::Item,
+  cache_items: Option<&[PivotCacheItemValue]>,
+) -> Option<PivotCacheItemValue> {
+  if let Some(name) = item.item_name.as_ref().filter(|name| !name.is_empty()) {
+    return Some(PivotCacheItemValue::String(name.clone()));
+  }
+  let cache_index = item.index? as usize;
+  cache_items.and_then(|items| items.get(cache_index).cloned())
+}
+
+fn pivot_row_cache_item_order(
+  definition: &x::PivotTableDefinition,
+  row_field_index: usize,
+) -> Vec<u32> {
+  definition
+    .pivot_fields
+    .as_ref()
+    .and_then(|fields| fields.pivot_field.get(row_field_index))
+    .and_then(|field| field.items.as_ref())
+    .map(|items| {
+      items
+        .item
+        .iter()
+        .filter(|item| {
+          page_item_is_data(item) && !item.hidden.is_some_and(|hidden| hidden.as_bool())
+        })
+        .filter_map(|item| item.index)
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn pivot_row_cache_item_values_order(
+  definition: &x::PivotTableDefinition,
+  row_field_index: usize,
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> Vec<PivotCacheItemValue> {
+  let cache_items = cache_field_item_values
+    .get(row_field_index)
+    .map(Vec::as_slice);
+  definition
+    .pivot_fields
+    .as_ref()
+    .and_then(|fields| fields.pivot_field.get(row_field_index))
+    .and_then(|field| field.items.as_ref())
+    .map(|items| {
+      items
+        .item
+        .iter()
+        .filter(|item| {
+          page_item_is_data(item) && !item.hidden.is_some_and(|hidden| hidden.as_bool())
+        })
+        .filter_map(|item| pivot_item_cache_value(item, cache_items))
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn source_cache_matches_page_filters(
+  source_cache: &PivotSourceCacheTable,
+  record_index: usize,
+  page_filters: &[PivotPageRecordFilter],
+  repeat_if_empty: bool,
+) -> bool {
+  page_filters.iter().all(|filter| {
+    let value = source_cache.item(record_index, filter.field_index, repeat_if_empty);
+    filter.kind.matches(&value)
+  })
+}
+
+impl PivotSourceFilterKind {
+  fn matches(&self, value: &PivotCacheItemValue) -> bool {
+    match self {
+      Self::Group(items) => items.contains(value),
+      Self::Single(item) => item == value,
+    }
+  }
+}
+
+fn record_cache_item_value(
+  record: &x::PivotCacheRecord,
+  field_index: usize,
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> PivotCacheItemValue {
+  let Some(choice) = record.pivot_cache_record_choice.get(field_index) else {
+    return PivotCacheItemValue::Empty;
+  };
+  match choice {
+    x::PivotCacheRecordChoice::MissingItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or(PivotCacheItemValue::Empty),
+    x::PivotCacheRecordChoice::NumberItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or(PivotCacheItemValue::Value(item.val)),
+    x::PivotCacheRecordChoice::BooleanItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| PivotCacheItemValue::Boolean(item.val.as_bool())),
+    x::PivotCacheRecordChoice::ErrorItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| PivotCacheItemValue::Error(item.val.clone())),
+    x::PivotCacheRecordChoice::StringItem(item) => {
+      PivotCacheItemValue::String(item.caption.clone().unwrap_or_else(|| item.val.clone()))
+    }
+    x::PivotCacheRecordChoice::DateTimeItem(item) => item
+      .caption
+      .as_ref()
+      .map(|caption| PivotCacheItemValue::String(caption.clone()))
+      .unwrap_or_else(|| {
+        pivot_cache_datetime_serial(&item.val)
+          .map(|serial| PivotCacheItemValue::DateTime {
+            serial,
+            text: item.val.clone(),
+          })
+          .unwrap_or_else(|| PivotCacheItemValue::String(item.val.clone()))
+      }),
+    x::PivotCacheRecordChoice::FieldItem(item) => cache_field_item_values
+      .get(field_index)
+      .and_then(|items| items.get(item.val as usize))
+      .cloned()
+      .unwrap_or(PivotCacheItemValue::Empty),
+  }
 }
 
 fn data_field_counts(
@@ -319,6 +1986,174 @@ fn printable_location_reference(
     }
   }
   .to_a1_range_string()
+}
+
+fn pivot_output_geometry(
+  definition: &x::PivotTableDefinition,
+  printable_reference: &str,
+) -> PivotOutputGeometry {
+  let location = CellRange::parse_a1_range(printable_reference)
+    .or_else(|| CellRange::parse_a1_range(&definition.location.reference))
+    .unwrap_or_default();
+  // Source: LibreOffice sc/source/core/data/dpoutput.cxx::CalcSizes.
+  // OOXML location is the insertion start plus a persisted cached area; Calc
+  // recomputes member/data starts and table/result ends from row/column fields
+  // and the data result matrix.
+  let page_fields = definition
+    .page_fields
+    .as_ref()
+    .map_or(0u32, |fields| fields.page_field.len() as u32);
+  let page_rows = if page_fields > 0 { page_fields + 1 } else { 0 };
+  let output_start = CellAddress {
+    col: location.start.col,
+    row: location.start.row.saturating_sub(page_rows),
+  };
+  let table_start = CellAddress {
+    col: output_start.col,
+    row: output_start.row + page_rows,
+  };
+  let header_rows = if definition.location.first_header_row == 0 {
+    0
+  } else if pivot_header_layout(definition) && pivot_column_field_count(definition) == 0 {
+    2
+  } else {
+    1
+  };
+  let row_field_columns = pivot_columns_for_row_fields(definition);
+  let column_field_rows = pivot_column_field_count(definition);
+  let data_start = CellAddress {
+    col: table_start.col + row_field_columns,
+    row: table_start.row + header_rows + column_field_rows,
+  };
+  let data_rows = pivot_data_row_count(definition).max(1);
+  let data_columns = pivot_data_column_count(definition).max(1);
+  let end = CellAddress {
+    col: data_start.col + data_columns - 1,
+    row: data_start.row + data_rows - 1,
+  };
+  let whole_range = CellRange::new(output_start, end);
+  let table_range = CellRange::new(
+    table_start,
+    CellAddress {
+      col: end.col,
+      row: end.row,
+    },
+  );
+  let result_range = CellRange::new(
+    data_start,
+    CellAddress {
+      col: end.col,
+      row: end.row,
+    },
+  );
+  PivotOutputGeometry {
+    whole_range,
+    table_range,
+    result_range,
+    output_start,
+    table_start,
+    data_start,
+    row_field_columns,
+    column_field_rows,
+    header_rows,
+    data_rows,
+    data_columns,
+  }
+}
+
+fn pivot_header_layout(_definition: &x::PivotTableDefinition) -> bool {
+  false
+}
+
+fn pivot_columns_for_row_fields(definition: &x::PivotTableDefinition) -> u32 {
+  let Some(row_fields) = definition.row_fields.as_ref() else {
+    return 0;
+  };
+  let row_field_count = row_fields.field.len() as u32;
+  if !pivot_has_compact_row_field(definition) {
+    return row_field_count;
+  }
+  let compact_flags = row_fields
+    .field
+    .iter()
+    .map(|field| {
+      usize::try_from(field.index)
+        .ok()
+        .and_then(|index| {
+          definition
+            .pivot_fields
+            .as_ref()
+            .and_then(|fields| fields.pivot_field.get(index))
+        })
+        .is_none_or(|field| field.compact.is_none_or(|value| value.as_bool()))
+    })
+    .collect::<Vec<_>>();
+  let mut columns = compact_flags.iter().filter(|compact| !**compact).count() as u32;
+  if compact_flags.last().copied().unwrap_or(false) {
+    columns += 1;
+  }
+  columns
+}
+
+fn pivot_has_compact_row_field(definition: &x::PivotTableDefinition) -> bool {
+  definition.row_fields.as_ref().is_some_and(|row_fields| {
+    row_fields.field.iter().any(|field| {
+      usize::try_from(field.index)
+        .ok()
+        .and_then(|index| {
+          definition
+            .pivot_fields
+            .as_ref()
+            .and_then(|fields| fields.pivot_field.get(index))
+        })
+        .is_some_and(|field| field.compact.is_none_or(|value| value.as_bool()))
+    })
+  })
+}
+
+fn pivot_column_field_count(definition: &x::PivotTableDefinition) -> u32 {
+  definition
+    .column_fields
+    .as_ref()
+    .map_or(0, |fields| fields.field.len() as u32)
+}
+
+fn pivot_data_row_count(definition: &x::PivotTableDefinition) -> u32 {
+  definition.row_items.as_ref().map_or_else(
+    || location_data_rows(definition),
+    |items| items.row_item.len() as u32,
+  )
+}
+
+fn pivot_data_column_count(definition: &x::PivotTableDefinition) -> u32 {
+  definition.column_items.as_ref().map_or_else(
+    || location_data_columns(definition),
+    |items| items.row_item.len() as u32,
+  )
+}
+
+fn location_data_rows(definition: &x::PivotTableDefinition) -> u32 {
+  CellRange::parse_a1_range(&definition.location.reference)
+    .map(|range| {
+      range
+        .end
+        .row
+        .saturating_sub(range.start.row + definition.location.first_data_row)
+        + 1
+    })
+    .unwrap_or(1)
+}
+
+fn location_data_columns(definition: &x::PivotTableDefinition) -> u32 {
+  CellRange::parse_a1_range(&definition.location.reference)
+    .map(|range| {
+      range
+        .end
+        .col
+        .saturating_sub(range.start.col + definition.location.first_data_column)
+        + 1
+    })
+    .unwrap_or(1)
 }
 
 fn data_layout_axis(definition: &x::PivotTableDefinition) -> PivotDataLayoutAxis {
@@ -401,6 +2236,12 @@ fn row_field_names(fields: Option<&x::RowFields>, cache_field_names: &[String]) 
     .unwrap_or_default()
 }
 
+fn row_field_indexes(fields: Option<&x::RowFields>) -> Vec<i32> {
+  fields
+    .map(|fields| fields.field.iter().map(|field| field.index).collect())
+    .unwrap_or_default()
+}
+
 fn column_field_names(
   fields: Option<&x::ColumnFields>,
   cache_field_names: &[String],
@@ -414,6 +2255,12 @@ fn column_field_names(
         .filter_map(|index| cache_field_names.get(index).cloned())
         .collect()
     })
+    .unwrap_or_default()
+}
+
+fn column_field_indexes(fields: Option<&x::ColumnFields>) -> Vec<i32> {
+  fields
+    .map(|fields| fields.field.iter().map(|field| field.index).collect())
     .unwrap_or_default()
 }
 
@@ -439,6 +2286,87 @@ fn data_field_names(
         .collect()
     })
     .unwrap_or_default()
+}
+
+fn data_field_number_format_ids(
+  definition: &x::PivotTableDefinition,
+  cache_field_number_format_ids: &[Option<u32>],
+  source_field_number_format_ids: &[Option<u32>],
+) -> Vec<Option<u32>> {
+  definition
+    .data_fields
+    .as_ref()
+    .map(|fields| {
+      fields
+        .data_field
+        .iter()
+        .map(|data_field| {
+          data_field
+            .number_format_id
+            .filter(|id| *id != 0)
+            .or_else(|| {
+              definition
+                .pivot_fields
+                .as_ref()
+                .and_then(|fields| fields.pivot_field.get(data_field.field as usize))
+                .and_then(|field| field.number_format_id)
+                .filter(|id| *id != 0)
+            })
+            .or_else(|| {
+              cache_field_number_format_ids
+                .get(data_field.field as usize)
+                .copied()
+                .flatten()
+                .filter(|id| *id != 0)
+            })
+            .or_else(|| {
+              source_field_number_format_ids
+                .get(data_field.field as usize)
+                .copied()
+                .flatten()
+                .filter(|id| *id != 0)
+            })
+        })
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn pivot_axis_field_number_format_ids(
+  definition: &x::PivotTableDefinition,
+  field_indexes: &[i32],
+  cache_field_number_format_ids: &[Option<u32>],
+  source_field_number_format_ids: &[Option<u32>],
+) -> Vec<Option<u32>> {
+  field_indexes
+    .iter()
+    .map(|field_index| {
+      if *field_index < 0 {
+        return None;
+      }
+      let field_index = *field_index as usize;
+      definition
+        .pivot_fields
+        .as_ref()
+        .and_then(|fields| fields.pivot_field.get(field_index))
+        .and_then(|field| field.number_format_id)
+        .filter(|id| *id != 0)
+        .or_else(|| {
+          cache_field_number_format_ids
+            .get(field_index)
+            .copied()
+            .flatten()
+            .filter(|id| *id != 0)
+        })
+        .or_else(|| {
+          source_field_number_format_ids
+            .get(field_index)
+            .copied()
+            .flatten()
+            .filter(|id| *id != 0)
+        })
+    })
+    .collect()
 }
 
 fn pivot_table_flag_count(definition: &x::PivotTableDefinition) -> usize {

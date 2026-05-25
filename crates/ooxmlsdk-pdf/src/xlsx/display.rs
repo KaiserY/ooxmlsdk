@@ -29,6 +29,14 @@ struct CalcCellTextFragment {
   text: TextItem,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CalcCellOutputArea {
+  align_rect: CellRect,
+  clip_rect: CellRect,
+  left_clip_pt: f32,
+  right_clip_pt: f32,
+}
+
 pub(crate) fn lower_to_layout_document(import: &ExcelImport) -> LayoutDocument {
   let mut pages = Vec::new();
   let print_document = CalcPrintDocument::from_import(import);
@@ -188,6 +196,7 @@ fn render_cell_area(
   zoom_scale: f32,
 ) {
   let area_rect = page.sheet.range_rect(area);
+  let occupied_cells = calc_occupied_text_cells(cells);
   let mut cell_text_items = Vec::new();
   for cell in cells {
     if page.sheet.is_covered_merged_cell(cell.address) {
@@ -202,6 +211,7 @@ fn render_cell_area(
     let width_pt = rect.width_pt * zoom_scale;
     let height_pt = rect.height_pt * zoom_scale;
     if let Some(fill_color) = conditional_fill_color(import, page.sheet, cell)
+      .or_else(|| pivot_format_fill_color(import, cell))
       .or_else(|| import.styles.fill_color_for_cell(cell.style_index))
     {
       items.push(PageItem::Rect(RectItem {
@@ -215,6 +225,15 @@ fn render_cell_area(
         stroke_opacity: 1.0,
       }));
     }
+    let mut borders = import.styles.borders_for_cell(cell.style_index);
+    let pivot_builtin_style =
+      super::pivot::pivot_builtin_style_for_address(page.sheet, cell.address);
+    merge_cell_borders(&mut borders, pivot_builtin_style.borders);
+    if let Some(format_id) = cell.pivot_format_id {
+      if let Some(pivot_borders) = import.styles.differential_borders(format_id) {
+        merge_cell_borders(&mut borders, pivot_borders);
+      }
+    }
     render_cell_borders(
       items,
       CellRect {
@@ -223,7 +242,7 @@ fn render_cell_area(
         width_pt,
         height_pt,
       },
-      import.styles.borders_for_cell(cell.style_index),
+      borders,
     );
     if cell.rendered_text.is_empty() {
       continue;
@@ -235,23 +254,54 @@ fn render_cell_area(
       width_pt,
       height_pt,
     };
-    let base_style = import.styles.text_style_for_cell(cell.style_index);
+    let measurement_style = import.styles.text_style_for_cell(cell.style_index);
+    let mut render_style = measurement_style.clone();
+    if pivot_builtin_style.bold {
+      render_style.bold = true;
+    }
+    if let Some(format_id) = cell.pivot_format_id {
+      import
+        .styles
+        .apply_differential_text_style(format_id, &mut render_style);
+    }
+    let mut alignment = import.styles.alignment_for_cell(cell.style_index);
+    if pivot_builtin_style.left_align {
+      let mut pivot_alignment = alignment.unwrap_or_default();
+      pivot_alignment.horizontal = Some(x::HorizontalAlignmentValues::Left);
+      alignment = Some(pivot_alignment);
+    }
+    if let Some(format_id) = cell.pivot_format_id {
+      if let Some(pivot_alignment) = import.styles.differential_alignment(format_id) {
+        alignment = Some(pivot_alignment);
+      }
+    }
+    let output_area = calc_cell_output_area(
+      page.sheet,
+      area,
+      &occupied_cells,
+      cell,
+      cell_rect,
+      &measurement_style,
+      alignment,
+      zoom_scale,
+    );
+    let rendered_text = calc_cell_visible_text(cell, &measurement_style, output_area);
     let mut rendered_text_items = Vec::new();
-    if !cell.rich_text_runs.is_empty() && cell.rendered_text == cell.text {
+    if !cell.rich_text_runs.is_empty() && rendered_text == cell.text {
       render_cell_rich_text(
         &mut rendered_text_items,
         cell.rich_text_runs,
-        cell_rect,
-        base_style,
+        output_area.align_rect,
+        render_style,
         hyperlink_url.clone(),
       );
     } else {
       render_cell_text(
         &mut rendered_text_items,
-        &cell.rendered_text,
-        cell_rect,
-        base_style,
-        import.styles.alignment_for_cell(cell.style_index),
+        rendered_text.as_ref(),
+        output_area.align_rect,
+        render_style,
+        alignment,
         hyperlink_url.clone(),
         cell.formula,
       );
@@ -280,6 +330,236 @@ fn render_cell_area(
   if page.page_settings.print_grid_lines {
     render_grid(items, page, area, origin_x_pt, origin_y_pt, zoom_scale);
   }
+}
+
+fn calc_occupied_text_cells(
+  cells: &[super::print::CalcPrintCell<'_>],
+) -> HashMap<(u32, u32), bool> {
+  cells
+    .iter()
+    .filter(|cell| !cell.rendered_text.is_empty())
+    .map(|cell| ((cell.address.row, cell.address.col), true))
+    .collect()
+}
+
+fn calc_cell_output_area(
+  sheet: &CalcSheet,
+  area: CellRange,
+  occupied_cells: &HashMap<(u32, u32), bool>,
+  cell: &super::print::CalcPrintCell<'_>,
+  rect: CellRect,
+  style: &TextStyle,
+  alignment: Option<super::styles::AlignmentRecord>,
+  zoom_scale: f32,
+) -> CalcCellOutputArea {
+  let text_width_pt = text_metrics::measure_text(&cell.rendered_text, style);
+  let needed_width_pt = text_width_pt + XLSX_CELL_TEXT_INSET_PT * 2.0;
+  let mut output = CalcCellOutputArea {
+    align_rect: rect,
+    clip_rect: rect,
+    left_clip_pt: 0.0,
+    right_clip_pt: 0.0,
+  };
+  if needed_width_pt <= rect.width_pt {
+    return output;
+  }
+
+  let missing_width_pt = needed_width_pt - rect.width_pt;
+  let (mut left_missing_pt, mut right_missing_pt) =
+    calc_cell_missing_width_by_alignment(missing_width_pt, cell, alignment);
+
+  if !calc_cell_is_value(cell) && !alignment.is_some_and(|alignment| alignment.wrap_text) {
+    let mut right_col = cell.address.col;
+    while right_missing_pt > 0.0
+      && output_column_available(sheet, area, occupied_cells, right_col + 1, cell.address.row)
+    {
+      right_col += 1;
+      let column_width_pt = sheet.column_width_pt(right_col) * zoom_scale;
+      if column_width_pt <= f32::EPSILON {
+        break;
+      }
+      output.clip_rect.width_pt += column_width_pt;
+      right_missing_pt -= column_width_pt;
+    }
+    let mut left_col = cell.address.col;
+    while left_missing_pt > 0.0
+      && left_col > 1
+      && output_column_available(sheet, area, occupied_cells, left_col - 1, cell.address.row)
+    {
+      left_col -= 1;
+      let column_width_pt = sheet.column_width_pt(left_col) * zoom_scale;
+      if column_width_pt <= f32::EPSILON {
+        break;
+      }
+      output.clip_rect.x_pt -= column_width_pt;
+      output.clip_rect.width_pt += column_width_pt;
+      left_missing_pt -= column_width_pt;
+    }
+  }
+
+  output.left_clip_pt = left_missing_pt.max(0.0);
+  output.right_clip_pt = right_missing_pt.max(0.0);
+  output
+}
+
+fn calc_cell_missing_width_by_alignment(
+  missing_width_pt: f32,
+  cell: &super::print::CalcPrintCell<'_>,
+  alignment: Option<super::styles::AlignmentRecord>,
+) -> (f32, f32) {
+  match calc_cell_horizontal_alignment(cell, alignment) {
+    x::HorizontalAlignmentValues::Right => (missing_width_pt, 0.0),
+    x::HorizontalAlignmentValues::Center | x::HorizontalAlignmentValues::CenterContinuous => {
+      let left = missing_width_pt / 2.0;
+      (left, missing_width_pt - left)
+    }
+    _ => (0.0, missing_width_pt),
+  }
+}
+
+fn calc_cell_horizontal_alignment(
+  cell: &super::print::CalcPrintCell<'_>,
+  alignment: Option<super::styles::AlignmentRecord>,
+) -> x::HorizontalAlignmentValues {
+  match alignment.and_then(|alignment| alignment.horizontal) {
+    Some(x::HorizontalAlignmentValues::General) | None => {
+      if calc_cell_is_value(cell) {
+        x::HorizontalAlignmentValues::Right
+      } else {
+        x::HorizontalAlignmentValues::Left
+      }
+    }
+    Some(value) => value,
+  }
+}
+
+fn output_column_available(
+  sheet: &CalcSheet,
+  area: CellRange,
+  occupied_cells: &HashMap<(u32, u32), bool>,
+  column: u32,
+  row: u32,
+) -> bool {
+  let address = CellAddress { col: column, row };
+  area.contains(address)
+    && !occupied_cells.contains_key(&(row, column))
+    && !sheet.is_covered_merged_cell(address)
+    && sheet.column_width_pt(column) > f32::EPSILON
+}
+
+fn calc_cell_visible_text<'a>(
+  cell: &'a super::print::CalcPrintCell<'_>,
+  style: &TextStyle,
+  output_area: CalcCellOutputArea,
+) -> std::borrow::Cow<'a, str> {
+  if output_area.left_clip_pt <= f32::EPSILON && output_area.right_clip_pt <= f32::EPSILON {
+    return std::borrow::Cow::Borrowed(&cell.rendered_text);
+  }
+  if calc_cell_is_value(cell) {
+    if cell.number_format_state == super::print::NumberFormatRenderState::General {
+      if let Some(text) = calc_fit_general_number_text(cell, style, output_area.align_rect.width_pt)
+      {
+        return std::borrow::Cow::Owned(text);
+      }
+    }
+    return if calc_cell_value_can_hash(cell) {
+      std::borrow::Cow::Borrowed("###")
+    } else {
+      std::borrow::Cow::Borrowed(&cell.rendered_text)
+    };
+  }
+  let text_width_pt = text_metrics::measure_text(&cell.rendered_text, style);
+  if text_width_pt <= f32::EPSILON {
+    return std::borrow::Cow::Borrowed(&cell.rendered_text);
+  }
+  let visible_ratio = ((text_width_pt - output_area.left_clip_pt - output_area.right_clip_pt)
+    / text_width_pt)
+    .clamp(0.0, 1.0);
+  if !(0.0..1.0).contains(&visible_ratio) {
+    return std::borrow::Cow::Borrowed(&cell.rendered_text);
+  }
+  let char_count = cell.rendered_text.chars().count();
+  let short_count = ((visible_ratio * char_count as f32) as usize + 1).min(char_count);
+  if output_area.left_clip_pt > 0.0 && output_area.right_clip_pt <= f32::EPSILON {
+    std::borrow::Cow::Owned(
+      cell
+        .rendered_text
+        .chars()
+        .skip(char_count.saturating_sub(short_count))
+        .collect(),
+    )
+  } else {
+    std::borrow::Cow::Owned(cell.rendered_text.chars().take(short_count).collect())
+  }
+}
+
+fn calc_cell_is_value(cell: &super::print::CalcPrintCell<'_>) -> bool {
+  matches!(
+    cell.number_format_state,
+    super::print::NumberFormatRenderState::General
+      | super::print::NumberFormatRenderState::Number
+      | super::print::NumberFormatRenderState::Percent
+      | super::print::NumberFormatRenderState::DateTime
+  ) && cell.text.parse::<f64>().is_ok()
+}
+
+fn calc_cell_value_can_hash(cell: &super::print::CalcPrintCell<'_>) -> bool {
+  matches!(
+    cell.number_format_state,
+    super::print::NumberFormatRenderState::Number
+      | super::print::NumberFormatRenderState::Percent
+      | super::print::NumberFormatRenderState::DateTime
+      | super::print::NumberFormatRenderState::UnsupportedFormatCode
+  )
+}
+
+fn calc_fit_general_number_text(
+  cell: &super::print::CalcPrintCell<'_>,
+  style: &TextStyle,
+  column_width_pt: f32,
+) -> Option<String> {
+  let value = cell.text.parse::<f64>().ok()?;
+  if !value.is_finite() {
+    return None;
+  }
+  let available_width = column_width_pt - XLSX_CELL_TEXT_INSET_PT * 2.0;
+  if available_width <= f32::EPSILON {
+    return None;
+  }
+  for significant_digits in (1..=15).rev() {
+    let text = format_general_number_with_significant_digits(value, significant_digits);
+    if text_metrics::measure_text(&text, style) <= available_width {
+      return Some(text);
+    }
+  }
+  None
+}
+
+fn format_general_number_with_significant_digits(value: f64, significant_digits: usize) -> String {
+  if value == 0.0 {
+    return "0".to_string();
+  }
+  let abs = value.abs();
+  let integer_digits = if abs >= 1.0 {
+    abs.log10().floor() as isize + 1
+  } else {
+    0
+  };
+  let decimals = if integer_digits >= significant_digits as isize {
+    0
+  } else {
+    significant_digits.saturating_sub(integer_digits.max(0) as usize)
+  };
+  let mut text = format!("{value:.decimals$}");
+  if text.contains('.') {
+    while text.ends_with('0') {
+      text.pop();
+    }
+    if text.ends_with('.') {
+      text.pop();
+    }
+  }
+  if text == "-0" { "0".to_string() } else { text }
 }
 
 fn coalesced_calc_row_text_items(items: Vec<CalcCellTextFragment>) -> Vec<PageItem> {
@@ -484,6 +764,15 @@ fn conditional_fill_color(
     }
   }
   None
+}
+
+fn pivot_format_fill_color(
+  import: &ExcelImport,
+  cell: &super::print::CalcPrintCell<'_>,
+) -> Option<RgbColor> {
+  cell
+    .pivot_format_id
+    .and_then(|format_id| import.styles.differential_fill_color(format_id))
 }
 
 fn conditional_format_contains_cell(
@@ -705,6 +994,24 @@ fn render_cell_borders(
       color: border.color,
       kind: LineItemKind::Stroke,
     }));
+  }
+}
+
+fn merge_cell_borders(
+  target: &mut super::styles::BorderRecord,
+  source: super::styles::BorderRecord,
+) {
+  if source.left.is_some() {
+    target.left = source.left;
+  }
+  if source.right.is_some() {
+    target.right = source.right;
+  }
+  if source.top.is_some() {
+    target.top = source.top;
+  }
+  if source.bottom.is_some() {
+    target.bottom = source.bottom;
   }
 }
 
@@ -3664,7 +3971,15 @@ fn sheet_lines(import: &ExcelImport, sheet: &CalcSheet) -> Vec<String> {
       .pivot_tables
       .tables
       .iter()
-      .map(|pivot| pivot.formats)
+      .map(|pivot| {
+        pivot.formats
+          + pivot.format_models.len()
+          + pivot
+            .format_models
+            .iter()
+            .map(|format| format.selections.len())
+            .sum::<usize>()
+      })
       .sum::<usize>();
     let pivot_flags = sheet
       .resources

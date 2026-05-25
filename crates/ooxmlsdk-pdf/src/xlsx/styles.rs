@@ -375,6 +375,51 @@ impl StylesCatalog {
       .map(|format| format.code.as_str())
   }
 
+  pub(crate) fn apply_differential_text_style(&self, format_id: u32, style: &mut TextStyle) {
+    let Some(font) = self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.font.as_ref())
+    else {
+      return;
+    };
+    if let Some(name) = &font.name {
+      style.font_family = Some(Arc::clone(name));
+    }
+    if let Some(size_pt) = font.size_pt {
+      style.font_size_pt = size_pt.get() as f32;
+    }
+    if let Some(color) = font.color {
+      style.color = color;
+    }
+    if font.bold {
+      style.bold = true;
+    }
+    if font.italic {
+      style.italic = true;
+    }
+    if font.underline {
+      style.underline = true;
+    }
+    if font.strikethrough {
+      style.strikethrough = true;
+    }
+  }
+
+  pub(crate) fn differential_borders(&self, format_id: u32) -> Option<BorderRecord> {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.border)
+  }
+
+  pub(crate) fn differential_alignment(&self, format_id: u32) -> Option<AlignmentRecord> {
+    self
+      .differential_format_records
+      .get(format_id as usize)
+      .and_then(|format| format.alignment)
+  }
+
   pub(crate) fn differential_format_flag_count(&self) -> usize {
     self
       .differential_format_records

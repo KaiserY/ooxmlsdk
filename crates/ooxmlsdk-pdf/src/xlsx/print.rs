@@ -125,12 +125,21 @@ impl<'a> CalcPrintDocument<'a> {
     let mut pages = Vec::new();
     let mut skipped_empty_pages = 0usize;
     let mut document_top_down = true;
+    let visible_sheets_with_body = import
+      .sheets
+      .iter()
+      .filter(|sheet| sheet.visible())
+      .filter(|sheet| !sheet_body_is_empty(import, sheet))
+      .count();
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(sheet, &named_ranges);
       let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
       let scale = print_scale_state(sheet, &areas, &named_ranges);
       document_top_down &= scale.top_down;
+      let keep_header_footer_only_page = visible_sheets_with_body == 0
+        && sheet.page_settings.header_footer.has_print_content()
+        && sheet_body_is_empty(import, sheet);
       let page_areas =
         page_areas_for_sheet(sheet, &areas, &named_ranges, scale.zoom, scale.top_down);
       let mut sheet_page_index = 0usize;
@@ -155,11 +164,13 @@ impl<'a> CalcPrintDocument<'a> {
         // Source: LibreOffice sc/source/ui/view/printfun.cxx lcl_SetHidden and
         // ScPrintFunc::DoPrint. Empty sheet page ranges are hidden by
         // ScDocument::IsPrintEmpty before PrintPage is called; header/footer
-        // content is painted only for page ranges that survive that test.
+        // content is painted only for page ranges that survive that test. A
+        // workbook made entirely of header/footer-only empty visible sheets
+        // still emits one page; otherwise later empty sheets keep being hidden.
         let empty = area.map_or(false, |area| print_area_is_empty(import, sheet, area))
           && drawing_summary.printable == 0
           && drawing_summary.charts == 0;
-        if scale.skip_empty && empty {
+        if scale.skip_empty && empty && !(keep_header_footer_only_page && sheet_page_index == 0) {
           skipped_empty_pages += 1;
           continue;
         }
@@ -580,8 +591,15 @@ fn print_areas_for_sheet(
     return named_ranges.resolved_print_areas.clone();
   }
   match sheet.used_range() {
-    Some(range) => vec![extend_print_area_for_overflow(sheet, range)],
-    // Source: LibreOffice sc/source/ui/view/printfun.cxx AdjustPrintArea(true).
+    // Source: LibreOffice sc/source/ui/view/printfun.cxx::AdjustPrintArea(true).
+    // Implicit print ranges start at A1; ScDocument::GetPrintArea() only
+    // supplies the lower-right used cell. Empty leading rows/columns still
+    // participate in page-break calculation and are skipped later by
+    // ScDocument::IsPrintEmpty.
+    Some(range) => vec![extend_print_area_for_overflow(
+      sheet,
+      CellRange::new(CellAddress { col: 1, row: 1 }, range.end),
+    )],
     // With skip-empty disabled, a missing document print area still leaves the
     // default start/end range printable, so header/footer-only sheets export a page.
     None => vec![CellRange::single(CellAddress { col: 1, row: 1 })],
@@ -694,7 +712,10 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
         col: cell_position as u32 + 1,
         row: row_index,
       });
-      if !area.contains(address) || column_hidden(sheet, address.col) {
+      let Some(print_address) = pivot_print_address(sheet, address) else {
+        continue;
+      };
+      if !area.contains(print_address) || column_hidden(sheet, address.col) {
         continue;
       }
       if !cell.display_text.is_empty()
@@ -717,6 +738,39 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
     }
   }
   true
+}
+
+fn sheet_body_is_empty(import: &ExcelImport, sheet: &CalcSheet) -> bool {
+  let has_printable_drawing = sheet
+    .resources
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.anchors.iter())
+    .any(|anchor| anchor.print_with_sheet && !anchor.object.hidden);
+  if has_printable_drawing {
+    return false;
+  }
+  sheet.rows.iter().all(|row| {
+    row.cells.iter().all(|cell| {
+      let Some(address) = cell.address() else {
+        return true;
+      };
+      if !cell.display_text.is_empty()
+        || !cell.rich_text_runs.is_empty()
+        || cell.formula.is_some()
+        || cell.cached_value.is_some()
+        || cell.data_type.is_some()
+      {
+        return false;
+      }
+      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      let borders = import.styles.borders_for_cell(style_index);
+      borders.left.is_none()
+        && borders.right.is_none()
+        && borders.top.is_none()
+        && borders.bottom.is_none()
+    })
+  })
 }
 
 fn page_areas_for_sheet(
@@ -830,7 +884,21 @@ fn split_range_by_page_metrics(
       sheet.column_width_pt(current)
     };
     if used > 0.0 && used + size > available {
-      slices.push(axis_slice(area, by_row, current_start, current - 1));
+      let previous = axis_slice(area, by_row, current_start, current - 1);
+      slices.push(previous);
+      if !by_row
+        && !sheet_area_has_print_data(sheet, previous)
+        && column_has_print_data(sheet, current)
+      {
+        // Source: LibreOffice sc/source/ui/view/printfun.cxx::CalcPages
+        // keeps the overflowing column as the visible page when all previous
+        // columns in the automatic slice are empty.
+        slices.push(axis_slice(area, by_row, current, current));
+        current += 1;
+        current_start = current;
+        used = 0.0;
+        continue;
+      }
       current_start = current;
       used = 0.0;
     }
@@ -867,6 +935,44 @@ fn axis_slice(area: CellRange, by_row: bool, start: u32, end: u32) -> CellRange 
       },
     )
   }
+}
+
+fn sheet_area_has_print_data(sheet: &CalcSheet, area: CellRange) -> bool {
+  sheet.rows.iter().enumerate().any(|(row_position, row)| {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    if row_index < area.start.row || row_index > area.end.row || row.hidden {
+      return false;
+    }
+    row.cells.iter().enumerate().any(|(cell_position, cell)| {
+      let address = cell.address().unwrap_or(CellAddress {
+        col: cell_position as u32 + 1,
+        row: row_index,
+      });
+      area.contains(address) && cell_has_print_data(cell)
+    })
+  })
+}
+
+fn column_has_print_data(sheet: &CalcSheet, column: u32) -> bool {
+  sheet.rows.iter().enumerate().any(|(row_position, row)| {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    !row.hidden
+      && row.cells.iter().enumerate().any(|(cell_position, cell)| {
+        let address = cell.address().unwrap_or(CellAddress {
+          col: cell_position as u32 + 1,
+          row: row_index,
+        });
+        address.col == column && cell_has_print_data(cell)
+      })
+  })
+}
+
+fn cell_has_print_data(cell: &super::worksheet::CalcCell) -> bool {
+  !cell.display_text.is_empty()
+    || !cell.rich_text_runs.is_empty()
+    || cell.formula.is_some()
+    || cell.cached_value.is_some()
+    || cell.data_type.is_some()
 }
 
 fn repeat_rows_for_page(
@@ -937,7 +1043,10 @@ fn print_cells_for_area<'a>(
         col: cell_position as u32 + 1,
         row: row_index,
       });
-      if !area.contains(address) {
+      let Some(print_address) = pivot_print_address(sheet, address) else {
+        continue;
+      };
+      if !area.contains(print_address) {
         continue;
       }
       let hidden_column = column_hidden(sheet, address.col);
@@ -958,9 +1067,9 @@ fn print_cells_for_area<'a>(
         cell.data_type,
         import.globals.settings.date_1904,
       );
-      let rendered_text = pivot_display_text(sheet, address, rendered_text);
+      let rendered_text = pivot_display_text(sheet, print_address, rendered_text);
       cells.push(CalcPrintCell {
-        address,
+        address: print_address,
         text: cell.display_text.as_str(),
         style_index,
         number_format_id,
@@ -1165,6 +1274,21 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
   // Source: LibreOffice sc/source/core/data/dpoutput.cxx emits DataPilot
   // field/member result captions from the imported pivot source instead of
   // keeping Excel's persisted generic "Row Labels"/"(blank)" strings.
+  if pivot.calculated_only_data_fields {
+    if let Some(location) = CellRange::parse_a1_range(&pivot.printable_location_reference) {
+      if address == location.start {
+        if let Some(label) = pivot_row_label_text(pivot) {
+          return label;
+        }
+      }
+      if address.row == location.start.row && address.col > location.start.col {
+        return "(empty)".to_string();
+      }
+    }
+  }
+  if is_pivot_row_labels_caption(text.as_str()) {
+    return pivot_row_label_text(pivot).unwrap_or(text);
+  }
   match text.as_str() {
     "Grand Total" => {
       if pivot.formats == 0 {
@@ -1172,6 +1296,10 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
       } else {
         text
       }
+    }
+    "Gesamtergebnis"
+    | "\u{041e}\u{0431}\u{0449}\u{0438}\u{0439} \u{0438}\u{0442}\u{043e}\u{0433}" => {
+      "Total Result".to_string()
     }
     "Total general" => "Total Result".to_string(),
     "Total" => pivot
@@ -1195,14 +1323,65 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
   }
 }
 
+fn is_pivot_row_labels_caption(text: &str) -> bool {
+  matches!(
+    text,
+    "Row Labels"
+      | "Zeilenbeschriftungen"
+      | "\u{041d}\u{0430}\u{0437}\u{0432}\u{0430}\u{043d}\u{0438}\u{044f} \u{0441}\u{0442}\u{0440}\u{043e}\u{043a}"
+  )
+}
+
 fn pivot_table_for_cell(
   sheet: &CalcSheet,
   address: CellAddress,
 ) -> Option<&super::pivot::PivotTableModel> {
   sheet.resources.pivot_tables.tables.iter().find(|pivot| {
-    CellRange::parse_a1_range(&pivot.location_reference)
+    CellRange::parse_a1_range(&pivot.printable_location_reference)
       .is_some_and(|range| range.contains(address))
   })
+}
+
+fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Option<CellAddress> {
+  for pivot in &sheet.resources.pivot_tables.tables {
+    let Some(location) = CellRange::parse_a1_range(&pivot.location_reference) else {
+      continue;
+    };
+    let Some(printable_location) = CellRange::parse_a1_range(&pivot.printable_location_reference)
+    else {
+      continue;
+    };
+    if !location.contains(address) {
+      continue;
+    }
+    if pivot.calculated_only_data_fields
+      && pivot.data_layout_axis == super::pivot::PivotDataLayoutAxis::Columns
+      && address.col == location.start.col
+      && address.row > location.start.row
+    {
+      let shifted = CellAddress {
+        col: address.col,
+        row: address.row - 1,
+      };
+      return printable_location.contains(shifted).then_some(shifted);
+    }
+    if !printable_location.contains(address) {
+      return None;
+    }
+    if !pivot.calculated_only_data_fields {
+      return Some(address);
+    }
+    let suppress = match pivot.data_layout_axis {
+      super::pivot::PivotDataLayoutAxis::Rows => {
+        address.row > printable_location.start.row && address.col > printable_location.start.col
+      }
+      super::pivot::PivotDataLayoutAxis::Columns | super::pivot::PivotDataLayoutAxis::Hidden => {
+        address.col > printable_location.start.col && address.row > printable_location.start.row
+      }
+    };
+    return (!suppress).then_some(address);
+  }
+  Some(address)
 }
 
 fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {

@@ -30,10 +30,18 @@ use crate::error::Result;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct WorkbookCatalog {
   pub(crate) external_links: Vec<ExternalLinkModel>,
+  pub(crate) external_cached_cells: Vec<ExternalCachedCell>,
   pub(crate) xml_maps: Option<XmlMapsModel>,
   pub(crate) persons: Vec<PersonModel>,
   pub(crate) revisions: Option<RevisionHeadersModel>,
   pub(crate) relationship_resources: WorkbookRelationshipResources,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ExternalCachedCell {
+  pub(crate) sheet_name: String,
+  pub(crate) reference: String,
+  pub(crate) value: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -303,11 +311,21 @@ impl WorkbookCatalog {
     let relationship_resources =
       WorkbookRelationshipResources::from_workbook_part(package, workbook_part)?;
 
+    let external_links = external_parts
+      .iter()
+      .map(|part| ExternalLinkModel::from_part(package, part))
+      .collect::<Result<Vec<_>>>()?;
+    let external_cached_cells = external_parts
+      .iter()
+      .map(|part| external_cached_cells_from_part(package, part))
+      .collect::<Result<Vec<_>>>()?
+      .into_iter()
+      .flatten()
+      .collect();
+
     Ok(Self {
-      external_links: external_parts
-        .iter()
-        .map(|part| ExternalLinkModel::from_part(package, part))
-        .collect::<Result<Vec<_>>>()?,
+      external_links,
+      external_cached_cells,
       xml_maps: xml_maps_part
         .as_ref()
         .map(|part| XmlMapsModel::from_part(package, part))
@@ -323,6 +341,53 @@ impl WorkbookCatalog {
       relationship_resources,
     })
   }
+}
+
+fn external_cached_cells_from_part(
+  package: &mut SpreadsheetDocument,
+  part: &ExternalWorkbookPart,
+) -> Result<Vec<ExternalCachedCell>> {
+  let link = part.root_element(package)?;
+  let Some(x::ExternalLinkChoice::ExternalBook(book)) = &link.external_link_choice else {
+    return Ok(Vec::new());
+  };
+  let sheet_names = book
+    .sheet_names
+    .as_ref()
+    .map(|names| {
+      names
+        .sheet_name
+        .iter()
+        .map(|name| name.val.clone().unwrap_or_default())
+        .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+  let Some(data_set) = &book.sheet_data_set else {
+    return Ok(Vec::new());
+  };
+  let mut cells = Vec::new();
+  for sheet_data in &data_set.external_sheet_data {
+    let sheet_name = sheet_names
+      .get(sheet_data.sheet_id as usize)
+      .cloned()
+      .unwrap_or_else(|| sheet_data.sheet_id.to_string());
+    for row in &sheet_data.external_row {
+      for cell in &row.external_cell {
+        if let Some(value) = cell
+          .xstring
+          .as_ref()
+          .and_then(|value| value.xml_content.clone())
+        {
+          cells.push(ExternalCachedCell {
+            sheet_name: sheet_name.clone(),
+            reference: cell.cell_reference.clone(),
+            value,
+          });
+        }
+      }
+    }
+  }
+  Ok(cells)
 }
 
 impl ExternalLinkModel {

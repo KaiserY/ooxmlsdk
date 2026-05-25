@@ -42,7 +42,10 @@ pub(crate) struct WorkbookResourceCatalog {
 }
 
 impl ExcelImport {
-  pub(crate) fn import_document(package: &mut SpreadsheetDocument) -> Result<Self> {
+  pub(crate) fn import_document(
+    package: &mut SpreadsheetDocument,
+    options: &crate::options::PdfOptions,
+  ) -> Result<Self> {
     // Source: LibreOffice sc/source/filter/oox/excelfilter.cxx
     // ExcelFilter::importDocument creates workbook-global state and delegates
     // workbook XML/substream order to WorkbookFragment. Document properties,
@@ -58,7 +61,13 @@ impl ExcelImport {
     let workbook_catalog = WorkbookCatalog::from_workbook_part(package, &workbook_part)?;
 
     let mut fragment = WorkbookFragment::new(workbook_part, workbook.clone());
-    let sheets = fragment.finalize_import(package)?;
+    let mut sheets = fragment.finalize_import(package)?;
+    super::formula::recalculate_formula_cells(
+      &mut sheets,
+      &fragment.defined_names,
+      options.source_file_name.as_deref(),
+      &workbook_catalog,
+    );
 
     Ok(Self {
       workbook,

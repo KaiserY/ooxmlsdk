@@ -1,6 +1,7 @@
 mod comments;
 mod display;
 mod drawing;
+mod formula;
 mod import;
 mod object_resources;
 mod page_settings;
@@ -32,6 +33,6 @@ pub(crate) fn layout(
   package: &mut SpreadsheetDocument,
   _options: &PdfOptions,
 ) -> Result<LayoutDocument> {
-  let import = ExcelImport::import_document(package)?;
+  let import = ExcelImport::import_document(package, _options)?;
   Ok(display::lower_to_layout_document(&import))
 }

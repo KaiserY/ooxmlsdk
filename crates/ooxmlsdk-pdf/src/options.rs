@@ -12,6 +12,9 @@ pub struct PdfOptions {
 
   /// JPEG quality used when the PDF filter asks raster graphics to be stored as JPEG.
   pub jpeg_quality: Option<u8>,
+
+  /// Source file name used by spreadsheet formulas such as CELL("filename").
+  pub source_file_name: Option<String>,
 }
 
 impl Default for PdfOptions {
@@ -20,6 +23,7 @@ impl Default for PdfOptions {
       standards: Vec::new(),
       compress_content_streams: true,
       jpeg_quality: None,
+      source_file_name: None,
     }
   }
 }

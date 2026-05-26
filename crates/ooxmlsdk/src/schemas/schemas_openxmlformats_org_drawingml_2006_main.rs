@@ -10866,8 +10866,7 @@ pub enum GraphicDataChoice {
   HiddenShape3D(std::boxed::Box<crate::schemas::a14::HiddenShape3D>),
   ImageProperties(std::boxed::Box<crate::schemas::a14::ImageProperties>),
   UseLocalDpi(std::boxed::Box<crate::schemas::a14::UseLocalDpi>),
-  #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  TextMath(crate::schemas::a14::TextMath),
+  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
   NonVisualDrawingProperties(std::boxed::Box<crate::schemas::dgm14::NonVisualDrawingProperties>),
   RecolorImages(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
   Drawing(std::boxed::Box<crate::schemas::dsp::Drawing>),
@@ -12112,8 +12111,7 @@ pub enum ParagraphChoice {
   Break(std::boxed::Box<Break>),
   /// Text Field.
   Field(std::boxed::Box<Field>),
-  #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  TextMath(crate::schemas::a14::TextMath),
+  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSpacingChoice {

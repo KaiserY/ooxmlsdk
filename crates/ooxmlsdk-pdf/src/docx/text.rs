@@ -339,14 +339,10 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
     return false;
   };
 
-  run_properties
-    .font_size
-    .as_ref()
+  super::paragraph_mark_run_properties_font_size(run_properties)
     .map(|size| size.val.as_str())
     .or_else(|| {
-      run_properties
-        .font_size_complex_script
-        .as_ref()
+      super::paragraph_mark_run_properties_complex_script_font_size(run_properties)
         .map(|size| size.val.as_str())
     })
     .and_then(|value| value.parse::<HpsMeasureValue>().ok())

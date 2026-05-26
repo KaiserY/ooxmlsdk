@@ -212,7 +212,12 @@ pub struct UseLocalDpi {
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the TextMath Class.
-pub type TextMath = Vec<String>;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(office2010, qname = "a14:CT_TextMath/a14:m")]
+pub struct TextMath {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<std::boxed::Box<str>>,
+}
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst")]

@@ -16,6 +16,7 @@ pub enum XsiTypeValue {
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// cp:category
   #[sdk(text_child(qname = "cp:CT_Category/cp:category"))]
   pub category: Option<Category>,

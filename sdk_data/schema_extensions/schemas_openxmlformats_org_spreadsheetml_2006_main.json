@@ -8,6 +8,15 @@
           "Value": "expression"
         }
       ]
+    },
+    {
+      "Name": "SheetStateValues",
+      "AddFacets": [
+        {
+          "Name": "Show",
+          "Value": "show"
+        }
+      ]
     }
   ],
   "Types": [
@@ -26,6 +35,18 @@
     {
       "ClassName": "TableStyle",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Sheet",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NumberingFormat",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Comment",
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "ExternalCell",

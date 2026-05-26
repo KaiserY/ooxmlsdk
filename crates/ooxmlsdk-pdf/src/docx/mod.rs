@@ -671,7 +671,7 @@ fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
-    .and_then(|properties| properties.vanish.as_ref())
+    .and_then(paragraph_mark_run_properties_vanish)
     .is_some_and(|vanish| vanish.val.is_none_or(|value| value.as_bool()))
 }
 
@@ -3773,10 +3773,7 @@ fn hidden_run_text(run: &w::Run) -> String {
 }
 
 fn run_properties_style_id(properties: &w::RunProperties) -> Option<&str> {
-  properties
-    .run_style
-    .as_ref()
-    .map(|run_style| run_style.val.as_str())
+  run_properties_run_style(properties).map(|run_style| run_style.val.as_str())
 }
 
 fn push_redline_run(
@@ -11185,144 +11182,254 @@ pub(super) enum RunProps<'a> {
   ParagraphMark(&'a w::ParagraphMarkRunProperties),
 }
 
+macro_rules! run_properties_accessor {
+  ($name:ident, $variant:ident, $ty:ty) => {
+    fn $name(properties: &w::RunProperties) -> Option<&$ty> {
+      properties
+        .run_properties_choice
+        .iter()
+        .find_map(|choice| match choice {
+          w::RunPropertiesChoice::$variant(value) => Some(value.as_ref()),
+          _ => None,
+        })
+    }
+  };
+}
+
+macro_rules! paragraph_mark_run_properties_accessor {
+  ($name:ident, $variant:ident, $ty:ty) => {
+    fn $name(properties: &w::ParagraphMarkRunProperties) -> Option<&$ty> {
+      properties
+        .paragraph_mark_run_properties_choice2
+        .iter()
+        .find_map(|choice| match choice {
+          w::ParagraphMarkRunPropertiesChoice2::$variant(value) => Some(value.as_ref()),
+          _ => None,
+        })
+    }
+  };
+}
+
+run_properties_accessor!(run_properties_run_style, RunStyle, w::RunStyle);
+run_properties_accessor!(run_properties_run_fonts, RunFonts, w::RunFonts);
+run_properties_accessor!(run_properties_bold, Bold, w::Bold);
+run_properties_accessor!(run_properties_italic, Italic, w::Italic);
+run_properties_accessor!(run_properties_font_size, FontSize, w::FontSize);
+run_properties_accessor!(
+  run_properties_complex_script_font_size,
+  FontSizeComplexScript,
+  w::FontSizeComplexScript
+);
+run_properties_accessor!(run_properties_color, Color, w::Color);
+run_properties_accessor!(run_properties_underline, Underline, w::Underline);
+run_properties_accessor!(run_properties_strike, Strike, w::Strike);
+run_properties_accessor!(run_properties_double_strike, DoubleStrike, w::DoubleStrike);
+run_properties_accessor!(run_properties_caps, Caps, w::Caps);
+run_properties_accessor!(run_properties_small_caps, SmallCaps, w::SmallCaps);
+run_properties_accessor!(run_properties_vanish, Vanish, w::Vanish);
+run_properties_accessor!(
+  run_properties_vertical_text_alignment,
+  VerticalTextAlignment,
+  w::VerticalTextAlignment
+);
+run_properties_accessor!(run_properties_spacing, Spacing, w::Spacing);
+run_properties_accessor!(run_properties_highlight, Highlight, w::Highlight);
+
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_run_style,
+  RunStyle,
+  w::RunStyle
+);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_run_fonts,
+  RunFonts,
+  w::RunFonts
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_bold, Bold, w::Bold);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_italic, Italic, w::Italic);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_font_size,
+  FontSize,
+  w::FontSize
+);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_complex_script_font_size,
+  FontSizeComplexScript,
+  w::FontSizeComplexScript
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_color, Color, w::Color);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_underline,
+  Underline,
+  w::Underline
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_strike, Strike, w::Strike);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_double_strike,
+  DoubleStrike,
+  w::DoubleStrike
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_caps, Caps, w::Caps);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_small_caps,
+  SmallCaps,
+  w::SmallCaps
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_vanish, Vanish, w::Vanish);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_vertical_text_alignment,
+  VerticalTextAlignment,
+  w::VerticalTextAlignment
+);
+paragraph_mark_run_properties_accessor!(paragraph_mark_run_properties_spacing, Spacing, w::Spacing);
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_highlight,
+  Highlight,
+  w::Highlight
+);
+
 impl<'a> RunProps<'a> {
   fn run_fonts(&self) -> Option<&'a w::RunFonts> {
     match self {
-      Self::Direct(properties) => properties.run_fonts.as_ref(),
+      Self::Direct(properties) => run_properties_run_fonts(properties),
       Self::Style(properties) => properties.run_fonts.as_ref(),
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
       Self::Numbering(properties) => properties.run_fonts.as_ref(),
-      Self::ParagraphMark(properties) => properties.run_fonts.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_run_fonts(properties),
     }
   }
 
   fn bold(&self) -> Option<&'a w::Bold> {
     match self {
-      Self::Direct(properties) => properties.bold.as_ref(),
+      Self::Direct(properties) => run_properties_bold(properties),
       Self::Style(properties) => properties.bold.as_ref(),
       Self::BaseStyle(properties) => properties.bold.as_ref(),
       Self::Numbering(properties) => properties.bold.as_ref(),
-      Self::ParagraphMark(properties) => properties.bold.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_bold(properties),
     }
   }
 
   fn italic(&self) -> Option<&'a w::Italic> {
     match self {
-      Self::Direct(properties) => properties.italic.as_ref(),
+      Self::Direct(properties) => run_properties_italic(properties),
       Self::Style(properties) => properties.italic.as_ref(),
       Self::BaseStyle(properties) => properties.italic.as_ref(),
       Self::Numbering(properties) => properties.italic.as_ref(),
-      Self::ParagraphMark(properties) => properties.italic.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_italic(properties),
     }
   }
 
   fn font_size(&self) -> Option<&'a w::FontSize> {
     match self {
-      Self::Direct(properties) => properties.font_size.first(),
+      Self::Direct(properties) => run_properties_font_size(properties),
       Self::Style(properties) => properties.font_size.as_ref(),
       Self::BaseStyle(properties) => properties.font_size.as_ref(),
       Self::Numbering(properties) => properties.font_size.as_ref(),
-      Self::ParagraphMark(properties) => properties.font_size.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_font_size(properties),
     }
   }
 
   fn complex_script_font_size(&self) -> Option<&'a w::FontSizeComplexScript> {
     match self {
-      Self::Direct(properties) => properties.font_size_complex_script.as_ref(),
+      Self::Direct(properties) => run_properties_complex_script_font_size(properties),
       Self::Style(properties) => properties.font_size_complex_script.as_ref(),
       Self::BaseStyle(properties) => properties.font_size_complex_script.as_ref(),
       Self::Numbering(properties) => properties.font_size_complex_script.as_ref(),
-      Self::ParagraphMark(properties) => properties.font_size_complex_script.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_complex_script_font_size(properties)
+      }
     }
   }
 
   fn color(&self) -> Option<&'a w::Color> {
     match self {
-      Self::Direct(properties) => properties.color.as_ref(),
+      Self::Direct(properties) => run_properties_color(properties),
       Self::Style(properties) => properties.color.as_ref(),
       Self::BaseStyle(properties) => properties.color.as_ref(),
       Self::Numbering(properties) => properties.color.as_ref(),
-      Self::ParagraphMark(properties) => properties.color.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_color(properties),
     }
   }
 
   fn underline(&self) -> Option<&'a w::Underline> {
     match self {
-      Self::Direct(properties) => properties.underline.as_ref(),
+      Self::Direct(properties) => run_properties_underline(properties),
       Self::Style(properties) => properties.underline.as_ref(),
       Self::BaseStyle(properties) => properties.underline.as_ref(),
       Self::Numbering(properties) => properties.underline.as_ref(),
-      Self::ParagraphMark(properties) => properties.underline.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_underline(properties),
     }
   }
 
   fn strike(&self) -> Option<&'a w::Strike> {
     match self {
-      Self::Direct(properties) => properties.strike.as_ref(),
+      Self::Direct(properties) => run_properties_strike(properties),
       Self::Style(properties) => properties.strike.as_ref(),
       Self::BaseStyle(properties) => properties.strike.as_ref(),
       Self::Numbering(properties) => properties.strike.as_ref(),
-      Self::ParagraphMark(properties) => properties.strike.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_strike(properties),
     }
   }
 
   fn double_strike(&self) -> Option<&'a w::DoubleStrike> {
     match self {
-      Self::Direct(properties) => properties.double_strike.as_ref(),
+      Self::Direct(properties) => run_properties_double_strike(properties),
       Self::Style(properties) => properties.double_strike.as_ref(),
       Self::BaseStyle(properties) => properties.double_strike.as_ref(),
       Self::Numbering(properties) => properties.double_strike.as_ref(),
-      Self::ParagraphMark(properties) => properties.double_strike.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_double_strike(properties),
     }
   }
 
   fn caps(&self) -> Option<&'a w::Caps> {
     match self {
-      Self::Direct(properties) => properties.caps.as_ref(),
+      Self::Direct(properties) => run_properties_caps(properties),
       Self::Style(properties) => properties.caps.as_ref(),
       Self::BaseStyle(properties) => properties.caps.as_ref(),
       Self::Numbering(properties) => properties.caps.as_ref(),
-      Self::ParagraphMark(properties) => properties.caps.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_caps(properties),
     }
   }
 
   fn small_caps(&self) -> Option<&'a w::SmallCaps> {
     match self {
-      Self::Direct(properties) => properties.small_caps.as_ref(),
+      Self::Direct(properties) => run_properties_small_caps(properties),
       Self::Style(properties) => properties.small_caps.as_ref(),
       Self::BaseStyle(properties) => properties.small_caps.as_ref(),
       Self::Numbering(properties) => properties.small_caps.as_ref(),
-      Self::ParagraphMark(properties) => properties.small_caps.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_small_caps(properties),
     }
   }
 
   fn vanish(&self) -> Option<&'a w::Vanish> {
     match self {
-      Self::Direct(properties) => properties.vanish.as_ref(),
+      Self::Direct(properties) => run_properties_vanish(properties),
       Self::Style(properties) => properties.vanish.as_ref(),
       Self::BaseStyle(properties) => properties.vanish.as_ref(),
       Self::Numbering(properties) => properties.vanish.as_ref(),
-      Self::ParagraphMark(properties) => properties.vanish.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_vanish(properties),
     }
   }
 
   fn vertical_text_alignment(&self) -> Option<&'a w::VerticalTextAlignment> {
     match self {
-      Self::Direct(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::Direct(properties) => run_properties_vertical_text_alignment(properties),
       Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
       Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
       Self::Numbering(properties) => properties.vertical_text_alignment.as_ref(),
-      Self::ParagraphMark(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::ParagraphMark(properties) => {
+        paragraph_mark_run_properties_vertical_text_alignment(properties)
+      }
     }
   }
 
   fn spacing(&self) -> Option<&'a w::Spacing> {
     match self {
-      Self::Direct(properties) => properties.spacing.as_ref(),
+      Self::Direct(properties) => run_properties_spacing(properties),
       Self::Style(properties) => properties.spacing.as_ref(),
       Self::BaseStyle(properties) => properties.spacing.as_ref(),
       Self::Numbering(properties) => properties.spacing.as_ref(),
-      Self::ParagraphMark(properties) => properties.spacing.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_spacing(properties),
     }
   }
 
@@ -11344,8 +11451,8 @@ impl<'a> RunProps<'a> {
 
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
-      Self::Direct(properties) => properties.highlight.as_ref(),
-      Self::ParagraphMark(properties) => properties.highlight.as_ref(),
+      Self::Direct(properties) => run_properties_highlight(properties),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_highlight(properties),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -12228,13 +12335,15 @@ mod tests {
       })),
       paragraph_choice: vec![w::ParagraphChoice::WRun(Box::new(w::Run {
         run_properties: Some(Box::new(w::RunProperties {
-          bold: Some(w::Bold {
-            val: Some(false.into()),
-          }),
-          color: Some(w::Color {
-            val: "0000FF".into(),
-            ..Default::default()
-          }),
+          run_properties_choice: vec![
+            w::RunPropertiesChoice::Bold(Box::new(w::Bold {
+              val: Some(false.into()),
+            })),
+            w::RunPropertiesChoice::Color(Box::new(w::Color {
+              val: "0000FF".into(),
+              ..Default::default()
+            })),
+          ],
           ..Default::default()
         })),
         run_choice: vec![w::RunChoice::Text(text("Header"))],

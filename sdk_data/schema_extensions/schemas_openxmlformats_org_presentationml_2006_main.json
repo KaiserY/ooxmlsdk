@@ -24,6 +24,10 @@
     {
       "ClassName": "SlideMasterExtensionList",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "SlideLayoutExtensionList",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

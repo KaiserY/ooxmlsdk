@@ -217,7 +217,7 @@ pub struct Comment {
     qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst",
     qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"
   ))]
-  pub comment_choice: Option<CommentChoice>,
+  pub comment_choice: Vec<CommentChoice>,
   /// Defines the Point2DType Class.
   #[sdk(child(office2021, qname = "a:CT_Point2D/p188:pos"))]
   pub point2_d_type: Option<Point2DType>,

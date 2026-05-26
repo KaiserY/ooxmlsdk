@@ -6264,120 +6264,47 @@ pub struct RunProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
-  /// Defines the RunStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub run_style: Option<RunStyle>,
-  /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub run_fonts: Option<RunFonts>,
-  /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub bold: Option<Bold>,
-  /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub bold_complex_script: Option<BoldComplexScript>,
-  /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub italic: Option<Italic>,
-  /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub italic_complex_script: Option<ItalicComplexScript>,
-  /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub caps: Option<Caps>,
-  /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub small_caps: Option<SmallCaps>,
-  /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub strike: Option<Strike>,
-  /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub double_strike: Option<DoubleStrike>,
-  /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub outline: Option<Outline>,
-  /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
-  pub shadow: Option<Shadow>,
-  /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub emboss: Option<Emboss>,
-  /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub imprint: Option<Imprint>,
-  /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub no_proof: Option<NoProof>,
-  /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub snap_to_grid: Option<SnapToGrid>,
-  /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub vanish: Option<Vanish>,
-  /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub web_hidden: Option<WebHidden>,
-  /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub color: Option<Color>,
-  /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub spacing: Option<Spacing>,
-  /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub character_scale: Option<CharacterScale>,
-  /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub kern: Option<Kern>,
-  /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub position: Option<Position>,
-  /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub font_size: Vec<FontSize>,
-  /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub font_size_complex_script: Option<FontSizeComplexScript>,
-  /// Defines the Highlight Class.
-  #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub highlight: Option<Highlight>,
-  /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub underline: Option<Underline>,
-  /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub text_effect: Option<TextEffect>,
-  /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub border: Option<Border>,
-  /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub shading: Option<Shading>,
-  /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub fit_text: Option<FitText>,
-  /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub vertical_text_alignment: Option<VerticalTextAlignment>,
-  /// Defines the RightToLeftText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub right_to_left_text: Option<RightToLeftText>,
-  /// Defines the ComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub complex_script: Option<ComplexScript>,
-  /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub emphasis: Option<Emphasis>,
-  /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub languages: Option<Languages>,
-  /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub east_asian_layout: Option<EastAsianLayout>,
-  /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub spec_vanish: Option<SpecVanish>,
+  #[sdk(choice(
+    qname = "w:CT_String253/w:rStyle",
+    qname = "w:CT_Fonts/w:rFonts",
+    qname = "w:CT_OnOff/w:b",
+    qname = "w:CT_OnOff/w:bCs",
+    qname = "w:CT_OnOff/w:i",
+    qname = "w:CT_OnOff/w:iCs",
+    qname = "w:CT_OnOff/w:caps",
+    qname = "w:CT_OnOff/w:smallCaps",
+    qname = "w:CT_OnOff/w:strike",
+    qname = "w:CT_OnOff/w:dstrike",
+    qname = "w:CT_OnOff/w:outline",
+    qname = "w:CT_OnOff/w:shadow",
+    qname = "w:CT_OnOff/w:emboss",
+    qname = "w:CT_OnOff/w:imprint",
+    qname = "w:CT_OnOff/w:noProof",
+    qname = "w:CT_OnOff/w:snapToGrid",
+    qname = "w:CT_OnOff/w:vanish",
+    qname = "w:CT_OnOff/w:webHidden",
+    qname = "w:CT_Color/w:color",
+    qname = "w:CT_ShortTwipsMeasure/w:spacing",
+    qname = "w:CT_TextScale/w:w",
+    qname = "w:CT_HpsKern/w:kern",
+    qname = "w:CT_SignedHpsMeasure/w:position",
+    qname = "w:CT_HpsMeasure/w:sz",
+    qname = "w:CT_HpsMeasure/w:szCs",
+    qname = "w:CT_Highlight/w:highlight",
+    qname = "w:CT_Underline/w:u",
+    qname = "w:CT_TextEffect/w:effect",
+    qname = "w:CT_Border/w:bdr",
+    qname = "w:CT_Shd/w:shd",
+    qname = "w:CT_FitText/w:fitText",
+    qname = "w:CT_VerticalAlignRun/w:vertAlign",
+    qname = "w:CT_OnOff/w:rtl",
+    qname = "w:CT_OnOff/w:cs",
+    qname = "w:CT_Em/w:em",
+    qname = "w:CT_Language/w:lang",
+    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
+    qname = "w:CT_OnOff/w:specVanish"
+  ))]
+  pub run_properties_choice: Vec<RunPropertiesChoice>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
@@ -10299,126 +10226,53 @@ pub struct ParagraphPropertiesExtended {
 pub struct PreviousRunProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Defines the RunStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub run_style: Vec<RunStyle>,
-  /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub run_fonts: Vec<RunFonts>,
-  /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub bold: Vec<Bold>,
-  /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub bold_complex_script: Vec<BoldComplexScript>,
-  /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub italic: Vec<Italic>,
-  /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub italic_complex_script: Vec<ItalicComplexScript>,
-  /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub caps: Vec<Caps>,
-  /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub small_caps: Vec<SmallCaps>,
-  /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub strike: Vec<Strike>,
-  /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub double_strike: Vec<DoubleStrike>,
-  /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub outline: Vec<Outline>,
-  /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
-  pub w_shadow: Vec<Shadow>,
-  /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub emboss: Vec<Emboss>,
-  /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub imprint: Vec<Imprint>,
-  /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub no_proof: Vec<NoProof>,
-  /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub snap_to_grid: Vec<SnapToGrid>,
-  /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub vanish: Vec<Vanish>,
-  /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub web_hidden: Vec<WebHidden>,
-  /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub color: Vec<Color>,
-  /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub spacing: Vec<Spacing>,
-  /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub character_scale: Vec<CharacterScale>,
-  /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub kern: Vec<Kern>,
-  /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub position: Vec<Position>,
-  /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub font_size: Vec<FontSize>,
-  /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub font_size_complex_script: Vec<FontSizeComplexScript>,
-  /// Defines the Highlight Class.
-  #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub highlight: Vec<Highlight>,
-  /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub underline: Vec<Underline>,
-  /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub text_effect: Vec<TextEffect>,
-  /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub border: Vec<Border>,
-  /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub shading: Vec<Shading>,
-  /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub fit_text: Vec<FitText>,
-  /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub vertical_text_alignment: Vec<VerticalTextAlignment>,
-  /// Defines the RightToLeftText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub right_to_left_text: Vec<RightToLeftText>,
-  /// Defines the ComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub complex_script: Vec<ComplexScript>,
-  /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub emphasis: Vec<Emphasis>,
-  /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub languages: Vec<Languages>,
-  /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub east_asian_layout: Vec<EastAsianLayout>,
-  /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub spec_vanish: Vec<SpecVanish>,
+  #[sdk(choice(
+    qname = "w:CT_String253/w:rStyle",
+    qname = "w:CT_Fonts/w:rFonts",
+    qname = "w:CT_OnOff/w:b",
+    qname = "w:CT_OnOff/w:bCs",
+    qname = "w:CT_OnOff/w:i",
+    qname = "w:CT_OnOff/w:iCs",
+    qname = "w:CT_OnOff/w:caps",
+    qname = "w:CT_OnOff/w:smallCaps",
+    qname = "w:CT_OnOff/w:strike",
+    qname = "w:CT_OnOff/w:dstrike",
+    qname = "w:CT_OnOff/w:outline",
+    qname = "w:CT_OnOff/w:shadow",
+    qname = "w:CT_OnOff/w:emboss",
+    qname = "w:CT_OnOff/w:imprint",
+    qname = "w:CT_OnOff/w:noProof",
+    qname = "w:CT_OnOff/w:snapToGrid",
+    qname = "w:CT_OnOff/w:vanish",
+    qname = "w:CT_OnOff/w:webHidden",
+    qname = "w:CT_Color/w:color",
+    qname = "w:CT_ShortTwipsMeasure/w:spacing",
+    qname = "w:CT_TextScale/w:w",
+    qname = "w:CT_HpsKern/w:kern",
+    qname = "w:CT_SignedHpsMeasure/w:position",
+    qname = "w:CT_HpsMeasure/w:sz",
+    qname = "w:CT_HpsMeasure/w:szCs",
+    qname = "w:CT_Highlight/w:highlight",
+    qname = "w:CT_Underline/w:u",
+    qname = "w:CT_TextEffect/w:effect",
+    qname = "w:CT_Border/w:bdr",
+    qname = "w:CT_Shd/w:shd",
+    qname = "w:CT_FitText/w:fitText",
+    qname = "w:CT_VerticalAlignRun/w:vertAlign",
+    qname = "w:CT_OnOff/w:rtl",
+    qname = "w:CT_OnOff/w:cs",
+    qname = "w:CT_Em/w:em",
+    qname = "w:CT_Language/w:lang",
+    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
+    qname = "w:CT_OnOff/w:specVanish"
+  ))]
+  pub run_properties_choice: Vec<PreviousRunPropertiesChoice>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
-  pub w14_shadow: Vec<crate::schemas::w14::Shadow>,
+  pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
@@ -10472,128 +10326,56 @@ pub struct PreviousParagraphMarkRunProperties {
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
-  pub previous_paragraph_mark_run_properties_choice:
+  pub previous_paragraph_mark_run_properties_choice1:
     Option<PreviousParagraphMarkRunPropertiesChoice>,
-  /// Defines the RunStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub run_style: Vec<RunStyle>,
-  /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub run_fonts: Vec<RunFonts>,
-  /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub bold: Vec<Bold>,
-  /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub bold_complex_script: Vec<BoldComplexScript>,
-  /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub italic: Vec<Italic>,
-  /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub italic_complex_script: Vec<ItalicComplexScript>,
-  /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub caps: Vec<Caps>,
-  /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub small_caps: Vec<SmallCaps>,
-  /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub strike: Vec<Strike>,
-  /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub double_strike: Vec<DoubleStrike>,
-  /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub outline: Vec<Outline>,
-  /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
-  pub w_shadow: Vec<Shadow>,
-  /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub emboss: Vec<Emboss>,
-  /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub imprint: Vec<Imprint>,
-  /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub no_proof: Vec<NoProof>,
-  /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub snap_to_grid: Vec<SnapToGrid>,
-  /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub vanish: Vec<Vanish>,
-  /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub web_hidden: Vec<WebHidden>,
-  /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub color: Vec<Color>,
-  /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub spacing: Vec<Spacing>,
-  /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub character_scale: Vec<CharacterScale>,
-  /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub kern: Vec<Kern>,
-  /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub position: Vec<Position>,
-  /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub font_size: Vec<FontSize>,
-  /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub font_size_complex_script: Vec<FontSizeComplexScript>,
-  /// Defines the Highlight Class.
-  #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub highlight: Vec<Highlight>,
-  /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub underline: Vec<Underline>,
-  /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub text_effect: Vec<TextEffect>,
-  /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub border: Vec<Border>,
-  /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub shading: Vec<Shading>,
-  /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub fit_text: Vec<FitText>,
-  /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub vertical_text_alignment: Vec<VerticalTextAlignment>,
-  /// Defines the RightToLeftText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub right_to_left_text: Vec<RightToLeftText>,
-  /// Defines the ComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub complex_script: Vec<ComplexScript>,
-  /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub emphasis: Vec<Emphasis>,
-  /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub languages: Vec<Languages>,
-  /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub east_asian_layout: Vec<EastAsianLayout>,
-  /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub spec_vanish: Vec<SpecVanish>,
+  #[sdk(choice(
+    qname = "w:CT_String253/w:rStyle",
+    qname = "w:CT_Fonts/w:rFonts",
+    qname = "w:CT_OnOff/w:b",
+    qname = "w:CT_OnOff/w:bCs",
+    qname = "w:CT_OnOff/w:i",
+    qname = "w:CT_OnOff/w:iCs",
+    qname = "w:CT_OnOff/w:caps",
+    qname = "w:CT_OnOff/w:smallCaps",
+    qname = "w:CT_OnOff/w:strike",
+    qname = "w:CT_OnOff/w:dstrike",
+    qname = "w:CT_OnOff/w:outline",
+    qname = "w:CT_OnOff/w:shadow",
+    qname = "w:CT_OnOff/w:emboss",
+    qname = "w:CT_OnOff/w:imprint",
+    qname = "w:CT_OnOff/w:noProof",
+    qname = "w:CT_OnOff/w:snapToGrid",
+    qname = "w:CT_OnOff/w:vanish",
+    qname = "w:CT_OnOff/w:webHidden",
+    qname = "w:CT_Color/w:color",
+    qname = "w:CT_ShortTwipsMeasure/w:spacing",
+    qname = "w:CT_TextScale/w:w",
+    qname = "w:CT_HpsKern/w:kern",
+    qname = "w:CT_SignedHpsMeasure/w:position",
+    qname = "w:CT_HpsMeasure/w:sz",
+    qname = "w:CT_HpsMeasure/w:szCs",
+    qname = "w:CT_Highlight/w:highlight",
+    qname = "w:CT_Underline/w:u",
+    qname = "w:CT_TextEffect/w:effect",
+    qname = "w:CT_Border/w:bdr",
+    qname = "w:CT_Shd/w:shd",
+    qname = "w:CT_FitText/w:fitText",
+    qname = "w:CT_VerticalAlignRun/w:vertAlign",
+    qname = "w:CT_OnOff/w:rtl",
+    qname = "w:CT_OnOff/w:cs",
+    qname = "w:CT_Em/w:em",
+    qname = "w:CT_Language/w:lang",
+    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
+    qname = "w:CT_OnOff/w:specVanish"
+  ))]
+  pub previous_paragraph_mark_run_properties_choice2:
+    Vec<PreviousParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
-  pub w14_shadow: Vec<crate::schemas::w14::Shadow>,
+  pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
@@ -10737,127 +10519,54 @@ pub struct ParagraphMarkRunProperties {
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
-  pub paragraph_mark_run_properties_choice: Option<ParagraphMarkRunPropertiesChoice>,
-  /// Defines the RunStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
-  pub run_style: Option<RunStyle>,
-  /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
-  pub run_fonts: Option<RunFonts>,
-  /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
-  pub bold: Option<Bold>,
-  /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
-  pub bold_complex_script: Option<BoldComplexScript>,
-  /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
-  pub italic: Option<Italic>,
-  /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
-  pub italic_complex_script: Option<ItalicComplexScript>,
-  /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
-  pub caps: Option<Caps>,
-  /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
-  pub small_caps: Option<SmallCaps>,
-  /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
-  pub strike: Option<Strike>,
-  /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
-  pub double_strike: Option<DoubleStrike>,
-  /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
-  pub outline: Option<Outline>,
-  /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
-  pub w_shadow: Option<Shadow>,
-  /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
-  pub emboss: Option<Emboss>,
-  /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
-  pub imprint: Option<Imprint>,
-  /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
-  pub no_proof: Option<NoProof>,
-  /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
-  pub snap_to_grid: Option<SnapToGrid>,
-  /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
-  pub vanish: Option<Vanish>,
-  /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
-  pub web_hidden: Option<WebHidden>,
-  /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
-  pub color: Option<Color>,
-  /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
-  pub spacing: Option<Spacing>,
-  /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
-  pub character_scale: Option<CharacterScale>,
-  /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
-  pub kern: Option<Kern>,
-  /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
-  pub position: Option<Position>,
-  /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub font_size: Option<FontSize>,
-  /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
-  pub font_size_complex_script: Option<FontSizeComplexScript>,
-  /// Defines the Highlight Class.
-  #[sdk(child(qname = "w:CT_Highlight/w:highlight"))]
-  pub highlight: Option<Highlight>,
-  /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
-  pub underline: Option<Underline>,
-  /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
-  pub text_effect: Option<TextEffect>,
-  /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
-  pub border: Option<Border>,
-  /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
-  pub shading: Option<Shading>,
-  /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
-  pub fit_text: Option<FitText>,
-  /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
-  pub vertical_text_alignment: Option<VerticalTextAlignment>,
-  /// Defines the RightToLeftText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
-  pub right_to_left_text: Option<RightToLeftText>,
-  /// Defines the ComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
-  pub complex_script: Option<ComplexScript>,
-  /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
-  pub emphasis: Option<Emphasis>,
-  /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
-  pub languages: Option<Languages>,
-  /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
-  pub east_asian_layout: Option<EastAsianLayout>,
-  /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
-  pub spec_vanish: Option<SpecVanish>,
+  pub paragraph_mark_run_properties_choice1: Option<ParagraphMarkRunPropertiesChoice>,
+  #[sdk(choice(
+    qname = "w:CT_String253/w:rStyle",
+    qname = "w:CT_Fonts/w:rFonts",
+    qname = "w:CT_OnOff/w:b",
+    qname = "w:CT_OnOff/w:bCs",
+    qname = "w:CT_OnOff/w:i",
+    qname = "w:CT_OnOff/w:iCs",
+    qname = "w:CT_OnOff/w:caps",
+    qname = "w:CT_OnOff/w:smallCaps",
+    qname = "w:CT_OnOff/w:strike",
+    qname = "w:CT_OnOff/w:dstrike",
+    qname = "w:CT_OnOff/w:outline",
+    qname = "w:CT_OnOff/w:shadow",
+    qname = "w:CT_OnOff/w:emboss",
+    qname = "w:CT_OnOff/w:imprint",
+    qname = "w:CT_OnOff/w:noProof",
+    qname = "w:CT_OnOff/w:snapToGrid",
+    qname = "w:CT_OnOff/w:vanish",
+    qname = "w:CT_OnOff/w:webHidden",
+    qname = "w:CT_Color/w:color",
+    qname = "w:CT_ShortTwipsMeasure/w:spacing",
+    qname = "w:CT_TextScale/w:w",
+    qname = "w:CT_HpsKern/w:kern",
+    qname = "w:CT_SignedHpsMeasure/w:position",
+    qname = "w:CT_HpsMeasure/w:sz",
+    qname = "w:CT_HpsMeasure/w:szCs",
+    qname = "w:CT_Highlight/w:highlight",
+    qname = "w:CT_Underline/w:u",
+    qname = "w:CT_TextEffect/w:effect",
+    qname = "w:CT_Border/w:bdr",
+    qname = "w:CT_Shd/w:shd",
+    qname = "w:CT_FitText/w:fitText",
+    qname = "w:CT_VerticalAlignRun/w:vertAlign",
+    qname = "w:CT_OnOff/w:rtl",
+    qname = "w:CT_OnOff/w:cs",
+    qname = "w:CT_Em/w:em",
+    qname = "w:CT_Language/w:lang",
+    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
+    qname = "w:CT_OnOff/w:specVanish"
+  ))]
+  pub paragraph_mark_run_properties_choice2: Vec<ParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
   #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
-  pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
+  pub shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
   #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::w14::Reflection>,
@@ -14615,7 +14324,7 @@ pub struct Lock {
 pub struct SdtPlaceholder {
   /// Document Part Reference
   #[sdk(child(qname = "w:CT_String/w:docPart"))]
-  pub doc_part_reference: std::boxed::Box<DocPartReference>,
+  pub doc_part_reference: Option<DocPartReference>,
 }
 /// Defines the DataBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15780,6 +15489,85 @@ pub enum DrawingChoice {
   Anchor(std::boxed::Box<crate::schemas::wp::Anchor>),
   /// Inline DrawingML Object.
   Inline(std::boxed::Box<crate::schemas::wp::Inline>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum RunPropertiesChoice {
+  /// Defines the RunStyle Class.
+  RunStyle(std::boxed::Box<RunStyle>),
+  /// Defines the RunFonts Class.
+  RunFonts(std::boxed::Box<RunFonts>),
+  /// Defines the Bold Class.
+  Bold(std::boxed::Box<Bold>),
+  /// Defines the BoldComplexScript Class.
+  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  /// Defines the Italic Class.
+  Italic(std::boxed::Box<Italic>),
+  /// Defines the ItalicComplexScript Class.
+  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  /// Defines the Caps Class.
+  Caps(std::boxed::Box<Caps>),
+  /// Defines the SmallCaps Class.
+  SmallCaps(std::boxed::Box<SmallCaps>),
+  /// Defines the Strike Class.
+  Strike(std::boxed::Box<Strike>),
+  /// Defines the DoubleStrike Class.
+  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  /// Defines the Outline Class.
+  Outline(std::boxed::Box<Outline>),
+  /// Defines the Shadow Class.
+  Shadow(std::boxed::Box<Shadow>),
+  /// Defines the Emboss Class.
+  Emboss(std::boxed::Box<Emboss>),
+  /// Defines the Imprint Class.
+  Imprint(std::boxed::Box<Imprint>),
+  /// Defines the NoProof Class.
+  NoProof(std::boxed::Box<NoProof>),
+  /// Defines the SnapToGrid Class.
+  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  /// Defines the Vanish Class.
+  Vanish(std::boxed::Box<Vanish>),
+  /// Defines the WebHidden Class.
+  WebHidden(std::boxed::Box<WebHidden>),
+  /// Defines the Color Class.
+  Color(std::boxed::Box<Color>),
+  /// Defines the Spacing Class.
+  Spacing(std::boxed::Box<Spacing>),
+  /// Defines the CharacterScale Class.
+  CharacterScale(std::boxed::Box<CharacterScale>),
+  /// Defines the Kern Class.
+  Kern(std::boxed::Box<Kern>),
+  /// Defines the Position Class.
+  Position(std::boxed::Box<Position>),
+  /// Defines the FontSize Class.
+  FontSize(std::boxed::Box<FontSize>),
+  /// Defines the FontSizeComplexScript Class.
+  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  /// Defines the Highlight Class.
+  Highlight(std::boxed::Box<Highlight>),
+  /// Defines the Underline Class.
+  Underline(std::boxed::Box<Underline>),
+  /// Defines the TextEffect Class.
+  TextEffect(std::boxed::Box<TextEffect>),
+  /// Defines the Border Class.
+  Border(std::boxed::Box<Border>),
+  /// Defines the Shading Class.
+  Shading(std::boxed::Box<Shading>),
+  /// Defines the FitText Class.
+  FitText(std::boxed::Box<FitText>),
+  /// Defines the VerticalTextAlignment Class.
+  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  /// Defines the RightToLeftText Class.
+  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  /// Defines the ComplexScript Class.
+  ComplexScript(std::boxed::Box<ComplexScript>),
+  /// Defines the Emphasis Class.
+  Emphasis(std::boxed::Box<Emphasis>),
+  /// Defines the Languages Class.
+  Languages(std::boxed::Box<Languages>),
+  /// Defines the EastAsianLayout Class.
+  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  /// Defines the SpecVanish Class.
+  SpecVanish(std::boxed::Box<SpecVanish>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedMathControlChoice {
@@ -18499,14 +18287,255 @@ pub enum PreviousTableRowPropertiesChoice {
   TableJustification(std::boxed::Box<TableJustification>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum PreviousRunPropertiesChoice {
+  /// Defines the RunStyle Class.
+  RunStyle(std::boxed::Box<RunStyle>),
+  /// Defines the RunFonts Class.
+  RunFonts(std::boxed::Box<RunFonts>),
+  /// Defines the Bold Class.
+  Bold(std::boxed::Box<Bold>),
+  /// Defines the BoldComplexScript Class.
+  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  /// Defines the Italic Class.
+  Italic(std::boxed::Box<Italic>),
+  /// Defines the ItalicComplexScript Class.
+  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  /// Defines the Caps Class.
+  Caps(std::boxed::Box<Caps>),
+  /// Defines the SmallCaps Class.
+  SmallCaps(std::boxed::Box<SmallCaps>),
+  /// Defines the Strike Class.
+  Strike(std::boxed::Box<Strike>),
+  /// Defines the DoubleStrike Class.
+  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  /// Defines the Outline Class.
+  Outline(std::boxed::Box<Outline>),
+  /// Defines the Shadow Class.
+  Shadow(std::boxed::Box<Shadow>),
+  /// Defines the Emboss Class.
+  Emboss(std::boxed::Box<Emboss>),
+  /// Defines the Imprint Class.
+  Imprint(std::boxed::Box<Imprint>),
+  /// Defines the NoProof Class.
+  NoProof(std::boxed::Box<NoProof>),
+  /// Defines the SnapToGrid Class.
+  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  /// Defines the Vanish Class.
+  Vanish(std::boxed::Box<Vanish>),
+  /// Defines the WebHidden Class.
+  WebHidden(std::boxed::Box<WebHidden>),
+  /// Defines the Color Class.
+  Color(std::boxed::Box<Color>),
+  /// Defines the Spacing Class.
+  Spacing(std::boxed::Box<Spacing>),
+  /// Defines the CharacterScale Class.
+  CharacterScale(std::boxed::Box<CharacterScale>),
+  /// Defines the Kern Class.
+  Kern(std::boxed::Box<Kern>),
+  /// Defines the Position Class.
+  Position(std::boxed::Box<Position>),
+  /// Defines the FontSize Class.
+  FontSize(std::boxed::Box<FontSize>),
+  /// Defines the FontSizeComplexScript Class.
+  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  /// Defines the Highlight Class.
+  Highlight(std::boxed::Box<Highlight>),
+  /// Defines the Underline Class.
+  Underline(std::boxed::Box<Underline>),
+  /// Defines the TextEffect Class.
+  TextEffect(std::boxed::Box<TextEffect>),
+  /// Defines the Border Class.
+  Border(std::boxed::Box<Border>),
+  /// Defines the Shading Class.
+  Shading(std::boxed::Box<Shading>),
+  /// Defines the FitText Class.
+  FitText(std::boxed::Box<FitText>),
+  /// Defines the VerticalTextAlignment Class.
+  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  /// Defines the RightToLeftText Class.
+  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  /// Defines the ComplexScript Class.
+  ComplexScript(std::boxed::Box<ComplexScript>),
+  /// Defines the Emphasis Class.
+  Emphasis(std::boxed::Box<Emphasis>),
+  /// Defines the Languages Class.
+  Languages(std::boxed::Box<Languages>),
+  /// Defines the EastAsianLayout Class.
+  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  /// Defines the SpecVanish Class.
+  SpecVanish(std::boxed::Box<SpecVanish>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousParagraphMarkRunPropertiesChoice {
+  /// Defines the ConflictInsertion Class.
   ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
+  /// Defines the ConflictDeletion Class.
   ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum PreviousParagraphMarkRunPropertiesChoice2 {
+  /// Defines the RunStyle Class.
+  RunStyle(std::boxed::Box<RunStyle>),
+  /// Defines the RunFonts Class.
+  RunFonts(std::boxed::Box<RunFonts>),
+  /// Defines the Bold Class.
+  Bold(std::boxed::Box<Bold>),
+  /// Defines the BoldComplexScript Class.
+  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  /// Defines the Italic Class.
+  Italic(std::boxed::Box<Italic>),
+  /// Defines the ItalicComplexScript Class.
+  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  /// Defines the Caps Class.
+  Caps(std::boxed::Box<Caps>),
+  /// Defines the SmallCaps Class.
+  SmallCaps(std::boxed::Box<SmallCaps>),
+  /// Defines the Strike Class.
+  Strike(std::boxed::Box<Strike>),
+  /// Defines the DoubleStrike Class.
+  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  /// Defines the Outline Class.
+  Outline(std::boxed::Box<Outline>),
+  /// Defines the Shadow Class.
+  Shadow(std::boxed::Box<Shadow>),
+  /// Defines the Emboss Class.
+  Emboss(std::boxed::Box<Emboss>),
+  /// Defines the Imprint Class.
+  Imprint(std::boxed::Box<Imprint>),
+  /// Defines the NoProof Class.
+  NoProof(std::boxed::Box<NoProof>),
+  /// Defines the SnapToGrid Class.
+  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  /// Defines the Vanish Class.
+  Vanish(std::boxed::Box<Vanish>),
+  /// Defines the WebHidden Class.
+  WebHidden(std::boxed::Box<WebHidden>),
+  /// Defines the Color Class.
+  Color(std::boxed::Box<Color>),
+  /// Defines the Spacing Class.
+  Spacing(std::boxed::Box<Spacing>),
+  /// Defines the CharacterScale Class.
+  CharacterScale(std::boxed::Box<CharacterScale>),
+  /// Defines the Kern Class.
+  Kern(std::boxed::Box<Kern>),
+  /// Defines the Position Class.
+  Position(std::boxed::Box<Position>),
+  /// Defines the FontSize Class.
+  FontSize(std::boxed::Box<FontSize>),
+  /// Defines the FontSizeComplexScript Class.
+  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  /// Defines the Highlight Class.
+  Highlight(std::boxed::Box<Highlight>),
+  /// Defines the Underline Class.
+  Underline(std::boxed::Box<Underline>),
+  /// Defines the TextEffect Class.
+  TextEffect(std::boxed::Box<TextEffect>),
+  /// Defines the Border Class.
+  Border(std::boxed::Box<Border>),
+  /// Defines the Shading Class.
+  Shading(std::boxed::Box<Shading>),
+  /// Defines the FitText Class.
+  FitText(std::boxed::Box<FitText>),
+  /// Defines the VerticalTextAlignment Class.
+  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  /// Defines the RightToLeftText Class.
+  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  /// Defines the ComplexScript Class.
+  ComplexScript(std::boxed::Box<ComplexScript>),
+  /// Defines the Emphasis Class.
+  Emphasis(std::boxed::Box<Emphasis>),
+  /// Defines the Languages Class.
+  Languages(std::boxed::Box<Languages>),
+  /// Defines the EastAsianLayout Class.
+  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  /// Defines the SpecVanish Class.
+  SpecVanish(std::boxed::Box<SpecVanish>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphMarkRunPropertiesChoice {
+  /// Defines the ConflictInsertion Class.
   ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
+  /// Defines the ConflictDeletion Class.
   ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum ParagraphMarkRunPropertiesChoice2 {
+  /// Defines the RunStyle Class.
+  RunStyle(std::boxed::Box<RunStyle>),
+  /// Defines the RunFonts Class.
+  RunFonts(std::boxed::Box<RunFonts>),
+  /// Defines the Bold Class.
+  Bold(std::boxed::Box<Bold>),
+  /// Defines the BoldComplexScript Class.
+  BoldComplexScript(std::boxed::Box<BoldComplexScript>),
+  /// Defines the Italic Class.
+  Italic(std::boxed::Box<Italic>),
+  /// Defines the ItalicComplexScript Class.
+  ItalicComplexScript(std::boxed::Box<ItalicComplexScript>),
+  /// Defines the Caps Class.
+  Caps(std::boxed::Box<Caps>),
+  /// Defines the SmallCaps Class.
+  SmallCaps(std::boxed::Box<SmallCaps>),
+  /// Defines the Strike Class.
+  Strike(std::boxed::Box<Strike>),
+  /// Defines the DoubleStrike Class.
+  DoubleStrike(std::boxed::Box<DoubleStrike>),
+  /// Defines the Outline Class.
+  Outline(std::boxed::Box<Outline>),
+  /// Defines the Shadow Class.
+  Shadow(std::boxed::Box<Shadow>),
+  /// Defines the Emboss Class.
+  Emboss(std::boxed::Box<Emboss>),
+  /// Defines the Imprint Class.
+  Imprint(std::boxed::Box<Imprint>),
+  /// Defines the NoProof Class.
+  NoProof(std::boxed::Box<NoProof>),
+  /// Defines the SnapToGrid Class.
+  SnapToGrid(std::boxed::Box<SnapToGrid>),
+  /// Defines the Vanish Class.
+  Vanish(std::boxed::Box<Vanish>),
+  /// Defines the WebHidden Class.
+  WebHidden(std::boxed::Box<WebHidden>),
+  /// Defines the Color Class.
+  Color(std::boxed::Box<Color>),
+  /// Defines the Spacing Class.
+  Spacing(std::boxed::Box<Spacing>),
+  /// Defines the CharacterScale Class.
+  CharacterScale(std::boxed::Box<CharacterScale>),
+  /// Defines the Kern Class.
+  Kern(std::boxed::Box<Kern>),
+  /// Defines the Position Class.
+  Position(std::boxed::Box<Position>),
+  /// Defines the FontSize Class.
+  FontSize(std::boxed::Box<FontSize>),
+  /// Defines the FontSizeComplexScript Class.
+  FontSizeComplexScript(std::boxed::Box<FontSizeComplexScript>),
+  /// Defines the Highlight Class.
+  Highlight(std::boxed::Box<Highlight>),
+  /// Defines the Underline Class.
+  Underline(std::boxed::Box<Underline>),
+  /// Defines the TextEffect Class.
+  TextEffect(std::boxed::Box<TextEffect>),
+  /// Defines the Border Class.
+  Border(std::boxed::Box<Border>),
+  /// Defines the Shading Class.
+  Shading(std::boxed::Box<Shading>),
+  /// Defines the FitText Class.
+  FitText(std::boxed::Box<FitText>),
+  /// Defines the VerticalTextAlignment Class.
+  VerticalTextAlignment(std::boxed::Box<VerticalTextAlignment>),
+  /// Defines the RightToLeftText Class.
+  RightToLeftText(std::boxed::Box<RightToLeftText>),
+  /// Defines the ComplexScript Class.
+  ComplexScript(std::boxed::Box<ComplexScript>),
+  /// Defines the Emphasis Class.
+  Emphasis(std::boxed::Box<Emphasis>),
+  /// Defines the Languages Class.
+  Languages(std::boxed::Box<Languages>),
+  /// Defines the EastAsianLayout Class.
+  EastAsianLayout(std::boxed::Box<EastAsianLayout>),
+  /// Defines the SpecVanish Class.
+  SpecVanish(std::boxed::Box<SpecVanish>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SectionPropertiesChoice {

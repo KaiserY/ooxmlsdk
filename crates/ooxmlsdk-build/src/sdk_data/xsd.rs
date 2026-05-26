@@ -1,9 +1,7 @@
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
 use quick_xml::{Reader, escape::unescape};
-use std::collections::BTreeMap;
-#[cfg(test)]
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::Result;
 use crate::simple_type::simple_type_mapping;
@@ -137,6 +135,119 @@ pub(crate) fn repeatable_choice_element_names(
     &mut names,
   );
   names
+}
+
+pub(crate) fn repeatable_group_choice_element_names(
+  xsd: &ParsedXsd,
+  complex_type_name: &str,
+  group_name: &str,
+) -> BTreeSet<String> {
+  let Some(complex_type) = xsd.complex_types.get(complex_type_name) else {
+    return BTreeSet::new();
+  };
+  let Some(particle) = &complex_type.particle else {
+    return BTreeSet::new();
+  };
+
+  let mut names = BTreeSet::new();
+  let mut group_stack = BTreeSet::new();
+  collect_repeatable_group_choice_element_names(
+    xsd,
+    particle.as_ref(),
+    group_name,
+    &mut group_stack,
+    &mut names,
+  );
+  names
+}
+
+fn collect_repeatable_group_choice_element_names(
+  xsd: &ParsedXsd,
+  node: &ParsedParticleNode,
+  target_group_name: &str,
+  group_stack: &mut BTreeSet<String>,
+  names: &mut BTreeSet<String>,
+) {
+  match node {
+    ParsedParticleNode::Group { children, .. } => {
+      for child in children {
+        collect_repeatable_group_choice_element_names(
+          xsd,
+          child,
+          target_group_name,
+          group_stack,
+          names,
+        );
+      }
+    }
+    ParsedParticleNode::Element(_) => {}
+    ParsedParticleNode::GroupRef {
+      _reference,
+      _max_occurs,
+      ..
+    } => {
+      let group_name = xsd_local_name(_reference);
+      if group_name == target_group_name && *_max_occurs > 1 {
+        collect_choice_group_element_names(xsd, group_name, group_stack, names);
+        return;
+      }
+
+      if !group_stack.insert(group_name.to_string()) {
+        return;
+      }
+      if let Some(group) = xsd.groups.get(group_name) {
+        collect_repeatable_group_choice_element_names(
+          xsd,
+          group,
+          target_group_name,
+          group_stack,
+          names,
+        );
+      }
+      group_stack.remove(group_name);
+    }
+  }
+}
+
+fn collect_choice_group_element_names(
+  xsd: &ParsedXsd,
+  group_name: &str,
+  group_stack: &mut BTreeSet<String>,
+  names: &mut BTreeSet<String>,
+) {
+  if !group_stack.insert(group_name.to_string()) {
+    return;
+  }
+  if let Some(ParsedParticleNode::Group { particle, children }) = xsd.groups.get(group_name)
+    && particle.kind == ParsedParticleKind::Choice
+  {
+    for child in children {
+      collect_group_element_names(xsd, child, group_stack, names);
+    }
+  }
+  group_stack.remove(group_name);
+}
+
+fn collect_group_element_names(
+  xsd: &ParsedXsd,
+  node: &ParsedParticleNode,
+  group_stack: &mut BTreeSet<String>,
+  names: &mut BTreeSet<String>,
+) {
+  match node {
+    ParsedParticleNode::Element(element) => {
+      names.insert(xsd_local_name(element.q_name.as_str()).to_string());
+    }
+    ParsedParticleNode::Group { children, .. } => {
+      for child in children {
+        collect_group_element_names(xsd, child, group_stack, names);
+      }
+    }
+    ParsedParticleNode::GroupRef { _reference, .. } => {
+      let group_name = xsd_local_name(_reference);
+      collect_choice_group_element_names(xsd, group_name, group_stack, names);
+    }
+  }
 }
 
 #[cfg(test)]
@@ -679,13 +790,13 @@ fn strip_prefix(value: &str) -> &str {
   }
 }
 
-#[cfg(test)]
 fn xsd_local_name(value: &str) -> &str {
   strip_prefix(value)
 }
 
 #[cfg(test)]
 mod tests {
+  use super::repeatable_group_choice_element_names;
   use super::{ParsedParticleKind, ParsedParticleNode, parse_xsd, repeatable_choice_element_names};
 
   #[test]
@@ -745,6 +856,41 @@ mod tests {
     ));
     assert_eq!(
       repeatable_choice_element_names(&xsd, "CT_RPr")
+        .into_iter()
+        .collect::<Vec<_>>(),
+      vec!["b".to_string(), "sz".to_string()],
+    );
+  }
+
+  #[test]
+  fn resolves_repeated_named_choice_group_elements() {
+    let xsd = parse_xsd(
+      r#"
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+        <xsd:group name="EG_RPrBase">
+          <xsd:choice>
+            <xsd:element name="b" type="CT_OnOff"/>
+            <xsd:element name="sz" type="CT_HpsMeasure"/>
+          </xsd:choice>
+        </xsd:group>
+        <xsd:group name="EG_RPrContent">
+          <xsd:sequence>
+            <xsd:group ref="EG_RPrBase" minOccurs="0" maxOccurs="unbounded"/>
+            <xsd:element name="rPrChange" type="CT_RPrChange" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:group>
+        <xsd:complexType name="CT_RPr">
+          <xsd:sequence>
+            <xsd:group ref="EG_RPrContent" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      "#,
+    )
+    .expect("parse xsd");
+
+    assert_eq!(
+      repeatable_group_choice_element_names(&xsd, "CT_RPr", "EG_RPrBase")
         .into_iter()
         .collect::<Vec<_>>(),
       vec!["b".to_string(), "sz".to_string()],

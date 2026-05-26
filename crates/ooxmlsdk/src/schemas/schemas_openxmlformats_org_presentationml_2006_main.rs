@@ -4582,6 +4582,7 @@ pub struct HeaderFooter {
 #[sdk(qname = "p:CT_SlideLayoutExtensionList/p:extLst")]
 pub struct SlideLayoutExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SlideLayoutExtension Class.
   #[sdk(child(qname = "p:CT_SlideLayoutExtension/p:ext"))]
   pub slide_layout_extension: Vec<SlideLayoutExtension>,
@@ -5427,8 +5428,7 @@ pub enum PresentationPropertiesExtensionChoice {
   /// Defines the DefaultImageDpi Class.
   DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
   /// Defines the TextMath Class.
-  #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  TextMath(crate::schemas::a14::TextMath),
+  TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
   /// Defines the ChartTrackingReferenceBased Class.
   ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
   #[sdk(any)]

@@ -1082,6 +1082,9 @@ fn build_type_decl(
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
   let content_model =
     refine_content_model_decl(source_content_model, &members, xml_content.as_ref());
+  let compact_xml_other_children = generate_direct_xml_other_children
+    && xml_content.is_none()
+    && !has_child_like_members(&members);
 
   Ok((
     TypeDecl {
@@ -1120,12 +1123,28 @@ fn build_type_decl(
         },
         have_xml_other_attrs: schema_type.have_xml_other_attrs,
         have_xml_other_children: generate_direct_xml_other_children,
+        compact_xml_other_children,
       },
       content_structure: None,
       members,
     },
     extra_types,
   ))
+}
+
+fn has_child_like_members(members: &[MemberDecl]) -> bool {
+  members.iter().any(|member| {
+    matches!(
+      member,
+      MemberDecl::Field(FieldDecl {
+        wire: FieldWireDecl::Child { .. }
+          | FieldWireDecl::TextChild { .. }
+          | FieldWireDecl::Any
+          | FieldWireDecl::Choice,
+        ..
+      })
+    )
+  })
 }
 
 fn apply_parent_choice_has_any_rewrites(
@@ -3082,7 +3101,13 @@ fn build_structured_one_sequence_members(
           docs: choice.property_comments.clone(),
           version: choice_version,
           wire: FieldWireDecl::Choice,
-          cardinality: if particle.repeated {
+          cardinality: if particle.repeated
+            || choice.variants.iter().any(|variant| match variant {
+              ResolvedOneSequenceChoiceVariant::Leaf(child) => child.repeated,
+              ResolvedOneSequenceChoiceVariant::Sequence(sequence_variant) => {
+                sequence_variant.fields.iter().any(|field| field.repeated)
+              }
+            }) {
             Cardinality::Many
           } else {
             Cardinality::Optional
@@ -3465,7 +3490,7 @@ fn build_mixed_choice_children_members(
     docs: build_mixed_choice_property_comments(&choice_variants),
     version: choice_version,
     wire: FieldWireDecl::Choice,
-    cardinality: if choice_child.repeated {
+    cardinality: if choice_child.repeated || choice_variants.iter().any(|child| child.repeated) {
       Cardinality::Many
     } else {
       Cardinality::Optional

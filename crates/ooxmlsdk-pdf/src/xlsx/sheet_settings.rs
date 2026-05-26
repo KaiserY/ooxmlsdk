@@ -209,7 +209,7 @@ impl SortStateModel {
         .case_sensitive
         .is_some_and(|value| value.as_bool()),
       sort_method: sort_state.sort_method,
-      has_sort_condition: sort_state.sort_state_choice.is_some(),
+      has_sort_condition: !sort_state.sort_state_choice.is_empty(),
       has_extensions: sort_state.extension_list.is_some(),
     }
   }

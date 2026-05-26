@@ -1221,6 +1221,25 @@ pub(crate) fn write_escaped_str<W: std::io::Write>(
 }
 
 #[inline]
+pub(crate) fn write_escaped_content_str<W: std::io::Write>(
+  writer: &mut W,
+  value: &str,
+) -> std::io::Result<()> {
+  match quick_xml::escape::minimal_escape(value) {
+    std::borrow::Cow::Borrowed(value) => writer.write_all(value.as_bytes()),
+    std::borrow::Cow::Owned(value) => writer.write_all(value.as_bytes()),
+  }
+}
+
+#[inline]
+pub(crate) fn write_escaped_content_text<W: std::io::Write, T: std::fmt::Display + ?Sized>(
+  writer: &mut W,
+  value: &T,
+) -> std::io::Result<()> {
+  write_escaped_content_str(writer, &value.to_string())
+}
+
+#[inline]
 pub(crate) fn write_escaped_text<W: std::io::Write, T: std::fmt::Display + ?Sized>(
   writer: &mut W,
   value: &T,
@@ -1283,6 +1302,26 @@ where
     for value in iter {
       writer.write_all(b" ")?;
       write_escaped_text(writer, value)?;
+    }
+  }
+  Ok(())
+}
+
+#[inline]
+pub(crate) fn write_list_text_content_value<W, T>(
+  writer: &mut W,
+  values: &[T],
+) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  T: std::fmt::Display,
+{
+  let mut iter = values.iter();
+  if let Some(first) = iter.next() {
+    write_escaped_content_text(writer, first)?;
+    for value in iter {
+      writer.write_all(b" ")?;
+      write_escaped_content_text(writer, value)?;
     }
   }
   Ok(())

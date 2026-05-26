@@ -40,15 +40,6 @@
       "HaveXmlOtherAttrs": true
     },
     {
-      "ClassName": "RunProperties",
-      "Children": [
-        {
-          "Name": "w:CT_HpsMeasure/w:sz",
-          "Repeated": true
-        }
-      ]
-    },
-    {
       "ClassName": "Font",
       "ParentChoiceHasAnyIn": ["Fonts"]
     },
@@ -74,6 +65,15 @@
         {
           "PropertyName": "CharacterSpace",
           "OverrideType": "Int32ZeroOnOverflowValue"
+        }
+      ]
+    },
+    {
+      "ClassName": "SdtPlaceholder",
+      "Children": [
+        {
+          "Name": "w:CT_String/w:docPart",
+          "Optional": true
         }
       ]
     },

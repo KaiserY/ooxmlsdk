@@ -1431,6 +1431,8 @@ pub enum SheetStateValues {
   Hidden,
   #[sdk(rename = "veryHidden")]
   VeryHidden,
+  #[sdk(rename = "show")]
+  Show,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum UpdateLinksBehaviorValues {
@@ -2743,7 +2745,7 @@ pub struct SortState {
     qname = "x14:CT_SortCondition/x14:sortCondition",
     qname = "x:CT_SortCondition/x:sortCondition"
   ))]
-  pub sort_state_choice: Option<SortStateChoice>,
+  pub sort_state_choice: Vec<SortStateChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2815,6 +2817,7 @@ pub struct CommentList {
 pub struct Comment {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Cell Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -7283,6 +7286,7 @@ pub struct GradientStop {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_NumFmt/x:numFmt")]
 pub struct NumberingFormat {
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Number Format Id
   #[sdk(attr(qname = ":numFmtId"))]
   pub number_format_id: crate::simple_type::UInt32Value,
@@ -8042,6 +8046,7 @@ pub struct CustomWorkbookView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Sheet/x:sheet")]
 pub struct Sheet {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Sheet Name
   #[sdk(attr(qname = ":name"))]

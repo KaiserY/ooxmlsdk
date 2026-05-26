@@ -678,9 +678,28 @@ fn mce_process_choice_field_tokens(field: &SdkChoiceField) -> proc_macro2::Token
 
 fn mce_xml_other_children_process_tokens(
   has_xml_other_children_field: bool,
+  compact_xml_other_children: bool,
 ) -> proc_macro2::TokenStream {
   if !has_xml_other_children_field {
     return quote! {};
+  }
+
+  if compact_xml_other_children {
+    return quote! {
+      let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
+      for xml in std::mem::take(&mut self.xml_other_children) {
+        if let Some(children) = crate::common::mce_choice_replacement_children(
+          xml.as_ref(),
+          settings,
+          context,
+        )? {
+          xml_other_children.extend(children.into_iter().map(|child| child.into_boxed_str()));
+        } else {
+          xml_other_children.push(xml);
+        }
+      }
+      self.xml_other_children = xml_other_children;
+    };
   }
 
   quote! {
@@ -1174,7 +1193,7 @@ fn build_text_child_write_tokens(
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
     let value_write_tokens = if list {
       quote! {
-        crate::common::write_list_value(writer, #value_expr.as_slice())?;
+        crate::common::write_list_text_content_value(writer, #value_expr.as_slice())?;
       }
     } else if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type) {
       write_simple_union_value_tokens(kind, value_expr.clone())
@@ -1185,11 +1204,11 @@ fn build_text_child_write_tokens(
       write_xml_schema_float_effective_tokens(value_expr.clone(), &inner_ty, simple_type, qname)
     } else if is_string_like_effective_type(&inner_ty, simple_type) {
       quote! {
-        crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
+        crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
       }
     } else {
       quote! {
-        crate::common::write_escaped_text(writer, #value_expr)?;
+        crate::common::write_escaped_content_text(writer, #value_expr)?;
       }
     };
     quote! {
@@ -1474,9 +1493,17 @@ fn build_unmatched_child_tokens(
   tag_prefix: &str,
   mode: DeserializeMode,
   has_xml_other_children_field: bool,
+  compact_xml_other_children: bool,
 ) -> proc_macro2::TokenStream {
   if has_xml_other_children_field {
     let read_outer_xml = mode.read_outer_xml_fn();
+    if compact_xml_other_children {
+      return quote! {
+        let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+        xml_other_children.push(xml.into_boxed_str());
+        continue;
+      };
+    }
     return quote! {
       let xml = #read_outer_xml(xml_reader, e, next_empty)?;
       xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
@@ -3346,6 +3373,7 @@ fn expand_named_struct(
   let mut xml_header_field = None;
   let mut xml_other_attrs_field = None;
   let mut xml_other_children_field = None;
+  let mut compact_xml_other_children = false;
   let mut ordered_field_specs = Vec::new();
 
   for field in &fields.named {
@@ -3366,6 +3394,9 @@ fn expand_named_struct(
       continue;
     }
     if field_ident == "xml_other_children" {
+      compact_xml_other_children = vec_inner_type(&field.ty)
+        .as_ref()
+        .is_some_and(is_box_str_type);
       xml_other_children_field = Some(field_ident.clone());
       continue;
     }
@@ -3496,7 +3527,7 @@ fn expand_named_struct(
   }
 
   let xml_child_slot_assign_tokens = |xml_child_slot: usize| {
-    if !has_xml_other_children_field {
+    if !has_xml_other_children_field || compact_xml_other_children {
       quote! {}
     } else {
       quote! {
@@ -5358,6 +5389,7 @@ fn expand_named_struct(
       &tag_prefix,
       DeserializeMode::Borrowed,
       has_xml_other_children_field,
+      compact_xml_other_children,
     )
   };
   let unmatched_child_tokens_io = if pure_any_dispatch || has_any_choice_dispatch {
@@ -5368,6 +5400,7 @@ fn expand_named_struct(
       &tag_prefix,
       DeserializeMode::Io,
       has_xml_other_children_field,
+      compact_xml_other_children,
     )
   };
   let flat_choice_dispatch_tokens_borrowed = if flat_choice_match_tokens_borrowed.is_empty() {
@@ -5694,13 +5727,21 @@ fn expand_named_struct(
   };
   let mut ordered_write_tokens = Vec::new();
   let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
-    quote! {
-      for (_, xml) in self
-        .xml_other_children
-        .iter()
-        .filter(|(slot, _)| *slot == #xml_child_slot_count)
-      {
-        writer.write_all(xml.as_bytes())?;
+    if compact_xml_other_children {
+      quote! {
+        for xml in &self.xml_other_children {
+          writer.write_all(xml.as_bytes())?;
+        }
+      }
+    } else {
+      quote! {
+        for (_, xml) in self
+          .xml_other_children
+          .iter()
+          .filter(|(slot, _)| *slot == #xml_child_slot_count)
+        {
+          writer.write_all(xml.as_bytes())?;
+        }
       }
     }
   } else {
@@ -5708,6 +5749,7 @@ fn expand_named_struct(
   };
   for (field_ident, field_ty, field_kind) in &ordered_field_specs {
     if has_xml_other_children_field
+      && !compact_xml_other_children
       && matches!(
         field_kind,
         SdkTypeFieldKind::Child { .. }
@@ -5844,7 +5886,7 @@ fn expand_named_struct(
         };
         let optional_text_write_tokens = if *list {
           quote! {
-            crate::common::write_list_value(writer, value.as_slice())?;
+            crate::common::write_list_text_content_value(writer, value.as_slice())?;
           }
         } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
           write_simple_union_value_tokens(kind, quote! { value })
@@ -5852,16 +5894,16 @@ fn expand_named_struct(
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
-            crate::common::write_escaped_str(writer, value.as_ref())?;
+            crate::common::write_escaped_content_str(writer, value.as_ref())?;
           }
         } else {
           quote! {
-            crate::common::write_escaped_text(writer, value)?;
+            crate::common::write_escaped_content_text(writer, value)?;
           }
         };
         let required_text_write_tokens = if *list {
           quote! {
-            crate::common::write_list_value(writer, self.#field_ident.as_slice())?;
+            crate::common::write_list_text_content_value(writer, self.#field_ident.as_slice())?;
           }
         } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
           write_simple_union_value_tokens(kind, quote! { &self.#field_ident })
@@ -5869,11 +5911,11 @@ fn expand_named_struct(
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
-            crate::common::write_escaped_str(writer, self.#field_ident.as_ref())?;
+            crate::common::write_escaped_content_str(writer, self.#field_ident.as_ref())?;
           }
         } else {
           quote! {
-            crate::common::write_escaped_text(writer, &self.#field_ident)?;
+            crate::common::write_escaped_content_text(writer, &self.#field_ident)?;
           }
         };
         if is_option_type(field_ty) {
@@ -6067,8 +6109,16 @@ fn expand_named_struct(
       crate::common::IoTagEvent::Decl(_) => {},
     }
   };
-  let needs_child_event_name =
-    has_child_dispatch || has_any_dispatch || has_text_child_dispatch || !pure_any_choice_dispatch;
+  let raw_xml_other_children_only = has_xml_other_children_field
+    && !has_child_dispatch
+    && !has_choice_dispatch
+    && !has_any_dispatch
+    && !has_text_child_dispatch;
+  let needs_child_event_name = !raw_xml_other_children_only
+    && (has_child_dispatch
+      || has_any_dispatch
+      || has_text_child_dispatch
+      || !pure_any_choice_dispatch);
   let child_event_name_tokens = if !needs_child_event_name {
     quote! {}
   } else if use_local_name_child_dispatch {
@@ -6276,9 +6326,15 @@ fn expand_named_struct(
     quote! {}
   };
   let xml_other_children_decl_tokens = if has_xml_other_children_field {
-    quote! {
-      let mut xml_other_children = Vec::<(usize, std::boxed::Box<str>)>::new();
-      let mut __xml_child_slot = 0usize;
+    if compact_xml_other_children {
+      quote! {
+        let mut xml_other_children = Vec::<std::boxed::Box<str>>::new();
+      }
+    } else {
+      quote! {
+        let mut xml_other_children = Vec::<(usize, std::boxed::Box<str>)>::new();
+        let mut __xml_child_slot = 0usize;
+      }
     }
   } else {
     quote! {}
@@ -6406,7 +6462,7 @@ fn expand_named_struct(
   let (mce_context_push_tokens, mce_xml_other_attrs_process_tokens, mce_context_pop_tokens) =
     mce_context_scope_tokens(&xmlns_fields, xml_other_attrs_field.as_ref());
   let mce_xml_other_children_process_tokens =
-    mce_xml_other_children_process_tokens(has_xml_other_children_field);
+    mce_xml_other_children_process_tokens(has_xml_other_children_field, compact_xml_other_children);
   let public_root_from_str_tokens = if local_name.is_empty() {
     quote! {}
   } else {

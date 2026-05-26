@@ -5,10 +5,43 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "DataDisplayOptions16",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "DLblsExtension",
       "Children": [
         {
           "Name": "c:CT_Tx/c15:tx",
+          "Repeated": true
+        }
+      ]
+    },
+    {
+      "ClassName": "DLblExtension",
+      "Children": [
+        {
+          "Name": "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
+          "Repeated": true
+        },
+        {
+          "Name": "c:CT_Boolean/c15:xForSave",
+          "Repeated": true
+        },
+        {
+          "Name": "c:CT_Boolean/c15:showDataLabelsRange",
+          "Repeated": true
+        },
+        {
+          "Name": "a:CT_ShapeProperties/c15:spPr",
+          "Repeated": true
+        },
+        {
+          "Name": "c:CT_Layout/c15:layout",
+          "Repeated": true
+        },
+        {
+          "Name": "c16:CT_ChartUniqueID/c16:uniqueId",
           "Repeated": true
         }
       ]

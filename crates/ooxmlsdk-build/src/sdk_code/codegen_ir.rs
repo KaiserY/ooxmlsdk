@@ -144,6 +144,7 @@ pub struct SystemSupportDecl {
   pub xml_header: XmlHeaderMode,
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
+  pub compact_xml_other_children: bool,
 }
 
 impl SystemSupportDecl {
@@ -362,6 +363,7 @@ mod tests {
           xml_header: XmlHeaderMode::Standalone,
           have_xml_other_attrs: true,
           have_xml_other_children: true,
+          compact_xml_other_children: false,
         },
         content_structure: None,
         members: vec![

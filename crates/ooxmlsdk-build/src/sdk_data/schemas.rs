@@ -10,7 +10,7 @@ use crate::sdk_data::{
 
 use crate::sdk_code::versioning::effective_version;
 use heck::ToUpperCamelCase;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
   let mut namespaces: Vec<Namespace> = gen_context
@@ -169,6 +169,12 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               );
             }
             mark_sequence_collection_children_repeated(ty, &mut children);
+            backfill_eg_rpr_base_repeatable_choice(
+              schema.target_namespace.as_str(),
+              &gen_context.xsd_schemas,
+              ty.name.as_str(),
+              &mut children,
+            );
             let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
               ty,
               kind,
@@ -1352,6 +1358,96 @@ fn mark_sequence_collection_children_repeated(
   children[0].repeated = true;
 }
 
+fn backfill_eg_rpr_base_repeatable_choice(
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+  schema_type_qname: &str,
+  children: &mut Vec<SchemaTypeChild>,
+) {
+  let Some((schema_prefix, _)) = schema_type_qname.split_once(':') else {
+    return;
+  };
+  let Some(type_name) = schema_type_name(schema_type_qname) else {
+    return;
+  };
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return;
+  };
+
+  let repeatable_names =
+    crate::sdk_data::xsd::repeatable_group_choice_element_names(xsd, type_name, "EG_RPrBase");
+  if repeatable_names.is_empty() {
+    return;
+  }
+
+  replace_repeated_choice_children(
+    children,
+    &repeatable_names,
+    schema_prefix,
+    "RunPropertiesChoice",
+  );
+}
+
+fn replace_repeated_choice_children(
+  children: &mut Vec<SchemaTypeChild>,
+  repeatable_names: &BTreeSet<String>,
+  schema_prefix: &str,
+  property_name: &str,
+) {
+  let Some(first) = children.iter().position(|child| {
+    child_schema_local_name(child, schema_prefix)
+      .is_some_and(|name| repeatable_names.contains(name))
+  }) else {
+    return;
+  };
+  let mut last = first;
+  while children.get(last + 1).is_some_and(|child| {
+    child_schema_local_name(child, schema_prefix)
+      .is_some_and(|name| repeatable_names.contains(name))
+  }) {
+    last += 1;
+  }
+
+  if first == last {
+    return;
+  }
+
+  let variants = children[first..=last]
+    .iter()
+    .map(|child| SchemaTypeChild {
+      repeated: false,
+      ..child.clone()
+    })
+    .collect();
+  children.splice(
+    first..=last,
+    [SchemaTypeChild {
+      particle_id: String::new(),
+      name: String::new(),
+      property_name: property_name.to_string(),
+      property_comments: "Run properties choice.".to_string(),
+      kind: SchemaTypeChildKind::Choice,
+      optional: true,
+      repeated: true,
+      initial_version: String::new(),
+      children: variants,
+    }],
+  );
+}
+
+fn child_schema_local_name<'a>(child: &'a SchemaTypeChild, schema_prefix: &str) -> Option<&'a str> {
+  if !matches!(
+    child.kind,
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+  ) {
+    return None;
+  }
+
+  let element_name = child.name.rsplit('/').next()?;
+  let (prefix, local_name) = element_name.split_once(':')?;
+  (prefix == schema_prefix).then_some(local_name)
+}
+
 fn have_xml_other_children_for_mixed_version_content(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
   type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
@@ -2472,6 +2568,59 @@ mod tests {
       .expect("font");
 
     assert_eq!(font.kind, SchemaTypeKind::Composite);
+  }
+
+  #[test]
+  fn backfills_word_run_properties_group_choice_from_xsd() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+    let word_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("word schema");
+    let run_properties = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "RunProperties")
+      .expect("RunProperties");
+    let run_properties_choice = run_properties
+      .children
+      .iter()
+      .find(|child| child.property_name == "RunPropertiesChoice")
+      .expect("RunPropertiesChoice");
+
+    assert_eq!(run_properties_choice.kind, SchemaTypeChildKind::Choice);
+    assert!(run_properties_choice.repeated);
+    assert!(
+      run_properties_choice
+        .children
+        .iter()
+        .any(|child| child.name == "w:CT_HpsMeasure/w:sz")
+    );
+    assert!(
+      run_properties_choice
+        .children
+        .iter()
+        .any(|child| child.name == "w:CT_OnOff/w:b")
+    );
+    assert!(
+      run_properties_choice
+        .children
+        .iter()
+        .all(|child| !child.name.starts_with("w14:"))
+    );
+
+    let paragraph_mark_run_properties = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "ParagraphMarkRunProperties")
+      .expect("ParagraphMarkRunProperties");
+    assert!(paragraph_mark_run_properties.children.iter().any(|child| {
+      child.property_name == "RunPropertiesChoice"
+        && child.kind == SchemaTypeChildKind::Choice
+        && child.repeated
+    }));
   }
 
   #[test]

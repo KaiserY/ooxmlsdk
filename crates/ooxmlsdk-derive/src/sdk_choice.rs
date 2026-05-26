@@ -405,11 +405,11 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
             )
           } else if is_string_like_effective_type(&inner_ty, simple_type.as_deref()) {
             quote! {
-              crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
+              crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
             }
           } else {
             quote! {
-              crate::common::write_escaped_text(writer, #value_expr)?;
+              crate::common::write_escaped_content_text(writer, #value_expr)?;
             }
           };
         quote! {
@@ -1194,11 +1194,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           )
         } else if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
           quote! {
-            crate::common::write_escaped_str(writer, value.as_ref())?;
+            crate::common::write_escaped_content_str(writer, value.as_ref())?;
           }
         } else {
           quote! {
-            crate::common::write_escaped_text(writer, value)?;
+            crate::common::write_escaped_content_text(writer, value)?;
           }
         };
         let write_arm = quote! {
@@ -1387,11 +1387,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           write_xml_schema_float_tokens(quote! { value }, &payload_ty)
         } else if is_string_like_type(&payload_ty) {
           quote! {
-            crate::common::write_escaped_str(writer, value.as_ref())?;
+            crate::common::write_escaped_content_str(writer, value.as_ref())?;
           }
         } else {
           quote! {
-            crate::common::write_escaped_text(writer, value)?;
+            crate::common::write_escaped_content_text(writer, value)?;
           }
         };
         let write_arm = quote! {

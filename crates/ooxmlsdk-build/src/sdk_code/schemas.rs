@@ -3527,9 +3527,15 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
   }
 
   if support.have_xml_other_children {
-    fields.push(quote! {
-      pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
-    });
+    if support.compact_xml_other_children {
+      fields.push(quote! {
+        pub xml_other_children: Vec<std::boxed::Box<str>>,
+      });
+    } else {
+      fields.push(quote! {
+        pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+      });
+    }
   }
 
   fields

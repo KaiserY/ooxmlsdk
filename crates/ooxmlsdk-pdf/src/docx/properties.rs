@@ -39,10 +39,7 @@ pub(super) fn run_style(
   };
 
   style = styles.character_run_style(
-    properties
-      .run_style
-      .as_ref()
-      .map(|run_style| run_style.val.as_str()),
+    super::run_properties_run_style(properties).map(|run_style| run_style.val.as_str()),
     style,
   );
   merge_run_style(
@@ -65,9 +62,7 @@ pub(super) fn paragraph_mark_run_style(
   };
 
   style = styles.character_run_style(
-    properties
-      .run_style
-      .as_ref()
+    super::paragraph_mark_run_properties_run_style(properties)
       .map(|run_style| run_style.val.as_str()),
     style,
   );

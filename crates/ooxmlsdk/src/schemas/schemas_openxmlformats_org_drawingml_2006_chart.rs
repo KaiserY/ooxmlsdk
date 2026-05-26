@@ -3894,7 +3894,7 @@ pub struct DLblExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub d_lbl_extension_choice: Option<DLblExtensionChoice>,
+  pub d_lbl_extension_choice: Vec<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4276,6 +4276,7 @@ pub struct SurfaceSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
 pub struct DataDisplayOptions16 {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,

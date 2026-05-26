@@ -20,6 +20,7 @@ use ooxmlsdk::parts::{
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_drawing_2008_diagram as dsp,
   schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_word_2010_wordprocessing_canvas as wpc,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_group as wpg,
   schemas_microsoft_com_office_word_2010_wordprocessing_shape as wps,
@@ -30,7 +31,6 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
-use ooxmlsdk::sdk::SdkChoice;
 use ooxmlsdk::simple_type::{
   DrawingmlPercentageValue, MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
 };
@@ -5104,27 +5104,23 @@ fn push_drawing_textboxes_impl(
   };
 
   for child in graphic_data.graphic_data_choice.iter() {
-    let Some(child) = drawing_graphic_data_choice_xml(child) else {
-      continue;
-    };
     let textbox_context = DrawingTextBoxImportContext {
       base_style: base_style.clone(),
       styles,
       images,
       hyperlinks,
     };
-    let text_box_frames = drawingml_textbox_frames_from_xml(
-      &child,
+    let text_box_frames = drawing_graphic_data_choice_textbox_frames(
+      child,
       placement,
       DrawingMlGroupTransform::identity(),
       textbox_context,
-      false,
     );
     if !text_box_frames.is_empty() {
       inlines.extend(text_box_frames.into_iter().map(InlineItem::Shape));
       continue;
     }
-    if let Some(content) = drawing_textbox_content(&child) {
+    if let Some(content) = drawing_graphic_data_choice_textbox_content(child) {
       push_textbox_content(
         &content,
         inlines,
@@ -5326,8 +5322,25 @@ fn drawingml_textbox_uses_auto_fit(xml: &str) -> bool {
   xml.contains(":spAutoFit") || xml.contains("<spAutoFit")
 }
 
+fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) -> bool {
+  matches!(
+    shape
+      .text_body_properties
+      .text_body_properties_choice1
+      .as_ref(),
+    Some(wps::TextBodyPropertiesChoice::ShapeAutoFit(_))
+  )
+}
+
 fn drawingml_textbox_is_vertical(xml: &str) -> bool {
   xml.contains("vert=\"vert\"")
+}
+
+fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) -> bool {
+  matches!(
+    shape.text_body_properties.vertical,
+    Some(a::TextVerticalValues::Vertical)
+  )
 }
 
 fn drawingml_textbox_has_fontwork_warp(xml: &str) -> bool {
@@ -5337,6 +5350,19 @@ fn drawingml_textbox_has_fontwork_warp(xml: &str) -> bool {
       && !fragment.contains("prst=\"textNoShape\"")
       && !fragment.contains("prst='textNoShape'")
   })
+}
+
+fn wordprocessing_shape_textbox_has_fontwork_warp(shape: &wps::WordprocessingShape) -> bool {
+  shape
+    .text_body_properties
+    .preset_text_warp
+    .as_ref()
+    .is_some_and(|warp| {
+      !matches!(
+        warp.preset,
+        a::TextShapeValues::TextPlain | a::TextShapeValues::TextNoShape
+      )
+    })
 }
 
 fn fontwork_warp_geometry() -> InlineShapeGeometry {
@@ -5449,6 +5475,22 @@ fn drawingml_textbox_frame_stroke(
   (auto_fit && !suppress_zero_width_relative_frame).then_some(BorderStyle::default())
 }
 
+fn wordprocessing_shape_textbox_frame_stroke(
+  _shape: &wps::WordprocessingShape,
+  auto_fit: bool,
+  placement: ImagePlacement,
+) -> Option<BorderStyle> {
+  let suppress_zero_width_relative_frame = matches!(
+    placement,
+    ImagePlacement::Floating(FloatingImagePlacement {
+      relative_width_pct: Some(width_pct),
+      relative_height_pct: Some(height_pct),
+      ..
+    }) if width_pct <= 0.0 && height_pct > 0.0
+  );
+  (auto_fit && !suppress_zero_width_relative_frame).then_some(BorderStyle::default())
+}
+
 #[derive(Clone, Debug)]
 struct TextBoxFrameContent {
   blocks: Vec<Block>,
@@ -5500,9 +5542,47 @@ fn text_box_frame_from_drawingml(
   frame
 }
 
+fn text_box_frame_from_wordprocessing_shape(
+  shape: &wps::WordprocessingShape,
+  content: &w::TextBoxContent,
+  mut base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> TextBoxFrameContent {
+  if wordprocessing_shape_textbox_uses_auto_light_text(shape, styles) {
+    base_style.color = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+  }
+  let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
+    content, base_style, styles, images, hyperlinks,
+  ));
+  apply_wordprocessing_shape_textbox_body_properties(&shape.text_body_properties, &mut frame);
+  if let Some(rotation_deg) = wordprocessing_shape_textbox_text_rotation(shape) {
+    rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
+  }
+  apply_drawingml_textbox_layout_adjustments(&mut frame);
+  frame
+}
+
 fn drawingml_textbox_text_rotation(xml: &str) -> Option<f32> {
   let body_pr = first_named_xml_fragment(xml, b"bodyPr")?;
   match drawingml_body_properties_from_fragment(&body_pr)?.vertical {
+    Some(a::TextVerticalValues::Vertical)
+    | Some(a::TextVerticalValues::WordArtVertical)
+    | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
+    Some(a::TextVerticalValues::Vertical270) | Some(a::TextVerticalValues::WordArtLeftToRight) => {
+      Some(90.0)
+    }
+    _ => None,
+  }
+}
+
+fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
+  match shape.text_body_properties.vertical {
     Some(a::TextVerticalValues::Vertical)
     | Some(a::TextVerticalValues::WordArtVertical)
     | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
@@ -5560,6 +5640,19 @@ fn drawingml_textbox_uses_auto_light_text(xml: &str, styles: &StylesCatalog) -> 
   fill_color.is_some_and(libreoffice_color_is_dark)
 }
 
+fn wordprocessing_shape_textbox_uses_auto_light_text(
+  shape: &wps::WordprocessingShape,
+  styles: &StylesCatalog,
+) -> bool {
+  let fill_color = wordprocessing_shape_fill_color(shape, &styles.theme_colors).or_else(|| {
+    shape
+      .shape_style
+      .as_ref()
+      .and_then(|style| drawingml_fill_reference_color(&style.fill_reference, &styles.theme_colors))
+  });
+  fill_color.is_some_and(libreoffice_color_is_dark)
+}
+
 fn libreoffice_color_is_dark(color: RgbColor) -> bool {
   // Source: LibreOffice tools/source/generic/color.cxx Color::IsDark().
   color_wcag_luminance(color) <= 87
@@ -5608,6 +5701,48 @@ fn apply_drawingml_textbox_body_properties(xml: &str, frame: &mut TextBoxFrameCo
   };
 }
 
+fn apply_wordprocessing_shape_textbox_body_properties(
+  properties: &wps::TextBodyProperties,
+  frame: &mut TextBoxFrameContent,
+) {
+  let body_properties = DrawingMlBodyProperties {
+    left_inset_emu: properties.left_inset.map(i64::from),
+    top_inset_emu: properties.top_inset.map(i64::from),
+    right_inset_emu: properties.right_inset.map(i64::from),
+    bottom_inset_emu: properties.bottom_inset.map(i64::from),
+    vertical: properties.vertical,
+    anchor: properties.anchor,
+  };
+  apply_drawingml_textbox_body_properties_model(body_properties, frame);
+}
+
+fn apply_drawingml_textbox_body_properties_model(
+  properties: DrawingMlBodyProperties,
+  frame: &mut TextBoxFrameContent,
+) {
+  frame.left_pt = properties
+    .left_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.left_pt);
+  frame.top_pt = properties
+    .top_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.top_pt);
+  frame.right_pt = properties
+    .right_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.right_pt);
+  frame.bottom_pt = properties
+    .bottom_inset_emu
+    .map(units::emu_to_points)
+    .unwrap_or(frame.bottom_pt);
+  frame.vertical_alignment = match properties.anchor {
+    Some(a::TextAnchoringTypeValues::Center) => TextBoxVerticalAlignment::Center,
+    Some(a::TextAnchoringTypeValues::Bottom) => TextBoxVerticalAlignment::Bottom,
+    _ => frame.vertical_alignment,
+  };
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct DrawingMlBodyProperties {
   left_inset_emu: Option<i64>,
@@ -5632,14 +5767,18 @@ fn drawingml_body_properties_from_fragment(xml: &str) -> Option<DrawingMlBodyPro
     });
   }
   let properties = a::BodyProperties::from_bytes(xml.as_bytes()).ok()?;
-  Some(DrawingMlBodyProperties {
+  Some(drawingml_body_properties_from_model(&properties))
+}
+
+fn drawingml_body_properties_from_model(properties: &a::BodyProperties) -> DrawingMlBodyProperties {
+  DrawingMlBodyProperties {
     left_inset_emu: properties.left_inset.map(|value| value.to_emu()),
     top_inset_emu: properties.top_inset.map(|value| value.to_emu()),
     right_inset_emu: properties.right_inset.map(|value| value.to_emu()),
     bottom_inset_emu: properties.bottom_inset.map(|value| value.to_emu()),
     vertical: properties.vertical,
     anchor: properties.anchor,
-  })
+  }
 }
 
 fn root_qname(xml: &str) -> Option<&str> {
@@ -5769,10 +5908,321 @@ fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::G
   }
 }
 
-fn drawing_graphic_data_choice_xml(choice: &a::GraphicDataChoice) -> Option<String> {
-  let mut writer = Vec::new();
-  choice.write_xml(&mut writer, "").ok()?;
-  String::from_utf8(writer).ok()
+fn drawing_graphic_data_choice_textbox_frames(
+  choice: &a::GraphicDataChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  match choice {
+    a::GraphicDataChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_textbox_frame(shape, placement, transform, context)
+        .into_iter()
+        .collect()
+    }
+    a::GraphicDataChoice::WordprocessingGroup(group) => {
+      wordprocessing_group_textbox_frames(group, placement, transform, context)
+    }
+    a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
+      wordprocessing_canvas_textbox_frames(canvas, placement, transform, context)
+    }
+    a::GraphicDataChoice::XmlAny(xml) => {
+      drawingml_textbox_frames_from_xml(xml, placement, transform, context, false)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_canvas_textbox_frames(
+  canvas: &wpc::WordprocessingCanvas,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  canvas
+    .wordprocessing_canvas_choice
+    .iter()
+    .flat_map(|choice| {
+      wordprocessing_canvas_choice_textbox_frames(choice, placement, transform, context.clone())
+    })
+    .collect()
+}
+
+fn wordprocessing_canvas_choice_textbox_frames(
+  choice: &wpc::WordprocessingCanvasChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  match choice {
+    wpc::WordprocessingCanvasChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_textbox_frame(shape, placement, transform, context)
+        .into_iter()
+        .collect()
+    }
+    wpc::WordprocessingCanvasChoice::WordprocessingGroup(group) => {
+      wordprocessing_group_textbox_frames(group, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_group_textbox_frames(
+  group: &wpg::WordprocessingGroup,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  group
+    .wordprocessing_group_choice
+    .iter()
+    .flat_map(|choice| {
+      wordprocessing_group_choice_textbox_frames(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        context.clone(),
+      )
+    })
+    .collect()
+}
+
+fn wordprocessing_group_shape_textbox_frames(
+  group: &wpg::GroupShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  group
+    .group_shape_choice
+    .iter()
+    .flat_map(|choice| {
+      wordprocessing_group_shape_choice_textbox_frames(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        context.clone(),
+      )
+    })
+    .collect()
+}
+
+fn wordprocessing_group_choice_textbox_frames(
+  choice: &wpg::WordprocessingGroupChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  match choice {
+    wpg::WordprocessingGroupChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_textbox_frame(shape, placement, transform, context)
+        .into_iter()
+        .collect()
+    }
+    wpg::WordprocessingGroupChoice::GroupShape(group) => {
+      wordprocessing_group_shape_textbox_frames(group, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_group_shape_choice_textbox_frames(
+  choice: &wpg::GroupShapeChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Vec<InlineShape> {
+  match choice {
+    wpg::GroupShapeChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_textbox_frame(shape, placement, transform, context)
+        .into_iter()
+        .collect()
+    }
+    wpg::GroupShapeChoice::GroupShape(group) => {
+      wordprocessing_group_shape_textbox_frames(group, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_shape_textbox_frame(
+  shape: &wps::WordprocessingShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingTextBoxImportContext<'_>,
+) -> Option<InlineShape> {
+  let content = wordprocessing_shape_textbox_content(shape)?;
+  let text_box = text_box_frame_from_wordprocessing_shape(
+    shape,
+    content,
+    context.base_style,
+    context.styles,
+    context.images,
+    context.hyperlinks,
+  );
+  let auto_fit = wordprocessing_shape_textbox_uses_auto_fit(shape);
+  let expands_auto_fit = auto_fit && wordprocessing_shape_textbox_is_vertical(shape);
+  let frame_stroke = wordprocessing_shape_textbox_frame_stroke(shape, auto_fit, placement);
+  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  let geometry = properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
+    drawingml_geometry_from_shape_properties(
+      Some(&properties),
+      &geometry,
+      transform.raw_coordinates,
+      None,
+    )?;
+  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
+  let width_pt = if expands_auto_fit {
+    shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
+  } else {
+    shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
+  };
+  let height_pt = if expands_auto_fit {
+    shape_height_pt.max(300.0)
+  } else {
+    shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
+  };
+  let has_fontwork_warp = wordprocessing_shape_textbox_has_fontwork_warp(shape);
+  let mut wordart_fill_colors = if has_fontwork_warp {
+    shape
+      .to_xml()
+      .ok()
+      .map(|xml| drawingml_text_fill_colors(&xml, &context.styles.theme_colors))
+      .unwrap_or_default()
+  } else {
+    Vec::new()
+  };
+  if wordart_fill_colors.is_empty()
+    && has_fontwork_warp
+    && let Some(color) = first_text_color_in_blocks(&text_box.blocks)
+  {
+    wordart_fill_colors.push(color);
+  }
+  let fill_color = wordart_fill_colors.first().copied();
+  let additional_fill_colors = wordart_fill_colors.into_iter().skip(1).collect();
+  let geometry = if has_fontwork_warp {
+    fontwork_warp_geometry()
+  } else {
+    InlineShapeGeometry::Rectangle
+  };
+  let placement = if auto_fit {
+    autofit_textbox_placement(placement)
+  } else {
+    placement
+  };
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    geometry,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color,
+    additional_fill_colors,
+    fill_image: None,
+    stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
+    suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
+    placement,
+    text_box_blocks: text_box.blocks,
+    text_inset_left_pt: text_box.left_pt,
+    text_inset_top_pt: text_box.top_pt,
+    text_inset_right_pt: text_box.right_pt,
+    text_inset_bottom_pt: text_box.bottom_pt,
+    text_box_auto_fit: auto_fit,
+    text_vertical_alignment: text_box.vertical_alignment,
+  })
+}
+
+fn drawing_graphic_data_choice_textbox_content(
+  choice: &a::GraphicDataChoice,
+) -> Option<w::TextBoxContent> {
+  match choice {
+    a::GraphicDataChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_textbox_content(shape).cloned()
+    }
+    a::GraphicDataChoice::WordprocessingGroup(group) => {
+      wordprocessing_group_textbox_content(group).cloned()
+    }
+    a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
+      wordprocessing_canvas_textbox_content(canvas).cloned()
+    }
+    a::GraphicDataChoice::XmlAny(xml) => drawing_textbox_content(xml),
+    _ => None,
+  }
+}
+
+fn wordprocessing_canvas_textbox_content(
+  canvas: &wpc::WordprocessingCanvas,
+) -> Option<&w::TextBoxContent> {
+  canvas
+    .wordprocessing_canvas_choice
+    .iter()
+    .find_map(|choice| match choice {
+      wpc::WordprocessingCanvasChoice::WordprocessingShape(shape) => {
+        wordprocessing_shape_textbox_content(shape)
+      }
+      wpc::WordprocessingCanvasChoice::WordprocessingGroup(group) => {
+        wordprocessing_group_textbox_content(group)
+      }
+      _ => None,
+    })
+}
+
+fn wordprocessing_group_textbox_content(
+  group: &wpg::WordprocessingGroup,
+) -> Option<&w::TextBoxContent> {
+  group
+    .wordprocessing_group_choice
+    .iter()
+    .find_map(|choice| match choice {
+      wpg::WordprocessingGroupChoice::WordprocessingShape(shape) => {
+        wordprocessing_shape_textbox_content(shape)
+      }
+      wpg::WordprocessingGroupChoice::GroupShape(group) => {
+        wordprocessing_group_shape_textbox_content(group)
+      }
+      _ => None,
+    })
+}
+
+fn wordprocessing_group_shape_textbox_content(
+  group: &wpg::GroupShape,
+) -> Option<&w::TextBoxContent> {
+  group
+    .group_shape_choice
+    .iter()
+    .find_map(|choice| match choice {
+      wpg::GroupShapeChoice::WordprocessingShape(shape) => {
+        wordprocessing_shape_textbox_content(shape)
+      }
+      wpg::GroupShapeChoice::GroupShape(group) => wordprocessing_group_shape_textbox_content(group),
+      _ => None,
+    })
+}
+
+fn wordprocessing_shape_textbox_content(
+  shape: &wps::WordprocessingShape,
+) -> Option<&w::TextBoxContent> {
+  match shape.wordprocessing_shape_choice2.as_ref()? {
+    wps::WordprocessingShapeChoice2::TextBoxInfo2(textbox) => textbox.text_box_content.as_ref(),
+    wps::WordprocessingShapeChoice2::LinkedTextBox(_) => None,
+  }
 }
 
 fn push_drawing_shapes_impl(
@@ -5838,11 +6288,8 @@ fn push_drawing_shapes_impl(
         }
       }
       _ => {
-        let Some(xml) = drawing_graphic_data_choice_xml(choice) else {
-          continue;
-        };
-        inlines.extend(drawingml_shapes_from_xml(
-          &xml,
+        inlines.extend(drawing_graphic_data_choice_shapes(
+          choice,
           placement,
           transform,
           DrawingShapeImportContext {
@@ -5852,11 +6299,291 @@ fn push_drawing_shapes_impl(
             hyperlinks,
             smartart_text_colors_by_model_id: None,
           },
-          false,
         ));
       }
     }
   }
+}
+
+fn drawing_graphic_data_choice_shapes(
+  choice: &a::GraphicDataChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    a::GraphicDataChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    a::GraphicDataChoice::WordprocessingGroup(group) => {
+      wordprocessing_group_shapes(group, placement, transform, context)
+    }
+    a::GraphicDataChoice::WordprocessingCanvas(canvas) => {
+      wordprocessing_canvas_shapes(canvas, placement, transform, context)
+    }
+    a::GraphicDataChoice::Picture(picture) => {
+      drawingml_picture_items(picture, placement, transform, context)
+    }
+    a::GraphicDataChoice::Drawing(drawing) => {
+      drawingml_diagram_drawing_shapes(drawing, placement, transform, context)
+    }
+    a::GraphicDataChoice::XmlAny(xml) => {
+      drawingml_shapes_from_xml(xml, placement, transform, context, false)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_canvas_shapes(
+  canvas: &wpc::WordprocessingCanvas,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  canvas
+    .wordprocessing_canvas_choice
+    .iter()
+    .flat_map(|choice| wordprocessing_canvas_choice_shapes(choice, placement, transform, context))
+    .collect()
+}
+
+fn wordprocessing_canvas_choice_shapes(
+  choice: &wpc::WordprocessingCanvasChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    wpc::WordprocessingCanvasChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    wpc::WordprocessingCanvasChoice::WordprocessingGroup(group) => {
+      wordprocessing_group_shapes(group, placement, transform, context)
+    }
+    wpc::WordprocessingCanvasChoice::Picture(picture) => {
+      drawingml_picture_items(picture, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_group_shapes(
+  group: &wpg::WordprocessingGroup,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  let child_context = DrawingShapeImportContext {
+    effect_extent: DrawingEffectExtent::default(),
+    ..context
+  };
+  group
+    .wordprocessing_group_choice
+    .iter()
+    .flat_map(|choice| {
+      wordprocessing_group_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        child_context,
+      )
+    })
+    .collect()
+}
+
+fn wordprocessing_group_shape_shapes(
+  group: &wpg::GroupShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform = drawingml_group_transform_from_properties(&group.group_shape_properties)
+    .map(|xfrm| transform.child(xfrm))
+    .unwrap_or(transform);
+  let child_context = DrawingShapeImportContext {
+    effect_extent: DrawingEffectExtent::default(),
+    ..context
+  };
+  group
+    .group_shape_choice
+    .iter()
+    .flat_map(|choice| {
+      wordprocessing_group_shape_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        child_context,
+      )
+    })
+    .collect()
+}
+
+fn wordprocessing_group_choice_shapes(
+  choice: &wpg::WordprocessingGroupChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    wpg::WordprocessingGroupChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    wpg::WordprocessingGroupChoice::GroupShape(group) => {
+      wordprocessing_group_shape_shapes(group, placement, transform, context)
+    }
+    wpg::WordprocessingGroupChoice::Picture(picture) => {
+      drawingml_picture_items(picture, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_group_shape_choice_shapes(
+  choice: &wpg::GroupShapeChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    wpg::GroupShapeChoice::WordprocessingShape(shape) => {
+      wordprocessing_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    wpg::GroupShapeChoice::GroupShape(group) => {
+      wordprocessing_group_shape_shapes(group, placement, transform, context)
+    }
+    wpg::GroupShapeChoice::Picture(picture) => {
+      drawingml_picture_items(picture, placement, transform, context)
+    }
+    _ => Vec::new(),
+  }
+}
+
+fn wordprocessing_shape_shape(
+  shape: &wps::WordprocessingShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Option<InlineShape> {
+  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  let explicit_fill_color =
+    drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
+  let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
+    None
+  } else {
+    explicit_fill_color.or_else(|| {
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
+      })
+    })
+  };
+  let fill_image = wordprocessing_shape_image_fill(&shape.shape_properties, context.images);
+  let stroke = if wordprocessing_shape_has_no_line(shape) {
+    None
+  } else {
+    wordprocessing_shape_stroke(shape, &context.styles.theme_colors).or_else(|| {
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_line_reference_stroke(
+          &style.line_reference,
+          &context.styles.theme_colors,
+          &context.styles.theme_lines,
+        )
+      })
+    })
+  };
+  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
+    return None;
+  }
+
+  let mut geometry = properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let has_custom_geometry = properties.custom_geometry().is_some();
+  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
+    geometry = InlineShapeGeometry::Polyline {
+      points: Vec::new(),
+      closed: false,
+    };
+  }
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
+    Some(&properties),
+    &geometry,
+    transform.raw_coordinates,
+    transform.fallback_size,
+  )?;
+  if has_custom_geometry
+    && let Some(custom_geometry) =
+      drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
+  {
+    geometry = custom_geometry;
+  }
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    effect_left_pt: context.effect_extent.left_pt,
+    effect_top_pt: context.effect_extent.top_pt,
+    effect_right_pt: context.effect_extent.right_pt,
+    effect_bottom_pt: context.effect_extent.bottom_pt,
+    geometry,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color,
+    additional_fill_colors: Vec::new(),
+    fill_image,
+    stroke,
+    suppress_zero_relative_background: explicit_fill_color.is_some(),
+    allow_outside_page: false,
+    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
+      && wordprocessing_shape_textbox_content(shape).is_some(),
+    placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
+}
+
+fn drawingml_picture_items(
+  picture: &pic::Picture,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let mut items = Vec::new();
+  if let Some(image) = drawingml_picture_image(
+    picture,
+    placement,
+    transform,
+    context.styles,
+    context.images,
+    context.hyperlinks,
+  ) {
+    items.push(InlineItem::Image(image));
+  }
+  if let Some(shape) = drawingml_picture_frame(picture, placement, transform) {
+    items.push(InlineItem::Shape(shape));
+  }
+  items
 }
 
 fn drawing_diagram_shapes(
@@ -5889,6 +6616,17 @@ fn drawing_diagram_shapes(
     .images
     .diagram_drawings_by_relationship_id
     .get(&drawing_relationship_id)?;
+  if let Ok(drawing) = dsp::Drawing::from_bytes(drawing_xml.as_bytes()) {
+    return Some(drawingml_diagram_drawing_shapes(
+      &drawing,
+      placement,
+      transform,
+      DrawingShapeImportContext {
+        smartart_text_colors_by_model_id: text_colors_by_model_id.as_ref(),
+        ..context
+      },
+    ));
+  }
   Some(drawingml_shapes_from_xml(
     drawing_xml,
     placement,
@@ -5899,6 +6637,219 @@ fn drawing_diagram_shapes(
     },
     false,
   ))
+}
+
+fn drawingml_diagram_drawing_shapes(
+  drawing: &dsp::Drawing,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform =
+    drawingml_group_transform_from_diagram_properties(&drawing.shape_tree.group_shape_properties)
+      .map(|xfrm| transform.child(xfrm))
+      .unwrap_or(transform);
+  drawing
+    .shape_tree
+    .shape_tree_choice
+    .iter()
+    .flat_map(|choice| {
+      drawingml_diagram_shape_tree_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        context,
+      )
+    })
+    .collect()
+}
+
+fn drawingml_diagram_group_shapes(
+  group: &dsp::GroupShape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  let child_transform =
+    drawingml_group_transform_from_diagram_properties(&group.group_shape_properties)
+      .map(|xfrm| transform.child(xfrm))
+      .unwrap_or(transform);
+  group
+    .group_shape_choice
+    .iter()
+    .flat_map(|choice| {
+      drawingml_diagram_group_choice_shapes(
+        choice,
+        drawingml_group_child_placement(placement),
+        child_transform,
+        context,
+      )
+    })
+    .collect()
+}
+
+fn drawingml_diagram_shape_tree_choice_shapes(
+  choice: &dsp::ShapeTreeChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    dsp::ShapeTreeChoice::Shape(shape) => {
+      drawingml_diagram_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    dsp::ShapeTreeChoice::GroupShape(group) => {
+      drawingml_diagram_group_shapes(group, placement, transform, context)
+    }
+  }
+}
+
+fn drawingml_diagram_group_choice_shapes(
+  choice: &dsp::GroupShapeChoice,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Vec<InlineItem> {
+  match choice {
+    dsp::GroupShapeChoice::Shape(shape) => {
+      drawingml_diagram_shape_shape(shape, placement, transform, context)
+        .into_iter()
+        .map(InlineItem::Shape)
+        .collect()
+    }
+    dsp::GroupShapeChoice::GroupShape(group) => {
+      drawingml_diagram_group_shapes(group, placement, transform, context)
+    }
+  }
+}
+
+fn drawingml_diagram_shape_shape(
+  shape: &dsp::Shape,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Option<InlineShape> {
+  let properties = DrawingMlShapeProperties::Diagram((*shape.shape_properties).clone());
+  let explicit_fill_color =
+    drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
+  let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
+    None
+  } else {
+    explicit_fill_color.or_else(|| {
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_fill_reference_color(&style.fill_reference, &context.styles.theme_colors)
+      })
+    })
+  };
+  let fill_image = drawingml_diagram_shape_image_fill(&shape.shape_properties, context.images);
+  let stroke = if drawingml_diagram_shape_has_no_line(shape) {
+    None
+  } else {
+    drawingml_diagram_shape_stroke(shape, &context.styles.theme_colors).or_else(|| {
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_line_reference_stroke(
+          &style.line_reference,
+          &context.styles.theme_colors,
+          &context.styles.theme_lines,
+        )
+      })
+    })
+  };
+  let smartart_text_color = context
+    .smartart_text_colors_by_model_id
+    .and_then(|colors| colors.get(shape.model_id.as_str()).copied());
+  let mut text_box = drawingml_diagram_shape_text_box(shape, context.styles, smartart_text_color);
+  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() && text_box.is_none() {
+    return None;
+  }
+
+  let mut geometry = properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let has_custom_geometry = properties.custom_geometry().is_some();
+  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
+    geometry = InlineShapeGeometry::Polyline {
+      points: Vec::new(),
+      closed: false,
+    };
+  }
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
+    Some(&properties),
+    &geometry,
+    transform.raw_coordinates,
+    transform.fallback_size,
+  )?;
+  if has_custom_geometry
+    && let Some(custom_geometry) =
+      drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
+  {
+    geometry = custom_geometry;
+  }
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+  let mut shape = InlineShape {
+    width_pt,
+    height_pt,
+    effect_left_pt: context.effect_extent.left_pt,
+    effect_top_pt: context.effect_extent.top_pt,
+    effect_right_pt: context.effect_extent.right_pt,
+    effect_bottom_pt: context.effect_extent.bottom_pt,
+    geometry,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color,
+    additional_fill_colors: Vec::new(),
+    fill_image,
+    stroke,
+    suppress_zero_relative_background: explicit_fill_color.is_some(),
+    allow_outside_page: false,
+    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
+      && shape.text_body.is_some(),
+    placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  };
+  if let Some(text_box) = text_box.take() {
+    shape.text_box_blocks = text_box.blocks;
+    shape.text_inset_left_pt = text_box.left_pt;
+    shape.text_inset_top_pt = text_box.top_pt;
+    shape.text_inset_right_pt = text_box.right_pt;
+    shape.text_inset_bottom_pt = text_box.bottom_pt;
+    shape.text_vertical_alignment = text_box.vertical_alignment;
+  }
+  Some(shape)
+}
+
+fn drawingml_diagram_shape_text_box(
+  shape: &dsp::Shape,
+  styles: &StylesCatalog,
+  smartart_text_color: Option<RgbColor>,
+) -> Option<TextBoxFrameContent> {
+  let text_body = shape.text_body.as_ref()?;
+  let texts = drawingml_text_body_texts(&text_body.paragraph);
+  if texts.is_empty() {
+    return None;
+  }
+  let color = smartart_text_color.unwrap_or_else(|| TextStyle::default().color);
+  let blocks = texts
+    .into_iter()
+    .map(|text| simple_text_block(text, text_style_with_color(styles, color)))
+    .collect();
+  let mut frame = TextBoxFrameContent::new(blocks);
+  apply_drawingml_textbox_body_properties_model(
+    drawingml_body_properties_from_model(&text_body.body_properties),
+    &mut frame,
+  );
+  apply_drawingml_textbox_layout_adjustments(&mut frame);
+  Some(frame)
 }
 
 fn diagram_text_fill_colors_by_model_id(
@@ -6220,6 +7171,7 @@ struct DrawingMlGroupXfrm {
 
 enum DrawingMlShapeProperties {
   Drawing(a::ShapeProperties),
+  Diagram(dsp::ShapeProperties),
   Wordprocessing(wps::ShapeProperties),
   Picture(pic::ShapeProperties),
 }
@@ -6236,6 +7188,9 @@ impl DrawingMlShapeProperties {
     if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes()) {
       return Some(Self::Drawing(properties));
     }
+    if let Ok(properties) = dsp::ShapeProperties::from_bytes(xml.as_bytes()) {
+      return Some(Self::Diagram(properties));
+    }
     if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes()) {
       return Some(Self::Wordprocessing(properties));
     }
@@ -6247,6 +7202,7 @@ impl DrawingMlShapeProperties {
   fn transform2_d(&self) -> Option<&a::Transform2D> {
     match self {
       Self::Drawing(properties) => properties.transform2_d.as_deref(),
+      Self::Diagram(properties) => properties.transform2_d.as_deref(),
       Self::Wordprocessing(properties) => properties.transform2_d.as_deref(),
       Self::Picture(properties) => properties.transform2_d.as_deref(),
     }
@@ -6257,6 +7213,11 @@ impl DrawingMlShapeProperties {
       Self::Drawing(properties) => matches!(
         properties.shape_properties_choice1.as_ref(),
         Some(a::ShapePropertiesChoice::PresetGeometry(geometry))
+          if geometry.preset == a::ShapeTypeValues::Line
+      ),
+      Self::Diagram(properties) => matches!(
+        properties.shape_properties_choice1.as_ref(),
+        Some(dsp::ShapePropertiesChoice::PresetGeometry(geometry))
           if geometry.preset == a::ShapeTypeValues::Line
       ),
       Self::Wordprocessing(properties) => matches!(
@@ -6284,6 +7245,10 @@ impl DrawingMlShapeProperties {
         a::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
         a::ShapePropertiesChoice::PresetGeometry(_) => None,
       },
+      Self::Diagram(properties) => match properties.shape_properties_choice1.as_ref()? {
+        dsp::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
+        dsp::ShapePropertiesChoice::PresetGeometry(_) => None,
+      },
       Self::Wordprocessing(properties) => match properties.shape_properties_choice1.as_ref()? {
         wps::ShapePropertiesChoice::CustomGeometry(geometry) => Some(geometry.as_ref()),
         wps::ShapePropertiesChoice::PresetGeometry(_) => None,
@@ -6303,6 +7268,16 @@ impl DrawingMlShapeProperties {
           Some(DrawingMlFillProperties::Solid(fill.as_ref()))
         }
         a::ShapePropertiesChoice2::GradientFill(fill) => {
+          Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
+        }
+        _ => None,
+      },
+      Self::Diagram(properties) => match properties.shape_properties_choice2.as_ref()? {
+        dsp::ShapePropertiesChoice2::NoFill(_) => Some(DrawingMlFillProperties::NoFill),
+        dsp::ShapePropertiesChoice2::SolidFill(fill) => {
+          Some(DrawingMlFillProperties::Solid(fill.as_ref()))
+        }
+        dsp::ShapePropertiesChoice2::GradientFill(fill) => {
           Some(DrawingMlFillProperties::Gradient(fill.as_ref()))
         }
         _ => None,
@@ -6744,26 +7719,48 @@ fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXf
         .ok()?
         .transform_group
     }?;
+  Some(drawingml_group_transform_from_model(&transform))
+}
+
+fn drawingml_group_transform_from_properties(
+  properties: &wpg::GroupShapeProperties,
+) -> Option<DrawingMlGroupXfrm> {
+  properties
+    .transform_group
+    .as_deref()
+    .map(drawingml_group_transform_from_model)
+}
+
+fn drawingml_group_transform_from_diagram_properties(
+  properties: &dsp::GroupShapeProperties,
+) -> Option<DrawingMlGroupXfrm> {
+  properties
+    .transform_group
+    .as_deref()
+    .map(drawingml_group_transform_from_model)
+}
+
+fn drawingml_group_transform_from_model(transform: &a::TransformGroup) -> DrawingMlGroupXfrm {
   let mut group = DrawingMlGroupXfrm::default();
 
-  if let Some(offset) = transform.offset {
+  if let Some(offset) = &transform.offset {
     group.offset_x_pt = units::emu_to_points(offset.x.to_emu());
     group.offset_y_pt = units::emu_to_points(offset.y.to_emu());
   }
-  if let Some(extents) = transform.extents {
+  if let Some(extents) = &transform.extents {
     group.width_pt = units::emu_to_points(extents.cx.to_emu());
     group.height_pt = units::emu_to_points(extents.cy.to_emu());
   }
-  if let Some(child_offset) = transform.child_offset {
+  if let Some(child_offset) = &transform.child_offset {
     group.child_offset_x = child_offset.x.to_emu() as f32;
     group.child_offset_y = child_offset.y.to_emu() as f32;
   }
-  if let Some(child_extents) = transform.child_extents {
+  if let Some(child_extents) = &transform.child_extents {
     group.child_width = child_extents.cx.to_emu() as f32;
     group.child_height = child_extents.cy.to_emu() as f32;
   }
 
-  Some(group)
+  group
 }
 
 fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
@@ -6783,6 +7780,14 @@ fn drawingml_custom_geometry(
   height_pt: f32,
 ) -> Option<InlineShapeGeometry> {
   let properties = drawingml_shape_properties_from_fragment(sp_pr)?;
+  drawingml_custom_geometry_from_properties(&properties, width_pt, height_pt)
+}
+
+fn drawingml_custom_geometry_from_properties(
+  properties: &DrawingMlShapeProperties,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<InlineShapeGeometry> {
   let geometry = properties.custom_geometry()?;
   let path = geometry.path_list.path.first()?;
   let path_width = path
@@ -6861,17 +7866,28 @@ fn drawingml_geometry_from_sp_pr(
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
 ) -> Option<(f32, f32, f32, f32)> {
+  let properties = drawingml_shape_properties_from_fragment(sp_pr);
+  drawingml_geometry_from_shape_properties(
+    properties.as_ref(),
+    geometry,
+    raw_coordinates,
+    fallback_size,
+  )
+}
+
+fn drawingml_geometry_from_shape_properties(
+  properties: Option<&DrawingMlShapeProperties>,
+  geometry: &InlineShapeGeometry,
+  raw_coordinates: bool,
+  fallback_size: Option<(f32, f32)>,
+) -> Option<(f32, f32, f32, f32)> {
   let mut offset_x_pt = 0.0f32;
   let mut offset_y_pt = 0.0f32;
   let mut width_pt = 0.0f32;
   let mut height_pt = 0.0f32;
   let mut saw_ext = false;
 
-  let properties = drawingml_shape_properties_from_fragment(sp_pr);
-  if let Some(transform) = properties
-    .as_ref()
-    .and_then(|properties| properties.transform2_d())
-  {
+  if let Some(transform) = properties.and_then(DrawingMlShapeProperties::transform2_d) {
     if let Some(offset) = &transform.offset {
       offset_x_pt = drawingml_coordinate_to_points(offset.x.to_emu(), raw_coordinates);
       offset_y_pt = drawingml_coordinate_to_points(offset.y.to_emu(), raw_coordinates);
@@ -6945,6 +7961,52 @@ fn drawingml_picture_frame_from_fragment(
   })
 }
 
+fn drawingml_picture_frame(
+  picture: &pic::Picture,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+) -> Option<InlineShape> {
+  let properties = DrawingMlShapeProperties::Picture((*picture.shape_properties).clone());
+  let geometry = properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
+    Some(&properties),
+    &geometry,
+    transform.raw_coordinates,
+    None,
+  )?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    geometry: InlineShapeGeometry::Rectangle,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color: None,
+    additional_fill_colors: Vec::new(),
+    fill_image: None,
+    stroke: None,
+    suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: false,
+    placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
+}
+
 fn drawingml_picture_image_from_fragment(
   xml: &str,
   placement: ImagePlacement,
@@ -6986,6 +8048,54 @@ fn drawingml_picture_image_from_fragment(
   })
 }
 
+fn drawingml_picture_image(
+  picture: &pic::Picture,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineImage> {
+  let properties = drawing_picture_image_properties(picture, &styles.theme_colors)?;
+  let relationship_id = properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &properties);
+  let shape_properties = DrawingMlShapeProperties::Picture((*picture.shape_properties).clone());
+  let geometry = shape_properties
+    .geometry_kind()
+    .unwrap_or(InlineShapeGeometry::Rectangle);
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_shape_properties(
+    Some(&shape_properties),
+    &geometry,
+    transform.raw_coordinates,
+    None,
+  )?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+  let hyperlink_url = properties
+    .hyperlink_relationship_id
+    .as_deref()
+    .and_then(|relationship_id| hyperlinks.target(relationship_id))
+    .map(ToString::to_string);
+  Some(InlineImage {
+    data: image_data.data,
+    content_type: image_data.content_type,
+    width_pt,
+    height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    crop: properties.crop,
+    rotation_deg: properties.rotation_deg,
+    flip_horizontal: properties.flip_horizontal,
+    flip_vertical: properties.flip_vertical,
+    alt_text: drawingml_picture_alt_text(picture),
+    hyperlink_url,
+    placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
+  })
+}
+
 fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
   let properties = drawing_shape_image_properties_from_fragment(sp_pr, &ThemeColors::default())?;
   let relationship_id = properties.relationship_id.as_deref()?;
@@ -6999,6 +8109,54 @@ fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<Inli
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
     flip_vertical: properties.flip_vertical,
+  })
+}
+
+fn wordprocessing_shape_image_fill(
+  properties: &wps::ShapeProperties,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  let wps::ShapePropertiesChoice2::BlipFill(blip_fill) =
+    properties.shape_properties_choice2.as_ref()?
+  else {
+    return None;
+  };
+  let image_properties = drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default())?;
+  let relationship_id = image_properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &image_properties);
+
+  Some(InlineShapeImageFill {
+    data: image_data.data,
+    content_type: image_data.content_type,
+    crop: image_properties.crop,
+    rotation_deg: image_properties.rotation_deg,
+    flip_horizontal: image_properties.flip_horizontal,
+    flip_vertical: image_properties.flip_vertical,
+  })
+}
+
+fn drawingml_diagram_shape_image_fill(
+  properties: &dsp::ShapeProperties,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  let dsp::ShapePropertiesChoice2::BlipFill(blip_fill) =
+    properties.shape_properties_choice2.as_ref()?
+  else {
+    return None;
+  };
+  let image_properties = drawing_blip_fill_image_properties(blip_fill, &ThemeColors::default())?;
+  let relationship_id = image_properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &image_properties);
+
+  Some(InlineShapeImageFill {
+    data: image_data.data,
+    content_type: image_data.content_type,
+    crop: image_properties.crop,
+    rotation_deg: image_properties.rotation_deg,
+    flip_horizontal: image_properties.flip_horizontal,
+    flip_vertical: image_properties.flip_vertical,
   })
 }
 
@@ -7196,6 +8354,21 @@ fn drawingml_child_placement(
 
 fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
   let properties = drawingml_shape_properties_from_fragment(xml)?;
+  drawingml_shape_properties_fill_color(&properties, theme_colors)
+}
+
+fn wordprocessing_shape_fill_color(
+  shape: &wps::WordprocessingShape,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  drawingml_shape_properties_fill_color(&properties, theme_colors)
+}
+
+fn drawingml_shape_properties_fill_color(
+  properties: &DrawingMlShapeProperties,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
   match properties.fill()? {
     DrawingMlFillProperties::NoFill => None,
     DrawingMlFillProperties::Solid(fill) => {
@@ -7223,6 +8396,12 @@ fn drawingml_shape_has_no_fill(xml: &str) -> bool {
     .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
 }
 
+fn drawingml_shape_properties_has_no_fill(properties: &DrawingMlShapeProperties) -> bool {
+  properties
+    .fill()
+    .is_some_and(|fill| matches!(fill, DrawingMlFillProperties::NoFill))
+}
+
 fn drawingml_shape_style_color(
   xml: &str,
   local_name: &[u8],
@@ -7245,9 +8424,17 @@ fn drawingml_shape_style_stroke(
   let fragment = first_named_xml_fragment(xml, b"lnRef")?;
   let fragment = drawingml_fragment_with_namespaces(fragment);
   let reference = a::LineReference::from_bytes(fragment.as_bytes()).ok()?;
+  drawingml_line_reference_stroke(&reference, theme_colors, theme_lines)
+}
+
+fn drawingml_line_reference_stroke(
+  reference: &a::LineReference,
+  theme_colors: &ThemeColors,
+  theme_lines: &ThemeLineStyles,
+) -> Option<BorderStyle> {
   let index = usize::try_from(reference.index).ok()?;
   let width_pt = theme_lines.width_pt(index)?;
-  let color = drawingml_line_reference_color(&reference, theme_colors)?;
+  let color = drawingml_line_reference_color(reference, theme_colors)?;
   Some(BorderStyle {
     width_pt,
     spacing_pt: 0.0,
@@ -7317,11 +8504,83 @@ fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<Borde
   })
 }
 
+fn wordprocessing_shape_stroke(
+  shape: &wps::WordprocessingShape,
+  theme_colors: &ThemeColors,
+) -> Option<BorderStyle> {
+  let line = shape.shape_properties.outline.as_ref()?;
+  let color = match line.outline_choice1.as_ref()? {
+    a::OutlineChoice::NoFill(_) => return None,
+    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
+    a::OutlineChoice::GradientFill(fill) => {
+      drawingml_first_gradient_fill_color(fill, theme_colors)?
+    }
+    a::OutlineChoice::PatternFill(_) => return None,
+  };
+  let width_pt = line
+    .width
+    .map(i64::from)
+    .map(units::emu_to_points)
+    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
+
+  Some(BorderStyle {
+    width_pt,
+    spacing_pt: 0.0,
+    color,
+    compound: false,
+  })
+}
+
+fn drawingml_diagram_shape_stroke(
+  shape: &dsp::Shape,
+  theme_colors: &ThemeColors,
+) -> Option<BorderStyle> {
+  let line = shape.shape_properties.outline.as_ref()?;
+  let color = match line.outline_choice1.as_ref()? {
+    a::OutlineChoice::NoFill(_) => return None,
+    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
+    a::OutlineChoice::GradientFill(fill) => {
+      drawingml_first_gradient_fill_color(fill, theme_colors)?
+    }
+    a::OutlineChoice::PatternFill(_) => return None,
+  };
+  let width_pt = line
+    .width
+    .map(i64::from)
+    .map(units::emu_to_points)
+    .unwrap_or_else(|| units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU));
+
+  Some(BorderStyle {
+    width_pt,
+    spacing_pt: 0.0,
+    color,
+    compound: false,
+  })
+}
+
 fn drawingml_shape_has_no_line(xml: &str) -> bool {
   let Some(line_fragment) = first_named_xml_fragment(xml, b"ln") else {
     return false;
   };
   drawingml_shape_has_no_fill(&line_fragment)
+}
+
+fn wordprocessing_shape_has_no_line(shape: &wps::WordprocessingShape) -> bool {
+  shape
+    .shape_properties
+    .outline
+    .as_ref()
+    .and_then(|line| line.outline_choice1.as_ref())
+    .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
+}
+
+fn drawingml_diagram_shape_has_no_line(shape: &dsp::Shape) -> bool {
+  shape
+    .shape_properties
+    .outline
+    .as_ref()
+    .and_then(|line| line.outline_choice1.as_ref())
+    .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
 }
 
 fn push_pict_shapes_impl(

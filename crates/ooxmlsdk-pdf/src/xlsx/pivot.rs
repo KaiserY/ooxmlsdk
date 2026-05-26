@@ -673,7 +673,6 @@ impl PivotSourceCacheTable {
     source_range: CellRange,
     record_count: Option<u32>,
     shared_strings: &[SharedStringModel],
-    raw_values: &HashMap<String, String>,
   ) -> Self {
     // Source: LibreOffice sc/source/filter/oox/pivottablebuffer.cxx
     // PivotTable::finalizeImport creates the DataPilot descriptor from the
@@ -708,7 +707,7 @@ impl PivotSourceCacheTable {
             let address = CellAddress { col, row };
             cells
               .get(&address)
-              .map(|cell| pivot_source_cell_value(cell, shared_strings, raw_values))
+              .map(|cell| pivot_source_cell_value(cell, shared_strings))
               .unwrap_or(PivotCacheItemValue::Empty)
           })
           .collect()
@@ -760,7 +759,6 @@ impl PivotSourceCacheTable {
 fn pivot_source_cell_value(
   cell: &x::Cell,
   shared_strings: &[SharedStringModel],
-  raw_values: &HashMap<String, String>,
 ) -> PivotCacheItemValue {
   let text = match cell.data_type {
     Some(x::CellValues::SharedString) => cell
@@ -791,17 +789,10 @@ fn pivot_source_cell_value(
       .map(ToString::to_string)
       .unwrap_or_default(),
     _ => cell
-      .cell_reference
+      .cell_value
       .as_ref()
-      .and_then(|reference| raw_values.get(reference.as_str()))
-      .cloned()
-      .or_else(|| {
-        cell
-          .cell_value
-          .as_ref()
-          .and_then(|value| value.xml_content.as_deref())
-          .map(ToString::to_string)
-      })
+      .and_then(|value| value.xml_content.as_deref())
+      .map(decode_excel_escaped_text)
       .unwrap_or_default(),
   };
   if text.is_empty() {
@@ -844,7 +835,6 @@ pub(crate) enum PivotDataLayoutAxis {
 #[derive(Clone, Copy)]
 pub(crate) struct PivotTableImportContext<'a> {
   pub(crate) current_worksheet: &'a x::Worksheet,
-  pub(crate) current_raw_values: &'a HashMap<String, String>,
   pub(crate) current_sheet_name: &'a str,
   pub(crate) shared_strings: &'a [SharedStringModel],
   pub(crate) styles: &'a StylesCatalog,
@@ -904,7 +894,6 @@ impl PivotTableModel {
         cache,
         context.current_sheet_name,
         context.current_worksheet,
-        context.current_raw_values,
         context.shared_strings,
       )
       .map_or_else(
@@ -1258,18 +1247,11 @@ fn pivot_cache_source_field_names(
   else {
     return Ok(Vec::new());
   };
-  let raw_data = worksheet_part
-    .data_as_str(package)
-    .ok()
-    .flatten()
-    .map(super::worksheet::worksheet_raw_data)
-    .unwrap_or_default();
   let worksheet = worksheet_part.root_element(package)?.clone();
   Ok(pivot_source_field_names_from_worksheet(
     &worksheet,
     source_range,
     shared_strings,
-    &raw_data.cell_values,
   ))
 }
 
@@ -1277,7 +1259,6 @@ fn pivot_cache_current_sheet_source_field_names(
   cache: &x::PivotCacheDefinition,
   current_sheet_name: &str,
   worksheet: &x::Worksheet,
-  raw_values: &HashMap<String, String>,
   shared_strings: &[SharedStringModel],
 ) -> Option<Vec<String>> {
   let x::CacheSourceChoice::WorksheetSource(source) =
@@ -1297,7 +1278,6 @@ fn pivot_cache_current_sheet_source_field_names(
     worksheet,
     source_range,
     shared_strings,
-    raw_values,
   ))
 }
 
@@ -1305,7 +1285,6 @@ fn pivot_source_field_names_from_worksheet(
   worksheet: &x::Worksheet,
   source_range: CellRange,
   shared_strings: &[SharedStringModel],
-  raw_values: &HashMap<String, String>,
 ) -> Vec<String> {
   let header_cells = worksheet
     .sheet_data
@@ -1327,7 +1306,7 @@ fn pivot_source_field_names_from_worksheet(
     .map(|col| {
       header_cells
         .get(&col)
-        .map(|cell| pivot_source_cell_value(cell, shared_strings, raw_values).text())
+        .map(|cell| pivot_source_cell_value(cell, shared_strings).text())
         .unwrap_or_default()
     })
     .collect()
@@ -1369,19 +1348,12 @@ fn pivot_source_cache_table(
   else {
     return Ok(None);
   };
-  let raw_data = worksheet_part
-    .data_as_str(package)
-    .ok()
-    .flatten()
-    .map(super::worksheet::worksheet_raw_data)
-    .unwrap_or_default();
   let worksheet = worksheet_part.root_element(package)?.clone();
   Ok(Some(PivotSourceCacheTable::from_worksheet_source(
     &worksheet,
     source_range,
     cache.record_count,
     shared_strings,
-    &raw_data.cell_values,
   )))
 }
 

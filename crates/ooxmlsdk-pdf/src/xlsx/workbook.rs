@@ -149,12 +149,6 @@ fn worksheet_sheet(
   sheet: &x::Sheet,
   context: WorkbookSheetContext<'_>,
 ) -> Result<CalcSheet> {
-  let raw_data = part
-    .data_as_str(package)
-    .ok()
-    .flatten()
-    .map(super::worksheet::worksheet_raw_data)
-    .unwrap_or_default();
   let worksheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_worksheet_part(
     package,
@@ -162,13 +156,12 @@ fn worksheet_sheet(
     WorksheetResourceImportContext {
       sheet_name: sheet.name.as_str(),
       worksheet: &worksheet,
-      raw_values: &raw_data.cell_values,
       shared_strings: context.shared_strings,
       styles: context.styles,
       date_1904: context.date_1904,
     },
   )?;
-  let mut sheet = CalcSheet::from_worksheet(
+  let sheet = CalcSheet::from_worksheet(
     SheetIdentity {
       workbook_index: context.workbook_index,
       name: sheet.name.as_str().to_string(),
@@ -179,68 +172,9 @@ fn worksheet_sheet(
     resources,
     context.shared_strings,
     context.styles,
-    &raw_data.cell_values,
     context.mso_document,
   );
-  apply_raw_page_setup(&mut sheet, &raw_data);
-  apply_raw_header_footer(&mut sheet, &raw_data);
   Ok(sheet)
-}
-
-fn apply_raw_page_setup(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawWorksheetData) {
-  // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
-  // pageSetUpPr fitToPage separately from pageSetup fitToWidth/fitToHeight.
-  if let Some(fit_to_page) = raw_data.fit_to_page {
-    sheet.metrics.settings.properties.page_setup.fit_to_page = fit_to_page;
-    sheet.page_settings.fit_to_page = fit_to_page;
-    if fit_to_page {
-      sheet.page_settings.fit_to_width = raw_data.fit_to_width.unwrap_or(1);
-      sheet.page_settings.fit_to_height = raw_data.fit_to_height.unwrap_or(1);
-      return;
-    }
-  }
-  if let Some(fit_to_width) = raw_data.fit_to_width {
-    sheet.page_settings.fit_to_width = fit_to_width;
-  }
-  if let Some(fit_to_height) = raw_data.fit_to_height {
-    sheet.page_settings.fit_to_height = fit_to_height;
-  }
-}
-
-fn apply_raw_header_footer(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawWorksheetData) {
-  let header_footer = &mut sheet.page_settings.header_footer;
-  apply_raw_header_footer_text(&mut header_footer.odd_header, raw_data.odd_header.as_ref());
-  apply_raw_header_footer_text(&mut header_footer.odd_footer, raw_data.odd_footer.as_ref());
-  apply_raw_header_footer_text(
-    &mut header_footer.even_header,
-    raw_data.even_header.as_ref(),
-  );
-  apply_raw_header_footer_text(
-    &mut header_footer.even_footer,
-    raw_data.even_footer.as_ref(),
-  );
-  apply_raw_header_footer_text(
-    &mut header_footer.first_header,
-    raw_data.first_header.as_ref(),
-  );
-  apply_raw_header_footer_text(
-    &mut header_footer.first_footer,
-    raw_data.first_footer.as_ref(),
-  );
-}
-
-fn apply_raw_header_footer_text(target: &mut Option<String>, raw: Option<&String>) {
-  if target.as_deref().is_none_or(str::is_empty)
-    || raw.is_some_and(|raw| {
-      header_footer_has_sections(raw) && !target.as_deref().is_some_and(header_footer_has_sections)
-    })
-  {
-    *target = raw.cloned();
-  }
-}
-
-fn header_footer_has_sections(text: &str) -> bool {
-  text.contains("&L") || text.contains("&C") || text.contains("&R")
 }
 
 fn chartsheet(

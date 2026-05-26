@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
 use ooxmlsdk::parts::chartsheet_part::ChartsheetPart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
-use quick_xml::escape::unescape;
-use quick_xml::events::Event;
 
 use super::comments::CommentsCatalog;
 use super::drawing::DrawingResourceCatalog;
@@ -202,20 +198,6 @@ pub(crate) struct FormulaModel {
   pub(crate) assigns_value_to_name: bool,
 }
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct RawWorksheetData {
-  pub(crate) cell_values: HashMap<String, String>,
-  pub(crate) fit_to_page: Option<bool>,
-  pub(crate) fit_to_width: Option<u32>,
-  pub(crate) fit_to_height: Option<u32>,
-  pub(crate) odd_header: Option<String>,
-  pub(crate) odd_footer: Option<String>,
-  pub(crate) even_header: Option<String>,
-  pub(crate) even_footer: Option<String>,
-  pub(crate) first_header: Option<String>,
-  pub(crate) first_footer: Option<String>,
-}
-
 impl CalcSheet {
   pub(crate) fn from_worksheet(
     identity: SheetIdentity,
@@ -223,7 +205,6 @@ impl CalcSheet {
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
     styles: &StylesCatalog,
-    raw_values: &HashMap<String, String>,
     mso_document: bool,
   ) -> Self {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
@@ -237,7 +218,7 @@ impl CalcSheet {
       page_settings,
       metrics,
       resources,
-      rows: worksheet_rows(&worksheet, shared_strings, raw_values, mso_document),
+      rows: worksheet_rows(&worksheet, shared_strings, mso_document),
     }
   }
 
@@ -821,7 +802,6 @@ impl SheetResourceCatalog {
       &pivot_table_parts,
       super::pivot::PivotTableImportContext {
         current_worksheet: context.worksheet,
-        current_raw_values: context.raw_values,
         current_sheet_name: context.sheet_name,
         shared_strings: context.shared_strings,
         styles: context.styles,
@@ -864,134 +844,14 @@ impl SheetResourceCatalog {
 pub(crate) struct WorksheetResourceImportContext<'a> {
   pub(crate) sheet_name: &'a str,
   pub(crate) worksheet: &'a x::Worksheet,
-  pub(crate) raw_values: &'a HashMap<String, String>,
   pub(crate) shared_strings: &'a [SharedStringModel],
   pub(crate) styles: &'a StylesCatalog,
   pub(crate) date_1904: bool,
 }
 
-pub(crate) fn worksheet_raw_data(xml: &str) -> RawWorksheetData {
-  let mut reader = quick_xml::Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  let mut data = RawWorksheetData::default();
-  let mut current_cell: Option<String> = None;
-  let mut in_value = false;
-  let mut header_footer_tag: Option<&'static str> = None;
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) => {
-        let name = event.name();
-        if name.as_ref().ends_with(b"c") {
-          current_cell = event
-            .attributes()
-            .flatten()
-            .find(|attr| attr.key.as_ref().ends_with(b"r"))
-            .map(|attr| String::from_utf8_lossy(attr.value.as_ref()).into_owned());
-        } else if name.as_ref().ends_with(b"v") {
-          in_value = current_cell.is_some();
-        } else if name.as_ref().ends_with(b"pageSetUpPr") {
-          data.fit_to_page = raw_bool_attribute(&event, b"fitToPage");
-        } else if name.as_ref().ends_with(b"pageSetup") {
-          data.fit_to_width = raw_u32_attribute(&event, b"fitToWidth");
-          data.fit_to_height = raw_u32_attribute(&event, b"fitToHeight");
-        } else {
-          header_footer_tag = raw_header_footer_tag(name.as_ref());
-        }
-      }
-      Ok(Event::Empty(event)) => {
-        let name = event.name();
-        if name.as_ref().ends_with(b"pageSetUpPr") {
-          data.fit_to_page = raw_bool_attribute(&event, b"fitToPage");
-        } else if name.as_ref().ends_with(b"pageSetup") {
-          data.fit_to_width = raw_u32_attribute(&event, b"fitToWidth");
-          data.fit_to_height = raw_u32_attribute(&event, b"fitToHeight");
-        }
-      }
-      Ok(Event::Text(event)) if in_value => {
-        if let Some(cell) = &current_cell {
-          data.cell_values.insert(
-            cell.clone(),
-            super::text::decode_excel_escaped_text(&String::from_utf8_lossy(event.as_ref())),
-          );
-        }
-      }
-      Ok(Event::Text(event)) => {
-        if let Some(tag) = header_footer_tag {
-          let raw = String::from_utf8_lossy(event.as_ref());
-          let text = unescape(&raw)
-            .map(|value| value.into_owned())
-            .unwrap_or_else(|_| raw.into_owned());
-          match tag {
-            "oddHeader" => data.odd_header = Some(text),
-            "oddFooter" => data.odd_footer = Some(text),
-            "evenHeader" => data.even_header = Some(text),
-            "evenFooter" => data.even_footer = Some(text),
-            "firstHeader" => data.first_header = Some(text),
-            "firstFooter" => data.first_footer = Some(text),
-            _ => {}
-          }
-        }
-      }
-      Ok(Event::End(event)) => {
-        let name = event.name();
-        if name.as_ref().ends_with(b"v") {
-          in_value = false;
-        } else if name.as_ref().ends_with(b"c") {
-          current_cell = None;
-        } else if raw_header_footer_tag(name.as_ref()).is_some() {
-          header_footer_tag = None;
-        }
-      }
-      Ok(Event::Eof) => break,
-      Err(_) => break,
-      _ => {}
-    }
-  }
-  data
-}
-
-fn raw_bool_attribute(event: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Option<bool> {
-  event
-    .attributes()
-    .flatten()
-    .find(|attr| attr.key.as_ref().ends_with(name))
-    .and_then(|attr| match attr.value.as_ref() {
-      b"1" | b"true" | b"TRUE" => Some(true),
-      b"0" | b"false" | b"FALSE" => Some(false),
-      _ => None,
-    })
-}
-
-fn raw_u32_attribute(event: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Option<u32> {
-  event
-    .attributes()
-    .flatten()
-    .find(|attr| attr.key.as_ref().ends_with(name))
-    .and_then(|attr| std::str::from_utf8(attr.value.as_ref()).ok()?.parse().ok())
-}
-
-fn raw_header_footer_tag(name: &[u8]) -> Option<&'static str> {
-  if name.ends_with(b"oddHeader") {
-    Some("oddHeader")
-  } else if name.ends_with(b"oddFooter") {
-    Some("oddFooter")
-  } else if name.ends_with(b"evenHeader") {
-    Some("evenHeader")
-  } else if name.ends_with(b"evenFooter") {
-    Some("evenFooter")
-  } else if name.ends_with(b"firstHeader") {
-    Some("firstHeader")
-  } else if name.ends_with(b"firstFooter") {
-    Some("firstFooter")
-  } else {
-    None
-  }
-}
-
 fn worksheet_rows(
   worksheet: &x::Worksheet,
   shared_strings: &[SharedStringModel],
-  raw_values: &HashMap<String, String>,
   mso_document: bool,
 ) -> Vec<CalcRow> {
   worksheet
@@ -1022,7 +882,7 @@ fn worksheet_rows(
                 row: row_index,
               }
             });
-          CalcCell::from_cell(cell, shared_strings, raw_values, Some(address))
+          CalcCell::from_cell(cell, shared_strings, Some(address))
         })
         .collect();
       CalcRow {
@@ -1095,18 +955,14 @@ impl CalcCell {
   fn from_cell(
     cell: &x::Cell,
     shared_strings: &[SharedStringModel],
-    raw_values: &HashMap<String, String>,
     resolved_address: Option<CellAddress>,
   ) -> Self {
-    let raw_value = cell
-      .cell_reference
-      .as_ref()
-      .and_then(|reference| raw_values.get(reference.as_str()));
+    let cell_value = decoded_cell_value(cell);
     let cached_value = cell
       .cell_value
       .as_ref()
       .and_then(|value| value.xml_content.as_deref())
-      .map(|value| raw_value.cloned().unwrap_or_else(|| value.to_string()));
+      .map(|_| cell_value.clone());
     Self {
       reference: resolved_address
         .map(format_cell_address_a1)
@@ -1115,10 +971,19 @@ impl CalcCell {
       data_type: cell.data_type,
       formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
       cached_value,
-      display_text: cell_text(cell, shared_strings, raw_value.map(String::as_str)),
+      display_text: cell_text(cell, shared_strings),
       rich_text_runs: cell_rich_text_runs(cell, shared_strings),
     }
   }
+}
+
+fn decoded_cell_value(cell: &x::Cell) -> String {
+  cell
+    .cell_value
+    .as_ref()
+    .and_then(|value| value.xml_content.as_deref())
+    .map(decode_excel_escaped_text)
+    .unwrap_or_default()
 }
 
 fn format_cell_address_a1(address: CellAddress) -> String {
@@ -1174,11 +1039,7 @@ fn inline_string_text(value: &x::InlineString) -> String {
   )
 }
 
-fn cell_text(
-  cell: &x::Cell,
-  shared_strings: &[SharedStringModel],
-  raw_value: Option<&str>,
-) -> String {
+fn cell_text(cell: &x::Cell, shared_strings: &[SharedStringModel]) -> String {
   match cell.data_type {
     Some(x::CellValues::SharedString) => cell
       .cell_value
@@ -1202,16 +1063,7 @@ fn cell_text(
       Some(_) => "FALSE".to_string(),
       None => String::new(),
     },
-    _ => raw_value
-      .map(ToString::to_string)
-      .or_else(|| {
-        cell
-          .cell_value
-          .as_ref()
-          .and_then(|value| value.xml_content.as_deref())
-          .map(ToString::to_string)
-      })
-      .unwrap_or_default(),
+    _ => decoded_cell_value(cell),
   }
 }
 
@@ -1256,22 +1108,5 @@ fn boolean_cell_value(value: &str) -> bool {
     "true" => true,
     "false" | "" => false,
     value => value.parse::<f64>().is_ok_and(|number| number != 0.0),
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn worksheet_raw_data_keeps_page_setup_fit_attributes() {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
-    // pageSetUpPr fitToPage and pageSetup fitToWidth/fitToHeight independently.
-    let data = worksheet_raw_data(
-      r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><pageSetup fitToWidth="1" fitToHeight="0"/></worksheet>"#,
-    );
-    assert_eq!(data.fit_to_page, Some(true));
-    assert_eq!(data.fit_to_width, Some(1));
-    assert_eq!(data.fit_to_height, Some(0));
   }
 }

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use super::import::ExcelImport;
 use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
-use super::styles::{DefinedNameBuiltin, DefinedNameRecord};
+use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
 use crate::docx::TextStyle;
 use crate::text_metrics;
@@ -24,8 +24,6 @@ const SC_VISATTR_STOP: u32 = 84;
 #[derive(Clone, Debug)]
 pub(crate) struct CalcPrintDocument<'a> {
   pub(crate) pages: Vec<CalcPrintPage<'a>>,
-  pub(crate) skipped_empty_pages: usize,
-  pub(crate) top_down: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -36,7 +34,6 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) total_pages: usize,
   pub(crate) zoom: u32,
   pub(crate) page_settings: &'a CalcPageSettings,
-  pub(crate) named_ranges: CalcPrintNamedRanges<'a>,
   pub(crate) area: Option<CellRange>,
   pub(crate) repeated_rows: Option<CellRange>,
   pub(crate) repeated_columns: Option<CellRange>,
@@ -44,26 +41,10 @@ pub(crate) struct CalcPrintPage<'a> {
   pub(crate) repeated_row_cells: Vec<CalcPrintCell<'a>>,
   pub(crate) repeated_column_cells: Vec<CalcPrintCell<'a>>,
   pub(crate) repeated_corner_cells: Vec<CalcPrintCell<'a>>,
-  pub(crate) all_cells: usize,
-  pub(crate) hidden_rows: usize,
-  pub(crate) hidden_columns: usize,
-  pub(crate) empty: bool,
-  pub(crate) merged_ranges: usize,
-  pub(crate) explicit_print_area: bool,
-  pub(crate) drawing_summary: CalcPrintDrawingSummary,
-  pub(crate) scale_mode: CalcPrintScaleMode,
-  pub(crate) auto_page_columns: usize,
-  pub(crate) auto_page_rows: usize,
-  pub(crate) forced_break_min_pages: usize,
-  pub(crate) tdf103516_adjusted: bool,
-  pub(crate) paint_ops: Vec<CalcPrintPaintOp>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CalcPrintNamedRanges<'a> {
-  pub(crate) print_areas: Vec<&'a DefinedNameRecord>,
-  pub(crate) print_titles: Vec<&'a DefinedNameRecord>,
-  pub(crate) filter_databases: Vec<&'a DefinedNameRecord>,
+pub(crate) struct CalcPrintNamedRanges {
   pub(crate) resolved_print_areas: Vec<CellRange>,
   pub(crate) repeat_rows: Option<CellRange>,
   pub(crate) repeat_columns: Option<CellRange>,
@@ -74,14 +55,10 @@ pub(crate) struct CalcPrintCell<'a> {
   pub(crate) address: CellAddress,
   pub(crate) text: Cow<'a, str>,
   pub(crate) style_index: Option<u32>,
-  pub(crate) number_format_id: Option<u32>,
-  pub(crate) number_format_code: Option<&'a str>,
   pub(crate) pivot_format_id: Option<u32>,
   pub(crate) rendered_text: String,
   pub(crate) rich_text_runs: &'a [super::workbook::SharedStringRun],
   pub(crate) number_format_state: NumberFormatRenderState,
-  pub(crate) hidden_row: bool,
-  pub(crate) hidden_column: bool,
   pub(crate) formula: bool,
 }
 
@@ -97,36 +74,10 @@ pub(crate) enum NumberFormatRenderState {
   UnsupportedFormatCode,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CalcPrintScaleMode {
-  None,
-  ScaleAll,
-  FitToWidthHeight,
-}
-
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CalcPrintDrawingSummary {
-  pub(crate) anchors: usize,
-  pub(crate) pictures: usize,
-  pub(crate) charts: usize,
-  pub(crate) graphic_frames: usize,
-  pub(crate) shapes: usize,
-  pub(crate) groups: usize,
-  pub(crate) connectors: usize,
-  pub(crate) content_parts: usize,
-  pub(crate) hidden: usize,
-  pub(crate) printable: usize,
-  pub(crate) text_len: usize,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CalcPrintPaintOp {
-  BackDrawingLayer,
-  RepeatedColumns,
-  RepeatedRows,
-  CellArea,
-  Grid,
-  FrontDrawingLayer,
+struct CalcPrintDrawingSummary {
+  anchors: usize,
+  charts: usize,
 }
 
 impl<'a> CalcPrintDocument<'a> {
@@ -135,8 +86,6 @@ impl<'a> CalcPrintDocument<'a> {
     // This is the first ScPrintFunc-shaped owner. Full range, break, and page
     // count logic lands here; display only consumes the resulting print pages.
     let mut pages = Vec::new();
-    let mut skipped_empty_pages = 0usize;
-    let mut document_top_down = true;
     let visible_sheets_with_body = import
       .sheets
       .iter()
@@ -146,9 +95,7 @@ impl<'a> CalcPrintDocument<'a> {
     for sheet in import.sheets.iter().filter(|sheet| sheet.visible()) {
       let named_ranges = CalcPrintNamedRanges::from_import(import, sheet);
       let areas = print_areas_for_sheet(import, sheet, &named_ranges);
-      let explicit_print_area = !named_ranges.resolved_print_areas.is_empty();
       let scale = print_scale_state(import, sheet, &areas, &named_ranges);
-      document_top_down &= scale.top_down;
       let keep_header_footer_only_page = visible_sheets_with_body == 0
         && sheet.page_settings.header_footer.has_print_content()
         && sheet_body_is_empty(import, sheet);
@@ -162,9 +109,6 @@ impl<'a> CalcPrintDocument<'a> {
       );
       let mut sheet_page_index = 0usize;
       for area in page_areas {
-        let all_cells = area
-          .map(|area| print_cells_for_area(import, sheet, area, false))
-          .unwrap_or_default();
         let cells = area
           .map(|area| print_cells_for_area(import, sheet, area, true))
           .unwrap_or_default();
@@ -185,24 +129,12 @@ impl<'a> CalcPrintDocument<'a> {
         // content is painted only for page ranges that survive that test. A
         // workbook made entirely of header/footer-only empty visible sheets
         // still emits one page; otherwise later empty sheets keep being hidden.
-        let empty = area.map_or(false, |area| print_area_is_empty(import, sheet, area))
+        let empty = area.is_some_and(|area| print_area_is_empty(import, sheet, area))
           && drawing_summary.anchors == 0
           && drawing_summary.charts == 0;
         if scale.skip_empty && empty && !(keep_header_footer_only_page && sheet_page_index == 0) {
-          skipped_empty_pages += 1;
           continue;
         }
-        let hidden_rows = all_cells.iter().filter(|cell| cell.hidden_row).count();
-        let hidden_columns = all_cells.iter().filter(|cell| cell.hidden_column).count();
-        let merged_ranges = area.map_or(0, |area| {
-          sheet
-            .metrics
-            .merged_ranges
-            .iter()
-            .filter_map(|reference| CellRange::parse_a1_range(reference))
-            .filter(|merged| merged.intersects(area))
-            .count()
-        });
         pages.push(CalcPrintPage {
           sheet,
           sheet_page_index,
@@ -212,30 +144,11 @@ impl<'a> CalcPrintDocument<'a> {
           page_settings: &sheet.page_settings,
           repeated_rows: named_ranges.repeat_rows,
           repeated_columns: named_ranges.repeat_columns,
-          named_ranges: named_ranges.clone(),
           area,
-          all_cells: all_cells.len(),
           cells,
           repeated_row_cells,
           repeated_column_cells,
           repeated_corner_cells,
-          hidden_rows,
-          hidden_columns,
-          empty,
-          merged_ranges,
-          explicit_print_area,
-          drawing_summary: drawing_summary.clone(),
-          scale_mode: scale.mode,
-          auto_page_columns: scale.auto_page_columns,
-          auto_page_rows: scale.auto_page_rows,
-          forced_break_min_pages: scale.forced_break_min_pages,
-          tdf103516_adjusted: scale.tdf103516_adjusted,
-          paint_ops: paint_ops_for_page(
-            named_ranges.repeat_columns.is_some(),
-            named_ranges.repeat_rows.is_some(),
-            drawing_summary.anchors > 0,
-            sheet.page_settings.print_grid_lines,
-          ),
         });
         sheet_page_index += 1;
       }
@@ -244,51 +157,13 @@ impl<'a> CalcPrintDocument<'a> {
     for page in &mut pages {
       page.total_pages = total_pages;
     }
-    Self {
-      pages,
-      skipped_empty_pages,
-      top_down: document_top_down,
-    }
+    Self { pages }
   }
-}
-
-fn paint_ops_for_page(
-  has_repeat_columns: bool,
-  has_repeat_rows: bool,
-  has_drawing_layer: bool,
-  has_grid: bool,
-) -> Vec<CalcPrintPaintOp> {
-  // Source: LibreOffice sc/source/ui/view/printfun.cxx PrintPage and
-  // PrintArea route back drawing layer before cell output, repeated areas
-  // before page-local data, grid through ScOutputData, and front drawing after.
-  let mut ops = Vec::new();
-  if has_drawing_layer {
-    ops.push(CalcPrintPaintOp::BackDrawingLayer);
-  }
-  if has_repeat_columns {
-    ops.push(CalcPrintPaintOp::RepeatedColumns);
-  }
-  if has_repeat_rows {
-    ops.push(CalcPrintPaintOp::RepeatedRows);
-  }
-  ops.push(CalcPrintPaintOp::CellArea);
-  if has_grid {
-    ops.push(CalcPrintPaintOp::Grid);
-  }
-  if has_drawing_layer {
-    ops.push(CalcPrintPaintOp::FrontDrawingLayer);
-  }
-  ops
 }
 
 #[derive(Clone, Copy, Debug)]
 struct CalcPrintScaleState {
-  mode: CalcPrintScaleMode,
   zoom: u32,
-  auto_page_columns: usize,
-  auto_page_rows: usize,
-  forced_break_min_pages: usize,
-  tdf103516_adjusted: bool,
   skip_empty: bool,
   top_down: bool,
 }
@@ -297,7 +172,7 @@ fn print_scale_state(
   import: &ExcelImport,
   sheet: &CalcSheet,
   areas: &[CellRange],
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
 ) -> CalcPrintScaleState {
   // Source: LibreOffice sc/source/ui/view/printfun.cxx InitParam,
   // UpdatePages, CalcZoom. Full page-size based CalcPages is a later bridge;
@@ -316,7 +191,6 @@ fn print_scale_state(
     .filter(|br| br.manual)
     .count()
     + 1;
-  let forced_break_min_pages = forced_break_min_columns * forced_break_min_rows;
   let fit_to_page = sheet.page_settings.fit_to_page
     || sheet.metrics.settings.properties.page_setup.fit_to_page
     || sheet.page_settings.fit_to_width != 1
@@ -336,14 +210,11 @@ fn print_scale_state(
       sheet.page_settings.fit_to_height,
     )
   };
-  let mut mode = CalcPrintScaleMode::None;
   let mut zoom = sheet.page_settings.scale;
   let mut auto_page_columns = forced_break_min_columns.max(1);
   let mut auto_page_rows = forced_break_min_rows.max(1);
-  let mut tdf103516_adjusted = false;
 
   if fit_to_page && (fit_to_width > 0 || fit_to_height > 0) {
-    mode = CalcPrintScaleMode::FitToWidthHeight;
     // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
     // PageSettingsConverter writes OOXML fitToWidth/fitToHeight directly to
     // ScaleToPagesX/Y with 0 preserved as "unlimited" for that axis.
@@ -385,26 +256,15 @@ fn print_scale_state(
         && actual_row_page_count(import, sheet, areas, named_ranges, adjusted_zoom)
           < actual_row_page_count(import, sheet, areas, named_ranges, zoom)
       {
-        tdf103516_adjusted = true;
         zoom = adjusted_zoom;
       }
     }
   } else if sheet.page_settings.scale > 0 {
-    mode = if sheet.page_settings.scale == 100 {
-      CalcPrintScaleMode::None
-    } else {
-      CalcPrintScaleMode::ScaleAll
-    };
     zoom = sheet.page_settings.scale.max(ZOOM_MIN);
   }
 
   CalcPrintScaleState {
-    mode,
     zoom,
-    auto_page_columns,
-    auto_page_rows,
-    forced_break_min_pages,
-    tdf103516_adjusted,
     skip_empty: true,
     top_down: matches!(
       sheet.page_settings.page_order,
@@ -418,7 +278,7 @@ fn actual_row_page_count(
   import: &ExcelImport,
   sheet: &CalcSheet,
   areas: &[CellRange],
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
   zoom: u32,
 ) -> usize {
   areas
@@ -442,7 +302,7 @@ fn actual_row_page_count(
 fn fit_zoom_to_pages(
   sheet: &CalcSheet,
   areas: &[CellRange],
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
   page_columns: usize,
   page_rows: usize,
 ) -> u32 {
@@ -482,7 +342,7 @@ fn fit_zoom_to_pages(
 fn fit_scale_area(
   sheet: &CalcSheet,
   area: CellRange,
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
 ) -> CellRange {
   if !named_ranges.resolved_print_areas.is_empty() {
     return area;
@@ -519,24 +379,6 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
       continue;
     }
     summary.anchors += 1;
-    summary.printable += usize::from(anchor.print_with_sheet);
-    summary.hidden += usize::from(anchor.object.hidden);
-    summary.text_len += anchor.object.text_len
-      + anchor.object.name.as_ref().map_or(0, |value| value.len())
-      + anchor
-        .object
-        .description
-        .as_ref()
-        .map_or(0, |value| value.len());
-    match anchor.object.kind {
-      super::drawing::DrawingObjectKind::Shape => summary.shapes += 1,
-      super::drawing::DrawingObjectKind::GroupShape => summary.groups += 1,
-      super::drawing::DrawingObjectKind::GraphicFrame => summary.graphic_frames += 1,
-      super::drawing::DrawingObjectKind::ConnectionShape => summary.connectors += 1,
-      super::drawing::DrawingObjectKind::Picture => summary.pictures += 1,
-      super::drawing::DrawingObjectKind::ContentPart => summary.content_parts += 1,
-      super::drawing::DrawingObjectKind::Unknown => {}
-    }
   }
   // Source: LibreOffice sc/source/filter/oox/drawingfragment.cxx imports VML
   // client shapes into the sheet draw layer; sc/source/core/data/documen9.cxx
@@ -552,14 +394,6 @@ fn drawing_summary_for_area(sheet: &CalcSheet, area: Option<CellRange>) -> CalcP
       continue;
     }
     summary.anchors += 1;
-    summary.printable += usize::from(shape.print_object && !shape.hidden);
-    summary.hidden += usize::from(shape.hidden);
-    summary.text_len += shape.text.len();
-    if shape.image_relationship_id.is_some() {
-      summary.pictures += 1;
-    } else {
-      summary.shapes += 1;
-    }
   }
   summary.charts = sheet
     .resources
@@ -591,8 +425,8 @@ fn anchor_belongs_to_area(
   }
 }
 
-impl<'a> CalcPrintNamedRanges<'a> {
-  fn from_import(import: &'a ExcelImport, sheet: &CalcSheet) -> Self {
+impl CalcPrintNamedRanges {
+  fn from_import(import: &ExcelImport, sheet: &CalcSheet) -> Self {
     // Source: LibreOffice sc/source/filter/oox/defnamesbuffer.cxx
     // DefinedName::convertFormula extracts print areas, repeated titles, and
     // filter database ranges after the defined-name formula token model exists.
@@ -604,9 +438,6 @@ impl<'a> CalcPrintNamedRanges<'a> {
     let print_titles = import
       .defined_names
       .records_for_sheet(sheet.workbook_index, DefinedNameBuiltin::PrintTitles);
-    let filter_databases = import
-      .defined_names
-      .records_for_sheet(sheet.workbook_index, DefinedNameBuiltin::FilterDatabase);
     let resolved_print_areas = print_areas
       .iter()
       .flat_map(|record| parse_defined_name_ranges(&record.formula))
@@ -620,23 +451,10 @@ impl<'a> CalcPrintNamedRanges<'a> {
           (rows, columns)
         });
     Self {
-      print_areas,
-      print_titles,
-      filter_databases,
       resolved_print_areas,
       repeat_rows,
       repeat_columns,
     }
-  }
-
-  pub(crate) fn unresolved_formula_count(&self) -> usize {
-    self
-      .print_areas
-      .iter()
-      .chain(&self.print_titles)
-      .chain(&self.filter_databases)
-      .filter(|record| !record.formula.is_empty())
-      .count()
   }
 }
 
@@ -656,7 +474,7 @@ fn anchor_intersects_area(
 fn print_areas_for_sheet(
   import: &ExcelImport,
   sheet: &CalcSheet,
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
 ) -> Vec<CellRange> {
   if !named_ranges.resolved_print_areas.is_empty() {
     return named_ranges
@@ -1290,7 +1108,7 @@ fn page_areas_for_sheet(
   import: &ExcelImport,
   sheet: &CalcSheet,
   print_areas: &[CellRange],
-  named_ranges: &CalcPrintNamedRanges<'_>,
+  named_ranges: &CalcPrintNamedRanges,
   zoom: u32,
   top_down: bool,
 ) -> Vec<Option<CellRange>> {
@@ -1697,14 +1515,10 @@ fn print_cells_for_area<'a>(
         address: print_address,
         text: Cow::Borrowed(cell.display_text.as_str()),
         style_index,
-        number_format_id,
-        number_format_code,
         pivot_format_id,
         rendered_text,
         rich_text_runs: &cell.rich_text_runs,
         number_format_state,
-        hidden_row: row.hidden,
-        hidden_column,
         formula: cell.formula.is_some(),
       });
     }
@@ -1771,14 +1585,10 @@ fn pivot_virtual_print_cells<'a>(
           address,
           text: Cow::Owned(text.clone()),
           style_index: None,
-          number_format_id: None,
-          number_format_code: None,
           pivot_format_id: None,
           rendered_text: text,
           rich_text_runs: &[],
           number_format_state: NumberFormatRenderState::Raw,
-          hidden_row: false,
-          hidden_column: false,
           formula: false,
         });
       }
@@ -2017,10 +1827,10 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
   // keeping Excel's persisted generic "Row Labels"/"(blank)" strings.
   if pivot.calculated_only_data_fields {
     let table_start = pivot.output_geometry.table_start;
-    if address == table_start {
-      if let Some(label) = pivot_row_label_text(pivot) {
-        return label;
-      }
+    if address == table_start
+      && let Some(label) = pivot_row_label_text(pivot)
+    {
+      return label;
     }
     if address.row == table_start.row && address.col > table_start.col {
       return "(empty)".to_string();
@@ -2049,11 +1859,7 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
       "Total Result".to_string()
     }
     "Total general" => "Total Result".to_string(),
-    "Total" => pivot
-      .data_field_names
-      .first()
-      .cloned()
-      .unwrap_or_else(|| text),
+    "Total" => pivot.data_field_names.first().cloned().unwrap_or(text),
     "Row Labels" => pivot_row_label_text(pivot).unwrap_or(text),
     "Column Labels" => pivot_column_label_text(pivot).unwrap_or(text),
     "(blank)" => "(empty)".to_string(),

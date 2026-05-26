@@ -440,17 +440,6 @@ impl HeaderFooterModel {
       + self.first_header.as_ref().map_or(0, |value| value.len())
       + self.first_footer.as_ref().map_or(0, |value| value.len())
   }
-
-  pub(crate) fn flag_count(&self) -> usize {
-    usize::from(self.different_odd_even)
-      + usize::from(self.different_first)
-      + usize::from(self.scale_with_doc)
-      + usize::from(self.align_with_margins)
-      + usize::from(self.legacy_drawing_relationship_id.is_some())
-      + usize::from(self.drawing_relationship_id.is_some())
-      + usize::from(self.background_picture_relationship_id.is_some())
-  }
-
   pub(crate) fn has_print_content(&self) -> bool {
     self.text_len() > 0
       || self.legacy_drawing_relationship_id.is_some()

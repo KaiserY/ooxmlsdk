@@ -22,7 +22,8 @@ pub(crate) fn recalculate_formula_cells(
   for _ in 0..12 {
     let book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
     let mut changed = false;
-    for sheet_index in 0..sheets.len() {
+    let mut sheet_index = 0;
+    while sheet_index < sheets.len() {
       let formulas = formula_cells(&sheets[sheet_index]);
       for formula_cell in formulas {
         let mut evaluator = Evaluator {
@@ -54,6 +55,7 @@ pub(crate) fn recalculate_formula_cells(
           changed = true;
         }
       }
+      sheet_index += 1;
     }
     if !changed {
       break;
@@ -182,7 +184,8 @@ fn formula_cells(sheet: &CalcSheet) -> Vec<FormulaCell> {
 
 fn apply_named_array_formulas(sheets: &mut [CalcSheet], defined: &DefinedNames) {
   let book = FormulaBook::from_sheets(sheets, defined, &WorkbookCatalog::default());
-  for sheet_index in 0..sheets.len() {
+  let mut sheet_index = 0;
+  while sheet_index < sheets.len() {
     let cells = formula_addresses(&sheets[sheet_index]);
     for address in cells {
       let Some((formula, reference)) = cell_formula_and_reference(&sheets[sheet_index], address)
@@ -210,6 +213,7 @@ fn apply_named_array_formulas(sheets: &mut [CalcSheet], defined: &DefinedNames) 
         }
       }
     }
+    sheet_index += 1;
   }
 }
 
@@ -1498,7 +1502,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     // LET takes name/value pairs followed by a final calculation. Duplicate
     // names inside one LET are illegal, and the bindings are scoped to the
     // current LET expression.
-    if args.len() < 3 || args.len() % 2 == 0 {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
       return Some(Value::Error("#VALUE!".to_string()));
     }
     let mut local_names = HashSet::new();
@@ -1634,7 +1638,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     aggregate_function_value(
       self.evaluator.book,
       function.rem_euclid(100),
-      &args.get(1..).unwrap_or_default(),
+      args.get(1..).unwrap_or_default(),
       None,
       options,
     )
@@ -2192,7 +2196,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     let right = value_numbers(self.evaluator.book, args.get(1)?);
     let tails = args.get(2)?.number(self.evaluator.book)? as i32;
     let test_type = args.get(3)?.number(self.evaluator.book)? as i32;
-    if left.is_empty() || right.is_empty() || tails < 1 || tails > 2 {
+    if left.is_empty() || right.is_empty() || !(1..=2).contains(&tails) {
       return Some(Value::Error("#NUM!".to_string()));
     }
     let mean_left = mean(&left)?;
@@ -3761,7 +3765,8 @@ fn norm_s_inv(p: f64) -> f64 {
       + 5.463784911164114)
       * t
       + 6.657904643501104)
-      / (((((((t * 2.0442631033899397e-15 + 1.4215117583164459e-7) * t + 1.8463183175100547e-5)
+      / (((((((t * 2.0442631033899397e-15 + 1.421_511_758_316_446e-7) * t
+        + 1.8463183175100547e-5)
         * t
         + 7.868691311456133e-4)
         * t
@@ -4682,7 +4687,7 @@ mod tests {
     for (formula, expected) in [
       ("AGGREGATE(1,0,Sheet2!C1:C11)", 49.0),
       ("AGGREGATE(1,1,Sheet2!C1:C11)", 43.125),
-      ("AGGREGATE(1,4,Sheet2!C1:C11)", 49.504132231404952),
+      ("AGGREGATE(1,4,Sheet2!C1:C11)", 49.504_132_231_404_95),
       ("AGGREGATE(1,6,Sheet2!E1:E11)", 43.0),
       ("AGGREGATE(14,0,Sheet2!C1:C11,2)", 77.0),
       ("AGGREGATE(15,0,Sheet2!C1:C11,2)", 28.0),

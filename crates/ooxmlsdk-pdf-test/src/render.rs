@@ -6,11 +6,13 @@ use ooxmlsdk_pdf::{PdfOptions, convert_docx, convert_pptx, convert_xlsx};
 use crate::Result;
 
 pub fn render_fixture_pdf(fixture: &Path) -> Result<Vec<u8>> {
-  let mut options = PdfOptions::default();
-  options.source_file_name = fixture
-    .file_name()
-    .and_then(|name| name.to_str())
-    .map(ToString::to_string);
+  let options = PdfOptions {
+    source_file_name: fixture
+      .file_name()
+      .and_then(|name| name.to_str())
+      .map(ToString::to_string),
+    ..PdfOptions::default()
+  };
   render_fixture_pdf_with_options(fixture, options)
 }
 

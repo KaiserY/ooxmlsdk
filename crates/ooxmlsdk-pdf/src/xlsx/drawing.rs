@@ -253,11 +253,11 @@ impl DrawingResourceCatalog {
       anchors,
       charts: chart_parts
         .iter()
-        .map(|chart| ChartResourceCatalog::from_chart_part(package, &chart))
+        .map(|chart| ChartResourceCatalog::from_chart_part(package, chart))
         .collect::<Result<Vec<_>>>()?,
       extended_charts: extended_chart_parts
         .iter()
-        .map(|chart| ChartResourceCatalog::from_extended_chart_part(package, &chart))
+        .map(|chart| ChartResourceCatalog::from_extended_chart_part(package, chart))
         .collect::<Result<Vec<_>>>()?,
       diagrams,
       images,
@@ -270,19 +270,6 @@ impl DrawingResourceCatalog {
 
   pub(crate) fn chart_count(&self) -> usize {
     self.charts.len() + self.extended_charts.len()
-  }
-
-  pub(crate) fn diagram_resource_count(&self) -> usize {
-    self.diagrams.resource_count()
-  }
-
-  pub(crate) fn chart_child_resource_count(&self) -> usize {
-    self
-      .charts
-      .iter()
-      .chain(self.extended_charts.iter())
-      .map(ChartResourceCatalog::child_resource_count)
-      .sum()
   }
 }
 
@@ -341,12 +328,12 @@ impl DrawingAnchorModel {
           .client_data
           .lock_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::OneCellAnchor(anchor) => Self {
         kind: DrawingAnchorKind::OneCell,
@@ -364,12 +351,12 @@ impl DrawingAnchorModel {
           .client_data
           .lock_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::AbsoluteAnchor(anchor) => Self {
         kind: DrawingAnchorKind::Absolute,
@@ -387,12 +374,12 @@ impl DrawingAnchorModel {
           .client_data
           .lock_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
         print_with_sheet: anchor
           .client_data
           .print_with_sheet
           .as_ref()
-          .map_or(true, |value| value.as_bool()),
+          .is_none_or(|value| value.as_bool()),
       },
       xdr::WorksheetDrawingChoice::XmlAny(value) => Self {
         kind: DrawingAnchorKind::Absolute,
@@ -958,33 +945,25 @@ impl DiagramResourceCatalog {
     Ok(Self {
       data_parts: data_parts
         .iter()
-        .map(|part| DiagramDataCatalog::from_part(package, &part))
+        .map(|part| DiagramDataCatalog::from_part(package, part))
         .collect::<Result<Vec<_>>>()?,
       layout_parts: layout_parts
         .iter()
-        .map(|part| DiagramLayoutCatalog::from_part(package, &part))
+        .map(|part| DiagramLayoutCatalog::from_part(package, part))
         .collect::<Result<Vec<_>>>()?,
       style_parts: style_parts
         .iter()
-        .map(|part| DiagramStyleCatalog::from_part(package, &part))
+        .map(|part| DiagramStyleCatalog::from_part(package, part))
         .collect::<Result<Vec<_>>>()?,
       color_parts: color_parts
         .iter()
-        .map(|part| DiagramColorCatalog::from_part(package, &part))
+        .map(|part| DiagramColorCatalog::from_part(package, part))
         .collect::<Result<Vec<_>>>()?,
       drawing_parts: drawing_parts
         .iter()
-        .map(|part| DiagramDrawingCatalog::from_part(package, &part))
+        .map(|part| DiagramDrawingCatalog::from_part(package, part))
         .collect::<Result<Vec<_>>>()?,
     })
-  }
-
-  pub(crate) fn resource_count(&self) -> usize {
-    self.data_parts.len()
-      + self.layout_parts.len()
-      + self.style_parts.len()
-      + self.color_parts.len()
-      + self.drawing_parts.len()
   }
 }
 
@@ -1242,16 +1221,6 @@ impl ChartResourceCatalog {
       ..model
     })
   }
-
-  pub(crate) fn child_resource_count(&self) -> usize {
-    usize::from(self.has_chart_drawing)
-      + usize::from(self.has_embedded_package)
-      + self.images
-      + usize::from(self.has_theme_override)
-      + self.styles
-      + self.color_styles
-  }
-
   fn from_chart_space(relationship_id: Option<String>, chart_space: &c::ChartSpace) -> Self {
     let chart = &chart_space.chart;
     let plot_area = &chart.plot_area;

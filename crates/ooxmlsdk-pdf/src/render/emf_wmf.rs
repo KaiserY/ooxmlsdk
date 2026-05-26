@@ -197,19 +197,17 @@ pub(crate) fn extract_metafile_text_runs(
       EMR_EXT_TEXTOUT_W => {
         if let Some(text) = extract_emr_ext_text_out_w(data, pos, record_size)
           && !text.trim().is_empty()
+          && let Some(run) = state.text_run(data, pos, record_size, text)
         {
-          if let Some(run) = state.text_run(data, pos, record_size, text) {
-            runs.push(run);
-          }
+          runs.push(run);
         }
       }
       EMR_EXT_TEXTOUT_A => {
         if let Some(text) = extract_emr_ext_text_out_a(data, pos, record_size)
           && !text.trim().is_empty()
+          && let Some(run) = state.text_run(data, pos, record_size, text)
         {
-          if let Some(run) = state.text_run(data, pos, record_size, text) {
-            runs.push(run);
-          }
+          runs.push(run);
         }
       }
       EMR_EOF => break,

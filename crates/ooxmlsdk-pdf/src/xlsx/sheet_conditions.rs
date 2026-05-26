@@ -343,7 +343,7 @@ impl ExtendedConditionalFormatRuleModel {
       rank: rule.rank,
       std_dev: rule.standard_deviation,
       id: rule.id.clone(),
-      formulas: rule.formula.iter().cloned().collect(),
+      formulas: rule.formula.to_vec(),
       has_color_scale: rule.color_scale.is_some(),
       has_data_bar: rule.data_bar.is_some(),
       has_icon_set: rule.icon_set.is_some(),

@@ -15,19 +15,6 @@ pub(crate) struct StylesCatalog {
   pub(crate) fill_records: Vec<FillRecord>,
   pub(crate) border_records: Vec<BorderRecord>,
   pub(crate) differential_format_records: Vec<DifferentialFormatRecord>,
-  pub(crate) indexed_colors: Vec<RgbColor>,
-  pub(crate) fonts: usize,
-  pub(crate) fills: usize,
-  pub(crate) borders: usize,
-  pub(crate) cell_style_formats: usize,
-  pub(crate) cell_formats: usize,
-  pub(crate) cell_styles: usize,
-  pub(crate) differential_formats: usize,
-  pub(crate) table_styles: usize,
-  pub(crate) default_table_style: Option<String>,
-  pub(crate) default_pivot_style: Option<String>,
-  pub(crate) has_colors: bool,
-  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,8 +40,6 @@ pub(crate) struct CellFormatRecord {
   pub(crate) apply_protection: bool,
   pub(crate) has_alignment: bool,
   pub(crate) alignment: Option<AlignmentRecord>,
-  pub(crate) has_protection: bool,
-  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -88,8 +73,6 @@ pub(crate) struct DifferentialFormatRecord {
   pub(crate) border: Option<BorderRecord>,
   pub(crate) alignment: Option<AlignmentRecord>,
   pub(crate) number_format: Option<NumberFormatRecord>,
-  pub(crate) has_protection: bool,
-  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -132,7 +115,6 @@ impl StylesCatalog {
   }
 
   fn from_stylesheet(stylesheet: &x::Stylesheet) -> Self {
-    let table_styles = stylesheet.table_styles.as_ref();
     let indexed_colors = stylesheet
       .colors
       .as_ref()
@@ -231,40 +213,6 @@ impl StylesCatalog {
             .collect()
         })
         .unwrap_or_default(),
-      indexed_colors,
-      fonts: stylesheet
-        .fonts
-        .as_ref()
-        .map_or(0, |fonts| fonts.font.len()),
-      fills: stylesheet
-        .fills
-        .as_ref()
-        .map_or(0, |fills| fills.fill.len()),
-      borders: stylesheet
-        .borders
-        .as_ref()
-        .map_or(0, |borders| borders.border.len()),
-      cell_style_formats: stylesheet
-        .cell_style_formats
-        .as_ref()
-        .map_or(0, |formats| formats.cell_format.len()),
-      cell_formats: stylesheet
-        .cell_formats
-        .as_ref()
-        .map_or(0, |formats| formats.cell_format.len()),
-      cell_styles: stylesheet
-        .cell_styles
-        .as_ref()
-        .map_or(0, |styles| styles.cell_style.len()),
-      differential_formats: stylesheet
-        .differential_formats
-        .as_ref()
-        .map_or(0, |formats| formats.differential_format.len()),
-      table_styles: table_styles.map_or(0, |styles| styles.table_style.len()),
-      default_table_style: table_styles.and_then(|styles| styles.default_table_style.clone()),
-      default_pivot_style: table_styles.and_then(|styles| styles.default_pivot_style.clone()),
-      has_colors: stylesheet.colors.is_some(),
-      has_extensions: stylesheet.stylesheet_extension_list.is_some(),
     }
   }
 
@@ -451,14 +399,6 @@ impl StylesCatalog {
       .and_then(|format| format.alignment)
   }
 
-  pub(crate) fn differential_format_flag_count(&self) -> usize {
-    self
-      .differential_format_records
-      .iter()
-      .map(DifferentialFormatRecord::used_flag_count)
-      .sum()
-  }
-
   pub(crate) fn borders_for_cell(&self, style_index: Option<u32>) -> BorderRecord {
     let Some(format) = self.effective_cell_format(style_index) else {
       return BorderRecord::default();
@@ -569,23 +509,7 @@ impl CellFormatRecord {
         .alignment
         .as_ref()
         .map(AlignmentRecord::from_alignment),
-      has_protection: format.protection.is_some(),
-      has_extensions: format.extension_list.is_some(),
     }
-  }
-
-  pub(crate) fn used_flag_count(&self) -> usize {
-    usize::from(self.apply_number_format)
-      + usize::from(self.apply_font)
-      + usize::from(self.apply_fill)
-      + usize::from(self.apply_border)
-      + usize::from(self.apply_alignment)
-      + usize::from(self.apply_protection)
-      + usize::from(self.quote_prefix)
-      + usize::from(self.pivot_button)
-      + usize::from(self.has_alignment)
-      + usize::from(self.has_protection)
-      + usize::from(self.has_extensions)
   }
 }
 
@@ -595,13 +519,13 @@ impl FontRecord {
     for choice in &font.font_choice {
       match choice {
         x::FontChoice::Bold(value) => {
-          record.bold = value.val.map_or(true, |value| value.as_bool());
+          record.bold = value.val.is_none_or(|value| value.as_bool());
         }
         x::FontChoice::Italic(value) => {
-          record.italic = value.val.map_or(true, |value| value.as_bool());
+          record.italic = value.val.is_none_or(|value| value.as_bool());
         }
         x::FontChoice::Strike(value) => {
-          record.strikethrough = value.val.map_or(true, |value| value.as_bool());
+          record.strikethrough = value.val.is_none_or(|value| value.as_bool());
         }
         x::FontChoice::Underline(value) => {
           record.underline = !matches!(value.val, Some(x::UnderlineValues::None));
@@ -620,16 +544,6 @@ impl FontRecord {
     }
     record
   }
-
-  fn used_flag_count(&self) -> usize {
-    usize::from(self.name.is_some())
-      + usize::from(self.size_pt.is_some())
-      + usize::from(self.color.is_some())
-      + usize::from(self.bold)
-      + usize::from(self.italic)
-      + usize::from(self.underline)
-      + usize::from(self.strikethrough)
-  }
 }
 
 impl FillRecord {
@@ -642,10 +556,6 @@ impl FillRecord {
       None => None,
     };
     Self { color }
-  }
-
-  fn used_flag_count(&self) -> usize {
-    usize::from(self.color.is_some())
   }
 }
 
@@ -669,13 +579,6 @@ impl BorderRecord {
         .as_deref()
         .and_then(|border| border_style(border.style, border.color.as_ref(), indexed_colors)),
     }
-  }
-
-  fn used_flag_count(&self) -> usize {
-    usize::from(self.left.is_some())
-      + usize::from(self.right.is_some())
-      + usize::from(self.top.is_some())
-      + usize::from(self.bottom.is_some())
   }
 }
 
@@ -708,25 +611,7 @@ impl DifferentialFormatRecord {
           id: format.number_format_id,
           code: format.format_code.clone(),
         }),
-      has_protection: format.protection.is_some(),
-      has_extensions: format.extension_list.is_some(),
     }
-  }
-
-  fn used_flag_count(&self) -> usize {
-    self.font.as_ref().map_or(0, FontRecord::used_flag_count)
-      + self.fill.as_ref().map_or(0, FillRecord::used_flag_count)
-      + self
-        .border
-        .as_ref()
-        .map_or(0, BorderRecord::used_flag_count)
-      + self
-        .alignment
-        .as_ref()
-        .map_or(0, AlignmentRecord::used_flag_count)
-      + usize::from(self.number_format.is_some())
-      + usize::from(self.has_protection)
-      + usize::from(self.has_extensions)
   }
 }
 
@@ -761,18 +646,6 @@ impl AlignmentRecord {
       shrink_to_fit: alignment.shrink_to_fit.is_some_and(|value| value.as_bool()),
       reading_order: alignment.reading_order,
     }
-  }
-
-  fn used_flag_count(&self) -> usize {
-    usize::from(self.horizontal.is_some())
-      + usize::from(self.vertical.is_some())
-      + usize::from(self.text_rotation.is_some())
-      + usize::from(self.wrap_text)
-      + usize::from(self.indent.is_some())
-      + usize::from(self.relative_indent.is_some())
-      + usize::from(self.justify_last_line)
-      + usize::from(self.shrink_to_fit)
-      + usize::from(self.reading_order.is_some())
   }
 }
 

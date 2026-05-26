@@ -363,18 +363,21 @@ fn shape_with_fallback(
     let font_index = font_for_char(&parsed_faces, ch)?;
     if active_font.is_some_and(|active| active != font_index) {
       shape_fallback_segment(
-        fonts,
-        text,
-        start,
-        index,
-        active_font.unwrap_or(font_index),
-        font_size,
-        character_spacing_pt,
-        script,
-        text_offset,
-        &mut glyphs,
-        &mut font_faces,
-        &mut width_pt,
+        FallbackSegment {
+          fonts,
+          text,
+          range: start..index,
+          source_font_index: active_font.unwrap_or(font_index),
+          font_size,
+          character_spacing_pt,
+          script,
+          text_offset,
+        },
+        &mut FallbackShapeOutput {
+          glyphs: &mut glyphs,
+          font_faces: &mut font_faces,
+          width_pt: &mut width_pt,
+        },
       )?;
       start = index;
     }
@@ -382,18 +385,21 @@ fn shape_with_fallback(
   }
   if start < text.len() {
     shape_fallback_segment(
-      fonts,
-      text,
-      start,
-      text.len(),
-      active_font?,
-      font_size,
-      character_spacing_pt,
-      script,
-      text_offset,
-      &mut glyphs,
-      &mut font_faces,
-      &mut width_pt,
+      FallbackSegment {
+        fonts,
+        text,
+        range: start..text.len(),
+        source_font_index: active_font?,
+        font_size,
+        character_spacing_pt,
+        script,
+        text_offset,
+      },
+      &mut FallbackShapeOutput {
+        glyphs: &mut glyphs,
+        font_faces: &mut font_faces,
+        width_pt: &mut width_pt,
+      },
     )?;
   }
 
@@ -404,36 +410,44 @@ fn shape_with_fallback(
   })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn shape_fallback_segment(
-  fonts: &[FontMetrics],
-  text: &str,
-  start: usize,
-  end: usize,
+struct FallbackSegment<'a> {
+  fonts: &'a [FontMetrics],
+  text: &'a str,
+  range: std::ops::Range<usize>,
   source_font_index: usize,
   font_size: f32,
   character_spacing_pt: f32,
   script: UnicodeScriptValue,
   text_offset: usize,
-  glyphs: &mut Vec<ShapedGlyph>,
-  font_faces: &mut Vec<FontFaceData>,
-  width_pt: &mut f32,
+}
+
+struct FallbackShapeOutput<'a> {
+  glyphs: &'a mut Vec<ShapedGlyph>,
+  font_faces: &'a mut Vec<FontFaceData>,
+  width_pt: &'a mut f32,
+}
+
+fn shape_fallback_segment(
+  segment: FallbackSegment<'_>,
+  output: &mut FallbackShapeOutput<'_>,
 ) -> Option<()> {
-  let font = fonts.get(source_font_index)?;
-  let target_font_index = font_faces.len();
-  font_faces.push(font.face.clone());
+  let font = segment.fonts.get(segment.source_font_index)?;
+  let target_font_index = output.font_faces.len();
+  output.font_faces.push(font.face.clone());
   let mut shaped = font.shape(
-    &text[start..end],
-    font_size,
-    character_spacing_pt,
-    script,
-    text_offset + start,
+    &segment.text[segment.range.clone()],
+    segment.font_size,
+    segment.character_spacing_pt,
+    segment.script,
+    segment.text_offset + segment.range.start,
   )?;
-  *width_pt += shaped.width_pt;
-  glyphs.extend(shaped.glyphs.drain(..).map(|mut glyph| {
-    glyph.font_index = target_font_index;
-    glyph
-  }));
+  *output.width_pt += shaped.width_pt;
+  output
+    .glyphs
+    .extend(shaped.glyphs.drain(..).map(|mut glyph| {
+      glyph.font_index = target_font_index;
+      glyph
+    }));
   Some(())
 }
 

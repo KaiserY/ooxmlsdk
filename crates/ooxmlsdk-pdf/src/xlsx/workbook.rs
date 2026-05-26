@@ -10,7 +10,9 @@ use crate::error::Result;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
 use super::text::decode_excel_escaped_text;
-use super::worksheet::{CalcSheet, SheetResourceCatalog};
+use super::worksheet::{
+  CalcSheet, SheetIdentity, SheetResourceCatalog, WorksheetResourceImportContext,
+};
 
 #[derive(Debug)]
 pub(crate) struct WorkbookFragment {
@@ -94,13 +96,15 @@ impl WorkbookFragment {
             package,
             part,
             sheet,
-            workbook_index,
-            state,
-            active_workbook_sheet == Some(workbook_index),
-            &self.shared_strings,
-            &self.styles,
-            date_1904,
-            mso_document,
+            WorkbookSheetContext {
+              workbook_index,
+              state,
+              active: active_workbook_sheet == Some(workbook_index),
+              shared_strings: &self.shared_strings,
+              styles: &self.styles,
+              date_1904,
+              mso_document,
+            },
           );
         }
 
@@ -118,30 +122,32 @@ impl WorkbookFragment {
           );
         }
 
-        Ok(CalcSheet::unresolved(
+        Ok(CalcSheet::unresolved(SheetIdentity {
           workbook_index,
-          sheet.name.as_str().to_string(),
-          sheet.sheet_id,
-          rel_id.to_string(),
+          name: sheet.name.as_str().to_string(),
           state,
-          active_workbook_sheet == Some(workbook_index),
-        ))
+          active: active_workbook_sheet == Some(workbook_index),
+        }))
       })
       .collect()
   }
+}
+
+struct WorkbookSheetContext<'a> {
+  workbook_index: usize,
+  state: Option<x::SheetStateValues>,
+  active: bool,
+  shared_strings: &'a [SharedStringModel],
+  styles: &'a StylesCatalog,
+  date_1904: bool,
+  mso_document: bool,
 }
 
 fn worksheet_sheet(
   package: &mut SpreadsheetDocument,
   part: &WorksheetPart,
   sheet: &x::Sheet,
-  workbook_index: usize,
-  state: Option<x::SheetStateValues>,
-  active: bool,
-  shared_strings: &[SharedStringModel],
-  styles: &StylesCatalog,
-  date_1904: bool,
-  mso_document: bool,
+  context: WorkbookSheetContext<'_>,
 ) -> Result<CalcSheet> {
   let raw_data = part
     .data_as_str(package)
@@ -153,26 +159,28 @@ fn worksheet_sheet(
   let resources = SheetResourceCatalog::from_worksheet_part(
     package,
     part,
-    sheet.name.as_str(),
-    &worksheet,
-    &raw_data.cell_values,
-    shared_strings,
-    styles,
-    date_1904,
+    WorksheetResourceImportContext {
+      sheet_name: sheet.name.as_str(),
+      worksheet: &worksheet,
+      raw_values: &raw_data.cell_values,
+      shared_strings: context.shared_strings,
+      styles: context.styles,
+      date_1904: context.date_1904,
+    },
   )?;
   let mut sheet = CalcSheet::from_worksheet(
-    workbook_index,
-    sheet.name.as_str().to_string(),
-    sheet.sheet_id,
-    sheet.id.as_str().to_string(),
-    state,
-    active,
+    SheetIdentity {
+      workbook_index: context.workbook_index,
+      name: sheet.name.as_str().to_string(),
+      state: context.state,
+      active: context.active,
+    },
     worksheet,
     resources,
-    shared_strings,
-    styles,
+    context.shared_strings,
+    context.styles,
     &raw_data.cell_values,
-    mso_document,
+    context.mso_document,
   );
   apply_raw_page_setup(&mut sheet, &raw_data);
   apply_raw_header_footer(&mut sheet, &raw_data);
@@ -246,12 +254,12 @@ fn chartsheet(
   let chartsheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_chartsheet_part(package, part)?;
   Ok(CalcSheet::from_chartsheet(
-    workbook_index,
-    sheet.name.as_str().to_string(),
-    sheet.sheet_id,
-    sheet.id.as_str().to_string(),
-    state,
-    active,
+    SheetIdentity {
+      workbook_index,
+      name: sheet.name.as_str().to_string(),
+      state,
+      active,
+    },
     chartsheet,
     resources,
   ))
@@ -310,13 +318,13 @@ fn shared_string_run(run: &x::Run) -> SharedStringRun {
     for choice in &properties.run_properties_choice {
       match choice {
         x::RunPropertiesChoice::Bold(value) => {
-          model.bold = value.val.map_or(true, |value| value.as_bool());
+          model.bold = value.val.is_none_or(|value| value.as_bool());
         }
         x::RunPropertiesChoice::Italic(value) => {
-          model.italic = value.val.map_or(true, |value| value.as_bool());
+          model.italic = value.val.is_none_or(|value| value.as_bool());
         }
         x::RunPropertiesChoice::Strike(value) => {
-          model.strikethrough = value.val.map_or(true, |value| value.as_bool());
+          model.strikethrough = value.val.is_none_or(|value| value.as_bool());
         }
         x::RunPropertiesChoice::Underline(value) => {
           model.underline = !matches!(value.val, Some(x::UnderlineValues::None));

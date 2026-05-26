@@ -74,21 +74,6 @@ impl CommentsCatalog {
         .collect::<Result<Vec<_>>>()?,
     })
   }
-
-  pub(crate) fn legacy_count(&self) -> usize {
-    self
-      .legacy
-      .as_ref()
-      .map_or(0, |legacy| legacy.comments.len())
-  }
-
-  pub(crate) fn threaded_count(&self) -> usize {
-    self
-      .threaded
-      .iter()
-      .map(|threaded| threaded.comments.len())
-      .sum()
-  }
 }
 
 impl LegacyCommentsCatalog {

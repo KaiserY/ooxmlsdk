@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use ooxmlsdk::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart;
 use ooxmlsdk::parts::pivot_table_part::PivotTablePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
@@ -14,28 +13,6 @@ use super::workbook::SharedStringModel;
 use super::worksheet::{CalcSheet, CellAddress, CellRange};
 use crate::docx::{BorderStyle, RgbColor};
 use crate::error::Result;
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct PivotCacheCatalog {
-  pub(crate) caches: Vec<PivotCacheModel>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct PivotCacheModel {
-  pub(crate) relationship_id: Option<String>,
-  pub(crate) workbook_cache_id: Option<u32>,
-  pub(crate) workbook_relationship_id: Option<String>,
-  pub(crate) definition_relationship_id: Option<String>,
-  pub(crate) cache_fields: usize,
-  pub(crate) record_count: Option<u32>,
-  pub(crate) refresh_on_load: bool,
-  pub(crate) save_data: Option<bool>,
-  pub(crate) invalid: bool,
-  pub(crate) has_records_part: bool,
-  pub(crate) has_cache_source: bool,
-  pub(crate) has_extensions: bool,
-  pub(crate) optional_child_count: usize,
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct PivotTableCatalog {
@@ -864,96 +841,26 @@ pub(crate) enum PivotDataLayoutAxis {
   Hidden,
 }
 
-impl PivotCacheCatalog {
-  pub(crate) fn from_workbook_part(
-    package: &mut SpreadsheetDocument,
-    workbook_part: &ooxmlsdk::parts::workbook_part::WorkbookPart,
-    workbook: &x::Workbook,
-  ) -> Result<Self> {
-    // Source: LibreOffice sc/source/filter/oox/workbookfragment.cxx
-    // Pivot cache ids are registered from workbook.xml and cache definitions
-    // are imported on demand by pivot tables.
-    let workbook_caches = workbook
-      .pivot_caches
-      .as_ref()
-      .map(|caches| caches.pivot_cache.clone())
-      .unwrap_or_default();
-    let cache_parts = workbook_part
-      .pivot_table_cache_definition_parts(package)
-      .collect::<Vec<_>>();
-    let mut caches = Vec::new();
-    for (index, part) in cache_parts.iter().enumerate() {
-      let workbook_cache = workbook_caches
-        .iter()
-        .find(|cache| part.relationship_id() == Some(cache.id.as_str()))
-        .or_else(|| workbook_caches.get(index));
-      caches.push(PivotCacheModel::from_part(package, part, workbook_cache)?);
-    }
-    Ok(Self { caches })
-  }
-}
-
-impl PivotCacheModel {
-  fn from_part(
-    package: &mut SpreadsheetDocument,
-    part: &PivotTableCacheDefinitionPart,
-    workbook_cache: Option<&x::PivotCache>,
-  ) -> Result<Self> {
-    let has_records_part = part.pivot_table_cache_records_part(package).is_some();
-    let definition = part.root_element(package)?;
-    Ok(Self {
-      relationship_id: part.relationship_id().map(ToString::to_string),
-      workbook_cache_id: workbook_cache.map(|cache| cache.cache_id),
-      workbook_relationship_id: workbook_cache.map(|cache| cache.id.clone()),
-      definition_relationship_id: definition.id.clone(),
-      cache_fields: definition.cache_fields.cache_field.len(),
-      record_count: definition.record_count,
-      refresh_on_load: definition
-        .refresh_on_load
-        .is_some_and(|value| value.as_bool()),
-      save_data: definition.save_data.map(|value| value.as_bool()),
-      invalid: definition.invalid.is_some_and(|value| value.as_bool()),
-      has_records_part,
-      has_cache_source: true,
-      has_extensions: definition.pivot_cache_definition_extension_list.is_some(),
-      optional_child_count: usize::from(definition.cache_hierarchies.is_some())
-        + usize::from(definition.kpis.is_some())
-        + usize::from(definition.tuple_cache.is_some())
-        + usize::from(definition.calculated_items.is_some())
-        + usize::from(definition.calculated_members.is_some())
-        + usize::from(definition.dimensions.is_some())
-        + usize::from(definition.measure_groups.is_some())
-        + usize::from(definition.maps.is_some()),
-    })
-  }
+#[derive(Clone, Copy)]
+pub(crate) struct PivotTableImportContext<'a> {
+  pub(crate) current_worksheet: &'a x::Worksheet,
+  pub(crate) current_raw_values: &'a HashMap<String, String>,
+  pub(crate) current_sheet_name: &'a str,
+  pub(crate) shared_strings: &'a [SharedStringModel],
+  pub(crate) styles: &'a StylesCatalog,
+  pub(crate) date_1904: bool,
 }
 
 impl PivotTableCatalog {
   pub(crate) fn from_parts(
     package: &mut SpreadsheetDocument,
     parts: &[PivotTablePart],
-    current_worksheet: &x::Worksheet,
-    current_raw_values: &HashMap<String, String>,
-    current_sheet_name: &str,
-    shared_strings: &[SharedStringModel],
-    styles: &StylesCatalog,
-    date_1904: bool,
+    context: PivotTableImportContext<'_>,
   ) -> Result<Self> {
     Ok(Self {
       tables: parts
         .iter()
-        .map(|part| {
-          PivotTableModel::from_part(
-            package,
-            part,
-            current_worksheet,
-            current_raw_values,
-            current_sheet_name,
-            shared_strings,
-            styles,
-            date_1904,
-          )
-        })
+        .map(|part| PivotTableModel::from_part(package, part, context))
         .collect::<Result<Vec<_>>>()?,
     })
   }
@@ -963,12 +870,7 @@ impl PivotTableModel {
   fn from_part(
     package: &mut SpreadsheetDocument,
     part: &PivotTablePart,
-    current_worksheet: &x::Worksheet,
-    current_raw_values: &HashMap<String, String>,
-    current_sheet_name: &str,
-    shared_strings: &[SharedStringModel],
-    styles: &StylesCatalog,
-    date_1904: bool,
+    context: PivotTableImportContext<'_>,
   ) -> Result<Self> {
     let cache_definition = part
       .pivot_table_cache_definition_part(package)
@@ -1000,22 +902,29 @@ impl PivotTableModel {
     let source_field_names = cache_definition.as_ref().map_or(Ok(Vec::new()), |cache| {
       pivot_cache_current_sheet_source_field_names(
         cache,
-        current_sheet_name,
-        current_worksheet,
-        current_raw_values,
-        shared_strings,
+        context.current_sheet_name,
+        context.current_worksheet,
+        context.current_raw_values,
+        context.shared_strings,
       )
       .map_or_else(
-        || pivot_cache_source_field_names(package, cache, shared_strings),
+        || pivot_cache_source_field_names(package, cache, context.shared_strings),
         Ok,
       )
     })?;
     let source_field_number_format_codes = source_field_number_format_ids
       .iter()
-      .map(|id| id.and_then(|id| styles.number_format_code(id).map(ToString::to_string)))
+      .map(|id| {
+        id.and_then(|id| {
+          context
+            .styles
+            .number_format_code(id)
+            .map(ToString::to_string)
+        })
+      })
       .collect::<Vec<_>>();
     let source_cache = cache_definition.as_ref().and_then(|cache| {
-      pivot_source_cache_table(package, cache, shared_strings)
+      pivot_source_cache_table(package, cache, context.shared_strings)
         .ok()
         .flatten()
     });
@@ -1166,13 +1075,15 @@ impl PivotTableModel {
       ),
       data_cell_text_overrides: pivot_count_data_cell_text_overrides(
         definition,
-        cache_records.as_ref(),
-        source_cache.as_ref(),
-        &cache_field_items,
-        &cache_field_item_values,
-        &cache_field_grouped,
-        &source_field_number_format_codes,
-        date_1904,
+        PivotCountOverrideContext {
+          records: cache_records.as_ref(),
+          source_cache: source_cache.as_ref(),
+          cache_field_items: &cache_field_items,
+          cache_field_item_values: &cache_field_item_values,
+          cache_field_grouped: &cache_field_grouped,
+          source_field_number_format_codes: &source_field_number_format_codes,
+          date_1904: context.date_1904,
+        },
       ),
       page_field_models: page_field_models(definition, &cache_field_names, &cache_field_items),
       format_models: pivot_table_format_models(definition),
@@ -2073,15 +1984,19 @@ fn page_item_member_text(item: &x::Item, cache_items: Option<&Vec<String>>) -> O
   cache_items.and_then(|items| items.get(cache_index).cloned())
 }
 
+struct PivotCountOverrideContext<'a> {
+  records: Option<&'a x::PivotCacheRecords>,
+  source_cache: Option<&'a PivotSourceCacheTable>,
+  cache_field_items: &'a [Vec<String>],
+  cache_field_item_values: &'a [Vec<PivotCacheItemValue>],
+  cache_field_grouped: &'a [bool],
+  source_field_number_format_codes: &'a [Option<String>],
+  date_1904: bool,
+}
+
 fn pivot_count_data_cell_text_overrides(
   definition: &x::PivotTableDefinition,
-  records: Option<&x::PivotCacheRecords>,
-  source_cache: Option<&PivotSourceCacheTable>,
-  cache_field_items: &[Vec<String>],
-  cache_field_item_values: &[Vec<PivotCacheItemValue>],
-  cache_field_grouped: &[bool],
-  source_field_number_format_codes: &[Option<String>],
-  date_1904: bool,
+  context: PivotCountOverrideContext<'_>,
 ) -> Vec<PivotDataCellTextOverride> {
   let Some(location) = CellRange::parse_a1_range(&definition.location.reference) else {
     return Vec::new();
@@ -2118,10 +2033,11 @@ fn pivot_count_data_cell_text_overrides(
     return Vec::new();
   }
   let cache_records_table;
-  let source_cache = if let Some(source_cache) = source_cache {
+  let source_cache = if let Some(source_cache) = context.source_cache {
     source_cache
-  } else if let Some(records) = records {
-    cache_records_table = PivotSourceCacheTable::from_records(records, cache_field_item_values);
+  } else if let Some(records) = context.records {
+    cache_records_table =
+      PivotSourceCacheTable::from_records(records, context.cache_field_item_values);
     &cache_records_table
   } else {
     return Vec::new();
@@ -2129,16 +2045,16 @@ fn pivot_count_data_cell_text_overrides(
   let page_filters = pivot_cache_page_filters(
     definition,
     source_cache,
-    cache_field_item_values,
-    cache_field_grouped,
-    source_field_number_format_codes,
-    date_1904,
+    context.cache_field_item_values,
+    context.cache_field_grouped,
+    context.source_field_number_format_codes,
+    context.date_1904,
   );
   let row_items = pivot_count_row_items(
     definition,
     &row_field_indexes,
-    cache_field_items,
-    cache_field_item_values,
+    context.cache_field_items,
+    context.cache_field_item_values,
   );
   if row_items.is_empty() {
     return Vec::new();
@@ -2147,7 +2063,7 @@ fn pivot_count_data_cell_text_overrides(
   let mut detail_total = 0u32;
   let mut missing_detail_counts = HashMap::<Vec<String>, u32>::new();
   for record_index in 0..source_cache.rows.len() {
-    if !source_cache_matches_page_filters(&source_cache, record_index, &page_filters, false) {
+    if !source_cache_matches_page_filters(source_cache, record_index, &page_filters, false) {
       continue;
     }
     let mut matched_detail = false;
@@ -2449,7 +2365,7 @@ fn pivot_source_field_members(
       .get(field_index)
       .cloned()
       .unwrap_or(PivotCacheItemValue::Empty);
-    if !values.iter().any(|member| *member == value) {
+    if !values.contains(&value) {
       values.push(value);
     }
   }

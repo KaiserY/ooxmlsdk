@@ -32,16 +32,21 @@ const CALC_BASE_COLUMN_PADDING_PX: f32 = 5.0;
 pub(crate) struct CalcSheet {
   pub(crate) workbook_index: usize,
   pub(crate) name: String,
-  pub(crate) relationship_id: String,
-  pub(crate) sheet_id: u32,
   pub(crate) sheet_type: SheetType,
   pub(crate) state: Option<x::SheetStateValues>,
   pub(crate) active: bool,
   pub(crate) page_settings: CalcPageSettings,
   pub(crate) metrics: SheetMetrics,
-  pub(crate) chartsheet_metrics: Option<ChartsheetMetrics>,
   pub(crate) resources: SheetResourceCatalog,
   pub(crate) rows: Vec<CalcRow>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SheetIdentity {
+  pub(crate) workbook_index: usize,
+  pub(crate) name: String,
+  pub(crate) state: Option<x::SheetStateValues>,
+  pub(crate) active: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -98,22 +103,6 @@ pub(crate) struct SheetMetrics {
   pub(crate) objects: SheetObjectCatalog,
   pub(crate) protected_ranges: usize,
   pub(crate) scenarios: usize,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct ChartsheetMetrics {
-  pub(crate) published: bool,
-  pub(crate) code_name: Option<String>,
-  pub(crate) has_tab_color: bool,
-  pub(crate) views: usize,
-  pub(crate) selected_views: usize,
-  pub(crate) zoom_to_fit_views: usize,
-  pub(crate) view_extensions: usize,
-  pub(crate) custom_views: usize,
-  pub(crate) custom_view_flags: usize,
-  pub(crate) protection_flags: usize,
-  pub(crate) web_publish_items: usize,
-  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -190,14 +179,10 @@ pub(crate) struct CalcCell {
   pub(crate) reference: Option<String>,
   pub(crate) style_index: Option<u32>,
   pub(crate) data_type: Option<x::CellValues>,
-  pub(crate) cell_meta_index: Option<u32>,
-  pub(crate) value_meta_index: Option<u32>,
-  pub(crate) show_phonetic: bool,
   pub(crate) formula: Option<FormulaModel>,
   pub(crate) cached_value: Option<String>,
   pub(crate) display_text: String,
   pub(crate) rich_text_runs: Vec<SharedStringRun>,
-  pub(crate) has_extensions: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -233,12 +218,7 @@ pub(crate) struct RawWorksheetData {
 
 impl CalcSheet {
   pub(crate) fn from_worksheet(
-    workbook_index: usize,
-    name: String,
-    sheet_id: u32,
-    relationship_id: String,
-    state: Option<x::SheetStateValues>,
-    active: bool,
+    identity: SheetIdentity,
     worksheet: x::Worksheet,
     resources: SheetResourceCatalog,
     shared_strings: &[SharedStringModel],
@@ -249,67 +229,46 @@ impl CalcSheet {
     let page_settings = CalcPageSettings::from_worksheet(&worksheet);
     let metrics = SheetMetrics::from_worksheet(&worksheet, styles, mso_document);
     Self {
-      workbook_index,
-      name,
-      relationship_id,
-      sheet_id,
+      workbook_index: identity.workbook_index,
+      name: identity.name,
       sheet_type: SheetType::Worksheet,
-      state,
-      active,
+      state: identity.state,
+      active: identity.active,
       page_settings,
       metrics,
-      chartsheet_metrics: None,
       resources,
       rows: worksheet_rows(&worksheet, shared_strings, raw_values, mso_document),
     }
   }
 
   pub(crate) fn from_chartsheet(
-    workbook_index: usize,
-    name: String,
-    sheet_id: u32,
-    relationship_id: String,
-    state: Option<x::SheetStateValues>,
-    active: bool,
+    identity: SheetIdentity,
     chartsheet: x::Chartsheet,
     resources: SheetResourceCatalog,
   ) -> Self {
     let page_settings = CalcPageSettings::from_chartsheet(&chartsheet);
     Self {
-      workbook_index,
-      name,
-      relationship_id,
-      sheet_id,
+      workbook_index: identity.workbook_index,
+      name: identity.name,
       sheet_type: SheetType::Chartsheet,
-      state,
-      active,
+      state: identity.state,
+      active: identity.active,
       page_settings,
       metrics: SheetMetrics::default(),
-      chartsheet_metrics: Some(ChartsheetMetrics::from_chartsheet(&chartsheet)),
       resources,
       rows: Vec::new(),
     }
   }
 
-  pub(crate) fn unresolved(
-    workbook_index: usize,
-    name: String,
-    sheet_id: u32,
-    relationship_id: String,
-    state: Option<x::SheetStateValues>,
-    active: bool,
-  ) -> Self {
+  pub(crate) fn unresolved(identity: SheetIdentity) -> Self {
     Self {
-      workbook_index,
-      name,
-      relationship_id,
-      sheet_id,
+      workbook_index: identity.workbook_index,
+      name: identity.name,
       sheet_type: SheetType::Unresolved,
-      state,
-      active,
+      state: identity.state,
+      active: identity.active,
       page_settings: CalcPageSettings::default(),
       metrics: SheetMetrics::default(),
-      chartsheet_metrics: None,
       resources: SheetResourceCatalog::default(),
       rows: Vec::new(),
     }
@@ -673,79 +632,6 @@ impl CellRange {
   }
 }
 
-impl ChartsheetMetrics {
-  fn from_chartsheet(chartsheet: &x::Chartsheet) -> Self {
-    // Source: LibreOffice sc/source/filter/oox/chartsheetfragment.cxx imports
-    // chartsheet properties/protection/views through WorksheetSettings and
-    // SheetViewSettings before final worksheet import.
-    let properties = chartsheet.chart_sheet_properties.as_deref();
-    let protection = chartsheet.chart_sheet_protection.as_ref();
-    Self {
-      published: properties
-        .and_then(|properties| properties.published)
-        .is_some_and(|value| value.as_bool()),
-      code_name: properties.and_then(|properties| properties.code_name.clone()),
-      has_tab_color: properties.is_some_and(|properties| properties.tab_color.is_some()),
-      views: chartsheet.chart_sheet_views.chart_sheet_view.len(),
-      selected_views: chartsheet
-        .chart_sheet_views
-        .chart_sheet_view
-        .iter()
-        .filter(|view| view.tab_selected.is_some_and(|value| value.as_bool()))
-        .count(),
-      zoom_to_fit_views: chartsheet
-        .chart_sheet_views
-        .chart_sheet_view
-        .iter()
-        .filter(|view| view.zoom_to_fit.is_some_and(|value| value.as_bool()))
-        .count(),
-      view_extensions: usize::from(chartsheet.chart_sheet_views.extension_list.is_some())
-        + chartsheet
-          .chart_sheet_views
-          .chart_sheet_view
-          .iter()
-          .filter(|view| view.extension_list.is_some())
-          .count(),
-      custom_views: chartsheet
-        .custom_chartsheet_views
-        .as_ref()
-        .map_or(0, |views| views.custom_chartsheet_view.len()),
-      custom_view_flags: chartsheet
-        .custom_chartsheet_views
-        .as_ref()
-        .map_or(0, |views| {
-          views
-            .custom_chartsheet_view
-            .iter()
-            .map(|view| {
-              usize::from(view.scale.is_some())
-                + usize::from(view.state.is_some())
-                + usize::from(view.zoom_to_fit.is_some_and(|value| value.as_bool()))
-                + usize::from(view.page_margins.is_some())
-                + usize::from(view.chart_sheet_page_setup.is_some())
-                + usize::from(view.header_footer.is_some())
-                + view.guid.len()
-            })
-            .sum()
-        }),
-      protection_flags: protection.map_or(0, |protection| {
-        usize::from(protection.password.is_some())
-          + usize::from(protection.algorithm_name.is_some())
-          + usize::from(protection.hash_value.is_some())
-          + usize::from(protection.salt_value.is_some())
-          + usize::from(protection.spin_count.is_some())
-          + usize::from(protection.content.is_some_and(|value| value.as_bool()))
-          + usize::from(protection.objects.is_some_and(|value| value.as_bool()))
-      }),
-      web_publish_items: chartsheet
-        .web_publish_items
-        .as_ref()
-        .map_or(0, |items| items.web_publish_item.len()),
-      has_extensions: chartsheet.extension_list.is_some(),
-    }
-  }
-}
-
 impl SheetMetrics {
   fn from_worksheet(worksheet: &x::Worksheet, styles: &StylesCatalog, mso_document: bool) -> Self {
     // Source: LibreOffice sc/source/filter/oox/worksheetfragment.cxx
@@ -910,12 +796,7 @@ impl SheetResourceCatalog {
   pub(crate) fn from_worksheet_part(
     package: &mut SpreadsheetDocument,
     part: &WorksheetPart,
-    sheet_name: &str,
-    worksheet: &x::Worksheet,
-    raw_values: &HashMap<String, String>,
-    shared_strings: &[SharedStringModel],
-    styles: &StylesCatalog,
-    date_1904: bool,
+    context: WorksheetResourceImportContext<'_>,
   ) -> Result<Self> {
     let drawings = part
       .drawings_part(package)
@@ -938,12 +819,14 @@ impl SheetResourceCatalog {
     let pivot_tables = PivotTableCatalog::from_parts(
       package,
       &pivot_table_parts,
-      worksheet,
-      raw_values,
-      sheet_name,
-      shared_strings,
-      styles,
-      date_1904,
+      super::pivot::PivotTableImportContext {
+        current_worksheet: context.worksheet,
+        current_raw_values: context.raw_values,
+        current_sheet_name: context.sheet_name,
+        shared_strings: context.shared_strings,
+        styles: context.styles,
+        date_1904: context.date_1904,
+      },
     )?;
     let query_table_parts = part.query_table_parts(package).collect::<Vec<_>>();
     let query_tables = QueryTableCatalog::from_parts(package, &query_table_parts)?;
@@ -976,6 +859,15 @@ impl SheetResourceCatalog {
       ..Self::default()
     })
   }
+}
+
+pub(crate) struct WorksheetResourceImportContext<'a> {
+  pub(crate) sheet_name: &'a str,
+  pub(crate) worksheet: &'a x::Worksheet,
+  pub(crate) raw_values: &'a HashMap<String, String>,
+  pub(crate) shared_strings: &'a [SharedStringModel],
+  pub(crate) styles: &'a StylesCatalog,
+  pub(crate) date_1904: bool,
 }
 
 pub(crate) fn worksheet_raw_data(xml: &str) -> RawWorksheetData {
@@ -1151,23 +1043,6 @@ fn worksheet_rows(
     .collect()
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn worksheet_raw_data_keeps_page_setup_fit_attributes() {
-    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
-    // pageSetUpPr fitToPage and pageSetup fitToWidth/fitToHeight independently.
-    let data = worksheet_raw_data(
-      r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><pageSetup fitToWidth="1" fitToHeight="0"/></worksheet>"#,
-    );
-    assert_eq!(data.fit_to_page, Some(true));
-    assert_eq!(data.fit_to_width, Some(1));
-    assert_eq!(data.fit_to_height, Some(0));
-  }
-}
-
 fn mso_row_height_pt(height: f64) -> f64 {
   if height > 0.0 {
     // Source: LibreOffice sc/source/filter/oox/sheetdatacontext.cxx and
@@ -1238,14 +1113,10 @@ impl CalcCell {
         .or_else(|| cell.cell_reference.as_ref().map(ToString::to_string)),
       style_index: cell.style_index,
       data_type: cell.data_type,
-      cell_meta_index: cell.cell_meta_index,
-      value_meta_index: cell.value_meta_index,
-      show_phonetic: cell.show_phonetic.is_some_and(|value| value.as_bool()),
       formula: cell.cell_formula.as_ref().map(FormulaModel::from_formula),
       cached_value,
       display_text: cell_text(cell, shared_strings, raw_value.map(String::as_str)),
       rich_text_runs: cell_rich_text_runs(cell, shared_strings),
-      has_extensions: cell.extension_list.is_some(),
     }
   }
 }
@@ -1385,5 +1256,22 @@ fn boolean_cell_value(value: &str) -> bool {
     "true" => true,
     "false" | "" => false,
     value => value.parse::<f64>().is_ok_and(|number| number != 0.0),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn worksheet_raw_data_keeps_page_setup_fit_attributes() {
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx imports
+    // pageSetUpPr fitToPage and pageSetup fitToWidth/fitToHeight independently.
+    let data = worksheet_raw_data(
+      r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><pageSetup fitToWidth="1" fitToHeight="0"/></worksheet>"#,
+    );
+    assert_eq!(data.fit_to_page, Some(true));
+    assert_eq!(data.fit_to_width, Some(1));
+    assert_eq!(data.fit_to_height, Some(0));
   }
 }

@@ -191,7 +191,6 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
   let mut shapes = Vec::new();
   let mut current: Option<VmlShapeModel> = None;
   let mut in_textbox = false;
-  let mut in_client_data = false;
   let mut in_anchor = false;
   let mut in_print_object = false;
   let mut in_visible = false;
@@ -225,7 +224,6 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
         } else if name.as_ref().ends_with(b"imagedata") {
           collect_vml_image_relationship(current.as_mut(), event.attributes().flatten());
         } else if name.as_ref().ends_with(b"ClientData") {
-          in_client_data = true;
           collect_vml_object_type(current.as_mut(), event.attributes().flatten());
         } else if name.as_ref().ends_with(b"Anchor") {
           in_anchor = true;
@@ -244,13 +242,14 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
           collect_vml_shape_text(
             current.as_mut(),
             &value,
-            in_textbox,
-            in_client_data,
-            in_anchor,
-            in_print_object,
-            in_visible,
-            in_note_row,
-            in_note_column,
+            VmlTextContext {
+              in_textbox,
+              in_anchor,
+              in_print_object,
+              in_visible,
+              in_note_row,
+              in_note_column,
+            },
           );
         }
       }
@@ -259,13 +258,14 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
           collect_vml_shape_text(
             current.as_mut(),
             &value,
-            in_textbox,
-            in_client_data,
-            in_anchor,
-            in_print_object,
-            in_visible,
-            in_note_row,
-            in_note_column,
+            VmlTextContext {
+              in_textbox,
+              in_anchor,
+              in_print_object,
+              in_visible,
+              in_note_row,
+              in_note_column,
+            },
           );
         }
       }
@@ -285,7 +285,6 @@ fn vml_shapes(data: &[u8]) -> Vec<VmlShapeModel> {
         if name.as_ref().ends_with(b"textbox") {
           in_textbox = false;
         } else if name.as_ref().ends_with(b"ClientData") {
-          in_client_data = false;
         } else if name.as_ref().ends_with(b"Anchor") {
           in_anchor = false;
         } else if name.as_ref().ends_with(b"PrintObject") {
@@ -361,31 +360,31 @@ fn collect_vml_image_resources(
     .collect()
 }
 
-fn collect_vml_shape_text(
-  shape: Option<&mut VmlShapeModel>,
-  value: &str,
+#[derive(Clone, Copy, Debug)]
+struct VmlTextContext {
   in_textbox: bool,
-  _in_client_data: bool,
   in_anchor: bool,
   in_print_object: bool,
   in_visible: bool,
   in_note_row: bool,
   in_note_column: bool,
-) {
+}
+
+fn collect_vml_shape_text(shape: Option<&mut VmlShapeModel>, value: &str, context: VmlTextContext) {
   let Some(shape) = shape else {
     return;
   };
-  if in_textbox {
+  if context.in_textbox {
     shape.text.push_str(value);
-  } else if in_anchor {
+  } else if context.in_anchor {
     shape.anchor = parse_vml_client_anchor(value);
-  } else if in_print_object {
+  } else if context.in_print_object {
     shape.print_object = decode_vml_bool(value, true);
-  } else if in_visible {
+  } else if context.in_visible {
     shape.visible = decode_vml_bool(value, true);
-  } else if in_note_row {
+  } else if context.in_note_row {
     shape.note_row = value.trim().parse::<u32>().ok();
-  } else if in_note_column {
+  } else if context.in_note_column {
     shape.note_column = value.trim().parse::<u32>().ok();
   }
 }

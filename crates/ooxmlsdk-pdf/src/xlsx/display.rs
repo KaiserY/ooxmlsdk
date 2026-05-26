@@ -721,9 +721,12 @@ fn calc_text_number_like(text: &str) -> bool {
 }
 
 fn calc_text_can_shape_as_line(text: &str) -> bool {
-  text
-    .chars()
-    .all(|ch| ch.is_ascii_alphanumeric() || !ch.is_ascii())
+  text.chars().all(|ch| {
+    ch.is_ascii_alphanumeric()
+      || ch.is_ascii_whitespace()
+      || matches!(ch, '/' | '-' | '+' | '.' | ',' | ':' | ';' | '(' | ')')
+      || !ch.is_ascii()
+  })
 }
 
 fn render_cell_rich_text(

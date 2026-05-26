@@ -78,6 +78,19 @@ pub(crate) fn has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace)
 }
 
 pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
+  visible_texts_with_default_series_label(chart_space, default_series_label)
+}
+
+pub(crate) fn visible_texts_with_uncached_series_labels(
+  chart_space: &c::ChartSpace,
+) -> Vec<String> {
+  visible_texts_with_default_series_label(chart_space, uncached_series_label)
+}
+
+fn visible_texts_with_default_series_label(
+  chart_space: &c::ChartSpace,
+  default_label: fn(ChartSeriesRef<'_>, usize) -> String,
+) -> Vec<String> {
   let mut texts = Vec::new();
   let mut series_index = 0usize;
 
@@ -103,7 +116,7 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
     if let Some(series_text) = series.series_text {
       push_series_text(&mut texts, series_text);
     } else {
-      push_unique_text(&mut texts, &default_series_label(series, series_index));
+      push_unique_text(&mut texts, &default_label(series, series_index));
     }
     if let Some(category_axis_data) = series.category_axis_data {
       push_category_axis_data_texts(&mut texts, category_axis_data);
@@ -130,6 +143,13 @@ pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
     push_data_label_texts(&mut texts, data_labels);
   }
   texts
+}
+
+fn uncached_series_label(_series: ChartSeriesRef<'_>, series_index: usize) -> String {
+  // Source: LibreOffice chart2/source/tools/UncachedDataSequence.cxx
+  // uses STR_DATA_UNNAMED_SERIES_WITH_INDEX ("Series%NUMBER") for imported
+  // OOXML series without a cached label sequence.
+  format!("Series{series_index}")
 }
 
 fn default_series_label(series: ChartSeriesRef<'_>, series_index: usize) -> String {

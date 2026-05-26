@@ -472,6 +472,19 @@ impl StylesCatalog {
       .unwrap_or_default()
   }
 
+  pub(crate) fn fill_for_cell(&self, style_index: Option<u32>) -> FillRecord {
+    let Some(format) = self.effective_cell_format(style_index) else {
+      return FillRecord::default();
+    };
+    if !format.apply_fill {
+      return FillRecord::default();
+    }
+    format
+      .fill_id
+      .and_then(|id| self.fill_records.get(id as usize).cloned())
+      .unwrap_or_default()
+  }
+
   fn effective_cell_format(&self, style_index: Option<u32>) -> Option<CellFormatRecord> {
     let mut format = self.cell_xfs.get(style_index? as usize)?.clone();
     let Some(style_xf) = format

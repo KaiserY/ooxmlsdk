@@ -354,8 +354,8 @@ pub(crate) fn pivot_print_address(sheet: &CalcSheet, address: CellAddress) -> Op
       print_address.row = address.row.saturating_sub(row_shift);
     }
     let cached_data_start_col = location.start.col + pivot.first_data_column;
-    let calc_data_start_col = pivot.output_geometry.table_start.col
-      + pivot.output_geometry.row_field_columns;
+    let calc_data_start_col =
+      pivot.output_geometry.table_start.col + pivot.output_geometry.row_field_columns;
     if cached_data_start_col > calc_data_start_col {
       let col_shift = cached_data_start_col - calc_data_start_col;
       if print_address.col < location.start.col + col_shift {
@@ -2086,19 +2086,25 @@ fn pivot_count_data_cell_text_overrides(
   let Some(location) = CellRange::parse_a1_range(&definition.location.reference) else {
     return Vec::new();
   };
-  let Some(row_field_index) = definition
-    .row_fields
-    .as_ref()
-    .and_then(|fields| fields.field.first())
-    .and_then(|field| usize::try_from(field.index).ok())
-  else {
-    return Vec::new();
-  };
   if definition
     .column_fields
     .as_ref()
     .is_some_and(|fields| !fields.field.is_empty())
   {
+    return Vec::new();
+  }
+  let row_field_indexes = definition
+    .row_fields
+    .as_ref()
+    .map(|fields| {
+      fields
+        .field
+        .iter()
+        .filter_map(|field| usize::try_from(field.index).ok())
+        .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+  if row_field_indexes.is_empty() {
     return Vec::new();
   }
   let Some(data_field) = definition
@@ -2128,35 +2134,50 @@ fn pivot_count_data_cell_text_overrides(
     source_field_number_format_codes,
     date_1904,
   );
-  let row_items = pivot_row_cache_item_order(definition, row_field_index);
-  let row_item_values =
-    pivot_row_cache_item_values_order(definition, row_field_index, cache_field_item_values);
+  let row_items = pivot_count_row_items(
+    definition,
+    &row_field_indexes,
+    cache_field_items,
+    cache_field_item_values,
+  );
   if row_items.is_empty() {
     return Vec::new();
   }
   let mut counts = vec![0u32; row_items.len()];
-  let mut total = 0u32;
+  let mut detail_total = 0u32;
+  let mut missing_detail_counts = HashMap::<Vec<String>, u32>::new();
   for record_index in 0..source_cache.rows.len() {
     if !source_cache_matches_page_filters(&source_cache, record_index, &page_filters, false) {
       continue;
     }
-    let row_value = source_cache.item(record_index, row_field_index, false);
-    let row_position = row_item_values
-      .iter()
-      .position(|item| *item == row_value)
-      .or_else(|| {
-        row_items.iter().position(|item| {
-          cache_field_items
-            .get(row_field_index)
-            .and_then(|items| items.get(*item as usize))
-            == Some(&row_value.text())
-        })
-      });
-    let Some(row_position) = row_position else {
-      continue;
-    };
-    total += 1;
-    counts[row_position] += 1;
+    let mut matched_detail = false;
+    for (row_position, row_item) in row_items.iter().enumerate() {
+      if row_item.grand_total {
+        continue;
+      }
+      if row_item.matches_source_record(source_cache, record_index, &row_field_indexes) {
+        matched_detail |= row_item.detail;
+        counts[row_position] += 1;
+      }
+    }
+    if matched_detail {
+      detail_total += 1;
+    } else if let Some(values) =
+      pivot_count_source_row_values(source_cache, record_index, &row_field_indexes)
+    {
+      *missing_detail_counts.entry(values).or_default() += 1;
+    }
+  }
+  let total = detail_total
+    + missing_detail_counts
+      .values()
+      .copied()
+      .filter(|count| *count >= 2)
+      .sum::<u32>();
+  for (position, row_item) in row_items.iter().enumerate() {
+    if row_item.grand_total {
+      counts[position] = total;
+    }
   }
   let data_col = location.start.col + definition.location.first_data_column;
   let data_row = location.start.row + definition.location.first_data_row;
@@ -2181,6 +2202,134 @@ fn pivot_count_data_cell_text_overrides(
     });
   }
   overrides
+}
+
+#[derive(Clone, Debug)]
+struct PivotCountRowItem {
+  values: Vec<PivotCacheItemValue>,
+  depth: usize,
+  grand_total: bool,
+  detail: bool,
+}
+
+impl PivotCountRowItem {
+  fn matches_source_record(
+    &self,
+    source_cache: &PivotSourceCacheTable,
+    record_index: usize,
+    row_field_indexes: &[usize],
+  ) -> bool {
+    if self.grand_total {
+      return true;
+    }
+    self
+      .values
+      .iter()
+      .zip(row_field_indexes.iter())
+      .take(self.depth)
+      .all(|(value, field_index)| source_cache.item(record_index, *field_index, false) == *value)
+  }
+}
+
+fn pivot_count_row_items(
+  definition: &x::PivotTableDefinition,
+  row_field_indexes: &[usize],
+  cache_field_items: &[Vec<String>],
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> Vec<PivotCountRowItem> {
+  let Some(row_items) = definition.row_items.as_ref() else {
+    return Vec::new();
+  };
+  let mut current_values = vec![PivotCacheItemValue::Empty; row_field_indexes.len()];
+  row_items
+    .row_item
+    .iter()
+    .map(|row_item| {
+      let item_type = row_item.item_type.unwrap_or(x::ItemValues::Data);
+      let grand_total = item_type == x::ItemValues::Grand;
+      let repeated = row_item.repeated_item_count.unwrap_or(0) as usize;
+      let raw_depth = repeated + row_item.member_property_index.len();
+      let depth = if grand_total {
+        0
+      } else if pivot_format_item_is_subtotal(item_type)
+        || (item_type == x::ItemValues::Default && raw_depth < row_field_indexes.len())
+      {
+        raw_depth
+      } else {
+        row_field_indexes.len()
+      }
+      .min(row_field_indexes.len());
+      let mut member_properties = row_item.member_property_index.iter();
+      for field_position in 0..row_field_indexes.len() {
+        if field_position >= repeated {
+          let Some(member_index) = member_properties
+            .next()
+            .map(|property| property.val.unwrap_or(0))
+            .and_then(|value| usize::try_from(value).ok())
+          else {
+            break;
+          };
+          let field_index = row_field_indexes[field_position];
+          current_values[field_position] = pivot_row_item_cache_value(
+            definition,
+            field_index,
+            member_index,
+            cache_field_items,
+            cache_field_item_values,
+          )
+          .unwrap_or(PivotCacheItemValue::Empty);
+        }
+      }
+      PivotCountRowItem {
+        values: current_values.clone(),
+        depth,
+        grand_total,
+        detail: !grand_total && depth == row_field_indexes.len(),
+      }
+    })
+    .collect()
+}
+
+fn pivot_count_source_row_values(
+  source_cache: &PivotSourceCacheTable,
+  record_index: usize,
+  row_field_indexes: &[usize],
+) -> Option<Vec<String>> {
+  let values = row_field_indexes
+    .iter()
+    .map(|field_index| source_cache.item(record_index, *field_index, false))
+    .collect::<Vec<_>>();
+  values
+    .iter()
+    .all(|value| !value.is_empty())
+    .then(|| values.into_iter().map(|value| value.text()).collect())
+}
+
+fn pivot_row_item_cache_value(
+  definition: &x::PivotTableDefinition,
+  field_index: usize,
+  member_index: usize,
+  cache_field_items: &[Vec<String>],
+  cache_field_item_values: &[Vec<PivotCacheItemValue>],
+) -> Option<PivotCacheItemValue> {
+  let cache_index = definition
+    .pivot_fields
+    .as_ref()
+    .and_then(|fields| fields.pivot_field.get(field_index))
+    .and_then(|field| field.items.as_ref())
+    .and_then(|items| items.item.get(member_index))
+    .and_then(|item| item.index)
+    .map(|index| index as usize)?;
+  cache_field_item_values
+    .get(field_index)
+    .and_then(|items| items.get(cache_index))
+    .cloned()
+    .or_else(|| {
+      cache_field_items
+        .get(field_index)
+        .and_then(|items| items.get(cache_index))
+        .map(|text| PivotCacheItemValue::String(text.clone()))
+    })
 }
 
 fn pivot_cache_page_filters(
@@ -2374,54 +2523,6 @@ fn pivot_item_cache_value(
   }
   let cache_index = item.index? as usize;
   cache_items.and_then(|items| items.get(cache_index).cloned())
-}
-
-fn pivot_row_cache_item_order(
-  definition: &x::PivotTableDefinition,
-  row_field_index: usize,
-) -> Vec<u32> {
-  definition
-    .pivot_fields
-    .as_ref()
-    .and_then(|fields| fields.pivot_field.get(row_field_index))
-    .and_then(|field| field.items.as_ref())
-    .map(|items| {
-      items
-        .item
-        .iter()
-        .filter(|item| {
-          page_item_is_data(item) && !item.hidden.is_some_and(|hidden| hidden.as_bool())
-        })
-        .filter_map(|item| item.index)
-        .collect()
-    })
-    .unwrap_or_default()
-}
-
-fn pivot_row_cache_item_values_order(
-  definition: &x::PivotTableDefinition,
-  row_field_index: usize,
-  cache_field_item_values: &[Vec<PivotCacheItemValue>],
-) -> Vec<PivotCacheItemValue> {
-  let cache_items = cache_field_item_values
-    .get(row_field_index)
-    .map(Vec::as_slice);
-  definition
-    .pivot_fields
-    .as_ref()
-    .and_then(|fields| fields.pivot_field.get(row_field_index))
-    .and_then(|field| field.items.as_ref())
-    .map(|items| {
-      items
-        .item
-        .iter()
-        .filter(|item| {
-          page_item_is_data(item) && !item.hidden.is_some_and(|hidden| hidden.as_bool())
-        })
-        .filter_map(|item| pivot_item_cache_value(item, cache_items))
-        .collect()
-    })
-    .unwrap_or_default()
 }
 
 fn source_cache_matches_page_filters(
@@ -2873,16 +2974,42 @@ fn data_field_names(
         .filter(|(position, _)| !unsupported_data_field_positions.contains(position))
         .map(|(_, field)| field)
         .map(|field| {
-          field
-            .name
-            .clone()
-            .or_else(|| cache_field_names.get(field.field as usize).cloned())
-            .unwrap_or_default()
+          if let Some(name) = field.name.as_ref().filter(|name| !name.is_empty()) {
+            return name.clone();
+          }
+          let field_name = cache_field_names
+            .get(field.field as usize)
+            .cloned()
+            .unwrap_or_default();
+          if field_name.is_empty() {
+            return String::new();
+          }
+          data_field_default_name(field.subtotal, &field_name)
         })
         .filter(|name| !name.is_empty())
         .collect()
     })
     .unwrap_or_default()
+}
+
+fn data_field_default_name(
+  subtotal: Option<x::DataConsolidateFunctionValues>,
+  field_name: &str,
+) -> String {
+  let function = match subtotal.unwrap_or(x::DataConsolidateFunctionValues::Sum) {
+    x::DataConsolidateFunctionValues::Average => "Average",
+    x::DataConsolidateFunctionValues::Count => "Count",
+    x::DataConsolidateFunctionValues::CountNumbers => "Count",
+    x::DataConsolidateFunctionValues::Maximum => "Max",
+    x::DataConsolidateFunctionValues::Minimum => "Min",
+    x::DataConsolidateFunctionValues::Product => "Product",
+    x::DataConsolidateFunctionValues::StandardDeviation => "StdDev",
+    x::DataConsolidateFunctionValues::StandardDeviationP => "StdDevP",
+    x::DataConsolidateFunctionValues::Sum => "Sum",
+    x::DataConsolidateFunctionValues::Variance => "Var",
+    x::DataConsolidateFunctionValues::VarianceP => "VarP",
+  };
+  format!("{function} - {field_name}")
 }
 
 fn data_field_number_format_ids(

@@ -22,7 +22,7 @@ fn chart_text_blocks(
     };
     let color = chart_label_color(chart_space, &styles.theme_colors).unwrap_or_default();
     let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
-    let mut texts = shared_chart::visible_texts(chart_space);
+    let mut texts = shared_chart::visible_texts_with_uncached_series_labels(chart_space);
     texts.extend(chart_derived_axis_labels(&texts));
     for text in texts {
       for segment in chart_visible_text_segments(text) {

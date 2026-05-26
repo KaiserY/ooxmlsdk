@@ -116,6 +116,7 @@ pub(crate) struct CalcPageSettings {
   pub(crate) margin_footer_in: f64,
   pub(crate) paper_size: u32,
   pub(crate) valid_printer_settings: bool,
+  pub(crate) fit_to_page: bool,
   pub(crate) scale: u32,
   pub(crate) fit_to_width: u32,
   pub(crate) fit_to_height: u32,
@@ -162,6 +163,7 @@ impl Default for CalcPageSettings {
       margin_footer_in: 0.512,
       paper_size: 1,
       valid_printer_settings: true,
+      fit_to_page: false,
       scale: 100,
       fit_to_width: 1,
       fit_to_height: 1,
@@ -187,6 +189,12 @@ impl CalcPageSettings {
     if let Some(page_setup) = &worksheet.page_setup {
       settings.apply_page_setup(page_setup);
     }
+    settings.fit_to_page = worksheet
+      .sheet_properties
+      .as_ref()
+      .and_then(|properties| properties.page_setup_properties.as_ref())
+      .and_then(|properties| properties.fit_to_page)
+      .is_some_and(|value| value.as_bool());
     if let Some(print_options) = &worksheet.print_options {
       settings.apply_print_options(print_options);
     }

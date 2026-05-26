@@ -184,6 +184,12 @@ fn apply_raw_page_setup(sheet: &mut CalcSheet, raw_data: &super::worksheet::RawW
   // pageSetUpPr fitToPage separately from pageSetup fitToWidth/fitToHeight.
   if let Some(fit_to_page) = raw_data.fit_to_page {
     sheet.metrics.settings.properties.page_setup.fit_to_page = fit_to_page;
+    sheet.page_settings.fit_to_page = fit_to_page;
+    if fit_to_page {
+      sheet.page_settings.fit_to_width = raw_data.fit_to_width.unwrap_or(1);
+      sheet.page_settings.fit_to_height = raw_data.fit_to_height.unwrap_or(1);
+      return;
+    }
   }
   if let Some(fit_to_width) = raw_data.fit_to_width {
     sheet.page_settings.fit_to_width = fit_to_width;

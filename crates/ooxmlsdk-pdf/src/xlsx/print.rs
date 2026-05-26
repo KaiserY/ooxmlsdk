@@ -16,6 +16,7 @@ const ZOOM_MIN: u32 = 10;
 const XLSX_MAX_COLUMN: u32 = 16_384;
 const XLSX_MAX_ROW: u32 = 1_048_576;
 const CALC_CELL_TEXT_MARGIN_PT: f32 = 4.0;
+const XLSX_HEADER_FOOTER_LINE_HEIGHT_PT: f32 = 12.0;
 const LIBREOFFICE_GENERIC_PRINTER_DPI: f32 = 600.0;
 // Source: LibreOffice sc/source/core/data/attarray.cxx defines SC_VISATTR_STOP.
 const SC_VISATTR_STOP: u32 = 84;
@@ -316,33 +317,48 @@ fn print_scale_state(
     .count()
     + 1;
   let forced_break_min_pages = forced_break_min_columns * forced_break_min_rows;
-  let fit_to_page = sheet.metrics.settings.properties.page_setup.fit_to_page
+  let fit_to_page = sheet.page_settings.fit_to_page
+    || sheet.metrics.settings.properties.page_setup.fit_to_page
     || sheet.page_settings.fit_to_width != 1
     || sheet.page_settings.fit_to_height != 1;
+  let (fit_to_width, fit_to_height) = if fit_to_page
+    && sheet.page_settings.fit_to_width == 0
+    && sheet.page_settings.fit_to_height == 0
+  {
+    // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx starts
+    // fitToWidth/fitToHeight from 1/1 defaults. If generated OOXML fields
+    // collapse absent fitToWidth together with fitToHeight="0", preserve the
+    // imported "fit to 1 page wide, unlimited height" behavior.
+    (1, 0)
+  } else {
+    (
+      sheet.page_settings.fit_to_width,
+      sheet.page_settings.fit_to_height,
+    )
+  };
   let mut mode = CalcPrintScaleMode::None;
   let mut zoom = sheet.page_settings.scale;
   let mut auto_page_columns = forced_break_min_columns.max(1);
   let mut auto_page_rows = forced_break_min_rows.max(1);
   let mut tdf103516_adjusted = false;
 
-  if fit_to_page && (sheet.page_settings.fit_to_width > 0 || sheet.page_settings.fit_to_height > 0)
-  {
+  if fit_to_page && (fit_to_width > 0 || fit_to_height > 0) {
     mode = CalcPrintScaleMode::FitToWidthHeight;
     // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx
     // PageSettingsConverter writes OOXML fitToWidth/fitToHeight directly to
     // ScaleToPagesX/Y with 0 preserved as "unlimited" for that axis.
-    auto_page_columns = if sheet.page_settings.fit_to_width == 0 {
+    auto_page_columns = if fit_to_width == 0 {
       0
     } else {
-      usize::try_from(sheet.page_settings.fit_to_width)
+      usize::try_from(fit_to_width)
         .ok()
         .unwrap_or(auto_page_columns)
         .max(forced_break_min_columns)
     };
-    auto_page_rows = if sheet.page_settings.fit_to_height == 0 {
+    auto_page_rows = if fit_to_height == 0 {
       0
     } else {
-      usize::try_from(sheet.page_settings.fit_to_height)
+      usize::try_from(fit_to_height)
         .ok()
         .unwrap_or(auto_page_rows)
         .max(forced_break_min_rows)
@@ -354,8 +370,14 @@ fn print_scale_state(
       auto_page_columns,
       auto_page_rows,
     );
-    if sheet.page_settings.fit_to_width > 0
-      && sheet.page_settings.fit_to_height == 0
+    if zoom == sheet.page_settings.scale && sheet.page_settings.scale != 100 {
+      // Source: LibreOffice sc/source/filter/oox/pagesettings.cxx writes either
+      // ScaleToPagesX/Y or PageScale. In fit-to-pages mode, pageSetup scale is
+      // not a fallback zoom.
+      zoom = 100;
+    }
+    if fit_to_width > 0
+      && fit_to_height == 0
       && actual_row_page_count(import, sheet, areas, named_ranges, zoom) > 1
     {
       let adjusted_zoom = ((zoom as f32) * 0.98).floor().max(ZOOM_MIN as f32) as u32;
@@ -438,7 +460,8 @@ fn fit_zoom_to_pages(
     .unwrap_or(0.0);
   let page_width = (content.0 - repeat_width).max(1.0);
   let page_height = (content.1 - repeat_height).max(1.0);
-  let area_rect = sheet.range_rect(area);
+  let fit_area = fit_scale_area(sheet, area, named_ranges);
+  let area_rect = sheet.range_rect(fit_area);
   let width_zoom = if page_columns > 0 && area_rect.width_pt > 0.0 {
     (page_width * page_columns as f32 * 100.0 / area_rect.width_pt).floor() as u32
   } else {
@@ -453,46 +476,21 @@ fn fit_zoom_to_pages(
   if metric_zoom < 100 {
     return metric_zoom;
   }
-  let mut zoom = 100u32;
-  let mut last_fit = 0u32;
-  let mut last_non_fit = 0u32;
-  loop {
-    if zoom <= ZOOM_MIN {
-      break;
-    }
-    let fits = estimated_pages_at_zoom(area, zoom, page_columns, page_rows);
-    if fits {
-      if zoom == 100 {
-        break;
-      }
-      last_fit = zoom;
-      zoom = (last_non_fit + zoom) / 2;
-      if last_fit == zoom {
-        break;
-      }
-    } else {
-      if zoom.saturating_sub(last_fit) <= 1 {
-        zoom = last_fit.max(ZOOM_MIN);
-        break;
-      }
-      last_non_fit = zoom;
-      zoom = (last_fit + zoom) / 2;
-    }
-  }
-  zoom.max(ZOOM_MIN)
+  100
 }
 
-fn estimated_pages_at_zoom(
+fn fit_scale_area(
+  sheet: &CalcSheet,
   area: CellRange,
-  zoom: u32,
-  page_columns: usize,
-  page_rows: usize,
-) -> bool {
-  let zoom = zoom.max(ZOOM_MIN);
-  let scaled_cols = (area.end.col - area.start.col + 1) as usize * zoom as usize;
-  let scaled_rows = (area.end.row - area.start.row + 1) as usize * zoom as usize;
-  (page_columns == 0 || scaled_cols <= page_columns * 100)
-    && (page_rows == 0 || scaled_rows <= page_rows * 100)
+  named_ranges: &CalcPrintNamedRanges<'_>,
+) -> CellRange {
+  if !named_ranges.resolved_print_areas.is_empty() {
+    return area;
+  }
+  sheet.used_range().map_or(area, |used| {
+    let range = CellRange::new(CellAddress { col: 1, row: 1 }, used.end);
+    extend_print_area_for_merges(sheet, range)
+  })
 }
 
 fn print_content_size_pt(sheet: &CalcSheet) -> (f32, f32) {
@@ -501,6 +499,11 @@ fn print_content_size_pt(sheet: &CalcSheet) -> (f32, f32) {
     * crate::units::POINTS_PER_INCH;
   height -= (sheet.page_settings.margin_top_in + sheet.page_settings.margin_bottom_in) as f32
     * crate::units::POINTS_PER_INCH;
+  if sheet.page_settings.scale != 100 && sheet.page_settings.header_footer.has_print_content() {
+    height -= (sheet.page_settings.margin_header_in + sheet.page_settings.margin_footer_in) as f32
+      * crate::units::POINTS_PER_INCH
+      + 2.0 * XLSX_HEADER_FOOTER_LINE_HEIGHT_PT;
+  }
   (width.max(1.0), height.max(1.0))
 }
 
@@ -671,7 +674,17 @@ fn print_areas_for_sheet(
     // ScDocument::IsPrintEmpty.
     Some(range) => {
       let mut range = CellRange::new(CellAddress { col: 1, row: 1 }, range.end);
-      if let Some(attr_end_row) = last_visible_row_attribute(sheet, range.end.row) {
+      if pivot_tabular_page_field_area_uses_dimension(sheet)
+        && let Some(dimension) = sheet
+          .metrics
+          .dimension
+          .as_deref()
+          .and_then(CellRange::parse_a1_range)
+      {
+        range.end.col = range.end.col.max(dimension.end.col);
+        range.end.row = range.end.row.max(dimension.end.row);
+      }
+      if let Some(attr_end_row) = last_visible_row_attribute(import, sheet, range.end.row) {
         range.end.row = range.end.row.max(attr_end_row);
       }
       if let Some(drawing_range) = drawing_print_area(sheet) {
@@ -687,6 +700,15 @@ fn print_areas_for_sheet(
       vec![drawing_print_area(sheet).unwrap_or(CellRange::single(CellAddress { col: 1, row: 1 }))]
     }
   }
+}
+
+fn pivot_tabular_page_field_area_uses_dimension(sheet: &CalcSheet) -> bool {
+  sheet
+    .resources
+    .pivot_tables
+    .tables
+    .iter()
+    .any(|pivot| pivot.page_fields > 0 && pivot.row_fields > 1 && !pivot.compact)
 }
 
 fn extend_print_area_for_merges(sheet: &CalcSheet, mut range: CellRange) -> CellRange {
@@ -978,7 +1000,15 @@ fn extend_print_area_for_overflow(
       if row_cell_has_print_data_at(row, address.col + 1) {
         continue;
       }
-      let style = print_cell_text_style(import, sheet, row, cell, address);
+      let style_index = sheet.effective_cell_style_index(row, cell, address);
+      if import
+        .styles
+        .alignment_for_cell(style_index)
+        .is_some_and(|alignment| alignment.wrap_text)
+      {
+        continue;
+      }
+      let style = import.styles.text_style_for_cell(style_index);
       let column = text_overflow_end_column(sheet, row, cell, address, &style);
       if column > range.end.col {
         range.end.col = column;
@@ -1097,18 +1127,25 @@ fn print_area_is_empty(import: &ExcelImport, sheet: &CalcSheet, area: CellRange)
       {
         return false;
       }
+      if import.styles.fill_for_cell(style_index).color.is_some() {
+        return false;
+      }
     }
   }
   if sheet_area_has_left_text_overflow(import, sheet, area) {
     return false;
   }
-  if area.end.col <= 2 && area_has_visible_row_attribute(sheet, area) {
+  if area.end.col <= 2 && area_has_visible_row_attribute(import, sheet, area) {
     return false;
   }
   true
 }
 
-fn last_visible_row_attribute(sheet: &CalcSheet, data_end_row: u32) -> Option<u32> {
+fn last_visible_row_attribute(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  data_end_row: u32,
+) -> Option<u32> {
   // Source: LibreOffice sc/source/core/data/table1.cxx::ScTable::GetPrintArea
   // calls ScAttrArray::GetLastVisibleAttr after data detection. Explicit row
   // formatting near the end of the sheet extends the print area even when the
@@ -1120,7 +1157,7 @@ fn last_visible_row_attribute(sheet: &CalcSheet, data_end_row: u32) -> Option<u3
   for row in sheet
     .rows
     .iter()
-    .filter(|row| row_has_visible_attribute(sheet, row))
+    .filter(|row| row_has_visible_attribute(import, sheet, row))
   {
     let row_index = row.row_index.unwrap_or(1);
     if row_index <= data_end_row {
@@ -1139,24 +1176,37 @@ fn last_visible_row_attribute(sheet: &CalcSheet, data_end_row: u32) -> Option<u3
   last_row
 }
 
-fn area_has_visible_row_attribute(sheet: &CalcSheet, area: CellRange) -> bool {
+fn area_has_visible_row_attribute(
+  import: &ExcelImport,
+  sheet: &CalcSheet,
+  area: CellRange,
+) -> bool {
   sheet.rows.iter().any(|row| {
     let row_index = row.row_index.unwrap_or(1);
     row_index >= area.start.row
       && row_index <= area.end.row
-      && row_has_visible_attribute(sheet, row)
+      && row_has_visible_attribute(import, sheet, row)
   })
 }
 
-fn row_has_visible_attribute(sheet: &CalcSheet, row: &CalcRow) -> bool {
+fn row_has_visible_attribute(import: &ExcelImport, sheet: &CalcSheet, row: &CalcRow) -> bool {
   if row.hidden {
     return false;
   }
-  row.cells.is_empty()
+  if row.cells.is_empty()
     && !row.custom_height
     && row.height.is_some_and(|height| {
       (height as f32 - sheet.metrics.format.default_row_height as f32).abs() > f32::EPSILON
     })
+  {
+    return true;
+  }
+  let borders = import.styles.borders_for_cell(row.style_index);
+  borders.left.is_some()
+    || borders.right.is_some()
+    || borders.top.is_some()
+    || borders.bottom.is_some()
+    || import.styles.fill_for_cell(row.style_index).color.is_some()
 }
 
 fn sheet_area_has_left_text_overflow(
@@ -1977,14 +2027,24 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
     }
   }
   if is_pivot_row_labels_caption(text.as_str()) {
-    return pivot_row_label_text(pivot).unwrap_or(text);
+    return pivot_row_caption_text(pivot, text.as_str());
   }
   if let Some(data_layout_caption) = pivot_data_layout_caption_text(pivot, address, text.as_str()) {
     return data_layout_caption;
   }
+  if address.col == pivot.output_geometry.data_start.col
+    && address.row == pivot.output_geometry.data_start.row.saturating_sub(1)
+    && let Some(name) = pivot.data_field_names.first()
+    && name
+      .strip_suffix(text.as_str())
+      .is_some_and(|prefix| prefix.ends_with(" - "))
+  {
+    return name.clone();
+  }
   match text.as_str() {
     "Grand Total" => "Total Result".to_string(),
     "Gesamtergebnis"
+    | "Végösszeg"
     | "\u{041e}\u{0431}\u{0449}\u{0438}\u{0439} \u{0438}\u{0442}\u{043e}\u{0433}" => {
       "Total Result".to_string()
     }
@@ -1997,6 +2057,10 @@ fn pivot_display_text(sheet: &CalcSheet, address: CellAddress, text: String) -> 
     "Row Labels" => pivot_row_label_text(pivot).unwrap_or(text),
     "Column Labels" => pivot_column_label_text(pivot).unwrap_or(text),
     "(blank)" => "(empty)".to_string(),
+    "N.év1" => "Q1".to_string(),
+    "N.év2" => "Q2".to_string(),
+    "N.év3" => "Q3".to_string(),
+    "N.év4" => "Q4".to_string(),
     _ => {
       if let Some(prefix) = text
         .strip_suffix(" Total")
@@ -2091,6 +2155,7 @@ fn is_pivot_row_labels_caption(text: &str) -> bool {
   matches!(
     text,
     "Row Labels"
+      | "Sorcímkék"
       | "Zeilenbeschriftungen"
       | "\u{041d}\u{0430}\u{0437}\u{0432}\u{0430}\u{043d}\u{0438}\u{044f} \u{0441}\u{0442}\u{0440}\u{043e}\u{043a}"
   )
@@ -2116,6 +2181,20 @@ fn pivot_row_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String>
     return None;
   }
   Some(pivot.row_field_names.join(" "))
+}
+
+fn pivot_row_caption_text(pivot: &super::pivot::PivotTableModel, text: &str) -> String {
+  pivot_row_label_text(pivot).unwrap_or_else(|| {
+    // Source: LibreOffice sc/source/core/data/dpoutput.cxx keeps Excel's
+    // generic compact-layout row caption when multiple row fields share one
+    // output column, while localized persisted captions are imported through
+    // the DataPilot source as the generic "Row Labels" text.
+    if pivot.compact && pivot.row_field_names.len() > 1 {
+      "Row Labels".to_string()
+    } else {
+      text.to_string()
+    }
+  })
 }
 
 fn pivot_column_label_text(pivot: &super::pivot::PivotTableModel) -> Option<String> {

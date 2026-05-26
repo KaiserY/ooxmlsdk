@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
 [![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
 
-`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The public package API is intentionally aligned with the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) container model, while the implementation is code-generated for Rust and organized around generated schema types, serializers, deserializers, and strongly typed package parts.
+`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. It uses the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) as a primary reference for OOXML package and schema behavior, but exposes Rust-native generated types, serializers, and strongly typed package parts.
 
 ## Features
 
@@ -21,6 +21,7 @@ The always-available modules in the crate root are:
 - `schemas`
 - `sdk`
 - `simple_type`
+- `units`
 
 Feature-gated modules are:
 
@@ -29,23 +30,17 @@ Feature-gated modules are:
 
 ## Version Coverage
 
-This repository treats Office 2007 as the compatibility baseline while always compiling the checked-in generated runtime for newer OOXML namespaces and parts:
+Office 2007 is the baseline. The checked-in generated schemas also include newer OOXML namespaces and package parts from the upstream metadata.
 
-- `--no-default-features --features parts`: package APIs without optional validators
+Common build shapes:
+
+- default: generated schemas plus package APIs
+- `--no-default-features --features parts`: package APIs only
 - `--no-default-features --features flat-opc`: package APIs plus Flat OPC helpers
 - `--no-default-features --features mce`: package APIs plus Markup Compatibility and Extensibility processing
-- default build: package APIs plus the full generated schema and part surface
+- `--features validators`: optional validator APIs
 
-The checked-in generated runtime covers OOXML namespaces and parts associated with:
-
-- Office 2010
-- Office 2013
-- Office 2016
-- Office 2019
-- Office 2021
-- Microsoft 365-era extensions and newer upstream namespace revisions currently present in the checked-in metadata, including 2022, 2023, and 2024-dated schema additions
-
-In practical terms, the runtime includes support for newer namespaces and package relationships such as later DrawingML, chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked in the upstream Open XML SDK metadata.
+The generated runtime includes Office 2010, 2013, 2016, 2019, 2021, Microsoft 365-era extensions, and newer upstream namespace revisions currently present in the checked-in metadata. In practice this covers later DrawingML and chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked by Open XML SDK metadata.
 
 ## Documentation
 
@@ -60,18 +55,30 @@ The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx`
 - open and create packages with constructors such as `new`, `new_with_settings`, `new_from_file`, and `new_from_file_with_settings`
 - save packages with `save`
 - inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
+- traverse typed related parts with helpers such as `related_parts_of_type`, `related_part_of_type`, and relationship-type-specific variants when the relationship id is needed alongside the typed part
 - access well-known child parts through typed methods such as `main_document_part`, `workbook_part`, `presentation_part`, `worksheet_parts`, `font_table_part`, and chart-related part accessors
 - read, replace, or unload parsed part payloads through public data helpers and root-element helpers
 
 Raw package storage, raw relationship sets, generated factory internals, and unchecked dynamic part plumbing are not part of the public API. Prefer the package and part methods above when writing code that should survive generator updates.
 
-The 0.6.1 runtime keeps that public API stable while reducing generated package/part boilerplate internally. Typed child accessors and relationship helpers remain visible as normal Rust API surface, but repeated relationship lookup and dispatch code is now shared through generated macros and fixed dispatch tables.
+The package API follows Open XML SDK container concepts. When relationship metadata matters, typed traversal helpers return `RelatedPart<T>` so callers can keep the typed part and its `r:id` together.
+
+## Generated Schema API
+
+The `schemas` module is generated from upstream Open XML SDK metadata plus checked-in schema extensions. Generated names are intended to read like Rust while staying traceable to the source schema:
+
+- repeated child fields are named for their item type, for example `paragraph`, `extension`, or `table_row`
+- choices use concrete child names when the schema provides enough information; generic names remain for genuinely anonymous schema groups
+- common scalar shapes are typed: lists are `Vec<T>`, OOXML booleans are enums, and measures/percentages use unit wrappers
+- extension and wildcard content is preserved, with known children exposed through typed choices where possible
+
+Prefer these generated types and conversion helpers over raw XML strings in new code. See the changelog for release-specific API changes.
 
 ## XML And MCE Compatibility
 
-The generated XML reader/writer preserves markup compatibility data needed for stable round trips, including common `mc:*` attributes, `mc:AlternateContent`, choice/fallback content, and extension namespace attributes used by newer Office documents.
+The generated XML reader/writer preserves markup compatibility data needed for stable round trips, including common `mc:*` attributes, `mc:AlternateContent`, choice/fallback content, unknown extension attributes, and extension namespace children used by newer Office documents.
 
-With the `mce` feature enabled, package/root loading can process known Markup Compatibility and Extensibility constructs such as `mc:AlternateContent` and package-level `ProcessAllParts` behavior. Current integration coverage includes upstream-derived MCE and extension samples such as `mcdoc.docx`, `mcinleaf.docx`, `MCExecl.xlsx`, `excel14.xlsx`, `extlst.xlsx`, and Office 2016 extended chart packages. These tests focus on public Rust APIs and stable XML/package round trips.
+With the `mce` feature enabled, package/root loading can process known Markup Compatibility and Extensibility constructs such as `mc:AlternateContent` and package-level `ProcessAllParts` behavior. Integration coverage includes upstream-derived MCE, strict, OPC, extension, and real-world compatibility samples, with tests focused on public Rust APIs and stable XML/package round trips.
 
 Unknown-element DOM editing and markup compatibility validator behavior are still future work.
 

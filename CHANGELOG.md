@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+## 0.7.0
+
+### Breaking Changes
+
+- Regenerated the schema runtime with revised child and choice naming rules. Some generated field and variant names changed from namespace-prefixed fallbacks such as `a_p`, `a_ext`, `a_font`, `a_tr`, or `w_tab` to source-backed semantic names such as `paragraph`, `extension`, `supplemental_font`, `table_row`, and `tab_stop`.
+- Normalized generated choice and sequence naming. Concrete variants now prefer the referenced child type or element name; generic `Choice`, `Choice2`, `Sequence`, and numbered suffixes are kept only when the source data does not provide a clearer stable name or when disambiguation is required.
+- Reworked generated simple text wrapper types. Several text elements now wrap a shared text payload type instead of exposing duplicated `xml_content`, `xml_other_attrs`, and `xml:space` fields directly on each element type.
+- Replaced the generic `ListValue<T>` wrapper with plain `Vec<T>` for generated list-valued attributes and text content.
+- Changed OOXML boolean-like simple types from raw `bool` aliases to explicit enums: `BooleanValue`, `OnOffValue`, `TrueFalseValue`, and `TrueFalseBlankValue`. Use `from_bool()` / `as_bool()` or the `From` conversions when converting to and from Rust booleans.
+- Changed many OOXML measure and percentage attributes from loose `String` or integer fields to typed unit unions from `ooxmlsdk::units`, including `TwipsMeasureValue`, `SignedTwipsMeasureValue`, `MeasurementOrPercentValue`, `DrawingmlPercentageValue`, coordinate values, HPS values, text point values, and related aliases.
+- Changed `SdkEnum::as_xml_str()` to return `&str` instead of `&'static str` so generated open-enum fallback variants can preserve unknown lexical values.
+- Changed the low-level `SdkType` derive contract. Generated types now expose `ELEMENT_NAME`, `read_borrowed`, `read_io`, and `write_inner` instead of the previous deserialize/write internals. This affects custom manual implementations of `SdkType`; normal `#[derive(SdkType)]` users should regenerate or rebuild.
+- Replaced some raw wildcard XML surfaces with typed known-child choices. For example, `a:graphicData` now exposes `graphic_data_choice: Vec<GraphicDataChoice>` for known graphic data payloads while still preserving unknown content through `XmlAny`.
+
+### Generated API Naming
+
+- Generated field names now prefer schema class names, summary-backed names, or local element names over namespace prefixes. Namespace prefixes are used only when needed to avoid collisions or when no better source-backed name exists.
+- Repeated child fields are named after the repeated item, not after the namespace-qualified XML tag. For example, repeated paragraph/table/extension children become `paragraph`, `table_row`, `extension`, etc.
+- Choice variants prefer the concrete child type name. When multiple particles map to the same type or local name, the generator adds stable numeric suffixes rather than inventing semantic names not present in the source data.
+- Anonymous wrapper choices are flattened when doing so is unambiguous. Generic names such as `Choice`, `Choice2`, and `Sequence` remain intentionally generic for source-anonymous particles.
+
+### XML and Compatibility
+
+- Preserved more unknown extension attributes and children in generated schemas, including DrawingML, SpreadsheetML, PresentationML, WordprocessingML, chart, comment, and OPC core properties compatibility cases.
+- Added direct XML preservation for additional extension-list and alternate-content locations so round trips keep non-standard or newer Office markup instead of dropping it.
+- Accepted additional real-world enum values and open enum fallbacks, including compatibility values such as SpreadsheetML sheet state `show`.
+- Improved MCE and unknown child routing in generated choices, including content under `mc:AlternateContent` and Office extension namespaces.
+- Improved Strict and OPC compatibility by tolerating real-world core-properties children such as `cp:contentType` while preserving unknown XML where appropriate.
+
+### Simple Types and Units
+
+- Added the public `ooxmlsdk::units` module with OOXML unit constants, parsers, lexical formatting, and conversions for EMU, twips, half-points, DrawingML percentages, Word percentages, VML fixed values, DrawingML angles, 1/100 mm, and text point units.
+- Added typed simple-value aliases and wrappers for OOXML measure unions, percentage unions, coordinate unions, and text-size units so generated schema fields retain the original lexical category while still offering conversion helpers such as `to_emu()`, `to_twips()`, and ratio conversion.
+- Added `Int32ZeroOnOverflowValue` handling for compatibility with fields where Office producers emit unsigned-looking values in signed integer slots.
+
+### Package API
+
+- Added `RelatedPart<T>` and typed related-part traversal helpers on packages and parts, including `related_parts_of_type`, `related_part_of_type`, and relationship-type variants that preserve the relationship id alongside the typed part handle.
+- Kept existing typed child accessors and relationship lookup behavior while reducing repeated generated relationship traversal code.
+
+### Derive and Code Generation
+
+- Extended `ooxmlsdk-derive` to parse generated metadata for list-valued attrs/text, simple-type-specific XML parsing/writing, typed child choices, open enum fallback variants, direct XML preservation, and the new `SdkType` read/write contract.
+- Improved generated read dispatch for overlapping nested choice branches, shared local names, and extension namespace children.
+- Regenerated checked-in runtime schemas from updated `data/`, package schemas, and `sdk_data/schema_extensions`.
+
+### Testing
+
+- Expanded round-trip coverage for real-world LibreOffice and Open XML SDK fixtures, especially MCE, unknown extension content, DrawingML graphic data, SpreadsheetML pivot/cache edge cases, WordprocessingML run-property ordering, and strict/compatibility package inputs.
+- Kept generator, formatting, workspace test, and clippy lanes green for the release preparation.
+
 ## 0.6.1
 
 ### Package API

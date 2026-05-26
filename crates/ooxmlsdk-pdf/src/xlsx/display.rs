@@ -694,6 +694,12 @@ fn calc_row_inter_cell_spaces(
   let space_width = text_metrics::measure_text(" ", &current_text.style)
     .max(current_text.style.font_size_pt * 0.25)
     .max(1.0);
+  if current.address.row == next.address.row
+    && current.address.col + 1 == next.address.col
+    && gap < space_width * 0.5
+  {
+    return 0;
+  }
   // Source: LibreOffice sc/source/ui/view/output2.cxx SetTextToWidthOrHash()
   // replaces clipped numeric output with "###", then SetClipMarks() only
   // adjusts the clip region. Keep PDF text extraction joined when the actual

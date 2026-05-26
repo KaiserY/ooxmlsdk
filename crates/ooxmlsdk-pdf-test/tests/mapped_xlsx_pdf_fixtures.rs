@@ -1175,7 +1175,6 @@ fn mapped_xlsx_tdf131424_keeps_structured_reference_sums_visible() {
 }
 
 #[test]
-#[ignore = "blocked by typed ooxmlsdk import dropping malformed cell refs such as r=\"1_1\"; LibreOffice falls back in SheetDataContext::importCell"]
 // Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTdf122336
 fn mapped_xlsx_tdf122336_keeps_imported_date_and_job_fields_visible() {
   let summary = render_summary("tdf122336.xlsx");
@@ -1437,7 +1436,6 @@ fn mapped_xlsx_tdf85617_keeps_sheet_local_name_result_visible() {
 }
 
 #[test]
-#[ignore = "blocked by typed ooxmlsdk import of non-standard sheet state=\"show\""]
 // Source: ../core/sc/qa/unit/subsequent_filters_test5.cxx:testTdf118668
 fn mapped_xlsx_tdf118668_prints_visible_second_sheet() {
   let summary = render_summary("tdf118668.xlsx");
@@ -1961,7 +1959,6 @@ fn mapped_xlsx_universal_content_strict_keeps_core_values_visible() {
 }
 
 #[test]
-#[ignore = "blocked by typed ooxmlsdk core properties import of cp:contentType"]
 // Source: ../core/sc/qa/unit/subsequent_filters_test.cxx:testRowIndex1BasedXLSX
 fn mapped_xlsx_row_index_1_based_keeps_first_row_and_multiline_text_visible() {
   let summary = render_summary("row-index-1-based.xlsx");

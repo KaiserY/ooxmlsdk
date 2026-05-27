@@ -2338,8 +2338,8 @@ fn add_new_parts_use_unique_upstream_style_part_names() {
 
   let image1 = main_part.add_image_part(&mut package, "image/png").unwrap();
   let image2 = main_part.add_image_part(&mut package, "image/png").unwrap();
-  assert_eq!(image1.path(&package), Some("word/media/image1.bin"));
-  assert_eq!(image2.path(&package), Some("word/media/image2.bin"));
+  assert_eq!(image1.path(&package), Some("word/media/image1.png"));
+  assert_eq!(image2.path(&package), Some("word/media/image2.png"));
 }
 
 #[test]
@@ -2590,6 +2590,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
     relationship_count + 1
   );
   assert_eq!(image_part.content_type(&package), Some("image/jpeg"));
+  assert_eq!(image_part.path(&package), Some("word/media/image1.jpeg"));
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();

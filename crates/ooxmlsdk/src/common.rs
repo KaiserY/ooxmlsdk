@@ -23,7 +23,7 @@ pub(crate) use package::PackageId;
 #[cfg(feature = "parts")]
 pub(crate) use package::{
   NewPartDescriptor, NewPartTargetMode, RelationshipInfo, RelationshipSet, SdkPackageStorage,
-  StoredPart,
+  StoredPart, default_part_extension_for_content_type,
 };
 #[cfg(feature = "parts")]
 pub use package::{

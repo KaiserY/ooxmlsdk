@@ -57,6 +57,48 @@ pub(crate) struct NewPartDescriptor {
   pub(crate) extension: Cow<'static, str>,
 }
 
+pub(crate) fn default_part_extension_for_content_type(content_type: &str) -> Option<&'static str> {
+  match content_type {
+    "image/unknown" => Some(".bin"),
+    "image/bmp" => Some(".bmp"),
+    "image/gif" => Some(".gif"),
+    "image/png" => Some(".png"),
+    "image/jp2" => Some(".jp2"),
+    "image/tif" => Some(".tif"),
+    "image/tiff" => Some(".tiff"),
+    "image/xbm" => Some(".xbm"),
+    "image/x-icon" => Some(".ico"),
+    "image/x-pcx" => Some(".pcx"),
+    "image/x-pcz" => Some(".pcz"),
+    "image/x-emz" => Some(".emz"),
+    "image/x-wmz" => Some(".wmz"),
+    "image/jpeg" => Some(".jpeg"),
+    "image/x-emf" => Some(".emf"),
+    "image/x-wmf" => Some(".wmf"),
+    "image/svg+xml" => Some(".svg"),
+    "audio/aiff" => Some(".aiff"),
+    "audio/midi" => Some(".midi"),
+    "audio/mp3" => Some(".mp3"),
+    "audio/mpegurl" => Some(".m3u"),
+    "audio/wav" => Some(".wav"),
+    "audio/x-ms-wma" => Some(".wma"),
+    "audio/mpeg" => Some(".mpeg"),
+    "audio/ogg" => Some(".ogg"),
+    "video/x-ms-asf-plugin" => Some(".asx"),
+    "video/avi" => Some(".avi"),
+    "video/mp4" => Some(".mp4"),
+    "video/mpg" => Some(".mpg"),
+    "video/mpeg" => Some(".mpeg"),
+    "video/x-ms-wmv" => Some(".wmv"),
+    "video/x-ms-wmx" => Some(".wmx"),
+    "video/x-ms-wvx" => Some(".wvx"),
+    "video/quicktime" => Some(".mov"),
+    "video/ogg" => Some(".ogg"),
+    "video/vc1" => Some(".wmv"),
+    _ => None,
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum NewPartTargetMode {
   Fixed,

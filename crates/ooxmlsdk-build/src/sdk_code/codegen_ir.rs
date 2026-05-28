@@ -68,8 +68,6 @@ pub struct TypeDecl {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub xml_content: Option<TypeRefDecl>,
   pub support: SystemSupportDecl,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub content_structure: Option<ContentParticleDecl>,
   pub members: Vec<MemberDecl>,
 }
 
@@ -109,32 +107,6 @@ pub enum ContentModelDecl {
   OneSequenceFlatten,
   OneSequenceStructured,
   GenericChildrenFallback,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(default, rename_all = "PascalCase")]
-pub struct ContentParticleDecl {
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub particle_id: Option<String>,
-  pub kind: ContentParticleKind,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub qname: Option<String>,
-  pub version: String,
-  pub cardinality: Cardinality,
-  pub children: Vec<ContentParticleDecl>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "PascalCase")]
-pub enum ContentParticleKind {
-  #[default]
-  Child,
-  TextChild,
-  Any,
-  Choice,
-  Sequence,
-  All,
-  Text,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -365,7 +337,6 @@ mod tests {
           have_xml_other_children: true,
           compact_xml_other_children: false,
         },
-        content_structure: None,
         members: vec![
           MemberDecl::Field(FieldDecl {
             rust_name: "id".to_string(),
@@ -443,38 +414,6 @@ mod tests {
         base_rust_name: None,
         xml_content: None,
         support: SystemSupportDecl::default(),
-        content_structure: Some(ContentParticleDecl {
-          particle_id: Some("root".to_string()),
-          kind: ContentParticleKind::Sequence,
-          qname: None,
-          version: String::new(),
-          cardinality: Cardinality::One,
-          children: vec![ContentParticleDecl {
-            particle_id: Some("root/choice_1".to_string()),
-            kind: ContentParticleKind::Choice,
-            qname: None,
-            version: "Office2010".to_string(),
-            cardinality: Cardinality::Optional,
-            children: vec![
-              ContentParticleDecl {
-                particle_id: Some("root/choice_1/text_child_1".to_string()),
-                kind: ContentParticleKind::TextChild,
-                qname: Some("w:t".to_string()),
-                version: String::new(),
-                cardinality: Cardinality::One,
-                children: vec![],
-              },
-              ContentParticleDecl {
-                particle_id: Some("root/choice_1/any_1".to_string()),
-                kind: ContentParticleKind::Any,
-                qname: None,
-                version: "Office2010".to_string(),
-                cardinality: Cardinality::Many,
-                children: vec![],
-              },
-            ],
-          }],
-        }),
         members: vec![MemberDecl::Variant(VariantDecl {
           rust_name: "Text".to_string(),
           docs: String::new(),

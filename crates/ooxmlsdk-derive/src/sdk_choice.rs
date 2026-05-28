@@ -21,23 +21,6 @@ impl DeserializeMode {
     }
   }
 
-  fn skip_foreign_element_children_tokens(self) -> proc_macro2::TokenStream {
-    match self {
-      Self::Borrowed => quote! {
-        crate::common::skip_foreign_element_children_borrowed(
-          xml_reader,
-          next_empty,
-        )?;
-      },
-      Self::Io => quote! {
-        crate::common::skip_foreign_element_children_io(
-          xml_reader,
-          next_empty,
-        )?;
-      },
-    }
-  }
-
   fn read_outer_xml_fn(self) -> proc_macro2::TokenStream {
     match self {
       Self::Borrowed => quote! { crate::common::read_outer_xml_borrowed },
@@ -147,9 +130,6 @@ fn empty_child_skip_tokens(
   local_name_fallback_qnames: &std::collections::HashSet<String>,
 ) -> proc_macro2::TokenStream {
   let qname_patterns = choice_qname_patterns(qnames, local_name_fallback_qnames);
-  let first_qname = qnames.first().map(String::as_str).unwrap_or("");
-  let QNameInfo { tag_prefix, .. } = parse_qname_info(first_qname);
-  let skip_foreign_children = mode.skip_foreign_element_children_tokens();
   let next_tag_event = mode.tag_event_ty();
 
   quote! {
@@ -159,15 +139,12 @@ fn empty_child_skip_tokens(
           #next_tag_event::Start(e, next_empty) => {
             let event_name = e.name();
             let event_name = event_name.as_ref();
-            if crate::common::is_foreign_prefixed_child(event_name, #tag_prefix) {
-              #skip_foreign_children
-            } else {
-              return Err(crate::common::unexpected_tag(
-                stringify!(#ident),
-                "empty child",
-                event_name,
-              ));
-            }
+            let _ = next_empty;
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "empty child",
+              event_name,
+            ));
           }
           #next_tag_event::End(e) => {
             match e.name().as_ref() {

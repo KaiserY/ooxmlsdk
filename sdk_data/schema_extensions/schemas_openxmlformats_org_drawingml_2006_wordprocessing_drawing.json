@@ -3,6 +3,20 @@
     {
       "ClassName": "Inline",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Anchor",
+      "HaveDirectXmlOtherChildren": true,
+      "Children": [
+        {
+          "PropertyName": "HorizontalPosition",
+          "Optional": true
+        },
+        {
+          "PropertyName": "VerticalPosition",
+          "Optional": true
+        }
+      ]
     }
   ]
 }

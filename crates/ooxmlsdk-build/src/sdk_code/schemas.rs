@@ -2290,7 +2290,9 @@ fn choice_variant_doc_attrs(
           .and_then(|type_decl| meaningful_doc_text(&type_decl.docs))
       })
   };
-  let doc_text = if prefer_payload_docs {
+  let doc_text = if variant.docs.is_empty() {
+    None
+  } else if prefer_payload_docs {
     payload_doc_text().or_else(|| meaningful_doc_text(&variant.docs))
   } else {
     meaningful_doc_text(&variant.docs).or_else(payload_doc_text)
@@ -2426,6 +2428,14 @@ fn can_omit_choice_child_qname_attr(
   render_context: &ChoiceVariantRenderContext<'_>,
   qnames: &[String],
 ) -> bool {
+  if choice_variant_is_math_drawing_run_properties(variant, qnames) {
+    return true;
+  }
+
+  if variant.docs.is_empty() {
+    return false;
+  }
+
   if qnames.len() != 1 {
     return false;
   }
@@ -2448,6 +2458,15 @@ fn can_omit_choice_child_qname_attr(
     .type_graph
     .type_xml_qname(&type_key)
     .is_some_and(|xml_qname| xml_qname == qnames[0])
+}
+
+fn choice_variant_is_math_drawing_run_properties(variant: &VariantDecl, qnames: &[String]) -> bool {
+  qnames.len() == 1
+    && variant.rust_name == "DrawingRunProperties"
+    && qnames[0] == "a:CT_TextCharacterProperties/a:rPr"
+    && variant.payload.rust_type == "RunProperties"
+    && variant.payload.module_path.as_deref()
+      == Some("crate::schemas::schemas_openxmlformats_org_drawingml_2006_main")
 }
 
 fn gen_choice_variant_tokens(

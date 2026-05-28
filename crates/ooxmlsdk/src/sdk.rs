@@ -295,10 +295,8 @@ pub(crate) fn typed_main_part_content_type<T: SdkPart>(
 }
 
 #[cfg(feature = "parts")]
-fn extension_for_content_type<T: SdkPart>(
-  content_type: &std::borrow::Cow<'static, str>,
-) -> std::borrow::Cow<'static, str> {
-  crate::common::default_part_extension_for_content_type(content_type.as_ref())
+fn extension_for_content_type<T: SdkPart>(content_type: &str) -> std::borrow::Cow<'static, str> {
+  crate::common::default_part_extension_for_content_type(content_type)
     .map(std::borrow::Cow::Borrowed)
     .unwrap_or(std::borrow::Cow::Borrowed(T::EXTENSION))
 }
@@ -2759,7 +2757,7 @@ pub trait SdkPart: Clone + Sized + 'static {
   {
     let content_type = content_type.into();
     let extension =
-      extension_for_content_type::<crate::parts::image_part::ImagePart>(&content_type);
+      extension_for_content_type::<crate::parts::image_part::ImagePart>(content_type.as_ref());
     self.add_new_part_with_content_type_and_extension_auto_id::<
       P,
       crate::parts::image_part::ImagePart,
@@ -2782,7 +2780,7 @@ pub trait SdkPart: Clone + Sized + 'static {
   {
     let content_type = content_type.into();
     let extension =
-      extension_for_content_type::<crate::parts::image_part::ImagePart>(&content_type);
+      extension_for_content_type::<crate::parts::image_part::ImagePart>(content_type.as_ref());
     self.add_new_part_with_content_type_and_extension::<P, crate::parts::image_part::ImagePart>(
       package,
       relationship_id,

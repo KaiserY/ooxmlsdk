@@ -21,7 +21,9 @@ use crate::sdk_data::{
   mce::gen_mc_schema_from_xsd,
   opc_schemas::read_opc_schemas,
   parts::gen_parts,
-  schema_extensions::{apply_schema_extensions, read_schema_extensions},
+  schema_extensions::{
+    apply_codegen_ir_schema_extensions, apply_schema_extensions, read_schema_extensions,
+  },
   schemas::{assign_schema_particle_ids, gen_schemas},
 };
 
@@ -65,12 +67,13 @@ pub fn gen_sdk_data<P: AsRef<Path>, Q: AsRef<Path>>(
   let codegen_context = CodegenContext::new(&schemas);
 
   for schema in &schemas {
-    let ir = build_codegen_ir(schema, &codegen_context).map_err(|err| {
+    let mut ir = build_codegen_ir(schema, &codegen_context).map_err(|err| {
       format!(
         "failed to build codegen IR for {}: {err}",
         schema.module_name
       )
     })?;
+    apply_codegen_ir_schema_extensions(&schema.module_name, &mut ir, &schema_extensions)?;
     write_json(
       out_schemas_dir_path.join(format!("{}.json", schema.module_name)),
       &ir,

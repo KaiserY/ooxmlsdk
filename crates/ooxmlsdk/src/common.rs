@@ -304,15 +304,6 @@ pub(crate) fn push_xml_general_ref(
   xml::push_xml_general_ref(value, text, ty, field)
 }
 
-pub(crate) fn is_foreign_prefixed_child(name: &[u8], expected_prefix: &str) -> bool {
-  let Some(separator_index) = name.iter().position(|b| *b == b':') else {
-    return false;
-  };
-  let prefix = &name[..separator_index];
-
-  prefix != expected_prefix.as_bytes()
-}
-
 #[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn parent_zip_path(path: &str) -> String {
@@ -347,102 +338,6 @@ pub(crate) fn part_relationships_directory_path(path: &str) -> String {
   let mut rels_dir_path = parent_zip_path(path);
   rels_dir_path.push_str("_rels");
   resolve_zip_file_path(&rels_dir_path)
-}
-
-pub(crate) fn process_foreign_element_children_borrowed<'de, F>(
-  xml_reader: &mut SliceReader<'de>,
-  empty_tag: bool,
-  visitor: &mut F,
-) -> Result<(), SdkError>
-where
-  F: FnMut(
-    &mut SliceReader<'de>,
-    quick_xml::events::BytesStart<'de>,
-    bool,
-  ) -> Result<bool, SdkError>,
-{
-  if empty_tag {
-    return Ok(());
-  }
-
-  loop {
-    match xml_reader.next_tag_event()? {
-      crate::common::SliceTagEvent::Start(e, false) => match visitor(xml_reader, e, false)? {
-        true => {}
-        false => {
-          process_foreign_element_children_borrowed(xml_reader, false, visitor)?;
-        }
-      },
-      crate::common::SliceTagEvent::Start(e, true) => {
-        visitor(xml_reader, e, true)?;
-      }
-      crate::common::SliceTagEvent::End(_) => break,
-      crate::common::SliceTagEvent::Eof => Err(unexpected_eof("process_foreign_element_children"))?,
-      crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
-    }
-  }
-
-  Ok(())
-}
-
-pub(crate) fn process_foreign_element_children_io<R, F>(
-  xml_reader: &mut IoReader<R>,
-  empty_tag: bool,
-  visitor: &mut F,
-) -> Result<(), SdkError>
-where
-  R: std::io::BufRead,
-  F:
-    FnMut(&mut IoReader<R>, quick_xml::events::BytesStart<'static>, bool) -> Result<bool, SdkError>,
-{
-  if empty_tag {
-    return Ok(());
-  }
-
-  loop {
-    let next_event = match xml_reader.next_borrowed()? {
-      quick_xml::events::Event::Start(e) => Some((e.into_owned(), false)),
-      quick_xml::events::Event::Empty(e) => Some((e.into_owned(), true)),
-      quick_xml::events::Event::End(_) => break,
-      quick_xml::events::Event::Eof => Err(unexpected_eof("process_foreign_element_children_io"))?,
-      _ => None,
-    };
-
-    match next_event {
-      Some((e, false)) => match visitor(xml_reader, e, false)? {
-        true => {}
-        false => {
-          process_foreign_element_children_io(xml_reader, false, visitor)?;
-        }
-      },
-      Some((e, true)) => {
-        visitor(xml_reader, e, true)?;
-      }
-      None => {}
-    }
-  }
-
-  Ok(())
-}
-
-pub(crate) fn skip_foreign_element_children_borrowed<'de>(
-  xml_reader: &mut SliceReader<'de>,
-  empty_tag: bool,
-) -> Result<(), SdkError> {
-  process_foreign_element_children_borrowed(
-    xml_reader,
-    empty_tag,
-    &mut |_xml_reader, _e, _e_empty| Ok(false),
-  )
-}
-
-pub(crate) fn skip_foreign_element_children_io<R: std::io::BufRead>(
-  xml_reader: &mut IoReader<R>,
-  empty_tag: bool,
-) -> Result<(), SdkError> {
-  process_foreign_element_children_io(xml_reader, empty_tag, &mut |_xml_reader, _e, _e_empty| {
-    Ok(false)
-  })
 }
 
 #[cfg(test)]

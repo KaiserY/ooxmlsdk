@@ -5,6 +5,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::sdk_code::codegen_ir::{
+  MemberDecl, SchemaModuleDecl, TypeKind, TypeRefDecl, VariantDecl, VariantWireDecl,
+};
 use crate::sdk_data::sdk_data_model::Schema;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -12,6 +15,7 @@ use crate::sdk_data::sdk_data_model::Schema;
 pub struct SchemaExtensions {
   pub enums: Vec<SchemaEnumExtension>,
   pub types: Vec<SchemaTypeExtension>,
+  pub choice_enums: Vec<SchemaChoiceEnumExtension>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -70,6 +74,29 @@ pub struct SchemaTypeChildExtension {
   pub repeated: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_name: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaChoiceEnumExtension {
+  pub rust_name: String,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub add_variants: Vec<SchemaChoiceVariantExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaChoiceVariantExtension {
+  pub rust_name: String,
+  #[serde(rename = "QName")]
+  pub q_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub docs: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub version: String,
+  pub payload_rust_type: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub payload_module_path: String,
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -242,6 +269,117 @@ pub fn apply_schema_extensions(
   Ok(())
 }
 
+pub fn apply_codegen_ir_schema_extensions(
+  module_name: &str,
+  ir: &mut SchemaModuleDecl,
+  schema_extensions: &[(String, SchemaExtensions)],
+) -> Result<()> {
+  let Some((_, extensions)) = schema_extensions
+    .iter()
+    .find(|(extension_module_name, _)| extension_module_name == module_name)
+  else {
+    return Ok(());
+  };
+
+  for choice_extension in &extensions.choice_enums {
+    let Some(type_decl) = ir
+      .types
+      .iter_mut()
+      .find(|type_decl| type_decl.rust_name == choice_extension.rust_name)
+    else {
+      return Err(
+        format!(
+          "schema extension choice enum {}.{} not found",
+          module_name, choice_extension.rust_name
+        )
+        .into(),
+      );
+    };
+
+    if type_decl.kind != TypeKind::ChoiceEnum {
+      return Err(
+        format!(
+          "schema extension choice enum {}.{} targets {:?}",
+          module_name, choice_extension.rust_name, type_decl.kind
+        )
+        .into(),
+      );
+    }
+
+    for variant_extension in &choice_extension.add_variants {
+      if variant_extension.rust_name.is_empty()
+        || variant_extension.q_name.is_empty()
+        || variant_extension.payload_rust_type.is_empty()
+      {
+        return Err(
+          format!(
+            "schema extension choice enum {}.{} has incomplete add variant",
+            module_name, choice_extension.rust_name
+          )
+          .into(),
+        );
+      }
+
+      if type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant) if variant.rust_name == variant_extension.rust_name
+        )
+      }) {
+        return Err(
+          format!(
+            "schema extension choice enum {}.{} already has variant {}",
+            module_name, choice_extension.rust_name, variant_extension.rust_name
+          )
+          .into(),
+        );
+      }
+
+      if type_decl.members.iter().any(|member| {
+        matches!(
+          member,
+          MemberDecl::Variant(variant)
+            if variant_wire_qnames(&variant.wire)
+              .is_some_and(|qnames| qnames.iter().any(|qname| qname == &variant_extension.q_name))
+        )
+      }) {
+        return Err(
+          format!(
+            "schema extension choice enum {}.{} already has child {}",
+            module_name, choice_extension.rust_name, variant_extension.q_name
+          )
+          .into(),
+        );
+      }
+
+      type_decl.members.push(MemberDecl::Variant(VariantDecl {
+        rust_name: variant_extension.rust_name.clone(),
+        docs: variant_extension.docs.clone(),
+        version: variant_extension.version.clone(),
+        wire: VariantWireDecl::Child {
+          qnames: vec![variant_extension.q_name.clone()],
+        },
+        payload: TypeRefDecl {
+          rust_type: variant_extension.payload_rust_type.clone(),
+          module_path: (!variant_extension.payload_module_path.is_empty())
+            .then(|| variant_extension.payload_module_path.clone()),
+        },
+      }));
+    }
+  }
+
+  Ok(())
+}
+
+fn variant_wire_qnames(wire: &VariantWireDecl) -> Option<&[String]> {
+  match wire {
+    VariantWireDecl::Child { qnames }
+    | VariantWireDecl::Sequence { qnames }
+    | VariantWireDecl::TextChild { qnames } => Some(qnames),
+    VariantWireDecl::Any | VariantWireDecl::Text => None,
+  }
+}
+
 fn find_child_mut<'a>(
   children: &'a mut [crate::sdk_data::sdk_data_model::SchemaTypeChild],
   extension: &SchemaTypeChildExtension,
@@ -260,6 +398,7 @@ fn find_child_mut<'a>(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::sdk_code::codegen_ir::{SchemaModuleDecl, TypeDecl};
   use crate::sdk_data::sdk_data_model::{
     SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
   };
@@ -535,5 +674,65 @@ mod tests {
     assert_eq!(schemas[0].enums[0].facets[2].name, "End");
     assert_eq!(schemas[0].enums[0].facets[2].value, "end");
     assert_eq!(schemas[0].enums[0].facets[2].version, "Office2010");
+  }
+
+  #[test]
+  fn applies_choice_enum_add_variant_extension() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "ControlPropertiesChoice".to_string(),
+        kind: TypeKind::ChoiceEnum,
+        members: vec![MemberDecl::Variant(VariantDecl {
+          rust_name: "RunProperties".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["w:CT_RPr/w:rPr".to_string()],
+          },
+          payload: TypeRefDecl {
+            rust_type: "RunProperties".to_string(),
+            module_path: Some("crate::schemas::w".to_string()),
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        choice_enums: vec![SchemaChoiceEnumExtension {
+          rust_name: "ControlPropertiesChoice".to_string(),
+          add_variants: vec![SchemaChoiceVariantExtension {
+            rust_name: "DrawingRunProperties".to_string(),
+            q_name: "a:CT_TextCharacterProperties/a:rPr".to_string(),
+            payload_rust_type: "RunProperties".to_string(),
+            payload_module_path: "crate::schemas::a".to_string(),
+            ..Default::default()
+          }],
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let choice = &ir.types[0];
+    assert_eq!(choice.members.len(), 2);
+    let MemberDecl::Variant(variant) = &choice.members[1] else {
+      panic!("expected variant");
+    };
+    assert_eq!(variant.rust_name, "DrawingRunProperties");
+    assert_eq!(
+      variant.wire,
+      VariantWireDecl::Child {
+        qnames: vec!["a:CT_TextCharacterProperties/a:rPr".to_string()]
+      }
+    );
+    assert_eq!(variant.payload.rust_type, "RunProperties");
+    assert_eq!(
+      variant.payload.module_path.as_deref(),
+      Some("crate::schemas::a")
+    );
   }
 }

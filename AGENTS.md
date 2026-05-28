@@ -112,6 +112,20 @@ ignored test before deciding the implementation is correct:
 
 - `cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
 
+The dump test expands one derive target at a time. Select the target with
+environment variables:
+
+- `OOXMLSDK_DUMP_KIND`: one of `SdkEnum`, `SdkType`, `SdkChoice`, `SdkPart`, or
+  `SdkPackage`; defaults to `SdkPart`
+- `OOXMLSDK_DUMP_FILE`: runtime source file under `crates/ooxmlsdk/src/`;
+  defaults to `parts/main_document_part.rs`
+- `OOXMLSDK_DUMP_TARGET`: item name to expand; defaults to `MainDocumentPart`
+
+Examples:
+
+- `OOXMLSDK_DUMP_KIND=SdkType OOXMLSDK_DUMP_FILE=schemas/schemas_microsoft_com_office_word_2010_wordml.rs OOXMLSDK_DUMP_TARGET=Shadow cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
+- `OOXMLSDK_DUMP_KIND=SdkChoice OOXMLSDK_DUMP_FILE=schemas/schemas_microsoft_com_office_word_2010_wordml.rs OOXMLSDK_DUMP_TARGET=ShadowChoice cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
+
 The dump writes expanded Rust under `target/ooxmlsdk_macro_expanded/`. Inspect
 the relevant expanded file and keep generated code direct, predictable, and
 cheap: prefer static decisions from generator metadata, avoid redundant runtime

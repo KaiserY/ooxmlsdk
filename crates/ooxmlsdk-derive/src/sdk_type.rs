@@ -21,23 +21,6 @@ impl DeserializeMode {
     }
   }
 
-  fn skip_foreign_element_children_tokens(self, reader_ident: &Ident) -> proc_macro2::TokenStream {
-    match self {
-      Self::Borrowed => quote! {
-        crate::common::skip_foreign_element_children_borrowed(
-          #reader_ident,
-          next_empty,
-        )?;
-      },
-      Self::Io => quote! {
-        crate::common::skip_foreign_element_children_io(
-          #reader_ident,
-          next_empty,
-        )?;
-      },
-    }
-  }
-
   fn read_outer_xml_fn(self) -> proc_macro2::TokenStream {
     match self {
       Self::Borrowed => quote! { crate::common::read_outer_xml_borrowed },
@@ -50,21 +33,18 @@ fn deserialize_type_inner_ident(mode: DeserializeMode) -> Ident {
   mode.deserialize_inner_ident()
 }
 
-fn is_local_name_dispatch_namespace(prefix: &str) -> bool {
+fn is_canonical_xmlns_prefix_namespace(prefix: &str) -> bool {
   matches!(prefix, "x14" | "xne")
 }
 
 fn should_match_text_child_end_by_local_name(qname: &str, use_local_name_dispatch: bool) -> bool {
   let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
-  use_local_name_dispatch && is_local_name_dispatch_namespace(&tag_prefix)
+  use_local_name_dispatch && !tag_prefix.is_empty()
 }
 
 fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  if tag_prefix.is_empty() || !is_local_name_dispatch_namespace(&tag_prefix) {
+  let QNameInfo { local_name, .. } = parse_qname_info(qname);
+  if local_name.is_empty() {
     return None;
   }
   Some(local_name)
@@ -88,18 +68,56 @@ where
 }
 
 fn should_use_local_name_child_dispatch(
-  schema_qname: &str,
+  _schema_qname: &str,
   child_qnames: impl IntoIterator<Item = String>,
   has_choice_dispatch: bool,
   has_any_dispatch: bool,
+  has_xml_other_children_dispatch: bool,
 ) -> bool {
-  let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
-  if !is_local_name_dispatch_namespace(&tag_prefix) || has_choice_dispatch || has_any_dispatch {
+  if has_choice_dispatch || has_any_dispatch || has_xml_other_children_dispatch {
     return false;
   }
 
   let child_qnames = child_qnames.into_iter().collect::<Vec<_>>();
   !child_qnames.is_empty() && has_unique_local_name_dispatch(child_qnames)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn local_name_child_dispatch_allows_any_prefix_when_unambiguous() {
+    assert!(should_use_local_name_child_dispatch(
+      "w:CT_DocVars/w:docVars",
+      ["w:CT_DocVar/w:docVar".to_string()],
+      false,
+      false,
+      false,
+    ));
+  }
+
+  #[test]
+  fn local_name_child_dispatch_rejects_same_parent_conflicts() {
+    assert!(!should_use_local_name_child_dispatch(
+      "w:CT_SomeParent/w:parent",
+      ["w:CT_R/w:r".to_string(), "m:CT_R/m:r".to_string()],
+      false,
+      false,
+      false,
+    ));
+  }
+
+  #[test]
+  fn local_name_child_dispatch_rejects_xml_other_children() {
+    assert!(!should_use_local_name_child_dispatch(
+      "w:CT_RPrList/w:rPr",
+      ["w:CT_OnOff/w:shadow".to_string()],
+      false,
+      false,
+      true,
+    ));
+  }
 }
 
 fn qname_match_targets(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
@@ -1281,17 +1299,10 @@ fn build_empty_child_skip_tokens(
   mode: DeserializeMode,
   reader_ident: &Ident,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
+  let QNameInfo { local_name, .. } = parse_qname_info(qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_qname_lit = LitByteStr::new(
-    format!("{tag_prefix}:{local_name}").as_bytes(),
-    Span::call_site(),
-  );
+  let tag_qname_lit = LitByteStr::new(qname.as_bytes(), Span::call_site());
   let next_tag_event = mode.tag_event_ty();
-  let skip_foreign_children = mode.skip_foreign_element_children_tokens(reader_ident);
 
   quote! {
     if !next_empty {
@@ -1300,15 +1311,12 @@ fn build_empty_child_skip_tokens(
           #next_tag_event::Start(e, next_empty) => {
             let event_name = e.name();
             let event_name = event_name.as_ref();
-            if crate::common::is_foreign_prefixed_child(event_name, #tag_prefix) {
-              #skip_foreign_children
-            } else {
-              return Err(crate::common::unexpected_tag(
-                stringify!(#owner_ident),
-                "empty child",
-                event_name,
-              ));
-            }
+            let _ = next_empty;
+            return Err(crate::common::unexpected_tag(
+              stringify!(#owner_ident),
+              "empty child",
+              event_name,
+            ));
           }
           #next_tag_event::End(e) => {
             if e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit {
@@ -1490,7 +1498,6 @@ fn build_pure_any_child_parse_tokens(
 
 fn build_unmatched_child_tokens(
   owner_ident: &Ident,
-  tag_prefix: &str,
   mode: DeserializeMode,
   has_xml_other_children_field: bool,
   compact_xml_other_children: bool,
@@ -1511,22 +1518,12 @@ fn build_unmatched_child_tokens(
     };
   }
 
-  let skip_foreign_children =
-    mode.skip_foreign_element_children_tokens(&Ident::new("xml_reader", Span::call_site()));
-
   quote! {
-    if crate::common::is_foreign_prefixed_child(
+    Err(crate::common::unexpected_tag(
+      stringify!(#owner_ident),
+      "known child",
       event_name,
-      #tag_prefix,
-    ) {
-      #skip_foreign_children
-    } else {
-      Err(crate::common::unexpected_tag(
-        stringify!(#owner_ident),
-        "known child",
-        event_name,
-      ))?;
-    }
+    ))?;
   }
 }
 
@@ -2977,123 +2974,7 @@ fn expand_helper_struct(
     return expand_sequence_helper_struct(input, fields);
   }
 
-  let has_child_dispatch = !child_fields.is_empty()
-    || !empty_child_fields.is_empty()
-    || !text_child_fields.is_empty()
-    || !any_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
-  let visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
-    quote! {
-      let mut visit_foreign_child = |
-        _xml_reader: &mut crate::common::SliceReader<'de>,
-        _e: quick_xml::events::BytesStart<'de>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
-    }
-  } else if !has_choice_dispatch {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
-        match event_name {
-          #( #direct_child_visit_match_tokens_borrowed )*
-          #( #child_visit_parse_tokens_borrowed )*
-          _ => Ok(false),
-        }
-      };
-    }
-  } else {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        e: quick_xml::events::BytesStart<'de>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
-        let matched: bool = match event_name {
-          #( #direct_child_visit_match_tokens_borrowed )*
-          #( #flat_choice_visit_match_tokens_borrowed )*
-          #( #child_visit_parse_tokens_borrowed )*
-          _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #( #choice_unique_visit_parse_tokens_borrowed )*
-              #choice_match_conflict_tokens
-            }
-            let mut matched = false;
-            #( #choice_visit_parse_tokens )*
-            Ok::<bool, crate::common::SdkError>(matched)
-          }
-        }?;
-        Ok(matched)
-      };
-    }
-  };
-  let visit_foreign_child_tokens_io = if !has_child_dispatch && !has_choice_dispatch {
-    quote! {
-      let mut visit_foreign_child = |
-        _xml_reader: &mut crate::common::IoReader<R>,
-        _e: quick_xml::events::BytesStart<'static>,
-        _next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        Ok(false)
-      };
-    }
-  } else if !has_choice_dispatch {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut crate::common::IoReader<R>,
-        e: quick_xml::events::BytesStart<'static>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
-        match event_name {
-          #( #direct_child_visit_match_tokens_io )*
-          #( #child_visit_parse_tokens_io )*
-          _ => Ok(false),
-        }
-      };
-    }
-  } else {
-    quote! {
-      let mut visit_foreign_child = |
-        xml_reader: &mut crate::common::IoReader<R>,
-        e: quick_xml::events::BytesStart<'static>,
-        next_empty: bool,
-      | -> Result<bool, crate::common::SdkError> {
-        let event_name = e.name();
-        let event_name = event_name.as_ref();
-        let matched: bool = match event_name {
-          #( #direct_child_visit_match_tokens_io )*
-          #( #flat_choice_visit_match_tokens_io )*
-          #( #child_visit_parse_tokens_io )*
-          _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #( #choice_unique_visit_parse_tokens_io )*
-              #choice_match_conflict_tokens
-            }
-            let mut matched = false;
-            #( #choice_visit_parse_tokens )*
-            Ok::<bool, crate::common::SdkError>(matched)
-          }
-        }?;
-        Ok(matched)
-      };
-    }
-  };
   let main_dispatch_tokens_borrowed = if !has_choice_dispatch {
     quote! {
       let matched = match event_name {
@@ -3165,15 +3046,6 @@ fn expand_helper_struct(
     }
   };
   let unmatched_child_tokens_borrowed = quote! {
-    if crate::common::is_foreign_prefixed_child(event_name, "") {
-      #visit_foreign_child_tokens_borrowed
-      crate::common::process_foreign_element_children_borrowed(
-        xml_reader,
-        next_empty,
-        &mut visit_foreign_child,
-      )?;
-      continue;
-    }
     return Err(crate::common::unexpected_tag(
       stringify!(#ident),
       "known child",
@@ -3181,15 +3053,6 @@ fn expand_helper_struct(
     ));
   };
   let unmatched_child_tokens_io = quote! {
-    if crate::common::is_foreign_prefixed_child(event_name, "") {
-      #visit_foreign_child_tokens_io
-      crate::common::process_foreign_element_children_io(
-        xml_reader,
-        next_empty,
-        &mut visit_foreign_child,
-      )?;
-      continue;
-    }
     return Err(crate::common::unexpected_tag(
       stringify!(#ident),
       "known child",
@@ -3495,7 +3358,7 @@ fn expand_named_struct(
   let has_xml_other_children_field = xml_other_children_field.is_some();
   let use_canonical_xmlns_prefix = has_xmlns_fields && {
     let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
-    is_local_name_dispatch_namespace(&tag_prefix)
+    is_canonical_xmlns_prefix_namespace(&tag_prefix)
   };
   let use_local_name_child_dispatch = should_use_local_name_child_dispatch(
     schema_qname,
@@ -3507,6 +3370,7 @@ fn expand_named_struct(
       .chain(any_child_fields.iter().map(|field| field.qname.clone())),
     !choice_fields.is_empty(),
     !any_fields.is_empty(),
+    has_xml_other_children_field,
   );
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
@@ -4978,401 +4842,6 @@ fn expand_named_struct(
     .iter()
     .any(|field| !field.accepts_any.unwrap_or(false));
   let has_any_dispatch = !any_fields.is_empty();
-  let _visit_foreign_child_tokens_borrowed =
-    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          _xml_reader: &mut crate::common::SliceReader<'de>,
-          _e: quick_xml::events::BytesStart<'de>,
-          _next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          Ok(false)
-        };
-      }
-    } else if !has_child_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #flat_choice_visit_match_tokens_borrowed )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_borrowed )*
-            #choice_match_conflict_tokens
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #flat_choice_visit_match_tokens_borrowed )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_borrowed )*
-            #choice_match_conflict_tokens
-          }
-          let mut matched = false;
-          #( #choice_visit_parse_tokens )*
-          #( #any_visit_parse_tokens_borrowed )*
-          Ok(matched)
-        };
-      }
-    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #direct_child_visit_match_tokens_borrowed )*
-            _ => {}
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_choice_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_borrowed )*
-            _ => {}
-          }
-          match event_name {
-            #( #child_visit_parse_tokens_borrowed )*
-            _ => Ok(false),
-          }
-        };
-      }
-    } else if !has_any_dispatch && !has_text_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_borrowed )*
-            _ => {}
-          }
-          match event_name {
-            #( #flat_choice_visit_match_tokens_borrowed )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_borrowed )*
-            #choice_match_conflict_tokens
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_borrowed )*
-            _ => {}
-          }
-          match event_name {
-            #( #flat_choice_visit_match_tokens_borrowed )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_borrowed )*
-            #choice_match_conflict_tokens
-          }
-          match event_name {
-            #( #child_visit_parse_tokens_borrowed )*
-            _ => Ok(false),
-          }
-        };
-      }
-    } else {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_borrowed )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_borrowed )*
-            #choice_match_conflict_tokens
-          }
-          let matched: bool = match event_name {
-            #( #child_visit_parse_tokens_borrowed )*
-            _ => {
-              let mut matched = false;
-              #( #choice_visit_parse_tokens )*
-              #( #any_visit_parse_tokens_borrowed )*
-              Ok::<bool, crate::common::SdkError>(matched)
-            }
-          }?;
-          Ok(matched)
-        };
-      }
-    };
-  let _visit_foreign_child_tokens_io =
-    if !has_child_dispatch && !has_choice_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          _xml_reader: &mut crate::common::IoReader<R>,
-          _e: quick_xml::events::BytesStart<'static>,
-          _next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          Ok(false)
-        };
-      }
-    } else if !has_child_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #flat_choice_visit_match_tokens_io )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_io )*
-            #choice_match_conflict_tokens
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #flat_choice_visit_match_tokens_io )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_io )*
-            #choice_match_conflict_tokens
-          }
-          let mut matched = false;
-          #( #choice_visit_parse_tokens )*
-          #( #any_visit_parse_tokens_io )*
-          Ok(matched)
-        };
-      }
-    } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #direct_child_visit_match_tokens_io )*
-            _ => {}
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_choice_dispatch && !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          match event_name {
-            #( #direct_child_visit_match_tokens_io )*
-            #( #child_visit_parse_tokens_io )*
-            _ => Ok(false),
-          }
-        };
-      }
-    } else if !has_any_dispatch && !has_text_child_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_io )*
-            _ => {}
-          }
-          match event_name {
-            #( #flat_choice_visit_match_tokens_io )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_io )*
-            #choice_match_conflict_tokens
-          }
-          Ok(false)
-        };
-      }
-    } else if !has_any_dispatch {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_io )*
-            _ => {}
-          }
-          match event_name {
-            #( #flat_choice_visit_match_tokens_io )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_io )*
-            #choice_match_conflict_tokens
-          }
-          match event_name {
-            #( #child_visit_parse_tokens_io )*
-            _ => Ok(false),
-          }
-        };
-      }
-    } else {
-      quote! {
-        let mut visit_foreign_child = |
-          xml_reader: &mut crate::common::IoReader<R>,
-          e: quick_xml::events::BytesStart<'static>,
-          next_empty: bool,
-        | -> Result<bool, crate::common::SdkError> {
-          let event_name = e.name();
-          let event_name = event_name.as_ref();
-          let direct_child_case = match event_name {
-            #( #direct_child_case_arms )*
-            _ => 0usize,
-          };
-          match direct_child_case {
-            #( #direct_child_visit_dispatch_tokens_io )*
-            _ => {}
-          }
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #( #choice_unique_visit_parse_tokens_io )*
-            #choice_match_conflict_tokens
-          }
-          let matched: bool = match event_name {
-            #( #child_visit_parse_tokens_io )*
-            _ => {
-              let mut matched = false;
-              #( #choice_visit_parse_tokens )*
-              #( #any_visit_parse_tokens_io )*
-              Ok::<bool, crate::common::SdkError>(matched)
-            }
-          }?;
-          Ok(matched)
-        };
-      }
-    };
   let pure_any_dispatch =
     !has_child_dispatch && !has_choice_dispatch && has_any_dispatch && !has_text_child_dispatch;
   let pure_any_choice_dispatch = !has_child_dispatch
@@ -5386,7 +4855,6 @@ fn expand_named_struct(
   } else {
     build_unmatched_child_tokens(
       ident,
-      &tag_prefix,
       DeserializeMode::Borrowed,
       has_xml_other_children_field,
       compact_xml_other_children,
@@ -5397,7 +4865,6 @@ fn expand_named_struct(
   } else {
     build_unmatched_child_tokens(
       ident,
-      &tag_prefix,
       DeserializeMode::Io,
       has_xml_other_children_field,
       compact_xml_other_children,

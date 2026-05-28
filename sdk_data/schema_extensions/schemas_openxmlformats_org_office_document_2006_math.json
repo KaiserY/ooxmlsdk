@@ -1,0 +1,15 @@
+{
+  "ChoiceEnums": [
+    {
+      "RustName": "ControlPropertiesChoice",
+      "AddVariants": [
+        {
+          "RustName": "DrawingRunProperties",
+          "QName": "a:CT_TextCharacterProperties/a:rPr",
+          "PayloadRustType": "RunProperties",
+          "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_drawingml_2006_main"
+        }
+      ]
+    }
+  ]
+}

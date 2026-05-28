@@ -4805,6 +4805,8 @@ fn effect_extent_bottom(extent: Option<&wp::EffectExtent>) -> f32 {
 
 fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
   let margins = floating_wrap_margins(anchor);
+  let horizontal_position = anchor.horizontal_position.as_deref();
+  let vertical_position = anchor.vertical_position.as_deref();
   let simple_position = anchor
     .simple_pos
     .as_ref()
@@ -4812,15 +4814,11 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     .then_some(anchor.simple_position.as_ref());
   let horizontal_relative_to = simple_position
     .map(|_| HorizontalImageReference::Page)
-    .or_else(|| {
-      Some(horizontal_image_reference(
-        anchor.horizontal_position.as_ref(),
-      ))
-    })
+    .or_else(|| horizontal_position.map(horizontal_image_reference))
     .unwrap_or_default();
   let vertical_relative_to = simple_position
     .map(|_| VerticalImageReference::Page)
-    .or_else(|| Some(vertical_image_reference(anchor.vertical_position.as_ref())))
+    .or_else(|| vertical_position.map(vertical_image_reference))
     .unwrap_or_default();
   let layout_in_cell = anchor.layout_in_cell.as_bool()
     || (simple_position.is_none()
@@ -4833,17 +4831,17 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     vertical_relative_to,
     horizontal_alignment: simple_position
       .map(|_| None)
-      .unwrap_or_else(|| horizontal_position_alignment(anchor.horizontal_position.as_ref())),
+      .unwrap_or_else(|| horizontal_position.and_then(horizontal_position_alignment)),
     vertical_alignment: simple_position
       .map(|_| None)
-      .unwrap_or_else(|| vertical_position_alignment(anchor.vertical_position.as_ref())),
+      .unwrap_or_else(|| vertical_position.and_then(vertical_position_alignment)),
     horizontal_offset_pt: simple_position
       .map(|position| units::emu_to_points(position.x))
-      .or_else(|| horizontal_position_offset(anchor.horizontal_position.as_ref()))
+      .or_else(|| horizontal_position.and_then(horizontal_position_offset))
       .unwrap_or(0.0),
     vertical_offset_pt: simple_position
       .map(|position| units::emu_to_points(position.y))
-      .or_else(|| vertical_position_offset(anchor.vertical_position.as_ref()))
+      .or_else(|| vertical_position.and_then(vertical_position_offset))
       .unwrap_or(0.0),
     wrap: anchor
       .anchor_choice

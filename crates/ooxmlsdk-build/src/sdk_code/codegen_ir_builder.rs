@@ -1793,32 +1793,40 @@ fn build_recursive_choice_sequence_variant_decl(
   name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<MemberDecl> {
   let sequence_leafs = collect_sequence_leaf_children(&child.children);
-  let struct_name = name_allocator.allocate_sequence_name();
-  let variant_name = recursive_choice_variant_name(child, child_index, context);
-  let property_comments = format!(
-    " Sequence of {}",
-    sequence_leafs
-      .iter()
-      .map(|field| schema_qname_element_name(&field.name))
-      .collect::<Vec<_>>()
-      .join(", ")
-  );
-  let sequence_variant = ResolvedOneSequenceSequenceVariant {
-    variant_name,
-    struct_name,
-    property_comments,
-    fields: sequence_leafs
-      .iter()
-      .map(|field| {
-        let resolved_child = context.resolve_one_sequence_child(schema_type, &field.name)?;
-        Ok(crate::sdk_code::schemas::ResolvedOneSequenceSequenceField {
-          child: resolved_child,
-          optional: field.optional,
-          repeated: field.repeated,
-          initial_version: field.initial_version.as_str(),
-        })
+  let sequence_fields = sequence_leafs
+    .iter()
+    .map(|field| {
+      let resolved_child = context.resolve_one_sequence_child(schema_type, &field.name)?;
+      Ok(crate::sdk_code::schemas::ResolvedOneSequenceSequenceField {
+        child: resolved_child,
+        optional: field.optional,
+        repeated: field.repeated,
+        initial_version: field.initial_version.as_str(),
       })
-      .collect::<Result<Vec<_>>>()?,
+    })
+    .collect::<Result<Vec<_>>>()?;
+
+  if sequence_fields.len() == 1 {
+    let mut variant =
+      build_single_field_sequence_choice_variant_decl(&sequence_fields[0], schema, context)?;
+    if let MemberDecl::Variant(variant) = &mut variant {
+      variant.docs.clear();
+    }
+    return Ok(variant);
+  }
+
+  let sequence_variant = ResolvedOneSequenceSequenceVariant {
+    variant_name: recursive_choice_variant_name(child, child_index, context),
+    struct_name: name_allocator.allocate_sequence_name(),
+    property_comments: format!(
+      " Sequence of {}",
+      sequence_leafs
+        .iter()
+        .map(|field| schema_qname_element_name(&field.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+    ),
+    fields: sequence_fields,
   };
 
   extra_types.push(build_structured_one_sequence_helper_struct_decl(

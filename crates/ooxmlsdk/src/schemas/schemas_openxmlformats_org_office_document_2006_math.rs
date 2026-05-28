@@ -947,7 +947,8 @@ pub struct ControlProperties {
     qname = "w:CT_MathCtrlIns/w:ins",
     qname = "w:CT_MathCtrlDel/w:del",
     qname = "w:CT_MathCtrlMove/w:moveFrom",
-    qname = "w:CT_MathCtrlMove/w:moveTo"
+    qname = "w:CT_MathCtrlMove/w:moveTo",
+    qname = "a:CT_TextCharacterProperties/a:rPr"
   ))]
   pub control_properties_choice: Option<ControlPropertiesChoice>,
 }
@@ -2446,6 +2447,7 @@ pub enum ControlPropertiesChoice {
   MoveFromMathControl(std::boxed::Box<crate::schemas::w::MoveFromMathControl>),
   /// Defines the MoveToMathControl Class.
   MoveToMathControl(std::boxed::Box<crate::schemas::w::MoveToMathControl>),
+  DrawingRunProperties(std::boxed::Box<crate::schemas::a::RunProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice {

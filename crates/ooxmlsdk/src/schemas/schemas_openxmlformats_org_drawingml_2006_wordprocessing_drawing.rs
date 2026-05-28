@@ -207,6 +207,7 @@ pub struct Inline {
 pub struct Anchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]
   pub distance_from_top: Option<crate::simple_type::UInt32Value>,
@@ -253,10 +254,10 @@ pub struct Anchor {
   pub simple_position: std::boxed::Box<SimplePosition>,
   /// Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
-  pub horizontal_position: std::boxed::Box<HorizontalPosition>,
+  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   /// Vertical Positioning
   #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
-  pub vertical_position: std::boxed::Box<VerticalPosition>,
+  pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   /// Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
   pub extent: std::boxed::Box<Extent>,

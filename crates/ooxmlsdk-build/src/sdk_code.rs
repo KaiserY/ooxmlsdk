@@ -15,6 +15,8 @@ use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::part_codegen_ir::PartModuleDecl;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
+use crate::sdk_code::versioning::version_cfg_attrs;
+use crate::sdk_data::sdk_data_model::Namespace as SdkDataNamespace;
 use crate::utils::escape_snake_case;
 
 pub mod codegen_ir;
@@ -45,12 +47,19 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let loaded_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let loaded_parts = read_parts(&sdk_data_parts_dir_path)?;
+  let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
 
   write_schemas(&loaded_schemas, out_dir_path)?;
   write_parts(&loaded_parts, out_dir_path)?;
+  write_namespaces(&namespaces, out_dir_path, true, false, false)?;
 
   Ok(())
+}
+
+pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
+  let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
+  write_namespaces(&namespaces, out_dir.as_ref(), false, true, true)
 }
 
 fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
@@ -123,6 +132,19 @@ fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
 
   loaded_parts.sort_by(|a, b| a.ir.module_name.cmp(&b.ir.module_name));
   Ok(loaded_parts)
+}
+
+fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
+  let file = File::open(path)?;
+  let reader = BufReader::new(file);
+  let mut namespaces: Vec<SdkDataNamespace> = serde_json::from_reader(reader)?;
+  namespaces.sort_by(|left, right| {
+    left
+      .prefix
+      .cmp(&right.prefix)
+      .then(left.uri.cmp(&right.uri))
+  });
+  Ok(namespaces)
 }
 
 fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result<()> {
@@ -328,6 +350,85 @@ fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
     )?,
   )?;
 
+  Ok(())
+}
+
+fn write_namespaces(
+  sdk_data_namespaces: &[SdkDataNamespace],
+  out_dir_path: &Path,
+  include_prefix_by_uri: bool,
+  include_uri_by_prefix: bool,
+  include_default_namespace_style: bool,
+) -> Result<()> {
+  let mut uri_to_prefix_arms: Vec<syn::Arm> = vec![];
+  let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
+  let mut seen_uris = HashSet::new();
+  let mut seen_prefixes = HashSet::new();
+
+  for namespace in sdk_data_namespaces {
+    if namespace.prefix.is_empty() || namespace.uri.is_empty() {
+      continue;
+    }
+    let prefix = namespace.prefix.as_str();
+    let uri = namespace.uri.as_str();
+    let attrs = version_cfg_attrs(&namespace.version);
+
+    if seen_uris.insert(uri) {
+      uri_to_prefix_arms.push(parse2(quote! {
+        #( #attrs )*
+        #uri => Some(#prefix),
+      })?);
+    }
+
+    if seen_prefixes.insert(prefix) {
+      prefix_to_uri_arms.push(parse2(quote! {
+        #( #attrs )*
+        #prefix => Some(#uri),
+      })?);
+    }
+  }
+
+  let prefix_by_uri_tokens = if include_prefix_by_uri {
+    quote! {
+      pub(crate) fn prefix_by_uri(uri: &str) -> Option<&'static str> {
+        match uri {
+          #( #uri_to_prefix_arms )*
+          _ => None,
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let uri_by_prefix_tokens = if include_uri_by_prefix {
+    quote! {
+      pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
+        match prefix {
+          #( #prefix_to_uri_arms )*
+          _ => None,
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let default_namespace_style_tokens = if include_default_namespace_style {
+    quote! {
+      #[inline]
+      pub(crate) fn uses_default_namespace(prefix: &str) -> bool {
+        matches!(prefix, "x")
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let token_stream: TokenStream = quote! {
+    #prefix_by_uri_tokens
+    #uri_by_prefix_tokens
+    #default_namespace_style_tokens
+  };
+
+  write_generated_module(&out_dir_path.join("namespaces.rs"), token_stream)?;
   Ok(())
 }
 

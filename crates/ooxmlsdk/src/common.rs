@@ -40,11 +40,11 @@ pub(crate) use xml::{
   read_raw_element_xml_borrowed, read_raw_element_xml_io, read_raw_empty_xml_borrowed,
   read_raw_empty_xml_io, read_root_start_borrowed, read_root_start_borrowed_no_header,
   read_root_start_io, read_root_start_io_no_header, write_attr_value, write_attr_value_str,
-  write_decimal_number_or_percent_attr, write_end_tag, write_end_tag_bytes,
-  write_escaped_content_str, write_escaped_content_text, write_escaped_text, write_list_attr_value,
+  write_decimal_number_or_percent_attr, write_end_tag_bytes, write_escaped_content_str,
+  write_escaped_content_text, write_escaped_text, write_list_attr_value,
   write_list_text_content_value, write_measurement_or_percent_attr,
-  write_signed_twips_measure_attr, write_start_tag_open, write_start_tag_open_bytes,
-  write_twips_measure_attr, write_xmlns_attr,
+  write_signed_twips_measure_attr, write_start_tag_open_bytes, write_twips_measure_attr,
+  write_xmlns_attr,
 };
 #[cfg(feature = "flat-opc")]
 pub(crate) use xml::{read_outer_xml_borrowed, read_outer_xml_io};
@@ -88,9 +88,10 @@ pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) ->
 
 #[inline]
 pub(crate) fn canonical_xmlns_prefix<'a>(prefix: &'a str, uri: &str) -> &'a str {
-  match uri {
-    "http://schemas.microsoft.com/office/excel/2006/main" => "xne",
-    _ => prefix,
+  if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri) {
+    canonical_prefix
+  } else {
+    prefix
   }
 }
 

@@ -1347,8 +1347,13 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     };
     let type_sdk_version_markers = sdk_version_markers(schema_type_version);
     let sdk_type_attrs = if let Some(qname) = &type_decl.xml_qname {
+      let default_ns = if ir.prefix == "x" {
+        quote! { default_ns, }
+      } else {
+        quote! {}
+      };
       quote! {
-        #[sdk(#(#type_sdk_version_markers,)* qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* #default_ns qname = #qname)]
       }
     } else {
       quote! {}

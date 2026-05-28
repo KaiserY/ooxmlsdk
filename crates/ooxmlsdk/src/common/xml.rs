@@ -1,10 +1,9 @@
 use quick_xml::{
-  Decoder, Reader, Writer,
+  Decoder, Reader,
   escape::unescape,
   events::{BytesRef, BytesText, Event, attributes::Attribute},
 };
 use std::io::BufRead;
-use std::io::Cursor;
 
 use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 
@@ -657,7 +656,7 @@ pub(crate) fn read_outer_xml_borrowed<'de>(
   start: quick_xml::events::BytesStart<'de>,
   empty_tag: bool,
 ) -> Result<String, SdkError> {
-  let mut writer = Writer::new(Cursor::new(Vec::new()));
+  let mut writer = quick_xml::Writer::new(std::io::Cursor::new(Vec::new()));
 
   if empty_tag {
     writer.write_event(Event::Empty(start))?;
@@ -739,7 +738,7 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
   start: quick_xml::events::BytesStart<'static>,
   empty_tag: bool,
 ) -> Result<String, SdkError> {
-  let mut writer = Writer::new(Cursor::new(Vec::new()));
+  let mut writer = quick_xml::Writer::new(std::io::Cursor::new(Vec::new()));
 
   if empty_tag {
     writer.write_event(Event::Empty(start))?;
@@ -960,7 +959,7 @@ fn read_outer_xml_from_str_reader(
   start: quick_xml::events::BytesStart<'_>,
   empty_tag: bool,
 ) -> Result<String, SdkError> {
-  let mut writer = Writer::new(Cursor::new(Vec::new()));
+  let mut writer = quick_xml::Writer::new(std::io::Cursor::new(Vec::new()));
   if empty_tag {
     writer.write_event(Event::Empty(start))?;
     return String::from_utf8(writer.into_inner().into_inner())
@@ -1211,84 +1210,33 @@ pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
 }
 
 #[inline(always)]
-pub(crate) fn write_start_tag_open<W: std::io::Write>(
-  writer: &mut W,
-  default_namespace_prefix: &str,
-  tag_prefix: &str,
-  local_name: &str,
-) -> std::io::Result<()> {
-  writer.write_all(b"<")?;
-  write_qualified_name(writer, default_namespace_prefix, tag_prefix, local_name)
-}
-
-#[inline(always)]
 pub(crate) fn write_start_tag_open_bytes<W: std::io::Write>(
   writer: &mut W,
-  default_namespace_prefix: &str,
   tag_prefix: &[u8],
   local_name: &[u8],
 ) -> std::io::Result<()> {
   writer.write_all(b"<")?;
-  write_qualified_name_bytes(
-    writer,
-    default_namespace_prefix.as_bytes(),
-    tag_prefix,
-    local_name,
-  )
-}
-
-#[inline(always)]
-pub(crate) fn write_end_tag<W: std::io::Write>(
-  writer: &mut W,
-  default_namespace_prefix: &str,
-  tag_prefix: &str,
-  local_name: &str,
-) -> std::io::Result<()> {
-  writer.write_all(b"</")?;
-  write_qualified_name(writer, default_namespace_prefix, tag_prefix, local_name)?;
-  writer.write_all(b">")
+  write_qualified_name_bytes(writer, tag_prefix, local_name)
 }
 
 #[inline(always)]
 pub(crate) fn write_end_tag_bytes<W: std::io::Write>(
   writer: &mut W,
-  default_namespace_prefix: &str,
   tag_prefix: &[u8],
   local_name: &[u8],
 ) -> std::io::Result<()> {
   writer.write_all(b"</")?;
-  write_qualified_name_bytes(
-    writer,
-    default_namespace_prefix.as_bytes(),
-    tag_prefix,
-    local_name,
-  )?;
+  write_qualified_name_bytes(writer, tag_prefix, local_name)?;
   writer.write_all(b">")
-}
-
-#[inline(always)]
-fn write_qualified_name<W: std::io::Write>(
-  writer: &mut W,
-  default_namespace_prefix: &str,
-  tag_prefix: &str,
-  local_name: &str,
-) -> std::io::Result<()> {
-  if !tag_prefix.is_empty() && default_namespace_prefix != tag_prefix {
-    writer.write_all(tag_prefix.as_bytes())?;
-    writer.write_all(b":")?;
-  }
-
-  writer.write_all(local_name.as_bytes())
 }
 
 #[inline(always)]
 fn write_qualified_name_bytes<W: std::io::Write>(
   writer: &mut W,
-  default_namespace_prefix: &[u8],
   tag_prefix: &[u8],
   local_name: &[u8],
 ) -> std::io::Result<()> {
-  if !tag_prefix.is_empty() && default_namespace_prefix != tag_prefix {
+  if !tag_prefix.is_empty() {
     writer.write_all(tag_prefix)?;
     writer.write_all(b":")?;
   }

@@ -41,18 +41,12 @@ fn write_typed_child_tokens(
   value: proc_macro2::TokenStream,
   qname: &str,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
-  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let element_name = element_name_tokens_from_qname(qname);
   quote! {
     <#child_ty as crate::sdk::SdkType>::write_inner(
       #value,
       writer,
-      xmlns_prefix,
-      crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit),
+      #element_name,
     )?;
   }
 }
@@ -65,7 +59,6 @@ fn write_typed_child_element_name_tokens(
     <#child_ty as crate::sdk::SdkType>::write_inner(
       #value,
       writer,
-      xmlns_prefix,
       <#child_ty as crate::sdk::SdkType>::ELEMENT_NAME,
     )?;
   }
@@ -349,12 +342,9 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
       }
     }
     NamedSequenceVariantFieldKind::EmptyChild { qname } => {
-      let QNameInfo {
-        tag_prefix,
-        local_name,
-      } = parse_qname_info(qname);
+      let start_tag_open = write_start_tag_open_tokens(qname);
       let write_tokens = quote! {
-        crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+        #start_tag_open
         writer.write_all(b" />")?;
       };
       if field.repeated {
@@ -374,10 +364,8 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
       }
     }
     NamedSequenceVariantFieldKind::TextChild { qname, simple_type } => {
-      let QNameInfo {
-        tag_prefix,
-        local_name,
-      } = parse_qname_info(qname);
+      let start_tag_open = write_start_tag_open_tokens(qname);
+      let end_tag = write_end_tag_tokens(qname);
       let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
         let value_write_tokens =
           if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type.as_deref()) {
@@ -402,10 +390,10 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
             }
           };
         quote! {
-          crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+          #start_tag_open
           writer.write_all(b">")?;
           #value_write_tokens
-          crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+          #end_tag
         }
       };
 
@@ -675,15 +663,19 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           } else {
             quote! { value }
           };
+          let write_qname = qnames.first().map(String::as_str).unwrap_or_default();
+          let start_tag_open = write_start_tag_open_tokens(write_qname);
+          let end_tag = write_end_tag_tokens(write_qname);
           write_arms.push(quote! {
             #(#cfg_attrs)*
             Self::#variant_ident(value) => {
-              crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+              #start_tag_open
               writer.write_all(b">")?;
               for value in #value_expr {
                 writer.write_all(value.as_bytes())?;
               }
-              crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
+              #end_tag
+              Ok(())
             }
           });
           validate_arms.push(quote! {
@@ -776,7 +768,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => value.write_xml(writer, xmlns_prefix),
+          Self::#variant_ident(value) => value.write_xml(writer),
         };
         write_arms.push(write_arm);
         let validate_arm = if is_box_type(&payload_ty) {
@@ -812,10 +804,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let write_qname = qnames.first().ok_or_else(|| {
           syn::Error::new_spanned(variant, "empty_child requires at least one qname")
         })?;
-        let QNameInfo {
-          tag_prefix,
-          local_name,
-        } = parse_qname_info(write_qname);
+        let start_tag_open = write_start_tag_open_tokens(write_qname);
         let skip_tokens_borrowed = empty_child_skip_tokens(
           ident,
           DeserializeMode::Borrowed,
@@ -849,7 +838,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         write_arms.push(quote! {
           #(#cfg_attrs)*
           Self::#variant_ident => {
-            crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+            #start_tag_open
             writer.write_all(b" />")?;
             Ok(())
           },
@@ -896,7 +885,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(value) => <#inner_ty as crate::sdk::SdkType>::write_inner(
             value,
             writer,
-            xmlns_prefix,
             crate::sdk::ElementName::new(b"", b""),
           ),
         };
@@ -1190,13 +1178,16 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             crate::common::write_escaped_content_text(writer, value)?;
           }
         };
+        let start_tag_open = write_start_tag_open_tokens(write_qname);
+        let end_tag = write_end_tag_tokens(write_qname);
         let write_arm = quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(value) => {
-            crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+            #start_tag_open
             writer.write_all(b">")?;
             #value_write_tokens
-            crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
+            #end_tag
+            Ok(())
           }
         };
         write_arms.push(write_arm);
@@ -1286,15 +1277,19 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             return Ok(Self::#variant_ident(parsed_child));
           }
         });
+        let start_tag_open =
+          write_start_tag_open_tokens(qnames.first().map(String::as_str).unwrap_or_default());
+        let end_tag = write_end_tag_tokens(qnames.first().map(String::as_str).unwrap_or_default());
         write_arms.push(quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(value) => {
-            crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+            #start_tag_open
             writer.write_all(b">")?;
             for value in value {
               writer.write_all(value.as_bytes())?;
             }
-            crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
+            #end_tag
+            Ok(())
           }
         });
         validate_arms.push(quote! {
@@ -1572,7 +1567,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
       ) -> Result<(), std::io::Error> {
         match self {
           #( #write_arms )*
@@ -1659,9 +1653,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
       ) -> Result<(), std::io::Error> {
-        <Self as crate::sdk::SdkChoice>::write_xml(self, writer, xmlns_prefix)
+        <Self as crate::sdk::SdkChoice>::write_xml(self, writer)
       }
     }
   })

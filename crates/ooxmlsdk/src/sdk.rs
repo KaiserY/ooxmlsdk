@@ -526,7 +526,6 @@ pub trait SdkType: Sized {
   fn write_inner<W: std::io::Write>(
     &self,
     _writer: &mut W,
-    _xmlns_prefix: &str,
     _name: ElementName,
   ) -> Result<(), std::io::Error> {
     Err(std::io::Error::other(
@@ -551,11 +550,7 @@ pub trait SdkChoice: Sized {
     xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
   ) -> Result<Self, crate::common::SdkError>;
 
-  fn write_xml<W: std::io::Write>(
-    &self,
-    writer: &mut W,
-    xmlns_prefix: &str,
-  ) -> Result<(), std::io::Error>;
+  fn write_xml<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error>;
 
   fn matches_specific_start_qname(name: &[u8]) -> bool;
 

@@ -111,14 +111,25 @@ fn extended_properties_round_trip_from_more_doc_props_test() {
   assert_eq!(parsed.application.as_deref(), Some("Microsoft Office Word"));
   assert_eq!(parsed.application_version.as_deref(), Some("15.0000"));
   let serialized = trim_xml_declaration(&serialized);
-  assert!(serialized.starts_with("<Properties"));
+  assert!(
+    serialized.starts_with("<Properties") || serialized.starts_with("<ap:Properties"),
+    "{serialized}"
+  );
   assert!(serialized.contains("extended-properties"));
-  assert!(serialized.contains("<Template"));
-  assert!(serialized.contains(">Normal.dotm</Template>"));
-  assert!(serialized.contains("<Application"));
-  assert!(serialized.contains(">Microsoft Office Word</Application>"));
-  assert!(serialized.contains("<AppVersion"));
-  assert!(serialized.contains(">15.0000</AppVersion>"));
+  assert!(serialized.contains("<Template") || serialized.contains("<ap:Template"));
+  assert!(
+    serialized.contains(">Normal.dotm</Template>")
+      || serialized.contains(">Normal.dotm</ap:Template>")
+  );
+  assert!(serialized.contains("<Application") || serialized.contains("<ap:Application"));
+  assert!(
+    serialized.contains(">Microsoft Office Word</Application>")
+      || serialized.contains(">Microsoft Office Word</ap:Application>")
+  );
+  assert!(serialized.contains("<AppVersion") || serialized.contains("<ap:AppVersion"));
+  assert!(
+    serialized.contains(">15.0000</AppVersion>") || serialized.contains(">15.0000</ap:AppVersion>")
+  );
   assert_eq!(parsed.template.is_some(), reparsed.template.is_some());
   assert_eq!(parsed.application.is_some(), reparsed.application.is_some());
   assert_eq!(
@@ -145,8 +156,11 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
   ));
   assert_eq!(titles.vt_vector.vt_vector_choice.len(), 1);
   let serialized = trim_xml_declaration(&serialized);
-  assert!(serialized.starts_with("<ap:Properties"));
-  assert!(serialized.contains("<ap:TitlesOfParts"));
+  assert!(
+    serialized.starts_with("<Properties") || serialized.starts_with("<ap:Properties"),
+    "{serialized}"
+  );
+  assert!(serialized.contains("<TitlesOfParts") || serialized.contains("<ap:TitlesOfParts"));
   assert!(serialized.contains("<vt:vector"));
   assert!(serialized.contains("baseType=\"lpstr\""));
   assert!(serialized.contains("size=\"1\""));

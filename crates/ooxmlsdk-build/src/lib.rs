@@ -27,6 +27,11 @@ mod tests {
     sdk_data::gen_sdk_data(&upstream_data_dir, &sdk_data_dir, &package_schema_dir)
       .expect("failed to generate sdk data");
     sdk_code::gen_sdk_code(&sdk_data_dir, &runtime_src_dir).expect("failed to generate sdk code");
+    sdk_code::gen_derive_namespace_code(
+      &sdk_data_dir,
+      &workspace_root.join("crates/ooxmlsdk-derive/src"),
+    )
+    .expect("failed to generate derive namespace code");
   }
 
   #[test]
@@ -48,6 +53,7 @@ mod tests {
 
     assert!(out_dir.join("parts.rs").is_file());
     assert!(out_dir.join("parts/wordprocessing_document.rs").is_file());
+    assert!(out_dir.join("namespaces.rs").is_file());
 
     std::fs::remove_dir_all(&out_dir).expect("failed to remove temp generated dir");
   }

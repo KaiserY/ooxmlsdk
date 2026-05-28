@@ -9,6 +9,7 @@ use syn::{
   punctuated::Punctuated,
 };
 
+mod namespaces;
 mod sdk_choice;
 mod sdk_enum;
 mod sdk_package;
@@ -1010,6 +1011,24 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   Ok(None)
 }
 
+fn parse_sdk_default_ns(attrs: &[Attribute]) -> syn::Result<bool> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      if let Meta::Path(path) = meta
+        && path.is_ident("default_ns")
+      {
+        return Ok(true);
+      }
+    }
+  }
+  Ok(false)
+}
+
 fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
   path.is_ident("office2010")
     || path.is_ident("office2013")
@@ -1707,6 +1726,57 @@ fn parse_qname_info(qname: &str) -> QNameInfo {
       local_name: first.to_string(),
     },
   }
+}
+
+fn qname_write_prefix(prefix: &str) -> &str {
+  if namespaces::uses_default_namespace(prefix) {
+    ""
+  } else {
+    prefix
+  }
+}
+
+fn element_name_tokens_from_qname(qname: &str) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let tag_prefix_lit = LitByteStr::new(
+    qname_write_prefix(&tag_prefix).as_bytes(),
+    Span::call_site(),
+  );
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  quote! { crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit) }
+}
+
+fn write_start_tag_open_tokens(qname: &str) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let write_prefix = qname_write_prefix(&tag_prefix);
+  let tag = if write_prefix.is_empty() {
+    format!("<{local_name}")
+  } else {
+    format!("<{write_prefix}:{local_name}")
+  };
+  let tag_lit = LitByteStr::new(tag.as_bytes(), Span::call_site());
+  quote! { writer.write_all(#tag_lit)?; }
+}
+
+fn write_end_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let write_prefix = qname_write_prefix(&tag_prefix);
+  let tag = if write_prefix.is_empty() {
+    format!("</{local_name}>")
+  } else {
+    format!("</{write_prefix}:{local_name}>")
+  };
+  let tag_lit = LitByteStr::new(tag.as_bytes(), Span::call_site());
+  quote! { writer.write_all(#tag_lit)?; }
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {

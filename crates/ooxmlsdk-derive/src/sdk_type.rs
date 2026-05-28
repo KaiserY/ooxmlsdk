@@ -288,18 +288,12 @@ fn write_typed_child_tokens(
   value: proc_macro2::TokenStream,
   qname: &str,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
-  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let element_name = element_name_tokens_from_qname(qname);
   quote! {
     <#child_ty as crate::sdk::SdkType>::write_inner(
       #value,
       writer,
-      xmlns_prefix,
-      crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit),
+      #element_name,
     )?;
   }
 }
@@ -499,7 +493,11 @@ fn expand_tuple_wrapper(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
+  let tag_prefix_lit = LitByteStr::new(
+    qname_write_prefix(&tag_prefix).as_bytes(),
+    Span::call_site(),
+  );
+  let element_name = element_name_tokens_from_qname(schema_qname);
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
@@ -525,10 +523,9 @@ fn expand_tuple_wrapper(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
         name: crate::sdk::ElementName,
       ) -> Result<(), std::io::Error> {
-        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer, xmlns_prefix, name)
+        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer, name)
       }
 
       #[inline]
@@ -622,8 +619,7 @@ fn expand_tuple_wrapper(
         <Self as crate::sdk::SdkType>::write_inner(
           self,
           writer,
-          "",
-          crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit),
+          #element_name,
         )
       }
 
@@ -1206,16 +1202,14 @@ fn build_text_child_write_tokens(
   optional: bool,
   list: bool,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
   let inner_ty = if list {
     vec_inner_type(&unwrap_option_type(field_ty)).unwrap_or_else(|| unwrap_wrapped_type(field_ty))
   } else {
     unwrap_wrapped_type(field_ty)
   };
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
+    let start_tag_open = write_start_tag_open_tokens(qname);
+    let end_tag = write_end_tag_tokens(qname);
     let value_write_tokens = if list {
       quote! {
         crate::common::write_list_text_content_value(writer, #value_expr.as_slice())?;
@@ -1237,10 +1231,10 @@ fn build_text_child_write_tokens(
       }
     };
     quote! {
-      crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+      #start_tag_open
       writer.write_all(b">")?;
       #value_write_tokens
-      crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+      #end_tag
     }
   };
 
@@ -1272,12 +1266,9 @@ fn build_empty_child_write_tokens(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
+  let start_tag_open = write_start_tag_open_tokens(qname);
   let write_tokens = quote! {
-    crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+    #start_tag_open
     writer.write_all(b" />")?;
   };
 
@@ -1411,17 +1402,15 @@ fn build_any_child_write_tokens(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
+  let start_tag_open = write_start_tag_open_tokens(qname);
+  let end_tag = write_end_tag_tokens(qname);
   let write_value_tokens = quote! {
-    crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+    #start_tag_open
     writer.write_all(b">")?;
     for value in value {
       writer.write_all(value.as_bytes())?;
     }
-    crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+    #end_tag
   };
 
   if repeated {
@@ -2037,7 +2026,6 @@ fn expand_sequence_helper_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
         _name: crate::sdk::ElementName,
       ) -> Result<(), std::io::Error> {
         #( #child_write_tokens )*
@@ -2804,7 +2792,7 @@ fn expand_helper_struct(
       choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(quote! {
         for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
         }
       });
       choice_validate_tokens.push(quote! {
@@ -2829,7 +2817,7 @@ fn expand_helper_struct(
       if field.optional {
         choice_write_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
           }
         });
         choice_validate_tokens.push(quote! {
@@ -2839,7 +2827,7 @@ fn expand_helper_struct(
         });
       } else {
         choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
         });
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
@@ -3192,7 +3180,6 @@ fn expand_helper_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
         _name: crate::sdk::ElementName,
       ) -> Result<(), std::io::Error> {
         #( #child_write_tokens )*
@@ -3247,7 +3234,24 @@ fn expand_named_struct(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
+  let raw_tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
+  let tag_prefix_lit = LitByteStr::new(
+    qname_write_prefix(&tag_prefix).as_bytes(),
+    Span::call_site(),
+  );
+  let element_name = element_name_tokens_from_qname(schema_qname);
+  let default_ns = parse_sdk_default_ns(&input.attrs)?;
+  let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
+  let fixed_namespace_uri_lit =
+    fixed_namespace_uri.map(|uri| LitByteStr::new(uri.as_bytes(), Span::call_site()));
+  let fixed_namespace_write_lit = fixed_namespace_uri.map(|uri| {
+    let attr = if default_ns {
+      format!(" xmlns=\"{uri}\"")
+    } else {
+      format!(" xmlns:{tag_prefix}=\"{uri}\"")
+    };
+    LitByteStr::new(attr.as_bytes(), Span::call_site())
+  });
   let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
   let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
@@ -3684,17 +3688,44 @@ fn expand_named_struct(
   }
 
   let xmlns_parse_tokens = if has_xmlns_fields {
-    quote! {
-      b"xmlns" => {
+    let default_xmlns_parse_tokens = if let Some(uri) = &fixed_namespace_uri_lit {
+      quote! {
+        let uri = crate::common::decode_attr_value(&attr, decoder)?;
+        if uri.as_bytes() != #uri.as_slice() {
+          xmlns.push(crate::common::XmlNamespaceDecl::new("", uri));
+        }
+      }
+    } else {
+      quote! {
         xmlns.push(crate::common::XmlNamespaceDecl::new(
           "",
           crate::common::decode_attr_value(&attr, decoder)?,
         ));
       }
-      key if key.starts_with(b"xmlns:") => {
+    };
+    let prefixed_xmlns_parse_tokens = if let Some(uri_lit) = &fixed_namespace_uri_lit {
+      quote! {
+        let uri = crate::common::decode_attr_value(&attr, decoder)?;
+        if &key[6..] != #raw_tag_prefix_lit.as_slice()
+          || uri.as_bytes() != #uri_lit.as_slice()
+        {
+          let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
+          xmlns.push(crate::common::XmlNamespaceDecl::new(prefix, uri));
+        }
+      }
+    } else {
+      quote! {
         let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
         let uri = crate::common::decode_attr_value(&attr, decoder)?;
         xmlns.push(crate::common::XmlNamespaceDecl::new(prefix, uri));
+      }
+    };
+    quote! {
+      b"xmlns" => {
+        #default_xmlns_parse_tokens
+      }
+      key if key.starts_with(b"xmlns:") => {
+        #prefixed_xmlns_parse_tokens
       }
     }
   } else {
@@ -4732,7 +4763,7 @@ fn expand_named_struct(
       choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(quote! {
         for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
         }
       });
       choice_validate_tokens.push(quote! {
@@ -4758,7 +4789,7 @@ fn expand_named_struct(
       if field.optional {
         choice_write_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
           }
         });
         choice_validate_tokens.push(quote! {
@@ -4768,7 +4799,7 @@ fn expand_named_struct(
         });
       } else {
         choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
         });
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
@@ -5400,18 +5431,18 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for choice in &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(choice) = &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
+              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
+            <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
           });
         }
       }
@@ -5832,9 +5863,42 @@ fn expand_named_struct(
     }
   };
 
-  let special_namespace_write_tokens = if use_canonical_xmlns_prefix {
-    quote! {
-      for declaration in &self.xmlns {
+  let fixed_namespace_write_tokens = if has_xmlns_fields {
+    if let Some(attr) = &fixed_namespace_write_lit {
+      quote! {
+        writer.write_all(#attr)?;
+      }
+    } else {
+      quote! {}
+    }
+  } else {
+    quote! {}
+  };
+  let special_namespace_write_tokens = if has_xmlns_fields {
+    let fixed_namespace_skip_tokens = if let Some(uri_lit) = &fixed_namespace_uri_lit {
+      if default_ns {
+        quote! {
+          if declaration.uri.as_bytes() == #uri_lit.as_slice()
+            && (declaration.is_default()
+              || declaration.prefix.as_bytes() == #raw_tag_prefix_lit.as_slice())
+          {
+            continue;
+          }
+        }
+      } else {
+        quote! {
+          if declaration.uri.as_bytes() == #uri_lit.as_slice()
+            && declaration.prefix.as_bytes() == #raw_tag_prefix_lit.as_slice()
+          {
+            continue;
+          }
+        }
+      }
+    } else {
+      quote! {}
+    };
+    let prefix_tokens = if use_canonical_xmlns_prefix {
+      quote! {
         let prefix = crate::common::canonical_xmlns_prefix(
           declaration.prefix.as_ref(),
           declaration.uri.as_ref(),
@@ -5844,17 +5908,21 @@ fn expand_named_struct(
         } else {
           Some(prefix)
         };
-        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_ref())?;
       }
-    }
-  } else if has_xmlns_fields {
-    quote! {
-      for declaration in &self.xmlns {
+    } else {
+      quote! {
         let prefix = if declaration.is_default() {
           None
         } else {
           Some(declaration.prefix.as_ref())
         };
+      }
+    };
+    quote! {
+      #fixed_namespace_write_tokens
+      for declaration in &self.xmlns {
+        #fixed_namespace_skip_tokens
+        #prefix_tokens
         crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_ref())?;
       }
     }
@@ -5980,18 +6048,6 @@ fn expand_named_struct(
       <Self as crate::sdk::SdkType>::read_io(&mut xml_reader, start, empty)
     }
   };
-  let to_xml_prefix_tokens = if has_xmlns_fields {
-    quote! {
-      if self.xmlns.iter().any(crate::common::XmlNamespaceDecl::is_default) {
-        #tag_prefix
-      } else {
-        ""
-      }
-    }
-  } else {
-    quote! { "" }
-  };
-
   let has_body = !child_fields.is_empty()
     || !empty_child_fields.is_empty()
     || !text_child_fields.is_empty()
@@ -6004,7 +6060,7 @@ fn expand_named_struct(
       writer.write_all(b">")?;
       #xml_other_children_write_setup_tokens
       #( #ordered_write_tokens )*
-      crate::common::write_end_tag_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
+      crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
     }
   } else {
     quote! {
@@ -6061,8 +6117,7 @@ fn expand_named_struct(
         <Self as crate::sdk::SdkType>::write_inner(
           self,
           writer,
-          #to_xml_prefix_tokens,
-          crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit),
+          #element_name,
         )
       }
 
@@ -6114,10 +6169,9 @@ fn expand_named_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        xmlns_prefix: &str,
         name: crate::sdk::ElementName,
       ) -> Result<(), std::io::Error> {
-        crate::common::write_start_tag_open_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
+        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
         #special_namespace_write_tokens
         #( #attr_write_tokens )*
         #xml_other_attrs_write_tokens

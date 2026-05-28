@@ -21,10 +21,17 @@ impl DeserializeMode {
     }
   }
 
-  fn read_outer_xml_fn(self) -> proc_macro2::TokenStream {
+  fn read_raw_empty_xml_fn(self) -> proc_macro2::TokenStream {
     match self {
-      Self::Borrowed => quote! { crate::common::read_outer_xml_borrowed },
-      Self::Io => quote! { crate::common::read_outer_xml_io },
+      Self::Borrowed => quote! { crate::common::read_raw_empty_xml_borrowed },
+      Self::Io => quote! { crate::common::read_raw_empty_xml_io },
+    }
+  }
+
+  fn read_raw_element_xml_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_element_xml_borrowed },
+      Self::Io => quote! { crate::common::read_raw_element_xml_io },
     }
   }
 }
@@ -219,12 +226,17 @@ fn any_child_dispatch_tokens(
   cfg_attrs: &[Attribute],
   constructor: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  let read_outer_xml = mode.read_outer_xml_fn();
+  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+  let read_raw_element_xml = mode.read_raw_element_xml_fn();
 
   quote! {
     #(#cfg_attrs)*
     {
-      let xml = #read_outer_xml(xml_reader, e, empty_tag)?;
+      let xml = if empty_tag {
+        #read_raw_empty_xml(e)?
+      } else {
+        #read_raw_element_xml(xml_reader, e)?
+      };
       return Ok(#constructor);
     }
   }
@@ -602,11 +614,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
                 loop {
                   match xml_reader.next()? {
                     quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, false)?;
+                      let xml = crate::common::read_raw_element_xml_borrowed(xml_reader, e)?;
                       parsed_child.push(xml);
                     }
                     quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, true)?;
+                      let xml = crate::common::read_raw_empty_xml_borrowed(e)?;
                       parsed_child.push(xml);
                     }
                     quick_xml::events::Event::End(end) => {
@@ -634,11 +646,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
                 loop {
                   match xml_reader.next()? {
                     quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_outer_xml_io(xml_reader, e, false)?;
+                      let xml = crate::common::read_raw_element_xml_io(xml_reader, e)?;
                       parsed_child.push(xml);
                     }
                     quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_outer_xml_io(xml_reader, e, true)?;
+                      let xml = crate::common::read_raw_empty_xml_io(e)?;
                       parsed_child.push(xml);
                     }
                     quick_xml::events::Event::End(end) => {
@@ -1218,11 +1230,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
               loop {
                 match xml_reader.next()? {
                   quick_xml::events::Event::Start(e) => {
-                    let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, false)?;
+                    let xml = crate::common::read_raw_element_xml_borrowed(xml_reader, e)?;
                     parsed_child.push(xml);
                   }
                   quick_xml::events::Event::Empty(e) => {
-                    let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, true)?;
+                    let xml = crate::common::read_raw_empty_xml_borrowed(e)?;
                     parsed_child.push(xml);
                   }
                   quick_xml::events::Event::End(end) => {
@@ -1250,11 +1262,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
               loop {
                 match xml_reader.next()? {
                   quick_xml::events::Event::Start(e) => {
-                    let xml = crate::common::read_outer_xml_io(xml_reader, e, false)?;
+                    let xml = crate::common::read_raw_element_xml_io(xml_reader, e)?;
                     parsed_child.push(xml);
                   }
                   quick_xml::events::Event::Empty(e) => {
-                    let xml = crate::common::read_outer_xml_io(xml_reader, e, true)?;
+                    let xml = crate::common::read_raw_empty_xml_io(e)?;
                     parsed_child.push(xml);
                   }
                   quick_xml::events::Event::End(end) => {
@@ -1449,9 +1461,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
   };
 
-  let mce_choice_dispatch_tokens_borrowed = quote! {};
-  let mce_choice_dispatch_tokens_io = quote! {};
-
   let read_tokens_borrowed = if any_dispatch_tokens_borrowed.is_empty() {
     quote! {
       let event_name = e.name();
@@ -1459,7 +1468,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       match event_name {
         #( #direct_child_dispatch_arms_borrowed )*
         _ => {
-          #mce_choice_dispatch_tokens_borrowed
           #( #helper_child_dispatch_tokens_borrowed )*
           Err(crate::common::unexpected_tag(
             stringify!(#ident),
@@ -1476,7 +1484,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       match event_name {
         #( #direct_child_dispatch_arms_borrowed )*
         _ => {
-          #mce_choice_dispatch_tokens_borrowed
           #( #helper_child_dispatch_tokens_borrowed )*
           #( #any_dispatch_tokens_borrowed )*
         }
@@ -1491,7 +1498,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       match event_name {
         #( #direct_child_dispatch_arms_io )*
         _ => {
-          #mce_choice_dispatch_tokens_io
           #( #helper_child_dispatch_tokens_io )*
           Err(crate::common::unexpected_tag(
             stringify!(#ident),
@@ -1508,7 +1514,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       match event_name {
         #( #direct_child_dispatch_arms_io )*
         _ => {
-          #mce_choice_dispatch_tokens_io
           #( #helper_child_dispatch_tokens_io )*
           #( #any_dispatch_tokens_io )*
         }

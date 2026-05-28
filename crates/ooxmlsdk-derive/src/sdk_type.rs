@@ -21,10 +21,17 @@ impl DeserializeMode {
     }
   }
 
-  fn read_outer_xml_fn(self) -> proc_macro2::TokenStream {
+  fn read_raw_empty_xml_fn(self) -> proc_macro2::TokenStream {
     match self {
-      Self::Borrowed => quote! { crate::common::read_outer_xml_borrowed },
-      Self::Io => quote! { crate::common::read_outer_xml_io },
+      Self::Borrowed => quote! { crate::common::read_raw_empty_xml_borrowed },
+      Self::Io => quote! { crate::common::read_raw_empty_xml_io },
+    }
+  }
+
+  fn read_raw_element_xml_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_element_xml_borrowed },
+      Self::Io => quote! { crate::common::read_raw_element_xml_io },
     }
   }
 }
@@ -1352,7 +1359,8 @@ fn build_any_child_parse_arm(
     format!("{tag_prefix}:{local_name}").as_bytes(),
     Span::call_site(),
   );
-  let read_outer_xml = mode.read_outer_xml_fn();
+  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+  let read_raw_element_xml = mode.read_raw_element_xml_fn();
   let assign_tokens = if repeated {
     quote! { #field_ident.push(parsed_child); }
   } else {
@@ -1371,11 +1379,11 @@ fn build_any_child_parse_arm(
         loop {
           match xml_reader.next()? {
             quick_xml::events::Event::Start(e) => {
-              let xml = #read_outer_xml(xml_reader, e, false)?;
+              let xml = #read_raw_element_xml(xml_reader, e)?;
               parsed_child.push(xml);
             }
             quick_xml::events::Event::Empty(e) => {
-              let xml = #read_outer_xml(xml_reader, e, true)?;
+              let xml = #read_raw_empty_xml(e)?;
               parsed_child.push(xml);
             }
             quick_xml::events::Event::End(end) => {
@@ -1444,7 +1452,8 @@ fn build_any_child_parse_tokens(
   as_result: bool,
   xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  let read_outer_xml = mode.read_outer_xml_fn();
+  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+  let read_raw_element_xml = mode.read_raw_element_xml_fn();
   let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
     quote! { xml.into_boxed_str() }
   } else {
@@ -1463,7 +1472,11 @@ fn build_any_child_parse_tokens(
 
   quote! {
     if !matched {
-      let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+      let xml = if next_empty {
+        #read_raw_empty_xml(e)?
+      } else {
+        #read_raw_element_xml(xml_reader, e)?
+      };
       #assign
       #xml_child_slot_assign
       #tail
@@ -1477,7 +1490,8 @@ fn build_pure_any_child_parse_tokens(
   repeated: bool,
   mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
-  let read_outer_xml = mode.read_outer_xml_fn();
+  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+  let read_raw_element_xml = mode.read_raw_element_xml_fn();
   let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
     quote! { xml.into_boxed_str() }
   } else {
@@ -1490,7 +1504,11 @@ fn build_pure_any_child_parse_tokens(
   };
 
   quote! {
-    let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+    let xml = if next_empty {
+      #read_raw_empty_xml(e)?
+    } else {
+      #read_raw_element_xml(xml_reader, e)?
+    };
     #assign
     continue;
   }
@@ -1503,16 +1521,25 @@ fn build_unmatched_child_tokens(
   compact_xml_other_children: bool,
 ) -> proc_macro2::TokenStream {
   if has_xml_other_children_field {
-    let read_outer_xml = mode.read_outer_xml_fn();
+    let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+    let read_raw_element_xml = mode.read_raw_element_xml_fn();
     if compact_xml_other_children {
       return quote! {
-        let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+        let xml = if next_empty {
+          #read_raw_empty_xml(e)?
+        } else {
+          #read_raw_element_xml(xml_reader, e)?
+        };
         xml_other_children.push(xml.into_boxed_str());
         continue;
       };
     }
     return quote! {
-      let xml = #read_outer_xml(xml_reader, e, next_empty)?;
+      let xml = if next_empty {
+        #read_raw_empty_xml(e)?
+      } else {
+        #read_raw_element_xml(xml_reader, e)?
+      };
       xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
       continue;
     };
@@ -4079,8 +4106,64 @@ fn expand_named_struct(
     }
   }
 
-  let mce_direct_child_dispatch_tokens_borrowed = quote! {};
-  let mce_direct_child_dispatch_tokens_io = quote! {};
+  let mce_direct_child_match_arm_borrowed = if has_xml_other_children_field {
+    if compact_xml_other_children {
+      quote! {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let xml = if next_empty {
+            crate::common::read_raw_empty_xml_borrowed(e)?
+          } else {
+            crate::common::read_raw_element_xml_borrowed(xml_reader, e)?
+          };
+          xml_other_children.push(xml.into_boxed_str());
+          continue;
+        }
+      }
+    } else {
+      quote! {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let xml = if next_empty {
+            crate::common::read_raw_empty_xml_borrowed(e)?
+          } else {
+            crate::common::read_raw_element_xml_borrowed(xml_reader, e)?
+          };
+          xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
+          continue;
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let mce_direct_child_match_arm_io = if has_xml_other_children_field {
+    if compact_xml_other_children {
+      quote! {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let xml = if next_empty {
+            crate::common::read_raw_empty_xml_io(e)?
+          } else {
+            crate::common::read_raw_element_xml_io(xml_reader, e)?
+          };
+          xml_other_children.push(xml.into_boxed_str());
+          continue;
+        }
+      }
+    } else {
+      quote! {
+        b"mc:AlternateContent" | b"AlternateContent" => {
+          let xml = if next_empty {
+            crate::common::read_raw_empty_xml_io(e)?
+          } else {
+            crate::common::read_raw_element_xml_io(xml_reader, e)?
+          };
+          xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
+          continue;
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
 
   for field in &empty_child_fields {
     let field_ident = &field.ident;
@@ -4875,6 +4958,7 @@ fn expand_named_struct(
   } else {
     quote! {
       match event_name {
+        #mce_direct_child_match_arm_borrowed
         #( #flat_choice_match_tokens_borrowed )*
         _ => {}
       }
@@ -4885,6 +4969,7 @@ fn expand_named_struct(
   } else {
     quote! {
       match event_name {
+        #mce_direct_child_match_arm_io
         #( #flat_choice_match_tokens_io )*
         _ => {}
       }
@@ -4925,16 +5010,16 @@ fn expand_named_struct(
       }
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_borrowed
         match event_name {
+          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           _ => {}
         }
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_borrowed
         let matched = match event_name {
+          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
           _ => false,
@@ -4945,8 +5030,8 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_borrowed
         match event_name {
+          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           _ => {
@@ -4962,8 +5047,8 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_borrowed
         let matched = match event_name {
+          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
@@ -4984,8 +5069,8 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        #mce_direct_child_dispatch_tokens_borrowed
         let matched = match event_name {
+          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
@@ -5043,16 +5128,16 @@ fn expand_named_struct(
       }
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_io
         match event_name {
+          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           _ => {}
         }
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_io
         let matched = match event_name {
+          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #child_parse_tokens_io )*
           _ => false,
@@ -5063,8 +5148,8 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_io
         match event_name {
+          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           _ => {
@@ -5080,8 +5165,8 @@ fn expand_named_struct(
       }
     } else if !has_any_dispatch {
       quote! {
-        #mce_direct_child_dispatch_tokens_io
         let matched = match event_name {
+          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
@@ -5102,8 +5187,8 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        #mce_direct_child_dispatch_tokens_io
         let matched = match event_name {
+          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
@@ -5193,6 +5278,21 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
+  let xml_other_children_write_setup_tokens =
+    if has_xml_other_children_field && !compact_xml_other_children {
+      let xml_other_children_slot_count = xml_child_slot_count + 1usize;
+      quote! {
+        let mut xml_other_children_by_slot: [Vec<&str>; #xml_other_children_slot_count] =
+          std::array::from_fn(|_| Vec::new());
+        for (slot, xml) in &self.xml_other_children {
+          if *slot < #xml_other_children_slot_count {
+            xml_other_children_by_slot[*slot].push(xml.as_ref());
+          }
+        }
+      }
+    } else {
+      quote! {}
+    };
   let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
     if compact_xml_other_children {
       quote! {
@@ -5202,11 +5302,7 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        for (_, xml) in self
-          .xml_other_children
-          .iter()
-          .filter(|(slot, _)| *slot == #xml_child_slot_count)
-        {
+        for xml in &xml_other_children_by_slot[#xml_child_slot_count] {
           writer.write_all(xml.as_bytes())?;
         }
       }
@@ -5233,11 +5329,7 @@ fn expand_named_struct(
         .unwrap_or_default()
         .saturating_sub(1usize);
       ordered_write_tokens.push(quote! {
-        for (_, xml) in self
-          .xml_other_children
-          .iter()
-          .filter(|(slot, _)| *slot == #xml_other_slot)
-        {
+        for xml in &xml_other_children_by_slot[#xml_other_slot] {
           writer.write_all(xml.as_bytes())?;
         }
       });
@@ -5910,6 +6002,7 @@ fn expand_named_struct(
   let body_write_tokens = if has_body {
     quote! {
       writer.write_all(b">")?;
+      #xml_other_children_write_setup_tokens
       #( #ordered_write_tokens )*
       crate::common::write_end_tag_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
     }

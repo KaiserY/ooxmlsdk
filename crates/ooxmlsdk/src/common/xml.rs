@@ -651,6 +651,7 @@ fn resolve_general_ref_entity(entity: &str) -> Option<std::borrow::Cow<'_, str>>
   None
 }
 
+#[cfg(feature = "flat-opc")]
 pub(crate) fn read_outer_xml_borrowed<'de>(
   xml_reader: &mut SliceReader<'de>,
   start: quick_xml::events::BytesStart<'de>,
@@ -689,6 +690,50 @@ pub(crate) fn read_outer_xml_borrowed<'de>(
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
+const RAW_EMPTY_XML_EXTRA_LEN: usize = 3;
+const RAW_ELEMENT_XML_EXTRA_LEN: usize = 5;
+
+#[inline]
+pub(crate) fn read_raw_empty_xml_borrowed<'de>(
+  start: quick_xml::events::BytesStart<'de>,
+) -> Result<String, SdkError> {
+  let start: &[u8] = start.as_ref();
+  let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
+  xml.push(b'<');
+  xml.extend_from_slice(start);
+  xml.extend_from_slice(b"/>");
+
+  String::from_utf8(xml)
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[inline]
+pub(crate) fn read_raw_element_xml_borrowed<'de>(
+  xml_reader: &mut SliceReader<'de>,
+  start: quick_xml::events::BytesStart<'de>,
+) -> Result<String, SdkError> {
+  let start_bytes: &[u8] = start.as_ref();
+  let end_name = start.name();
+  let inner = xml_reader.reader.read_text(end_name)?;
+  let inner: &[u8] = inner.as_ref();
+  let end_name = end_name.as_ref();
+
+  let mut xml = Vec::with_capacity(
+    start_bytes.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN,
+  );
+  xml.push(b'<');
+  xml.extend_from_slice(start_bytes);
+  xml.push(b'>');
+  xml.extend_from_slice(inner);
+  xml.extend_from_slice(b"</");
+  xml.extend_from_slice(end_name);
+  xml.push(b'>');
+
+  String::from_utf8(xml)
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[cfg(feature = "flat-opc")]
 pub(crate) fn read_outer_xml_io<R: BufRead>(
   xml_reader: &mut IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
@@ -724,6 +769,48 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
   }
 
   String::from_utf8(writer.into_inner().into_inner())
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[inline]
+pub(crate) fn read_raw_empty_xml_io(
+  start: quick_xml::events::BytesStart<'static>,
+) -> Result<String, SdkError> {
+  let start: &[u8] = start.as_ref();
+  let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
+  xml.push(b'<');
+  xml.extend_from_slice(start);
+  xml.extend_from_slice(b"/>");
+
+  String::from_utf8(xml)
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[inline]
+pub(crate) fn read_raw_element_xml_io<R: BufRead>(
+  xml_reader: &mut IoReader<R>,
+  start: quick_xml::events::BytesStart<'static>,
+) -> Result<String, SdkError> {
+  let start_bytes: &[u8] = start.as_ref();
+  let end_name = start.name();
+  let inner = xml_reader
+    .reader
+    .read_text_into(end_name, &mut xml_reader.buf)?;
+  let inner: &[u8] = inner.as_ref();
+  let end_name = end_name.as_ref();
+
+  let mut xml = Vec::with_capacity(
+    start_bytes.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN,
+  );
+  xml.push(b'<');
+  xml.extend_from_slice(start_bytes);
+  xml.push(b'>');
+  xml.extend_from_slice(inner);
+  xml.extend_from_slice(b"</");
+  xml.extend_from_slice(end_name);
+  xml.push(b'>');
+
+  String::from_utf8(xml)
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 

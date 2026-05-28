@@ -12,13 +12,9 @@ use syn::{Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
-use crate::sdk_code::codegen_ir_builder::build_codegen_ir;
 use crate::sdk_code::part_codegen_ir::PartModuleDecl;
 use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
-use crate::sdk_code::schemas::{
-  CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
-};
-use crate::sdk_data::sdk_data_model::Schema as SdkDataSchema;
+use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
 use crate::utils::escape_snake_case;
 
 pub mod codegen_ir;
@@ -40,11 +36,6 @@ struct LoadedSchema {
   ir: SchemaModuleDecl,
 }
 
-enum SchemaInputRecord {
-  Legacy(SdkDataSchema),
-  Ir(SchemaModuleDecl),
-}
-
 struct LoadedPart {
   ir: PartModuleDecl,
 }
@@ -63,7 +54,7 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
 }
 
 fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
-  let mut input_records = vec![];
+  let mut loaded_schemas = vec![];
 
   for entry in fs::read_dir(sdk_data_schemas_dir_path)? {
     let entry = entry?;
@@ -81,35 +72,21 @@ fn read_schemas(sdk_data_schemas_dir_path: &Path) -> Result<Vec<LoadedSchema>> {
     if file_name.starts_with("package_") {
       continue;
     }
-    let value: Value = serde_json::from_reader(reader)?;
-    if is_codegen_ir_schema_json(&value) {
-      input_records.push(SchemaInputRecord::Ir(serde_json::from_value(value)?));
-    } else {
-      input_records.push(SchemaInputRecord::Legacy(serde_json::from_value(value)?));
+    let ir: SchemaModuleDecl = serde_json::from_reader(reader)?;
+    if !is_valid_codegen_ir_schema(&ir) {
+      return Err(
+        format!(
+          "expected schema IR json in {}, found legacy/non-IR shape",
+          path.display()
+        )
+        .into(),
+      );
     }
+    loaded_schemas.push(LoadedSchema { ir });
   }
 
-  input_records.sort_by(|a, b| schema_input_module_name(a).cmp(schema_input_module_name(b)));
-
-  let legacy_schemas: Vec<SdkDataSchema> = input_records
-    .iter()
-    .filter_map(|item| match item {
-      SchemaInputRecord::Legacy(schema) => Some(schema.clone()),
-      SchemaInputRecord::Ir(_) => None,
-    })
-    .collect();
-  let context = CodegenContext::new(&legacy_schemas);
-
-  input_records
-    .into_iter()
-    .map(|record| match record {
-      SchemaInputRecord::Legacy(legacy) => {
-        let ir = build_codegen_ir(&legacy, &context)?;
-        Ok(LoadedSchema { ir })
-      }
-      SchemaInputRecord::Ir(ir) => Ok(LoadedSchema { ir }),
-    })
-    .collect()
+  loaded_schemas.sort_by(|a, b| a.ir.module_name.cmp(&b.ir.module_name));
+  Ok(loaded_schemas)
 }
 
 fn read_parts(sdk_data_parts_dir_path: &Path) -> Result<Vec<LoadedPart>> {
@@ -445,26 +422,10 @@ fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {
   Ok(())
 }
 
-fn schema_input_module_name(record: &SchemaInputRecord) -> &str {
-  match record {
-    SchemaInputRecord::Legacy(schema) => &schema.module_name,
-    SchemaInputRecord::Ir(schema) => &schema.module_name,
-  }
-}
-
-fn is_codegen_ir_schema_json(value: &Value) -> bool {
-  value
-    .get("Types")
-    .and_then(Value::as_array)
-    .and_then(|types| types.first())
-    .and_then(Value::as_object)
-    .is_some_and(|ty| ty.contains_key("RustName"))
-    || value
-      .get("Enums")
-      .and_then(Value::as_array)
-      .and_then(|enums| enums.first())
-      .and_then(Value::as_object)
-      .is_some_and(|en| en.contains_key("RustName"))
+fn is_valid_codegen_ir_schema(schema: &SchemaModuleDecl) -> bool {
+  !schema.module_name.is_empty()
+    && schema.types.iter().all(|ty| !ty.rust_name.is_empty())
+    && schema.enums.iter().all(|en| !en.rust_name.is_empty())
 }
 
 fn is_codegen_ir_part_json(value: &Value) -> bool {

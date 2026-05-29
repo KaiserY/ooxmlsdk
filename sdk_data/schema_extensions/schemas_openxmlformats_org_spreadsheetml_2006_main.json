@@ -21,32 +21,82 @@
   ],
   "Types": [
     {
-      "ClassName": "Control",
-      "ParentChoiceHasAnyIn": ["Controls"]
-    },
-    {
-      "ClassName": "Workbook",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "Worksheet",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "TableStyle",
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Sheet",
+      "ClassName": "CacheFieldExtension",
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "NumberingFormat",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "CacheFieldExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CacheHierarchyExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CacheHierarchyExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CacheSourceExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CacheSourceExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CalculatedMemberExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CalculatedMemberExtensionList",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Comment",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "ConditionalFormattingRuleExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ConditionalFormattingRuleExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ConnectionExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ConnectionExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Control",
+      "ParentChoiceHasAnyIn": [
+        "Controls"
+      ]
+    },
+    {
+      "ClassName": "DataFieldExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DataFieldExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Extension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExternalBook",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "ExternalCell",
@@ -58,6 +108,90 @@
       ]
     },
     {
+      "ClassName": "NumberingFormat",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PivotCacheDefinitionExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotCacheDefinitionExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotFieldExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotFieldExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotFilterExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotFilterExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotHierarchyExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotHierarchyExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotTableDefinitionExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PivotTableDefinitionExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "QueryTableExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "QueryTableExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SharedStringItem",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Sheet",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SlicerCacheDefinitionExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StylesheetExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StylesheetExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TableExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TableExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TableStyle",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "Topic",
       "Children": [
         {
@@ -65,6 +199,30 @@
           "OverrideName": "x:CT_Xstring/x:v"
         }
       ]
+    },
+    {
+      "ClassName": "Workbook",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "WorkbookExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "WorkbookExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Worksheet",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "WorksheetExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "WorksheetExtensionList",
+      "HaveXmlnsFields": true
     }
   ]
 }

@@ -16,7 +16,7 @@ pub enum HyperlinkColorEnum {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr")]
 pub struct HyperlinkColor {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
   #[sdk(attr(office2019, qname = ":val"))]
   #[sdk(string_format(kind = "token"))]

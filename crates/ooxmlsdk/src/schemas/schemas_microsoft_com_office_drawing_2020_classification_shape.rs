@@ -23,6 +23,7 @@ pub enum ClassificationOutcomeType {
   qname = "aclsh:CT_ClassificationOutcome/aclsh:classification"
 )]
 pub struct ClassificationOutcome {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// classificationOutcomeType
   #[sdk(attr(office2021, qname = ":classificationOutcomeType"))]
   #[sdk(string_format(kind = "token"))]

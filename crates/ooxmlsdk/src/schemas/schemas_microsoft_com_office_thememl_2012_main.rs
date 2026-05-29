@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "thm15:CT_ThemeFamily/thm15:themeFamily")]
 pub struct ThemeFamily {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -30,7 +30,6 @@ pub struct ThemeFamily {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,

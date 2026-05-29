@@ -888,7 +888,7 @@ pub enum VerticalAlignmentValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransform/dgm:colorsDef")]
 pub struct ColorsDefinition {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Unique ID
@@ -951,7 +951,7 @@ pub struct ColorsDefinitionHeaderList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModelRoot/dgm:dataModel")]
 pub struct DataModelRoot {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Point List
@@ -974,7 +974,7 @@ pub struct DataModelRoot {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinition/dgm:layoutDef")]
 pub struct LayoutDefinition {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// uniqueId
@@ -1052,7 +1052,7 @@ pub struct LayoutDefinitionHeaderList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_RelIds/dgm:relIds")]
 pub struct RelationshipIds {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Explicit Relationship to Diagram Data Part
   #[sdk(attr(qname = "r:dm"))]
   pub data_part: crate::simple_type::StringValue,
@@ -1070,7 +1070,7 @@ pub struct RelationshipIds {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinition/dgm:styleDef")]
 pub struct StyleDefinition {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Unique Style ID
@@ -1148,7 +1148,6 @@ pub struct ColorTransformCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1172,7 +1171,6 @@ pub struct FillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1196,7 +1194,6 @@ pub struct LineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1220,7 +1217,6 @@ pub struct EffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1244,7 +1240,6 @@ pub struct TextLineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1268,7 +1263,6 @@ pub struct TextFillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1292,7 +1286,6 @@ pub struct TextEffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
@@ -1712,7 +1705,7 @@ pub struct Algorithm {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Shape/dgm:shape")]
 pub struct Shape {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::DoubleValue>,
@@ -2234,6 +2227,7 @@ pub struct DiagramChooseElse {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModel/dgm:dataModel")]
 pub struct DataModel {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
@@ -2564,7 +2558,6 @@ pub struct Whole {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DataModelExtensionList/dgm:extLst")]
 pub struct DataModelExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the DataModelExtension Class.
   #[sdk(child(qname = "a:CT_DataModelExtension/a:ext"))]
   pub data_model_extension: Vec<crate::schemas::a::DataModelExtension>,
@@ -2674,7 +2667,6 @@ pub struct PropertySet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dgm:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -2718,7 +2710,6 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -2733,7 +2724,6 @@ pub struct TextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PtExtensionList/dgm:extLst")]
 pub struct PtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the PtExtension Class.
   #[sdk(child(qname = "a:CT_PtExtension/a:ext"))]
   pub pt_extension: Vec<crate::schemas::a::PtExtension>,
@@ -2742,7 +2732,6 @@ pub struct PtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -2792,7 +2781,6 @@ pub struct ColorData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst")]
 pub struct DiagramDefinitionExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the DiagramDefinitionExtension Class.
   #[sdk(child(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext"))]
   pub diagram_definition_extension: Vec<DiagramDefinitionExtension>,

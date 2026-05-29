@@ -11,7 +11,7 @@
   qname = "xfpb:CT_FeaturePropertyBags/xfpb:FeaturePropertyBags"
 )]
 pub struct FeaturePropertyBags {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
@@ -174,7 +174,6 @@ pub struct ColumnTotalsRevDxfTableRevDxf {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt")]
 pub struct BagExtensions {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -210,7 +209,6 @@ pub struct FeaturePropertyBag {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,

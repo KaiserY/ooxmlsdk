@@ -421,7 +421,6 @@ pub struct ChartShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:txPr")]
 pub struct TextProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -436,7 +435,6 @@ pub struct TextProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:rich")]
 pub struct RichText {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -1378,7 +1376,7 @@ pub struct MinAxisValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpace/c:chartSpace")]
 pub struct ChartSpace {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Version number of the file, as determined by the features used by this chart
@@ -1436,7 +1434,7 @@ pub struct ChartSpace {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Drawing/c:userShapes")]
 pub struct UserShapes {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
@@ -1449,7 +1447,7 @@ pub struct UserShapes {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:chart")]
 pub struct ChartReference {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Relationship Reference
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -1466,6 +1464,7 @@ pub struct LegacyDrawingHeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:userShapes")]
 pub struct UserShapesReference {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Relationship Reference
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -1474,7 +1473,7 @@ pub struct UserShapesReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Extension/c:ext")]
 pub struct Extension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Uniform Resource Identifier
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -1518,7 +1517,7 @@ pub struct NumericPoint {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ExtensionList/c:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Extension.
   #[sdk(child(qname = "c:CT_Extension/c:ext"))]
   pub extension: Vec<Extension>,
@@ -1776,7 +1775,6 @@ pub struct Size {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Marker/c:marker")]
 pub struct Marker {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
   #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
   pub symbol: Option<Symbol>,
@@ -2187,7 +2185,6 @@ pub struct PageSetup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -3025,7 +3022,7 @@ pub struct Thickness {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtension/c:ext")]
 pub struct StockChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3038,7 +3035,7 @@ pub struct StockChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtension/c:ext")]
 pub struct PieChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3051,7 +3048,7 @@ pub struct PieChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtension/c:ext")]
 pub struct Pie3DChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3064,7 +3061,7 @@ pub struct Pie3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtension/c:ext")]
 pub struct NumRefExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3082,7 +3079,7 @@ pub struct NumRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtension/c:ext")]
 pub struct StrDataExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3095,7 +3092,7 @@ pub struct StrDataExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtension/c:ext")]
 pub struct StrRefExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3113,7 +3110,7 @@ pub struct StrRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtension/c:ext")]
 pub struct MultiLvlStrRefExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3131,7 +3128,7 @@ pub struct MultiLvlStrRefExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtension/c:ext")]
 pub struct DLblsExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3153,7 +3150,7 @@ pub struct DLblsExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtension/c:ext")]
 pub struct LineChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3166,7 +3163,7 @@ pub struct LineChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtension/c:ext")]
 pub struct Line3DChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3179,7 +3176,7 @@ pub struct Line3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtension/c:ext")]
 pub struct ScatterChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3192,7 +3189,7 @@ pub struct ScatterChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtension/c:ext")]
 pub struct RadarChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3205,7 +3202,7 @@ pub struct RadarChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtension/c:ext")]
 pub struct BarChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3218,7 +3215,7 @@ pub struct BarChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtension/c:ext")]
 pub struct Bar3DChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3231,7 +3228,7 @@ pub struct Bar3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtension/c:ext")]
 pub struct AreaChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3244,7 +3241,7 @@ pub struct AreaChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtension/c:ext")]
 pub struct Area3DChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3257,7 +3254,7 @@ pub struct Area3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtension/c:ext")]
 pub struct BubbleChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3270,7 +3267,7 @@ pub struct BubbleChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtension/c:ext")]
 pub struct SurfaceChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3283,7 +3280,7 @@ pub struct SurfaceChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtension/c:ext")]
 pub struct Surface3DChartExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3296,7 +3293,7 @@ pub struct Surface3DChartExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtension/c:ext")]
 pub struct CatAxExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3309,7 +3306,7 @@ pub struct CatAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtension/c:ext")]
 pub struct DateAxExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3322,7 +3319,7 @@ pub struct DateAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtension/c:ext")]
 pub struct SerAxExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3335,7 +3332,7 @@ pub struct SerAxExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtension/c:ext")]
 pub struct ValAxExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -3365,7 +3362,7 @@ pub struct UpDownBars {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtensionList/c:extLst")]
 pub struct StockChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the StockChartExtension Class.
   #[sdk(child(qname = "c:CT_StockChartExtension/c:ext"))]
   pub stock_chart_extension: Vec<StockChartExtension>,
@@ -3374,7 +3371,7 @@ pub struct StockChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtensionList/c:extLst")]
 pub struct PieChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the PieChartExtension Class.
   #[sdk(child(qname = "c:CT_PieChartExtension/c:ext"))]
   pub pie_chart_extension: Vec<PieChartExtension>,
@@ -3383,7 +3380,7 @@ pub struct PieChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtensionList/c:extLst")]
 pub struct Pie3DChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Pie3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Pie3DChartExtension/c:ext"))]
   pub pie3_d_chart_extension: Vec<Pie3DChartExtension>,
@@ -3392,7 +3389,7 @@ pub struct Pie3DChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtensionList/c:extLst")]
 pub struct NumRefExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the NumRefExtension Class.
   #[sdk(child(qname = "c:CT_NumRefExtension/c:ext"))]
   pub num_ref_extension: Vec<NumRefExtension>,
@@ -3401,7 +3398,7 @@ pub struct NumRefExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtensionList/c:extLst")]
 pub struct StrDataExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the StrDataExtension Class.
   #[sdk(child(qname = "c:CT_StrDataExtension/c:ext"))]
   pub str_data_extension: Vec<StrDataExtension>,
@@ -3410,7 +3407,7 @@ pub struct StrDataExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtensionList/c:extLst")]
 pub struct StrRefExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the StrRefExtension Class.
   #[sdk(child(qname = "c:CT_StrRefExtension/c:ext"))]
   pub str_ref_extension: Vec<StrRefExtension>,
@@ -3433,7 +3430,7 @@ pub struct MultiLevelStringCache {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtensionList/c:extLst")]
 pub struct MultiLvlStrRefExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the MultiLvlStrRefExtension Class.
   #[sdk(child(qname = "c:CT_MultiLvlStrRefExtension/c:ext"))]
   pub multi_lvl_str_ref_extension: Vec<MultiLvlStrRefExtension>,
@@ -3442,7 +3439,7 @@ pub struct MultiLvlStrRefExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtensionList/c:extLst")]
 pub struct DLblsExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the DLblsExtension Class.
   #[sdk(child(qname = "c:CT_DLblsExtension/c:ext"))]
   pub d_lbls_extension: Vec<DLblsExtension>,
@@ -3451,7 +3448,7 @@ pub struct DLblsExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtensionList/c:extLst")]
 pub struct LineChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the LineChartExtension Class.
   #[sdk(child(qname = "c:CT_LineChartExtension/c:ext"))]
   pub line_chart_extension: Vec<LineChartExtension>,
@@ -3460,7 +3457,7 @@ pub struct LineChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtensionList/c:extLst")]
 pub struct Line3DChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Line3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Line3DChartExtension/c:ext"))]
   pub line3_d_chart_extension: Vec<Line3DChartExtension>,
@@ -3521,7 +3518,7 @@ pub struct ScatterChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtensionList/c:extLst")]
 pub struct ScatterChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ScatterChartExtension Class.
   #[sdk(child(qname = "c:CT_ScatterChartExtension/c:ext"))]
   pub scatter_chart_extension: Vec<ScatterChartExtension>,
@@ -3576,7 +3573,7 @@ pub struct RadarChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtensionList/c:extLst")]
 pub struct RadarChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the RadarChartExtension Class.
   #[sdk(child(qname = "c:CT_RadarChartExtension/c:ext"))]
   pub radar_chart_extension: Vec<RadarChartExtension>,
@@ -3594,7 +3591,7 @@ pub struct Overlap {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtensionList/c:extLst")]
 pub struct BarChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the BarChartExtension Class.
   #[sdk(child(qname = "c:CT_BarChartExtension/c:ext"))]
   pub bar_chart_extension: Vec<BarChartExtension>,
@@ -3603,7 +3600,6 @@ pub struct BarChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Shape/c:shape")]
 pub struct Shape {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Shape Value
   #[sdk(attr(qname = ":val"))]
   pub val: Option<ShapeValues>,
@@ -3612,7 +3608,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtensionList/c:extLst")]
 pub struct Bar3DChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Bar3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Bar3DChartExtension/c:ext"))]
   pub bar3_d_chart_extension: Vec<Bar3DChartExtension>,
@@ -3621,7 +3617,7 @@ pub struct Bar3DChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtensionList/c:extLst")]
 pub struct AreaChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the AreaChartExtension Class.
   #[sdk(child(qname = "c:CT_AreaChartExtension/c:ext"))]
   pub area_chart_extension: Vec<AreaChartExtension>,
@@ -3630,7 +3626,7 @@ pub struct AreaChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtensionList/c:extLst")]
 pub struct Area3DChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Area3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Area3DChartExtension/c:ext"))]
   pub area3_d_chart_extension: Vec<Area3DChartExtension>,
@@ -3706,7 +3702,7 @@ pub struct SizeRepresents {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtensionList/c:extLst")]
 pub struct BubbleChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the BubbleChartExtension Class.
   #[sdk(child(qname = "c:CT_BubbleChartExtension/c:ext"))]
   pub bubble_chart_extension: Vec<BubbleChartExtension>,
@@ -3715,7 +3711,7 @@ pub struct BubbleChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtensionList/c:extLst")]
 pub struct SurfaceChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SurfaceChartExtension Class.
   #[sdk(child(qname = "c:CT_SurfaceChartExtension/c:ext"))]
   pub surface_chart_extension: Vec<SurfaceChartExtension>,
@@ -3724,7 +3720,7 @@ pub struct SurfaceChartExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtensionList/c:extLst")]
 pub struct Surface3DChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Surface3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Surface3DChartExtension/c:ext"))]
   pub surface3_d_chart_extension: Vec<Surface3DChartExtension>,
@@ -3768,7 +3764,7 @@ pub struct TickMarkSkip {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtensionList/c:extLst")]
 pub struct CatAxExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the CatAxExtension Class.
   #[sdk(child(qname = "c:CT_CatAxExtension/c:ext"))]
   pub cat_ax_extension: Vec<CatAxExtension>,
@@ -3819,7 +3815,7 @@ pub struct MinorUnit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtensionList/c:extLst")]
 pub struct DateAxExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the DateAxExtension Class.
   #[sdk(child(qname = "c:CT_DateAxExtension/c:ext"))]
   pub date_ax_extension: Vec<DateAxExtension>,
@@ -3828,7 +3824,7 @@ pub struct DateAxExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtensionList/c:extLst")]
 pub struct SerAxExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SerAxExtension Class.
   #[sdk(child(qname = "c:CT_SerAxExtension/c:ext"))]
   pub ser_ax_extension: Vec<SerAxExtension>,
@@ -3861,7 +3857,7 @@ pub struct DisplayUnits {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtensionList/c:extLst")]
 pub struct ValAxExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ValAxExtension Class.
   #[sdk(child(qname = "c:CT_ValAxExtension/c:ext"))]
   pub val_ax_extension: Vec<ValAxExtension>,
@@ -3870,7 +3866,7 @@ pub struct ValAxExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtensionList/c:extLst")]
 pub struct DLblExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the DLblExtension Class.
   #[sdk(child(qname = "c:CT_DLblExtension/c:ext"))]
   pub d_lbl_extension: Vec<DLblExtension>,
@@ -3879,7 +3875,7 @@ pub struct DLblExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtension/c:ext")]
 pub struct DLblExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4028,7 +4024,7 @@ pub struct XValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtensionList/c:extLst")]
 pub struct LineSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the LineSerExtension Class.
   #[sdk(child(qname = "c:CT_LineSerExtension/c:ext"))]
   pub line_ser_extension: Vec<LineSerExtension>,
@@ -4037,7 +4033,7 @@ pub struct LineSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtension/c:ext")]
 pub struct LineSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4059,7 +4055,7 @@ pub struct LineSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtensionList/c:extLst")]
 pub struct ScatterSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ScatterSerExtension Class.
   #[sdk(child(qname = "c:CT_ScatterSerExtension/c:ext"))]
   pub scatter_ser_extension: Vec<ScatterSerExtension>,
@@ -4068,7 +4064,7 @@ pub struct ScatterSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtension/c:ext")]
 pub struct ScatterSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4090,7 +4086,7 @@ pub struct ScatterSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtensionList/c:extLst")]
 pub struct RadarSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the RadarSerExtension Class.
   #[sdk(child(qname = "c:CT_RadarSerExtension/c:ext"))]
   pub radar_ser_extension: Vec<RadarSerExtension>,
@@ -4099,7 +4095,7 @@ pub struct RadarSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtension/c:ext")]
 pub struct RadarSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4121,7 +4117,7 @@ pub struct RadarSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtensionList/c:extLst")]
 pub struct BarSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the BarSerExtension Class.
   #[sdk(child(qname = "c:CT_BarSerExtension/c:ext"))]
   pub bar_ser_extension: Vec<BarSerExtension>,
@@ -4130,7 +4126,7 @@ pub struct BarSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtension/c:ext")]
 pub struct BarSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4153,7 +4149,7 @@ pub struct BarSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtensionList/c:extLst")]
 pub struct AreaSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the AreaSerExtension Class.
   #[sdk(child(qname = "c:CT_AreaSerExtension/c:ext"))]
   pub area_ser_extension: Vec<AreaSerExtension>,
@@ -4162,7 +4158,7 @@ pub struct AreaSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtension/c:ext")]
 pub struct AreaSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4184,7 +4180,7 @@ pub struct AreaSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtensionList/c:extLst")]
 pub struct PieSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the PieSerExtension Class.
   #[sdk(child(qname = "c:CT_PieSerExtension/c:ext"))]
   pub pie_ser_extension: Vec<PieSerExtension>,
@@ -4193,7 +4189,7 @@ pub struct PieSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtension/c:ext")]
 pub struct PieSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4215,7 +4211,7 @@ pub struct PieSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtensionList/c:extLst")]
 pub struct BubbleSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the BubbleSerExtension Class.
   #[sdk(child(qname = "c:CT_BubbleSerExtension/c:ext"))]
   pub bubble_ser_extension: Vec<BubbleSerExtension>,
@@ -4224,7 +4220,7 @@ pub struct BubbleSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtension/c:ext")]
 pub struct BubbleSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4246,7 +4242,7 @@ pub struct BubbleSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtensionList/c:extLst")]
 pub struct SurfaceSerExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SurfaceSerExtension Class.
   #[sdk(child(qname = "c:CT_SurfaceSerExtension/c:ext"))]
   pub surface_ser_extension: Vec<SurfaceSerExtension>,
@@ -4255,7 +4251,7 @@ pub struct SurfaceSerExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtension/c:ext")]
 pub struct SurfaceSerExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
@@ -4276,6 +4272,7 @@ pub struct SurfaceSerExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
 pub struct DataDisplayOptions16 {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
@@ -4447,7 +4444,7 @@ pub struct DisplayBlanksAs {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the DataDisplayOptions16 Class.
   #[sdk(child(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
@@ -4564,6 +4561,7 @@ pub struct Protection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Chart/c:chart")]
 pub struct Chart {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Title data and formatting
   #[sdk(child(qname = "c:CT_Title/c:title"))]
   pub title: Option<std::boxed::Box<Title>>,
@@ -4636,7 +4634,7 @@ pub struct PrintSettings {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpaceExtensionList/c:extLst")]
 pub struct ChartSpaceExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ChartSpaceExtension Class.
   #[sdk(child(qname = "c:CT_ChartSpaceExtension/c:ext"))]
   pub chart_space_extension: Vec<ChartSpaceExtension>,
@@ -4645,7 +4643,7 @@ pub struct ChartSpaceExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpaceExtension/c:ext")]
 pub struct ChartSpaceExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]

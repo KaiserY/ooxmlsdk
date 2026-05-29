@@ -11,7 +11,6 @@
   qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt"
 )]
 pub struct PlaceholderTypeExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the PlaceholderTypeACB Class.
   #[sdk(child(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type"))]
   pub placeholder_type_acb: std::boxed::Box<PlaceholderTypeAcb>,

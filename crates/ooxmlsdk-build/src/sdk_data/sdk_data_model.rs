@@ -114,10 +114,6 @@ pub struct SchemaType {
   pub xml_header: SchemaTypeXmlHeader,
   pub is_abstract: bool,
   pub have_xmlns_fields: bool,
-  #[serde(default, skip_serializing_if = "crate::utils::is_default")]
-  pub xmlns_known_capacity: usize,
-  #[serde(default, skip_serializing_if = "crate::utils::is_default")]
-  pub xmlns_custom_capacity: usize,
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
   pub have_direct_xml_other_children: bool,

@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "wetp:CT_OsfTaskpanes/wetp:taskpanes")]
 pub struct Taskpanes {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the WebExtensionTaskpane Class.
@@ -19,7 +19,6 @@ pub struct Taskpanes {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_WebExtensionPartRef/wetp:webextensionref")]
 pub struct WebExtensionPartReference {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
@@ -28,7 +27,6 @@ pub struct WebExtensionPartReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/wetp:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
@@ -37,7 +35,6 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "wetp:CT_OsfTaskpane/wetp:taskpane")]
 pub struct WebExtensionTaskpane {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// dockstate
   #[sdk(attr(office2013, qname = ":dockstate"))]
   pub dock_state: crate::simple_type::StringValue,

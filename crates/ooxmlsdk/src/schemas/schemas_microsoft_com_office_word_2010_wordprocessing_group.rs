@@ -66,7 +66,6 @@ pub struct GroupShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr")]
 pub struct NonVisualDrawingProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -108,7 +107,6 @@ pub struct NonVisualGraphicFrameProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_Transform2D/wpg:xfrm")]
 pub struct Transform2D {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
@@ -129,7 +127,6 @@ pub struct Transform2D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,

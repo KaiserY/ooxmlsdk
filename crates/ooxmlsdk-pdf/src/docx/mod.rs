@@ -5326,7 +5326,7 @@ fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) 
       .text_body_properties
       .text_body_properties_choice1
       .as_ref(),
-    Some(wps::TextBodyPropertiesChoice::ShapeAutoFit(_))
+    Some(wps::TextBodyPropertiesChoice::ShapeAutoFit)
   )
 }
 

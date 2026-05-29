@@ -185,16 +185,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             );
             let have_xmlns_fields = ty.has_xmlns_fields
               || !ty.part.is_empty()
-              || ty.base_class == "OpenXmlPartRootElement"
-              || has_extension_xmlns_fields(ty, kind)
-              || has_drawing_payload_xmlns_fields(ty, kind, &type_map)
-              || has_spreadsheet_repeated_part_root_content_xmlns_fields(
-                ty,
-                kind,
-                schema.module_name.as_str(),
-                &type_map,
-              )
-              || has_mce_context_xmlns_fields(ty, kind, have_xml_other_attrs, &type_map, &children);
+              || ty.base_class == "OpenXmlPartRootElement";
             let have_xml_other_children =
               have_xml_other_children_for_mixed_version_content(ty, &type_map, &children)
                 || have_xml_other_children_for_spreadsheet_repeated_part_root_content_child(
@@ -237,8 +228,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               xml_header,
               is_abstract: ty.is_abstract,
               have_xmlns_fields,
-              xmlns_known_capacity: 0,
-              xmlns_custom_capacity: 0,
               have_xml_other_attrs,
               have_xml_other_children,
               have_direct_xml_other_children,
@@ -1580,33 +1569,6 @@ fn have_xml_other_attrs_for_mixed_version_content(
         || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, "")))
 }
 
-fn has_mce_context_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  have_xml_other_attrs: bool,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-  children: &[SchemaTypeChild],
-) -> bool {
-  have_xml_other_attrs
-    && can_have_xmlns_fields(kind)
-    && matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
-    && !is_extension_schema_type(schema_type)
-    && children.iter().any(child_can_carry_mce_context)
-    && (children_need_xml_other_children_for_mixed_version_content(children, type_map)
-      || particle_has_any_repeated_child(&schema_type.particle)
-      || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, ""))
-}
-
-fn child_can_carry_mce_context(child: &SchemaTypeChild) -> bool {
-  matches!(
-    child.kind,
-    SchemaTypeChildKind::Child
-      | SchemaTypeChildKind::Choice
-      | SchemaTypeChildKind::Sequence
-      | SchemaTypeChildKind::Any
-  ) || child.children.iter().any(child_can_carry_mce_context)
-}
-
 fn have_xml_other_attrs_for_derived_text_content(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
   kind: SchemaTypeKind,
@@ -2157,178 +2119,11 @@ fn resolve_kind(
   }
 }
 
-fn has_drawing_payload_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  if !can_have_xmlns_fields(kind) {
-    return false;
-  }
-
-  has_core_drawing_payload_xmlns_fields(schema_type)
-    || has_drawing_hyperlink_xmlns_fields(schema_type, kind, type_map)
-    || has_drawing_text_payload_xmlns_fields(schema_type)
-    || has_drawing_extension_payload_xmlns_fields(schema_type)
-}
-
-fn has_core_drawing_payload_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-) -> bool {
-  let Some(type_name) = schema_type_name(schema_type.name.as_str()) else {
-    return false;
-  };
-
-  if matches!(
-    drawing_schema_type_name(schema_type.name.as_str()),
-    Some(
-      "CT_GraphicalObject"
-        | "CT_GraphicalObjectData"
-        | "CT_Blip"
-        | "CT_TextBodyProperties"
-        | "CT_TextBody"
-        | "CT_ShapeProperties"
-        | "CT_NonVisualDrawingProps"
-        | "CT_NonVisualDrawingShapeProps"
-        | "CT_GvmlShape"
-        | "CT_GvmlShapeNonVisual"
-        | "CT_Transform2D"
-        | "CT_LineProperties"
-        | "CT_NoFillProperties"
-        | "CT_EffectList"
-        | "CT_PresetGeometry2D"
-        | "CT_ShapeLocking"
-        | "CT_GraphicalObjectFrameLocking"
-        | "CT_SpreadSheetNonVisualDrawingProps"
-    )
-  ) {
-    return true;
-  }
-
-  is_drawing_payload_module(schema_type.module_name.as_str())
-    && matches!(
-      type_name,
-      "CT_Drawing" | "CT_Shape" | "CT_ShapeNonVisual" | "CT_RelSizeAnchor" | "CT_Marker"
-    )
-}
-
-fn has_drawing_hyperlink_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  kind == SchemaTypeKind::Derived
-    && resolve_derived_base_type(schema_type, type_map).is_some_and(|base_type| {
-      base_type.name == "a:CT_Hyperlink/"
-        && base_type.base_class == "OpenXmlCompositeElement"
-        && base_type
-          .attributes
-          .iter()
-          .any(|attribute| attribute.q_name == "r:id")
-    })
-}
-
-fn has_drawing_text_payload_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-) -> bool {
-  if !is_drawing_payload_module(schema_type.module_name.as_str()) {
-    return false;
-  }
-
-  matches!(
-    schema_type.class_name.as_str(),
-    "Paragraph"
-      | "ParagraphProperties"
-      | "Run"
-      | "RunProperties"
-      | "DefaultRunProperties"
-      | "EndParagraphRunProperties"
-      | "TextCharacterPropertiesType"
-      | "TextParagraphPropertiesType"
-      | "ComplexScriptFont"
-      | "EastAsianFont"
-      | "LatinFont"
-      | "ListStyle"
-      | "RgbColorModelHex"
-      | "ShapeAutoFit"
-  )
-}
-
-fn has_drawing_extension_payload_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-) -> bool {
-  if !is_drawing_payload_module(schema_type.module_name.as_str()) {
-    return false;
-  }
-
-  matches!(
-    schema_type.class_name.as_str(),
-    "ImageProperties"
-      | "UseLocalDpi"
-      | "Media"
-      | "DefaultImageDpi"
-      | "DiscardImageEditData"
-      | "CreationId"
-      | "ModificationId"
-      | "ChartTrackingReferenceBased"
-      | "ThemeFamily"
-  )
-}
-
-fn drawing_schema_type_name(name: &str) -> Option<&str> {
-  let (prefix, rest) = name.split_once(':')?;
-  if prefix != "a" {
-    return None;
-  }
-
-  rest.split_once('/').map(|(type_name, _)| type_name)
-}
-
 fn schema_type_name(name: &str) -> Option<&str> {
   name
     .split_once(':')
     .and_then(|(_, rest)| rest.split_once('/'))
     .map(|(type_name, _)| type_name)
-}
-
-fn has_extension_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-) -> bool {
-  if !can_have_xmlns_fields(kind) {
-    return false;
-  }
-
-  schema_type.class_name == "Extension"
-    || schema_type.class_name.contains("Extension")
-    || schema_type.name.ends_with("/ext")
-    || schema_type.name.ends_with("/extLst")
-}
-
-fn has_spreadsheet_repeated_part_root_content_xmlns_fields(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  can_have_xmlns_fields(kind)
-    && matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
-    && module_name.contains("spreadsheetml_2006_main")
-    && is_office2007_or_default(schema_type.version.as_deref())
-    && !is_extension_schema_type(schema_type)
-    && is_repeated_child_of_part_root(schema_type.name.as_str(), module_name, type_map)
-    && particle_has_any_repeated_child(&schema_type.particle)
-}
-
-fn can_have_xmlns_fields(kind: SchemaTypeKind) -> bool {
-  !matches!(kind, SchemaTypeKind::LeafText)
-}
-
-fn is_drawing_payload_module(module_name: &str) -> bool {
-  module_name.contains("drawingml")
-    || module_name.contains("office_drawing")
-    || module_name.contains("powerpoint")
-    || module_name.contains("thememl")
 }
 
 fn resolve_composite_kind(

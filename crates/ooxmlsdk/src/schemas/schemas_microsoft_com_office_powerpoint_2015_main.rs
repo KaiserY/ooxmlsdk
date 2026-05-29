@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "p16:CT_DesignElement/p16:designElem")]
 pub struct DesignElement {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,

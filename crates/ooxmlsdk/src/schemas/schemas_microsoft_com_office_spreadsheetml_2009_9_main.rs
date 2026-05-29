@@ -326,7 +326,7 @@ pub struct ConditionalFormattings {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DataValidations/x14:dataValidations")]
 pub struct DataValidations {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// disablePrompts
   #[sdk(attr(office2010, qname = ":disablePrompts"))]
   pub disable_prompts: Option<crate::simple_type::BooleanValue>,
@@ -347,7 +347,7 @@ pub struct DataValidations {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups")]
 pub struct SparklineGroups {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SparklineGroup Class.
   #[sdk(child(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
   pub sparkline_group: Vec<SparklineGroup>,
@@ -492,6 +492,7 @@ pub struct PivotField {
   qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition"
 )]
 pub struct PivotTableDefinition {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// fillDownLabelsDefault
   #[sdk(attr(office2010, qname = ":fillDownLabelsDefault"))]
   pub fill_down_labels_default: Option<crate::simple_type::BooleanValue>,
@@ -708,7 +709,7 @@ pub struct SourceConnection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DatastoreItem/x14:datastoreItem")]
 pub struct DatastoreItem {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
@@ -722,7 +723,7 @@ pub struct DatastoreItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_FormControlPr/x14:formControlPr")]
 pub struct FormControlProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// objectType
@@ -834,7 +835,7 @@ pub struct FormControlProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_Slicers/x14:slicers")]
 pub struct Slicers {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Slicer Class.
@@ -848,7 +849,7 @@ pub struct Slicers {
   qname = "x14:CT_SlicerCacheDefinition/x14:slicerCacheDefinition"
 )]
 pub struct SlicerCacheDefinition {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// name
@@ -877,7 +878,7 @@ pub struct SlicerCacheDefinition {
   qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
 )]
 pub struct ConditionalFormatting {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// pivot
   #[sdk(attr(office2010, qname = ":pivot"))]
   pub pivot: Option<crate::simple_type::BooleanValue>,
@@ -967,7 +968,6 @@ pub struct ConditionalFormattingRule {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x:CT_ExtensionList/x14:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
@@ -2320,7 +2320,6 @@ pub struct SlicerCacheData {
   qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"
 )]
 pub struct SlicerCacheDefinitionExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SlicerCacheDefinitionExtension Class.
   #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext"))]
   pub slicer_cache_definition_extension: Vec<crate::schemas::x::SlicerCacheDefinitionExtension>,

@@ -1,7 +1,11 @@
 {
   "Types": [
     {
-      "ClassName": "SlideGuideList",
+      "ClassName": "ChartTrackingReferenceBased",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExtendedGuide",
       "HaveXmlnsFields": true
     },
     {
@@ -13,7 +17,7 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "ExtendedGuide",
+      "ClassName": "SlideGuideList",
       "HaveXmlnsFields": true
     }
   ]

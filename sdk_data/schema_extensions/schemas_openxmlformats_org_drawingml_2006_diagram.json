@@ -1,12 +1,22 @@
 {
   "Types": [
     {
-      "ClassName": "RelationshipIds",
+      "ClassName": "DataModel",
       "HaveXmlnsFields": true
     },
     {
       "ClassName": "Point",
-      "ParentChoiceHasAnyIn": ["PointList"]
+      "ParentChoiceHasAnyIn": [
+        "PointList"
+      ]
+    },
+    {
+      "ClassName": "RelationshipIds",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Shape",
+      "HaveXmlnsFields": true
     }
   ]
 }

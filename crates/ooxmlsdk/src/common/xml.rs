@@ -900,7 +900,9 @@ fn mce_unknown_element_replacement(
     namespaces
       .iter()
       .rev()
-      .find_map(|(candidate, ns)| (candidate.as_ref() == prefix).then_some(ns.as_ref()))
+      .find_map(|(candidate, ns)| {
+        (candidate.as_bytes() == prefix.as_bytes()).then_some(ns.as_str())
+      })
       .filter(|ns| context.is_ignorable_namespace(ns))
   });
 
@@ -1032,11 +1034,11 @@ fn choice_requires_supported(
     let Some((_, ns)) = namespaces
       .iter()
       .rev()
-      .find(|(candidate, _)| candidate.as_ref() == prefix)
+      .find(|(candidate, _)| candidate.as_bytes() == prefix.as_bytes())
     else {
       return Ok(false);
     };
-    if !namespace_supported(ns, target) {
+    if !namespace_supported(ns.as_str(), target) {
       return Ok(false);
     }
   }
@@ -1072,13 +1074,10 @@ fn namespace_decls(
     let attr = attr?;
     let key = attr.key.as_ref();
     if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+      let uri = String::from_utf8_lossy(attr.value.as_ref());
       namespaces.push((
-        String::from_utf8_lossy(prefix)
-          .into_owned()
-          .into_boxed_str(),
-        String::from_utf8_lossy(attr.value.as_ref())
-          .into_owned()
-          .into_boxed_str(),
+        crate::common::XmlPrefix::new(prefix),
+        crate::common::XmlNamespaceUri::new(uri.as_ref()),
       ));
     }
   }

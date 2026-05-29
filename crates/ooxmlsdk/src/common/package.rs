@@ -707,7 +707,7 @@ impl RelationshipSet {
 
   pub(crate) fn to_relationships(&self) -> Relationships {
     Relationships {
-      xmlns: vec![super::XmlNamespaceDecl::new(
+      xmlns: vec![super::XmlNamespace::new(
         "",
         "http://schemas.openxmlformats.org/package/2006/relationships",
       )],
@@ -1978,7 +1978,7 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
 
 fn empty_content_types() -> Types {
   Types {
-    xmlns: vec![super::XmlNamespaceDecl::new(
+    xmlns: vec![super::XmlNamespace::new(
       "",
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],

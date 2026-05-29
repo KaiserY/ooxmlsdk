@@ -11,7 +11,7 @@
   qname = "w16cex:CT_CommentsExtensible/w16cex:commentsExtensible"
 )]
 pub struct CommentsExtensible {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the CommentExtensible Class.
@@ -49,7 +49,6 @@ pub struct CommentExtensible {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "w16cur:CT_Extension/w16cur:ext"))]
   pub extension: Vec<crate::schemas::w16cur::Extension>,

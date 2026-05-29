@@ -35,29 +35,8 @@
   ],
   "Types": [
     {
-      "ClassName": "RunPropertiesDefault",
-      "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Font",
-      "ParentChoiceHasAnyIn": ["Fonts"]
-    },
-    {
-      "ClassName": "Paragraph",
-      "ParentChoiceHasAnyIn": ["Body"]
-    },
-    {
-      "ClassName": "Run",
-      "ParentChoiceHasAnyIn": ["Paragraph"]
-    },
-    {
-      "ClassName": "Drawing",
-      "ParentChoiceHasAnyIn": ["Run"]
-    },
-    {
-      "ClassName": "SpacingBetweenLines",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "DocDefaults",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "DocGrid",
@@ -67,6 +46,47 @@
           "OverrideType": "Int32ZeroOnOverflowValue"
         }
       ]
+    },
+    {
+      "ClassName": "Drawing",
+      "ParentChoiceHasAnyIn": [
+        "Run"
+      ]
+    },
+    {
+      "ClassName": "Font",
+      "ParentChoiceHasAnyIn": [
+        "Fonts"
+      ]
+    },
+    {
+      "ClassName": "NumberingSymbolRunProperties",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Paragraph",
+      "ParentChoiceHasAnyIn": [
+        "Body"
+      ]
+    },
+    {
+      "ClassName": "ParagraphBorders",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "ParagraphPropertiesBaseStyle",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Run",
+      "ParentChoiceHasAnyIn": [
+        "Paragraph"
+      ]
+    },
+    {
+      "ClassName": "RunPropertiesDefault",
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "SdtPlaceholder",
@@ -82,16 +102,8 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
-      "ClassName": "NumberingSymbolRunProperties",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "ParagraphPropertiesBaseStyle",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "ParagraphBorders",
-      "HaveDirectXmlOtherChildren": true
+      "ClassName": "SpacingBetweenLines",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "StyleRunProperties",

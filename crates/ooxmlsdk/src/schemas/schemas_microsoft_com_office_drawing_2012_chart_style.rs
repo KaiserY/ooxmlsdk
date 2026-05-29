@@ -142,7 +142,7 @@ pub enum TitlePosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "cs:CT_ColorStyle/cs:colorStyle")]
 pub struct ColorStyle {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// meth
@@ -183,7 +183,7 @@ pub struct ColorStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "cs:CT_ChartStyle/cs:chartStyle")]
 pub struct ChartStyle {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
@@ -326,7 +326,6 @@ pub struct ColorStyleVariation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/cs:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
@@ -472,7 +471,6 @@ pub struct FontReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_ShapeProperties/cs:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -516,7 +514,6 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_TextCharacterProperties/cs:defRPr")]
 pub struct TextCharacterPropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// kumimoji
   #[sdk(attr(qname = ":kumimoji"))]
   pub kumimoji: Option<crate::simple_type::BooleanValue>,
@@ -639,7 +636,6 @@ pub struct TextCharacterPropertiesType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_TextBodyProperties/cs:bodyPr")]
 pub struct TextBodyProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
@@ -2413,7 +2409,8 @@ pub enum TextBodyPropertiesChoice {
   /// Normal AutoFit.
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  ShapeAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
+  #[sdk(empty_child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
+  ShapeAutoFit,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {

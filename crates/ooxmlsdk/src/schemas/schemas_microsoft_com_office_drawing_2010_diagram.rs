@@ -8,7 +8,6 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr")]
 pub struct NonVisualDrawingProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,

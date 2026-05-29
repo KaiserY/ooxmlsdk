@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "t:CT_Tasks/t:Tasks")]
 pub struct Tasks {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Task Class.
@@ -41,7 +41,6 @@ pub struct Task {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "oel:CT_ExtensionList/t:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "oel:CT_Extension/oel:ext"))]
   pub extension: Vec<crate::schemas::oel::Extension>,

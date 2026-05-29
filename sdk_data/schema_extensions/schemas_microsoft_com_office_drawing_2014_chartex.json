@@ -12,6 +12,10 @@
           "Optional": true
         }
       ]
+    },
+    {
+      "ClassName": "RelId",
+      "HaveXmlnsFields": true
     }
   ]
 }

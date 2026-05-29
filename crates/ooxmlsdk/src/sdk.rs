@@ -652,7 +652,7 @@ pub trait SdkMceChoice: SdkChoice {
 }
 
 #[cfg(feature = "mce")]
-pub(crate) type MceNamespace = (Box<str>, Box<str>);
+pub(crate) type MceNamespace = (crate::common::XmlPrefix, crate::common::XmlNamespaceUri);
 
 #[cfg(feature = "mce")]
 #[derive(Clone, Debug, Default)]
@@ -676,7 +676,7 @@ pub struct MceContextCheckpoint {
 impl MceContext {
   pub(crate) fn push<N, V>(
     &mut self,
-    namespaces: &[crate::common::XmlNamespaceDecl],
+    namespaces: &[crate::common::XmlNamespace],
     attrs: &[(N, V)],
     settings: &MarkupCompatibilityProcessSettings,
   ) -> Result<MceContextCheckpoint, crate::common::SdkError>
@@ -694,7 +694,7 @@ impl MceContext {
     self.namespaces.extend(
       namespaces
         .iter()
-        .map(|decl| (decl.prefix.as_ref().into(), decl.uri.as_ref().into())),
+        .map(|decl| (decl.prefix.clone(), decl.uri.clone())),
     );
 
     if let Some(value) = mce_attr(attrs, "Ignorable") {
@@ -789,11 +789,9 @@ impl MceContext {
   }
 
   pub(crate) fn namespace_for_prefix(&self, prefix: &str) -> Option<&str> {
-    self
-      .namespaces
-      .iter()
-      .rev()
-      .find_map(|(candidate, uri)| (candidate.as_ref() == prefix).then_some(uri.as_ref()))
+    self.namespaces.iter().rev().find_map(|(candidate, uri)| {
+      (candidate.as_bytes() == prefix.as_bytes()).then_some(uri.as_str())
+    })
   }
 
   pub(crate) fn namespaces(&self) -> &[MceNamespace] {

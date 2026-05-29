@@ -66,6 +66,7 @@ pub struct NonVisualGroupProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a15:CT_ObjectPr/a15:objectPr")]
 pub struct ObjectProperties {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// objectId
   #[sdk(attr(office2013, qname = ":objectId"))]
   pub id: Option<crate::simple_type::StringValue>,

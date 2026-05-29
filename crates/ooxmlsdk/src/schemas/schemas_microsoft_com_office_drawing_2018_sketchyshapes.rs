@@ -51,7 +51,6 @@ pub type LineSketchSeed = crate::simple_type::UInt32Value;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "a:CT_OfficeArtExtensionList/ask:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,

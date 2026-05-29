@@ -16,7 +16,7 @@ pub enum TargetMode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "CT_Relationships/Relationships")]
 pub struct Relationships {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Relationship
   #[sdk(child(qname = "CT_Relationship/Relationship"))]

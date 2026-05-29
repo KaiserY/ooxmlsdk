@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "adec:CT_Decorative/adec:decorative")]
 pub struct Decorative {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
   #[sdk(attr(office2019, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,

@@ -827,8 +827,6 @@ fn build_type_decl(
       xml_content,
       support: SystemSupportDecl {
         have_xmlns_fields: schema_type.have_xmlns_fields,
-        xmlns_known_capacity: schema_type.xmlns_known_capacity,
-        xmlns_custom_capacity: schema_type.xmlns_custom_capacity,
         xml_header: match schema_type.xml_header {
           SchemaTypeXmlHeader::None => XmlHeaderMode::None,
           SchemaTypeXmlHeader::Plain => XmlHeaderMode::Plain,

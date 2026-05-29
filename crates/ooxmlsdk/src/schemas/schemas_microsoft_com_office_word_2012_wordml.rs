@@ -69,7 +69,7 @@ pub struct Appearance {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_CommentsEx/w15:commentsEx")]
 pub struct CommentsEx {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the CommentEx Class.
@@ -80,7 +80,7 @@ pub struct CommentsEx {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_People/w15:people")]
 pub struct People {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Person Class.
@@ -118,7 +118,6 @@ pub struct DefaultCollapsed {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w:CT_OnOff/w15:webExtensionLinked")]
 pub struct WebExtensionLinked {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
@@ -127,7 +126,6 @@ pub struct WebExtensionLinked {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w:CT_OnOff/w15:webExtensionCreated")]
 pub struct WebExtensionCreated {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,

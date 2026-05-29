@@ -751,7 +751,7 @@ fn mce_context_scope_tokens(
   let xmlns_expr = if let Some(ident) = xmlns_fields.first() {
     quote! { self.#ident.as_slice() }
   } else {
-    quote! { &[] as &[crate::common::XmlNamespaceDecl] }
+    quote! { &[] as &[crate::common::XmlNamespace] }
   };
   let attrs_expr = if let Some(ident) = xml_other_attrs_field {
     quote! { self.#ident.as_slice() }
@@ -3264,8 +3264,6 @@ fn expand_named_struct(
   let mut any_fields = Vec::new();
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
-  let mut xmlns_known_field = None;
-  let mut xmlns_custom_field = None;
   let mut xml_header_field = None;
   let mut xml_other_attrs_field = None;
   let mut xml_other_children_field = None;
@@ -3279,14 +3277,6 @@ fn expand_named_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     if is_xmlns_field(field_ident) {
       xmlns_fields.push(field_ident.clone());
-      continue;
-    }
-    if field_ident == "xmlns_known" {
-      xmlns_known_field = Some(field_ident.clone());
-      continue;
-    }
-    if field_ident == "xmlns_custom" {
-      xmlns_custom_field = Some(field_ident.clone());
       continue;
     }
     if field_ident == "xml_header" {
@@ -3702,12 +3692,12 @@ fn expand_named_struct(
       quote! {
         let uri = crate::common::decode_attr_value(&attr, decoder)?;
         if uri.as_bytes() != #uri.as_slice() {
-          xmlns.push(crate::common::XmlNamespaceDecl::new("", uri));
+          xmlns.push(crate::common::XmlNamespace::new("", uri));
         }
       }
     } else {
       quote! {
-        xmlns.push(crate::common::XmlNamespaceDecl::new(
+        xmlns.push(crate::common::XmlNamespace::new(
           "",
           crate::common::decode_attr_value(&attr, decoder)?,
         ));
@@ -3719,15 +3709,13 @@ fn expand_named_struct(
         if &key[6..] != #raw_tag_prefix_lit.as_slice()
           || uri.as_bytes() != #uri_lit.as_slice()
         {
-          let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
-          xmlns.push(crate::common::XmlNamespaceDecl::new(prefix, uri));
+          xmlns.push(crate::common::XmlNamespace::new(&key[6..], uri));
         }
       }
     } else {
       quote! {
-        let prefix = String::from_utf8_lossy(&key[6..]).into_owned();
         let uri = crate::common::decode_attr_value(&attr, decoder)?;
-        xmlns.push(crate::common::XmlNamespaceDecl::new(prefix, uri));
+        xmlns.push(crate::common::XmlNamespace::new(&key[6..], uri));
       }
     };
     quote! {
@@ -3761,7 +3749,7 @@ fn expand_named_struct(
     } else {
       match (has_xmlns_fields, has_xml_other_attrs_field) {
         (true, true) => quote! {
-          let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
+          let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
           let mut xml_other_attrs =
             Vec::<(std::boxed::Box<str>, std::boxed::Box<str>)>::new();
           let decoder = xml_reader.decoder();
@@ -3775,7 +3763,7 @@ fn expand_named_struct(
           }
         },
         (true, false) => quote! {
-          let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
+          let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -5888,7 +5876,7 @@ fn expand_named_struct(
     let fixed_namespace_skip_tokens = if let Some(uri_lit) = &fixed_namespace_uri_lit {
       if default_ns {
         quote! {
-          if declaration.uri.as_bytes() == #uri_lit.as_slice()
+          if declaration.uri.as_str().as_bytes() == #uri_lit.as_slice()
             && (declaration.is_default()
               || declaration.prefix.as_bytes() == #raw_tag_prefix_lit.as_slice())
           {
@@ -5897,7 +5885,7 @@ fn expand_named_struct(
         }
       } else {
         quote! {
-          if declaration.uri.as_bytes() == #uri_lit.as_slice()
+          if declaration.uri.as_str().as_bytes() == #uri_lit.as_slice()
             && declaration.prefix.as_bytes() == #raw_tag_prefix_lit.as_slice()
           {
             continue;
@@ -5909,10 +5897,9 @@ fn expand_named_struct(
     };
     let prefix_tokens = if use_canonical_xmlns_prefix {
       quote! {
-        let prefix = crate::common::canonical_xmlns_prefix(
-          declaration.prefix.as_ref(),
-          declaration.uri.as_ref(),
-        );
+        let prefix = declaration
+          .uri
+          .canonical_prefix(declaration.prefix.as_str().unwrap_or(""));
         let prefix = if declaration.is_default() {
           None
         } else {
@@ -5924,7 +5911,7 @@ fn expand_named_struct(
         let prefix = if declaration.is_default() {
           None
         } else {
-          Some(declaration.prefix.as_ref())
+          declaration.prefix.as_str()
         };
       }
     };
@@ -5933,7 +5920,7 @@ fn expand_named_struct(
       for declaration in &self.xmlns {
         #fixed_namespace_skip_tokens
         #prefix_tokens
-        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_ref())?;
+        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_str())?;
       }
     }
   } else {
@@ -5951,20 +5938,6 @@ fn expand_named_struct(
   let special_namespace_init_tokens = if has_xmlns_fields {
     quote! {
       xmlns,
-    }
-  } else {
-    quote! {}
-  };
-  let xmlns_known_init_tokens = if let Some(ident) = &xmlns_known_field {
-    quote! {
-      #ident: std::default::Default::default(),
-    }
-  } else {
-    quote! {}
-  };
-  let xmlns_custom_init_tokens = if let Some(ident) = &xmlns_custom_field {
-    quote! {
-      #ident: std::default::Default::default(),
     }
   } else {
     quote! {}
@@ -6269,8 +6242,6 @@ fn expand_named_struct(
           #text_finish_tokens
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
-          #xmlns_known_init_tokens
-          #xmlns_custom_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
           #xml_other_children_init_tokens
@@ -6303,8 +6274,6 @@ fn expand_named_struct(
           #text_finish_tokens
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
-          #xmlns_known_init_tokens
-          #xmlns_custom_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
           #xml_other_children_init_tokens

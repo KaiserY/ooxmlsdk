@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdip:CT_CustomPropertyEditors/cdip:customPropertyEditors")]
 pub struct CustomPropertyEditors {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ShowOnOpen Class.
   #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/cdip:showOnOpen"))]
   pub show_on_open: ShowOnOpen,

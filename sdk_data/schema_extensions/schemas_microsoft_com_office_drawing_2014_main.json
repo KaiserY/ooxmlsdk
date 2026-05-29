@@ -1,0 +1,16 @@
+{
+  "Types": [
+    {
+      "ClassName": "ColIdIdentifier",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CreationId",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RowIdIdentifier",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

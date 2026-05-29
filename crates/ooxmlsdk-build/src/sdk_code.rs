@@ -394,15 +394,14 @@ fn write_namespaces(
   sdk_data_namespaces: &[SdkDataNamespace],
   namespace_aliases: &[SdkDataNamespaceAlias],
   out_dir_path: &Path,
-  include_prefix_by_uri: bool,
+  include_known_namespace: bool,
   include_uri_by_prefix: bool,
   include_default_namespace_style: bool,
 ) -> Result<()> {
-  let mut uri_to_prefix_arms: Vec<syn::Arm> = vec![];
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
-  let mut known_prefix_arms: Vec<syn::Arm> = vec![];
-  let mut known_uri_arms: Vec<syn::Arm> = vec![];
+  let mut known_prefix_bytes_arms: Vec<syn::Arm> = vec![];
+  let mut known_uri_bytes_arms: Vec<syn::Arm> = vec![];
   let mut known_from_uri_arms: Vec<syn::Arm> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
@@ -426,22 +425,18 @@ fn write_namespaces(
           #( #attrs )*
           #variant_ident,
         });
-        known_prefix_arms.push(parse2(quote! {
+        known_prefix_bytes_arms.push(parse2(quote! {
           #( #attrs )*
-          Self::#variant_ident => #prefix,
+          Self::#variant_ident => #prefix.as_bytes(),
         })?);
-        known_uri_arms.push(parse2(quote! {
+        known_uri_bytes_arms.push(parse2(quote! {
           #( #attrs )*
-          Self::#variant_ident => #uri,
+          Self::#variant_ident => #uri.as_bytes(),
         })?);
       }
       known_from_uri_arms.push(parse2(quote! {
         #( #attrs )*
         #uri => Some(Self::#variant_ident),
-      })?);
-      uri_to_prefix_arms.push(parse2(quote! {
-        #( #attrs )*
-        #uri => Some(#prefix),
       })?);
     }
 
@@ -482,18 +477,6 @@ fn write_namespaces(
     })?);
   }
 
-  let prefix_by_uri_tokens = if include_prefix_by_uri {
-    quote! {
-      pub(crate) fn prefix_by_uri(uri: &str) -> Option<&'static str> {
-        match uri {
-          #( #uri_to_prefix_arms )*
-          _ => None,
-        }
-      }
-    }
-  } else {
-    quote! {}
-  };
   let uri_by_prefix_tokens = if include_uri_by_prefix {
     quote! {
       pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
@@ -516,7 +499,7 @@ fn write_namespaces(
   } else {
     quote! {}
   };
-  let known_namespace_tokens = if include_prefix_by_uri {
+  let known_namespace_tokens = if include_known_namespace {
     quote! {
       #[repr(u16)]
       #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -532,16 +515,26 @@ fn write_namespaces(
       }
 
       impl XmlKnownNamespace {
-        pub const fn prefix(self) -> &'static str {
+        pub const fn prefix_bytes(self) -> &'static [u8] {
           match self {
-            #( #known_prefix_arms )*
+            #( #known_prefix_bytes_arms )*
+          }
+        }
+
+        pub const fn prefix(self) -> &'static str {
+          // Generated namespace prefixes are ASCII and therefore valid UTF-8.
+          unsafe { std::str::from_utf8_unchecked(self.prefix_bytes()) }
+        }
+
+        pub const fn uri_bytes(self) -> &'static [u8] {
+          match self {
+            #( #known_uri_bytes_arms )*
           }
         }
 
         pub const fn uri(self) -> &'static str {
-          match self {
-            #( #known_uri_arms )*
-          }
+          // Generated namespace URIs are ASCII and therefore valid UTF-8.
+          unsafe { std::str::from_utf8_unchecked(self.uri_bytes()) }
         }
 
         pub fn from_uri(uri: &str) -> Option<Self> {
@@ -589,7 +582,6 @@ fn write_namespaces(
   let token_stream: TokenStream = quote! {
     #known_namespace_tokens
 
-    #prefix_by_uri_tokens
     #uri_by_prefix_tokens
     #default_namespace_style_tokens
   };

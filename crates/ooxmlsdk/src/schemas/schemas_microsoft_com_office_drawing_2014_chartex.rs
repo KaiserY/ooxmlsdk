@@ -256,7 +256,7 @@ pub enum PageOrientation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ChartSpace/cx:chartSpace")]
 pub struct ChartSpace {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
@@ -298,6 +298,7 @@ pub struct ChartSpace {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_RelId/cx:chart")]
 pub struct RelId {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
   #[sdk(attr(office2016, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
@@ -310,7 +311,6 @@ pub type BinCountXsdunsignedInt = crate::simple_type::UInt32Value;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_Extension/cx:ext")]
 pub struct Extension2 {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   #[sdk(attr(office2016, qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -463,7 +463,6 @@ pub struct StringDimension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ExtensionList/cx:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension2 Class.
   #[sdk(child(office2016, qname = "cx:CT_Extension/cx:ext"))]
   pub extension2: Vec<Extension2>,
@@ -524,7 +523,6 @@ pub struct TextData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_TextBody/cx:rich")]
 pub struct RichTextBody {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -539,7 +537,6 @@ pub struct RichTextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_TextBody/cx:txPr")]
 pub struct TxPrTextBody {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -561,7 +558,6 @@ pub struct Text {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_ShapeProperties/cx:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -1900,7 +1896,7 @@ pub struct ChartData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_Chart/cx:chart")]
 pub struct Chart {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ChartTitle Class.
   #[sdk(child(office2016, qname = "cx:CT_ChartTitle/cx:title"))]
   pub chart_title: Option<std::boxed::Box<ChartTitle>>,

@@ -14,7 +14,7 @@ pub enum XsiTypeValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cp:CT_CoreProperties/cp:coreProperties")]
 pub struct CoreProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// cp:category

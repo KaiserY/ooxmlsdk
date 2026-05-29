@@ -13,6 +13,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "PivotTableDefinition",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "SparklineGroups",
       "HaveXmlnsFields": true
     }

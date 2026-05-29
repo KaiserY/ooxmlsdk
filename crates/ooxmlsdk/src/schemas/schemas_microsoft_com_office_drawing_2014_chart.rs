@@ -8,7 +8,6 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_ShapeProperties/c16:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -76,7 +75,6 @@ pub struct Bubble3DBoolean {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c:CT_Marker/c16:marker")]
 pub struct Marker {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
   #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
   pub symbol: Option<crate::schemas::c::Symbol>,

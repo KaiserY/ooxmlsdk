@@ -22,7 +22,7 @@ pub struct PresetTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_PresenceInfo/p15:presenceInfo")]
 pub struct PresenceInfo {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// userId
   #[sdk(attr(office2013, qname = ":userId"))]
   pub user_id: crate::simple_type::StringValue,
@@ -45,7 +45,7 @@ pub struct ThreadingInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst")]
 pub struct SlideGuideList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
   pub extended_guide: Vec<ExtendedGuide>,
@@ -57,7 +57,7 @@ pub struct SlideGuideList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst")]
 pub struct NotesGuideList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
   pub extended_guide: Vec<ExtendedGuide>,
@@ -72,7 +72,7 @@ pub struct NotesGuideList {
   qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"
 )]
 pub struct ChartTrackingReferenceBased {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
   #[sdk(attr(office2013, qname = ":val"))]
   pub val: crate::simple_type::BooleanValue,
@@ -106,7 +106,6 @@ pub struct ColorType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p:CT_ExtensionList/p15:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
@@ -115,7 +114,7 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_ExtendedGuide/p15:guide")]
 pub struct ExtendedGuide {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,

@@ -1,11 +1,27 @@
 {
   "Types": [
     {
-      "ClassName": "SectionProperties",
+      "ClassName": "CreationId",
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "SectionList",
+      "ClassName": "DefaultImageDpi",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DiscardImageEditData",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LaserColor",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Media",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ModificationId",
       "HaveXmlnsFields": true
     },
     {
@@ -13,7 +29,15 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "SectionList",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "SectionOld",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SectionProperties",
       "HaveXmlnsFields": true
     },
     {
@@ -22,10 +46,6 @@
     },
     {
       "ClassName": "SectionSlideIdListEntry",
-      "HaveXmlnsFields": true
-    },
-    {
-      "ClassName": "LaserColor",
       "HaveXmlnsFields": true
     },
     {

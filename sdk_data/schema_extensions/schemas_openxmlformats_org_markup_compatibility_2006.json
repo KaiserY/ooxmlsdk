@@ -1,0 +1,16 @@
+{
+  "Types": [
+    {
+      "ClassName": "AlternateContent",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Choice",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Fallback",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

@@ -256,7 +256,12 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
   let (parsed, serialized, reparsed) =
     assert_stable_roundtrip::<SharedStringTable>(fixtures::SPREADSHEET_SHARED_STRING_TABLE_XML);
 
-  assert_eq!(ooxmlsdk::common::find_xmlns_uri(&parsed.xmlns, "x"), None);
+  assert!(
+    parsed
+      .xmlns
+      .iter()
+      .all(|declaration| declaration.prefix.as_bytes() != b"x")
+  );
   let items = shared_string_items(&parsed);
   assert_eq!(items.len(), 1);
   let item = items[0];

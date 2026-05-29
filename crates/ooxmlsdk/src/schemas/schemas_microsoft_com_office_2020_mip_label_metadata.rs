@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "clbl:CT_ClassificationLabelList/clbl:labelList")]
 pub struct ClassificationLabelList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ClassificationLabel Class.
@@ -22,7 +22,6 @@ pub struct ClassificationLabelList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "clbl:CT_ClassificationExtension/clbl:ext")]
 pub struct ClassificationExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   #[sdk(attr(office2021, qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -70,7 +69,6 @@ pub struct ClassificationLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "clbl:CT_ClassificationExtensionList/clbl:extLst")]
 pub struct ClassificationExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the ClassificationExtension Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationExtension/clbl:ext"))]
   pub classification_extension: Vec<ClassificationExtension>,

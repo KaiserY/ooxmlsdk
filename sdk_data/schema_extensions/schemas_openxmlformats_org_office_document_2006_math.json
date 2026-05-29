@@ -11,5 +11,15 @@
         }
       ]
     }
+  ],
+  "Types": [
+    {
+      "ClassName": "OfficeMath",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Paragraph",
+      "HaveXmlnsFields": true
+    }
   ]
 }

@@ -58,27 +58,6 @@ pub enum XmlHeaderType {
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct XmlNamespaceDecl {
-  pub prefix: Box<str>,
-  pub uri: Box<str>,
-}
-
-impl XmlNamespaceDecl {
-  #[inline]
-  pub fn new(prefix: impl Into<Box<str>>, uri: impl Into<Box<str>>) -> Self {
-    Self {
-      prefix: prefix.into(),
-      uri: uri.into(),
-    }
-  }
-
-  #[inline]
-  pub fn is_default(&self) -> bool {
-    self.prefix.is_empty()
-  }
-}
-
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct XmlPrefix(smallvec::SmallVec<[u8; 8]>);
 
 impl XmlPrefix {
@@ -166,6 +145,14 @@ impl XmlNamespaceUri {
       Self::Custom(uri) => uri.as_ref(),
     }
   }
+
+  #[inline]
+  pub(crate) fn canonical_prefix<'a>(&self, prefix: &'a str) -> &'a str {
+    match self {
+      Self::Known(namespace) => namespace.prefix(),
+      Self::Custom(_) => prefix,
+    }
+  }
 }
 
 impl AsRef<str> for XmlNamespaceUri {
@@ -193,23 +180,6 @@ impl XmlNamespace {
   #[inline]
   pub fn is_default(&self) -> bool {
     self.prefix.is_empty()
-  }
-}
-
-#[inline]
-pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) -> Option<&'a str> {
-  declarations
-    .iter()
-    .find(|declaration| declaration.prefix.as_ref() == prefix)
-    .map(|declaration| declaration.uri.as_ref())
-}
-
-#[inline]
-pub(crate) fn canonical_xmlns_prefix<'a>(prefix: &'a str, uri: &str) -> &'a str {
-  if let Some(canonical_prefix) = crate::namespaces::prefix_by_uri(uri) {
-    canonical_prefix
-  } else {
-    prefix
   }
 }
 

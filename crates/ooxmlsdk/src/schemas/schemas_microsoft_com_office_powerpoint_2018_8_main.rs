@@ -18,7 +18,6 @@ pub enum CommentStatus {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "a:CT_TextBody/p188:txBody")]
 pub struct TextBodyType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -36,7 +35,6 @@ pub struct TextBodyType {
   qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
 )]
 pub struct CommentPropertiesExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Data for the Windows platform..
   #[sdk(child(office2021, qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
   pub comment_properties_extension: Vec<crate::schemas::p::CommentPropertiesExtension>,
@@ -45,7 +43,7 @@ pub struct CommentPropertiesExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p188:CT_AuthorList/p188:authorLst")]
 pub struct AuthorList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Author Class.
@@ -56,7 +54,7 @@ pub struct AuthorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p188:CT_CommentList/p188:cmLst")]
 pub struct CommentList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Comment Class.
@@ -75,7 +73,6 @@ pub struct CommentRelationship {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p:CT_ExtensionList/p188:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,

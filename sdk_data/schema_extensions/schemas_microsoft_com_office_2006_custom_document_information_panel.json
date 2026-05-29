@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "CustomPropertyEditors",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

@@ -1,6 +1,10 @@
 {
   "Types": [
     {
+      "ClassName": "Snapshot",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "WebExtension",
       "HaveXmlnsFields": true
     }

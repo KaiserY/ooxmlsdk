@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cppr:CT_CoverPageProperties/cppr:CoverPageProperties")]
 pub struct CoverPageProperties {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the PublishDate Class.
   #[sdk(text_child(
     simple_type = "StringValue",

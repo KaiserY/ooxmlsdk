@@ -166,7 +166,6 @@ pub struct QueryTable {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_WebExtensions/x15:webExtensions")]
 pub struct WebExtensions {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtension Class.
   #[sdk(child(office2013, qname = "x15:CT_WebExtension/x15:webExtension"))]
   pub web_extension: Vec<WebExtension>,
@@ -508,7 +507,7 @@ pub struct Survey {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_Timelines/x15:timelines")]
 pub struct Timelines {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Timeline Class.
@@ -522,7 +521,7 @@ pub struct Timelines {
   qname = "x15:CT_TimelineCacheDefinition/x15:timelineCacheDefinition"
 )]
 pub struct TimelineCacheDefinition {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// name
@@ -556,7 +555,6 @@ pub struct PivotTableReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_WebExtension/x15:webExtension")]
 pub struct WebExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// appRef
   #[sdk(attr(office2013, qname = ":appRef"))]
   pub application_reference: crate::simple_type::StringValue,
@@ -760,7 +758,6 @@ pub struct FieldListActiveTabTopLevelEntity {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x:CT_ExtensionList/x15:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,

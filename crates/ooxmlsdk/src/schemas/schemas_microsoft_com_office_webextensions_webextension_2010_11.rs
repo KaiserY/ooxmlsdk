@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtension/we:webextension")]
 pub struct WebExtension {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
@@ -43,7 +43,6 @@ pub struct WebExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_WebExtensionPartRef/we:webextensionref")]
 pub struct WebExtensionReference {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
@@ -52,7 +51,6 @@ pub struct WebExtensionReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property")]
 pub struct WebExtensionProperty {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -64,7 +62,6 @@ pub struct WebExtensionProperty {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst")]
 pub struct OfficeArtExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
@@ -73,7 +70,6 @@ pub struct OfficeArtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding")]
 pub struct WebExtensionBinding {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
@@ -91,7 +87,6 @@ pub struct WebExtensionBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference")]
 pub struct WebExtensionStoreReference {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
@@ -115,7 +110,6 @@ pub struct WebExtensionStoreReference {
   qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences"
 )]
 pub struct WebExtensionReferenceList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionStoreReference Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub web_extension_store_reference: Vec<WebExtensionStoreReference>,
@@ -124,7 +118,6 @@ pub struct WebExtensionReferenceList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
 pub struct WebExtensionPropertyBag {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionProperty Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property"))]
   pub web_extension_property: Vec<WebExtensionProperty>,
@@ -133,7 +126,6 @@ pub struct WebExtensionPropertyBag {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
 pub struct WebExtensionBindingList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the WebExtensionBinding Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
   pub web_extension_binding: Vec<WebExtensionBinding>,
@@ -142,7 +134,7 @@ pub struct WebExtensionBindingList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "a:CT_Blip/we:snapshot")]
 pub struct Snapshot {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Embedded Picture Reference
   #[sdk(attr(qname = "r:embed"))]
   pub embed: Option<crate::simple_type::StringValue>,

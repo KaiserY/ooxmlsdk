@@ -1,20 +1,28 @@
 {
   "Types": [
     {
-      "ClassName": "Shape",
-      "HaveXmlnsFields": true,
-      "ParentChoiceHasAnyIn": ["ShapeTree"]
+      "ClassName": "CommonTimeNode",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Control",
-      "ParentChoiceHasAnyIn": ["ControlList"]
+      "ParentChoiceHasAnyIn": [
+        "ControlList"
+      ]
+    },
+    {
+      "ClassName": "OutlineViewSlideListEntry",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Shape",
+      "HaveXmlnsFields": true,
+      "ParentChoiceHasAnyIn": [
+        "ShapeTree"
+      ]
     },
     {
       "ClassName": "Slide",
-      "HaveDirectXmlOtherChildren": true
-    },
-    {
-      "ClassName": "SlideMaster",
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -22,12 +30,24 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
+      "ClassName": "SlideLayoutExtensionList",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "SlideListEntry",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SlideMaster",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "SlideMasterExtensionList",
       "HaveXmlOtherAttrs": true
     },
     {
-      "ClassName": "SlideLayoutExtensionList",
-      "HaveXmlOtherAttrs": true
+      "ClassName": "Transition",
+      "HaveXmlnsFields": true
     }
   ]
 }

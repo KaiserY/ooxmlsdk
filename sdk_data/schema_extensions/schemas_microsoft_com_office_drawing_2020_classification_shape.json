@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "ClassificationOutcome",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

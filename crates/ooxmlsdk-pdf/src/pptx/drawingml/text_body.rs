@@ -215,7 +215,7 @@ impl TextBodyDisplayProperties {
             .unwrap_or(100_000),
         };
       }
-      Some(a::BodyPropertiesChoice::ShapeAutoFit(_)) => {
+      Some(a::BodyPropertiesChoice::ShapeAutoFit) => {
         if !matches!(
           result.vertical,
           Some(

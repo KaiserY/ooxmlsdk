@@ -116,7 +116,7 @@ pub struct RichSortCondition {
   qname = "xlrd2:CT_SupportingPropertyBags/xlrd2:supportingPropertyBags"
 )]
 pub struct SupportingPropertyBags {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SupportingPropertyBagArrayData Class.
@@ -136,7 +136,7 @@ pub struct SupportingPropertyBags {
   qname = "xlrd2:CT_SupportingPropertyBagStructures/xlrd2:spbStructures"
 )]
 pub struct SupportingPropertyBagStructures {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
@@ -153,7 +153,7 @@ pub struct SupportingPropertyBagStructures {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_ArrayData/xlrd2:arrayData")]
 pub struct ArrayData {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
@@ -170,7 +170,7 @@ pub struct ArrayData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichStylesheet/xlrd2:richStyleSheet")]
 pub struct RichStylesheet {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Dxfs Class.
@@ -193,7 +193,7 @@ pub struct RichStylesheet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichValueTypesInfo/xlrd2:rvTypesInfo")]
 pub struct RichValueTypesInfo {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the RichValueGlobalType Class.
@@ -280,7 +280,6 @@ pub struct DynamicRichFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst")]
 pub struct ExtensionList {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,

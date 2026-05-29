@@ -1,21 +1,96 @@
 {
   "Types": [
     {
+      "ClassName": "Area3DChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Area3DChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "AreaChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "AreaChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "AreaSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "AreaSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Bar3DChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Bar3DChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BarChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BarChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BarSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BarSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BubbleChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BubbleChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BubbleSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BubbleSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CatAxExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CatAxExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Chart",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "ChartReference",
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "DataDisplayOptions16",
-      "HaveDirectXmlOtherChildren": true
+      "ClassName": "ChartSpaceExtension",
+      "HaveXmlnsFields": true
     },
     {
-      "ClassName": "DLblsExtension",
-      "Children": [
-        {
-          "Name": "c:CT_Tx/c15:tx",
-          "Repeated": true
-        }
-      ]
+      "ClassName": "ChartSpaceExtensionList",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "DLblExtension",
@@ -44,7 +119,211 @@
           "Name": "c16:CT_ChartUniqueID/c16:uniqueId",
           "Repeated": true
         }
-      ]
+      ],
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DLblExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DLblsExtension",
+      "Children": [
+        {
+          "Name": "c:CT_Tx/c15:tx",
+          "Repeated": true
+        }
+      ],
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DLblsExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DataDisplayOptions16",
+      "HaveDirectXmlOtherChildren": true,
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DateAxExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DateAxExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Extension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Line3DChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Line3DChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LineChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LineChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LineSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LineSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "MultiLvlStrRefExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "MultiLvlStrRefExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NumRefExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NumRefExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Pie3DChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Pie3DChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PieChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PieChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PieSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PieSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RadarChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RadarChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RadarSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RadarSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ScatterChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ScatterChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ScatterSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ScatterSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SerAxExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SerAxExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StockChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StockChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StrDataExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StrDataExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StrRefExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "StrRefExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Surface3DChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Surface3DChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SurfaceChartExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SurfaceChartExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SurfaceSerExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SurfaceSerExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "UserShapesReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ValAxExtension",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ValAxExtensionList",
+      "HaveXmlnsFields": true
     }
   ]
 }

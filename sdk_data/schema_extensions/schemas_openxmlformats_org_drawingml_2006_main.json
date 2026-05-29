@@ -1,8 +1,136 @@
 {
   "Types": [
     {
+      "ClassName": "Blip",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BlipExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BodyProperties",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ConnectorLockingExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "EffectList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "EffectReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "FillReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "FontReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Graphic",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "GraphicFrameLocks",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "GvmlGroupShapeExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "HyperlinkExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "HyperlinkOnClick",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LinePropertiesExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LineReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ListStyle",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NoFill",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualDrawingPropertiesExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualGroupDrawingShapePropsExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NonVisualPicturePropertiesExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "OfficeStyleSheetExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Outline",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Paragraph",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PresetGeometry",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RgbColorModelHex",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ShapeLocks",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ShapePropertiesExtensionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SolidFill",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "TableStyleList",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Transform2D",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TransformEffect",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TransformGroup",
+      "HaveXmlnsFields": true
     }
   ]
 }

@@ -108,7 +108,6 @@ pub type DrawingMonikerList = Vec<String>;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_Transform2D/oac:xfrm")]
 pub struct Transform2D {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
@@ -308,7 +307,6 @@ pub struct Point2DType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_TextParagraphProperties/oac:pPr")]
 pub struct TextParagraphPropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
   #[sdk(number_range(range = 0..= 51206400))]
@@ -394,7 +392,6 @@ pub struct TextParagraphPropertiesType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_TextBodyProperties/oac:bodyPr")]
 pub struct TextBodyProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
@@ -527,7 +524,6 @@ pub type ShapePropsMonikerList = Vec<String>;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_ShapeProperties/oac:spPr")]
 pub struct ShapeProperties {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
@@ -850,7 +846,6 @@ pub struct ResetGroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_NonVisualDrawingProps/oac:cNvPr")]
 pub struct NonVisualDrawingProps {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -1119,7 +1114,6 @@ pub type SvgBlipMonikerList = Vec<String>;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_LineProperties/oac:lineProps")]
 pub struct LinePropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = 0..= 20116800))]
@@ -1362,7 +1356,8 @@ pub enum TextBodyPropertiesChoice {
   /// Normal AutoFit.
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  ShapeAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
+  #[sdk(empty_child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
+  ShapeAutoFit,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {

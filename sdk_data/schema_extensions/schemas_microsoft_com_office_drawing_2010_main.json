@@ -1,11 +1,19 @@
 {
   "Types": [
     {
+      "ClassName": "HiddenEffectsProperties",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "HiddenFillProperties",
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "HiddenEffectsProperties",
+      "ClassName": "HiddenLineProperties",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ImageProperties",
       "HaveXmlnsFields": true
     },
     {
@@ -16,6 +24,10 @@
       "ClassName": "TextMath",
       "HaveXmlnsFields": true,
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "UseLocalDpi",
+      "HaveXmlnsFields": true
     }
   ]
 }

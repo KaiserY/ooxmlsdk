@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "ContentTypeSchema",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

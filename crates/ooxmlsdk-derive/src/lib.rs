@@ -1231,11 +1231,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         Meta::Path(path) if is_sdk_version_marker_path(&path) => {}
         Meta::NameValue(meta) if meta.path.is_ident("bit") => {}
         Meta::Path(path)
-          if path.is_ident("xmlns")
-            || path.is_ident("xmlns_known")
-            || path.is_ident("xmlns_custom")
-            || path.is_ident("mce")
-            || path.is_ident("xml_header") =>
+          if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>
         {
           continue;
         }

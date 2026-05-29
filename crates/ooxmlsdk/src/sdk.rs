@@ -743,15 +743,15 @@ impl MceContext {
       .truncate(checkpoint.preserve_attributes);
   }
 
-  pub(crate) fn is_process_content_qname(&self, qname: &str) -> bool {
+  pub(crate) fn is_process_content_qname_bytes(&self, qname: &[u8]) -> bool {
     self.process_content.iter().any(|candidate| {
       let candidate = candidate.as_ref();
-      candidate == "*"
-        || candidate == qname
+      candidate.as_bytes() == b"*"
+        || candidate.as_bytes() == qname
         || candidate
           .strip_suffix(":*")
-          .zip(qname.split_once(':'))
-          .is_some_and(|(prefix, (qname_prefix, _))| prefix == qname_prefix)
+          .zip(qname.iter().position(|byte| *byte == b':'))
+          .is_some_and(|(prefix, qname_prefix_len)| prefix.as_bytes() == &qname[..qname_prefix_len])
     })
   }
 

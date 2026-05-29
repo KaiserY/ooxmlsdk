@@ -26,7 +26,7 @@ pub struct ClassificationExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Defines the ClassificationLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

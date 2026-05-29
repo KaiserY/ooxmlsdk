@@ -5,10 +5,8 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "Point",
-      "ParentChoiceHasAnyIn": [
-        "PointList"
-      ]
+      "ClassName": "PointList",
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "RelationshipIds",

@@ -128,7 +128,7 @@ current element may contain direct unknown XML children that should be preserved
 as raw XML on the current struct. In generated Rust this adds:
 
 ```rust
-pub xml_other_children: Vec<(usize, Box<str>)>
+pub xml_other_children: Vec<(usize, Box<[u8]>)>
 ```
 
 Use `HaveDirectXmlOtherChildren` only when the unknown child really belongs to
@@ -136,31 +136,25 @@ the current element's own direct-child storage. Do not use it for
 `mc:AlternateContent` that wraps an otherwise known child inside a repeated
 choice stream.
 
-`ParentChoiceHasAnyIn` is scoped through references to the current type and a
-small explicit parent-class allowlist. It means that when the current type
-appears as a member of one of those parent repeated choice or single repeated
-child streams, the parent stream must accept raw XML as another ordered item. In
-generated Rust this either adds `XmlAny` to the parent's existing
-`Vec<ChoiceEnum>` field or promotes a single `Vec<Child>` field into a
-`Vec<ParentChoice>` field with both the child variant and `XmlAny`.
+`ChoiceEnums[].AddXmlAny` is scoped to an existing generated choice enum. It
+means the parent choice stream must accept raw XML as another ordered item. In
+generated Rust this adds `XmlAny` to that existing choice enum.
 
-For example, if `w:CT_Font/w:font` has
-`"ParentChoiceHasAnyIn": ["Fonts"]`, then `w:CT_FontsList/w:fonts` can be
-generated as:
+For example, if `RunChoice` has `"AddXmlAny": true`, then `w:CT_R/w:r` can be
+generated with:
 
 ```rust
-#[sdk(choice(qname = "w:CT_Font/w:font", any))]
-pub xml_children: Vec<FontsChoice>,
+#[sdk(choice(qname = "w:CT_Drawing/w:drawing", any))]
+pub run_choice: Vec<RunChoice>,
 ```
 
-Use `ParentChoiceHasAnyIn` when an MCE wrapper, such as `mc:AlternateContent`,
-is observed in a specific parent where the wrapped payload is the marked child
-type. The mark belongs on the wrapped child type and must list the parent class
-that needs the raw XML choice item. This preserves order inside the parent child
-stream without adding a separate `xml_other_children` field to the parent.
-
-Do not add alternate parent-level raw-child fields for this path. MCE wrappers
-inside parent child streams should use `ParentChoiceHasAnyIn`.
+Use `AddXmlAny` only when an MCE wrapper, such as `mc:AlternateContent`, is
+observed inside an already modeled choice stream. If the parent has a direct
+child slot, such as a single repeated child list or a named sequence position,
+use `HaveDirectXmlOtherChildren` on the parent instead. For a parent with only
+one repeated child, `HaveDirectXmlOtherChildren` promotes that child list to a
+choice stream with an `XmlAny` variant so the raw MCE wrapper can preserve its
+ordered position.
 
 ## Feature Model
 

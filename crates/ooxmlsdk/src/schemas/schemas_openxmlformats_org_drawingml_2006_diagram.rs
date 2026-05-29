@@ -2958,6 +2958,14 @@ pub enum TextPropertiesChoice {
   FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum PointListChoice {
+  /// Point.
+  Point(std::boxed::Box<Point>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -3022,13 +3030,5 @@ pub enum DiagramDefinitionExtensionChoice {
   /// Defines the TextListStyleType Class.
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum PointListChoice {
-  /// Point.
-  Point(std::boxed::Box<Point>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }

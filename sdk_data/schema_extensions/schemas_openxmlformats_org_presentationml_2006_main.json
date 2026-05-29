@@ -5,10 +5,8 @@
       "HaveXmlnsFields": true
     },
     {
-      "ClassName": "Control",
-      "ParentChoiceHasAnyIn": [
-        "ControlList"
-      ]
+      "ClassName": "ControlList",
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "OutlineViewSlideListEntry",
@@ -16,10 +14,7 @@
     },
     {
       "ClassName": "Shape",
-      "HaveXmlnsFields": true,
-      "ParentChoiceHasAnyIn": [
-        "ShapeTree"
-      ]
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Slide",
@@ -48,6 +43,24 @@
     {
       "ClassName": "Transition",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TitleStyle",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "BodyStyle",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "OtherStyle",
+      "HaveDirectXmlOtherChildren": true
+    }
+  ],
+  "ChoiceEnums": [
+    {
+      "RustName": "ShapeTreeChoice",
+      "AddXmlAny": true
     }
   ]
 }

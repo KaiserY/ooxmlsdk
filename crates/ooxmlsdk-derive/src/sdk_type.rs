@@ -34,6 +34,20 @@ impl DeserializeMode {
       Self::Io => quote! { crate::common::read_raw_element_xml_io },
     }
   }
+
+  fn read_raw_empty_xml_bytes_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_empty_xml_borrowed_bytes },
+      Self::Io => quote! { crate::common::read_raw_empty_xml_io_bytes },
+    }
+  }
+
+  fn read_raw_element_xml_bytes_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_element_xml_borrowed_bytes },
+      Self::Io => quote! { crate::common::read_raw_element_xml_io_bytes },
+    }
+  }
 }
 
 fn deserialize_type_inner_ident(mode: DeserializeMode) -> Ident {
@@ -709,12 +723,12 @@ fn mce_xml_other_children_process_tokens(
     return quote! {
       let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
       for xml in std::mem::take(&mut self.xml_other_children) {
-        if let Some(children) = crate::common::mce_choice_replacement_children(
+        if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
           xml.as_ref(),
           settings,
           context,
         )? {
-          xml_other_children.extend(children.into_iter().map(|child| child.into_boxed_str()));
+          xml_other_children.extend(children);
         } else {
           xml_other_children.push(xml);
         }
@@ -726,12 +740,12 @@ fn mce_xml_other_children_process_tokens(
   quote! {
     let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
     for (slot, xml) in std::mem::take(&mut self.xml_other_children) {
-      if let Some(children) = crate::common::mce_choice_replacement_children(
+      if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
         xml.as_ref(),
         settings,
         context,
       )? {
-        xml_other_children.extend(children.into_iter().map(|child| (slot, child.into_boxed_str())));
+        xml_other_children.extend(children.into_iter().map(|child| (slot, child)));
       } else {
         xml_other_children.push((slot, xml));
       }
@@ -1441,9 +1455,19 @@ fn build_any_child_parse_tokens(
   as_result: bool,
   xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
-  let read_raw_element_xml = mode.read_raw_element_xml_fn();
-  let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
+  let field_item_ty = unwrap_option_vec_type(field_ty);
+  let use_bytes = is_box_u8_slice_type(&field_item_ty);
+  let read_raw_empty_xml = if use_bytes {
+    mode.read_raw_empty_xml_bytes_fn()
+  } else {
+    mode.read_raw_empty_xml_fn()
+  };
+  let read_raw_element_xml = if use_bytes {
+    mode.read_raw_element_xml_bytes_fn()
+  } else {
+    mode.read_raw_element_xml_fn()
+  };
+  let value_expr = if is_box_str_type(&field_item_ty) {
     quote! { xml.into_boxed_str() }
   } else {
     quote! { xml }
@@ -1479,9 +1503,19 @@ fn build_pure_any_child_parse_tokens(
   repeated: bool,
   mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
-  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
-  let read_raw_element_xml = mode.read_raw_element_xml_fn();
-  let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
+  let field_item_ty = unwrap_option_vec_type(field_ty);
+  let use_bytes = is_box_u8_slice_type(&field_item_ty);
+  let read_raw_empty_xml = if use_bytes {
+    mode.read_raw_empty_xml_bytes_fn()
+  } else {
+    mode.read_raw_empty_xml_fn()
+  };
+  let read_raw_element_xml = if use_bytes {
+    mode.read_raw_element_xml_bytes_fn()
+  } else {
+    mode.read_raw_element_xml_fn()
+  };
+  let value_expr = if is_box_str_type(&field_item_ty) {
     quote! { xml.into_boxed_str() }
   } else {
     quote! { xml }
@@ -1510,8 +1544,8 @@ fn build_unmatched_child_tokens(
   compact_xml_other_children: bool,
 ) -> proc_macro2::TokenStream {
   if has_xml_other_children_field {
-    let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
-    let read_raw_element_xml = mode.read_raw_element_xml_fn();
+    let read_raw_empty_xml = mode.read_raw_empty_xml_bytes_fn();
+    let read_raw_element_xml = mode.read_raw_element_xml_bytes_fn();
     if compact_xml_other_children {
       return quote! {
         let xml = if next_empty {
@@ -1519,7 +1553,7 @@ fn build_unmatched_child_tokens(
         } else {
           #read_raw_element_xml(xml_reader, e)?
         };
-        xml_other_children.push(xml.into_boxed_str());
+        xml_other_children.push(xml);
         continue;
       };
     }
@@ -1529,7 +1563,7 @@ fn build_unmatched_child_tokens(
       } else {
         #read_raw_element_xml(xml_reader, e)?
       };
-      xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
+      xml_other_children.push((__xml_child_slot, xml));
       continue;
     };
   }
@@ -3290,7 +3324,7 @@ fn expand_named_struct(
     if field_ident == "xml_other_children" {
       compact_xml_other_children = vec_inner_type(&field.ty)
         .as_ref()
-        .is_some_and(is_box_str_type);
+        .is_some_and(is_box_u8_slice_type);
       xml_other_children_field = Some(field_ident.clone());
       continue;
     }
@@ -4135,11 +4169,11 @@ fn expand_named_struct(
       quote! {
         b"mc:AlternateContent" | b"AlternateContent" => {
           let xml = if next_empty {
-            crate::common::read_raw_empty_xml_borrowed(e)?
+            crate::common::read_raw_empty_xml_borrowed_bytes(e)?
           } else {
-            crate::common::read_raw_element_xml_borrowed(xml_reader, e)?
+            crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
           };
-          xml_other_children.push(xml.into_boxed_str());
+          xml_other_children.push(xml);
           continue;
         }
       }
@@ -4147,11 +4181,11 @@ fn expand_named_struct(
       quote! {
         b"mc:AlternateContent" | b"AlternateContent" => {
           let xml = if next_empty {
-            crate::common::read_raw_empty_xml_borrowed(e)?
+            crate::common::read_raw_empty_xml_borrowed_bytes(e)?
           } else {
-            crate::common::read_raw_element_xml_borrowed(xml_reader, e)?
+            crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
           };
-          xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
+          xml_other_children.push((__xml_child_slot, xml));
           continue;
         }
       }
@@ -4164,11 +4198,11 @@ fn expand_named_struct(
       quote! {
         b"mc:AlternateContent" | b"AlternateContent" => {
           let xml = if next_empty {
-            crate::common::read_raw_empty_xml_io(e)?
+            crate::common::read_raw_empty_xml_io_bytes(e)?
           } else {
-            crate::common::read_raw_element_xml_io(xml_reader, e)?
+            crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
           };
-          xml_other_children.push(xml.into_boxed_str());
+          xml_other_children.push(xml);
           continue;
         }
       }
@@ -4176,11 +4210,11 @@ fn expand_named_struct(
       quote! {
         b"mc:AlternateContent" | b"AlternateContent" => {
           let xml = if next_empty {
-            crate::common::read_raw_empty_xml_io(e)?
+            crate::common::read_raw_empty_xml_io_bytes(e)?
           } else {
-            crate::common::read_raw_element_xml_io(xml_reader, e)?
+            crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
           };
-          xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
+          xml_other_children.push((__xml_child_slot, xml));
           continue;
         }
       }
@@ -5306,7 +5340,7 @@ fn expand_named_struct(
     if has_xml_other_children_field && !compact_xml_other_children {
       let xml_other_children_slot_count = xml_child_slot_count + 1usize;
       quote! {
-        let mut xml_other_children_by_slot: [Vec<&str>; #xml_other_children_slot_count] =
+        let mut xml_other_children_by_slot: [Vec<&[u8]>; #xml_other_children_slot_count] =
           std::array::from_fn(|_| Vec::new());
         for (slot, xml) in &self.xml_other_children {
           if *slot < #xml_other_children_slot_count {
@@ -5321,13 +5355,13 @@ fn expand_named_struct(
     if compact_xml_other_children {
       quote! {
         for xml in &self.xml_other_children {
-          writer.write_all(xml.as_bytes())?;
+          writer.write_all(xml.as_ref())?;
         }
       }
     } else {
       quote! {
         for xml in &xml_other_children_by_slot[#xml_child_slot_count] {
-          writer.write_all(xml.as_bytes())?;
+          writer.write_all(xml)?;
         }
       }
     }
@@ -5354,7 +5388,7 @@ fn expand_named_struct(
         .saturating_sub(1usize);
       ordered_write_tokens.push(quote! {
         for xml in &xml_other_children_by_slot[#xml_other_slot] {
-          writer.write_all(xml.as_bytes())?;
+          writer.write_all(xml)?;
         }
       });
     }
@@ -5442,21 +5476,31 @@ fn expand_named_struct(
       SdkTypeFieldKind::Any => {
         let repeated = contains_vec_type(field_ty);
         let optional = is_option_type(field_ty);
+        let value_bytes_expr = if is_box_u8_slice_type(&unwrap_option_vec_type(field_ty)) {
+          quote! { value.as_ref() }
+        } else {
+          quote! { value.as_bytes() }
+        };
+        let field_bytes_expr = if is_box_u8_slice_type(&unwrap_option_vec_type(field_ty)) {
+          quote! { self.#field_ident.as_ref() }
+        } else {
+          quote! { self.#field_ident.as_bytes() }
+        };
         if repeated {
           ordered_write_tokens.push(quote! {
             for value in &self.#field_ident {
-              writer.write_all(value.as_bytes())?;
+              writer.write_all(#value_bytes_expr)?;
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
-              writer.write_all(value.as_bytes())?;
+              writer.write_all(#value_bytes_expr)?;
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            writer.write_all(self.#field_ident.as_bytes())?;
+            writer.write_all(#field_bytes_expr)?;
           });
         }
       }
@@ -5947,11 +5991,11 @@ fn expand_named_struct(
   let xml_other_children_decl_tokens = if has_xml_other_children_field {
     if compact_xml_other_children {
       quote! {
-        let mut xml_other_children = Vec::<std::boxed::Box<str>>::new();
+        let mut xml_other_children = Vec::<std::boxed::Box<[u8]>>::new();
       }
     } else {
       quote! {
-        let mut xml_other_children = Vec::<(usize, std::boxed::Box<str>)>::new();
+        let mut xml_other_children = Vec::<(usize, std::boxed::Box<[u8]>)>::new();
         let mut __xml_child_slot = 0usize;
       }
     }

@@ -34,6 +34,20 @@ impl DeserializeMode {
       Self::Io => quote! { crate::common::read_raw_element_xml_io },
     }
   }
+
+  fn read_raw_empty_xml_bytes_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_empty_xml_borrowed_bytes },
+      Self::Io => quote! { crate::common::read_raw_empty_xml_io_bytes },
+    }
+  }
+
+  fn read_raw_element_xml_bytes_fn(self) -> proc_macro2::TokenStream {
+    match self {
+      Self::Borrowed => quote! { crate::common::read_raw_element_xml_borrowed_bytes },
+      Self::Io => quote! { crate::common::read_raw_element_xml_io_bytes },
+    }
+  }
 }
 
 fn write_typed_child_tokens(
@@ -218,9 +232,18 @@ fn any_child_dispatch_tokens(
   mode: DeserializeMode,
   cfg_attrs: &[Attribute],
   constructor: &proc_macro2::TokenStream,
+  use_bytes: bool,
 ) -> proc_macro2::TokenStream {
-  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
-  let read_raw_element_xml = mode.read_raw_element_xml_fn();
+  let read_raw_empty_xml = if use_bytes {
+    mode.read_raw_empty_xml_bytes_fn()
+  } else {
+    mode.read_raw_empty_xml_fn()
+  };
+  let read_raw_element_xml = if use_bytes {
+    mode.read_raw_element_xml_bytes_fn()
+  } else {
+    mode.read_raw_element_xml_fn()
+  };
 
   quote! {
     #(#cfg_attrs)*
@@ -1300,23 +1323,32 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
-        let any_xml_expr = if is_box_str_type(&payload_ty) {
+        let any_xml_expr = if is_box_u8_slice_type(&payload_ty) {
           quote! { xml.as_ref() }
+        } else if is_box_str_type(&payload_ty) {
+          quote! { xml.as_ref().as_bytes() }
         } else if is_box_type(&payload_ty) {
-          quote! { xml.as_ref().as_str() }
+          quote! { xml.as_ref().as_str().as_bytes() }
         } else {
-          quote! { xml.as_str() }
+          quote! { xml.as_str().as_bytes() }
         };
-        let constructor = if is_box_str_type(&payload_ty) {
+        let constructor = if is_box_u8_slice_type(&payload_ty) {
+          quote! { Self::#variant_ident(xml) }
+        } else if is_box_str_type(&payload_ty) {
           quote! { Self::#variant_ident(xml.into_boxed_str()) }
         } else if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(xml)) }
         } else {
           quote! { Self::#variant_ident(xml) }
         };
+        let write_value_expr = if is_box_u8_slice_type(&payload_ty) {
+          quote! { value.as_ref() }
+        } else {
+          quote! { value.as_bytes() }
+        };
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => writer.write_all(value.as_bytes()),
+          Self::#variant_ident(value) => writer.write_all(#write_value_expr),
         };
         write_arms.push(write_arm);
         validate_arms.push(quote! {
@@ -1326,13 +1358,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         mce_any_arms.push(quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(xml) => {
-            if let Some(children) = crate::common::mce_choice_replacement_children(
+            if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
               #any_xml_expr,
               settings,
               context,
             )? {
               for child_xml in children {
-                let mut child_reader = crate::common::from_bytes_inner(child_xml.as_bytes())?;
+                let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
                 let mut child = <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
                   &mut child_reader,
                   None,
@@ -1358,11 +1390,13 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           DeserializeMode::Borrowed,
           &cfg_attrs,
           &constructor,
+          is_box_u8_slice_type(&payload_ty),
         ));
         any_dispatch_tokens_io.push(any_child_dispatch_tokens(
           DeserializeMode::Io,
           &cfg_attrs,
           &constructor,
+          is_box_u8_slice_type(&payload_ty),
         ));
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Text) if fields.unnamed.len() == 1 => {

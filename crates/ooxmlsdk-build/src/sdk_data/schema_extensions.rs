@@ -51,7 +51,6 @@ pub struct SchemaTypeExtension {
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
-  pub parent_choice_has_any_in: Option<Vec<String>>,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
 }
@@ -80,6 +79,8 @@ pub struct SchemaTypeChildExtension {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaChoiceEnumExtension {
   pub rust_name: String,
+  #[serde(skip_serializing_if = "is_false")]
+  pub add_xml_any: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub add_variants: Vec<SchemaChoiceVariantExtension>,
 }
@@ -97,6 +98,10 @@ pub struct SchemaChoiceVariantExtension {
   pub payload_rust_type: String,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub payload_module_path: String,
+}
+
+fn is_false(value: &bool) -> bool {
+  !*value
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -218,9 +223,6 @@ pub fn apply_schema_extensions(
       if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
         schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
       }
-      if let Some(parent_choice_has_any_in) = &extension.parent_choice_has_any_in {
-        schema_type.parent_choice_has_any_in = parent_choice_has_any_in.clone();
-      }
 
       for attr_extension in &extension.attributes {
         let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
@@ -306,6 +308,10 @@ pub fn apply_codegen_ir_schema_extensions(
       );
     }
 
+    if choice_extension.add_xml_any {
+      add_xml_any_choice_variant(type_decl);
+    }
+
     for variant_extension in &choice_extension.add_variants {
       if variant_extension.rust_name.is_empty()
         || variant_extension.q_name.is_empty()
@@ -369,6 +375,28 @@ pub fn apply_codegen_ir_schema_extensions(
   }
 
   Ok(())
+}
+
+fn add_xml_any_choice_variant(type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl) {
+  if type_decl.members.iter().any(|member| {
+    matches!(
+      member,
+      MemberDecl::Variant(variant) if variant.rust_name == "XmlAny"
+    )
+  }) {
+    return;
+  }
+
+  type_decl.members.push(MemberDecl::Variant(VariantDecl {
+    rust_name: "XmlAny".to_string(),
+    docs: "Unknown XML child.".to_string(),
+    version: String::new(),
+    wire: VariantWireDecl::Any,
+    payload: TypeRefDecl {
+      rust_type: "std::boxed::Box<[u8]>".to_string(),
+      module_path: None,
+    },
+  }));
 }
 
 fn variant_wire_qnames(wire: &VariantWireDecl) -> Option<&[String]> {
@@ -459,7 +487,6 @@ mod tests {
         types: vec![SchemaTypeExtension {
           class_name: "Parent".to_string(),
           have_direct_xml_other_children: Some(true),
-          parent_choice_has_any_in: Some(vec!["ParentContainer".to_string()]),
           children: vec![SchemaTypeChildExtension {
             property_name: "Child".to_string(),
             optional: Some(true),
@@ -475,10 +502,6 @@ mod tests {
 
     assert!(schemas[0].types[0].children[0].optional);
     assert!(schemas[0].types[0].have_direct_xml_other_children);
-    assert_eq!(
-      schemas[0].types[0].parent_choice_has_any_in,
-      vec!["ParentContainer".to_string()]
-    );
   }
 
   #[test]
@@ -703,6 +726,7 @@ mod tests {
       SchemaExtensions {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "ControlPropertiesChoice".to_string(),
+          add_xml_any: false,
           add_variants: vec![SchemaChoiceVariantExtension {
             rust_name: "DrawingRunProperties".to_string(),
             q_name: "a:CT_TextCharacterProperties/a:rPr".to_string(),
@@ -734,5 +758,52 @@ mod tests {
       variant.payload.module_path.as_deref(),
       Some("crate::schemas::a")
     );
+  }
+
+  #[test]
+  fn applies_choice_enum_add_xml_any_extension() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "RunChoice".to_string(),
+        kind: TypeKind::ChoiceEnum,
+        members: vec![MemberDecl::Variant(VariantDecl {
+          rust_name: "Text".to_string(),
+          wire: VariantWireDecl::Child {
+            qnames: vec!["w:CT_Text/w:t".to_string()],
+          },
+          payload: TypeRefDecl {
+            rust_type: "Text".to_string(),
+            module_path: None,
+          },
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        choice_enums: vec![SchemaChoiceEnumExtension {
+          rust_name: "RunChoice".to_string(),
+          add_xml_any: true,
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let choice = &ir.types[0];
+    assert_eq!(choice.members.len(), 2);
+    let MemberDecl::Variant(variant) = &choice.members[1] else {
+      panic!("expected variant");
+    };
+    assert_eq!(variant.rust_name, "XmlAny");
+    assert_eq!(variant.wire, VariantWireDecl::Any);
+    assert_eq!(variant.payload.rust_type, "std::boxed::Box<[u8]>");
+    assert!(variant.payload.module_path.is_none());
   }
 }

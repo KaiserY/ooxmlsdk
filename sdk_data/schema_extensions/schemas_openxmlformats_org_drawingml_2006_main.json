@@ -106,6 +106,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Run",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "ShapeLocks",
       "HaveXmlnsFields": true
     },

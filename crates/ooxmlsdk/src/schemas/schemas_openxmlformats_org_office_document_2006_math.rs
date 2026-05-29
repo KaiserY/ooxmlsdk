@@ -2182,7 +2182,7 @@ pub enum RunChoice {
   MText(std::boxed::Box<Text>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
@@ -2264,7 +2264,7 @@ pub enum ParagraphChoice {
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice {

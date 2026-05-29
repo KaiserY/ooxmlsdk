@@ -1813,6 +1813,12 @@ fn is_box_str_type(ty: &Type) -> bool {
     .is_some_and(|inner_ty| is_terminal_type(inner_ty, "str"))
 }
 
+fn is_box_u8_slice_type(ty: &Type) -> bool {
+  box_inner_type(ty).as_ref().is_some_and(
+    |inner_ty| matches!(inner_ty, Type::Slice(slice) if is_terminal_type(&slice.elem, "u8")),
+  )
+}
+
 fn contains_vec_type(ty: &Type) -> bool {
   if is_vec_type(ty) {
     return true;

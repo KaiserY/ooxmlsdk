@@ -2740,7 +2740,7 @@ pub enum TextBoxChoice {
   /// Rich Text Box Content Container.
   TextBoxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeChoice {

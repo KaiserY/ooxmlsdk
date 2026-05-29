@@ -1477,7 +1477,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Numeric Value.
 pub type NumericValue = crate::simple_type::StringValue;
@@ -4239,7 +4239,7 @@ pub struct SurfaceSerExtension {
 #[sdk(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
 pub struct DataDisplayOptions16 {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,
@@ -4724,7 +4724,7 @@ pub enum ChartSpaceChoice {
   CStyle(std::boxed::Box<Style>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UserShapesChoice {
@@ -4888,21 +4888,21 @@ pub enum StockChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   FilteredLineSeriesExtension(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
   /// Defines the FilteredPieSeries Class.
   FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
   /// Defines the FilteredPieSeries Class.
   FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
@@ -4913,14 +4913,14 @@ pub enum NumRefExtensionChoice {
   /// Defines the FormulaReference Class.
   FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
   /// Defines the AutoGeneneratedCategories Class.
   AutoGeneneratedCategories(std::boxed::Box<crate::schemas::c15::AutoGeneneratedCategories>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
@@ -4931,7 +4931,7 @@ pub enum StrRefExtensionChoice {
   /// Defines the FormulaReference Class.
   FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
@@ -4942,7 +4942,7 @@ pub enum MultiLvlStrRefExtensionChoice {
   /// Defines the FormulaReference Class.
   FormulaReference(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
@@ -4961,112 +4961,112 @@ pub enum DLblsExtensionChoice {
   /// Defines the LeaderLines Class.
   LeaderLines(std::boxed::Box<crate::schemas::c15::LeaderLines>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   FilteredLineSeriesExtension(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   FilteredLineSeriesExtension(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
   /// Defines the FilteredScatterSeries Class.
   FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
   /// Defines the FilteredRadarSeries Class.
   FilteredRadarSeries(std::boxed::Box<crate::schemas::c15::FilteredRadarSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
   /// Defines the FilteredBarSeries Class.
   FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
   /// Defines the FilteredBarSeries Class.
   FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
   /// Defines the FilteredAreaSeries Class.
   FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
   /// Defines the FilteredAreaSeries Class.
   FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
   /// Defines the FilteredBubbleSeries Class.
   FilteredBubbleSeries(std::boxed::Box<crate::schemas::c15::FilteredBubbleSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
   /// Defines the FilteredSurfaceSeries Class.
   FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
   /// Defines the FilteredSurfaceSeries Class.
   FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DisplayUnitsChoice {
@@ -5090,7 +5090,7 @@ pub enum DLblExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CategoryAxisDataChoice {
@@ -5143,7 +5143,7 @@ pub enum LineSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
@@ -5170,7 +5170,7 @@ pub enum ScatterSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
@@ -5197,7 +5197,7 @@ pub enum RadarSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
@@ -5226,7 +5226,7 @@ pub enum BarSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
@@ -5253,7 +5253,7 @@ pub enum AreaSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
@@ -5280,7 +5280,7 @@ pub enum PieSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
@@ -5307,7 +5307,7 @@ pub enum BubbleSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
@@ -5332,7 +5332,7 @@ pub enum SurfaceSerExtensionChoice {
   /// Defines the UniqueIdChartUniqueID Class.
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlotAreaChoice {
@@ -5389,5 +5389,5 @@ pub enum ChartSpaceExtensionChoice {
   /// Defines the PivotSource Class.
   PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }

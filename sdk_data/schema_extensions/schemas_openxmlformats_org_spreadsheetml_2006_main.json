@@ -53,6 +53,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "Controls",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "Comment",
       "HaveDirectXmlOtherChildren": true,
       "HaveXmlOtherAttrs": true
@@ -72,12 +76,6 @@
     {
       "ClassName": "ConnectionExtensionList",
       "HaveXmlnsFields": true
-    },
-    {
-      "ClassName": "Control",
-      "ParentChoiceHasAnyIn": [
-        "Controls"
-      ]
     },
     {
       "ClassName": "DataFieldExtension",
@@ -163,7 +161,8 @@
     {
       "ClassName": "SharedStringItem",
       "HaveXmlnsFields": true,
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Sheet",

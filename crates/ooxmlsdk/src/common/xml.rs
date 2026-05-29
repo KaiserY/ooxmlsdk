@@ -693,24 +693,30 @@ const RAW_EMPTY_XML_EXTRA_LEN: usize = 3;
 const RAW_ELEMENT_XML_EXTRA_LEN: usize = 5;
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_borrowed<'de>(
+pub(crate) fn read_raw_empty_xml_borrowed_bytes<'de>(
   start: quick_xml::events::BytesStart<'de>,
-) -> Result<String, SdkError> {
+) -> Result<Box<[u8]>, SdkError> {
   let start: &[u8] = start.as_ref();
   let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
   xml.push(b'<');
   xml.extend_from_slice(start);
   xml.extend_from_slice(b"/>");
+  Ok(xml.into_boxed_slice())
+}
 
-  String::from_utf8(xml)
+#[inline]
+pub(crate) fn read_raw_empty_xml_borrowed<'de>(
+  start: quick_xml::events::BytesStart<'de>,
+) -> Result<String, SdkError> {
+  String::from_utf8(read_raw_empty_xml_borrowed_bytes(start)?.into_vec())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
 #[inline]
-pub(crate) fn read_raw_element_xml_borrowed<'de>(
+pub(crate) fn read_raw_element_xml_borrowed_bytes<'de>(
   xml_reader: &mut SliceReader<'de>,
   start: quick_xml::events::BytesStart<'de>,
-) -> Result<String, SdkError> {
+) -> Result<Box<[u8]>, SdkError> {
   let start_bytes: &[u8] = start.as_ref();
   let end_name = start.name();
   let inner = xml_reader.reader.read_text(end_name)?;
@@ -727,8 +733,15 @@ pub(crate) fn read_raw_element_xml_borrowed<'de>(
   xml.extend_from_slice(b"</");
   xml.extend_from_slice(end_name);
   xml.push(b'>');
+  Ok(xml.into_boxed_slice())
+}
 
-  String::from_utf8(xml)
+#[inline]
+pub(crate) fn read_raw_element_xml_borrowed<'de>(
+  xml_reader: &mut SliceReader<'de>,
+  start: quick_xml::events::BytesStart<'de>,
+) -> Result<String, SdkError> {
+  String::from_utf8(read_raw_element_xml_borrowed_bytes(xml_reader, start)?.into_vec())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
@@ -772,24 +785,30 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 }
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_io(
+pub(crate) fn read_raw_empty_xml_io_bytes(
   start: quick_xml::events::BytesStart<'static>,
-) -> Result<String, SdkError> {
+) -> Result<Box<[u8]>, SdkError> {
   let start: &[u8] = start.as_ref();
   let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
   xml.push(b'<');
   xml.extend_from_slice(start);
   xml.extend_from_slice(b"/>");
+  Ok(xml.into_boxed_slice())
+}
 
-  String::from_utf8(xml)
+#[inline]
+pub(crate) fn read_raw_empty_xml_io(
+  start: quick_xml::events::BytesStart<'static>,
+) -> Result<String, SdkError> {
+  String::from_utf8(read_raw_empty_xml_io_bytes(start)?.into_vec())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
 #[inline]
-pub(crate) fn read_raw_element_xml_io<R: BufRead>(
+pub(crate) fn read_raw_element_xml_io_bytes<R: BufRead>(
   xml_reader: &mut IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
-) -> Result<String, SdkError> {
+) -> Result<Box<[u8]>, SdkError> {
   let start_bytes: &[u8] = start.as_ref();
   let end_name = start.name();
   let inner = xml_reader
@@ -808,8 +827,15 @@ pub(crate) fn read_raw_element_xml_io<R: BufRead>(
   xml.extend_from_slice(b"</");
   xml.extend_from_slice(end_name);
   xml.push(b'>');
+  Ok(xml.into_boxed_slice())
+}
 
-  String::from_utf8(xml)
+#[inline]
+pub(crate) fn read_raw_element_xml_io<R: BufRead>(
+  xml_reader: &mut IoReader<R>,
+  start: quick_xml::events::BytesStart<'static>,
+) -> Result<String, SdkError> {
+  String::from_utf8(read_raw_element_xml_io_bytes(xml_reader, start)?.into_vec())
     .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
@@ -821,12 +847,12 @@ const MC_CHOICE_NAMES: &[&[u8]] = &[b"mc:Choice", b"Choice"];
 const MC_FALLBACK_NAMES: &[&[u8]] = &[b"mc:Fallback", b"Fallback"];
 
 #[cfg(feature = "mce")]
-pub(crate) fn mce_choice_replacement_children(
-  xml: &str,
+pub(crate) fn mce_choice_replacement_child_bytes(
+  xml: &[u8],
   settings: &crate::sdk::MarkupCompatibilityProcessSettings,
   context: &crate::sdk::MceContext,
-) -> Result<Option<Vec<String>>, SdkError> {
-  let mut reader = Reader::from_str(xml);
+) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
+  let mut reader = Reader::from_reader(xml);
   reader.config_mut().check_end_names = false;
   let mut fallback = None;
 
@@ -839,7 +865,7 @@ pub(crate) fn mce_choice_replacement_children(
             Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
               let choice_namespaces = namespaces_with(&namespaces, &e)?;
               let requires = attr_value(&reader, &e, b"Requires")?;
-              let children = read_mce_container_children(&mut reader, MC_CHOICE_NAMES)?;
+              let children = read_mce_container_children_bytes(&mut reader, MC_CHOICE_NAMES)?;
               if choice_requires_supported(
                 requires.as_deref(),
                 &choice_namespaces,
@@ -860,7 +886,10 @@ pub(crate) fn mce_choice_replacement_children(
               }
             }
             Event::Start(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
-              fallback = Some(read_mce_container_children(&mut reader, MC_FALLBACK_NAMES)?);
+              fallback = Some(read_mce_container_children_bytes(
+                &mut reader,
+                MC_FALLBACK_NAMES,
+              )?);
             }
             Event::Empty(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
               fallback = Some(Vec::new());
@@ -879,8 +908,12 @@ pub(crate) fn mce_choice_replacement_children(
       Event::Empty(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
         return Ok(Some(Vec::new()));
       }
-      Event::Start(e) => return mce_unknown_element_replacement(&mut reader, e, context, false),
-      Event::Empty(e) => return mce_unknown_element_replacement(&mut reader, e, context, true),
+      Event::Start(e) => {
+        return mce_unknown_element_replacement_bytes(&mut reader, e, context, false);
+      }
+      Event::Empty(e) => {
+        return mce_unknown_element_replacement_bytes(&mut reader, e, context, true);
+      }
       Event::Eof => return Ok(None),
       _ => {}
     }
@@ -888,30 +921,29 @@ pub(crate) fn mce_choice_replacement_children(
 }
 
 #[cfg(feature = "mce")]
-fn mce_unknown_element_replacement(
+fn mce_unknown_element_replacement_bytes(
   reader: &mut Reader<&[u8]>,
   start: quick_xml::events::BytesStart<'_>,
   context: &crate::sdk::MceContext,
   empty_tag: bool,
-) -> Result<Option<Vec<String>>, SdkError> {
-  let qname = String::from_utf8_lossy(start.name().as_ref()).into_owned();
+) -> Result<Option<Vec<Box<[u8]>>>, SdkError> {
+  let qname = start.name();
+  let qname = qname.as_ref();
   let namespaces = namespaces_from_context_with(context, &start)?;
-  let ignorable_namespace = qname.split_once(':').and_then(|(prefix, _)| {
-    namespaces
-      .iter()
-      .rev()
-      .find_map(|(candidate, ns)| {
-        (candidate.as_bytes() == prefix.as_bytes()).then_some(ns.as_str())
-      })
-      .filter(|ns| context.is_ignorable_namespace(ns))
+  let ignorable_namespace = qname_prefix(qname).and_then(|prefix| {
+    namespaces.iter().rev().find_map(|(candidate, ns)| {
+      (candidate.as_bytes() == prefix)
+        .then_some(ns.as_str())
+        .filter(|ns| context.is_ignorable_namespace(ns))
+    })
   });
 
-  if ignorable_namespace.is_some() && context.is_process_content_qname(qname.as_str()) {
+  if ignorable_namespace.is_some() && context.is_process_content_qname_bytes(qname) {
     if empty_tag {
       return Ok(Some(Vec::new()));
     }
     let end_name = start.name().as_ref().to_vec();
-    return read_mce_container_children(reader, &[end_name.as_slice()]).map(Some);
+    return read_mce_container_children_bytes(reader, &[end_name.as_slice()]).map(Some);
   }
 
   if ignorable_namespace.is_some() {
@@ -921,7 +953,7 @@ fn mce_unknown_element_replacement(
     return Ok(Some(Vec::new()));
   }
 
-  if !qname.contains(':') {
+  if !qname.contains(&b':') {
     if !empty_tag {
       skip_element(reader)?;
     }
@@ -935,18 +967,18 @@ fn mce_unknown_element_replacement(
 }
 
 #[cfg(feature = "mce")]
-fn read_mce_container_children(
+fn read_mce_container_children_bytes(
   reader: &mut Reader<&[u8]>,
   end_names: &[&[u8]],
-) -> Result<Vec<String>, SdkError> {
+) -> Result<Vec<Box<[u8]>>, SdkError> {
   let mut children = Vec::new();
   loop {
     match reader.read_event()? {
       Event::Start(e) => {
-        children.push(read_outer_xml_from_str_reader(reader, e, false)?);
+        children.push(read_outer_xml_from_str_reader_bytes(reader, e, false)?);
       }
       Event::Empty(e) => {
-        children.push(read_outer_xml_from_str_reader(reader, e, true)?);
+        children.push(read_outer_xml_from_str_reader_bytes(reader, e, true)?);
       }
       Event::End(e) if qname_in(e.name().as_ref(), end_names) => return Ok(children),
       Event::Eof => return Err(unexpected_eof("mce choice/fallback")),
@@ -956,16 +988,15 @@ fn read_mce_container_children(
 }
 
 #[cfg(feature = "mce")]
-fn read_outer_xml_from_str_reader(
+fn read_outer_xml_from_str_reader_bytes(
   reader: &mut Reader<&[u8]>,
   start: quick_xml::events::BytesStart<'_>,
   empty_tag: bool,
-) -> Result<String, SdkError> {
+) -> Result<Box<[u8]>, SdkError> {
   let mut writer = quick_xml::Writer::new(std::io::Cursor::new(Vec::new()));
   if empty_tag {
     writer.write_event(Event::Empty(start))?;
-    return String::from_utf8(writer.into_inner().into_inner())
-      .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")));
+    return Ok(writer.into_inner().into_inner().into_boxed_slice());
   }
 
   writer.write_event(Event::Start(start))?;
@@ -984,8 +1015,15 @@ fn read_outer_xml_from_str_reader(
     }
   }
 
-  String::from_utf8(writer.into_inner().into_inner())
-    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+  Ok(writer.into_inner().into_inner().into_boxed_slice())
+}
+
+#[cfg(feature = "mce")]
+fn qname_prefix(qname: &[u8]) -> Option<&[u8]> {
+  qname
+    .iter()
+    .position(|byte| *byte == b':')
+    .map(|index| &qname[..index])
 }
 
 #[cfg(feature = "mce")]

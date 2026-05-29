@@ -643,7 +643,7 @@ pub enum TwoCellAnchorChoice {
   ContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneCellAnchorChoice {
@@ -699,7 +699,7 @@ pub enum WorksheetDrawingChoice {
   AbsoluteAnchor(std::boxed::Box<AbsoluteAnchor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

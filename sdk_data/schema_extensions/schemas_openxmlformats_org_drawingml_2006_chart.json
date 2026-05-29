@@ -1,4 +1,10 @@
 {
+  "ChoiceEnums": [
+    {
+      "RustName": "ChartSpaceChoice",
+      "AddXmlAny": true
+    }
+  ],
   "Types": [
     {
       "ClassName": "Area3DChartExtension",

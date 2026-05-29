@@ -215,7 +215,7 @@ pub struct UseLocalDpi {
 #[sdk(office2010, qname = "a14:CT_TextMath/a14:m")]
 pub struct TextMath {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_children: Vec<std::boxed::Box<str>>,
+  pub xml_other_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -18,7 +18,7 @@ pub struct AlternateContent {
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Defines the Fallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -26,7 +26,7 @@ pub struct Choice {
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlternateContentChoice {

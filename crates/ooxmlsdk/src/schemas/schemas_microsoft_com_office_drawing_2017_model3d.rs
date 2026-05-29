@@ -646,7 +646,7 @@ pub enum Model3DExtensionChoice {
   /// Defines the PosterFrame Class.
   PosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

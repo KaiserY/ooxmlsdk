@@ -13,5 +13,5 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

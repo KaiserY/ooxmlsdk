@@ -338,18 +338,20 @@ Expected fix:
 - Treat non-empty/non-Office2007 version on wrappers as a reason not to flatten
   unless explicitly tested.
 
-### 10. Any/Unknown XML Choice Insertion Depends On Generated Shape
+### 10. Any/Unknown XML Preservation Depends On Generated Shape
 
 Location:
 
-- `ParentChoiceHasAnyIn` extension handling in `codegen_ir_builder.rs`
+- `ChoiceEnums[].AddXmlAny` extension handling in schema extensions
+- `HaveDirectXmlOtherChildren` type extension handling in schema extensions
 - schema extensions under `sdk_data/schema_extensions/`
 
 Problem:
 
-- Parent raw-XML preservation is patched after shape generation.
-- If choice flattening changes the parent field shape, `XmlAny` may be added to
-  the wrong field or not added at all.
+- Parent raw-XML preservation depends on whether MCE appears in an existing
+  choice stream or in a direct child slot.
+- If choice flattening changes the parent field shape, the extension may need
+  to move between `AddXmlAny` and `HaveDirectXmlOtherChildren`.
 
 Why this matters:
 
@@ -358,9 +360,12 @@ Why this matters:
 
 Expected fix:
 
-- When changing choice flattening, re-check all `ParentChoiceHasAnyIn` parents:
-  `Body`, `Paragraph`, `Run`, `Fonts`, `Controls`, `ChartSpace`,
-  `WorksheetDrawing`, and anchor types in drawing schemas.
+- When changing choice flattening, re-check MCE-backed parents in
+  `sdk_data/schema_extensions/`. Existing choice streams should use
+  `ChoiceEnums[].AddXmlAny`; direct child slots should use
+  `HaveDirectXmlOtherChildren`. Single repeated child parents rely on
+  `HaveDirectXmlOtherChildren` to promote the child list into a choice stream
+  with `XmlAny`.
 
 ### 11. Mixed Sequence Direct Children Were Forced Optional
 

@@ -1,12 +1,12 @@
 {
-  "Types": [
+  "ChoiceEnums": [
     {
-      "ClassName": "TwoCellAnchor",
-      "ParentChoiceHasAnyIn": ["WorksheetDrawing"]
+      "RustName": "TwoCellAnchorChoice",
+      "AddXmlAny": true
     },
     {
-      "ClassName": "GraphicFrame",
-      "ParentChoiceHasAnyIn": ["TwoCellAnchor"]
+      "RustName": "WorksheetDrawingChoice",
+      "AddXmlAny": true
     }
   ]
 }

@@ -57,16 +57,7 @@
     },
     {
       "ClassName": "Drawing",
-      "ParentChoiceHasAnyIn": [
-        "Run"
-      ],
       "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "Font",
-      "ParentChoiceHasAnyIn": [
-        "Fonts"
-      ]
     },
     {
       "ClassName": "Endnotes",
@@ -74,7 +65,8 @@
     },
     {
       "ClassName": "Fonts",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Footnotes",
@@ -102,9 +94,6 @@
     },
     {
       "ClassName": "Paragraph",
-      "ParentChoiceHasAnyIn": [
-        "Body"
-      ],
       "HaveXmlOtherAttrs": true
     },
     {
@@ -117,9 +106,6 @@
     },
     {
       "ClassName": "Run",
-      "ParentChoiceHasAnyIn": [
-        "Paragraph"
-      ],
       "HaveXmlOtherAttrs": true
     },
     {
@@ -142,7 +128,8 @@
     },
     {
       "ClassName": "Settings",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "SpacingBetweenLines",
@@ -202,7 +189,8 @@
     },
     {
       "ClassName": "ParagraphProperties",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Picture",
@@ -210,11 +198,30 @@
     },
     {
       "ClassName": "RunProperties",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "RunPropertiesBaseStyle",
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "TableRow",
       "HaveXmlOtherAttrs": true
+    }
+  ],
+  "ChoiceEnums": [
+    {
+      "RustName": "BodyChoice",
+      "AddXmlAny": true
+    },
+    {
+      "RustName": "ParagraphChoice",
+      "AddXmlAny": true
+    },
+    {
+      "RustName": "RunChoice",
+      "AddXmlAny": true
     }
   ]
 }

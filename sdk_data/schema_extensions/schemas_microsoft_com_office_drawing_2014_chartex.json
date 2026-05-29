@@ -6,6 +6,7 @@
     },
     {
       "ClassName": "ChartSpace",
+      "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
           "PropertyName": "ChartData",

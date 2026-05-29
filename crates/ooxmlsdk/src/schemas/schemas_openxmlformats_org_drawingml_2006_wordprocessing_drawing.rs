@@ -206,7 +206,7 @@ pub struct Inline {
 #[sdk(qname = "wp:CT_Anchor/wp:anchor")]
 pub struct Anchor {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]
   pub distance_from_top: Option<crate::simple_type::UInt32Value>,

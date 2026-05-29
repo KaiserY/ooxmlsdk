@@ -10,6 +10,14 @@
           "PayloadModulePath": "crate::schemas::schemas_openxmlformats_org_drawingml_2006_main"
         }
       ]
+    },
+    {
+      "RustName": "ParagraphChoice",
+      "AddXmlAny": true
+    },
+    {
+      "RustName": "RunChoice",
+      "AddXmlAny": true
     }
   ],
   "Types": [

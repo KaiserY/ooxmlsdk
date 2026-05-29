@@ -794,7 +794,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Browse Slide Show Mode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1104,7 +1104,7 @@ pub struct PresentationProperties {
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1136,7 +1136,7 @@ pub struct Slide {
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1181,7 +1181,7 @@ pub struct SlideLayout {
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
@@ -2925,7 +2925,7 @@ pub struct NonVisualGroupShapeDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:titleStyle")]
 pub struct TitleStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties:
@@ -2974,7 +2974,7 @@ pub struct TitleStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:bodyStyle")]
 pub struct BodyStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties:
@@ -3023,7 +3023,7 @@ pub struct BodyStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextListStyle/p:otherStyle")]
 pub struct OtherStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
   pub default_paragraph_properties:
@@ -4979,14 +4979,14 @@ pub enum SlideExtensionChoice {
   /// Defines the CommentRelationship Class.
   CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommonSlideDataExtensionChoice {
   /// Defines the CreationId Class.
   CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesExtensionChoice {
@@ -4997,7 +4997,7 @@ pub enum ShowPropertiesExtensionChoice {
   /// Defines the ShowMediaControls Class.
   ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TransitionChoice {
@@ -5098,7 +5098,7 @@ pub enum ShapeTreeChoice {
   ContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
@@ -5114,6 +5114,14 @@ pub enum GroupShapeChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum ControlListChoice {
+  /// Embedded Control.
+  Control(std::boxed::Box<Control>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
@@ -5157,42 +5165,42 @@ pub enum CommentAuthorExtensionChoice {
   /// Defines the PresenceInfo Class.
   PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentExtensionChoice {
   /// Defines the ThreadingInfo Class.
   ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideLayoutExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HandoutMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NotesMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
@@ -5201,7 +5209,7 @@ pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
   /// Defines the ModificationId Class.
   ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum IterateChoice {
@@ -5279,7 +5287,7 @@ pub enum PresentationExtensionChoice {
   /// Defines the NotesGuideList Class.
   NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HtmlPublishPropertiesChoice {
@@ -5337,7 +5345,7 @@ pub enum PresentationPropertiesExtensionChoice {
   /// Defines the ChartTrackingReferenceBased Class.
   ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextElementChoice {
@@ -5360,12 +5368,4 @@ pub enum SoundActionChoice {
   /// Stop Sound Action.
   #[sdk(empty_child(qname = "p:CT_Empty/p:endSnd"))]
   EndSoundAction,
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ControlListChoice {
-  /// Embedded Control.
-  Control(std::boxed::Box<Control>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
 }

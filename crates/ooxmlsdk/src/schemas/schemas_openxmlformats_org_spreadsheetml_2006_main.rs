@@ -1572,7 +1572,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Calculation Chain Info.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2201,7 +2201,7 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Sheet Properties.
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2626,7 +2626,7 @@ pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
@@ -2800,7 +2800,7 @@ pub struct CommentList {
 #[sdk(default_ns, qname = "x:CT_Comment/x:comment")]
 pub struct Comment {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Cell Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -2987,7 +2987,7 @@ pub struct Schema {
   #[sdk(attr(qname = ":Namespace"))]
   pub namespace: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// XML Mapping Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3044,7 +3044,7 @@ pub struct DataBinding {
   #[sdk(attr(qname = ":DataBindingLoadMode"))]
   pub data_binding_load_mode: crate::simple_type::UInt32Value,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Connection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4750,7 +4750,7 @@ pub struct QueryTableField {
 pub struct SharedStringItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
@@ -11125,28 +11125,36 @@ pub enum ConditionalFormattingRuleExtensionChoice {
   #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Guid/x14:id"))]
   Id(crate::schemas::x14::Id),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotHierarchyExtensionChoice {
   /// Defines the PivotHierarchy Class.
   PivotHierarchy(std::boxed::Box<crate::schemas::x14::PivotHierarchy>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFieldExtensionChoice {
   /// Defines the PivotField Class.
   PivotField(std::boxed::Box<crate::schemas::x14::PivotField>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceExtensionChoice {
   /// Defines the SourceConnection Class.
   SourceConnection(std::boxed::Box<crate::schemas::x14::SourceConnection>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum ControlsChoice {
+  /// Embedded Control.
+  Control(std::boxed::Box<Control>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FiltersChoice {
@@ -11170,7 +11178,7 @@ pub enum SlicerCacheDefinitionExtensionChoice {
     std::boxed::Box<crate::schemas::x15::SlicerCacheHideItemsWithNoData>,
   ),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFilterExtensionChoice {
@@ -11179,14 +11187,14 @@ pub enum PivotFilterExtensionChoice {
   /// Defines the MovingPeriodState Class.
   MovingPeriodState(std::boxed::Box<crate::schemas::x15::MovingPeriodState>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QueryTableExtensionChoice {
   /// Defines the QueryTable Class.
   QueryTable(std::boxed::Box<crate::schemas::x15::QueryTable>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectionExtensionChoice {
@@ -11197,7 +11205,7 @@ pub enum ConnectionExtensionChoice {
   #[sdk(child(office2013, qname = "x15:CT_Connection/x15:connection"))]
   X15Connection(std::boxed::Box<crate::schemas::x15::Connection>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SharedItemsChoice {
@@ -11228,7 +11236,7 @@ pub enum CacheFieldExtensionChoice {
   /// Defines the CachedUniqueNames Class.
   CachedUniqueNames(std::boxed::Box<crate::schemas::x15::CachedUniqueNames>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheHierarchyExtensionChoice {
@@ -11239,7 +11247,7 @@ pub enum CacheHierarchyExtensionChoice {
   #[sdk(child(office2013, qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"))]
   X15CacheHierarchy(std::boxed::Box<crate::schemas::x15::CacheHierarchy>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CalculatedMemberExtensionChoice {
@@ -11250,7 +11258,7 @@ pub enum CalculatedMemberExtensionChoice {
   #[sdk(child(office2013, qname = "x15:CT_CalculatedMember/x15:calculatedMember"))]
   X15CalculatedMember(std::boxed::Box<crate::schemas::x15::CalculatedMember>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataFieldExtensionChoice {
@@ -11261,7 +11269,7 @@ pub enum DataFieldExtensionChoice {
   #[sdk(child(office2013, qname = "x15:CT_DataField/x15:dataField"))]
   X15DataField(std::boxed::Box<crate::schemas::x15::DataField>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetExtensionChoice {
@@ -11282,7 +11290,7 @@ pub enum WorksheetExtensionChoice {
   /// Defines the TimelineReferences Class.
   TimelineReferences(std::boxed::Box<crate::schemas::x15::TimelineReferences>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
@@ -11297,7 +11305,7 @@ pub enum StylesheetExtensionChoice {
   /// Defines the TimelineStyles Class.
   TimelineStyles(std::boxed::Box<crate::schemas::x15::TimelineStyles>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotTableDefinitionExtensionChoice {
@@ -11310,7 +11318,7 @@ pub enum PivotTableDefinitionExtensionChoice {
   /// Defines the PivotVersionInfo Class.
   PivotVersionInfo(std::boxed::Box<crate::schemas::xxpvi::PivotVersionInfo>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceChoice {
@@ -11352,7 +11360,7 @@ pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheDynamicArray Class.
   PivotCacheDynamicArray(std::boxed::Box<crate::schemas::xlpda::PivotCacheDynamicArray>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableExtensionChoice {
@@ -11361,7 +11369,7 @@ pub enum TableExtensionChoice {
   /// Defines the MsForm Class.
   MsForm(std::boxed::Box<crate::schemas::xlmsforms::MsForm>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorkbookExtensionChoice {
@@ -11402,13 +11410,5 @@ pub enum WorkbookExtensionChoice {
     std::boxed::Box<crate::schemas::xlecs2::ExternalCodeServiceImageAsInput>,
   ),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ControlsChoice {
-  /// Embedded Control.
-  Control(std::boxed::Box<Control>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }

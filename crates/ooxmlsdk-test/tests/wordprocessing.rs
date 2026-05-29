@@ -233,7 +233,9 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 #[cfg(not(feature = "mce"))]
 fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
   match choice {
-    BodyChoice::XmlAny(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_ref()),
+    BodyChoice::XmlAny(xml) if xml.starts_with(b"<mc:AlternateContent") => {
+      std::str::from_utf8(xml.as_ref()).ok()
+    }
     _ => None,
   }
 }
@@ -709,7 +711,9 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .run_choice
     .iter()
     .find_map(|choice| match choice {
-      RunChoice::XmlAny(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_ref()),
+      RunChoice::XmlAny(xml) if xml.starts_with(b"<mc:AlternateContent") => {
+        std::str::from_utf8(xml.as_ref()).ok()
+      }
       _ => None,
     })
     .expect("expected alternate content in run");

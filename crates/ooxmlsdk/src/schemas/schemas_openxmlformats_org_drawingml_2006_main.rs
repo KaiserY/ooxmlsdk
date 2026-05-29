@@ -2213,7 +2213,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// RGB Color Model - Percentage Variant.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4174,7 +4174,7 @@ pub struct UnderlineFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_RegularTextRun/a:r")]
 pub struct Run {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Text Character Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -4330,7 +4330,7 @@ pub struct Table {
 pub struct TableStyleList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default
   #[sdk(attr(qname = ":def"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
@@ -11204,7 +11204,7 @@ pub enum GraphicDataChoice {
   WebExtensionReference(std::boxed::Box<crate::schemas::we::WebExtensionReference>),
   TimeSlicer(std::boxed::Box<crate::schemas::tsle::TimeSlicer>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
@@ -12027,14 +12027,14 @@ pub enum ShapePropertiesExtensionChoice {
   /// Defines the ShadowObscured Class.
   ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GvmlGroupShapeExtensionChoice {
   /// Defines the IsCanvas Class.
   IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VisualGroupShapePropertiesChoice {
@@ -12080,21 +12080,21 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
   /// Defines the NonVisualGroupProperties Class.
   NonVisualGroupProperties(std::boxed::Box<crate::schemas::a15::NonVisualGroupProperties>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeStyleSheetExtensionChoice {
   /// Defines the ThemeFamily Class.
   ThemeFamily(std::boxed::Box<crate::schemas::thm15::ThemeFamily>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectorLockingExtensionChoice {
   /// Graphic Object.
   Graphic(std::boxed::Box<Graphic>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataModelExtensionChoice {
@@ -12103,28 +12103,28 @@ pub enum DataModelExtensionChoice {
   /// Defines the RecolorImages Class.
   RecolorImages(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PtExtensionChoice {
   /// Defines the NonVisualDrawingProperties Class.
   NonVisualDrawingProperties(std::boxed::Box<crate::schemas::dgm14::NonVisualDrawingProperties>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkExtensionChoice {
   /// Defines the HyperlinkColor Class.
   HyperlinkColor(std::boxed::Box<crate::schemas::ahyp::HyperlinkColor>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesExtensionChoice {
   /// Defines the LineSketchStyleProperties Class.
   LineSketchStyleProperties(std::boxed::Box<crate::schemas::ask::LineSketchStyleProperties>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
@@ -12145,7 +12145,7 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
   /// Defines the ScriptLink Class.
   ScriptLink(std::boxed::Box<crate::schemas::asl::ScriptLink>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
@@ -12160,7 +12160,7 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
   /// Defines the ImageFormula Class.
   ImageFormula(std::boxed::Box<crate::schemas::aif::ImageFormula>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipExtensionChoice {
@@ -12179,5 +12179,5 @@ pub enum BlipExtensionChoice {
   /// Defines the OEmbedShared Class.
   OEmbedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }

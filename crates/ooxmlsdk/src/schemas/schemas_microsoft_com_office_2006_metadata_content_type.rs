@@ -38,5 +38,5 @@ pub struct ContentTypeSchema {
   #[sdk(attr(qname = "ma:versionID"))]
   pub version_id: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<std::boxed::Box<str>>,
+  pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }

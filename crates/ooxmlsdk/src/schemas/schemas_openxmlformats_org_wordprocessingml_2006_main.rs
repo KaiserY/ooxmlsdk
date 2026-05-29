@@ -4562,7 +4562,7 @@ pub struct NumberingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PBdr/w:pBdr")]
 pub struct ParagraphBorders {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Paragraph Border Above Identical Paragraphs
   #[sdk(child(qname = "w:CT_Border/w:top"))]
   pub top_border: Option<TopBorder>,
@@ -6273,7 +6273,7 @@ pub struct RunPropertiesChange {
 #[sdk(qname = "w:CT_RPr/w:rPr")]
 pub struct RunProperties {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   #[sdk(choice(
     qname = "w:CT_String253/w:rStyle",
     qname = "w:CT_Fonts/w:rFonts",
@@ -9383,7 +9383,7 @@ pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Write Protection
   #[sdk(child(qname = "w:CT_WriteProtection/w:writeProtection"))]
   pub write_protection: Option<WriteProtection>,
@@ -10536,7 +10536,7 @@ pub struct ParagraphMarkRunProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPr/w:sectPr")]
 pub struct SectionProperties {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Physical Section Mark Character Revision ID
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
@@ -11929,7 +11929,7 @@ pub struct TemplateCode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrBaseStyleable/w:rPr")]
 pub struct RunPropertiesBaseStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -12037,7 +12037,7 @@ pub struct RunPropertiesBaseStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrBaseStyleable/w:pPr")]
 pub struct ParagraphPropertiesBaseStyle {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the KeepNext Class.
   #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
   pub keep_next: Option<KeepNext>,
@@ -12488,7 +12488,7 @@ pub struct PreviousParagraphProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrList/w:rPr")]
 pub struct NumberingSymbolRunProperties {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -12896,7 +12896,7 @@ pub struct UiPriority {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrStyle/w:rPr")]
 pub struct StyleRunProperties {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -14002,7 +14002,7 @@ pub struct TableRowPropertiesChange {
 #[sdk(qname = "w:CT_PPr/w:pPr")]
 pub struct ParagraphProperties {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the ParagraphStyleId Class.
   #[sdk(child(qname = "w:CT_String/w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
@@ -15896,7 +15896,7 @@ pub enum RunChoice {
   LastRenderedPageBreak,
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtRunRubyChoice {
@@ -16764,7 +16764,7 @@ pub enum ParagraphChoice {
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableChoice {
@@ -18113,6 +18113,14 @@ pub enum FooterChoice {
   ContentPart(std::boxed::Box<ContentPart>),
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum FontsChoice {
+  /// Properties for a Single Font.
+  Font(std::boxed::Box<Font>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousTableCellPropertiesChoice {
@@ -19509,7 +19517,7 @@ pub enum BodyChoice {
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowPropertiesChoice {
@@ -19570,12 +19578,4 @@ pub enum PictureBulletBaseChoice {
   RoundRectangle(std::boxed::Box<crate::schemas::v::RoundRectangle>),
   Shape(std::boxed::Box<crate::schemas::v::Shape>),
   Shapetype(std::boxed::Box<crate::schemas::v::Shapetype>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FontsChoice {
-  /// Properties for a Single Font.
-  Font(std::boxed::Box<Font>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
 }

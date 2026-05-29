@@ -4065,7 +4065,7 @@ fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
 }
 
 fn push_run_xml_any(
-  xml: &str,
+  xml: &[u8],
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   style: TextStyle,
@@ -4073,7 +4073,7 @@ fn push_run_xml_any(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  if let Ok(drawing) = w::Drawing::from_bytes(xml.as_bytes()) {
+  if let Ok(drawing) = w::Drawing::from_bytes(xml) {
     if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
       inlines.push(InlineItem::Image(image));
     }
@@ -4086,7 +4086,7 @@ fn push_run_xml_any(
     return;
   }
 
-  if let Some(drawing_xml) = first_named_xml_fragment(xml, b"drawing")
+  if let Some(drawing_xml) = first_named_xml_fragment_bytes(xml, b"drawing")
     && let Ok(drawing) = w::Drawing::from_bytes(drawing_xml.as_bytes())
   {
     if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
@@ -4101,7 +4101,7 @@ fn push_run_xml_any(
     return;
   }
 
-  if let Ok(picture) = w::Picture::from_bytes(xml.as_bytes()) {
+  if let Ok(picture) = w::Picture::from_bytes(xml) {
     if let Some(image) = drawing::pict_image(&picture, images) {
       inlines.push(InlineItem::Image(image));
     }
@@ -4110,7 +4110,7 @@ fn push_run_xml_any(
     return;
   }
 
-  if let Some(picture_xml) = first_named_xml_fragment(xml, b"pict")
+  if let Some(picture_xml) = first_named_xml_fragment_bytes(xml, b"pict")
     && let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes())
   {
     if let Some(image) = drawing::pict_image(&picture, images) {
@@ -4122,17 +4122,17 @@ fn push_run_xml_any(
 }
 
 fn push_alternate_content_pict_textboxes(
-  xml: &str,
+  xml: &[u8],
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  if !(xml.contains("AlternateContent") && xml.contains("txbxContent")) {
+  if !(xml_contains(xml, b"AlternateContent") && xml_contains(xml, b"txbxContent")) {
     return;
   }
-  let Some(picture_xml) = first_named_xml_fragment(xml, b"pict") else {
+  let Some(picture_xml) = first_named_xml_fragment_bytes(xml, b"pict") else {
     return;
   };
   let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes()) else {
@@ -5149,14 +5149,14 @@ struct DrawingShapeImportContext<'a> {
 }
 
 fn drawingml_textbox_frames_from_xml(
-  xml: &str,
+  xml: &[u8],
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
   skip_container_root: bool,
 ) -> Vec<InlineShape> {
   let mut frames = Vec::new();
-  let mut reader = Reader::from_str(xml);
+  let mut reader = Reader::from_reader(xml);
   reader.config_mut().trim_text(false);
   let mut skipped_container_root = false;
 
@@ -5174,7 +5174,7 @@ fn drawingml_textbox_frames_from_xml(
             .map(|xfrm| transform.child(xfrm))
             .unwrap_or(transform);
           frames.extend(drawingml_textbox_frames_from_xml(
-            &fragment,
+            fragment.as_bytes(),
             drawingml_group_child_placement(placement),
             child_transform,
             context.clone(),
@@ -5231,7 +5231,7 @@ fn drawingml_textbox_frame_from_fragment(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineShape> {
-  let content = drawing_textbox_content(xml)?;
+  let content = drawing_textbox_content(xml.as_bytes())?;
   let text_box =
     text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
   let auto_fit = drawingml_textbox_uses_auto_fit(xml);
@@ -5897,6 +5897,30 @@ fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
       _ => {}
     }
   }
+}
+
+fn first_named_xml_fragment_bytes(xml: &[u8], local_name: &[u8]) -> Option<String> {
+  let mut reader = Reader::from_reader(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), local_name) => {
+        return read_outer_xml_fragment(&mut reader, event);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), local_name) => {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Empty(event.into_owned())).ok()?;
+        return String::from_utf8(writer.into_inner()).ok();
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn xml_contains(xml: &[u8], needle: &[u8]) -> bool {
+  xml.windows(needle.len()).any(|window| window == needle)
 }
 
 fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
@@ -6626,7 +6650,7 @@ fn drawing_diagram_shapes(
     ));
   }
   Some(drawingml_shapes_from_xml(
-    drawing_xml,
+    drawing_xml.as_bytes(),
     placement,
     transform,
     DrawingShapeImportContext {
@@ -7309,14 +7333,14 @@ fn drawingml_shape_properties_from_fragment(xml: &str) -> Option<DrawingMlShapeP
 }
 
 fn drawingml_shapes_from_xml(
-  xml: &str,
+  xml: &[u8],
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
   skip_container_root: bool,
 ) -> Vec<InlineItem> {
   let mut shapes = Vec::new();
-  let mut reader = Reader::from_str(xml);
+  let mut reader = Reader::from_reader(xml);
   reader.config_mut().trim_text(false);
   let mut skipped_container_root = false;
 
@@ -7334,7 +7358,7 @@ fn drawingml_shapes_from_xml(
             .map(|xfrm| transform.child(xfrm))
             .unwrap_or(transform);
           shapes.extend(drawingml_shapes_from_xml(
-            &fragment,
+            fragment.as_bytes(),
             drawingml_group_child_placement(placement),
             child_transform,
             DrawingShapeImportContext {
@@ -7594,7 +7618,7 @@ fn drawingml_shape_from_fragment(
     suppress_zero_relative_background: explicit_fill_color.is_some(),
     allow_outside_page: false,
     inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
-      && drawing_textbox_content(xml).is_some(),
+      && drawing_textbox_content(xml.as_bytes()).is_some(),
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -10468,12 +10492,12 @@ fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> O
   Some(unescape(&decoded).ok()?.into_owned())
 }
 
-fn drawing_textbox_content(xml: &str) -> Option<w::TextBoxContent> {
-  if !xml.contains("txbxContent") {
+fn drawing_textbox_content(xml: &[u8]) -> Option<w::TextBoxContent> {
+  if !xml_contains(xml, b"txbxContent") {
     return None;
   }
 
-  let xml = textbox_fragment_with_namespaces(first_named_xml_fragment(xml, b"txbxContent")?);
+  let xml = textbox_fragment_with_namespaces(first_named_xml_fragment_bytes(xml, b"txbxContent")?);
   w::TextBoxContent::from_bytes(xml.as_bytes()).ok()
 }
 
@@ -12974,7 +12998,7 @@ mod tests {
     // Source: LibreOffice imports <wps:txbx> through WpsContext as text on the
     // drawing shape, not as fallback body text.
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>"#;
-    assert!(drawing_textbox_content(xml).is_some());
+    assert!(drawing_textbox_content(xml.as_bytes()).is_some());
     assert!(drawingml_shape_geometry(xml).is_some());
 
     let frame = drawingml_textbox_frame_from_fragment(
@@ -13024,7 +13048,7 @@ mod tests {
     let mut inlines = Vec::new();
 
     push_run_xml_any(
-      xml,
+      xml.as_bytes(),
       &mut inlines,
       TextStyle::default(),
       TextStyle::default(),
@@ -13970,7 +13994,7 @@ mod tests {
     "#;
 
     let frames = drawingml_textbox_frames_from_xml(
-      xml,
+      xml.as_bytes(),
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
       DrawingTextBoxImportContext {
@@ -13998,7 +14022,7 @@ mod tests {
   </wps:txbx>
 </wps:wsp>"#;
 
-    let content = drawing_textbox_content(xml).expect("typed textbox content");
+    let content = drawing_textbox_content(xml.as_bytes()).expect("typed textbox content");
     let blocks = textbox_blocks(
       &content,
       &StylesCatalog::default(),

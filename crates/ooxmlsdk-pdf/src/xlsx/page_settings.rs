@@ -240,14 +240,8 @@ impl CalcPageSettings {
     if let Some(scale) = page_setup.scale.filter(|scale| *scale > 0) {
       self.scale = scale;
     }
-    self.fit_to_width = page_setup
-      .fit_to_width
-      .or_else(|| page_setup_raw_u32(page_setup, "fitToWidth"))
-      .unwrap_or(self.fit_to_width);
-    self.fit_to_height = page_setup
-      .fit_to_height
-      .or_else(|| page_setup_raw_u32(page_setup, "fitToHeight"))
-      .unwrap_or(self.fit_to_height);
+    self.fit_to_width = page_setup.fit_to_width.unwrap_or(self.fit_to_width);
+    self.fit_to_height = page_setup.fit_to_height.unwrap_or(self.fit_to_height);
     self.horizontal_dpi = page_setup.horizontal_dpi.unwrap_or(self.horizontal_dpi);
     self.vertical_dpi = page_setup.vertical_dpi.unwrap_or(self.vertical_dpi);
     self.page_order = page_setup.page_order.or(self.page_order);
@@ -313,16 +307,6 @@ impl CalcPageSettings {
   }
 }
 
-fn page_setup_raw_u32(page_setup: &x::PageSetup, local_name: &str) -> Option<u32> {
-  page_setup.xml_other_attrs.iter().find_map(|(name, value)| {
-    (name.as_ref() == local_name
-      || name.as_ref().ends_with(&format!(":{local_name}"))
-      || name.as_ref().ends_with(local_name))
-    .then(|| value.parse::<u32>().ok())
-    .flatten()
-  })
-}
-
 impl HeaderFooterModel {
   fn from_worksheet(worksheet: &x::Worksheet) -> Self {
     let mut model = worksheet
@@ -378,27 +362,27 @@ impl HeaderFooterModel {
       odd_header: header_footer
         .odd_header
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       odd_footer: header_footer
         .odd_footer
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       even_header: header_footer
         .even_header
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       even_footer: header_footer
         .even_footer
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       first_header: header_footer
         .first_header
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       first_footer: header_footer
         .first_footer
         .as_ref()
-        .and_then(|value| value.0.xml_content.clone()),
+        .and_then(|value| value.xml_content.clone()),
       ..Self::default()
     }
   }

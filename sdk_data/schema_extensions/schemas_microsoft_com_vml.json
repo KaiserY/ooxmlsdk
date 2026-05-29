@@ -1,0 +1,28 @@
+{
+  "Types": [
+    {
+      "ClassName": "Group",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Line",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Oval",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Rectangle",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Shape",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Shapetype",
+      "HaveXmlOtherAttrs": true
+    }
+  ]
+}

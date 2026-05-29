@@ -39,6 +39,14 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "Comments",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Document",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "DocGrid",
       "Attributes": [
         {
@@ -51,13 +59,42 @@
       "ClassName": "Drawing",
       "ParentChoiceHasAnyIn": [
         "Run"
-      ]
+      ],
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "Font",
       "ParentChoiceHasAnyIn": [
         "Fonts"
       ]
+    },
+    {
+      "ClassName": "Endnotes",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Fonts",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Footnotes",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Footer",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "GlossaryDocument",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Header",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Numbering",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "NumberingSymbolRunProperties",
@@ -67,7 +104,8 @@
       "ClassName": "Paragraph",
       "ParentChoiceHasAnyIn": [
         "Body"
-      ]
+      ],
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "ParagraphBorders",
@@ -81,7 +119,8 @@
       "ClassName": "Run",
       "ParentChoiceHasAnyIn": [
         "Paragraph"
-      ]
+      ],
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "RunPropertiesDefault",
@@ -102,12 +141,80 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
+      "ClassName": "Settings",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "SpacingBetweenLines",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Styles",
       "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "StyleRunProperties",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "TextType",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Text",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "WebSettings",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "AbstractNum",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CustomXmlRuby",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CustomXmlBlock",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Deleted",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "EmbeddedObject",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Inserted",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "NumberingInstance",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ParagraphPropertiesExtended",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ParagraphProperties",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Picture",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "RunProperties",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "TableRow",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

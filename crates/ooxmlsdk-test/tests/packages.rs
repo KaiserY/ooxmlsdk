@@ -42,14 +42,10 @@ use ooxmlsdk::sdk::{
 };
 use ooxmlsdk_test::fixtures;
 
-fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
-where
-  N: AsRef<str>,
-  V: AsRef<str>,
-{
+fn xml_other_attr<'a>(attrs: &'a [ooxmlsdk::common::XmlOtherAttr], name: &str) -> Option<&'a str> {
   attrs
     .iter()
-    .find_map(|(attr_name, value)| (attr_name.as_ref() == name).then_some(value.as_ref()))
+    .find_map(|attr| (attr.name() == name).then_some(attr.raw_value()))
 }
 
 macro_rules! part_ref_variant {

@@ -10,7 +10,6 @@
 pub struct WebExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,

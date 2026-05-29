@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "RevisionPtr",
+      "HaveXmlOtherAttrs": true
+    }
+  ]
+}

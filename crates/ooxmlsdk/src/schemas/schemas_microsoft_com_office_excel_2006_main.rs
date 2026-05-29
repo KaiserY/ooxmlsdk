@@ -10,7 +10,6 @@
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<crate::schemas::x::SheetProperties>>,
@@ -99,7 +98,6 @@ pub struct Macrosheet {
 pub struct WorksheetSortMap {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Row Sort Map
   #[sdk(child(qname = "xne:CT_RowSortMap/xne:rowSortMap"))]
   pub row_sort_map: Option<RowSortMap>,

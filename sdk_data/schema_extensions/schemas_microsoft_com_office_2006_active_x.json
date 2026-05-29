@@ -2,7 +2,8 @@
   "Types": [
     {
       "ClassName": "ActiveXControlData",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

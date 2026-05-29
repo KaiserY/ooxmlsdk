@@ -10,7 +10,6 @@
 pub struct TemplateCommandGroup {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the KeyMapCustomizations Class.
   #[sdk(child(qname = "wne:CT_Keymaps/wne:keymaps"))]
   pub key_map_customizations: Vec<KeyMapCustomizations>,
@@ -38,7 +37,6 @@ pub struct Mcds {
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the DocEvents Class.
   #[sdk(child(qname = "wne:CT_DocEvents/wne:docEvents"))]
   pub doc_events: Option<DocEvents>,
@@ -52,7 +50,6 @@ pub struct VbaSuppData {
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SingleDataSourceRecord Class.
   #[sdk(child(qname = "wne:CT_HashedRecipientData/wne:recipientData"))]
   pub single_data_source_record: Vec<SingleDataSourceRecord>,
@@ -118,6 +115,7 @@ pub struct CharacterInsertion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_Keymap/wne:keymap")]
 pub struct KeyMapEntry {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// chmPrimary
   #[sdk(attr(qname = "wne:chmPrimary"))]
   #[sdk(string_length(min = 2u32, max = 2u32))]

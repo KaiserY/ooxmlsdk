@@ -10,7 +10,6 @@
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ClassificationLabel Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationLabel/clbl:label"))]
   pub classification_label: Vec<ClassificationLabel>,

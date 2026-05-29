@@ -48,7 +48,6 @@ pub enum DataSourceValues {
 pub struct Sources {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Selected Style
   #[sdk(attr(qname = ":SelectedStyle"))]
   #[sdk(string_length(min = 0u32, max = 255u32))]

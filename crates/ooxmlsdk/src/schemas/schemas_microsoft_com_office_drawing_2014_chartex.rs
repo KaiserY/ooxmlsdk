@@ -258,7 +258,6 @@ pub enum PageOrientation {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// version
   #[sdk(attr(office2016, qname = ":version"))]
@@ -471,6 +470,7 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ExternalData/cx:externalData")]
 pub struct ExternalData {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// RelId of the relationship for the external data
   #[sdk(attr(office2016, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,

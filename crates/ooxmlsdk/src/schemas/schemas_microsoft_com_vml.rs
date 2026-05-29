@@ -578,6 +578,7 @@ pub struct ImageData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Shape/v:shape")]
 pub struct Shape {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -780,6 +781,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Shapetype/v:shapetype")]
 pub struct Shapetype {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -977,6 +979,7 @@ pub struct Shapetype {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Group/v:group")]
 pub struct Group {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1743,6 +1746,7 @@ pub struct ImageFile {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Line/v:line")]
 pub struct Line {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -1937,6 +1941,7 @@ pub struct Line {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Oval/v:oval")]
 pub struct Oval {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -2317,6 +2322,7 @@ pub struct PolyLine {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Rect/v:rect")]
 pub struct Rectangle {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,

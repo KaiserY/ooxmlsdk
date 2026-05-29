@@ -10,7 +10,6 @@
 pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Person Class.
   #[sdk(child(office2019, qname = "xltc:CT_Person/xltc:person"))]
   pub person: Vec<Person>,
@@ -24,7 +23,6 @@ pub struct PersonList {
 pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ThreadedComment Class.
   #[sdk(child(office2019, qname = "xltc:CT_ThreadedComment/xltc:threadedComment"))]
   pub threaded_comment: Vec<ThreadedComment>,

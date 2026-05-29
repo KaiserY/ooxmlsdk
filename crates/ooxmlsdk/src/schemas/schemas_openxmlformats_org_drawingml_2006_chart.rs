@@ -1378,7 +1378,6 @@ pub struct MinAxisValue {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Version number of the file, as determined by the features used by this chart
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,
@@ -1436,7 +1435,6 @@ pub struct ChartSpace {
 pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor",
     qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"
@@ -3023,7 +3021,6 @@ pub struct Thickness {
 #[sdk(qname = "c:CT_StockChartExtension/c:ext")]
 pub struct StockChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3036,7 +3033,6 @@ pub struct StockChartExtension {
 #[sdk(qname = "c:CT_PieChartExtension/c:ext")]
 pub struct PieChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3049,7 +3045,6 @@ pub struct PieChartExtension {
 #[sdk(qname = "c:CT_Pie3DChartExtension/c:ext")]
 pub struct Pie3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3062,7 +3057,6 @@ pub struct Pie3DChartExtension {
 #[sdk(qname = "c:CT_NumRefExtension/c:ext")]
 pub struct NumRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3080,7 +3074,6 @@ pub struct NumRefExtension {
 #[sdk(qname = "c:CT_StrDataExtension/c:ext")]
 pub struct StrDataExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3093,7 +3086,6 @@ pub struct StrDataExtension {
 #[sdk(qname = "c:CT_StrRefExtension/c:ext")]
 pub struct StrRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3111,7 +3103,6 @@ pub struct StrRefExtension {
 #[sdk(qname = "c:CT_MultiLvlStrRefExtension/c:ext")]
 pub struct MultiLvlStrRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3129,7 +3120,6 @@ pub struct MultiLvlStrRefExtension {
 #[sdk(qname = "c:CT_DLblsExtension/c:ext")]
 pub struct DLblsExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3151,7 +3141,6 @@ pub struct DLblsExtension {
 #[sdk(qname = "c:CT_LineChartExtension/c:ext")]
 pub struct LineChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3164,7 +3153,6 @@ pub struct LineChartExtension {
 #[sdk(qname = "c:CT_Line3DChartExtension/c:ext")]
 pub struct Line3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3177,7 +3165,6 @@ pub struct Line3DChartExtension {
 #[sdk(qname = "c:CT_ScatterChartExtension/c:ext")]
 pub struct ScatterChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3190,7 +3177,6 @@ pub struct ScatterChartExtension {
 #[sdk(qname = "c:CT_RadarChartExtension/c:ext")]
 pub struct RadarChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3203,7 +3189,6 @@ pub struct RadarChartExtension {
 #[sdk(qname = "c:CT_BarChartExtension/c:ext")]
 pub struct BarChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3216,7 +3201,6 @@ pub struct BarChartExtension {
 #[sdk(qname = "c:CT_Bar3DChartExtension/c:ext")]
 pub struct Bar3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3229,7 +3213,6 @@ pub struct Bar3DChartExtension {
 #[sdk(qname = "c:CT_AreaChartExtension/c:ext")]
 pub struct AreaChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3242,7 +3225,6 @@ pub struct AreaChartExtension {
 #[sdk(qname = "c:CT_Area3DChartExtension/c:ext")]
 pub struct Area3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3255,7 +3237,6 @@ pub struct Area3DChartExtension {
 #[sdk(qname = "c:CT_BubbleChartExtension/c:ext")]
 pub struct BubbleChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3268,7 +3249,6 @@ pub struct BubbleChartExtension {
 #[sdk(qname = "c:CT_SurfaceChartExtension/c:ext")]
 pub struct SurfaceChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3281,7 +3261,6 @@ pub struct SurfaceChartExtension {
 #[sdk(qname = "c:CT_Surface3DChartExtension/c:ext")]
 pub struct Surface3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3294,7 +3273,6 @@ pub struct Surface3DChartExtension {
 #[sdk(qname = "c:CT_CatAxExtension/c:ext")]
 pub struct CatAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3307,7 +3285,6 @@ pub struct CatAxExtension {
 #[sdk(qname = "c:CT_DateAxExtension/c:ext")]
 pub struct DateAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3320,7 +3297,6 @@ pub struct DateAxExtension {
 #[sdk(qname = "c:CT_SerAxExtension/c:ext")]
 pub struct SerAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3333,7 +3309,6 @@ pub struct SerAxExtension {
 #[sdk(qname = "c:CT_ValAxExtension/c:ext")]
 pub struct ValAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3876,7 +3851,6 @@ pub struct DLblExtensionList {
 #[sdk(qname = "c:CT_DLblExtension/c:ext")]
 pub struct DLblExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4034,7 +4008,6 @@ pub struct LineSerExtensionList {
 #[sdk(qname = "c:CT_LineSerExtension/c:ext")]
 pub struct LineSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4065,7 +4038,6 @@ pub struct ScatterSerExtensionList {
 #[sdk(qname = "c:CT_ScatterSerExtension/c:ext")]
 pub struct ScatterSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4096,7 +4068,6 @@ pub struct RadarSerExtensionList {
 #[sdk(qname = "c:CT_RadarSerExtension/c:ext")]
 pub struct RadarSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4127,7 +4098,6 @@ pub struct BarSerExtensionList {
 #[sdk(qname = "c:CT_BarSerExtension/c:ext")]
 pub struct BarSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4159,7 +4129,6 @@ pub struct AreaSerExtensionList {
 #[sdk(qname = "c:CT_AreaSerExtension/c:ext")]
 pub struct AreaSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4190,7 +4159,6 @@ pub struct PieSerExtensionList {
 #[sdk(qname = "c:CT_PieSerExtension/c:ext")]
 pub struct PieSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4221,7 +4189,6 @@ pub struct BubbleSerExtensionList {
 #[sdk(qname = "c:CT_BubbleSerExtension/c:ext")]
 pub struct BubbleSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4252,7 +4219,6 @@ pub struct SurfaceSerExtensionList {
 #[sdk(qname = "c:CT_SurfaceSerExtension/c:ext")]
 pub struct SurfaceSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4445,7 +4411,6 @@ pub struct DisplayBlanksAs {
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the DataDisplayOptions16 Class.
   #[sdk(child(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub data_display_options16: Vec<DataDisplayOptions16>,
@@ -4644,7 +4609,6 @@ pub struct ChartSpaceExtensionList {
 #[sdk(qname = "c:CT_ChartSpaceExtension/c:ext")]
 pub struct ChartSpaceExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]

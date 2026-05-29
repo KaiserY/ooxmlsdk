@@ -674,16 +674,12 @@ pub struct MceContextCheckpoint {
 
 #[cfg(feature = "mce")]
 impl MceContext {
-  pub(crate) fn push<N, V>(
+  pub(crate) fn push(
     &mut self,
     namespaces: &[crate::common::XmlNamespace],
-    attrs: &[(N, V)],
+    attrs: &[crate::common::XmlOtherAttr],
     settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<MceContextCheckpoint, crate::common::SdkError>
-  where
-    N: AsRef<str>,
-    V: AsRef<str>,
-  {
+  ) -> Result<MceContextCheckpoint, crate::common::SdkError> {
     let checkpoint = MceContextCheckpoint {
       namespaces: self.namespaces.len(),
       ignorable_namespaces: self.ignorable_namespaces.len(),
@@ -844,15 +840,11 @@ fn file_format_rank(version: FileFormatVersion) -> u8 {
 }
 
 #[cfg(feature = "mce")]
-fn mce_attr<'a, N, V>(attrs: &'a [(N, V)], local_name: &str) -> Option<&'a str>
-where
-  N: AsRef<str>,
-  V: AsRef<str>,
-{
+fn mce_attr<'a>(attrs: &'a [crate::common::XmlOtherAttr], local_name: &str) -> Option<&'a str> {
   let prefixed_name = format!("mc:{local_name}");
-  attrs.iter().find_map(|(name, value)| {
-    let name = name.as_ref();
-    (name == prefixed_name || name == local_name).then_some(value.as_ref())
+  attrs.iter().find_map(|attr| {
+    let name = attr.name();
+    (name == prefixed_name || name == local_name).then_some(attr.raw_value())
   })
 }
 

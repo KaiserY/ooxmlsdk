@@ -118,7 +118,6 @@ pub struct RichSortCondition {
 pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SupportingPropertyBagArrayData Class.
   #[sdk(child(
     office2019,
@@ -138,7 +137,6 @@ pub struct SupportingPropertyBags {
 pub struct SupportingPropertyBagStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -155,7 +153,6 @@ pub struct SupportingPropertyBagStructures {
 pub struct ArrayData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -172,7 +169,6 @@ pub struct ArrayData {
 pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Dxfs Class.
   #[sdk(child(office2019, qname = "x:CT_Dxfs/xlrd2:dxfs"))]
   pub dxfs: Option<Dxfs>,
@@ -195,7 +191,6 @@ pub struct RichStylesheet {
 pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the RichValueGlobalType Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueGlobalType/xlrd2:global"))]
   pub rich_value_global_type: Option<std::boxed::Box<RichValueGlobalType>>,

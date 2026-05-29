@@ -264,7 +264,7 @@ impl ConditionalFormatRuleModel {
       formulas: rule
         .formula
         .iter()
-        .filter_map(|formula| formula.0.xml_content.clone())
+        .filter_map(|formula| formula.xml_content.clone())
         .collect(),
       has_color_scale: rule.color_scale.is_some(),
       has_data_bar: rule.data_bar.is_some(),
@@ -300,11 +300,11 @@ impl DataValidationModel {
       formula1: validation
         .formula1
         .as_ref()
-        .and_then(|formula| formula.0.xml_content.clone()),
+        .and_then(|formula| formula.xml_content.clone()),
       formula2: validation
         .formula2
         .as_ref()
-        .and_then(|formula| formula.0.xml_content.clone()),
+        .and_then(|formula| formula.xml_content.clone()),
     }
   }
 }

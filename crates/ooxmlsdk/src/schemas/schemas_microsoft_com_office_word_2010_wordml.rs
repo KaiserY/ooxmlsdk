@@ -1435,6 +1435,7 @@ pub struct ContentPart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "w14:CT_LongHexNumber/w14:docId")]
 pub struct DocumentId {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]

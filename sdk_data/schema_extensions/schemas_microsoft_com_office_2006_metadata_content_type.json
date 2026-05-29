@@ -2,7 +2,8 @@
   "Types": [
     {
       "ClassName": "ContentTypeSchema",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

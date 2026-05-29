@@ -18,7 +18,6 @@ pub enum EditAsValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")]
 pub struct TwoCellAnchor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Positioning and Resizing Behaviors
   #[sdk(attr(qname = ":editAs"))]
   #[sdk(string_format(kind = "token"))]
@@ -47,7 +46,6 @@ pub struct TwoCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor")]
 pub struct OneCellAnchor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
@@ -71,7 +69,6 @@ pub struct OneCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor")]
 pub struct AbsoluteAnchor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Position
   #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
   pub position: std::boxed::Box<Position>,
@@ -124,7 +121,6 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_GroupShape/xdr:grpSp")]
 pub struct GroupShape {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -242,7 +238,6 @@ pub struct ContentPart {
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
     qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",

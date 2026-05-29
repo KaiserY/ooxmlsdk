@@ -890,7 +890,6 @@ pub enum VerticalAlignmentValues {
 pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Unique ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -953,7 +952,6 @@ pub struct ColorsDefinitionHeaderList {
 pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
@@ -976,7 +974,6 @@ pub struct DataModelRoot {
 pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1072,7 +1069,6 @@ pub struct RelationshipIds {
 pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Unique Style ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1148,7 +1144,6 @@ pub struct ColorTransformCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1171,7 +1166,6 @@ pub struct FillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1194,7 +1188,6 @@ pub struct LineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1217,7 +1210,6 @@ pub struct EffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1240,7 +1232,6 @@ pub struct TextLineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1263,7 +1254,6 @@ pub struct TextFillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -2732,7 +2722,6 @@ pub struct PtExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]

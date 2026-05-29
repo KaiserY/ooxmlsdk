@@ -176,13 +176,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               ty.name.as_str(),
               &mut children,
             );
-            let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
-              ty,
-              kind,
-              schema.module_name.as_str(),
-              &type_map,
-              &children,
-            );
+            let have_xml_other_attrs = false;
             let have_xmlns_fields = ty.has_xmlns_fields
               || !ty.part.is_empty()
               || ty.base_class == "OpenXmlPartRootElement";
@@ -1533,149 +1527,6 @@ fn have_direct_xml_other_children_for_targeted_mce_content(
       && name == "cx:CT_ChartSpace/cx:chartSpace")
 }
 
-fn have_xml_other_attrs_for_mixed_version_content(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-  children: &[SchemaTypeChild],
-) -> bool {
-  is_part_root_schema_type(schema_type)
-    || is_mce_schema_type(schema_type)
-    || (is_office2007_or_default(schema_type.version.as_deref())
-      && (schema_type_has_later_version_attributes(schema_type)
-        || children_need_xml_other_children_for_mixed_version_content(children, type_map)
-        || have_xml_other_attrs_for_spreadsheet_extensible_composite(
-          schema_type,
-          kind,
-          module_name,
-        )
-        || have_xml_other_attrs_for_spreadsheet_relationship_leaf(schema_type, kind, module_name)
-        || have_xml_other_attrs_for_spreadsheet_repeated_part_root_content_child(
-          schema_type,
-          kind,
-          module_name,
-          type_map,
-          children,
-        )
-        || have_xml_other_attrs_for_word_repeated_part_root_identity_child(
-          schema_type,
-          kind,
-          module_name,
-          type_map,
-        )
-        || have_xml_other_attrs_for_derived_text_base(schema_type, kind, type_map)
-        || have_xml_other_attrs_for_derived_text_content(schema_type, kind, type_map)
-        || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, "")))
-}
-
-fn have_xml_other_attrs_for_derived_text_content(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  if kind != SchemaTypeKind::Derived || !schema_type.is_leaf_text {
-    return false;
-  }
-
-  resolve_derived_base_type(schema_type, type_map).is_some_and(|base_type| {
-    base_type.is_leaf_text
-      && !base_type.attributes.is_empty()
-      && base_type.base_class == "OpenXmlLeafTextElement"
-  })
-}
-
-fn have_xml_other_attrs_for_derived_text_base(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  kind == SchemaTypeKind::LeafText
-    && schema_type.base_class == "OpenXmlLeafTextElement"
-    && !schema_type.attributes.is_empty()
-    && type_map.values().any(|derived_type| {
-      derived_type.is_leaf_text
-        && derived_type.base_class == schema_type.class_name
-        && resolve_kind(derived_type, type_map) == SchemaTypeKind::Derived
-        && derived_type.attributes.is_empty()
-        && derived_type.children.is_empty()
-    })
-}
-
-fn have_xml_other_attrs_for_spreadsheet_extensible_composite(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-) -> bool {
-  kind == SchemaTypeKind::Composite
-    && module_name.contains("spreadsheetml_2006_main")
-    && !schema_type.attributes.is_empty()
-    && !is_extension_schema_type(schema_type)
-    && schema_type
-      .children
-      .iter()
-      .any(|child| is_extension_list_name(child.name.as_str()))
-}
-
-fn have_xml_other_attrs_for_spreadsheet_relationship_leaf(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-) -> bool {
-  kind == SchemaTypeKind::Leaf
-    && module_name.contains("spreadsheetml_2006_main")
-    && schema_type
-      .attributes
-      .iter()
-      .any(|attr| attr.q_name.starts_with("r:"))
-}
-
-fn have_xml_other_attrs_for_spreadsheet_repeated_part_root_content_child(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-  children: &[SchemaTypeChild],
-) -> bool {
-  matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
-    && module_name.contains("spreadsheetml_2006_main")
-    && !is_extension_schema_type(schema_type)
-    && is_repeated_child_of_part_root(schema_type.name.as_str(), module_name, type_map)
-    && (children_have_repeated_element_child(children)
-      || particle_has_any_repeated_child(&schema_type.particle))
-}
-
-fn have_xml_other_attrs_for_word_repeated_part_root_identity_child(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
-) -> bool {
-  kind == SchemaTypeKind::Composite
-    && module_name.contains("wordprocessingml_2006_main")
-    && !is_extension_schema_type(schema_type)
-    && schema_type_has_required_identity_attribute(schema_type)
-    && is_repeated_child_of_part_root(schema_type.name.as_str(), module_name, type_map)
-}
-
-fn schema_type_has_required_identity_attribute(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-) -> bool {
-  schema_type.attributes.iter().any(|attr| {
-    let local_name = attr
-      .q_name
-      .rsplit(':')
-      .next()
-      .unwrap_or(attr.q_name.as_str());
-    let is_identity_attr = local_name.ends_with("Id") || local_name.ends_with("ID");
-    is_identity_attr
-      && attr
-        .validators
-        .iter()
-        .any(|validator| validator.name == "RequiredValidator")
-  })
-}
-
 fn is_repeated_child_of_part_root(
   child_name: &str,
   module_name: &str,
@@ -1710,10 +1561,6 @@ fn particle_has_any_repeated_child(
 
 fn is_part_root_schema_type(schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType) -> bool {
   !schema_type.part.is_empty() || schema_type.base_class == "OpenXmlPartRootElement"
-}
-
-fn is_mce_schema_type(schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType) -> bool {
-  schema_type.name.starts_with("mc:")
 }
 
 fn is_common_ooxml_content_module(module_name: &str) -> bool {

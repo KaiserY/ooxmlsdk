@@ -3546,7 +3546,7 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.have_xml_other_attrs {
     fields.push(quote! {
-      pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+      pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
     });
   }
 
@@ -4318,9 +4318,7 @@ mod tests {
     assert!(!generated.contains("pub struct StyleMatrixReferenceType"));
     assert!(!generated.contains("pub enum StyleMatrixReferenceTypeChoice"));
     assert!(generated.contains("pub struct FillReference"));
-    assert!(generated.contains(
-      "pub xml_other_attrs : Vec < (std :: boxed :: Box < str > , std :: boxed :: Box < str >) >"
-    ));
+    assert!(generated.contains("pub xml_other_attrs : Vec < crate :: common :: XmlOtherAttr >"));
     assert!(
       generated.contains("pub xml_other_children : Vec < (usize , std :: boxed :: Box < str >) >")
     );

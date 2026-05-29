@@ -10,7 +10,6 @@
 pub struct Tasks {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Task Class.
   #[sdk(child(office2021, qname = "t:CT_Task/t:Task"))]
   pub task: Vec<Task>,

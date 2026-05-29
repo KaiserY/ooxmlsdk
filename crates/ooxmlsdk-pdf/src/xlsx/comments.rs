@@ -83,7 +83,7 @@ impl LegacyCommentsCatalog {
       .authors
       .author
       .iter()
-      .map(|author| author.0.xml_content.clone().unwrap_or_default())
+      .map(|author| author.xml_content.clone().unwrap_or_default())
       .collect::<Vec<_>>();
     Ok(Self {
       relationship_id: part.relationship_id().map(ToString::to_string),
@@ -154,7 +154,7 @@ impl ThreadedCommentModel {
 
 fn comment_text(text: &x::CommentText) -> String {
   if let Some(text) = &text.text
-    && let Some(content) = &text.0.xml_content
+    && let Some(content) = &text.xml_content
   {
     return content.clone();
   }

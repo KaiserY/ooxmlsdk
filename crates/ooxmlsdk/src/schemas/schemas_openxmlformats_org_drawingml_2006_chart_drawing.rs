@@ -9,7 +9,6 @@
 #[sdk(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor")]
 pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: std::boxed::Box<FromAnchor>,
@@ -30,7 +29,6 @@ pub struct RelativeAnchorSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: std::boxed::Box<FromAnchor>,
@@ -80,7 +78,6 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShape/cdr:grpSp")]
 pub struct GroupShape {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,

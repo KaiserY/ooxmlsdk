@@ -16,6 +16,10 @@
     {
       "ClassName": "RelId",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExternalData",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

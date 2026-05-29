@@ -756,7 +756,7 @@ fn mce_context_scope_tokens(
   let attrs_expr = if let Some(ident) = xml_other_attrs_field {
     quote! { self.#ident.as_slice() }
   } else {
-    quote! { &[] as &[(String, String)] }
+    quote! { &[] as &[crate::common::XmlOtherAttr] }
   };
 
   if xmlns_fields.is_empty() && xml_other_attrs_field.is_none() {
@@ -766,7 +766,7 @@ fn mce_context_scope_tokens(
       quote! {
         self
           .#ident
-          .retain(|(name, _)| !context.should_remove_ignorable_attribute(std::convert::AsRef::<str>::as_ref(name)));
+          .retain(|attr| !context.should_remove_ignorable_attribute(attr.name()));
       }
     } else {
       quote! {}
@@ -3734,10 +3734,7 @@ fn expand_named_struct(
       b"xmlns" => {}
       key if key.starts_with(b"xmlns:") => {}
       key => {
-        xml_other_attrs.push((
-          String::from_utf8_lossy(key).into_owned().into_boxed_str(),
-          crate::common::decode_attr_value(&attr, decoder)?.into_boxed_str(),
-        ));
+        xml_other_attrs.push(crate::common::XmlOtherAttr::new_raw(key, attr.value.as_ref()));
       }
     }
   } else {
@@ -3750,8 +3747,7 @@ fn expand_named_struct(
       match (has_xmlns_fields, has_xml_other_attrs_field) {
         (true, true) => quote! {
           let mut xmlns = Vec::<crate::common::XmlNamespace>::new();
-          let mut xml_other_attrs =
-            Vec::<(std::boxed::Box<str>, std::boxed::Box<str>)>::new();
+          let mut xml_other_attrs = Vec::<crate::common::XmlOtherAttr>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -3775,8 +3771,7 @@ fn expand_named_struct(
           }
         },
         (false, true) => quote! {
-          let mut xml_other_attrs =
-            Vec::<(std::boxed::Box<str>, std::boxed::Box<str>)>::new();
+          let mut xml_other_attrs = Vec::<crate::common::XmlOtherAttr>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -5928,8 +5923,8 @@ fn expand_named_struct(
   };
   let xml_other_attrs_write_tokens = if has_xml_other_attrs_field {
     quote! {
-      for (name, value) in &self.xml_other_attrs {
-        crate::common::write_attr_value_str(writer, name.as_ref(), value.as_ref())?;
+      for attr in &self.xml_other_attrs {
+        attr.write(writer)?;
       }
     }
   } else {

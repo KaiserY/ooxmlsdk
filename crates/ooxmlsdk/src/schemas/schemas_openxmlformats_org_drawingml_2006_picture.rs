@@ -9,7 +9,6 @@
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,

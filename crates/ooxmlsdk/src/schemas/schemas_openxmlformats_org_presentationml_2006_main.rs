@@ -906,7 +906,6 @@ pub struct BackgroundProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/p:bgRef")]
 pub struct BackgroundStyleReference {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
@@ -937,7 +936,6 @@ pub struct CommentPropertiesExtension {
 pub struct CommentAuthorList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Comment Author.
   #[sdk(child(qname = "p:CT_CommentAuthor/p:cmAuthor"))]
   pub comment_author: Vec<CommentAuthor>,
@@ -948,7 +946,6 @@ pub struct CommentAuthorList {
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Comment.
   #[sdk(child(qname = "p:CT_Comment/p:cm"))]
   pub comment: Vec<Comment>,
@@ -996,7 +993,6 @@ pub struct OleObject {
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
   pub server_zoom: Option<crate::simple_type::DrawingmlPercentageValue>,
@@ -1083,7 +1079,6 @@ pub struct Presentation {
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:CT_HtmlPublishProperties/p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
@@ -1109,7 +1104,6 @@ pub struct PresentationProperties {
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1142,7 +1136,6 @@ pub struct Slide {
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1188,7 +1181,6 @@ pub struct SlideLayout {
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
@@ -1224,7 +1216,6 @@ pub struct SlideMaster {
 pub struct HandoutMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1244,7 +1235,6 @@ pub struct HandoutMaster {
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1267,7 +1257,6 @@ pub struct NotesMaster {
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1290,7 +1279,6 @@ pub struct NotesSlide {
 pub struct SlideSyncProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Server's Slide File ID
   #[sdk(attr(qname = ":serverSldId"))]
   pub server_slide_id: crate::simple_type::StringValue,
@@ -1310,7 +1298,6 @@ pub struct SlideSyncProperties {
 pub struct TagList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Programmable Extensibility Tag.
   #[sdk(child(qname = "p:CT_StringTag/p:tag"))]
   pub tag: Vec<Tag>,
@@ -1321,7 +1308,6 @@ pub struct TagList {
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]
   #[sdk(string_format(kind = "token"))]
@@ -1439,7 +1425,6 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_Empty/p:sldTgt",
     qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
@@ -1514,7 +1499,6 @@ pub struct EndSync {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Parallel TimeNode
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -1523,7 +1507,6 @@ pub struct ParallelTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeSequence/p:seq")]
 pub struct SequenceTimeNode {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Concurrent
   #[sdk(attr(qname = ":concurrent"))]
   pub concurrent: Option<crate::simple_type::BooleanValue>,
@@ -1549,7 +1532,6 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
@@ -1558,7 +1540,6 @@ pub struct ExclusiveTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateBehavior/p:anim")]
 pub struct Animate {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// by
   #[sdk(attr(qname = ":by"))]
   pub by: Option<crate::simple_type::StringValue>,
@@ -1644,7 +1625,6 @@ pub struct AnimateEffect {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion")]
 pub struct AnimateMotion {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// origin
   #[sdk(attr(qname = ":origin"))]
   #[sdk(string_format(kind = "token"))]
@@ -1693,7 +1673,6 @@ pub struct AnimateMotion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateRotationBehavior/p:animRot")]
 pub struct AnimateRotation {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// by
   #[sdk(attr(qname = ":by"))]
   pub by: Option<crate::simple_type::Int32Value>,
@@ -1722,7 +1701,6 @@ pub struct AnimateRotation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimateScaleBehavior/p:animScale")]
 pub struct AnimateScale {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// zoomContents
   #[sdk(attr(qname = ":zoomContents"))]
   pub zoom_contents: Option<crate::simple_type::BooleanValue>,
@@ -1803,7 +1781,6 @@ pub struct Video {
 #[sdk(qname = "p:CT_TLCommonTimeNodeData/p:cTn")]
 pub struct CommonTimeNode {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,
@@ -1991,7 +1968,6 @@ pub struct StringVariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:clrVal")]
 pub struct ColorValue {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2006,7 +1982,6 @@ pub struct ColorValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:penClr")]
 pub struct PenColor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2077,7 +2052,6 @@ pub struct HslColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonBehaviorData/p:cBhvr")]
 pub struct CommonBehavior {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Additive
   #[sdk(attr(qname = ":additive"))]
   #[sdk(string_format(kind = "token"))]
@@ -2154,7 +2128,6 @@ pub struct VariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode")]
 pub struct CommonMediaNode {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Volume
   #[sdk(attr(qname = ":vol"))]
   #[sdk(number_range(range = 0..= 100000))]
@@ -2359,7 +2332,6 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2374,7 +2346,6 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3499,7 +3470,6 @@ pub struct NotesSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideExtension/p:ext")]
 pub struct SlideExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3516,7 +3486,6 @@ pub struct SlideExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommonSlideDataExtension/p:ext")]
 pub struct CommonSlideDataExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3528,7 +3497,6 @@ pub struct CommonSlideDataExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ShowPropertiesExtension/p:ext")]
 pub struct ShowPropertiesExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3589,7 +3557,6 @@ pub struct OleObjectLink {
 #[sdk(qname = "p:CT_SlideTransition/p:transition")]
 pub struct Transition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// spd
   #[sdk(attr(qname = ":spd"))]
   #[sdk(string_format(kind = "token"))]
@@ -3697,7 +3664,6 @@ pub struct Background {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:spTree")]
 pub struct ShapeTree {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -3722,7 +3688,6 @@ pub struct ShapeTree {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:grpSp")]
 pub struct GroupShape {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
@@ -3923,7 +3888,6 @@ pub struct SubShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentAuthorExtension/p:ext")]
 pub struct CommentAuthorExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3935,7 +3899,6 @@ pub struct CommentAuthorExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CommentExtension/p:ext")]
 pub struct CommentExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3947,7 +3910,6 @@ pub struct CommentExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutExtension/p:ext")]
 pub struct SlideLayoutExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3959,7 +3921,6 @@ pub struct SlideLayoutExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterExtension/p:ext")]
 pub struct SlideMasterExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3971,7 +3932,6 @@ pub struct SlideMasterExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_HandoutMasterExtension/p:ext")]
 pub struct HandoutMasterExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3983,7 +3943,6 @@ pub struct HandoutMasterExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_NotesMasterExtension/p:ext")]
 pub struct NotesMasterExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4030,7 +3989,6 @@ pub struct ApplicationNonVisualDrawingPropertiesExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ApplicationNonVisualDrawingPropsExtension/p:ext")]
 pub struct ApplicationNonVisualDrawingPropertiesExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4064,7 +4022,6 @@ pub struct Iterate {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:childTnLst")]
 pub struct ChildTimeNodeList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
     qname = "p:CT_TLTimeNodeSequence/p:seq",
@@ -4086,7 +4043,6 @@ pub struct ChildTimeNodeList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:subTnLst")]
 pub struct SubTimeNodeList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
     qname = "p:CT_TLTimeNodeSequence/p:seq",
@@ -4277,7 +4233,6 @@ pub struct Kinsoku {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ModifyVerifier/p:modifyVerifier")]
 pub struct ModificationVerifier {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Cryptographic Provider Type
   #[sdk(attr(qname = ":cryptProviderType"))]
   pub cryptographic_provider_type: CryptProviderValues,
@@ -4339,7 +4294,6 @@ pub struct PresentationExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationExtension/p:ext")]
 pub struct PresentationExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4478,7 +4432,6 @@ pub struct ShowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMRU/p:clrMru")]
 pub struct ColorMostRecentlyUsed {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4501,7 +4454,6 @@ pub struct PresentationPropertiesExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PresentationPropertiesExtension/p:ext")]
 pub struct PresentationPropertiesExtension {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4539,7 +4491,7 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutExtensionList/p:extLst")]
 pub struct SlideLayoutExtensionList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the SlideLayoutExtension Class.
   #[sdk(child(qname = "p:CT_SlideLayoutExtension/p:ext"))]
   pub slide_layout_extension: Vec<SlideLayoutExtension>,
@@ -4573,7 +4525,7 @@ pub struct TextStyles {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterExtensionList/p:extLst")]
 pub struct SlideMasterExtensionList {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the SlideMasterExtension Class.
   #[sdk(child(qname = "p:CT_SlideMasterExtension/p:ext"))]
   pub slide_master_extension: Vec<SlideMasterExtension>,

@@ -21,6 +21,7 @@ pub enum PersistenceValues {
 #[sdk(qname = "ax:CT_Ocx/ax:ocx")]
 pub struct ActiveXControlData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// classid
   #[sdk(attr(qname = "ax:classid"))]
   pub active_x_control_class_id: crate::simple_type::StringValue,

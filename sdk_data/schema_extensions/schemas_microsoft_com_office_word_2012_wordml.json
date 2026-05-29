@@ -1,0 +1,32 @@
+{
+  "Types": [
+    {
+      "ClassName": "CommentsEx",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "People",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Appearance",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CommentEx",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PersistentDocumentId",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Person",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PresenceInfo",
+      "HaveXmlOtherAttrs": true
+    }
+  ]
+}

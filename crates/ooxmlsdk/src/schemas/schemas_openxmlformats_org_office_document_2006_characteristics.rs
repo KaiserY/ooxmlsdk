@@ -24,7 +24,6 @@ pub enum RelationValues {
 pub struct AdditionalCharacteristicsInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Single Characteristic.
   #[sdk(child(qname = "ac:CT_Characteristic/ac:characteristic"))]
   pub characteristic: Vec<Characteristic>,

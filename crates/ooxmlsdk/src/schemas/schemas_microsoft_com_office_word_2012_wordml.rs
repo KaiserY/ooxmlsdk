@@ -61,6 +61,7 @@ pub struct DataBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_SdtAppearance/w15:appearance")]
 pub struct Appearance {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(office2013, qname = "w15:val"))]
   pub val: Option<SdtAppearance>,
@@ -71,7 +72,7 @@ pub struct Appearance {
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the CommentEx Class.
   #[sdk(child(office2013, qname = "w15:CT_CommentEx/w15:commentEx"))]
   pub comment_ex: Vec<CommentEx>,
@@ -82,7 +83,7 @@ pub struct CommentsEx {
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the Person Class.
   #[sdk(child(office2013, qname = "w15:CT_Person/w15:person"))]
   pub person: Vec<Person>,
@@ -142,6 +143,7 @@ pub struct DoNotAllowInsertDeleteSection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_Guid/w15:docId")]
 pub struct PersistentDocumentId {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
   #[sdk(attr(office2013, qname = "w15:val"))]
   #[sdk(pattern(
@@ -164,6 +166,7 @@ pub struct FootnoteColumns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_CommentEx/w15:commentEx")]
 pub struct CommentEx {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// paraId
   #[sdk(attr(office2013, qname = "w15:paraId"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]
@@ -180,6 +183,7 @@ pub struct CommentEx {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_Person/w15:person")]
 pub struct Person {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
   #[sdk(attr(office2013, qname = "w15:author"))]
   pub author: crate::simple_type::StringValue,
@@ -191,6 +195,7 @@ pub struct Person {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_PresenceInfo/w15:presenceInfo")]
 pub struct PresenceInfo {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// providerId
   #[sdk(attr(office2013, qname = "w15:providerId"))]
   pub w15_provider_id: crate::simple_type::StringValue,

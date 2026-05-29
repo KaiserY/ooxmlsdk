@@ -54,7 +54,8 @@
     },
     {
       "ClassName": "Comment",
-      "HaveDirectXmlOtherChildren": true
+      "HaveDirectXmlOtherChildren": true,
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "ConditionalFormattingRuleExtension",
@@ -161,7 +162,8 @@
     },
     {
       "ClassName": "SharedStringItem",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "Sheet",
@@ -180,6 +182,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "Stylesheet",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "TableExtension",
       "HaveXmlnsFields": true
     },
@@ -189,6 +195,42 @@
     },
     {
       "ClassName": "TableStyle",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Comments",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Connections",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ExternalLink",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Headers",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PivotCacheDefinition",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PivotCacheRecords",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PivotTableDefinition",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Table",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Users",
       "HaveXmlOtherAttrs": true
     },
     {
@@ -202,6 +244,7 @@
     },
     {
       "ClassName": "Workbook",
+      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -214,6 +257,7 @@
     },
     {
       "ClassName": "Worksheet",
+      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -223,6 +267,46 @@
     {
       "ClassName": "WorksheetExtensionList",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "AutoFilter",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CellStyle",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "DataValidation",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Fonts",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Hyperlink",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Row",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "SheetFormatProperties",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "TableColumn",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Text",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "WorkbookView",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

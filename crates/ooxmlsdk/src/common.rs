@@ -183,6 +183,86 @@ impl XmlNamespace {
   }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct XmlOtherAttr(Box<[u8]>);
+
+impl XmlOtherAttr {
+  #[inline]
+  pub fn new_raw(name: impl AsRef<[u8]>, raw_value: impl AsRef<[u8]>) -> Self {
+    let name = name.as_ref();
+    let raw_value = raw_value.as_ref();
+    let mut attr = Vec::with_capacity(name.len() + 1 + raw_value.len());
+    attr.extend_from_slice(name);
+    attr.push(0);
+    attr.extend_from_slice(raw_value);
+    Self(attr.into_boxed_slice())
+  }
+
+  #[inline]
+  pub fn name_bytes(&self) -> &[u8] {
+    self.split_bytes().0
+  }
+
+  #[inline]
+  pub fn raw_value_bytes(&self) -> &[u8] {
+    self.split_bytes().1
+  }
+
+  #[inline]
+  pub fn name(&self) -> &str {
+    std::str::from_utf8(self.name_bytes()).unwrap_or("")
+  }
+
+  #[inline]
+  pub fn raw_value(&self) -> &str {
+    std::str::from_utf8(self.raw_value_bytes()).unwrap_or("")
+  }
+
+  #[inline]
+  pub(crate) fn write<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    let (name, raw_value) = self.split_bytes();
+    writer.write_all(b" ")?;
+    writer.write_all(name)?;
+    write_raw_attr_value(writer, raw_value)
+  }
+
+  #[inline]
+  fn split_bytes(&self) -> (&[u8], &[u8]) {
+    if let Some(separator) = self.0.iter().position(|byte| *byte == 0) {
+      (&self.0[..separator], &self.0[separator + 1..])
+    } else {
+      (self.0.as_ref(), &[])
+    }
+  }
+}
+
+#[inline]
+fn write_raw_attr_value<W: std::io::Write>(
+  writer: &mut W,
+  raw_value: &[u8],
+) -> std::io::Result<()> {
+  if !raw_value.contains(&b'"') {
+    writer.write_all(b"=\"")?;
+    writer.write_all(raw_value)?;
+    writer.write_all(b"\"")
+  } else if !raw_value.contains(&b'\'') {
+    writer.write_all(b"='")?;
+    writer.write_all(raw_value)?;
+    writer.write_all(b"'")
+  } else {
+    writer.write_all(b"=\"")?;
+    let mut chunks = raw_value.split(|byte| *byte == b'"');
+    if let Some(first) = chunks.next() {
+      writer.write_all(first)?;
+    }
+    for chunk in chunks {
+      writer.write_all(b"&quot;")?;
+      writer.write_all(chunk)?;
+    }
+    writer.write_all(b"\"")
+  }
+}
+
 #[inline]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,

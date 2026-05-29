@@ -711,7 +711,6 @@ pub struct SourceConnection {
 pub struct DatastoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
@@ -725,7 +724,6 @@ pub struct DatastoreItem {
 pub struct FormControlProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// objectType
   #[sdk(attr(office2010, qname = ":objectType"))]
   #[sdk(string_format(kind = "token"))]
@@ -837,7 +835,6 @@ pub struct FormControlProperties {
 pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Slicer Class.
   #[sdk(child(office2010, qname = "x14:CT_Slicer/x14:slicer"))]
   pub slicer: Vec<Slicer>,
@@ -851,7 +848,6 @@ pub struct Slicers {
 pub struct SlicerCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -1706,7 +1702,7 @@ pub struct DifferentialType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_Cfvo/x14:cfvo")]
 pub struct ConditionalFormattingValueObject {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
   pub r#type: ConditionalFormattingValueObjectTypeValues,

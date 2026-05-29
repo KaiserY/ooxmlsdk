@@ -10,7 +10,6 @@
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the NamedSheetView Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView"))]
   pub named_sheet_view: Vec<NamedSheetView>,

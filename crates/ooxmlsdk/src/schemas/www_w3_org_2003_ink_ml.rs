@@ -368,7 +368,6 @@ pub enum TableInterpolationValues {
 pub struct Ink {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// documentID
   #[sdk(attr(qname = ":documentID"))]
   #[sdk(string_format(kind = "uri"))]

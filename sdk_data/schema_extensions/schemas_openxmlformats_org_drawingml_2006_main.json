@@ -102,7 +102,8 @@
     },
     {
       "ClassName": "RgbColorModelHex",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "ShapeLocks",
@@ -121,6 +122,10 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
+      "ClassName": "Theme",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "Transform2D",
       "HaveXmlnsFields": true
     },
@@ -131,6 +136,10 @@
     {
       "ClassName": "TransformGroup",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "TableStyleEntry",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

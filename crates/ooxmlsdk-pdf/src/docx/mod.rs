@@ -13777,7 +13777,6 @@ mod tests {
           run_choice: vec![w::RunChoice::Text(text("漢"))],
           ..Default::default()
         }))],
-        ..Default::default()
       }),
       ..Default::default()
     };
@@ -13923,7 +13922,6 @@ mod tests {
                     ..Default::default()
                   },
                 ))],
-                ..Default::default()
               },
             ))),
             ..Default::default()
@@ -14078,7 +14076,6 @@ mod tests {
         w::PageOrientationValues::Landscape,
         Some(w::SectionMarkValues::Continuous),
       ))),
-      ..Default::default()
     };
     let mut numbering = NumberingCatalog::default();
 

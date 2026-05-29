@@ -9,6 +9,7 @@
 #[sdk(qname = "ct:CT_ContentTypeSchema/ct:contentTypeSchema")]
 pub struct ContentTypeSchema {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// _
   #[sdk(attr(qname = "ct:_"))]
   pub under_score: Option<crate::simple_type::StringValue>,

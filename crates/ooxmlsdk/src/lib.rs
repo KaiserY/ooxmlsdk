@@ -1,7 +1,7 @@
 #![cfg_attr(doc, recursion_limit = "512")]
 
 pub mod common;
-pub(crate) mod namespaces;
+pub mod namespaces;
 #[cfg(feature = "parts")]
 pub mod parts;
 pub mod schemas;

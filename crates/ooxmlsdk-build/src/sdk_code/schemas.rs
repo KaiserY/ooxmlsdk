@@ -3538,6 +3538,21 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
     });
   }
 
+  if support.xmlns_known_capacity > 0 {
+    let capacity = syn::Index::from(support.xmlns_known_capacity);
+    fields.push(quote! {
+      pub xmlns_known:
+        smallvec::SmallVec<[crate::namespaces::XmlKnownNamespaceDecl; #capacity]>,
+    });
+  }
+
+  if support.xmlns_custom_capacity > 0 {
+    let capacity = syn::Index::from(support.xmlns_custom_capacity);
+    fields.push(quote! {
+      pub xmlns_custom: smallvec::SmallVec<[std::boxed::Box<str>; #capacity]>,
+    });
+  }
+
   if support.xml_header != crate::sdk_code::codegen_ir::XmlHeaderMode::None {
     fields.push(quote! {
       pub xml_header: crate::common::XmlHeaderType,

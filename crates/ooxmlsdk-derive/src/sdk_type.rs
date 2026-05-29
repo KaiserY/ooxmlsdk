@@ -3264,6 +3264,8 @@ fn expand_named_struct(
   let mut any_fields = Vec::new();
   let mut text_field = None;
   let mut xmlns_fields = Vec::new();
+  let mut xmlns_known_field = None;
+  let mut xmlns_custom_field = None;
   let mut xml_header_field = None;
   let mut xml_other_attrs_field = None;
   let mut xml_other_children_field = None;
@@ -3277,6 +3279,14 @@ fn expand_named_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     if is_xmlns_field(field_ident) {
       xmlns_fields.push(field_ident.clone());
+      continue;
+    }
+    if field_ident == "xmlns_known" {
+      xmlns_known_field = Some(field_ident.clone());
+      continue;
+    }
+    if field_ident == "xmlns_custom" {
+      xmlns_custom_field = Some(field_ident.clone());
       continue;
     }
     if field_ident == "xml_header" {
@@ -5945,6 +5955,20 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let xmlns_known_init_tokens = if let Some(ident) = &xmlns_known_field {
+    quote! {
+      #ident: std::default::Default::default(),
+    }
+  } else {
+    quote! {}
+  };
+  let xmlns_custom_init_tokens = if let Some(ident) = &xmlns_custom_field {
+    quote! {
+      #ident: std::default::Default::default(),
+    }
+  } else {
+    quote! {}
+  };
   let xml_other_attrs_init_tokens = if has_xml_other_attrs_field {
     quote! {
       xml_other_attrs,
@@ -6245,6 +6269,8 @@ fn expand_named_struct(
           #text_finish_tokens
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
+          #xmlns_known_init_tokens
+          #xmlns_custom_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
           #xml_other_children_init_tokens
@@ -6277,6 +6303,8 @@ fn expand_named_struct(
           #text_finish_tokens
           #( #attr_finish_tokens, )*
           #special_namespace_init_tokens
+          #xmlns_known_init_tokens
+          #xmlns_custom_init_tokens
           #xml_header_init_tokens
           #xml_other_attrs_init_tokens
           #xml_other_children_init_tokens

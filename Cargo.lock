@@ -1216,6 +1216,7 @@ dependencies = [
  "ooxmlsdk-derive",
  "quick-xml",
  "regex",
+ "smallvec",
  "thiserror",
  "zip",
 ]

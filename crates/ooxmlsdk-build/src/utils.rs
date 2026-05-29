@@ -8,6 +8,13 @@ pub fn escape_snake_case(name: String) -> String {
   }
 }
 
+pub fn is_default<T>(value: &T) -> bool
+where
+  T: Default + PartialEq,
+{
+  value == &T::default()
+}
+
 pub fn escape_upper_camel_case(name: String) -> String {
   if name
     .chars()

@@ -236,6 +236,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               xml_header,
               is_abstract: ty.is_abstract,
               have_xmlns_fields,
+              xmlns_known_capacity: 0,
+              xmlns_custom_capacity: 0,
               have_xml_other_attrs,
               have_xml_other_children,
               have_direct_xml_other_children,

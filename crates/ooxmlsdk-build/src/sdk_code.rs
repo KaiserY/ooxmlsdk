@@ -1,4 +1,4 @@
-use heck::ToSnakeCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde_json::Value;
@@ -17,7 +17,7 @@ use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::Namespace as SdkDataNamespace;
-use crate::utils::escape_snake_case;
+use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 pub mod codegen_ir;
 pub mod codegen_ir_builder;
@@ -362,8 +362,12 @@ fn write_namespaces(
 ) -> Result<()> {
   let mut uri_to_prefix_arms: Vec<syn::Arm> = vec![];
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
+  let mut known_namespace_variants: Vec<TokenStream> = vec![];
+  let mut known_prefix_arms: Vec<syn::Arm> = vec![];
+  let mut known_uri_arms: Vec<syn::Arm> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
+  let mut seen_variants = HashSet::new();
 
   for namespace in sdk_data_namespaces {
     if namespace.prefix.is_empty() || namespace.uri.is_empty() {
@@ -374,6 +378,22 @@ fn write_namespaces(
     let attrs = version_cfg_attrs(&namespace.version);
 
     if seen_uris.insert(uri) {
+      let variant_name = namespace_variant_name(prefix);
+      let variant_ident: Ident = parse_str(&variant_name)?;
+      if seen_variants.insert(variant_name) {
+        known_namespace_variants.push(quote! {
+          #( #attrs )*
+          #variant_ident,
+        });
+        known_prefix_arms.push(parse2(quote! {
+          #( #attrs )*
+          Self::#variant_ident => #prefix,
+        })?);
+        known_uri_arms.push(parse2(quote! {
+          #( #attrs )*
+          Self::#variant_ident => #uri,
+        })?);
+      }
       uri_to_prefix_arms.push(parse2(quote! {
         #( #attrs )*
         #uri => Some(#prefix),
@@ -422,7 +442,74 @@ fn write_namespaces(
   } else {
     quote! {}
   };
+  let known_namespace_tokens = if include_prefix_by_uri {
+    quote! {
+      #[repr(u16)]
+      #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+      pub enum XmlKnownNamespace {
+        #( #known_namespace_variants )*
+      }
+
+      impl Default for XmlKnownNamespace {
+        #[inline]
+        fn default() -> Self {
+          Self::A
+        }
+      }
+
+      impl XmlKnownNamespace {
+        #[inline]
+        pub const fn prefix(self) -> &'static str {
+          match self {
+            #( #known_prefix_arms )*
+          }
+        }
+
+        #[inline]
+        pub const fn uri(self) -> &'static str {
+          match self {
+            #( #known_uri_arms )*
+          }
+        }
+      }
+
+      #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+      pub struct XmlKnownNamespaceDecl {
+        pub namespace: XmlKnownNamespace,
+        pub flags: u8,
+      }
+
+      impl XmlKnownNamespaceDecl {
+        pub const DEFAULT_NAMESPACE: u8 = 1;
+
+        #[inline]
+        pub const fn new(namespace: XmlKnownNamespace) -> Self {
+          Self {
+            namespace,
+            flags: 0,
+          }
+        }
+
+        #[inline]
+        pub const fn new_default(namespace: XmlKnownNamespace) -> Self {
+          Self {
+            namespace,
+            flags: Self::DEFAULT_NAMESPACE,
+          }
+        }
+
+        #[inline]
+        pub const fn is_default(self) -> bool {
+          self.flags & Self::DEFAULT_NAMESPACE != 0
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
   let token_stream: TokenStream = quote! {
+    #known_namespace_tokens
+
     #prefix_by_uri_tokens
     #uri_by_prefix_tokens
     #default_namespace_style_tokens
@@ -430,6 +517,14 @@ fn write_namespaces(
 
   write_generated_module(&out_dir_path.join("namespaces.rs"), token_stream)?;
   Ok(())
+}
+
+fn namespace_variant_name(prefix: &str) -> String {
+  let mut name = prefix.to_upper_camel_case();
+  if name.is_empty() {
+    name.push_str("Default");
+  }
+  escape_upper_camel_case(name)
 }
 
 fn write_generated_module(path: &Path, token_stream: TokenStream) -> Result<()> {

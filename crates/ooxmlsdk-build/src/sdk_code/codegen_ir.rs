@@ -113,6 +113,10 @@ pub enum ContentModelDecl {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SystemSupportDecl {
   pub have_xmlns_fields: bool,
+  #[serde(default, skip_serializing_if = "crate::utils::is_default")]
+  pub xmlns_known_capacity: usize,
+  #[serde(default, skip_serializing_if = "crate::utils::is_default")]
+  pub xmlns_custom_capacity: usize,
   pub xml_header: XmlHeaderMode,
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
@@ -121,7 +125,11 @@ pub struct SystemSupportDecl {
 
 impl SystemSupportDecl {
   pub fn has_extra_support_fields(&self) -> bool {
-    self.have_xmlns_fields || self.have_xml_other_attrs || self.have_xml_other_children
+    self.have_xmlns_fields
+      || self.xmlns_known_capacity > 0
+      || self.xmlns_custom_capacity > 0
+      || self.have_xml_other_attrs
+      || self.have_xml_other_children
   }
 }
 
@@ -332,6 +340,8 @@ mod tests {
         xml_content: None,
         support: SystemSupportDecl {
           have_xmlns_fields: true,
+          xmlns_known_capacity: 0,
+          xmlns_custom_capacity: 0,
           xml_header: XmlHeaderMode::Standalone,
           have_xml_other_attrs: true,
           have_xml_other_children: true,

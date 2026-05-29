@@ -48,6 +48,8 @@ pub struct SchemaTypeExtension {
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_base_class: String,
   pub have_xmlns_fields: Option<bool>,
+  pub xmlns_known_capacity: Option<usize>,
+  pub xmlns_custom_capacity: Option<usize>,
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
@@ -202,6 +204,30 @@ pub fn apply_schema_extensions(
 
       if let Some(have_xmlns_fields) = extension.have_xmlns_fields {
         schema_type.have_xmlns_fields = have_xmlns_fields;
+      }
+      if let Some(xmlns_known_capacity) = extension.xmlns_known_capacity {
+        if xmlns_known_capacity > 8 {
+          return Err(
+            format!(
+              "schema extension type {}.{} XmlnsKnownCapacity {xmlns_known_capacity} exceeds 8",
+              module_name, extension.class_name
+            )
+            .into(),
+          );
+        }
+        schema_type.xmlns_known_capacity = xmlns_known_capacity;
+      }
+      if let Some(xmlns_custom_capacity) = extension.xmlns_custom_capacity {
+        if xmlns_custom_capacity > 4 {
+          return Err(
+            format!(
+              "schema extension type {}.{} XmlnsCustomCapacity {xmlns_custom_capacity} exceeds 4",
+              module_name, extension.class_name
+            )
+            .into(),
+          );
+        }
+        schema_type.xmlns_custom_capacity = xmlns_custom_capacity;
       }
       if !extension.override_name.is_empty() {
         schema_type.name = extension.override_name.clone();

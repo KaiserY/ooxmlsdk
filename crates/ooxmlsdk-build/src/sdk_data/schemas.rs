@@ -21,6 +21,7 @@ pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
       prefix: namespace.prefix.clone(),
       uri: namespace.uri.clone(),
       version: namespace.version.clone(),
+      source: String::new(),
     })
     .collect();
 

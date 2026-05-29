@@ -78,6 +78,124 @@ impl XmlNamespaceDecl {
   }
 }
 
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct XmlPrefix(smallvec::SmallVec<[u8; 8]>);
+
+impl XmlPrefix {
+  #[inline]
+  pub fn new(prefix: impl AsRef<[u8]>) -> Self {
+    Self(smallvec::SmallVec::from_slice(prefix.as_ref()))
+  }
+
+  #[inline]
+  pub fn as_bytes(&self) -> &[u8] {
+    self.0.as_slice()
+  }
+
+  #[inline]
+  pub fn as_str(&self) -> Option<&str> {
+    std::str::from_utf8(self.as_bytes()).ok()
+  }
+
+  #[inline]
+  pub fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
+}
+
+impl AsRef<[u8]> for XmlPrefix {
+  #[inline]
+  fn as_ref(&self) -> &[u8] {
+    self.as_bytes()
+  }
+}
+
+impl From<&str> for XmlPrefix {
+  #[inline]
+  fn from(value: &str) -> Self {
+    Self::new(value.as_bytes())
+  }
+}
+
+impl From<String> for XmlPrefix {
+  #[inline]
+  fn from(value: String) -> Self {
+    Self::new(value.as_bytes())
+  }
+}
+
+impl From<Box<str>> for XmlPrefix {
+  #[inline]
+  fn from(value: Box<str>) -> Self {
+    Self::new(value.as_bytes())
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum XmlNamespaceUri {
+  Known(crate::namespaces::XmlKnownNamespace),
+  Custom(Box<str>),
+}
+
+impl Default for XmlNamespaceUri {
+  #[inline]
+  fn default() -> Self {
+    Self::Custom(Box::from(""))
+  }
+}
+
+impl XmlNamespaceUri {
+  #[inline]
+  pub fn new(uri: impl AsRef<str>) -> Self {
+    Self::from_uri(uri.as_ref())
+  }
+
+  #[inline]
+  pub fn from_uri(uri: &str) -> Self {
+    if let Some(namespace) = crate::namespaces::XmlKnownNamespace::from_uri(uri) {
+      Self::Known(namespace)
+    } else {
+      Self::Custom(uri.into())
+    }
+  }
+
+  #[inline]
+  pub fn as_str(&self) -> &str {
+    match self {
+      Self::Known(namespace) => namespace.uri(),
+      Self::Custom(uri) => uri.as_ref(),
+    }
+  }
+}
+
+impl AsRef<str> for XmlNamespaceUri {
+  #[inline]
+  fn as_ref(&self) -> &str {
+    self.as_str()
+  }
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct XmlNamespace {
+  pub prefix: XmlPrefix,
+  pub uri: XmlNamespaceUri,
+}
+
+impl XmlNamespace {
+  #[inline]
+  pub fn new(prefix: impl AsRef<[u8]>, uri: impl AsRef<str>) -> Self {
+    Self {
+      prefix: XmlPrefix::new(prefix),
+      uri: XmlNamespaceUri::new(uri),
+    }
+  }
+
+  #[inline]
+  pub fn is_default(&self) -> bool {
+    self.prefix.is_empty()
+  }
+}
+
 #[inline]
 pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) -> Option<&'a str> {
   declarations

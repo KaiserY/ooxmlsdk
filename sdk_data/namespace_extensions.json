@@ -1,0 +1,244 @@
+{
+  "Namespaces": [
+    {
+      "Prefix": "c16r2",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2015/06/chart",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx1",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx2",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx3",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx4",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx5",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx6",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx7",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "cx8",
+      "Uri": "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "dcmitype",
+      "Uri": "http://purl.org/dc/dcmitype/",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "dms",
+      "Uri": "http://schemas.microsoft.com/office/2006/documentManagement/types",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "loext",
+      "Uri": "http://schemas.libreoffice.org/",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "ma14",
+      "Uri": "http://schemas.microsoft.com/office/mac/drawingml/2011/main",
+      "Version": "Office2013",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "mo",
+      "Uri": "http://schemas.microsoft.com/office/mac/office/2008/main",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "mv",
+      "Uri": "urn:schemas-microsoft-com:mac:vml",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "mx",
+      "Uri": "http://schemas.microsoft.com/office/mac/excel/2008/main",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "oa",
+      "Uri": "urn:schemas-microsoft-com:office:activation",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "odoc",
+      "Uri": "http://schemas.microsoft.com/internal/obd",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "outs",
+      "Uri": "http://schemas.microsoft.com/office/2009/outspace/metadata",
+      "Version": "Office2010",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "p1510",
+      "Uri": "http://schemas.microsoft.com/office/powerpoint/2015/10/main",
+      "Version": "Office2016",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "spe",
+      "Uri": "http://schemas.microsoft.com/sharepoint/events",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "wpi",
+      "Uri": "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+      "Version": "Office2010",
+      "Source": "test-data xmlns scan"
+    },
+    {
+      "Prefix": "xsi",
+      "Uri": "http://www.w3.org/2001/XMLSchema-instance",
+      "Version": "",
+      "Source": "test-data xmlns scan"
+    }
+  ],
+  "Aliases": [
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/chart",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/chartDrawing",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/compatibility",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/compatibility",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/diagram",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/lockedCanvas",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/main",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/main",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/picture",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/picture",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+      "CanonicalUri": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/bibliography",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/bibliography",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/customProperties",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/customXml",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/customXml",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/extendedProperties",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/math",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/relationships",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/presentationml/main",
+      "CanonicalUri": "http://schemas.openxmlformats.org/presentationml/2006/main",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/schemaLibrary/main",
+      "CanonicalUri": "http://schemas.openxmlformats.org/schemaLibrary/2006/main",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/spreadsheetml/main",
+      "CanonicalUri": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/wordprocessingml/main",
+      "CanonicalUri": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+      "Source": "Strict OOXML"
+    }
+  ]
+}

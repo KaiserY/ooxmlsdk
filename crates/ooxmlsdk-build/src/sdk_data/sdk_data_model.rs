@@ -14,6 +14,22 @@ pub struct Namespace {
   pub prefix: String,
   pub uri: String,
   pub version: String,
+  pub source: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct NamespaceExtensions {
+  pub namespaces: Vec<Namespace>,
+  pub aliases: Vec<NamespaceAlias>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct NamespaceAlias {
+  pub uri: String,
+  pub canonical_uri: String,
+  pub source: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

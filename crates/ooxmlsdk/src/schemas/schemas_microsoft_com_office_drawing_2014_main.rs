@@ -6,55 +6,55 @@
 
 /// Defines the CreationId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:creationId")]
+#[sdk(qname = "a16:creationId")]
 pub struct CreationId {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PredecessorDrawingElementReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:predDERef")]
+#[sdk(qname = "a16:predDERef")]
 pub struct PredecessorDrawingElementReference {
   /// pred
-  #[sdk(attr(office2016, qname = ":pred"))]
+  #[sdk(attr(qname = ":pred"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub pred: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ConnectableReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:cxnDERefs")]
+#[sdk(qname = "a16:cxnDERefs")]
 pub struct ConnectableReferences {
   /// st
-  #[sdk(attr(office2016, qname = ":st"))]
+  #[sdk(attr(qname = ":st"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub st: Option<crate::simple_type::StringValue>,
   /// end
-  #[sdk(attr(office2016, qname = ":end"))]
+  #[sdk(attr(qname = ":end"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub end: Option<crate::simple_type::StringValue>,
 }
 /// Defines the RowIdIdentifier Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:rowId")]
+#[sdk(qname = "a16:rowId")]
 pub struct RowIdIdentifier {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the ColIdIdentifier Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:colId")]
+#[sdk(qname = "a16:colId")]
 pub struct ColIdIdentifier {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }

@@ -16,7 +16,7 @@ pub enum SdtAppearance {
 }
 /// Defines the Color Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:color")]
+#[sdk(qname = "w15:color")]
 pub struct Color {
   /// Run Content Color
   #[sdk(attr(qname = "w:val"))]
@@ -45,7 +45,7 @@ pub struct Color {
 }
 /// Defines the DataBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:dataBinding")]
+#[sdk(qname = "w15:dataBinding")]
 pub struct DataBinding {
   /// XML Namespace Prefix Mappings
   #[sdk(attr(qname = "w:prefixMappings"))]
@@ -59,49 +59,49 @@ pub struct DataBinding {
 }
 /// Defines the Appearance Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:appearance")]
+#[sdk(qname = "w15:appearance")]
 pub struct Appearance {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
-  #[sdk(attr(office2013, qname = "w15:val"))]
+  #[sdk(attr(qname = "w15:val"))]
   pub val: Option<SdtAppearance>,
 }
 /// Defines the CommentsEx Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:commentsEx")]
+#[sdk(qname = "w15:commentsEx")]
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the CommentEx Class.
-  #[sdk(child(office2013, qname = "w15:commentEx"))]
+  #[sdk(child(qname = "w15:commentEx"))]
   pub comment_ex: Vec<CommentEx>,
 }
 /// Defines the People Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:people")]
+#[sdk(qname = "w15:people")]
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the Person Class.
-  #[sdk(child(office2013, qname = "w15:person"))]
+  #[sdk(child(qname = "w15:person"))]
   pub person: Vec<Person>,
 }
 /// Defines the SdtRepeatedSection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:repeatingSection")]
+#[sdk(qname = "w15:repeatingSection")]
 pub struct SdtRepeatedSection {
   /// Defines the SectionTitle Class.
-  #[sdk(child(office2013, qname = "w15:sectionTitle"))]
+  #[sdk(child(qname = "w15:sectionTitle"))]
   pub section_title: Option<SectionTitle>,
   /// Defines the DoNotAllowInsertDeleteSection Class.
-  #[sdk(child(office2013, qname = "w15:doNotAllowInsertDeleteSection"))]
+  #[sdk(child(qname = "w15:doNotAllowInsertDeleteSection"))]
   pub do_not_allow_insert_delete_section: Option<DoNotAllowInsertDeleteSection>,
 }
 /// Defines the ChartTrackingRefBased Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:chartTrackingRefBased")]
+#[sdk(qname = "w15:chartTrackingRefBased")]
 pub struct ChartTrackingRefBased {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -109,7 +109,7 @@ pub struct ChartTrackingRefBased {
 }
 /// Defines the DefaultCollapsed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:collapsed")]
+#[sdk(qname = "w15:collapsed")]
 pub struct DefaultCollapsed {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -117,7 +117,7 @@ pub struct DefaultCollapsed {
 }
 /// Defines the WebExtensionLinked Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:webExtensionLinked")]
+#[sdk(qname = "w15:webExtensionLinked")]
 pub struct WebExtensionLinked {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -125,7 +125,7 @@ pub struct WebExtensionLinked {
 }
 /// Defines the WebExtensionCreated Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:webExtensionCreated")]
+#[sdk(qname = "w15:webExtensionCreated")]
 pub struct WebExtensionCreated {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -133,7 +133,7 @@ pub struct WebExtensionCreated {
 }
 /// Defines the DoNotAllowInsertDeleteSection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:doNotAllowInsertDeleteSection")]
+#[sdk(qname = "w15:doNotAllowInsertDeleteSection")]
 pub struct DoNotAllowInsertDeleteSection {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -141,11 +141,11 @@ pub struct DoNotAllowInsertDeleteSection {
 }
 /// Defines the PersistentDocumentId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:docId")]
+#[sdk(qname = "w15:docId")]
 pub struct PersistentDocumentId {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
-  #[sdk(attr(office2013, qname = "w15:val"))]
+  #[sdk(attr(qname = "w15:val"))]
   #[sdk(pattern(
     source = 1u32,
     union = 0u64,
@@ -156,7 +156,7 @@ pub struct PersistentDocumentId {
 }
 /// Defines the FootnoteColumns Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:footnoteColumns")]
+#[sdk(qname = "w15:footnoteColumns")]
 pub struct FootnoteColumns {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -164,48 +164,48 @@ pub struct FootnoteColumns {
 }
 /// Defines the CommentEx Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:commentEx")]
+#[sdk(qname = "w15:commentEx")]
 pub struct CommentEx {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// paraId
-  #[sdk(attr(office2013, qname = "w15:paraId"))]
+  #[sdk(attr(qname = "w15:paraId"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]
   pub para_id: crate::simple_type::HexBinaryValue,
   /// paraIdParent
-  #[sdk(attr(office2013, qname = "w15:paraIdParent"))]
+  #[sdk(attr(qname = "w15:paraIdParent"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub para_id_parent: Option<crate::simple_type::HexBinaryValue>,
   /// done
-  #[sdk(attr(office2013, qname = "w15:done"))]
+  #[sdk(attr(qname = "w15:done"))]
   pub done: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Person Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:person")]
+#[sdk(qname = "w15:person")]
 pub struct Person {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
-  #[sdk(attr(office2013, qname = "w15:author"))]
+  #[sdk(attr(qname = "w15:author"))]
   pub author: crate::simple_type::StringValue,
   /// Defines the PresenceInfo Class.
-  #[sdk(child(office2013, qname = "w15:presenceInfo"))]
+  #[sdk(child(qname = "w15:presenceInfo"))]
   pub presence_info: Option<PresenceInfo>,
 }
 /// Defines the PresenceInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:presenceInfo")]
+#[sdk(qname = "w15:presenceInfo")]
 pub struct PresenceInfo {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// providerId
-  #[sdk(attr(office2013, qname = "w15:providerId"))]
+  #[sdk(attr(qname = "w15:providerId"))]
   pub w15_provider_id: crate::simple_type::StringValue,
   /// userId
-  #[sdk(attr(office2013, qname = "w15:userId"))]
+  #[sdk(attr(qname = "w15:userId"))]
   pub w15_user_id: crate::simple_type::StringValue,
 }
 /// Defines the SectionTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "w15:sectionTitle")]
+#[sdk(qname = "w15:sectionTitle")]
 pub struct SectionTitle {
   /// String Value
   #[sdk(attr(qname = "w:val"))]

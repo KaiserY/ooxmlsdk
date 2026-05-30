@@ -6,10 +6,10 @@
 
 /// Defines the CompatibilityShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "com14:compatSp")]
+#[sdk(qname = "com14:compatSp")]
 pub struct CompatibilityShape {
   /// spid
-  #[sdk(attr(office2010, qname = ":spid"))]
+  #[sdk(attr(qname = ":spid"))]
   #[sdk(string_format(kind = "token"))]
   pub shape_id: crate::simple_type::StringValue,
 }

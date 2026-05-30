@@ -6,7 +6,7 @@
 
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dgm14:cNvPr")]
+#[sdk(qname = "dgm14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -36,9 +36,9 @@ pub struct NonVisualDrawingProperties {
 }
 /// Defines the RecolorImages Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dgm14:recolorImg")]
+#[sdk(qname = "dgm14:recolorImg")]
 pub struct RecolorImages {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }

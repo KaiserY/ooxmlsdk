@@ -6,31 +6,31 @@
 
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:contentPart")]
+#[sdk(qname = "cdr14:contentPart")]
 pub struct ContentPart {
   /// id
-  #[sdk(attr(office2010, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
   /// bwMode
-  #[sdk(attr(office2010, qname = ":bwMode"))]
+  #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// Defines the NonVisualContentPartProperties Class.
-  #[sdk(child(office2010, qname = "cdr14:nvContentPartPr"))]
+  #[sdk(child(qname = "cdr14:nvContentPartPr"))]
   pub non_visual_content_part_properties: Option<std::boxed::Box<NonVisualContentPartProperties>>,
   /// Defines the ApplicationNonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "cdr14:nvPr"))]
+  #[sdk(child(qname = "cdr14:nvPr"))]
   pub application_non_visual_drawing_properties: Option<ApplicationNonVisualDrawingProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "cdr14:xfrm"))]
+  #[sdk(child(qname = "cdr14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "cdr14:extLst"))]
+  #[sdk(child(qname = "cdr14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:cNvPr")]
+#[sdk(qname = "cdr14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -60,44 +60,44 @@ pub struct NonVisualDrawingProperties {
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:cNvContentPartPr")]
+#[sdk(qname = "cdr14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
-  #[sdk(attr(office2010, qname = ":isComment"))]
+  #[sdk(attr(qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
-  #[sdk(child(office2010, qname = "a14:cpLocks"))]
+  #[sdk(child(qname = "a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a14:extLst"))]
+  #[sdk(child(qname = "a14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the NonVisualContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:nvContentPartPr")]
+#[sdk(qname = "cdr14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "cdr14:cNvPr"))]
+  #[sdk(child(qname = "cdr14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualInkContentPartProperties Class.
-  #[sdk(child(office2010, qname = "cdr14:cNvContentPartPr"))]
+  #[sdk(child(qname = "cdr14:cNvContentPartPr"))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
 }
 /// Defines the ApplicationNonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:nvPr")]
+#[sdk(qname = "cdr14:nvPr")]
 pub struct ApplicationNonVisualDrawingProperties {
   /// macro
-  #[sdk(attr(office2010, qname = ":macro"))]
+  #[sdk(attr(qname = ":macro"))]
   pub r#macro: Option<crate::simple_type::StringValue>,
   /// fPublished
-  #[sdk(attr(office2010, qname = ":fPublished"))]
+  #[sdk(attr(qname = ":fPublished"))]
   pub published: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:xfrm")]
+#[sdk(qname = "cdr14:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -117,7 +117,7 @@ pub struct Transform2D {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:extLst")]
+#[sdk(qname = "cdr14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]

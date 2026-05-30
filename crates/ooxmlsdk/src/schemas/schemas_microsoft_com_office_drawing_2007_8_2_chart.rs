@@ -6,55 +6,55 @@
 
 /// Defines the PivotOptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:pivotOptions")]
+#[sdk(qname = "c14:pivotOptions")]
 pub struct PivotOptions {
   /// Defines the DropZoneFilter Class.
-  #[sdk(child(office2010, qname = "c14:dropZoneFilter"))]
+  #[sdk(child(qname = "c14:dropZoneFilter"))]
   pub drop_zone_filter: Option<DropZoneFilter>,
   /// Defines the DropZoneCategories Class.
-  #[sdk(child(office2010, qname = "c14:dropZoneCategories"))]
+  #[sdk(child(qname = "c14:dropZoneCategories"))]
   pub drop_zone_categories: Option<DropZoneCategories>,
   /// Defines the DropZoneData Class.
-  #[sdk(child(office2010, qname = "c14:dropZoneData"))]
+  #[sdk(child(qname = "c14:dropZoneData"))]
   pub drop_zone_data: Option<DropZoneData>,
   /// Defines the DropZoneSeries Class.
-  #[sdk(child(office2010, qname = "c14:dropZoneSeries"))]
+  #[sdk(child(qname = "c14:dropZoneSeries"))]
   pub drop_zone_series: Option<DropZoneSeries>,
   /// Defines the DropZonesVisible Class.
-  #[sdk(child(office2010, qname = "c14:dropZonesVisible"))]
+  #[sdk(child(qname = "c14:dropZonesVisible"))]
   pub drop_zones_visible: Option<DropZonesVisible>,
 }
 /// Defines the SketchOptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:sketchOptions")]
+#[sdk(qname = "c14:sketchOptions")]
 pub struct SketchOptions {
   /// Defines the InSketchMode Class.
-  #[sdk(child(office2010, qname = "c14:inSketchMode"))]
+  #[sdk(child(qname = "c14:inSketchMode"))]
   pub in_sketch_mode: Option<InSketchMode>,
   /// Defines the ShowSketchButton Class.
-  #[sdk(child(office2010, qname = "c14:showSketchBtn"))]
+  #[sdk(child(qname = "c14:showSketchBtn"))]
   pub show_sketch_button: Option<ShowSketchButton>,
 }
 /// Defines the InvertSolidFillFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:invertSolidFillFmt")]
+#[sdk(qname = "c14:invertSolidFillFmt")]
 pub struct InvertSolidFillFormat {
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2010, qname = "c14:spPr"))]
+  #[sdk(child(qname = "c14:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
 }
 /// Defines the Style Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:style")]
+#[sdk(qname = "c14:style")]
 pub struct Style {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 101..= 148))]
   pub val: crate::simple_type::ByteValue,
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:spPr")]
+#[sdk(qname = "c14:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -103,58 +103,58 @@ pub struct ShapeProperties {
 }
 /// Defines the DropZoneFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:dropZoneFilter")]
+#[sdk(qname = "c14:dropZoneFilter")]
 pub struct DropZoneFilter {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneCategories Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:dropZoneCategories")]
+#[sdk(qname = "c14:dropZoneCategories")]
 pub struct DropZoneCategories {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:dropZoneData")]
+#[sdk(qname = "c14:dropZoneData")]
 pub struct DropZoneData {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:dropZoneSeries")]
+#[sdk(qname = "c14:dropZoneSeries")]
 pub struct DropZoneSeries {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZonesVisible Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:dropZonesVisible")]
+#[sdk(qname = "c14:dropZonesVisible")]
 pub struct DropZonesVisible {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the InSketchMode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:inSketchMode")]
+#[sdk(qname = "c14:inSketchMode")]
 pub struct InSketchMode {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShowSketchButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:showSketchBtn")]
+#[sdk(qname = "c14:showSketchBtn")]
 pub struct ShowSketchButton {
   /// val
-  #[sdk(attr(office2010, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

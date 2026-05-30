@@ -6,23 +6,23 @@
 
 /// Defines the ClassificationLabelList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:labelList")]
+#[sdk(qname = "clbl:labelList")]
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ClassificationLabel Class.
-  #[sdk(child(office2021, qname = "clbl:label"))]
+  #[sdk(child(qname = "clbl:label"))]
   pub classification_label: Vec<ClassificationLabel>,
   /// Defines the ClassificationExtensionList Class.
-  #[sdk(child(office2021, qname = "clbl:extLst"))]
+  #[sdk(child(qname = "clbl:extLst"))]
   pub classification_extension_list: Option<ClassificationExtensionList>,
 }
 /// Defines the ClassificationExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:ext")]
+#[sdk(qname = "clbl:ext")]
 pub struct ClassificationExtension {
   /// uri
-  #[sdk(attr(office2021, qname = ":uri"))]
+  #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
@@ -30,45 +30,45 @@ pub struct ClassificationExtension {
 }
 /// Defines the ClassificationLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:label")]
+#[sdk(qname = "clbl:label")]
 pub struct ClassificationLabel {
   /// id
-  #[sdk(attr(office2021, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// enabled
-  #[sdk(attr(office2021, qname = ":enabled"))]
+  #[sdk(attr(qname = ":enabled"))]
   pub enabled: crate::simple_type::BooleanValue,
   /// setDate
-  #[sdk(attr(office2021, qname = ":setDate"))]
+  #[sdk(attr(qname = ":setDate"))]
   pub set_date: Option<crate::simple_type::StringValue>,
   /// method
-  #[sdk(attr(office2021, qname = ":method"))]
+  #[sdk(attr(qname = ":method"))]
   pub method: crate::simple_type::StringValue,
   /// name
-  #[sdk(attr(office2021, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// siteId
-  #[sdk(attr(office2021, qname = ":siteId"))]
+  #[sdk(attr(qname = ":siteId"))]
   #[sdk(pattern(
     regex = "\\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\}"
   ))]
   #[sdk(string_format(kind = "token"))]
   pub site_id: crate::simple_type::StringValue,
   /// actionId
-  #[sdk(attr(office2021, qname = ":actionId"))]
+  #[sdk(attr(qname = ":actionId"))]
   pub action_id: Option<crate::simple_type::StringValue>,
   /// contentBits
-  #[sdk(attr(office2021, qname = ":contentBits"))]
+  #[sdk(attr(qname = ":contentBits"))]
   pub content_bits: Option<crate::simple_type::UInt32Value>,
   /// removed
-  #[sdk(attr(office2021, qname = ":removed"))]
+  #[sdk(attr(qname = ":removed"))]
   pub removed: crate::simple_type::BooleanValue,
 }
 /// Defines the ClassificationExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:extLst")]
+#[sdk(qname = "clbl:extLst")]
 pub struct ClassificationExtensionList {
   /// Defines the ClassificationExtension Class.
-  #[sdk(child(office2021, qname = "clbl:ext"))]
+  #[sdk(child(qname = "clbl:ext"))]
   pub classification_extension: Vec<ClassificationExtension>,
 }

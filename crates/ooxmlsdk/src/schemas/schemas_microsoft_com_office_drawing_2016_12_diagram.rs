@@ -6,7 +6,7 @@
 
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1612:spPr")]
+#[sdk(qname = "dgm1612:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -55,7 +55,7 @@ pub struct ShapeProperties {
 }
 /// Defines the TextListStyleType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1612:lstStyle")]
+#[sdk(qname = "dgm1612:lstStyle")]
 pub struct TextListStyleType {
   /// Default Paragraph Style
   #[sdk(child(qname = "a:defPPr"))]

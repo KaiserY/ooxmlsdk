@@ -6,10 +6,10 @@
 
 /// Defines the LineSketchStyleProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "ask:lineSketchStyleProps")]
+#[sdk(qname = "ask:lineSketchStyleProps")]
 pub struct LineSketchStyleProperties {
   /// sd
-  #[sdk(attr(office2021, qname = ":sd"))]
+  #[sdk(attr(qname = ":sd"))]
   pub sd: Option<crate::simple_type::UInt32Value>,
   #[sdk(
         choice(
@@ -19,18 +19,18 @@ pub struct LineSketchStyleProperties {
     )]
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,
   /// Defines the LineSketchTypeProperties Class.
-  #[sdk(child(office2021, qname = "ask:type"))]
+  #[sdk(child(qname = "ask:type"))]
   pub line_sketch_type_properties: Option<std::boxed::Box<LineSketchTypeProperties>>,
   /// Defines the LineSketchSeed Class.
-  #[sdk(text_child(office2021, simple_type = "UInt32Value", qname = "ask:seed"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "ask:seed"))]
   pub line_sketch_seed: Option<LineSketchSeed>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "ask:extLst"))]
+  #[sdk(child(qname = "ask:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LineSketchTypeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "ask:type")]
+#[sdk(qname = "ask:type")]
 pub struct LineSketchTypeProperties {
   #[sdk(
         choice(
@@ -52,7 +52,7 @@ pub struct LineSketchTypeProperties {
 pub type LineSketchSeed = crate::simple_type::UInt32Value;
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "ask:extLst")]
+#[sdk(qname = "ask:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -66,15 +66,15 @@ pub enum LineSketchStylePropertiesChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchTypePropertiesChoice {
   /// Defines the LineSketchNoneEmpty Class.
-  #[sdk(empty_child(office2021, qname = "ask:lineSketchNone"))]
+  #[sdk(empty_child(qname = "ask:lineSketchNone"))]
   LineSketchNoneEmpty,
   /// Defines the LineSketchCurvedEmpty Class.
-  #[sdk(empty_child(office2021, qname = "ask:lineSketchCurved"))]
+  #[sdk(empty_child(qname = "ask:lineSketchCurved"))]
   LineSketchCurvedEmpty,
   /// Defines the LineSketchFreehandEmpty Class.
-  #[sdk(empty_child(office2021, qname = "ask:lineSketchFreehand"))]
+  #[sdk(empty_child(qname = "ask:lineSketchFreehand"))]
   LineSketchFreehandEmpty,
   /// Defines the LineSketchScribbleEmpty Class.
-  #[sdk(empty_child(office2021, qname = "ask:lineSketchScribble"))]
+  #[sdk(empty_child(qname = "ask:lineSketchScribble"))]
   LineSketchScribbleEmpty,
 }

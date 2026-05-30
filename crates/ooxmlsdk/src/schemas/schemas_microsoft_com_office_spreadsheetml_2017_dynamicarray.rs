@@ -6,21 +6,21 @@
 
 /// Defines the DynamicArrayProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xda:dynamicArrayProperties")]
+#[sdk(qname = "xda:dynamicArrayProperties")]
 pub struct DynamicArrayProperties {
   /// fDynamic
-  #[sdk(attr(office2019, qname = ":fDynamic"))]
+  #[sdk(attr(qname = ":fDynamic"))]
   pub f_dynamic: Option<crate::simple_type::BooleanValue>,
   /// fCollapsed
-  #[sdk(attr(office2019, qname = ":fCollapsed"))]
+  #[sdk(attr(qname = ":fCollapsed"))]
   pub f_collapsed: Option<crate::simple_type::BooleanValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2019, qname = "xda:extLst"))]
+  #[sdk(child(qname = "xda:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xda:extLst")]
+#[sdk(qname = "xda:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]

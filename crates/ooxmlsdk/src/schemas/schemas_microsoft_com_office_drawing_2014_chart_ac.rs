@@ -6,7 +6,7 @@
 
 /// Defines the MultiLvlStrData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16ac:multiLvlStrLit")]
+#[sdk(qname = "c16ac:multiLvlStrLit")]
 pub struct MultiLvlStrData {
   /// Point Count.
   #[sdk(child(qname = "c:ptCount"))]

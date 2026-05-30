@@ -24,13 +24,13 @@ pub type SlideLayoutMonikerList = Vec<String>;
 pub type MainMasterMonikerList = Vec<String>;
 /// Defines the SlideMonikerList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "pc:sldMkLst")]
+#[sdk(qname = "pc:sldMkLst")]
 pub struct SlideMonikerList {
   /// Defines the DocumentMoniker Class.
-  #[sdk(empty_child(office2016, qname = "pc:docMk"))]
+  #[sdk(empty_child(qname = "pc:docMk"))]
   pub document_moniker: (),
   /// Defines the SlideMoniker Class.
-  #[sdk(child(office2016, qname = "pc:sldMk"))]
+  #[sdk(child(qname = "pc:sldMk"))]
   pub slide_moniker: std::boxed::Box<SlideMoniker>,
   /// _
   #[sdk(any)]
@@ -62,13 +62,13 @@ pub type DesignerTagMonikerList = Vec<String>;
 pub type CustomXmlPartMonikerList = Vec<String>;
 /// Defines the SlideMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "pc:sldMk")]
+#[sdk(qname = "pc:sldMk")]
 pub struct SlideMoniker {
   /// cId
-  #[sdk(attr(office2016, qname = ":cId"))]
+  #[sdk(attr(qname = ":cId"))]
   pub c_id: Option<crate::simple_type::UInt32Value>,
   /// sldId
-  #[sdk(attr(office2016, qname = ":sldId"))]
+  #[sdk(attr(qname = ":sldId"))]
   #[sdk(number_range(range = 256..2147483648))]
   pub sld_id: crate::simple_type::UInt32Value,
 }

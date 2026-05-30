@@ -6,30 +6,30 @@
 
 /// Defines the Drawing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:drawing")]
+#[sdk(qname = "dsp:drawing")]
 pub struct Drawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ShapeTree Class.
-  #[sdk(child(office2010, qname = "dsp:spTree"))]
+  #[sdk(child(qname = "dsp:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,
 }
 /// Defines the DataModelExtensionBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:dataModelExt")]
+#[sdk(qname = "dsp:dataModelExt")]
 pub struct DataModelExtensionBlock {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// relId
-  #[sdk(attr(office2010, qname = ":relId"))]
+  #[sdk(attr(qname = ":relId"))]
   pub rel_id: Option<crate::simple_type::StringValue>,
   /// minVer
-  #[sdk(attr(office2010, qname = ":minVer"))]
+  #[sdk(attr(qname = ":minVer"))]
   #[sdk(string_format(kind = "uri"))]
   pub min_ver: Option<crate::simple_type::StringValue>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:cNvPr")]
+#[sdk(qname = "dsp:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -59,7 +59,7 @@ pub struct NonVisualDrawingProperties {
 }
 /// Defines the NonVisualDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:cNvSpPr")]
+#[sdk(qname = "dsp:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   /// Text Box
   #[sdk(attr(qname = ":txBox"))]
@@ -73,18 +73,18 @@ pub struct NonVisualDrawingShapeProperties {
 }
 /// Defines the ShapeNonVisualProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:nvSpPr")]
+#[sdk(qname = "dsp:nvSpPr")]
 pub struct ShapeNonVisualProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "dsp:cNvPr"))]
+  #[sdk(child(qname = "dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "dsp:cNvSpPr"))]
+  #[sdk(child(qname = "dsp:cNvSpPr"))]
   pub non_visual_drawing_shape_properties: std::boxed::Box<NonVisualDrawingShapeProperties>,
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:spPr")]
+#[sdk(qname = "dsp:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -133,7 +133,7 @@ pub struct ShapeProperties {
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:style")]
+#[sdk(qname = "dsp:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
   #[sdk(child(qname = "a:lnRef"))]
@@ -150,7 +150,7 @@ pub struct ShapeStyle {
 }
 /// Defines the TextBody Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:txBody")]
+#[sdk(qname = "dsp:txBody")]
 pub struct TextBody {
   /// Body Properties
   #[sdk(child(qname = "a:bodyPr"))]
@@ -164,7 +164,7 @@ pub struct TextBody {
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:txXfrm")]
+#[sdk(qname = "dsp:txXfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -184,7 +184,7 @@ pub struct Transform2D {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:extLst")]
+#[sdk(qname = "dsp:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -192,7 +192,7 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:cNvGrpSpPr")]
+#[sdk(qname = "dsp:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProperties {
   /// Defines the GroupShapeLocks Class.
   #[sdk(child(qname = "a:grpSpLocks"))]
@@ -204,19 +204,19 @@ pub struct NonVisualGroupDrawingShapeProperties {
 }
 /// Defines the GroupShapeNonVisualProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:nvGrpSpPr")]
+#[sdk(qname = "dsp:nvGrpSpPr")]
 pub struct GroupShapeNonVisualProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "dsp:cNvPr"))]
+  #[sdk(child(qname = "dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualGroupDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "dsp:cNvGrpSpPr"))]
+  #[sdk(child(qname = "dsp:cNvGrpSpPr"))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
 }
 /// Defines the GroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:grpSpPr")]
+#[sdk(qname = "dsp:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -252,10 +252,10 @@ pub struct GroupShapeProperties {
 }
 /// Defines the Shape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:sp")]
+#[sdk(qname = "dsp:sp")]
 pub struct Shape {
   /// modelId
-  #[sdk(attr(office2010, qname = ":modelId"))]
+  #[sdk(attr(qname = ":modelId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
     source = 2u32,
@@ -264,33 +264,33 @@ pub struct Shape {
   ))]
   pub model_id: crate::simple_type::StringValue,
   /// Defines the ShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:nvSpPr"))]
+  #[sdk(child(qname = "dsp:nvSpPr"))]
   pub shape_non_visual_properties: std::boxed::Box<ShapeNonVisualProperties>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2010, qname = "dsp:spPr"))]
+  #[sdk(child(qname = "dsp:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(office2010, qname = "dsp:style"))]
+  #[sdk(child(qname = "dsp:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// Defines the TextBody Class.
-  #[sdk(child(office2010, qname = "dsp:txBody"))]
+  #[sdk(child(qname = "dsp:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "dsp:txXfrm"))]
+  #[sdk(child(qname = "dsp:txXfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "dsp:extLst"))]
+  #[sdk(child(qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:grpSp")]
+#[sdk(qname = "dsp:grpSp")]
 pub struct GroupShape {
   /// Defines the GroupShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:nvGrpSpPr"))]
+  #[sdk(child(qname = "dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "dsp:grpSpPr"))]
+  #[sdk(child(qname = "dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -300,18 +300,18 @@ pub struct GroupShape {
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "dsp:extLst"))]
+  #[sdk(child(qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ShapeTree Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:spTree")]
+#[sdk(qname = "dsp:spTree")]
 pub struct ShapeTree {
   /// Defines the GroupShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:nvGrpSpPr"))]
+  #[sdk(child(qname = "dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "dsp:grpSpPr"))]
+  #[sdk(child(qname = "dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -321,7 +321,7 @@ pub struct ShapeTree {
     )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "dsp:extLst"))]
+  #[sdk(child(qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

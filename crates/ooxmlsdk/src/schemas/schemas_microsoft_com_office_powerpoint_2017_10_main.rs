@@ -6,9 +6,9 @@
 
 /// Defines the ReadonlyRecommended Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p1710:readonlyRecommended")]
+#[sdk(qname = "p1710:readonlyRecommended")]
 pub struct ReadonlyRecommended {
   /// val
-  #[sdk(attr(office2019, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::BooleanValue,
 }

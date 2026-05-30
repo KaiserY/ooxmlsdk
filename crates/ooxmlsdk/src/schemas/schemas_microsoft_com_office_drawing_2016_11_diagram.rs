@@ -14,21 +14,21 @@ pub enum STorageType {
 }
 /// Defines the NumberDiagramInfoList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1611:autoBuNodeInfoLst")]
+#[sdk(qname = "dgm1611:autoBuNodeInfoLst")]
 pub struct NumberDiagramInfoList {
   /// Defines the NumberDiagramInfo Class.
-  #[sdk(child(office2019, qname = "dgm1611:autoBuNodeInfo"))]
+  #[sdk(child(qname = "dgm1611:autoBuNodeInfo"))]
   pub number_diagram_info: Vec<NumberDiagramInfo>,
 }
 /// Defines the DiagramAutoBullet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1611:buPr")]
+#[sdk(qname = "dgm1611:buPr")]
 pub struct DiagramAutoBullet {
   /// prefix
-  #[sdk(attr(office2019, qname = ":prefix"))]
+  #[sdk(attr(qname = ":prefix"))]
   pub auto_bullet_prefix: Option<crate::simple_type::StringValue>,
   /// leadZeros
-  #[sdk(attr(office2019, qname = ":leadZeros"))]
+  #[sdk(attr(qname = ":leadZeros"))]
   pub lead_zeros: Option<crate::simple_type::BooleanValue>,
   #[sdk(
         choice(
@@ -42,17 +42,17 @@ pub struct DiagramAutoBullet {
 }
 /// Defines the NumberDiagramInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1611:autoBuNodeInfo")]
+#[sdk(qname = "dgm1611:autoBuNodeInfo")]
 pub struct NumberDiagramInfo {
   /// lvl
-  #[sdk(attr(office2019, qname = ":lvl"))]
+  #[sdk(attr(qname = ":lvl"))]
   pub lvl: crate::simple_type::UInt32Value,
   /// ptType
-  #[sdk(attr(office2019, qname = ":ptType"))]
+  #[sdk(attr(qname = ":ptType"))]
   #[sdk(string_format(kind = "token"))]
   pub pt_type: STorageType,
   /// Defines the DiagramAutoBullet Class.
-  #[sdk(child(office2019, qname = "dgm1611:buPr"))]
+  #[sdk(child(qname = "dgm1611:buPr"))]
   pub diagram_auto_bullet: std::boxed::Box<DiagramAutoBullet>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

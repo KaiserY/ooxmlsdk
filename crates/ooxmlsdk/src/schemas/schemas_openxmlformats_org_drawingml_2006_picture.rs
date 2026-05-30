@@ -19,10 +19,10 @@ pub struct Picture {
   #[sdk(child(qname = "pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(office2010, qname = "pic14:style"))]
+  #[sdk(child(qname = "pic14:style"))]
   pub shape_style: Option<std::boxed::Box<crate::schemas::pic14::ShapeStyle>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "pic14:extLst"))]
+  #[sdk(child(qname = "pic14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::pic14::OfficeArtExtensionList>,
 }
 /// Non-Visual Drawing Properties.

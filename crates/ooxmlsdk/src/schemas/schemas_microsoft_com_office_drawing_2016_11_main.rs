@@ -6,9 +6,9 @@
 
 /// Defines the PictureAttributionSourceURL Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a1611:picAttrSrcUrl")]
+#[sdk(qname = "a1611:picAttrSrcUrl")]
 pub struct PictureAttributionSourceUrl {
   /// id
-  #[sdk(attr(office2019, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }

@@ -26,78 +26,78 @@ pub enum DetachConnection {
 }
 /// Defines the ShapeMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:spMk")]
+#[sdk(qname = "oac:spMk")]
 pub struct ShapeMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GroupShapeMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:grpSpMk")]
+#[sdk(qname = "oac:grpSpMk")]
 pub struct GroupShapeMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GraphicFrameMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:graphicFrameMk")]
+#[sdk(qname = "oac:graphicFrameMk")]
 pub struct GraphicFrameMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ConnectorMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cxnSpMk")]
+#[sdk(qname = "oac:cxnSpMk")]
 pub struct ConnectorMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PictureMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:picMk")]
+#[sdk(qname = "oac:picMk")]
 pub struct PictureMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the InkMoniker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:inkMk")]
+#[sdk(qname = "oac:inkMk")]
 pub struct InkMoniker {
   /// id
-  #[sdk(attr(office2016, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  #[sdk(attr(office2016, qname = ":creationId"))]
+  #[sdk(attr(qname = ":creationId"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
@@ -106,7 +106,7 @@ pub struct InkMoniker {
 pub type DrawingMonikerList = Vec<String>;
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:xfrm")]
+#[sdk(qname = "oac:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -142,32 +142,32 @@ pub type OrigImgDataImgData = crate::simple_type::Base64BinaryValue;
 pub type SndDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the ResourceUrl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:imgUrl")]
+#[sdk(qname = "oac:imgUrl")]
 pub struct ResourceUrl {
   /// src
-  #[sdk(attr(office2016, qname = ":src"))]
+  #[sdk(attr(qname = ":src"))]
   #[sdk(string_format(kind = "uri"))]
   pub src: Option<crate::simple_type::StringValue>,
   /// linkage
-  #[sdk(attr(office2016, qname = ":linkage"))]
+  #[sdk(attr(qname = ":linkage"))]
   #[sdk(string_format(kind = "token"))]
   pub linkage: Option<ResourceLinkage>,
 }
 /// Defines the GroupCommand Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:grpCmd")]
+#[sdk(qname = "oac:grpCmd")]
 pub struct GroupCommand {
   /// verId
-  #[sdk(attr(office2016, qname = ":verId"))]
+  #[sdk(attr(qname = ":verId"))]
   pub ver_id: Option<crate::simple_type::UInt32Value>,
   /// preventRegroup
-  #[sdk(attr(office2016, qname = ":preventRegroup"))]
+  #[sdk(attr(qname = ":preventRegroup"))]
   pub prevent_regroup: Option<crate::simple_type::BooleanValue>,
   /// grpId
-  #[sdk(attr(office2016, qname = ":grpId"))]
+  #[sdk(attr(qname = ":grpId"))]
   pub grp_id: Option<crate::simple_type::UInt32Value>,
   /// Defines the DrawingMonikerList Class.
-  #[sdk(any_child(office2016, qname = "oac:dgMkLst"))]
+  #[sdk(any_child(qname = "oac:dgMkLst"))]
   pub drawing_moniker_list: DrawingMonikerList,
   #[sdk(
         choice(
@@ -181,22 +181,22 @@ pub struct GroupCommand {
     )]
   pub group_command_choice: Vec<GroupCommandChoice>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2016, qname = "oac:grpSpPr"))]
+  #[sdk(child(qname = "oac:grpSpPr"))]
   pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   /// Defines the NonVisualDrawingProps Class.
-  #[sdk(child(office2016, qname = "oac:cNvPr"))]
+  #[sdk(child(qname = "oac:cNvPr"))]
   pub non_visual_drawing_props: Option<std::boxed::Box<NonVisualDrawingProps>>,
   /// Defines the NonVisualGroupDrawingShapeProps Class.
-  #[sdk(child(office2016, qname = "oac:cNvGrpSpPr"))]
+  #[sdk(child(qname = "oac:cNvGrpSpPr"))]
   pub non_visual_group_drawing_shape_props:
     Option<std::boxed::Box<NonVisualGroupDrawingShapeProps>>,
 }
 /// Defines the ImgLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:imgLink")]
+#[sdk(qname = "oac:imgLink")]
 pub struct ImgLink {
   /// tgt
-  #[sdk(attr(office2016, qname = ":tgt"))]
+  #[sdk(attr(qname = ":tgt"))]
   #[sdk(string_format(kind = "uri"))]
   pub tgt: crate::simple_type::StringValue,
 }
@@ -238,60 +238,60 @@ pub type TableRowMonikerList = Vec<String>;
 pub type TableColumnMonikerList = Vec<String>;
 /// Defines the ModifyNonVisualDrawingProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvPr")]
+#[sdk(qname = "oac:cNvPr")]
 pub struct ModifyNonVisualDrawingProps {
   /// name
-  #[sdk(attr(office2016, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// descr
-  #[sdk(attr(office2016, qname = ":descr"))]
+  #[sdk(attr(qname = ":descr"))]
   pub descr: Option<crate::simple_type::StringValue>,
   /// hidden
-  #[sdk(attr(office2016, qname = ":hidden"))]
+  #[sdk(attr(qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
   /// title
-  #[sdk(attr(office2016, qname = ":title"))]
+  #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// decor
-  #[sdk(attr(office2016, qname = ":decor"))]
+  #[sdk(attr(qname = ":decor"))]
   pub decor: Option<crate::simple_type::BooleanValue>,
   /// scriptLink
-  #[sdk(attr(office2016, qname = ":scriptLink"))]
+  #[sdk(attr(qname = ":scriptLink"))]
   pub script_link: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ModifyTransformProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:xfrm")]
+#[sdk(qname = "oac:xfrm")]
 pub struct ModifyTransformProps {
   /// x
-  #[sdk(attr(office2016, qname = ":x"))]
+  #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
-  #[sdk(attr(office2016, qname = ":y"))]
+  #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// cx
-  #[sdk(attr(office2016, qname = ":cx"))]
+  #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
-  #[sdk(attr(office2016, qname = ":cy"))]
+  #[sdk(attr(qname = ":cy"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// rot
-  #[sdk(attr(office2016, qname = ":rot"))]
+  #[sdk(attr(qname = ":rot"))]
   pub rot: Option<crate::simple_type::Int32Value>,
   /// flipH
-  #[sdk(attr(office2016, qname = ":flipH"))]
+  #[sdk(attr(qname = ":flipH"))]
   pub flip_h: Option<crate::simple_type::BooleanValue>,
   /// flipV
-  #[sdk(attr(office2016, qname = ":flipV"))]
+  #[sdk(attr(qname = ":flipV"))]
   pub flip_v: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Point2DType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:off")]
+#[sdk(qname = "oac:off")]
 pub struct Point2DType {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
@@ -304,7 +304,7 @@ pub struct Point2DType {
 }
 /// Defines the TextParagraphPropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:pPr")]
+#[sdk(qname = "oac:pPr")]
 pub struct TextParagraphPropertiesType {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
@@ -397,7 +397,7 @@ pub struct TextParagraphPropertiesType {
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:bodyPr")]
+#[sdk(qname = "oac:bodyPr")]
 pub struct TextBodyProperties {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -490,50 +490,50 @@ pub struct TextBodyProperties {
 }
 /// Defines the ModifyNonVisualDrawingShapeProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvSpPr")]
+#[sdk(qname = "oac:cNvSpPr")]
 pub struct ModifyNonVisualDrawingShapeProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  #[sdk(attr(office2016, qname = ":noRot"))]
+  #[sdk(attr(qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  #[sdk(attr(office2016, qname = ":noEditPoints"))]
+  #[sdk(attr(qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
+  #[sdk(attr(qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
+  #[sdk(attr(qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
+  #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// noTextEdit
-  #[sdk(attr(office2016, qname = ":noTextEdit"))]
+  #[sdk(attr(qname = ":noTextEdit"))]
   pub no_text_edit: Option<crate::simple_type::BooleanValue>,
   /// txBox
-  #[sdk(attr(office2016, qname = ":txBox"))]
+  #[sdk(attr(qname = ":txBox"))]
   pub tx_box: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShapePropsMonikerList Class.
 pub type ShapePropsMonikerList = Vec<String>;
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:spPr")]
+#[sdk(qname = "oac:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -582,39 +582,39 @@ pub struct ShapeProperties {
 }
 /// Defines the ResetShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:spPr")]
+#[sdk(qname = "oac:spPr")]
 pub struct ResetShapeProperties {
   /// Defines the XfrmEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:xfrm"))]
+  #[sdk(empty_child(qname = "oac:xfrm"))]
   pub xfrm_empty: Option<()>,
   /// Defines the GeomEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:geom"))]
+  #[sdk(empty_child(qname = "oac:geom"))]
   pub geom_empty: Option<()>,
   /// Defines the FillEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:fill"))]
+  #[sdk(empty_child(qname = "oac:fill"))]
   pub fill_empty: Option<()>,
   /// Defines the LnEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:ln"))]
+  #[sdk(empty_child(qname = "oac:ln"))]
   pub ln_empty: Option<()>,
   /// Defines the EffectEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:effect"))]
+  #[sdk(empty_child(qname = "oac:effect"))]
   pub effect_empty: Option<()>,
   /// Defines the Scene3dEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:scene3d"))]
+  #[sdk(empty_child(qname = "oac:scene3d"))]
   pub scene3d_empty: Option<()>,
   /// Defines the Sp3dEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:sp3d"))]
+  #[sdk(empty_child(qname = "oac:sp3d"))]
   pub sp3d_empty: Option<()>,
   /// Defines the ExtLstEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:extLst"))]
+  #[sdk(empty_child(qname = "oac:extLst"))]
   pub ext_lst_empty: Option<()>,
   /// Defines the BwModeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:bwMode"))]
+  #[sdk(empty_child(qname = "oac:bwMode"))]
   pub bw_mode_empty: Option<()>,
 }
 /// Defines the LnRefStyleMatrixReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:lnRef")]
+#[sdk(qname = "oac:lnRef")]
 pub struct LnRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -633,7 +633,7 @@ pub struct LnRefStyleMatrixReference {
 }
 /// Defines the FillRefStyleMatrixReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:fillRef")]
+#[sdk(qname = "oac:fillRef")]
 pub struct FillRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -652,7 +652,7 @@ pub struct FillRefStyleMatrixReference {
 }
 /// Defines the EffectRefStyleMatrixReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:effectRef")]
+#[sdk(qname = "oac:effectRef")]
 pub struct EffectRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -671,7 +671,7 @@ pub struct EffectRefStyleMatrixReference {
 }
 /// Defines the FontReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:fontRef")]
+#[sdk(qname = "oac:fontRef")]
 pub struct FontReference {
   /// Identifier
   #[sdk(attr(qname = ":idx"))]
@@ -691,19 +691,19 @@ pub struct FontReference {
 }
 /// Defines the ModifyShapeStyleProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:style")]
+#[sdk(qname = "oac:style")]
 pub struct ModifyShapeStyleProps {
   /// Defines the LnRefStyleMatrixReference Class.
-  #[sdk(child(office2016, qname = "oac:lnRef"))]
+  #[sdk(child(qname = "oac:lnRef"))]
   pub ln_ref_style_matrix_reference: Option<std::boxed::Box<LnRefStyleMatrixReference>>,
   /// Defines the FillRefStyleMatrixReference Class.
-  #[sdk(child(office2016, qname = "oac:fillRef"))]
+  #[sdk(child(qname = "oac:fillRef"))]
   pub fill_ref_style_matrix_reference: Option<std::boxed::Box<FillRefStyleMatrixReference>>,
   /// Defines the EffectRefStyleMatrixReference Class.
-  #[sdk(child(office2016, qname = "oac:effectRef"))]
+  #[sdk(child(qname = "oac:effectRef"))]
   pub effect_ref_style_matrix_reference: Option<std::boxed::Box<EffectRefStyleMatrixReference>>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2016, qname = "oac:fontRef"))]
+  #[sdk(child(qname = "oac:fontRef"))]
   pub font_reference: Option<std::boxed::Box<FontReference>>,
 }
 /// Defines the ResetXsdboolean Class.
@@ -712,7 +712,7 @@ pub type ResetXsdboolean = crate::simple_type::BooleanValue;
 pub type UseBoundsXsdboolean = crate::simple_type::BooleanValue;
 /// Defines the BlipFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:blipFill")]
+#[sdk(qname = "oac:blipFill")]
 pub struct BlipFillProperties {
   /// DPI Setting
   #[sdk(attr(qname = ":dpi"))]
@@ -736,84 +736,84 @@ pub struct BlipFillProperties {
 }
 /// Defines the FillRectRelativeRectProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:fillRect")]
+#[sdk(qname = "oac:fillRect")]
 pub struct FillRectRelativeRectProps {
   /// l
-  #[sdk(attr(office2016, qname = ":l"))]
+  #[sdk(attr(qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
   /// t
-  #[sdk(attr(office2016, qname = ":t"))]
+  #[sdk(attr(qname = ":t"))]
   pub t: Option<crate::simple_type::Int32Value>,
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
+  #[sdk(attr(qname = ":r"))]
   pub r: Option<crate::simple_type::Int32Value>,
   /// b
-  #[sdk(attr(office2016, qname = ":b"))]
+  #[sdk(attr(qname = ":b"))]
   pub b: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the SrcRectRelativeRectProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:srcRect")]
+#[sdk(qname = "oac:srcRect")]
 pub struct SrcRectRelativeRectProps {
   /// l
-  #[sdk(attr(office2016, qname = ":l"))]
+  #[sdk(attr(qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
   /// t
-  #[sdk(attr(office2016, qname = ":t"))]
+  #[sdk(attr(qname = ":t"))]
   pub t: Option<crate::simple_type::Int32Value>,
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
+  #[sdk(attr(qname = ":r"))]
   pub r: Option<crate::simple_type::Int32Value>,
   /// b
-  #[sdk(attr(office2016, qname = ":b"))]
+  #[sdk(attr(qname = ":b"))]
   pub b: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ResetBlipFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:blipFill")]
+#[sdk(qname = "oac:blipFill")]
 pub struct ResetBlipFillProperties {
   /// Defines the SrcRectEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:srcRect"))]
+  #[sdk(empty_child(qname = "oac:srcRect"))]
   pub src_rect_empty: Option<()>,
   /// Defines the FillModeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:fillMode"))]
+  #[sdk(empty_child(qname = "oac:fillMode"))]
   pub fill_mode_empty: Option<()>,
   /// Defines the DpiEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:dpi"))]
+  #[sdk(empty_child(qname = "oac:dpi"))]
   pub dpi_empty: Option<()>,
   /// Defines the RotWithShapeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:rotWithShape"))]
+  #[sdk(empty_child(qname = "oac:rotWithShape"))]
   pub rot_with_shape_empty: Option<()>,
 }
 /// Defines the ModifyNonVisualGroupDrawingShapeProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvGrpSpPr")]
+#[sdk(qname = "oac:cNvGrpSpPr")]
 pub struct ModifyNonVisualGroupDrawingShapeProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noUngrp
-  #[sdk(attr(office2016, qname = ":noUngrp"))]
+  #[sdk(attr(qname = ":noUngrp"))]
   pub no_ungrp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  #[sdk(attr(office2016, qname = ":noRot"))]
+  #[sdk(attr(qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the GroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:grpSpPr")]
+#[sdk(qname = "oac:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -849,30 +849,30 @@ pub struct GroupShapeProperties {
 }
 /// Defines the ResetGroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:grpSpPr")]
+#[sdk(qname = "oac:grpSpPr")]
 pub struct ResetGroupShapeProperties {
   /// Defines the XfrmEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:xfrm"))]
+  #[sdk(empty_child(qname = "oac:xfrm"))]
   pub xfrm_empty: Option<()>,
   /// Defines the FillEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:fill"))]
+  #[sdk(empty_child(qname = "oac:fill"))]
   pub fill_empty: Option<()>,
   /// Defines the EffectEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:effect"))]
+  #[sdk(empty_child(qname = "oac:effect"))]
   pub effect_empty: Option<()>,
   /// Defines the Scene3dEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:scene3d"))]
+  #[sdk(empty_child(qname = "oac:scene3d"))]
   pub scene3d_empty: Option<()>,
   /// Defines the ExtLstEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:extLst"))]
+  #[sdk(empty_child(qname = "oac:extLst"))]
   pub ext_lst_empty: Option<()>,
   /// Defines the BwModeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:bwMode"))]
+  #[sdk(empty_child(qname = "oac:bwMode"))]
   pub bw_mode_empty: Option<()>,
 }
 /// Defines the NonVisualDrawingProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvPr")]
+#[sdk(qname = "oac:cNvPr")]
 pub struct NonVisualDrawingProps {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -902,7 +902,7 @@ pub struct NonVisualDrawingProps {
 }
 /// Defines the NonVisualGroupDrawingShapeProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvGrpSpPr")]
+#[sdk(qname = "oac:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProps {
   /// Defines the GroupShapeLocks Class.
   #[sdk(child(qname = "a:grpSpLocks"))]
@@ -914,30 +914,30 @@ pub struct NonVisualGroupDrawingShapeProps {
 }
 /// Defines the ModifyNonVisualGraphicFrameProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvGraphicFramePr")]
+#[sdk(qname = "oac:cNvGraphicFramePr")]
 pub struct ModifyNonVisualGraphicFrameProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noDrilldown
-  #[sdk(attr(office2016, qname = ":noDrilldown"))]
+  #[sdk(attr(qname = ":noDrilldown"))]
   pub no_drilldown: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the StCxnConnection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:stCxn")]
+#[sdk(qname = "oac:stCxn")]
 pub struct StCxnConnection {
   /// Identifier
   #[sdk(attr(qname = ":id"))]
@@ -948,7 +948,7 @@ pub struct StCxnConnection {
 }
 /// Defines the EndCxnConnection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:endCxn")]
+#[sdk(qname = "oac:endCxn")]
 pub struct EndCxnConnection {
   /// Identifier
   #[sdk(attr(qname = ":id"))]
@@ -959,153 +959,153 @@ pub struct EndCxnConnection {
 }
 /// Defines the ModifyNonVisualConnectorProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvCxnSpPr")]
+#[sdk(qname = "oac:cNvCxnSpPr")]
 pub struct ModifyNonVisualConnectorProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  #[sdk(attr(office2016, qname = ":noRot"))]
+  #[sdk(attr(qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  #[sdk(attr(office2016, qname = ":noEditPoints"))]
+  #[sdk(attr(qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
+  #[sdk(attr(qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
+  #[sdk(attr(qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
+  #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// Defines the StCxnConnection Class.
-  #[sdk(child(office2016, qname = "oac:stCxn"))]
+  #[sdk(child(qname = "oac:stCxn"))]
   pub st_cxn_connection: Option<StCxnConnection>,
   /// Defines the EndCxnConnection Class.
-  #[sdk(child(office2016, qname = "oac:endCxn"))]
+  #[sdk(child(qname = "oac:endCxn"))]
   pub end_cxn_connection: Option<EndCxnConnection>,
 }
 /// Defines the ResetNonVisualConnectorProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvCxnSpPr")]
+#[sdk(qname = "oac:cNvCxnSpPr")]
 pub struct ResetNonVisualConnectorProps {
   /// Defines the StCxnEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:stCxn"))]
+  #[sdk(empty_child(qname = "oac:stCxn"))]
   pub st_cxn_empty: Option<()>,
   /// Defines the EndCxnEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:endCxn"))]
+  #[sdk(empty_child(qname = "oac:endCxn"))]
   pub end_cxn_empty: Option<()>,
   /// Defines the NoGrpEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noGrp"))]
+  #[sdk(empty_child(qname = "oac:noGrp"))]
   pub no_grp_empty: Option<()>,
   /// Defines the NoSelectEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noSelect"))]
+  #[sdk(empty_child(qname = "oac:noSelect"))]
   pub no_select_empty: Option<()>,
   /// Defines the NoRotEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noRot"))]
+  #[sdk(empty_child(qname = "oac:noRot"))]
   pub no_rot_empty: Option<()>,
   /// Defines the NoChangeAspectEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noChangeAspect"))]
+  #[sdk(empty_child(qname = "oac:noChangeAspect"))]
   pub no_change_aspect_empty: Option<()>,
   /// Defines the NoMoveEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noMove"))]
+  #[sdk(empty_child(qname = "oac:noMove"))]
   pub no_move_empty: Option<()>,
   /// Defines the NoResizeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noResize"))]
+  #[sdk(empty_child(qname = "oac:noResize"))]
   pub no_resize_empty: Option<()>,
   /// Defines the NoEditPointsEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noEditPoints"))]
+  #[sdk(empty_child(qname = "oac:noEditPoints"))]
   pub no_edit_points_empty: Option<()>,
   /// Defines the NoAdjustHandlesEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noAdjustHandles"))]
+  #[sdk(empty_child(qname = "oac:noAdjustHandles"))]
   pub no_adjust_handles_empty: Option<()>,
   /// Defines the NoChangeArrowheadsEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noChangeArrowheads"))]
+  #[sdk(empty_child(qname = "oac:noChangeArrowheads"))]
   pub no_change_arrowheads_empty: Option<()>,
   /// Defines the NoChangeShapeTypeEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:noChangeShapeType"))]
+  #[sdk(empty_child(qname = "oac:noChangeShapeType"))]
   pub no_change_shape_type_empty: Option<()>,
 }
 /// Defines the CompressPictureProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:compressPicPr")]
+#[sdk(qname = "oac:compressPicPr")]
 pub struct CompressPictureProps {
   /// removeCrop
-  #[sdk(attr(office2016, qname = ":removeCrop"))]
+  #[sdk(attr(qname = ":removeCrop"))]
   pub remove_crop: Option<crate::simple_type::BooleanValue>,
   /// useLocalDpi
-  #[sdk(attr(office2016, qname = ":useLocalDpi"))]
+  #[sdk(attr(qname = ":useLocalDpi"))]
   pub use_local_dpi: Option<crate::simple_type::BooleanValue>,
   /// cstate
-  #[sdk(attr(office2016, qname = ":cstate"))]
+  #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(kind = "token"))]
   pub cstate: Option<crate::schemas::a::BlipCompressionValues>,
 }
 /// Defines the ModifyNonVisualPictureProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvPicPr")]
+#[sdk(qname = "oac:cNvPicPr")]
 pub struct ModifyNonVisualPictureProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  #[sdk(attr(office2016, qname = ":noRot"))]
+  #[sdk(attr(qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  #[sdk(attr(office2016, qname = ":noEditPoints"))]
+  #[sdk(attr(qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
+  #[sdk(attr(qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
+  #[sdk(attr(qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
+  #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// noCrop
-  #[sdk(attr(office2016, qname = ":noCrop"))]
+  #[sdk(attr(qname = ":noCrop"))]
   pub no_crop: Option<crate::simple_type::BooleanValue>,
   /// preferRelativeResize
-  #[sdk(attr(office2016, qname = ":preferRelativeResize"))]
+  #[sdk(attr(qname = ":preferRelativeResize"))]
   pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ResetNonVisualPictureProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvPicPr")]
+#[sdk(qname = "oac:cNvPicPr")]
 pub struct ResetNonVisualPictureProps {
   /// Defines the LfPrEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:lfPr"))]
+  #[sdk(empty_child(qname = "oac:lfPr"))]
   pub lf_pr_empty: Option<()>,
 }
 /// Defines the BoundRect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:bounds")]
+#[sdk(qname = "oac:bounds")]
 pub struct BoundRect {
   /// l
   #[sdk(attr(qname = ":l"))]
@@ -1128,7 +1128,7 @@ pub struct BoundRect {
 pub type SvgBlipMonikerList = Vec<String>;
 /// Defines the LinePropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:lineProps")]
+#[sdk(qname = "oac:lineProps")]
 pub struct LinePropertiesType {
   /// line width
   #[sdk(attr(qname = ":w"))]
@@ -1182,131 +1182,131 @@ pub struct LinePropertiesType {
 }
 /// Defines the ModifyNonVisualInkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:cNvInkPr")]
+#[sdk(qname = "oac:cNvInkPr")]
 pub struct ModifyNonVisualInkProps {
   /// noGrp
-  #[sdk(attr(office2016, qname = ":noGrp"))]
+  #[sdk(attr(qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  #[sdk(attr(office2016, qname = ":noSelect"))]
+  #[sdk(attr(qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  #[sdk(attr(office2016, qname = ":noRot"))]
+  #[sdk(attr(qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
+  #[sdk(attr(qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  #[sdk(attr(office2016, qname = ":noMove"))]
+  #[sdk(attr(qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  #[sdk(attr(office2016, qname = ":noResize"))]
+  #[sdk(attr(qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  #[sdk(attr(office2016, qname = ":noEditPoints"))]
+  #[sdk(attr(qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
+  #[sdk(attr(qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
+  #[sdk(attr(qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
+  #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// isComment
-  #[sdk(attr(office2016, qname = ":isComment"))]
+  #[sdk(attr(qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the HlinkClickHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:hlinkClick")]
+#[sdk(qname = "oac:hlinkClick")]
 pub struct HlinkClickHyperlinkProps {
   /// source
-  #[sdk(attr(office2016, qname = ":source"))]
+  #[sdk(attr(qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// action
-  #[sdk(attr(office2016, qname = ":action"))]
+  #[sdk(attr(qname = ":action"))]
   pub action: Option<crate::simple_type::StringValue>,
   /// tgtFrame
-  #[sdk(attr(office2016, qname = ":tgtFrame"))]
+  #[sdk(attr(qname = ":tgtFrame"))]
   pub tgt_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  #[sdk(attr(office2016, qname = ":tooltip"))]
+  #[sdk(attr(qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// highlightClick
-  #[sdk(attr(office2016, qname = ":highlightClick"))]
+  #[sdk(attr(qname = ":highlightClick"))]
   pub highlight_click: Option<crate::simple_type::BooleanValue>,
   /// endSnd
-  #[sdk(attr(office2016, qname = ":endSnd"))]
+  #[sdk(attr(qname = ":endSnd"))]
   pub end_snd: Option<crate::simple_type::BooleanValue>,
   /// sndName
-  #[sdk(attr(office2016, qname = ":sndName"))]
+  #[sdk(attr(qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
-  #[sdk(text_child(office2016, simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
   pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the HlinkHoverHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:hlinkHover")]
+#[sdk(qname = "oac:hlinkHover")]
 pub struct HlinkHoverHyperlinkProps {
   /// source
-  #[sdk(attr(office2016, qname = ":source"))]
+  #[sdk(attr(qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// action
-  #[sdk(attr(office2016, qname = ":action"))]
+  #[sdk(attr(qname = ":action"))]
   pub action: Option<crate::simple_type::StringValue>,
   /// tgtFrame
-  #[sdk(attr(office2016, qname = ":tgtFrame"))]
+  #[sdk(attr(qname = ":tgtFrame"))]
   pub tgt_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  #[sdk(attr(office2016, qname = ":tooltip"))]
+  #[sdk(attr(qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// highlightClick
-  #[sdk(attr(office2016, qname = ":highlightClick"))]
+  #[sdk(attr(qname = ":highlightClick"))]
   pub highlight_click: Option<crate::simple_type::BooleanValue>,
   /// endSnd
-  #[sdk(attr(office2016, qname = ":endSnd"))]
+  #[sdk(attr(qname = ":endSnd"))]
   pub end_snd: Option<crate::simple_type::BooleanValue>,
   /// sndName
-  #[sdk(attr(office2016, qname = ":sndName"))]
+  #[sdk(attr(qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
-  #[sdk(text_child(office2016, simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:sndData"))]
   pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the ModifyHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:hlink")]
+#[sdk(qname = "oac:hlink")]
 pub struct ModifyHyperlinkProps {
   /// Defines the HlinkClickHyperlinkProps Class.
-  #[sdk(child(office2016, qname = "oac:hlinkClick"))]
+  #[sdk(child(qname = "oac:hlinkClick"))]
   pub hlink_click_hyperlink_props: Option<HlinkClickHyperlinkProps>,
   /// Defines the HlinkHoverHyperlinkProps Class.
-  #[sdk(child(office2016, qname = "oac:hlinkHover"))]
+  #[sdk(child(qname = "oac:hlinkHover"))]
   pub hlink_hover_hyperlink_props: Option<HlinkHoverHyperlinkProps>,
 }
 /// Defines the ResetHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:hlink")]
+#[sdk(qname = "oac:hlink")]
 pub struct ResetHyperlinkProps {
   /// Defines the HlinkClickEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:hlinkClick"))]
+  #[sdk(empty_child(qname = "oac:hlinkClick"))]
   pub hlink_click_empty: Option<()>,
   /// Defines the HlinkHoverEmpty Class.
-  #[sdk(empty_child(office2016, qname = "oac:hlinkHover"))]
+  #[sdk(empty_child(qname = "oac:hlinkHover"))]
   pub hlink_hover_empty: Option<()>,
 }
 /// Defines the TextCharRangeContext Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:context")]
+#[sdk(qname = "oac:context")]
 pub struct TextCharRangeContext {
   /// len
-  #[sdk(attr(office2016, qname = ":len"))]
+  #[sdk(attr(qname = ":len"))]
   pub len: Option<crate::simple_type::UInt32Value>,
   /// hash
-  #[sdk(attr(office2016, qname = ":hash"))]
+  #[sdk(attr(qname = ":hash"))]
   pub hash: crate::simple_type::UInt32Value,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

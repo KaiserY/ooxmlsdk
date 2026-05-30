@@ -6,7 +6,7 @@
 
 /// Defines the PivotSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:pivotSource")]
+#[sdk(qname = "c15:pivotSource")]
 pub struct PivotSource {
   /// Pivot Name
   #[sdk(text_child(simple_type = "StringValue", qname = "c:name"))]
@@ -20,7 +20,7 @@ pub struct PivotSource {
 }
 /// Defines the NumberingFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:numFmt")]
+#[sdk(qname = "c15:numFmt")]
 pub struct NumberingFormat {
   /// Number Format Code
   #[sdk(attr(qname = ":formatCode"))]
@@ -31,7 +31,7 @@ pub struct NumberingFormat {
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:spPr")]
+#[sdk(qname = "c15:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -80,7 +80,7 @@ pub struct ShapeProperties {
 }
 /// Defines the Layout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:layout")]
+#[sdk(qname = "c15:layout")]
 pub struct Layout {
   /// Manual Layout
   #[sdk(child(qname = "c:manualLayout"))]
@@ -91,138 +91,138 @@ pub struct Layout {
 }
 /// Defines the FullReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:fullRef")]
+#[sdk(qname = "c15:fullRef")]
 pub struct FullReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the LevelReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:levelRef")]
+#[sdk(qname = "c15:levelRef")]
 pub struct LevelReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FormulaReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:formulaRef")]
+#[sdk(qname = "c15:formulaRef")]
 pub struct FormulaReference {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FilteredSeriesTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredSeriesTitle")]
+#[sdk(qname = "c15:filteredSeriesTitle")]
 pub struct FilteredSeriesTitle {
   /// Defines the ChartText Class.
-  #[sdk(child(office2013, qname = "c15:tx"))]
+  #[sdk(child(qname = "c15:tx"))]
   pub chart_text: std::boxed::Box<ChartText>,
 }
 /// Defines the FilteredCategoryTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredCategoryTitle")]
+#[sdk(qname = "c15:filteredCategoryTitle")]
 pub struct FilteredCategoryTitle {
   /// Defines the AxisDataSourceType Class.
-  #[sdk(child(office2013, qname = "c15:cat"))]
+  #[sdk(child(qname = "c15:cat"))]
   pub axis_data_source_type: std::boxed::Box<AxisDataSourceType>,
 }
 /// Defines the FilteredAreaSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredAreaSeries")]
+#[sdk(qname = "c15:filteredAreaSeries")]
 pub struct FilteredAreaSeries {
   /// Defines the AreaChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub area_chart_series: std::boxed::Box<AreaChartSeries>,
 }
 /// Defines the FilteredBarSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredBarSeries")]
+#[sdk(qname = "c15:filteredBarSeries")]
 pub struct FilteredBarSeries {
   /// Defines the BarChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub bar_chart_series: std::boxed::Box<BarChartSeries>,
 }
 /// Defines the FilteredBubbleSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredBubbleSeries")]
+#[sdk(qname = "c15:filteredBubbleSeries")]
 pub struct FilteredBubbleSeries {
   /// Defines the BubbleChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub bubble_chart_series: std::boxed::Box<BubbleChartSeries>,
 }
 /// Defines the FilteredLineSeriesExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredLineSeries")]
+#[sdk(qname = "c15:filteredLineSeries")]
 pub struct FilteredLineSeriesExtension {
   /// Defines the LineChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub line_chart_series: std::boxed::Box<LineChartSeries>,
 }
 /// Defines the FilteredPieSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredPieSeries")]
+#[sdk(qname = "c15:filteredPieSeries")]
 pub struct FilteredPieSeries {
   /// Defines the PieChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub pie_chart_series: std::boxed::Box<PieChartSeries>,
 }
 /// Defines the FilteredRadarSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredRadarSeries")]
+#[sdk(qname = "c15:filteredRadarSeries")]
 pub struct FilteredRadarSeries {
   /// Defines the RadarChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub radar_chart_series: std::boxed::Box<RadarChartSeries>,
 }
 /// Defines the FilteredScatterSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredScatterSeries")]
+#[sdk(qname = "c15:filteredScatterSeries")]
 pub struct FilteredScatterSeries {
   /// Defines the ScatterChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub scatter_chart_series: std::boxed::Box<ScatterChartSeries>,
 }
 /// Defines the FilteredSurfaceSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:filteredSurfaceSeries")]
+#[sdk(qname = "c15:filteredSurfaceSeries")]
 pub struct FilteredSurfaceSeries {
   /// Defines the SurfaceChartSeries Class.
-  #[sdk(child(office2013, qname = "c15:ser"))]
+  #[sdk(child(qname = "c15:ser"))]
   pub surface_chart_series: std::boxed::Box<SurfaceChartSeries>,
 }
 /// Defines the DataLabelsRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:datalabelsRange")]
+#[sdk(qname = "c15:datalabelsRange")]
 pub struct DataLabelsRange {
   /// Defines the Formula Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:f"))]
   pub formula: Formula,
   /// Defines the DataLabelsRangeChache Class.
-  #[sdk(child(office2013, qname = "c15:dlblRangeCache"))]
+  #[sdk(child(qname = "c15:dlblRangeCache"))]
   pub data_labels_range_chache: Option<std::boxed::Box<DataLabelsRangeChache>>,
 }
 /// Defines the CategoryFilterExceptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:categoryFilterExceptions")]
+#[sdk(qname = "c15:categoryFilterExceptions")]
 pub struct CategoryFilterExceptions {
   /// Defines the CategoryFilterException Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterException"))]
+  #[sdk(child(qname = "c15:categoryFilterException"))]
   pub category_filter_exception: Vec<CategoryFilterException>,
 }
 /// Defines the DataLabelFieldTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:dlblFieldTable")]
+#[sdk(qname = "c15:dlblFieldTable")]
 pub struct DataLabelFieldTable {
   /// Defines the DataLabelFieldTableEntry Class.
-  #[sdk(child(office2013, qname = "c15:dlblFTEntry"))]
+  #[sdk(child(qname = "c15:dlblFTEntry"))]
   pub data_label_field_table_entry: Vec<DataLabelFieldTableEntry>,
 }
 /// Defines the ExceptionForSave Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:xForSave")]
+#[sdk(qname = "c15:xForSave")]
 pub struct ExceptionForSave {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -230,7 +230,7 @@ pub struct ExceptionForSave {
 }
 /// Defines the ShowDataLabelsRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:showDataLabelsRange")]
+#[sdk(qname = "c15:showDataLabelsRange")]
 pub struct ShowDataLabelsRange {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -238,7 +238,7 @@ pub struct ShowDataLabelsRange {
 }
 /// Defines the ShowLeaderLines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:showLeaderLines")]
+#[sdk(qname = "c15:showLeaderLines")]
 pub struct ShowLeaderLines {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -246,7 +246,7 @@ pub struct ShowLeaderLines {
 }
 /// Defines the AutoGeneneratedCategories Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:autoCat")]
+#[sdk(qname = "c15:autoCat")]
 pub struct AutoGeneneratedCategories {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -254,7 +254,7 @@ pub struct AutoGeneneratedCategories {
 }
 /// Defines the InvertIfNegativeBoolean Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:invertIfNegative")]
+#[sdk(qname = "c15:invertIfNegative")]
 pub struct InvertIfNegativeBoolean {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -262,7 +262,7 @@ pub struct InvertIfNegativeBoolean {
 }
 /// Defines the Bubble3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:bubble3D")]
+#[sdk(qname = "c15:bubble3D")]
 pub struct Bubble3D {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -270,7 +270,7 @@ pub struct Bubble3D {
 }
 /// Defines the ChartText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:tx")]
+#[sdk(qname = "c15:tx")]
 pub struct ChartText {
   #[sdk(
         choice(
@@ -283,7 +283,7 @@ pub struct ChartText {
 }
 /// Defines the LeaderLines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:leaderLines")]
+#[sdk(qname = "c15:leaderLines")]
 pub struct LeaderLines {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "c:spPr"))]
@@ -297,7 +297,7 @@ pub type Formula = crate::simple_type::StringValue;
 pub type TextFieldGuid = crate::simple_type::StringValue;
 /// Defines the AxisDataSourceType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:cat")]
+#[sdk(qname = "c15:cat")]
 pub struct AxisDataSourceType {
   #[sdk(
         choice(
@@ -312,7 +312,7 @@ pub struct AxisDataSourceType {
 }
 /// Defines the BarChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct BarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -359,7 +359,7 @@ pub struct BarChartSeries {
 }
 /// Defines the LineChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct LineChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -406,7 +406,7 @@ pub struct LineChartSeries {
 }
 /// Defines the ScatterChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct ScatterChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -450,7 +450,7 @@ pub struct ScatterChartSeries {
 }
 /// Defines the AreaChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct AreaChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -491,7 +491,7 @@ pub struct AreaChartSeries {
 }
 /// Defines the PieChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct PieChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -529,7 +529,7 @@ pub struct PieChartSeries {
 }
 /// Defines the BubbleChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct BubbleChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -579,7 +579,7 @@ pub struct BubbleChartSeries {
 }
 /// Defines the RadarChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct RadarChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -617,7 +617,7 @@ pub struct RadarChartSeries {
 }
 /// Defines the SurfaceChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:ser")]
+#[sdk(qname = "c15:ser")]
 pub struct SurfaceChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
@@ -649,7 +649,7 @@ pub struct SurfaceChartSeries {
 }
 /// Defines the DataLabelsRangeChache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:dlblRangeCache")]
+#[sdk(qname = "c15:dlblRangeCache")]
 pub struct DataLabelsRangeChache {
   /// Point Count.
   #[sdk(child(qname = "c:ptCount"))]
@@ -663,7 +663,7 @@ pub struct DataLabelsRangeChache {
 }
 /// Defines the DataLabelFieldTableCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:dlblFieldTableCache")]
+#[sdk(qname = "c15:dlblFieldTableCache")]
 pub struct DataLabelFieldTableCache {
   /// Point Count.
   #[sdk(child(qname = "c:ptCount"))]
@@ -677,7 +677,7 @@ pub struct DataLabelFieldTableCache {
 }
 /// Defines the Explosion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:explosion")]
+#[sdk(qname = "c15:explosion")]
 pub struct Explosion {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
@@ -685,7 +685,7 @@ pub struct Explosion {
 }
 /// Defines the Marker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:marker")]
+#[sdk(qname = "c15:marker")]
 pub struct Marker {
   /// Symbol
   #[sdk(child(qname = "c:symbol"))]
@@ -702,7 +702,7 @@ pub struct Marker {
 }
 /// Defines the DataLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:dLbl")]
+#[sdk(qname = "c15:dLbl")]
 pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
@@ -735,42 +735,42 @@ pub struct DataLabel {
 }
 /// Defines the CategoryFilterException Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:categoryFilterException")]
+#[sdk(qname = "c15:categoryFilterException")]
 pub struct CategoryFilterException {
   /// Defines the SequenceOfReferences Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:sqref"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:sqref"))]
   pub sequence_of_references: SequenceOfReferences,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "c15:spPr"))]
+  #[sdk(child(qname = "c15:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the Explosion Class.
-  #[sdk(child(office2013, qname = "c15:explosion"))]
+  #[sdk(child(qname = "c15:explosion"))]
   pub explosion: Option<Explosion>,
   /// Defines the InvertIfNegativeBoolean Class.
-  #[sdk(child(office2013, qname = "c15:invertIfNegative"))]
+  #[sdk(child(qname = "c15:invertIfNegative"))]
   pub invert_if_negative_boolean: Option<InvertIfNegativeBoolean>,
   /// Defines the Bubble3D Class.
-  #[sdk(child(office2013, qname = "c15:bubble3D"))]
+  #[sdk(child(qname = "c15:bubble3D"))]
   pub bubble3_d: Option<Bubble3D>,
   /// Defines the Marker Class.
-  #[sdk(child(office2013, qname = "c15:marker"))]
+  #[sdk(child(qname = "c15:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
   /// Defines the DataLabel Class.
-  #[sdk(child(office2013, qname = "c15:dLbl"))]
+  #[sdk(child(qname = "c15:dLbl"))]
   pub data_label: Option<std::boxed::Box<DataLabel>>,
 }
 /// Defines the DataLabelFieldTableEntry Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "c15:dlblFTEntry")]
+#[sdk(qname = "c15:dlblFTEntry")]
 pub struct DataLabelFieldTableEntry {
   /// Defines the TextFieldGuid Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:txfldGUID"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:txfldGUID"))]
   pub text_field_guid: TextFieldGuid,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "c15:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c15:f"))]
   pub formula: Formula,
   /// Defines the DataLabelFieldTableCache Class.
-  #[sdk(child(office2013, qname = "c15:dlblFieldTableCache"))]
+  #[sdk(child(qname = "c15:dlblFieldTableCache"))]
   pub data_label_field_table_cache: Option<std::boxed::Box<DataLabelFieldTableCache>>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -6,15 +6,15 @@
 
 /// Defines the WebVideoProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "wp15:webVideoPr")]
+#[sdk(qname = "wp15:webVideoPr")]
 pub struct WebVideoProperty {
   /// embeddedHtml
-  #[sdk(attr(office2013, qname = ":embeddedHtml"))]
+  #[sdk(attr(qname = ":embeddedHtml"))]
   pub embedded_html: Option<crate::simple_type::StringValue>,
   /// h
-  #[sdk(attr(office2013, qname = ":h"))]
+  #[sdk(attr(qname = ":h"))]
   pub height: Option<crate::simple_type::UInt32Value>,
   /// w
-  #[sdk(attr(office2013, qname = ":w"))]
+  #[sdk(attr(qname = ":w"))]
   pub width: Option<crate::simple_type::UInt32Value>,
 }

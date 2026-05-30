@@ -6,12 +6,12 @@
 
 /// Defines the Version Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlwcv:version")]
+#[sdk(qname = "xlwcv:version")]
 pub struct Version {
   /// warnBelowVersion
-  #[sdk(attr(microsoft365, qname = ":warnBelowVersion"))]
+  #[sdk(attr(qname = ":warnBelowVersion"))]
   pub warn_below_version: Option<crate::simple_type::UInt32Value>,
   /// setVersion
-  #[sdk(attr(microsoft365, qname = ":setVersion"))]
+  #[sdk(attr(qname = ":setVersion"))]
   pub set_version: Option<crate::simple_type::UInt32Value>,
 }

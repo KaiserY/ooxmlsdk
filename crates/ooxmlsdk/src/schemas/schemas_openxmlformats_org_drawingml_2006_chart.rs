@@ -4496,12 +4496,12 @@ pub struct SurfaceSerExtension {
 }
 /// Defines the DataDisplayOptions16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "c:ext")]
+#[sdk(qname = "c:ext")]
 pub struct DataDisplayOptions16 {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the BooleanFalse Class.
-  #[sdk(child(office2019, qname = "c16r3:dispNaAsBlank"))]
+  #[sdk(child(qname = "c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,
 }
 /// pivot chart format persistence data.
@@ -4676,7 +4676,7 @@ pub struct DisplayBlanksAs {
 pub struct ChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the DataDisplayOptions16 Class.
-  #[sdk(child(office2019, qname = "c:ext"))]
+  #[sdk(child(qname = "c:ext"))]
   pub data_display_options16: Vec<DataDisplayOptions16>,
 }
 /// Defines the EditingLanguage Class.
@@ -4983,7 +4983,7 @@ pub enum DataLabelsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceChoice {
-  #[sdk(child(office2010, qname = "c14:style"))]
+  #[sdk(child(qname = "c14:style"))]
   C14Style(std::boxed::Box<crate::schemas::c14::Style>),
   /// Defines the Style Class.
   #[sdk(child(qname = "c:style"))]
@@ -5393,10 +5393,10 @@ pub enum LineSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5414,10 +5414,10 @@ pub enum ScatterSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5435,10 +5435,10 @@ pub enum RadarSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5458,10 +5458,10 @@ pub enum BarSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5479,10 +5479,10 @@ pub enum AreaSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5500,10 +5500,10 @@ pub enum PieSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5521,10 +5521,10 @@ pub enum BubbleSerExtensionChoice {
   /// Defines the DataLabelsRange Class.
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
@@ -5540,10 +5540,10 @@ pub enum SurfaceSerExtensionChoice {
   /// Defines the FilteredCategoryTitle Class.
   FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),

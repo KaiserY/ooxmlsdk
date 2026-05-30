@@ -6,7 +6,7 @@
 
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "pic14:style")]
+#[sdk(qname = "pic14:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
   #[sdk(child(qname = "a:lnRef"))]
@@ -23,7 +23,7 @@ pub struct ShapeStyle {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "pic14:extLst")]
+#[sdk(qname = "pic14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]

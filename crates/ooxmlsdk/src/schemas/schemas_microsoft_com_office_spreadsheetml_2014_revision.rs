@@ -158,27 +158,27 @@ pub enum OartAnchorType {
 }
 /// Defines the RevExHeaders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:revHdrs")]
+#[sdk(qname = "xr:revHdrs")]
 pub struct RevExHeaders {
   /// minRev
-  #[sdk(attr(office2016, qname = ":minRev"))]
+  #[sdk(attr(qname = ":minRev"))]
   pub min_rev: crate::simple_type::UInt64Value,
   /// maxRev
-  #[sdk(attr(office2016, qname = ":maxRev"))]
+  #[sdk(attr(qname = ":maxRev"))]
   pub max_rev: crate::simple_type::UInt64Value,
   /// docId
-  #[sdk(attr(office2016, qname = ":docId"))]
+  #[sdk(attr(qname = ":docId"))]
   pub doc_id: crate::simple_type::StringValue,
   /// endpointId
-  #[sdk(attr(office2016, qname = ":endpointId"))]
+  #[sdk(attr(qname = ":endpointId"))]
   pub endpoint_id: crate::simple_type::StringValue,
   /// Defines the RevExHeader Class.
-  #[sdk(child(office2016, qname = "xr:hdr"))]
+  #[sdk(child(qname = "xr:hdr"))]
   pub rev_ex_header: Vec<RevExHeader>,
 }
 /// Defines the RevExStream Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:revStream")]
+#[sdk(qname = "xr:revStream")]
 pub struct RevExStream {
   #[sdk(
         choice(
@@ -202,7 +202,7 @@ pub struct RevExStream {
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:dxf")]
+#[sdk(qname = "xr:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:font"))]
@@ -228,19 +228,19 @@ pub struct DifferentialFormatType {
 }
 /// Defines the RevisionPtr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:revisionPtr")]
+#[sdk(qname = "xr:revisionPtr")]
 pub struct RevisionPtr {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// revIDLastSave
-  #[sdk(attr(office2016, qname = ":revIDLastSave"))]
+  #[sdk(attr(qname = ":revIDLastSave"))]
   pub rev_id_last_save: crate::simple_type::UInt64Value,
   /// documentId
-  #[sdk(attr(office2016, qname = ":documentId"))]
+  #[sdk(attr(qname = ":documentId"))]
   pub document_id: crate::simple_type::StringValue,
 }
 /// Defines the StateBasedObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:objectState")]
+#[sdk(qname = "xr:objectState")]
 pub struct StateBasedObject {
   #[sdk(
         choice(
@@ -256,423 +256,423 @@ pub struct StateBasedObject {
 }
 /// Defines the RevExHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:hdr")]
+#[sdk(qname = "xr:hdr")]
 pub struct RevExHeader {
   /// id
-  #[sdk(attr(office2016, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// minRev
-  #[sdk(attr(office2016, qname = ":minRev"))]
+  #[sdk(attr(qname = ":minRev"))]
   pub min_rev: Option<crate::simple_type::UInt64Value>,
   /// maxRev
-  #[sdk(attr(office2016, qname = ":maxRev"))]
+  #[sdk(attr(qname = ":maxRev"))]
   pub max_rev: Option<crate::simple_type::UInt64Value>,
   /// time
-  #[sdk(attr(office2016, qname = ":time"))]
+  #[sdk(attr(qname = ":time"))]
   pub time: crate::simple_type::DateTimeValue,
 }
 /// Defines the RevExFuture Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrftr")]
+#[sdk(qname = "xr:xrrftr")]
 pub struct RevExFuture {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// sti
-  #[sdk(attr(office2016, qname = ":sti"))]
+  #[sdk(attr(qname = ":sti"))]
   pub sti: Option<crate::simple_type::BooleanValue>,
   /// Defines the RevExTest Class.
-  #[sdk(empty_child(office2016, qname = "xr:xrrtest"))]
+  #[sdk(empty_child(qname = "xr:xrrtest"))]
   pub rev_ex_test: Vec<()>,
 }
 /// Defines the RevExUnsupported Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrUspt")]
+#[sdk(qname = "xr:xrrUspt")]
 pub struct RevExUnsupported {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
 }
 /// Defines the RevExTrimmed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrTrim")]
+#[sdk(qname = "xr:xrrTrim")]
 pub struct RevExTrimmed {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
 }
 /// Defines the RevExRowColumn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrrc")]
+#[sdk(qname = "xr:xrrrc")]
 pub struct RevExRowColumn {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// eol
-  #[sdk(attr(office2016, qname = ":eol"))]
+  #[sdk(attr(qname = ":eol"))]
   pub eol: Option<crate::simple_type::BooleanValue>,
   /// ref
-  #[sdk(attr(office2016, qname = ":ref"))]
+  #[sdk(attr(qname = ":ref"))]
   pub r#ref: crate::simple_type::StringValue,
   /// action
-  #[sdk(attr(office2016, qname = ":action"))]
+  #[sdk(attr(qname = ":action"))]
   pub action: RwColAction,
 }
 /// Defines the RevExMove Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrm")]
+#[sdk(qname = "xr:xrrm")]
 pub struct RevExMove {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// src
-  #[sdk(attr(office2016, qname = ":src"))]
+  #[sdk(attr(qname = ":src"))]
   pub src: crate::simple_type::StringValue,
   /// dst
-  #[sdk(attr(office2016, qname = ":dst"))]
+  #[sdk(attr(qname = ":dst"))]
   pub dst: crate::simple_type::StringValue,
   /// srcSh
-  #[sdk(attr(office2016, qname = ":srcSh"))]
+  #[sdk(attr(qname = ":srcSh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub src_sh: Option<crate::simple_type::StringValue>,
 }
 /// Defines the RevExChangeCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrc")]
+#[sdk(qname = "xr:xrrc")]
 pub struct RevExChangeCell {
   /// listUid
-  #[sdk(attr(office2016, qname = ":listUid"))]
+  #[sdk(attr(qname = ":listUid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub list_uid: Option<crate::simple_type::StringValue>,
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
+  #[sdk(attr(qname = ":r"))]
   pub r: crate::simple_type::StringValue,
   /// t
-  #[sdk(attr(office2016, qname = ":t"))]
+  #[sdk(attr(qname = ":t"))]
   pub t: Option<FillType>,
   /// x
-  #[sdk(attr(office2016, qname = ":x"))]
+  #[sdk(attr(qname = ":x"))]
   pub x: Option<FillTypeExt>,
   /// w
-  #[sdk(attr(office2016, qname = ":w"))]
+  #[sdk(attr(qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
-  #[sdk(child(office2016, qname = "xr:c"))]
+  #[sdk(child(qname = "xr:c"))]
   pub rev_cell: Vec<RevCell>,
   /// Defines the ChangeCellSubEdit Class.
-  #[sdk(child(office2016, qname = "xr:ccse"))]
+  #[sdk(child(qname = "xr:ccse"))]
   pub change_cell_sub_edit: Vec<ChangeCellSubEdit>,
 }
 /// Defines the RevExFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrf")]
+#[sdk(qname = "xr:xrrf")]
 pub struct RevExFormatting {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// numFmtId
-  #[sdk(attr(office2016, qname = ":numFmtId"))]
+  #[sdk(attr(qname = ":numFmtId"))]
   pub num_fmt_id: Option<crate::simple_type::UInt32Value>,
   /// xfDxf
-  #[sdk(attr(office2016, qname = ":xfDxf"))]
+  #[sdk(attr(qname = ":xfDxf"))]
   pub xf_dxf: Option<crate::simple_type::BooleanValue>,
   /// style
-  #[sdk(attr(office2016, qname = ":style"))]
+  #[sdk(attr(qname = ":style"))]
   pub style: Option<crate::simple_type::BooleanValue>,
   /// sqref
-  #[sdk(attr(office2016, list, qname = ":sqref"))]
+  #[sdk(attr(list, qname = ":sqref"))]
   pub sqref: Vec<crate::simple_type::StringValue>,
   /// start
-  #[sdk(attr(office2016, qname = ":start"))]
+  #[sdk(attr(qname = ":start"))]
   pub start: Option<crate::simple_type::UInt32Value>,
   /// length
-  #[sdk(attr(office2016, qname = ":length"))]
+  #[sdk(attr(qname = ":length"))]
   pub length: Option<crate::simple_type::UInt32Value>,
   /// styleUid
-  #[sdk(attr(office2016, qname = ":styleUid"))]
+  #[sdk(attr(qname = ":styleUid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub style_uid: Option<crate::simple_type::StringValue>,
   /// fBlankCell
-  #[sdk(attr(office2016, qname = ":fBlankCell"))]
+  #[sdk(attr(qname = ":fBlankCell"))]
   pub f_blank_cell: Option<crate::simple_type::BooleanValue>,
   /// applyNumberFormat
-  #[sdk(attr(office2016, qname = ":applyNumberFormat"))]
+  #[sdk(attr(qname = ":applyNumberFormat"))]
   pub apply_number_format: Option<crate::simple_type::BooleanValue>,
   /// applyFont
-  #[sdk(attr(office2016, qname = ":applyFont"))]
+  #[sdk(attr(qname = ":applyFont"))]
   pub apply_font: Option<crate::simple_type::BooleanValue>,
   /// applyFill
-  #[sdk(attr(office2016, qname = ":applyFill"))]
+  #[sdk(attr(qname = ":applyFill"))]
   pub apply_fill: Option<crate::simple_type::BooleanValue>,
   /// applyBorder
-  #[sdk(attr(office2016, qname = ":applyBorder"))]
+  #[sdk(attr(qname = ":applyBorder"))]
   pub apply_border: Option<crate::simple_type::BooleanValue>,
   /// applyAlignment
-  #[sdk(attr(office2016, qname = ":applyAlignment"))]
+  #[sdk(attr(qname = ":applyAlignment"))]
   pub apply_alignment: Option<crate::simple_type::BooleanValue>,
   /// applyProtection
-  #[sdk(attr(office2016, qname = ":applyProtection"))]
+  #[sdk(attr(qname = ":applyProtection"))]
   pub apply_protection: Option<crate::simple_type::BooleanValue>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(office2016, qname = "xr:dxf"))]
+  #[sdk(child(qname = "xr:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "xr:extLst"))]
+  #[sdk(child(qname = "xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDefinedName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrDefName")]
+#[sdk(qname = "xr:xrrDefName")]
 pub struct RevExDefinedName {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// customView
-  #[sdk(attr(office2016, qname = ":customView"))]
+  #[sdk(attr(qname = ":customView"))]
   pub custom_view: Option<crate::simple_type::BooleanValue>,
   /// name
-  #[sdk(attr(office2016, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// function
-  #[sdk(attr(office2016, qname = ":function"))]
+  #[sdk(attr(qname = ":function"))]
   pub function: Option<crate::simple_type::BooleanValue>,
   /// functionGroupId
-  #[sdk(attr(office2016, qname = ":functionGroupId"))]
+  #[sdk(attr(qname = ":functionGroupId"))]
   pub function_group_id: Option<crate::simple_type::ByteValue>,
   /// shortcutKey
-  #[sdk(attr(office2016, qname = ":shortcutKey"))]
+  #[sdk(attr(qname = ":shortcutKey"))]
   pub shortcut_key: Option<crate::simple_type::ByteValue>,
   /// hidden
-  #[sdk(attr(office2016, qname = ":hidden"))]
+  #[sdk(attr(qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
   /// customMenu
-  #[sdk(attr(office2016, qname = ":customMenu"))]
+  #[sdk(attr(qname = ":customMenu"))]
   pub custom_menu: Option<crate::simple_type::StringValue>,
   /// description
-  #[sdk(attr(office2016, qname = ":description"))]
+  #[sdk(attr(qname = ":description"))]
   pub description: Option<crate::simple_type::StringValue>,
   /// help
-  #[sdk(attr(office2016, qname = ":help"))]
+  #[sdk(attr(qname = ":help"))]
   pub help: Option<crate::simple_type::StringValue>,
   /// statusBar
-  #[sdk(attr(office2016, qname = ":statusBar"))]
+  #[sdk(attr(qname = ":statusBar"))]
   pub status_bar: Option<crate::simple_type::StringValue>,
   /// comment
-  #[sdk(attr(office2016, qname = ":comment"))]
+  #[sdk(attr(qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
   /// Defines the FormulaFormula Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:formula"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xr:formula"))]
   pub formula_formula: Option<FormulaFormula>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "xr:extLst"))]
+  #[sdk(child(qname = "xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDelObj Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrdo")]
+#[sdk(qname = "xr:xrrdo")]
 pub struct RevExDelObj {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
-  #[sdk(child(office2016, qname = "xr:hdr"))]
+  #[sdk(child(qname = "xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
 }
 /// Defines the RevExChgObj Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrco")]
+#[sdk(qname = "xr:xrrco")]
 pub struct RevExChgObj {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
-  #[sdk(child(office2016, qname = "xr:hdr"))]
+  #[sdk(child(qname = "xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
   #[sdk(
         choice(
@@ -684,150 +684,150 @@ pub struct RevExChgObj {
 }
 /// Defines the RevExSheetOp Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrSheet")]
+#[sdk(qname = "xr:xrrSheet")]
 pub struct RevExSheetOp {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// op
-  #[sdk(attr(office2016, qname = ":op"))]
+  #[sdk(attr(qname = ":op"))]
   pub op: SheetOp,
   /// name
-  #[sdk(attr(office2016, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// idOrig
-  #[sdk(attr(office2016, qname = ":idOrig"))]
+  #[sdk(attr(qname = ":idOrig"))]
   pub id_orig: Option<crate::simple_type::UInt32Value>,
   /// idNew
-  #[sdk(attr(office2016, qname = ":idNew"))]
+  #[sdk(attr(qname = ":idNew"))]
   pub id_new: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the RevisionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrList")]
+#[sdk(qname = "xr:xrrList")]
 pub struct RevisionList {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Data
-  #[sdk(attr(office2016, qname = ":Data"))]
+  #[sdk(attr(qname = ":Data"))]
   pub data: Option<crate::simple_type::BooleanValue>,
   /// Formatting
-  #[sdk(attr(office2016, qname = ":Formatting"))]
+  #[sdk(attr(qname = ":Formatting"))]
   pub formatting: Option<crate::simple_type::BooleanValue>,
   /// RangeBased
-  #[sdk(attr(office2016, qname = ":RangeBased"))]
+  #[sdk(attr(qname = ":RangeBased"))]
   pub range_based: Option<crate::simple_type::BooleanValue>,
   /// Fake
-  #[sdk(attr(office2016, qname = ":Fake"))]
+  #[sdk(attr(qname = ":Fake"))]
   pub fake: Option<crate::simple_type::BooleanValue>,
   /// ref
-  #[sdk(attr(office2016, qname = ":ref"))]
+  #[sdk(attr(qname = ":ref"))]
   pub r#ref: crate::simple_type::StringValue,
   /// Headers
-  #[sdk(attr(office2016, qname = ":Headers"))]
+  #[sdk(attr(qname = ":Headers"))]
   pub headers: Option<crate::simple_type::BooleanValue>,
   /// InsDelHeaders
-  #[sdk(attr(office2016, qname = ":InsDelHeaders"))]
+  #[sdk(attr(qname = ":InsDelHeaders"))]
   pub ins_del_headers: Option<crate::simple_type::BooleanValue>,
   /// rId
-  #[sdk(attr(office2016, qname = ":rId"))]
+  #[sdk(attr(qname = ":rId"))]
   pub r_id: crate::simple_type::UInt32Value,
 }
 /// Defines the RevListAutoExpandRw Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrListExpR")]
+#[sdk(qname = "xr:xrrListExpR")]
 pub struct RevListAutoExpandRw {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// refAdded
-  #[sdk(attr(office2016, qname = ":refAdded"))]
+  #[sdk(attr(qname = ":refAdded"))]
   pub ref_added: crate::simple_type::StringValue,
   /// listGuid
-  #[sdk(attr(office2016, qname = ":listGuid"))]
+  #[sdk(attr(qname = ":listGuid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub list_guid: crate::simple_type::StringValue,
 }
 /// Defines the RevGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:xrrg")]
+#[sdk(qname = "xr:xrrg")]
 pub struct RevGroup {
   /// rev
-  #[sdk(attr(office2016, qname = ":rev"))]
+  #[sdk(attr(qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  #[sdk(attr(office2016, qname = ":sh"))]
+  #[sdk(attr(qname = ":sh"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  #[sdk(attr(office2016, qname = ":uidp"))]
+  #[sdk(attr(qname = ":uidp"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  #[sdk(attr(office2016, qname = ":ctx"))]
+  #[sdk(attr(qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   #[sdk(
         choice(
@@ -850,53 +850,53 @@ pub struct RevGroup {
 }
 /// Defines the RevCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:c")]
+#[sdk(qname = "xr:c")]
 pub struct RevCell {
   /// t
-  #[sdk(attr(office2016, qname = ":t"))]
+  #[sdk(attr(qname = ":t"))]
   pub t: Option<crate::schemas::x::CellValues>,
   /// nop
-  #[sdk(attr(office2016, qname = ":nop"))]
+  #[sdk(attr(qname = ":nop"))]
   pub nop: Option<crate::simple_type::BooleanValue>,
   /// tick
-  #[sdk(attr(office2016, qname = ":tick"))]
+  #[sdk(attr(qname = ":tick"))]
   pub tick: Option<crate::simple_type::BooleanValue>,
   /// rep
-  #[sdk(attr(office2016, qname = ":rep"))]
+  #[sdk(attr(qname = ":rep"))]
   pub rep: Option<crate::simple_type::UInt32Value>,
   /// Defines the FFormula Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xr:f"))]
   pub f_formula: Option<FFormula>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xr:v"))]
   pub xstring: Option<Xstring>,
   /// Defines the RstType Class.
-  #[sdk(child(office2016, qname = "xr:is"))]
+  #[sdk(child(qname = "xr:is"))]
   pub rst_type: Option<std::boxed::Box<RstType>>,
 }
 /// Defines the ChangeCellSubEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:ccse")]
+#[sdk(qname = "xr:ccse")]
 pub struct ChangeCellSubEdit {
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
+  #[sdk(attr(qname = ":r"))]
   pub r: crate::simple_type::StringValue,
   /// t
-  #[sdk(attr(office2016, qname = ":t"))]
+  #[sdk(attr(qname = ":t"))]
   pub t: Option<FillType>,
   /// x
-  #[sdk(attr(office2016, qname = ":x"))]
+  #[sdk(attr(qname = ":x"))]
   pub x: Option<FillTypeExt>,
   /// w
-  #[sdk(attr(office2016, qname = ":w"))]
+  #[sdk(attr(qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
-  #[sdk(child(office2016, qname = "xr:c"))]
+  #[sdk(child(qname = "xr:c"))]
   pub rev_cell: Vec<RevCell>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:extLst")]
+#[sdk(qname = "xr:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -908,40 +908,40 @@ pub type FormulaFormula = crate::simple_type::StringValue;
 pub type FFormula = crate::simple_type::StringValue;
 /// Defines the StateBasedHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:hdr")]
+#[sdk(qname = "xr:hdr")]
 pub struct StateBasedHeader {
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// eft
-  #[sdk(attr(office2016, qname = ":eft"))]
+  #[sdk(attr(qname = ":eft"))]
   pub eft: FeatureType,
   /// eftx
-  #[sdk(attr(office2016, qname = ":eftx"))]
+  #[sdk(attr(qname = ":eftx"))]
   pub eftx: Option<ExtFeatureType>,
   /// seft
-  #[sdk(attr(office2016, qname = ":seft"))]
+  #[sdk(attr(qname = ":seft"))]
   pub seft: Option<SubFeatureType>,
   /// seftx
-  #[sdk(attr(office2016, qname = ":seftx"))]
+  #[sdk(attr(qname = ":seftx"))]
   pub seftx: Option<ExtSubFeatureType>,
   /// Defines the RefMap Class.
-  #[sdk(child(office2016, qname = "xr:refmap"))]
+  #[sdk(child(qname = "xr:refmap"))]
   pub ref_map: Option<RefMap>,
 }
 /// Defines the RevisionStateLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:link")]
+#[sdk(qname = "xr:link")]
 pub struct RevisionStateLink {
   /// id
-  #[sdk(attr(office2016, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the RevisionState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:body")]
+#[sdk(qname = "xr:body")]
 pub struct RevisionState {
   #[sdk(
         choice(
@@ -956,7 +956,7 @@ pub struct RevisionState {
 }
 /// Defines the RefMap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:refmap")]
+#[sdk(qname = "xr:refmap")]
 pub struct RefMap {
   #[sdk(
         choice(
@@ -971,77 +971,77 @@ pub struct RefMap {
 }
 /// Defines the RowColVisualOps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:rowColVisualOps")]
+#[sdk(qname = "xr:rowColVisualOps")]
 pub struct RowColVisualOps {
   /// action
-  #[sdk(attr(office2016, qname = ":action"))]
+  #[sdk(attr(qname = ":action"))]
   pub action: RowColVisualOp,
   /// isRow
-  #[sdk(attr(office2016, qname = ":isRow"))]
+  #[sdk(attr(qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
   /// size
-  #[sdk(attr(office2016, qname = ":size"))]
+  #[sdk(attr(qname = ":size"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// userSized
-  #[sdk(attr(office2016, qname = ":userSized"))]
+  #[sdk(attr(qname = ":userSized"))]
   pub user_sized: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the HideUnhideSheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:hideUnhideSheet")]
+#[sdk(qname = "xr:hideUnhideSheet")]
 pub struct HideUnhideSheet {
   /// hide
-  #[sdk(attr(office2016, qname = ":hide"))]
+  #[sdk(attr(qname = ":hide"))]
   pub hide: crate::simple_type::BooleanValue,
 }
 /// Defines the ShowGridlinesHeadings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:showGridlinesHeadings")]
+#[sdk(qname = "xr:showGridlinesHeadings")]
 pub struct ShowGridlinesHeadings {
   /// showGridLines
-  #[sdk(attr(office2016, qname = ":showGridLines"))]
+  #[sdk(attr(qname = ":showGridLines"))]
   pub show_grid_lines: crate::simple_type::BooleanValue,
   /// showRowCol
-  #[sdk(attr(office2016, qname = ":showRowCol"))]
+  #[sdk(attr(qname = ":showRowCol"))]
   pub show_row_col: crate::simple_type::BooleanValue,
 }
 /// Defines the FreezePanes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:freezePanes")]
+#[sdk(qname = "xr:freezePanes")]
 pub struct FreezePanes {
   /// sheetViewUid
-  #[sdk(attr(office2016, qname = ":sheetViewUid"))]
+  #[sdk(attr(qname = ":sheetViewUid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub sheet_view_uid: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Outlines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:outlines")]
+#[sdk(qname = "xr:outlines")]
 pub struct Outlines {
   /// isRow
-  #[sdk(attr(office2016, qname = ":isRow"))]
+  #[sdk(attr(qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
   /// Defines the Outline Class.
-  #[sdk(child(office2016, qname = "xr:outline"))]
+  #[sdk(child(qname = "xr:outline"))]
   pub outline: Vec<Outline>,
 }
 /// Defines the Outline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:outline")]
+#[sdk(qname = "xr:outline")]
 pub struct Outline {
   /// isCollapsed
-  #[sdk(attr(office2016, qname = ":isCollapsed"))]
+  #[sdk(attr(qname = ":isCollapsed"))]
   pub is_collapsed: crate::simple_type::BooleanValue,
   /// level
-  #[sdk(attr(office2016, qname = ":level"))]
+  #[sdk(attr(qname = ":level"))]
   pub level: crate::simple_type::ByteValue,
 }
 /// Defines the Xstring Class.
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the RstType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:is")]
+#[sdk(qname = "xr:is")]
 pub struct RstType {
   /// Text
   #[sdk(child(qname = "x:t"))]
@@ -1058,131 +1058,131 @@ pub struct RstType {
 }
 /// Defines the RefCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:ref")]
+#[sdk(qname = "xr:ref")]
 pub struct RefCell {
   /// n
-  #[sdk(attr(office2016, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  #[sdk(attr(office2016, qname = ":ajt"))]
+  #[sdk(attr(qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  #[sdk(attr(office2016, qname = ":ajtx"))]
+  #[sdk(attr(qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  #[sdk(attr(office2016, qname = ":homeRef"))]
+  #[sdk(attr(qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// r
-  #[sdk(attr(office2016, list, qname = ":r"))]
+  #[sdk(attr(list, qname = ":r"))]
   pub r: Vec<crate::simple_type::StringValue>,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: Option<crate::simple_type::StringValue>,
   /// uidLast
-  #[sdk(attr(office2016, qname = ":uidLast"))]
+  #[sdk(attr(qname = ":uidLast"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid_last: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SheetXluid Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:sheetUid")]
+#[sdk(qname = "xr:sheetUid")]
 pub struct SheetXluid {
   /// n
-  #[sdk(attr(office2016, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  #[sdk(attr(office2016, qname = ":ajt"))]
+  #[sdk(attr(qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  #[sdk(attr(office2016, qname = ":ajtx"))]
+  #[sdk(attr(qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  #[sdk(attr(office2016, qname = ":homeRef"))]
+  #[sdk(attr(qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// uid
-  #[sdk(attr(office2016, qname = ":uid"))]
+  #[sdk(attr(qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
 }
 /// Defines the RefOartAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:oartAnchor")]
+#[sdk(qname = "xr:oartAnchor")]
 pub struct RefOartAnchor {
   /// n
-  #[sdk(attr(office2016, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  #[sdk(attr(office2016, qname = ":ajt"))]
+  #[sdk(attr(qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  #[sdk(attr(office2016, qname = ":ajtx"))]
+  #[sdk(attr(qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  #[sdk(attr(office2016, qname = ":homeRef"))]
+  #[sdk(attr(qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
+  #[sdk(attr(qname = ":r"))]
   pub r: Option<crate::simple_type::StringValue>,
   /// fromRowOff
-  #[sdk(attr(office2016, qname = ":fromRowOff"))]
+  #[sdk(attr(qname = ":fromRowOff"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub from_row_off: Option<crate::simple_type::Int64Value>,
   /// fromColOff
-  #[sdk(attr(office2016, qname = ":fromColOff"))]
+  #[sdk(attr(qname = ":fromColOff"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub from_col_off: Option<crate::simple_type::Int64Value>,
   /// toRowOff
-  #[sdk(attr(office2016, qname = ":toRowOff"))]
+  #[sdk(attr(qname = ":toRowOff"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub to_row_off: Option<crate::simple_type::Int64Value>,
   /// toColOff
-  #[sdk(attr(office2016, qname = ":toColOff"))]
+  #[sdk(attr(qname = ":toColOff"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub to_col_off: Option<crate::simple_type::Int64Value>,
   /// cx
-  #[sdk(attr(office2016, qname = ":cx"))]
+  #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
-  #[sdk(attr(office2016, qname = ":cy"))]
+  #[sdk(attr(qname = ":cy"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// x
-  #[sdk(attr(office2016, qname = ":x"))]
+  #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
-  #[sdk(attr(office2016, qname = ":y"))]
+  #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// oat
-  #[sdk(attr(office2016, qname = ":oat"))]
+  #[sdk(attr(qname = ":oat"))]
   pub oat: OartAnchorType,
 }
 /// Defines the RefTest Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:test")]
+#[sdk(qname = "xr:test")]
 pub struct RefTest {
   /// n
-  #[sdk(attr(office2016, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  #[sdk(attr(office2016, qname = ":ajt"))]
+  #[sdk(attr(qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  #[sdk(attr(office2016, qname = ":ajtx"))]
+  #[sdk(attr(qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  #[sdk(attr(office2016, qname = ":homeRef"))]
+  #[sdk(attr(qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
 }
 /// Represents an external link to another workbook..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:dataValidation")]
+#[sdk(qname = "xr:dataValidation")]
 pub struct DataValidation {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -1224,7 +1224,7 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x12ac:list"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:formula1"))]
@@ -1235,7 +1235,7 @@ pub struct DataValidation {
 }
 /// Represents a hyperlink within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:hyperlink")]
+#[sdk(qname = "xr:hyperlink")]
 pub struct Hyperlink {
   /// Reference
   #[sdk(attr(qname = ":ref"))]
@@ -1255,93 +1255,93 @@ pub struct Hyperlink {
 }
 /// Represents a sparkline group of 1 or more sparklines..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:sparklineGroup")]
+#[sdk(qname = "xr:sparklineGroup")]
 pub struct SparklineGroup {
   /// manualMax
-  #[sdk(attr(office2010, qname = ":manualMax"))]
+  #[sdk(attr(qname = ":manualMax"))]
   pub manual_max: Option<crate::simple_type::DoubleValue>,
   /// manualMin
-  #[sdk(attr(office2010, qname = ":manualMin"))]
+  #[sdk(attr(qname = ":manualMin"))]
   pub manual_min: Option<crate::simple_type::DoubleValue>,
   /// lineWeight
-  #[sdk(attr(office2010, qname = ":lineWeight"))]
+  #[sdk(attr(qname = ":lineWeight"))]
   pub line_weight: Option<crate::simple_type::DoubleValue>,
   /// type
-  #[sdk(attr(office2010, qname = ":type"))]
+  #[sdk(attr(qname = ":type"))]
   pub r#type: Option<crate::schemas::x14::SparklineTypeValues>,
   /// dateAxis
-  #[sdk(attr(office2010, qname = ":dateAxis"))]
+  #[sdk(attr(qname = ":dateAxis"))]
   pub date_axis: Option<crate::simple_type::BooleanValue>,
   /// displayEmptyCellsAs
-  #[sdk(attr(office2010, qname = ":displayEmptyCellsAs"))]
+  #[sdk(attr(qname = ":displayEmptyCellsAs"))]
   pub display_empty_cells_as: Option<crate::schemas::x14::DisplayBlanksAsValues>,
   /// markers
-  #[sdk(attr(office2010, qname = ":markers"))]
+  #[sdk(attr(qname = ":markers"))]
   pub markers: Option<crate::simple_type::BooleanValue>,
   /// high
-  #[sdk(attr(office2010, qname = ":high"))]
+  #[sdk(attr(qname = ":high"))]
   pub high: Option<crate::simple_type::BooleanValue>,
   /// low
-  #[sdk(attr(office2010, qname = ":low"))]
+  #[sdk(attr(qname = ":low"))]
   pub low: Option<crate::simple_type::BooleanValue>,
   /// first
-  #[sdk(attr(office2010, qname = ":first"))]
+  #[sdk(attr(qname = ":first"))]
   pub first: Option<crate::simple_type::BooleanValue>,
   /// last
-  #[sdk(attr(office2010, qname = ":last"))]
+  #[sdk(attr(qname = ":last"))]
   pub last: Option<crate::simple_type::BooleanValue>,
   /// negative
-  #[sdk(attr(office2010, qname = ":negative"))]
+  #[sdk(attr(qname = ":negative"))]
   pub negative: Option<crate::simple_type::BooleanValue>,
   /// displayXAxis
-  #[sdk(attr(office2010, qname = ":displayXAxis"))]
+  #[sdk(attr(qname = ":displayXAxis"))]
   pub display_x_axis: Option<crate::simple_type::BooleanValue>,
   /// displayHidden
-  #[sdk(attr(office2010, qname = ":displayHidden"))]
+  #[sdk(attr(qname = ":displayHidden"))]
   pub display_hidden: Option<crate::simple_type::BooleanValue>,
   /// minAxisType
-  #[sdk(attr(office2010, qname = ":minAxisType"))]
+  #[sdk(attr(qname = ":minAxisType"))]
   pub min_axis_type: Option<crate::schemas::x14::SparklineAxisMinMaxValues>,
   /// maxAxisType
-  #[sdk(attr(office2010, qname = ":maxAxisType"))]
+  #[sdk(attr(qname = ":maxAxisType"))]
   pub max_axis_type: Option<crate::schemas::x14::SparklineAxisMinMaxValues>,
   /// rightToLeft
-  #[sdk(attr(office2010, qname = ":rightToLeft"))]
+  #[sdk(attr(qname = ":rightToLeft"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
   /// Defines the SeriesColor Class.
-  #[sdk(child(office2010, qname = "x14:colorSeries"))]
+  #[sdk(child(qname = "x14:colorSeries"))]
   pub series_color: Option<crate::schemas::x14::SeriesColor>,
   /// Defines the NegativeColor Class.
-  #[sdk(child(office2010, qname = "x14:colorNegative"))]
+  #[sdk(child(qname = "x14:colorNegative"))]
   pub negative_color: Option<crate::schemas::x14::NegativeColor>,
   /// Defines the AxisColor Class.
-  #[sdk(child(office2010, qname = "x14:colorAxis"))]
+  #[sdk(child(qname = "x14:colorAxis"))]
   pub axis_color: Option<crate::schemas::x14::AxisColor>,
   /// Defines the MarkersColor Class.
-  #[sdk(child(office2010, qname = "x14:colorMarkers"))]
+  #[sdk(child(qname = "x14:colorMarkers"))]
   pub markers_color: Option<crate::schemas::x14::MarkersColor>,
   /// Defines the FirstMarkerColor Class.
-  #[sdk(child(office2010, qname = "x14:colorFirst"))]
+  #[sdk(child(qname = "x14:colorFirst"))]
   pub first_marker_color: Option<crate::schemas::x14::FirstMarkerColor>,
   /// Defines the LastMarkerColor Class.
-  #[sdk(child(office2010, qname = "x14:colorLast"))]
+  #[sdk(child(qname = "x14:colorLast"))]
   pub last_marker_color: Option<crate::schemas::x14::LastMarkerColor>,
   /// Defines the HighMarkerColor Class.
-  #[sdk(child(office2010, qname = "x14:colorHigh"))]
+  #[sdk(child(qname = "x14:colorHigh"))]
   pub high_marker_color: Option<crate::schemas::x14::HighMarkerColor>,
   /// Defines the LowMarkerColor Class.
-  #[sdk(child(office2010, qname = "x14:colorLow"))]
+  #[sdk(child(qname = "x14:colorLow"))]
   pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "xne:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
-  #[sdk(child(office2010, qname = "x14:sparklines"))]
+  #[sdk(child(qname = "x14:sparklines"))]
   pub sparklines: std::boxed::Box<crate::schemas::x14::Sparklines>,
 }
 /// Represents one comment within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:comments")]
+#[sdk(qname = "xr:comments")]
 pub struct Comments {
   /// Authors
   #[sdk(child(qname = "x:authors"))]
@@ -1355,7 +1355,7 @@ pub struct Comments {
 }
 /// Represents an autofilter..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:autoFilter")]
+#[sdk(qname = "xr:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
@@ -1372,7 +1372,7 @@ pub struct AutoFilter {
 }
 /// Represents a PivotTable View..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:pivotTableDefinition")]
+#[sdk(qname = "xr:pivotTableDefinition")]
 pub struct PivotTableDefinition {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -1735,7 +1735,7 @@ pub enum RefMapChoice {
   /// Defines the RefOartAnchor Class.
   RefOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
-  #[sdk(empty_child(office2016, qname = "xr:future"))]
+  #[sdk(empty_child(qname = "xr:future"))]
   RefFuture,
   /// Defines the RefTest Class.
   RefTest(std::boxed::Box<RefTest>),

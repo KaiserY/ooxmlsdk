@@ -6,64 +6,64 @@
 
 /// Defines the EmbeddedAnimation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:embedAnim")]
+#[sdk(qname = "a3danim:embedAnim")]
 pub struct EmbeddedAnimation {
   /// animId
-  #[sdk(attr(office2019, qname = ":animId"))]
+  #[sdk(attr(qname = ":animId"))]
   pub anim_id: crate::simple_type::UInt32Value,
   /// Defines the AnimationProperties Class.
-  #[sdk(child(office2019, qname = "a3danim:animPr"))]
+  #[sdk(child(qname = "a3danim:animPr"))]
   pub animation_properties: std::boxed::Box<AnimationProperties>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "a3danim:extLst"))]
+  #[sdk(child(qname = "a3danim:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PosterFrame Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:posterFrame")]
+#[sdk(qname = "a3danim:posterFrame")]
 pub struct PosterFrame {
   /// animId
-  #[sdk(attr(office2019, qname = ":animId"))]
+  #[sdk(attr(qname = ":animId"))]
   pub anim_id: crate::simple_type::UInt32Value,
   /// frame
-  #[sdk(attr(office2019, qname = ":frame"))]
+  #[sdk(attr(qname = ":frame"))]
   #[sdk(number_range(range = 0..= 100000))]
   pub frame: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the AnimationProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:animPr")]
+#[sdk(qname = "a3danim:animPr")]
 pub struct AnimationProperties {
   /// name
-  #[sdk(attr(office2019, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// length
-  #[sdk(attr(office2019, qname = ":length"))]
+  #[sdk(attr(qname = ":length"))]
   pub length: crate::simple_type::StringValue,
   /// count
-  #[sdk(attr(office2019, qname = ":count"))]
+  #[sdk(attr(qname = ":count"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:unsignedInt"))]
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["indefinite"]))]
   pub count: Option<crate::simple_type::StringValue>,
   /// auto
-  #[sdk(attr(office2019, qname = ":auto"))]
+  #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// offset
-  #[sdk(attr(office2019, qname = ":offset"))]
+  #[sdk(attr(qname = ":offset"))]
   pub offset: Option<crate::simple_type::StringValue>,
   /// st
-  #[sdk(attr(office2019, qname = ":st"))]
+  #[sdk(attr(qname = ":st"))]
   pub st: Option<crate::simple_type::StringValue>,
   /// end
-  #[sdk(attr(office2019, qname = ":end"))]
+  #[sdk(attr(qname = ":end"))]
   pub end: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "aanim:extLst"))]
+  #[sdk(child(qname = "aanim:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::aanim::OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:extLst")]
+#[sdk(qname = "a3danim:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]

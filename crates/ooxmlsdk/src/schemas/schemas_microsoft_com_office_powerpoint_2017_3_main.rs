@@ -14,29 +14,29 @@ pub enum DisplayLocation {
 }
 /// Defines the TracksInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:tracksInfo")]
+#[sdk(qname = "p173:tracksInfo")]
 pub struct TracksInfo {
   /// displayLoc
-  #[sdk(attr(office2019, qname = ":displayLoc"))]
+  #[sdk(attr(qname = ":displayLoc"))]
   pub display_loc: DisplayLocation,
   /// Defines the TrackList Class.
-  #[sdk(child(office2019, qname = "p173:trackLst"))]
+  #[sdk(child(qname = "p173:trackLst"))]
   pub track_list: Option<TrackList>,
 }
 /// Defines the Track Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:track")]
+#[sdk(qname = "p173:track")]
 pub struct Track {
   /// id
-  #[sdk(attr(office2019, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// label
-  #[sdk(attr(office2019, qname = ":label"))]
+  #[sdk(attr(qname = ":label"))]
   pub label: crate::simple_type::StringValue,
   /// lang
-  #[sdk(attr(office2019, qname = ":lang"))]
+  #[sdk(attr(qname = ":lang"))]
   pub lang: Option<crate::simple_type::StringValue>,
   /// Embedded Picture Reference
   #[sdk(attr(qname = "r:embed"))]
@@ -47,9 +47,9 @@ pub struct Track {
 }
 /// Defines the TrackList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:trackLst")]
+#[sdk(qname = "p173:trackLst")]
 pub struct TrackList {
   /// Defines the Track Class.
-  #[sdk(child(office2019, qname = "p173:track"))]
+  #[sdk(child(qname = "p173:track"))]
   pub track: Vec<Track>,
 }

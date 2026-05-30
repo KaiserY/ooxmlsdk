@@ -28,43 +28,43 @@ pub enum ModelTimeGroupingContentType {
 }
 /// Defines the ModelTimeGroupings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x16:modelTimeGroupings")]
+#[sdk(qname = "x16:modelTimeGroupings")]
 pub struct ModelTimeGroupings {
   /// Defines the ModelTimeGrouping Class.
-  #[sdk(child(office2016, qname = "x16:modelTimeGrouping"))]
+  #[sdk(child(qname = "x16:modelTimeGrouping"))]
   pub model_time_grouping: Vec<ModelTimeGrouping>,
 }
 /// Defines the ModelTimeGrouping Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x16:modelTimeGrouping")]
+#[sdk(qname = "x16:modelTimeGrouping")]
 pub struct ModelTimeGrouping {
   /// tableName
-  #[sdk(attr(office2016, qname = ":tableName"))]
+  #[sdk(attr(qname = ":tableName"))]
   pub table_name: crate::simple_type::StringValue,
   /// columnName
-  #[sdk(attr(office2016, qname = ":columnName"))]
+  #[sdk(attr(qname = ":columnName"))]
   pub column_name: crate::simple_type::StringValue,
   /// columnId
-  #[sdk(attr(office2016, qname = ":columnId"))]
+  #[sdk(attr(qname = ":columnId"))]
   pub column_id: crate::simple_type::StringValue,
   /// Defines the CalculatedTimeColumn Class.
-  #[sdk(child(office2016, qname = "x16:calculatedTimeColumn"))]
+  #[sdk(child(qname = "x16:calculatedTimeColumn"))]
   pub calculated_time_column: Vec<CalculatedTimeColumn>,
 }
 /// Defines the CalculatedTimeColumn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x16:calculatedTimeColumn")]
+#[sdk(qname = "x16:calculatedTimeColumn")]
 pub struct CalculatedTimeColumn {
   /// columnName
-  #[sdk(attr(office2016, qname = ":columnName"))]
+  #[sdk(attr(qname = ":columnName"))]
   pub column_name: crate::simple_type::StringValue,
   /// columnId
-  #[sdk(attr(office2016, qname = ":columnId"))]
+  #[sdk(attr(qname = ":columnId"))]
   pub column_id: crate::simple_type::StringValue,
   /// contentType
-  #[sdk(attr(office2016, qname = ":contentType"))]
+  #[sdk(attr(qname = ":contentType"))]
   pub content_type: ModelTimeGroupingContentType,
   /// isSelected
-  #[sdk(attr(office2016, qname = ":isSelected"))]
+  #[sdk(attr(qname = ":isSelected"))]
   pub is_selected: crate::simple_type::BooleanValue,
 }

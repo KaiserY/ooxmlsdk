@@ -8,20 +8,20 @@
 pub type Xsdboolean = crate::simple_type::BooleanValue;
 /// Defines the Ignorable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xxpim:ignorableAfterVersion")]
+#[sdk(qname = "xxpim:ignorableAfterVersion")]
 pub struct Ignorable {
   /// version
-  #[sdk(attr(office2021, qname = ":version"))]
+  #[sdk(attr(qname = ":version"))]
   pub version: crate::simple_type::ByteValue,
 }
 /// Defines the DataFieldFutureData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xxpim:dataFieldFutureData")]
+#[sdk(qname = "xxpim:dataFieldFutureData")]
 pub struct DataFieldFutureData {
   /// version
-  #[sdk(attr(office2021, qname = ":version"))]
+  #[sdk(attr(qname = ":version"))]
   pub version: crate::simple_type::ByteValue,
   /// sourceField
-  #[sdk(attr(office2021, qname = ":sourceField"))]
+  #[sdk(attr(qname = ":sourceField"))]
   pub source_field: crate::simple_type::UInt32Value,
 }

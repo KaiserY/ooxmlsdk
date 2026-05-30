@@ -2356,7 +2356,7 @@ pub struct Chartsheet {
   #[sdk(child(qname = "x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
   /// Defines the DrawingHeaderFooter Class.
-  #[sdk(child(office2010, qname = "x:drawingHF"))]
+  #[sdk(child(qname = "x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// Defines the Picture Class.
   #[sdk(child(qname = "x:picture"))]
@@ -2411,13 +2411,13 @@ pub struct DialogSheet {
   #[sdk(child(qname = "x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
   /// Defines the DrawingHeaderFooter Class.
-  #[sdk(child(office2010, qname = "x:drawingHF"))]
+  #[sdk(child(qname = "x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
   /// Defines the Controls Class.
-  #[sdk(child(office2010, qname = "x:controls"))]
+  #[sdk(child(qname = "x:controls"))]
   pub controls: Option<Controls>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:extLst"))]
@@ -2644,7 +2644,7 @@ pub struct Workbook {
   #[sdk(child(qname = "x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
   /// Defines the AbsolutePath Class.
-  #[sdk(child(office2013, qname = "x15ac:absPath"))]
+  #[sdk(child(qname = "x15ac:absPath"))]
   pub absolute_path: Option<crate::schemas::x15ac::AbsolutePath>,
   /// Defines the WorkbookProtection Class.
   #[sdk(child(qname = "x:workbookProtection"))]
@@ -2821,13 +2821,13 @@ pub struct Comment {
   #[sdk(string_format(kind = "token"))]
   pub guid: Option<crate::simple_type::StringValue>,
   /// shapeId
-  #[sdk(attr(office2010, qname = ":shapeId"))]
+  #[sdk(attr(qname = ":shapeId"))]
   pub shape_id: Option<crate::simple_type::UInt32Value>,
   /// Comment Text
   #[sdk(child(qname = "x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
   /// Defines the CommentProperties Class.
-  #[sdk(child(office2010, qname = "x:commentPr"))]
+  #[sdk(child(qname = "x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
 }
 /// Author.
@@ -5890,7 +5890,7 @@ pub struct Row {
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
   /// dyDescent
-  #[sdk(attr(office2010, qname = "x14ac:dyDescent"))]
+  #[sdk(attr(qname = "x14ac:dyDescent"))]
   pub dy_descent: Option<crate::simple_type::DoubleValue>,
   /// Cell.
   #[sdk(child(qname = "x:c"))]
@@ -6604,7 +6604,7 @@ pub struct Control {
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Defines the ControlProperties Class.
-  #[sdk(child(office2010, qname = "x:controlPr"))]
+  #[sdk(child(qname = "x:controlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Ignored Error.
@@ -6695,7 +6695,7 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x12ac:list"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:formula1"))]
@@ -6901,7 +6901,7 @@ pub struct OleObject {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the EmbeddedObjectProperties Class.
-  #[sdk(child(office2010, qname = "x:objectPr"))]
+  #[sdk(child(qname = "x:objectPr"))]
   pub embedded_object_properties: Option<std::boxed::Box<EmbeddedObjectProperties>>,
 }
 /// Metadata Types Collection.
@@ -7419,10 +7419,10 @@ pub struct Border {
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
   /// Defines the StartBorder Class.
-  #[sdk(child(office2010, qname = "x:start"))]
+  #[sdk(child(qname = "x:start"))]
   pub start_border: Option<std::boxed::Box<StartBorder>>,
   /// Defines the EndBorder Class.
-  #[sdk(child(office2010, qname = "x:end"))]
+  #[sdk(child(qname = "x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
   /// Left Border
   #[sdk(child(qname = "x:left"))]
@@ -7743,7 +7743,7 @@ pub struct ExternalBook {
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
   /// Alternate URLs and identifiers of the external book
-  #[sdk(child(microsoft365, qname = "xxl21:alternateUrls"))]
+  #[sdk(child(qname = "xxl21:alternateUrls"))]
   pub external_book_alternate_urls:
     Option<std::boxed::Box<crate::schemas::xxl21::ExternalBookAlternateUrls>>,
   /// Sheet names of supporting book
@@ -8196,7 +8196,7 @@ pub struct FunctionGroup {
 }
 /// Defines the ObjectAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:anchor")]
+#[sdk(default_ns, qname = "x:anchor")]
 pub struct ObjectAnchor {
   /// moveWithCells
   #[sdk(attr(qname = ":moveWithCells"))]
@@ -8208,15 +8208,15 @@ pub struct ObjectAnchor {
   #[sdk(attr(qname = ":z-order"))]
   pub z_order: Option<crate::simple_type::UInt32Value>,
   /// Defines the FromMarker Class.
-  #[sdk(child(office2010, qname = "x:from"))]
+  #[sdk(child(qname = "x:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
   /// Defines the ToMarker Class.
-  #[sdk(child(office2010, qname = "x:to"))]
+  #[sdk(child(qname = "x:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
 }
 /// Defines the FromMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:from")]
+#[sdk(default_ns, qname = "x:from")]
 pub struct FromMarker {
   /// Column)
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
@@ -8233,7 +8233,7 @@ pub struct FromMarker {
 }
 /// Defines the ToMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:to")]
+#[sdk(default_ns, qname = "x:to")]
 pub struct ToMarker {
   /// Column)
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
@@ -8318,7 +8318,7 @@ pub struct OleItem {
 }
 /// Defines the StartBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:start")]
+#[sdk(default_ns, qname = "x:start")]
 pub struct StartBorder {
   /// Line Style
   #[sdk(attr(qname = ":style"))]
@@ -8329,7 +8329,7 @@ pub struct StartBorder {
 }
 /// Defines the EndBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:end")]
+#[sdk(default_ns, qname = "x:end")]
 pub struct EndBorder {
   /// Line Style
   #[sdk(attr(qname = ":style"))]
@@ -8417,7 +8417,7 @@ pub struct HorizontalBorder {
 }
 /// Defines the ControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:controlPr")]
+#[sdk(default_ns, qname = "x:controlPr")]
 pub struct ControlProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]
@@ -8465,12 +8465,12 @@ pub struct ControlProperties {
   #[sdk(attr(qname = "r:id"))]
   pub r_id: Option<crate::simple_type::StringValue>,
   /// Defines the ObjectAnchor Class.
-  #[sdk(child(office2010, qname = "x:anchor"))]
+  #[sdk(child(qname = "x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
 /// Defines the EmbeddedObjectProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:objectPr")]
+#[sdk(default_ns, qname = "x:objectPr")]
 pub struct EmbeddedObjectProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]
@@ -8509,7 +8509,7 @@ pub struct EmbeddedObjectProperties {
   #[sdk(attr(qname = "r:id"))]
   pub r_id: Option<crate::simple_type::StringValue>,
   /// Defines the ObjectAnchor Class.
-  #[sdk(child(office2010, qname = "x:anchor"))]
+  #[sdk(child(qname = "x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
 /// Chart Sheet Properties.
@@ -8833,7 +8833,7 @@ pub struct SheetFormatProperties {
   #[sdk(attr(qname = ":outlineLevelCol"))]
   pub outline_level_column: Option<crate::simple_type::ByteValue>,
   /// dyDescent
-  #[sdk(attr(office2010, qname = "x14ac:dyDescent"))]
+  #[sdk(attr(qname = "x14ac:dyDescent"))]
   pub dy_descent: Option<crate::simple_type::DoubleValue>,
 }
 /// Sheet Protection.
@@ -8963,7 +8963,7 @@ pub struct DataConsolidate {
   #[sdk(attr(qname = ":leftLabels"))]
   pub left_labels: Option<crate::simple_type::BooleanValue>,
   /// startLabels
-  #[sdk(attr(office2010, qname = ":startLabels"))]
+  #[sdk(attr(qname = ":startLabels"))]
   pub start_labels: Option<crate::simple_type::BooleanValue>,
   /// Labels In Top Row
   #[sdk(attr(qname = ":topLabels"))]
@@ -9104,7 +9104,7 @@ pub struct CacheSourceExtensionList {
 }
 /// Defines the CommentProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, default_ns, qname = "x:commentPr")]
+#[sdk(default_ns, qname = "x:commentPr")]
 pub struct CommentProperties {
   /// locked
   #[sdk(attr(qname = ":locked"))]
@@ -9152,7 +9152,7 @@ pub struct CommentProperties {
   #[sdk(attr(qname = ":colHidden"))]
   pub col_hidden: Option<crate::simple_type::BooleanValue>,
   /// Defines the ObjectAnchor Class.
-  #[sdk(child(office2010, qname = "x:anchor"))]
+  #[sdk(child(qname = "x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
 /// Defines the SortCondition Class.
@@ -9276,10 +9276,10 @@ pub struct DynamicFilter {
   #[sdk(attr(qname = ":maxVal"))]
   pub max_val: Option<crate::simple_type::DoubleValue>,
   /// valIso
-  #[sdk(attr(office2010, qname = ":valIso"))]
+  #[sdk(attr(qname = ":valIso"))]
   pub val_iso: Option<crate::simple_type::DateTimeValue>,
   /// maxValIso
-  #[sdk(attr(office2010, qname = ":maxValIso"))]
+  #[sdk(attr(qname = ":maxValIso"))]
   pub max_val_iso: Option<crate::simple_type::DateTimeValue>,
 }
 /// Color Filter Criteria.
@@ -9983,7 +9983,7 @@ pub struct Fonts {
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// knownFonts
-  #[sdk(attr(office2010, qname = "x14ac:knownFonts"))]
+  #[sdk(attr(qname = "x14ac:knownFonts"))]
   pub known_fonts: Option<crate::simple_type::BooleanValue>,
   /// Font Properties.
   #[sdk(child(qname = "x:font"))]
@@ -10650,7 +10650,7 @@ pub struct WorkbookProperties {
   #[sdk(attr(qname = ":date1904"))]
   pub date1904: Option<crate::simple_type::BooleanValue>,
   /// dateCompatibility
-  #[sdk(attr(office2010, qname = ":dateCompatibility"))]
+  #[sdk(attr(qname = ":dateCompatibility"))]
   pub date_compatibility: Option<crate::simple_type::BooleanValue>,
   /// Show Objects
   #[sdk(attr(qname = ":showObjects"))]
@@ -11009,7 +11009,7 @@ pub enum FilterColumnChoice {
   /// Top 10.
   Top10(std::boxed::Box<Top10>),
   /// Defines the CustomFilters Class.
-  #[sdk(child(office2010, qname = "x14:customFilters"))]
+  #[sdk(child(qname = "x14:customFilters"))]
   X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
   /// Custom Filters.
   #[sdk(child(qname = "x:customFilters"))]
@@ -11019,7 +11019,7 @@ pub enum FilterColumnChoice {
   /// Color Filter Criteria.
   ColorFilter(std::boxed::Box<ColorFilter>),
   /// Defines the IconFilter Class.
-  #[sdk(child(office2010, qname = "x14:iconFilter"))]
+  #[sdk(child(qname = "x14:iconFilter"))]
   X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
   /// Icon Filter.
   #[sdk(child(qname = "x:iconFilter"))]
@@ -11029,7 +11029,7 @@ pub enum FilterColumnChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortStateChoice {
-  #[sdk(child(office2010, qname = "x14:sortCondition"))]
+  #[sdk(child(qname = "x14:sortCondition"))]
   X14SortCondition(std::boxed::Box<crate::schemas::x14::SortCondition>),
   /// Defines the SortCondition Class.
   #[sdk(child(qname = "x:sortCondition"))]
@@ -11196,13 +11196,13 @@ pub enum OleItemsChoice {
   #[sdk(child(qname = "x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
   /// Defines the OleItem Class.
-  #[sdk(child(office2010, qname = "x14:oleItem"))]
+  #[sdk(child(qname = "x14:oleItem"))]
   X14OleItem(std::boxed::Box<crate::schemas::x14::OleItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionalFormattingRuleExtensionChoice {
   /// Defines the Id Class.
-  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x14:id"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "x14:id"))]
   Id(crate::schemas::x14::Id),
   #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
@@ -11239,7 +11239,7 @@ pub enum ControlsChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FiltersChoice {
   /// Defines the Filter Class.
-  #[sdk(child(office2010, qname = "x14:filter"))]
+  #[sdk(child(qname = "x14:filter"))]
   X14Filter(std::boxed::Box<crate::schemas::x14::Filter>),
   /// Filter.
   #[sdk(child(qname = "x:filter"))]
@@ -11279,10 +11279,10 @@ pub enum QueryTableExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectionExtensionChoice {
   /// Defines the Connection Class.
-  #[sdk(child(office2010, qname = "x14:connection"))]
+  #[sdk(child(qname = "x14:connection"))]
   X14Connection(std::boxed::Box<crate::schemas::x14::Connection>),
   /// Defines the Connection Class.
-  #[sdk(child(office2013, qname = "x15:connection"))]
+  #[sdk(child(qname = "x15:connection"))]
   X15Connection(std::boxed::Box<crate::schemas::x15::Connection>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
@@ -11321,10 +11321,10 @@ pub enum CacheFieldExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheHierarchyExtensionChoice {
   /// Defines the CacheHierarchy Class.
-  #[sdk(child(office2010, qname = "x14:cacheHierarchy"))]
+  #[sdk(child(qname = "x14:cacheHierarchy"))]
   X14CacheHierarchy(std::boxed::Box<crate::schemas::x14::CacheHierarchy>),
   /// Defines the CacheHierarchy Class.
-  #[sdk(child(office2013, qname = "x15:cacheHierarchy"))]
+  #[sdk(child(qname = "x15:cacheHierarchy"))]
   X15CacheHierarchy(std::boxed::Box<crate::schemas::x15::CacheHierarchy>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
@@ -11332,10 +11332,10 @@ pub enum CacheHierarchyExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CalculatedMemberExtensionChoice {
   /// Defines the CalculatedMember Class.
-  #[sdk(child(office2010, qname = "x14:calculatedMember"))]
+  #[sdk(child(qname = "x14:calculatedMember"))]
   X14CalculatedMember(std::boxed::Box<crate::schemas::x14::CalculatedMember>),
   /// Defines the CalculatedMember Class.
-  #[sdk(child(office2013, qname = "x15:calculatedMember"))]
+  #[sdk(child(qname = "x15:calculatedMember"))]
   X15CalculatedMember(std::boxed::Box<crate::schemas::x15::CalculatedMember>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
@@ -11343,10 +11343,10 @@ pub enum CalculatedMemberExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataFieldExtensionChoice {
   /// Defines the DataField Class.
-  #[sdk(child(office2010, qname = "x14:dataField"))]
+  #[sdk(child(qname = "x14:dataField"))]
   X14DataField(std::boxed::Box<crate::schemas::x14::DataField>),
   /// Defines the DataField Class.
-  #[sdk(child(office2013, qname = "x15:dataField"))]
+  #[sdk(child(qname = "x15:dataField"))]
   X15DataField(std::boxed::Box<crate::schemas::x15::DataField>),
   #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
@@ -11375,12 +11375,12 @@ pub enum WorksheetExtensionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
   /// Defines the DifferentialFormats Class.
-  #[sdk(child(office2010, qname = "x14:dxfs"))]
+  #[sdk(child(qname = "x14:dxfs"))]
   X14DifferentialFormats(std::boxed::Box<crate::schemas::x14::DifferentialFormats>),
   /// Defines the SlicerStyles Class.
   SlicerStyles(std::boxed::Box<crate::schemas::x14::SlicerStyles>),
   /// Defines the DifferentialFormats Class.
-  #[sdk(child(office2013, qname = "x15:dxfs"))]
+  #[sdk(child(qname = "x15:dxfs"))]
   X15DifferentialFormats(std::boxed::Box<crate::schemas::x15::DifferentialFormats>),
   /// Defines the TimelineStyles Class.
   TimelineStyles(std::boxed::Box<crate::schemas::x15::TimelineStyles>),
@@ -11420,22 +11420,14 @@ pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheIdVersion Class.
   PivotCacheIdVersion(std::boxed::Box<crate::schemas::x15::PivotCacheIdVersion>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(
-    office2021,
-    simple_type = "BooleanValue",
-    qname = "xxpim:implicitMeasureSupport"
-  ))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "xxpim:implicitMeasureSupport"))]
   XxpimXsdboolean(crate::schemas::xxpim::Xsdboolean),
   /// Defines the PivotCacheRichInfo Class.
   PivotCacheRichInfo(std::boxed::Box<crate::schemas::xprd::PivotCacheRichInfo>),
   /// Defines the CacheVersionInfo Class.
   CacheVersionInfo(std::boxed::Box<crate::schemas::xxpvi::CacheVersionInfo>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(
-    microsoft365,
-    simple_type = "BooleanValue",
-    qname = "xlpar:autoRefresh"
-  ))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "xlpar:autoRefresh"))]
   XlparXsdboolean(crate::schemas::xlpar::Xsdboolean),
   /// Defines the PivotCacheDynamicArray Class.
   PivotCacheDynamicArray(std::boxed::Box<crate::schemas::xlpda::PivotCacheDynamicArray>),
@@ -11456,19 +11448,19 @@ pub enum WorkbookExtensionChoice {
   /// Defines the DefinedNames Class.
   DefinedNames(std::boxed::Box<crate::schemas::x14::DefinedNames>),
   /// Defines the PivotCaches Class.
-  #[sdk(child(office2010, qname = "x14:pivotCaches"))]
+  #[sdk(child(qname = "x14:pivotCaches"))]
   X14PivotCaches(std::boxed::Box<crate::schemas::x14::PivotCaches>),
   /// Defines the SlicerCaches Class.
-  #[sdk(child(office2010, qname = "x14:slicerCaches"))]
+  #[sdk(child(qname = "x14:slicerCaches"))]
   X14SlicerCaches(std::boxed::Box<crate::schemas::x14::SlicerCaches>),
   /// Defines the SlicerCaches Class.
-  #[sdk(child(office2013, qname = "x15:slicerCaches"))]
+  #[sdk(child(qname = "x15:slicerCaches"))]
   X15SlicerCaches(std::boxed::Box<crate::schemas::x15::SlicerCaches>),
   /// Defines the WorkbookProperties Class.
-  #[sdk(child(office2010, qname = "x14:workbookPr"))]
+  #[sdk(child(qname = "x14:workbookPr"))]
   X14WorkbookProperties(std::boxed::Box<crate::schemas::x14::WorkbookProperties>),
   /// Defines the PivotCaches Class.
-  #[sdk(child(office2013, qname = "x15:pivotCaches"))]
+  #[sdk(child(qname = "x15:pivotCaches"))]
   X15PivotCaches(std::boxed::Box<crate::schemas::x15::PivotCaches>),
   /// Defines the PivotTableReferences Class.
   PivotTableReferences(std::boxed::Box<crate::schemas::x15::PivotTableReferences>),
@@ -11477,7 +11469,7 @@ pub enum WorkbookExtensionChoice {
   /// Defines the TimelineCacheReferences Class.
   TimelineCacheReferences(std::boxed::Box<crate::schemas::x15::TimelineCacheReferences>),
   /// Defines the WorkbookProperties Class.
-  #[sdk(child(office2013, qname = "x15:workbookPr"))]
+  #[sdk(child(qname = "x15:workbookPr"))]
   X15WorkbookProperties(std::boxed::Box<crate::schemas::x15::WorkbookProperties>),
   /// Defines the DataModel Class.
   DataModel(std::boxed::Box<crate::schemas::x15::DataModel>),

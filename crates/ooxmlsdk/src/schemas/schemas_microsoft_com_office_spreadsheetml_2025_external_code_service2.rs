@@ -6,12 +6,12 @@
 
 /// Defines the ExternalCodeServiceImageAsInput Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlecs2:externalCodeServiceImageAsInput")]
+#[sdk(qname = "xlecs2:externalCodeServiceImageAsInput")]
 pub struct ExternalCodeServiceImageAsInput {
   /// maxWidth
-  #[sdk(attr(microsoft365, qname = ":maxWidth"))]
+  #[sdk(attr(qname = ":maxWidth"))]
   pub max_width: Option<crate::simple_type::UInt32Value>,
   /// maxHeight
-  #[sdk(attr(microsoft365, qname = ":maxHeight"))]
+  #[sdk(attr(qname = ":maxHeight"))]
   pub max_height: Option<crate::simple_type::UInt32Value>,
 }

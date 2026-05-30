@@ -8,24 +8,24 @@
 pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Defines the CommentHyperlink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xltc2:hyperlink")]
+#[sdk(qname = "xltc2:hyperlink")]
 pub struct CommentHyperlink {
   /// startIndex
-  #[sdk(attr(office2021, qname = ":startIndex"))]
+  #[sdk(attr(qname = ":startIndex"))]
   pub start_index: crate::simple_type::UInt32Value,
   /// length
-  #[sdk(attr(office2021, qname = ":length"))]
+  #[sdk(attr(qname = ":length"))]
   pub length: crate::simple_type::UInt32Value,
   /// url
-  #[sdk(attr(office2021, qname = ":url"))]
+  #[sdk(attr(qname = ":url"))]
   pub url: crate::simple_type::StringValue,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "xltc2:extLst"))]
+  #[sdk(child(qname = "xltc2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xltc2:extLst")]
+#[sdk(qname = "xltc2:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]

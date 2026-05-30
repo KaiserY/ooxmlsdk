@@ -20,74 +20,74 @@ pub enum AggregationType {
 }
 /// Defines the AggregationInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:aggregationInfo")]
+#[sdk(qname = "xlpcalc:aggregationInfo")]
 pub struct AggregationInfo {
   /// aggregationType
-  #[sdk(attr(microsoft365, qname = ":aggregationType"))]
+  #[sdk(attr(qname = ":aggregationType"))]
   pub aggregation_type: AggregationType,
   /// sourceField
-  #[sdk(attr(microsoft365, qname = ":sourceField"))]
+  #[sdk(attr(qname = ":sourceField"))]
   pub source_field: crate::simple_type::UInt32Value,
 }
 /// Defines the FeatureSupport Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:featureSupportInfo")]
+#[sdk(qname = "xlpcalc:featureSupportInfo")]
 pub struct FeatureSupport {
   /// featureName
-  #[sdk(attr(microsoft365, qname = ":featureName"))]
+  #[sdk(attr(qname = ":featureName"))]
   pub feature_name: crate::simple_type::StringValue,
 }
 /// Defines the PivotFieldSubtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:pivotFieldSubtotals")]
+#[sdk(qname = "xlpcalc:pivotFieldSubtotals")]
 pub struct PivotFieldSubtotals {
   /// Defines the SubtotalPivotItemSubtotal Class.
-  #[sdk(child(microsoft365, qname = "xlpcalc:subtotal"))]
+  #[sdk(child(qname = "xlpcalc:subtotal"))]
   pub subtotal_pivot_item_subtotal: Vec<SubtotalPivotItemSubtotal>,
 }
 /// Defines the PivotAreaReferenceSubtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:pivotAreaReferenceSubtotals")]
+#[sdk(qname = "xlpcalc:pivotAreaReferenceSubtotals")]
 pub struct PivotAreaReferenceSubtotals {
   /// Defines the PivotSubtotalType Class.
-  #[sdk(child(microsoft365, qname = "xlpcalc:subtotal"))]
+  #[sdk(child(qname = "xlpcalc:subtotal"))]
   pub pivot_subtotal_type: Vec<PivotSubtotalType>,
 }
 /// Defines the PivotTableSubtotalLineItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:pivotFieldSubtotalLineItems")]
+#[sdk(qname = "xlpcalc:pivotFieldSubtotalLineItems")]
 pub struct PivotTableSubtotalLineItems {
   /// Defines the SubtotalLineItemPivotItemSubtotal Class.
-  #[sdk(child(microsoft365, qname = "xlpcalc:subtotalLineItem"))]
+  #[sdk(child(qname = "xlpcalc:subtotalLineItem"))]
   pub subtotal_line_item_pivot_item_subtotal: Vec<SubtotalLineItemPivotItemSubtotal>,
 }
 /// Defines the SubtotalPivotItemSubtotal Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:subtotal")]
+#[sdk(qname = "xlpcalc:subtotal")]
 pub struct SubtotalPivotItemSubtotal {
   /// subtotalType
-  #[sdk(attr(microsoft365, qname = ":subtotalType"))]
+  #[sdk(attr(qname = ":subtotalType"))]
   pub subtotal_type: AggregationType,
   /// itemLocation
-  #[sdk(attr(microsoft365, qname = ":itemLocation"))]
+  #[sdk(attr(qname = ":itemLocation"))]
   pub item_location: crate::simple_type::UInt32Value,
 }
 /// Defines the SubtotalLineItemPivotItemSubtotal Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:subtotalLineItem")]
+#[sdk(qname = "xlpcalc:subtotalLineItem")]
 pub struct SubtotalLineItemPivotItemSubtotal {
   /// subtotalType
-  #[sdk(attr(microsoft365, qname = ":subtotalType"))]
+  #[sdk(attr(qname = ":subtotalType"))]
   pub subtotal_type: AggregationType,
   /// itemLocation
-  #[sdk(attr(microsoft365, qname = ":itemLocation"))]
+  #[sdk(attr(qname = ":itemLocation"))]
   pub item_location: crate::simple_type::UInt32Value,
 }
 /// Defines the PivotSubtotalType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:subtotal")]
+#[sdk(qname = "xlpcalc:subtotal")]
 pub struct PivotSubtotalType {
   /// subtotalType
-  #[sdk(attr(microsoft365, qname = ":subtotalType"))]
+  #[sdk(attr(qname = ":subtotalType"))]
   pub subtotal_type: AggregationType,
 }

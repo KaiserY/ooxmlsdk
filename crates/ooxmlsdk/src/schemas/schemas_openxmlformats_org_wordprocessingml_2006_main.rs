@@ -2058,7 +2058,7 @@ pub struct CellInsertion {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2090,7 +2090,7 @@ pub struct CellDeletion {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2122,7 +2122,7 @@ pub struct CustomXmlInsRangeStart {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2154,7 +2154,7 @@ pub struct CustomXmlDelRangeStart {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2186,7 +2186,7 @@ pub struct CustomXmlMoveFromRangeStart {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2218,7 +2218,7 @@ pub struct CustomXmlMoveToRangeStart {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2251,7 +2251,7 @@ pub struct Inserted {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2284,7 +2284,7 @@ pub struct Deleted {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2316,7 +2316,7 @@ pub struct MoveFrom {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2348,7 +2348,7 @@ pub struct MoveTo {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2386,7 +2386,7 @@ pub struct CellMerge {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2808,7 +2808,7 @@ pub struct CustomXmlPlaceholder {
 }
 /// Defines the TableCaption Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:tblCaption")]
+#[sdk(qname = "w:tblCaption")]
 pub struct TableCaption {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2816,7 +2816,7 @@ pub struct TableCaption {
 }
 /// Defines the TableDescription Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:tblDescription")]
+#[sdk(qname = "w:tblDescription")]
 pub struct TableDescription {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -4712,7 +4712,7 @@ pub struct Indentation {
   ))]
   pub left: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// start
-  #[sdk(attr(office2010, qname = "w:start"))]
+  #[sdk(attr(qname = "w:start"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -4725,7 +4725,7 @@ pub struct Indentation {
   #[sdk(attr(qname = "w:leftChars"))]
   pub left_chars: Option<crate::simple_type::Int32Value>,
   /// startChars
-  #[sdk(attr(office2010, qname = "w:startChars"))]
+  #[sdk(attr(qname = "w:startChars"))]
   pub start_characters: Option<crate::simple_type::Int32Value>,
   /// Right Indentation
   #[sdk(attr(qname = "w:right"))]
@@ -4738,7 +4738,7 @@ pub struct Indentation {
   ))]
   pub right: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// end
-  #[sdk(attr(office2010, qname = "w:end"))]
+  #[sdk(attr(qname = "w:end"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -4751,7 +4751,7 @@ pub struct Indentation {
   #[sdk(attr(qname = "w:rightChars"))]
   pub right_chars: Option<crate::simple_type::Int32Value>,
   /// endChars
-  #[sdk(attr(office2010, qname = "w:endChars"))]
+  #[sdk(attr(qname = "w:endChars"))]
   pub end_characters: Option<crate::simple_type::Int32Value>,
   /// Indentation Removed from First Line
   #[sdk(attr(qname = "w:hanging"))]
@@ -4928,7 +4928,7 @@ pub struct ParagraphPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -5054,7 +5054,7 @@ pub struct EmbeddedObject {
   #[sdk(attr(qname = "w:dyaOrig"))]
   pub dya_original: Option<crate::simple_type::TwipsMeasureValue>,
   /// anchorId
-  #[sdk(attr(office2010, qname = "w14:anchorId"))]
+  #[sdk(attr(qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
@@ -5092,7 +5092,7 @@ pub struct EmbeddedObject {
 pub struct Picture {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// anchorId
-  #[sdk(attr(office2010, qname = "w14:anchorId"))]
+  #[sdk(attr(qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(
@@ -5896,7 +5896,7 @@ pub struct BarBorder {
 }
 /// Defines the StartBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:start")]
+#[sdk(qname = "w:start")]
 pub struct StartBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5941,7 +5941,7 @@ pub struct StartBorder {
 }
 /// Defines the EndBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:end")]
+#[sdk(qname = "w:end")]
 pub struct EndBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -6258,7 +6258,7 @@ pub struct RunPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -6331,40 +6331,40 @@ pub struct RunProperties {
     )]
   pub run_properties_choice: Vec<RunPropertiesChoice>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:glow"))]
+  #[sdk(child(qname = "w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:shadow"))]
+  #[sdk(child(qname = "w14:shadow"))]
   pub shadow14: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:reflection"))]
+  #[sdk(child(qname = "w14:reflection"))]
   pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:textOutline"))]
+  #[sdk(child(qname = "w14:textOutline"))]
   pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:textFill"))]
+  #[sdk(child(qname = "w14:textFill"))]
   pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:scene3d"))]
+  #[sdk(child(qname = "w14:scene3d"))]
   pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:props3d"))]
+  #[sdk(child(qname = "w14:props3d"))]
   pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:ligatures"))]
+  #[sdk(child(qname = "w14:ligatures"))]
   pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:numForm"))]
+  #[sdk(child(qname = "w14:numForm"))]
   pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:numSpacing"))]
+  #[sdk(child(qname = "w14:numSpacing"))]
   pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
+  #[sdk(child(qname = "w14:stylisticSets"))]
   pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
+  #[sdk(child(qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the RunPropertiesChange Class.
   #[sdk(child(qname = "w:rPrChange"))]
@@ -6382,7 +6382,7 @@ pub struct InsertedMathControl {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -6421,7 +6421,7 @@ pub struct DeletedMathControl {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -6456,7 +6456,7 @@ pub struct MoveFromMathControl {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -6496,7 +6496,7 @@ pub struct MoveToMathControl {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -7019,7 +7019,7 @@ pub struct InsertedRun {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -7136,7 +7136,7 @@ pub struct DeletedRun {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -7253,7 +7253,7 @@ pub struct MoveFromRun {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -7370,7 +7370,7 @@ pub struct MoveToRun {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -7477,7 +7477,7 @@ pub struct MoveToRun {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:contentPart")]
+#[sdk(qname = "w:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -7707,15 +7707,15 @@ pub struct Paragraph {
   #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rsid_run_addition_default: Option<crate::simple_type::HexBinaryValue>,
   /// paraId
-  #[sdk(attr(office2010, qname = "w14:paraId"))]
+  #[sdk(attr(qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  #[sdk(attr(office2010, qname = "w14:textId"))]
+  #[sdk(attr(qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// noSpellErr
-  #[sdk(attr(office2010, qname = "w14:noSpellErr"))]
+  #[sdk(attr(qname = "w14:noSpellErr"))]
   pub no_spell_error: Option<crate::simple_type::OnOffValue>,
   /// Paragraph Properties
   #[sdk(child(qname = "w:pPr"))]
@@ -7955,11 +7955,11 @@ pub struct TableRow {
   #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rsid_table_row_properties: Option<crate::simple_type::HexBinaryValue>,
   /// paraId
-  #[sdk(attr(office2010, qname = "w14:paraId"))]
+  #[sdk(attr(qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  #[sdk(attr(office2010, qname = "w14:textId"))]
+  #[sdk(attr(qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// Table-Level Property Exceptions
@@ -8690,7 +8690,7 @@ pub struct Hyperlink {
 }
 /// Defines the BidirectionalOverride Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:bdo")]
+#[sdk(qname = "w:bdo")]
 pub struct BidirectionalOverride {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -8787,7 +8787,7 @@ pub struct BidirectionalOverride {
 }
 /// Defines the BidirectionalEmbedding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:dir")]
+#[sdk(qname = "w:dir")]
 pub struct BidirectionalEmbedding {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -8964,40 +8964,40 @@ pub struct ConditionalFormatStyle {
   #[sdk(string_length(min = 12u32, max = 12u32))]
   pub val: crate::simple_type::StringValue,
   /// firstRow
-  #[sdk(attr(office2010, qname = "w:firstRow"))]
+  #[sdk(attr(qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
   /// lastRow
-  #[sdk(attr(office2010, qname = "w:lastRow"))]
+  #[sdk(attr(qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
   /// firstColumn
-  #[sdk(attr(office2010, qname = "w:firstColumn"))]
+  #[sdk(attr(qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
   /// lastColumn
-  #[sdk(attr(office2010, qname = "w:lastColumn"))]
+  #[sdk(attr(qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
   /// oddVBand
-  #[sdk(attr(office2010, qname = "w:oddVBand"))]
+  #[sdk(attr(qname = "w:oddVBand"))]
   pub odd_vertical_band: Option<crate::simple_type::OnOffValue>,
   /// evenVBand
-  #[sdk(attr(office2010, qname = "w:evenVBand"))]
+  #[sdk(attr(qname = "w:evenVBand"))]
   pub even_vertical_band: Option<crate::simple_type::OnOffValue>,
   /// oddHBand
-  #[sdk(attr(office2010, qname = "w:oddHBand"))]
+  #[sdk(attr(qname = "w:oddHBand"))]
   pub odd_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// evenHBand
-  #[sdk(attr(office2010, qname = "w:evenHBand"))]
+  #[sdk(attr(qname = "w:evenHBand"))]
   pub even_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// firstRowFirstColumn
-  #[sdk(attr(office2010, qname = "w:firstRowFirstColumn"))]
+  #[sdk(attr(qname = "w:firstRowFirstColumn"))]
   pub first_row_first_column: Option<crate::simple_type::OnOffValue>,
   /// firstRowLastColumn
-  #[sdk(attr(office2010, qname = "w:firstRowLastColumn"))]
+  #[sdk(attr(qname = "w:firstRowLastColumn"))]
   pub first_row_last_column: Option<crate::simple_type::OnOffValue>,
   /// lastRowFirstColumn
-  #[sdk(attr(office2010, qname = "w:lastRowFirstColumn"))]
+  #[sdk(attr(qname = "w:lastRowFirstColumn"))]
   pub last_row_first_column: Option<crate::simple_type::OnOffValue>,
   /// lastRowLastColumn
-  #[sdk(attr(office2010, qname = "w:lastRowLastColumn"))]
+  #[sdk(attr(qname = "w:lastRowLastColumn"))]
   pub last_row_last_column: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableCellWidth Class.
@@ -9098,7 +9098,7 @@ pub struct TopMargin {
 }
 /// Defines the StartMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:start")]
+#[sdk(qname = "w:start")]
 pub struct StartMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9130,7 +9130,7 @@ pub struct BottomMargin {
 }
 /// Defines the EndMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:end")]
+#[sdk(qname = "w:end")]
 pub struct EndMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9203,7 +9203,7 @@ pub struct TableCellBorders {
   #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Defines the StartBorder Class.
-  #[sdk(child(office2010, qname = "w:start"))]
+  #[sdk(child(qname = "w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Cell Bottom Border
   #[sdk(child(qname = "w:bottom"))]
@@ -9212,7 +9212,7 @@ pub struct TableCellBorders {
   #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
   /// Defines the EndBorder Class.
-  #[sdk(child(office2010, qname = "w:end"))]
+  #[sdk(child(qname = "w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Cell Inside Horizontal Edges Border
   #[sdk(child(qname = "w:insideH"))]
@@ -9390,7 +9390,7 @@ pub struct TableCellMargin {
   #[sdk(child(qname = "w:left"))]
   pub left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
-  #[sdk(child(office2010, qname = "w:start"))]
+  #[sdk(child(qname = "w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Exception
   #[sdk(child(qname = "w:bottom"))]
@@ -9399,7 +9399,7 @@ pub struct TableCellMargin {
   #[sdk(child(qname = "w:right"))]
   pub right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
-  #[sdk(child(office2010, qname = "w:end"))]
+  #[sdk(child(qname = "w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Defines the TableCellVerticalAlignment Class.
@@ -9546,7 +9546,7 @@ pub struct TableBorders {
   #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Defines the StartBorder Class.
-  #[sdk(child(office2010, qname = "w:start"))]
+  #[sdk(child(qname = "w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Bottom Border
   #[sdk(child(qname = "w:bottom"))]
@@ -9555,7 +9555,7 @@ pub struct TableBorders {
   #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
   /// Defines the EndBorder Class.
-  #[sdk(child(office2010, qname = "w:end"))]
+  #[sdk(child(qname = "w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Inside Horizontal Edges Border
   #[sdk(child(qname = "w:insideH"))]
@@ -9583,7 +9583,7 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
-  #[sdk(child(office2010, qname = "w:start"))]
+  #[sdk(child(qname = "w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Default
   #[sdk(child(qname = "w:bottom"))]
@@ -9592,7 +9592,7 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
-  #[sdk(child(office2010, qname = "w:end"))]
+  #[sdk(child(qname = "w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Footnote and Endnote Numbering Starting Value.
@@ -9631,22 +9631,22 @@ pub struct TableLook {
   #[sdk(string_length(min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
   /// firstRow
-  #[sdk(attr(office2010, qname = "w:firstRow"))]
+  #[sdk(attr(qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
   /// lastRow
-  #[sdk(attr(office2010, qname = "w:lastRow"))]
+  #[sdk(attr(qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
   /// firstColumn
-  #[sdk(attr(office2010, qname = "w:firstColumn"))]
+  #[sdk(attr(qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
   /// lastColumn
-  #[sdk(attr(office2010, qname = "w:lastColumn"))]
+  #[sdk(attr(qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
   /// noHBand
-  #[sdk(attr(office2010, qname = "w:noHBand"))]
+  #[sdk(attr(qname = "w:noHBand"))]
   pub no_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// noVBand
-  #[sdk(attr(office2010, qname = "w:noVBand"))]
+  #[sdk(attr(qname = "w:noVBand"))]
   pub no_vertical_band: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the FootnoteProperties Class.
@@ -10430,22 +10430,22 @@ pub struct Settings {
   #[sdk(child(qname = "w:listSeparator"))]
   pub list_separator: Option<ListSeparator>,
   /// Defines the DocumentId Class.
-  #[sdk(child(office2010, qname = "w14:docId"))]
+  #[sdk(child(qname = "w14:docId"))]
   pub document_id: Option<crate::schemas::w14::DocumentId>,
   /// Defines the DiscardImageEditingData Class.
-  #[sdk(child(office2010, qname = "w14:discardImageEditingData"))]
+  #[sdk(child(qname = "w14:discardImageEditingData"))]
   pub discard_image_editing_data: Option<crate::schemas::w14::DiscardImageEditingData>,
   /// Defines the DefaultImageDpi Class.
-  #[sdk(child(office2010, qname = "w14:defaultImageDpi"))]
+  #[sdk(child(qname = "w14:defaultImageDpi"))]
   pub default_image_dpi: Option<crate::schemas::w14::DefaultImageDpi>,
   /// Defines the ConflictMode Class.
-  #[sdk(child(office2010, qname = "w14:conflictMode"))]
+  #[sdk(child(qname = "w14:conflictMode"))]
   pub conflict_mode: Option<crate::schemas::w14::ConflictMode>,
   /// Defines the ChartTrackingRefBased Class.
-  #[sdk(child(office2013, qname = "w15:chartTrackingRefBased"))]
+  #[sdk(child(qname = "w15:chartTrackingRefBased"))]
   pub chart_tracking_ref_based: Option<crate::schemas::w15::ChartTrackingRefBased>,
   /// Defines the PersistentDocumentId Class.
-  #[sdk(child(office2013, qname = "w15:docId"))]
+  #[sdk(child(qname = "w15:docId"))]
   pub persistent_document_id: Option<crate::schemas::w15::PersistentDocumentId>,
 }
 /// Web Page Settings.
@@ -10720,10 +10720,10 @@ pub struct PreviousTableProperties {
   #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Defines the TableCaption Class.
-  #[sdk(child(office2010, qname = "w:tblCaption"))]
+  #[sdk(child(qname = "w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// Defines the TableDescription Class.
-  #[sdk(child(office2010, qname = "w:tblDescription"))]
+  #[sdk(child(qname = "w:tblDescription"))]
   pub table_description: Option<TableDescription>,
 }
 /// Previous Section Properties.
@@ -10804,7 +10804,7 @@ pub struct PreviousSectionProperties {
   #[sdk(child(qname = "w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(office2013, qname = "w15:footnoteColumns"))]
+  #[sdk(child(qname = "w15:footnoteColumns"))]
   pub footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
 }
 /// Previous Paragraph Properties.
@@ -10960,40 +10960,40 @@ pub struct PreviousRunProperties {
     )]
   pub run_properties_choice: Vec<PreviousRunPropertiesChoice>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:glow"))]
+  #[sdk(child(qname = "w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:shadow"))]
+  #[sdk(child(qname = "w14:shadow"))]
   pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:reflection"))]
+  #[sdk(child(qname = "w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:textOutline"))]
+  #[sdk(child(qname = "w14:textOutline"))]
   pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:textFill"))]
+  #[sdk(child(qname = "w14:textFill"))]
   pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:scene3d"))]
+  #[sdk(child(qname = "w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:props3d"))]
+  #[sdk(child(qname = "w14:props3d"))]
   pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:ligatures"))]
+  #[sdk(child(qname = "w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:numForm"))]
+  #[sdk(child(qname = "w14:numForm"))]
   pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:numSpacing"))]
+  #[sdk(child(qname = "w14:numSpacing"))]
   pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
+  #[sdk(child(qname = "w14:stylisticSets"))]
   pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
+  #[sdk(child(qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
 }
 /// Previous Run Properties for the Paragraph Mark.
@@ -11065,40 +11065,40 @@ pub struct PreviousParagraphMarkRunProperties {
   pub previous_paragraph_mark_run_properties_choice2:
     Vec<PreviousParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:glow"))]
+  #[sdk(child(qname = "w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:shadow"))]
+  #[sdk(child(qname = "w14:shadow"))]
   pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:reflection"))]
+  #[sdk(child(qname = "w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:textOutline"))]
+  #[sdk(child(qname = "w14:textOutline"))]
   pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:textFill"))]
+  #[sdk(child(qname = "w14:textFill"))]
   pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:scene3d"))]
+  #[sdk(child(qname = "w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:props3d"))]
+  #[sdk(child(qname = "w14:props3d"))]
   pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:ligatures"))]
+  #[sdk(child(qname = "w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:numForm"))]
+  #[sdk(child(qname = "w14:numForm"))]
   pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:numSpacing"))]
+  #[sdk(child(qname = "w14:numSpacing"))]
   pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
+  #[sdk(child(qname = "w14:stylisticSets"))]
   pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
+  #[sdk(child(qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "w:oMath"))]
@@ -11155,7 +11155,7 @@ pub struct NumberingChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -11257,40 +11257,40 @@ pub struct ParagraphMarkRunProperties {
     )]
   pub paragraph_mark_run_properties_choice2: Vec<ParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:glow"))]
+  #[sdk(child(qname = "w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:shadow"))]
+  #[sdk(child(qname = "w14:shadow"))]
   pub shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:reflection"))]
+  #[sdk(child(qname = "w14:reflection"))]
   pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:textOutline"))]
+  #[sdk(child(qname = "w14:textOutline"))]
   pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:textFill"))]
+  #[sdk(child(qname = "w14:textFill"))]
   pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:scene3d"))]
+  #[sdk(child(qname = "w14:scene3d"))]
   pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:props3d"))]
+  #[sdk(child(qname = "w14:props3d"))]
   pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:ligatures"))]
+  #[sdk(child(qname = "w14:ligatures"))]
   pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:numForm"))]
+  #[sdk(child(qname = "w14:numForm"))]
   pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:numSpacing"))]
+  #[sdk(child(qname = "w14:numSpacing"))]
   pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
+  #[sdk(child(qname = "w14:stylisticSets"))]
   pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
+  #[sdk(child(qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
   #[sdk(child(qname = "w:oMath"))]
@@ -11386,7 +11386,7 @@ pub struct SectionProperties {
   #[sdk(child(qname = "w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(office2013, qname = "w15:footnoteColumns"))]
+  #[sdk(child(qname = "w15:footnoteColumns"))]
   pub footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
   /// Revision Information for Section Properties.
   #[sdk(child(qname = "w:sectPrChange"))]
@@ -11614,7 +11614,7 @@ pub struct SectionPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -11649,7 +11649,7 @@ pub struct ParagraphMarkRunPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -12455,7 +12455,7 @@ pub struct TableCellPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -12545,7 +12545,7 @@ pub struct TablePropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -12580,7 +12580,7 @@ pub struct TablePropertyExceptionsChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -12647,10 +12647,10 @@ pub struct TableProperties {
   #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Defines the TableCaption Class.
-  #[sdk(child(office2010, qname = "w:tblCaption"))]
+  #[sdk(child(qname = "w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// Defines the TableDescription Class.
-  #[sdk(child(office2010, qname = "w:tblDescription"))]
+  #[sdk(child(qname = "w:tblDescription"))]
   pub table_description: Option<TableDescription>,
   /// Revision Information for Table Properties
   #[sdk(child(qname = "w:tblPrChange"))]
@@ -12683,7 +12683,7 @@ pub struct NumberingFormat {
   #[sdk(attr(qname = "w:val"))]
   pub val: NumberFormatValues,
   /// format
-  #[sdk(attr(office2010, qname = "w:format"))]
+  #[sdk(attr(qname = "w:format"))]
   pub format: Option<crate::simple_type::StringValue>,
 }
 /// Endnote Placement.
@@ -14394,7 +14394,7 @@ pub struct Comment {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -15059,7 +15059,7 @@ pub struct TableRowPropertiesChange {
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
+  #[sdk(attr(qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -15421,16 +15421,16 @@ pub struct WriteProtection {
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
   /// algorithmName
-  #[sdk(attr(office2010, qname = "w:algorithmName"))]
+  #[sdk(attr(qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  #[sdk(attr(office2010, qname = "w:hashValue"))]
+  #[sdk(attr(qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  #[sdk(attr(office2010, qname = "w:saltValue"))]
+  #[sdk(attr(qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinCount
-  #[sdk(attr(office2010, qname = "w:spinCount"))]
+  #[sdk(attr(qname = "w:spinCount"))]
   pub spin_count: Option<crate::simple_type::Int32Value>,
 }
 /// Document View Setting.
@@ -15502,49 +15502,49 @@ pub struct StylePaneFormatFilter {
   #[sdk(string_length(min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
   /// allStyles
-  #[sdk(attr(office2010, qname = "w:allStyles"))]
+  #[sdk(attr(qname = "w:allStyles"))]
   pub all_styles: Option<crate::simple_type::OnOffValue>,
   /// customStyles
-  #[sdk(attr(office2010, qname = "w:customStyles"))]
+  #[sdk(attr(qname = "w:customStyles"))]
   pub custom_styles: Option<crate::simple_type::OnOffValue>,
   /// latentStyles
-  #[sdk(attr(office2010, qname = "w:latentStyles"))]
+  #[sdk(attr(qname = "w:latentStyles"))]
   pub latent_styles: Option<crate::simple_type::OnOffValue>,
   /// stylesInUse
-  #[sdk(attr(office2010, qname = "w:stylesInUse"))]
+  #[sdk(attr(qname = "w:stylesInUse"))]
   pub styles_in_use: Option<crate::simple_type::OnOffValue>,
   /// headingStyles
-  #[sdk(attr(office2010, qname = "w:headingStyles"))]
+  #[sdk(attr(qname = "w:headingStyles"))]
   pub heading_styles: Option<crate::simple_type::OnOffValue>,
   /// numberingStyles
-  #[sdk(attr(office2010, qname = "w:numberingStyles"))]
+  #[sdk(attr(qname = "w:numberingStyles"))]
   pub numbering_styles: Option<crate::simple_type::OnOffValue>,
   /// tableStyles
-  #[sdk(attr(office2010, qname = "w:tableStyles"))]
+  #[sdk(attr(qname = "w:tableStyles"))]
   pub table_styles: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnRuns
-  #[sdk(attr(office2010, qname = "w:directFormattingOnRuns"))]
+  #[sdk(attr(qname = "w:directFormattingOnRuns"))]
   pub direct_formatting_on_runs: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnParagraphs
-  #[sdk(attr(office2010, qname = "w:directFormattingOnParagraphs"))]
+  #[sdk(attr(qname = "w:directFormattingOnParagraphs"))]
   pub direct_formatting_on_paragraphs: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnNumbering
-  #[sdk(attr(office2010, qname = "w:directFormattingOnNumbering"))]
+  #[sdk(attr(qname = "w:directFormattingOnNumbering"))]
   pub direct_formatting_on_numbering: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnTables
-  #[sdk(attr(office2010, qname = "w:directFormattingOnTables"))]
+  #[sdk(attr(qname = "w:directFormattingOnTables"))]
   pub direct_formatting_on_tables: Option<crate::simple_type::OnOffValue>,
   /// clearFormatting
-  #[sdk(attr(office2010, qname = "w:clearFormatting"))]
+  #[sdk(attr(qname = "w:clearFormatting"))]
   pub clear_formatting: Option<crate::simple_type::OnOffValue>,
   /// top3HeadingStyles
-  #[sdk(attr(office2010, qname = "w:top3HeadingStyles"))]
+  #[sdk(attr(qname = "w:top3HeadingStyles"))]
   pub top3_heading_styles: Option<crate::simple_type::OnOffValue>,
   /// visibleStyles
-  #[sdk(attr(office2010, qname = "w:visibleStyles"))]
+  #[sdk(attr(qname = "w:visibleStyles"))]
   pub visible_styles: Option<crate::simple_type::OnOffValue>,
   /// alternateStyleNames
-  #[sdk(attr(office2010, qname = "w:alternateStyleNames"))]
+  #[sdk(attr(qname = "w:alternateStyleNames"))]
   pub alternate_style_names: Option<crate::simple_type::OnOffValue>,
 }
 /// Suggested Sorting for List of Document Styles.
@@ -15714,16 +15714,16 @@ pub struct DocumentProtection {
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
   /// algorithmName
-  #[sdk(attr(office2010, qname = "w:algorithmName"))]
+  #[sdk(attr(qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  #[sdk(attr(office2010, qname = "w:hashValue"))]
+  #[sdk(attr(qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  #[sdk(attr(office2010, qname = "w:saltValue"))]
+  #[sdk(attr(qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinCount
-  #[sdk(attr(office2010, qname = "w:spinCount"))]
+  #[sdk(attr(qname = "w:spinCount"))]
   pub spin_count: Option<crate::simple_type::Int32Value>,
 }
 /// Distance Between Automatic Tab Stops.
@@ -19747,7 +19747,7 @@ pub enum SdtPropertiesChoice {
   /// Defines the DataBinding Class.
   #[sdk(child(qname = "w:dataBinding"))]
   WDataBinding(std::boxed::Box<DataBinding>),
-  #[sdk(child(office2013, qname = "w15:dataBinding"))]
+  #[sdk(child(qname = "w15:dataBinding"))]
   W15DataBinding(std::boxed::Box<crate::schemas::w15::DataBinding>),
   /// Defines the TemporarySdt Class.
   TemporarySdt(std::boxed::Box<TemporarySdt>),
@@ -19790,12 +19790,12 @@ pub enum SdtPropertiesChoice {
   #[sdk(empty_child(qname = "w:bibliography"))]
   SdtContentBibliography,
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w14:entityPicker"))]
+  #[sdk(empty_child(qname = "w14:entityPicker"))]
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(office2013, qname = "w15:repeatingSectionItem"))]
+  #[sdk(empty_child(qname = "w15:repeatingSectionItem"))]
   SdtRepeatedSectionItem,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

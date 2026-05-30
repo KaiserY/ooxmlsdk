@@ -177,11 +177,11 @@ pub struct Inline {
   #[sdk(attr(qname = ":distR"))]
   pub distance_from_right: Option<crate::simple_type::UInt32Value>,
   /// anchorId
-  #[sdk(attr(office2010, qname = "wp14:anchorId"))]
+  #[sdk(attr(qname = "wp14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   /// editId
-  #[sdk(attr(office2010, qname = "wp14:editId"))]
+  #[sdk(attr(qname = "wp14:editId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub edit_id: Option<crate::simple_type::HexBinaryValue>,
   /// Drawing Object Size
@@ -241,11 +241,11 @@ pub struct Anchor {
   #[sdk(attr(qname = ":allowOverlap"))]
   pub allow_overlap: crate::simple_type::BooleanValue,
   /// editId
-  #[sdk(attr(office2010, qname = "wp14:editId"))]
+  #[sdk(attr(qname = "wp14:editId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub edit_id: Option<crate::simple_type::HexBinaryValue>,
   /// anchorId
-  #[sdk(attr(office2010, qname = "wp14:anchorId"))]
+  #[sdk(attr(qname = "wp14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   /// Simple Positioning Coordinates
@@ -284,10 +284,10 @@ pub struct Anchor {
   #[sdk(child(qname = "a:graphic"))]
   pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
   /// Defines the RelativeWidth Class.
-  #[sdk(child(office2010, qname = "wp14:sizeRelH"))]
+  #[sdk(child(qname = "wp14:sizeRelH"))]
   pub relative_width: Option<crate::schemas::wp14::RelativeWidth>,
   /// Defines the RelativeHeight Class.
-  #[sdk(child(office2010, qname = "wp14:sizeRelV"))]
+  #[sdk(child(qname = "wp14:sizeRelV"))]
   pub wp14_relative_height: Option<crate::schemas::wp14::RelativeHeight>,
 }
 /// Wrapping Polygon Start.
@@ -487,11 +487,7 @@ pub enum HorizontalPositionChoice {
   #[sdk(text_child(simple_type = "Int32Value", qname = "wp:posOffset"))]
   PositionOffset(PositionOffset),
   /// Defines the PercentagePositionHeightOffset Class.
-  #[sdk(text_child(
-    office2010,
-    simple_type = "DrawingmlPercentageValue",
-    qname = "wp14:pctPosHOffset"
-  ))]
+  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosHOffset"))]
   PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -503,10 +499,6 @@ pub enum VerticalPositionChoice {
   #[sdk(text_child(simple_type = "Int32Value", qname = "wp:posOffset"))]
   PositionOffset(PositionOffset),
   /// Defines the PercentagePositionVerticalOffset Class.
-  #[sdk(text_child(
-    office2010,
-    simple_type = "DrawingmlPercentageValue",
-    qname = "wp14:pctPosVOffset"
-  ))]
+  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosVOffset"))]
   PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
 }

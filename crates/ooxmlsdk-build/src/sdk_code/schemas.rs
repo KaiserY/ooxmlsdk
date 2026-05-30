@@ -60,17 +60,9 @@ impl VersionCfgContext {
   }
 }
 
-fn sdk_version_marker(version: &str) -> Option<TokenStream> {
-  if version.is_empty() || version == "Office2007" {
-    return None;
-  }
-
-  let marker = TokenIdent::new(&version.to_snake_case(), Span::call_site());
-  Some(quote! { #marker })
-}
-
 fn sdk_version_markers(version: &str) -> Vec<TokenStream> {
-  sdk_version_marker(version).into_iter().collect()
+  let _ = version;
+  Vec::new()
 }
 
 #[derive(Debug)]
@@ -4385,7 +4377,7 @@ mod tests {
     let generated =
       render_workspace_schema("schemas_microsoft_com_office_drawing_2013_main_command");
 
-    assert!(generated.contains("# [sdk (empty_child (office2016 , qname = \"oac:fill\"))]"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"oac:fill\"))]"));
     assert!(generated.contains("pub fill_empty : Option < () >"));
     assert!(!generated.contains("pub struct FillEmpty"));
     assert!(!generated.contains("pub fill_empty : Option < FillEmpty >"));
@@ -4398,7 +4390,7 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (office2010 , qname = \"w14:noFill\"))]"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"w14:noFill\"))]"));
     assert!(generated.contains("NoFillEmpty ,"));
     assert!(!generated.contains("pub struct NoFillEmpty"));
     assert!(!generated.contains("NoFillEmpty (std :: boxed :: Box < NoFillEmpty >)"));
@@ -4409,7 +4401,7 @@ mod tests {
     let generated = render_workspace_schema("schemas_microsoft_com_office_powerpoint_2022_08_main");
 
     assert!(!generated.contains("pub struct EmptyType"));
-    assert!(generated.contains("# [sdk (empty_child (microsoft365 , qname = \"p228:add\"))]"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"p228:add\"))]"));
   }
 
   #[test]
@@ -7198,7 +7190,7 @@ mod tests {
     .unwrap()
     .to_string();
 
-    assert!(generated.contains("# [sdk (attr (office2016 , qname = \":creationId\"))]"));
+    assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
     assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
     assert!(generated.contains("# [sdk (string_format (kind = \"token\"))]"));
     assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));

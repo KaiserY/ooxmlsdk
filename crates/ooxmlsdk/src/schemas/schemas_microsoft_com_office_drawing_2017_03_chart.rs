@@ -6,17 +6,17 @@
 
 /// Defines the DataDisplayOptions16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "c16r3:dataDisplayOptions16")]
+#[sdk(qname = "c16r3:dataDisplayOptions16")]
 pub struct DataDisplayOptions16 {
   /// Defines the BooleanFalse Class.
-  #[sdk(child(office2019, qname = "c16r3:dispNaAsBlank"))]
+  #[sdk(child(qname = "c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<BooleanFalse>,
 }
 /// Defines the BooleanFalse Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "c16r3:dispNaAsBlank")]
+#[sdk(qname = "c16r3:dispNaAsBlank")]
 pub struct BooleanFalse {
   /// val
-  #[sdk(attr(office2019, qname = "c16r3:val"))]
+  #[sdk(attr(qname = "c16r3:val"))]
   pub c16r3_val: Option<crate::simple_type::BooleanValue>,
 }

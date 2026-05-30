@@ -2273,7 +2273,7 @@ pub struct RgbColorModelHex {
   #[sdk(string_length(min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
   /// legacySpreadsheetColorIndex
-  #[sdk(attr(office2010, qname = "a14:legacySpreadsheetColorIndex"))]
+  #[sdk(attr(qname = "a14:legacySpreadsheetColorIndex"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -4391,7 +4391,7 @@ pub struct Theme {
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// id
-  #[sdk(attr(office2013, qname = "thm15:id"))]
+  #[sdk(attr(qname = "thm15:id"))]
   #[sdk(pattern(
     source = 1u32,
     union = 0u64,
@@ -11135,7 +11135,7 @@ pub enum GraphicDataChoice {
   PictureAttributionSourceUrl(std::boxed::Box<crate::schemas::a1611::PictureAttributionSourceUrl>),
   SvgBlip(std::boxed::Box<crate::schemas::asvg::SvgBlip>),
   Decorative(std::boxed::Box<crate::schemas::adec::Decorative>),
-  #[sdk(child(office2016, qname = "a16:creationId"))]
+  #[sdk(child(qname = "a16:creationId"))]
   A16CreationId(std::boxed::Box<crate::schemas::a16::CreationId>),
   PredecessorDrawingElementReference(
     std::boxed::Box<crate::schemas::a16::PredecessorDrawingElementReference>,
@@ -11153,7 +11153,7 @@ pub enum GraphicDataChoice {
   CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
   CompatExtension(std::boxed::Box<crate::schemas::a14::CompatExtension>),
   IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
-  #[sdk(child(office2010, qname = "a14:contentPart"))]
+  #[sdk(child(qname = "a14:contentPart"))]
   GvmlContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
   ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
   HiddenFillProperties(std::boxed::Box<crate::schemas::a14::HiddenFillProperties>),
@@ -11179,7 +11179,7 @@ pub enum GraphicDataChoice {
   StyleDefinition(std::boxed::Box<crate::schemas::dgm::StyleDefinition>),
   StyleDefinitionHeader(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeader>),
   StyleDefinitionHeaderList(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeaderList>),
-  #[sdk(child(office2019, qname = "dgm1612:spPr"))]
+  #[sdk(child(qname = "dgm1612:spPr"))]
   Dgm1612ShapeProperties(std::boxed::Box<crate::schemas::dgm1612::ShapeProperties>),
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
@@ -11187,21 +11187,21 @@ pub enum GraphicDataChoice {
   UserShapes(std::boxed::Box<crate::schemas::c::UserShapes>),
   ChartReference(std::boxed::Box<crate::schemas::c::ChartReference>),
   DataDisplayOptions16(std::boxed::Box<crate::schemas::c16r3::DataDisplayOptions16>),
-  #[sdk(child(office2016, qname = "c16:spPr"))]
+  #[sdk(child(qname = "c16:spPr"))]
   C16ShapeProperties(std::boxed::Box<crate::schemas::c16::ShapeProperties>),
   UnsignedIntegerType(std::boxed::Box<crate::schemas::c16::UnsignedIntegerType>),
   InvertIfNegativeBoolean(std::boxed::Box<crate::schemas::c16::InvertIfNegativeBoolean>),
   Bubble3DBoolean(std::boxed::Box<crate::schemas::c16::Bubble3DBoolean>),
   Marker(std::boxed::Box<crate::schemas::c16::Marker>),
   DLbl(std::boxed::Box<crate::schemas::c16::DLbl>),
-  #[sdk(child(office2016, qname = "c16:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   PivotOptions16(std::boxed::Box<crate::schemas::c16::PivotOptions16>),
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
-  #[sdk(child(office2013, qname = "c15:spPr"))]
+  #[sdk(child(qname = "c15:spPr"))]
   C15ShapeProperties(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
@@ -11218,7 +11218,7 @@ pub enum GraphicDataChoice {
   FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
-  #[sdk(child(office2013, qname = "c15:categoryFilterExceptions"))]
+  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   DataLabelFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
   ExceptionForSave(std::boxed::Box<crate::schemas::c15::ExceptionForSave>),
@@ -11230,84 +11230,76 @@ pub enum GraphicDataChoice {
   PivotOptions(std::boxed::Box<crate::schemas::c14::PivotOptions>),
   SketchOptions(std::boxed::Box<crate::schemas::c14::SketchOptions>),
   InvertSolidFillFormat(std::boxed::Box<crate::schemas::c14::InvertSolidFillFormat>),
-  #[sdk(child(office2010, qname = "c14:style"))]
+  #[sdk(child(qname = "c14:style"))]
   Style(std::boxed::Box<crate::schemas::c14::Style>),
-  #[sdk(child(office2010, qname = "cdr14:contentPart"))]
+  #[sdk(child(qname = "cdr14:contentPart"))]
   Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
   LegacyDrawing(std::boxed::Box<crate::schemas::comp::LegacyDrawing>),
   LockedCanvas(std::boxed::Box<crate::schemas::lc::LockedCanvas>),
   Inline(std::boxed::Box<crate::schemas::wp::Inline>),
   Anchor(std::boxed::Box<crate::schemas::wp::Anchor>),
-  #[sdk(text_child(
-    office2010,
-    simple_type = "DrawingmlPercentageValue",
-    qname = "wp14:pctPosHOffset"
-  ))]
+  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosHOffset"))]
   PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
-  #[sdk(text_child(
-    office2010,
-    simple_type = "DrawingmlPercentageValue",
-    qname = "wp14:pctPosVOffset"
-  ))]
+  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosVOffset"))]
   PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
   RelativeWidth(std::boxed::Box<crate::schemas::wp14::RelativeWidth>),
   RelativeHeight(std::boxed::Box<crate::schemas::wp14::RelativeHeight>),
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
-  #[sdk(child(office2010, qname = "pic14:style"))]
+  #[sdk(child(qname = "pic14:style"))]
   ShapeStyle(std::boxed::Box<crate::schemas::pic14::ShapeStyle>),
-  #[sdk(child(office2010, qname = "pic14:extLst"))]
+  #[sdk(child(qname = "pic14:extLst"))]
   OfficeArtExtensionList(std::boxed::Box<crate::schemas::pic14::OfficeArtExtensionList>),
   WorksheetDrawing(std::boxed::Box<crate::schemas::xdr::WorksheetDrawing>),
-  #[sdk(child(office2010, qname = "xdr:contentPart"))]
+  #[sdk(child(qname = "xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<crate::schemas::xdr::ContentPart>),
-  #[sdk(child(office2010, qname = "xdr14:contentPart"))]
+  #[sdk(child(qname = "xdr14:contentPart"))]
   Xdr14ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
-  #[sdk(any_child(office2016, qname = "pc:cmAuthorMkLst"))]
+  #[sdk(any_child(qname = "pc:cmAuthorMkLst"))]
   CommentAuthorMonikerList(crate::schemas::pc::CommentAuthorMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:cmMkLst"))]
+  #[sdk(any_child(qname = "pc:cmMkLst"))]
   CommentMonikerList(crate::schemas::pc::CommentMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:tagMkLst"))]
+  #[sdk(any_child(qname = "pc:tagMkLst"))]
   StringTagMonikerList(crate::schemas::pc::StringTagMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:custShowMkLst"))]
+  #[sdk(any_child(qname = "pc:custShowMkLst"))]
   CustomShowMonikerList(crate::schemas::pc::CustomShowMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:docMkLst"))]
+  #[sdk(any_child(qname = "pc:docMkLst"))]
   DocumentMonikerList(crate::schemas::pc::DocumentMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:sectionMkLst"))]
+  #[sdk(any_child(qname = "pc:sectionMkLst"))]
   SectionMonikerList(crate::schemas::pc::SectionMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:sldBaseMkLst"))]
+  #[sdk(any_child(qname = "pc:sldBaseMkLst"))]
   SlideBaseMonikerList(crate::schemas::pc::SlideBaseMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:sldLayoutMkLst"))]
+  #[sdk(any_child(qname = "pc:sldLayoutMkLst"))]
   SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:sldMasterMkLst"))]
+  #[sdk(any_child(qname = "pc:sldMasterMkLst"))]
   MainMasterMonikerList(crate::schemas::pc::MainMasterMonikerList),
   SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
-  #[sdk(any_child(office2016, qname = "pc:sldPosMkLst"))]
+  #[sdk(any_child(qname = "pc:sldPosMkLst"))]
   SlidePosMonikerList(crate::schemas::pc::SlidePosMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:notesMkLst"))]
+  #[sdk(any_child(qname = "pc:notesMkLst"))]
   NotesMonikerList(crate::schemas::pc::NotesMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:notesTxtMkLst"))]
+  #[sdk(any_child(qname = "pc:notesTxtMkLst"))]
   NotesTextMonikerList(crate::schemas::pc::NotesTextMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:notesMasterMkLst"))]
+  #[sdk(any_child(qname = "pc:notesMasterMkLst"))]
   NotesMasterMonikerList(crate::schemas::pc::NotesMasterMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:handoutMkLst"))]
+  #[sdk(any_child(qname = "pc:handoutMkLst"))]
   HandoutMonikerList(crate::schemas::pc::HandoutMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:animEffectMkLst"))]
+  #[sdk(any_child(qname = "pc:animEffectMkLst"))]
   AnimEffectMkLstAnimationEffectMonikerList(
     crate::schemas::pc::AnimEffectMkLstAnimationEffectMonikerList,
   ),
-  #[sdk(any_child(office2016, qname = "pc:animEffectParentMkLst"))]
+  #[sdk(any_child(qname = "pc:animEffectParentMkLst"))]
   AnimEffectParentMkLstAnimationEffectMonikerList(
     crate::schemas::pc::AnimEffectParentMkLstAnimationEffectMonikerList,
   ),
-  #[sdk(any_child(office2016, qname = "pc:tkAppMkLst"))]
+  #[sdk(any_child(qname = "pc:tkAppMkLst"))]
   OsfTaskPaneAppMonikerList(crate::schemas::pc::OsfTaskPaneAppMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:tocMkLst"))]
+  #[sdk(any_child(qname = "pc:tocMkLst"))]
   SummaryZoomMonikerList(crate::schemas::pc::SummaryZoomMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:sectionLnkObjMkLst"))]
+  #[sdk(any_child(qname = "pc:sectionLnkObjMkLst"))]
   SectionLinkObjMonikerList(crate::schemas::pc::SectionLinkObjMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:designTagMkLst"))]
+  #[sdk(any_child(qname = "pc:designTagMkLst"))]
   DesignerTagMonikerList(crate::schemas::pc::DesignerTagMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:cXmlMkLst"))]
+  #[sdk(any_child(qname = "pc:cXmlMkLst"))]
   CustomXmlPartMonikerList(crate::schemas::pc::CustomXmlPartMonikerList),
   CommentAuthorList(std::boxed::Box<crate::schemas::p::CommentAuthorList>),
   #[sdk(child(qname = "p:cmLst"))]
@@ -11324,74 +11316,70 @@ pub enum GraphicDataChoice {
   SlideSyncProperties(std::boxed::Box<crate::schemas::p::SlideSyncProperties>),
   TagList(std::boxed::Box<crate::schemas::p::TagList>),
   ViewProperties(std::boxed::Box<crate::schemas::p::ViewProperties>),
-  #[sdk(child(office2010, qname = "p:contentPart"))]
+  #[sdk(child(qname = "p:contentPart"))]
   PContentPart(std::boxed::Box<crate::schemas::p::ContentPart>),
   PlaceholderTypeExtension(std::boxed::Box<crate::schemas::p232::PlaceholderTypeExtension>),
   AuthorList(std::boxed::Box<crate::schemas::p188::AuthorList>),
-  #[sdk(child(office2021, qname = "p188:cmLst"))]
+  #[sdk(child(qname = "p188:cmLst"))]
   P188CommentList(std::boxed::Box<crate::schemas::p188::CommentList>),
   CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
   Reactions(std::boxed::Box<crate::schemas::p223::Reactions>),
   TaskDetails(std::boxed::Box<crate::schemas::p228::TaskDetails>),
   TaskHistoryDetails(std::boxed::Box<crate::schemas::p1912::TaskHistoryDetails>),
   /// Defines the TextBodyPackage Class.
-  #[sdk(empty_child(office2016, qname = "oac:txBodyPkg"))]
+  #[sdk(empty_child(qname = "oac:txBodyPkg"))]
   TextBodyPackage,
   GroupCommand(std::boxed::Box<crate::schemas::oac::GroupCommand>),
-  #[sdk(text_child(office2016, simple_type = "Base64BinaryValue", qname = "oac:imgData"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:imgData"))]
   ImgDataImgData(crate::schemas::oac::ImgDataImgData),
-  #[sdk(text_child(
-    office2016,
-    simple_type = "Base64BinaryValue",
-    qname = "oac:origImgData"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:origImgData"))]
   OrigImgDataImgData(crate::schemas::oac::OrigImgDataImgData),
   ImgLink(std::boxed::Box<crate::schemas::oac::ImgLink>),
-  #[sdk(any_child(office2016, qname = "oac:dgMkLst"))]
+  #[sdk(any_child(qname = "oac:dgMkLst"))]
   DrawingMonikerList(crate::schemas::oac::DrawingMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:dcMkLst"))]
+  #[sdk(any_child(qname = "oac:dcMkLst"))]
   DocumentContextMonikerList(crate::schemas::oac::DocumentContextMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:graphicParentMkLst"))]
+  #[sdk(any_child(qname = "oac:graphicParentMkLst"))]
   GraphicParentMonikerList(crate::schemas::oac::GraphicParentMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:deMkLst"))]
+  #[sdk(any_child(qname = "oac:deMkLst"))]
   DeMkLstDrawingElementMonikerList(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:deMasterMkLst"))]
+  #[sdk(any_child(qname = "oac:deMasterMkLst"))]
   DeMasterMkLstDrawingElementMonikerList(
     crate::schemas::oac::DeMasterMkLstDrawingElementMonikerList,
   ),
-  #[sdk(any_child(office2016, qname = "oac:spMkLst"))]
+  #[sdk(any_child(qname = "oac:spMkLst"))]
   ShapeMonikerList(crate::schemas::oac::ShapeMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:grpSpMkLst"))]
+  #[sdk(any_child(qname = "oac:grpSpMkLst"))]
   GroupShapeMonikerList(crate::schemas::oac::GroupShapeMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:graphicFrameMkLst"))]
+  #[sdk(any_child(qname = "oac:graphicFrameMkLst"))]
   GraphicFrameMonikerList(crate::schemas::oac::GraphicFrameMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:cxnSpMkLst"))]
+  #[sdk(any_child(qname = "oac:cxnSpMkLst"))]
   ConnectorMonikerList(crate::schemas::oac::ConnectorMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:picMkLst"))]
+  #[sdk(any_child(qname = "oac:picMkLst"))]
   PictureMonikerList(crate::schemas::oac::PictureMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:inkMkLst"))]
+  #[sdk(any_child(qname = "oac:inkMkLst"))]
   InkMonikerList(crate::schemas::oac::InkMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:txBodyMkLst"))]
+  #[sdk(any_child(qname = "oac:txBodyMkLst"))]
   TextBodyMonikerList(crate::schemas::oac::TextBodyMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:txMkLst"))]
+  #[sdk(any_child(qname = "oac:txMkLst"))]
   TextCharRangeMonikerList(crate::schemas::oac::TextCharRangeMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:hlinkMkLst"))]
+  #[sdk(any_child(qname = "oac:hlinkMkLst"))]
   HyperlinkMonikerList(crate::schemas::oac::HyperlinkMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:model3DMkLst"))]
+  #[sdk(any_child(qname = "oac:model3DMkLst"))]
   Model3DMonikerList(crate::schemas::oac::Model3DMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:viewSelLst"))]
+  #[sdk(any_child(qname = "oac:viewSelLst"))]
   ViewSelectionStgList(crate::schemas::oac::ViewSelectionStgList),
-  #[sdk(any_child(office2016, qname = "oac:editorSelLst"))]
+  #[sdk(any_child(qname = "oac:editorSelLst"))]
   EditorSelectionStgList(crate::schemas::oac::EditorSelectionStgList),
-  #[sdk(any_child(office2016, qname = "oac:drSelLst"))]
+  #[sdk(any_child(qname = "oac:drSelLst"))]
   DrawingSelectionStgList(crate::schemas::oac::DrawingSelectionStgList),
-  #[sdk(any_child(office2016, qname = "oac:tblMkLst"))]
+  #[sdk(any_child(qname = "oac:tblMkLst"))]
   TableMonikerList(crate::schemas::oac::TableMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:tcMkLst"))]
+  #[sdk(any_child(qname = "oac:tcMkLst"))]
   TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:trMkLst"))]
+  #[sdk(any_child(qname = "oac:trMkLst"))]
   TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:gridColMkLst"))]
+  #[sdk(any_child(qname = "oac:gridColMkLst"))]
   TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
   #[sdk(child(qname = "inkml:ink"))]
   InkmlInk(std::boxed::Box<crate::schemas::inkml::Ink>),
@@ -11421,13 +11409,13 @@ pub enum GraphicDataChoice {
   ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
-  #[sdk(child(office2013, qname = "p15:chartTrackingRefBased"))]
+  #[sdk(child(qname = "p15:chartTrackingRefBased"))]
   ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
   NonVisualContentPartProperties(
     std::boxed::Box<crate::schemas::p14::NonVisualContentPartProperties>,
   ),
   Transform2D(std::boxed::Box<crate::schemas::p14::Transform2D>),
-  #[sdk(child(office2010, qname = "p14:extLst"))]
+  #[sdk(child(qname = "p14:extLst"))]
   ExtensionListModify(std::boxed::Box<crate::schemas::p14::ExtensionListModify>),
   Media(std::boxed::Box<crate::schemas::p14::Media>),
   VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
@@ -11435,7 +11423,7 @@ pub enum GraphicDataChoice {
   FlipTransition(std::boxed::Box<crate::schemas::p14::FlipTransition>),
   RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
   /// Defines the HoneycombTransition Class.
-  #[sdk(empty_child(office2010, qname = "p14:honeycomb"))]
+  #[sdk(empty_child(qname = "p14:honeycomb"))]
   HoneycombTransition,
   PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
   DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
@@ -11448,7 +11436,7 @@ pub enum GraphicDataChoice {
   WarpTransition(std::boxed::Box<crate::schemas::p14::WarpTransition>),
   FlythroughTransition(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
   /// Defines the FlashTransition Class.
-  #[sdk(empty_child(office2010, qname = "p14:flash"))]
+  #[sdk(empty_child(qname = "p14:flash"))]
   FlashTransition,
   ShredTransition(std::boxed::Box<crate::schemas::p14::ShredTransition>),
   RevealTransition(std::boxed::Box<crate::schemas::p14::RevealTransition>),
@@ -11458,12 +11446,12 @@ pub enum GraphicDataChoice {
   SectionList(std::boxed::Box<crate::schemas::p14::SectionList>),
   BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
   LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
-  #[sdk(child(office2010, qname = "p14:defaultImageDpi"))]
+  #[sdk(child(qname = "p14:defaultImageDpi"))]
   P14DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
   DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
   ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
   LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
-  #[sdk(child(office2010, qname = "p14:creationId"))]
+  #[sdk(child(qname = "p14:creationId"))]
   P14CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
   ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
   ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
@@ -11488,19 +11476,19 @@ pub enum GraphicDataChoice {
   People(std::boxed::Box<crate::schemas::w15::People>),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(office2013, qname = "w15:repeatingSectionItem"))]
+  #[sdk(empty_child(qname = "w15:repeatingSectionItem"))]
   SdtRepeatedSectionItem,
-  #[sdk(child(office2013, qname = "w15:chartTrackingRefBased"))]
+  #[sdk(child(qname = "w15:chartTrackingRefBased"))]
   ChartTrackingRefBased(std::boxed::Box<crate::schemas::w15::ChartTrackingRefBased>),
   DefaultCollapsed(std::boxed::Box<crate::schemas::w15::DefaultCollapsed>),
-  #[sdk(child(office2013, qname = "w15:docId"))]
+  #[sdk(child(qname = "w15:docId"))]
   PersistentDocumentId(std::boxed::Box<crate::schemas::w15::PersistentDocumentId>),
   FootnoteColumns(std::boxed::Box<crate::schemas::w15::FootnoteColumns>),
   WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
   WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
-  #[sdk(child(office2010, qname = "w14:contentPart"))]
+  #[sdk(child(qname = "w14:contentPart"))]
   W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
-  #[sdk(child(office2010, qname = "w14:docId"))]
+  #[sdk(child(qname = "w14:docId"))]
   DocumentId(std::boxed::Box<crate::schemas::w14::DocumentId>),
   ConflictMode(std::boxed::Box<crate::schemas::w14::ConflictMode>),
   CustomXmlConflictInsertionRangeStart(
@@ -11516,10 +11504,10 @@ pub enum GraphicDataChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
   DiscardImageEditingData(std::boxed::Box<crate::schemas::w14::DiscardImageEditingData>),
-  #[sdk(child(office2010, qname = "w14:defaultImageDpi"))]
+  #[sdk(child(qname = "w14:defaultImageDpi"))]
   W14DefaultImageDpi(std::boxed::Box<crate::schemas::w14::DefaultImageDpi>),
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w14:entityPicker"))]
+  #[sdk(empty_child(qname = "w14:entityPicker"))]
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
   SchemaLibrary(std::boxed::Box<crate::schemas::sl::SchemaLibrary>),

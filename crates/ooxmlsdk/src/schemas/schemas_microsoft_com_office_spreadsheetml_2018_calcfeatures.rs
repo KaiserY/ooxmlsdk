@@ -6,17 +6,17 @@
 
 /// Defines the CalcFeatures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xcalcf:calcFeatures")]
+#[sdk(qname = "xcalcf:calcFeatures")]
 pub struct CalcFeatures {
   /// Defines the CalcFeature Class.
-  #[sdk(child(office2019, qname = "xcalcf:feature"))]
+  #[sdk(child(qname = "xcalcf:feature"))]
   pub calc_feature: Vec<CalcFeature>,
 }
 /// Defines the CalcFeature Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xcalcf:feature")]
+#[sdk(qname = "xcalcf:feature")]
 pub struct CalcFeature {
   /// name
-  #[sdk(attr(office2019, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
 }

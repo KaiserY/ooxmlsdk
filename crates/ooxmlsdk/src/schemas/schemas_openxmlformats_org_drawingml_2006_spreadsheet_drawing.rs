@@ -210,28 +210,28 @@ pub struct Picture {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "xdr:contentPart")]
+#[sdk(qname = "xdr:contentPart")]
 pub struct ContentPart {
   /// id
-  #[sdk(attr(office2010, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
   /// bwMode
-  #[sdk(attr(office2010, qname = ":bwMode"))]
+  #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// Defines the ExcelNonVisualContentPartShapeProperties Class.
-  #[sdk(child(office2010, qname = "xdr14:nvContentPartPr"))]
+  #[sdk(child(qname = "xdr14:nvContentPartPr"))]
   pub excel_non_visual_content_part_shape_properties:
     Option<std::boxed::Box<crate::schemas::xdr14::ExcelNonVisualContentPartShapeProperties>>,
   /// Defines the ApplicationNonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "xdr14:nvPr"))]
+  #[sdk(child(qname = "xdr14:nvPr"))]
   pub application_non_visual_drawing_properties:
     Option<crate::schemas::xdr14::ApplicationNonVisualDrawingProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "xdr14:xfrm"))]
+  #[sdk(child(qname = "xdr14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::xdr14::Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "xdr14:extLst"))]
+  #[sdk(child(qname = "xdr14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::xdr14::OfficeArtExtensionList>,
 }
 /// Worksheet Drawing.

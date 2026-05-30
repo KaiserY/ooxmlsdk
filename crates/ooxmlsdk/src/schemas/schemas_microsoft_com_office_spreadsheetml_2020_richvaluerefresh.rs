@@ -6,23 +6,23 @@
 
 /// Defines the RichValueRefreshIntervals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xlrvr:refreshIntervals")]
+#[sdk(qname = "xlrvr:refreshIntervals")]
 pub struct RichValueRefreshIntervals {
   /// Defines the RichValueRefreshInterval Class.
-  #[sdk(child(office2021, qname = "xlrvr:refreshInterval"))]
+  #[sdk(child(qname = "xlrvr:refreshInterval"))]
   pub rich_value_refresh_interval: Vec<RichValueRefreshInterval>,
 }
 /// Defines the RichValueRefreshInterval Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xlrvr:refreshInterval")]
+#[sdk(qname = "xlrvr:refreshInterval")]
 pub struct RichValueRefreshInterval {
   /// resourceIdInt
-  #[sdk(attr(office2021, qname = ":resourceIdInt"))]
+  #[sdk(attr(qname = ":resourceIdInt"))]
   pub resource_id_int: Option<crate::simple_type::Int32Value>,
   /// resourceIdStr
-  #[sdk(attr(office2021, qname = ":resourceIdStr"))]
+  #[sdk(attr(qname = ":resourceIdStr"))]
   pub resource_id_str: Option<crate::simple_type::StringValue>,
   /// interval
-  #[sdk(attr(office2021, qname = ":interval"))]
+  #[sdk(attr(qname = ":interval"))]
   pub interval: crate::simple_type::Int32Value,
 }

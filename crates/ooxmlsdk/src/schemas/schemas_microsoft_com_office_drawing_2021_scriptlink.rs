@@ -6,18 +6,18 @@
 
 /// Defines the ScriptLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "asl:scriptLink")]
+#[sdk(qname = "asl:scriptLink")]
 pub struct ScriptLink {
   /// val
-  #[sdk(attr(microsoft365, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(microsoft365, qname = "asl:extLst"))]
+  #[sdk(child(qname = "asl:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "asl:extLst")]
+#[sdk(qname = "asl:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]

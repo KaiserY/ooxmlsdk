@@ -6,13 +6,13 @@
 
 /// Defines the WordprocessingCanvas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:wpc")]
+#[sdk(qname = "wpc:wpc")]
 pub struct WordprocessingCanvas {
   /// Defines the BackgroundFormatting Class.
-  #[sdk(child(office2010, qname = "wpc:bg"))]
+  #[sdk(child(qname = "wpc:bg"))]
   pub background_formatting: Option<std::boxed::Box<BackgroundFormatting>>,
   /// Defines the WholeFormatting Class.
-  #[sdk(child(office2010, qname = "wpc:whole"))]
+  #[sdk(child(qname = "wpc:whole"))]
   pub whole_formatting: Option<std::boxed::Box<WholeFormatting>>,
   #[sdk(
         choice(
@@ -25,12 +25,12 @@ pub struct WordprocessingCanvas {
     )]
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wpc:extLst"))]
+  #[sdk(child(qname = "wpc:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:bg")]
+#[sdk(qname = "wpc:bg")]
 pub struct BackgroundFormatting {
   #[sdk(
         choice(
@@ -53,7 +53,7 @@ pub struct BackgroundFormatting {
 }
 /// Defines the WholeFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:whole")]
+#[sdk(qname = "wpc:whole")]
 pub struct WholeFormatting {
   /// Outline
   #[sdk(child(qname = "a:ln"))]
@@ -68,29 +68,29 @@ pub struct WholeFormatting {
 }
 /// Defines the GraphicFrameType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:graphicFrame")]
+#[sdk(qname = "wpc:graphicFrame")]
 pub struct GraphicFrameType {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvPr"))]
+  #[sdk(child(qname = "wpg:cNvPr"))]
   pub non_visual_drawing_properties:
     std::boxed::Box<crate::schemas::wpg::NonVisualDrawingProperties>,
   /// Defines the NonVisualGraphicFrameProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvFrPr"))]
+  #[sdk(child(qname = "wpg:cNvFrPr"))]
   pub non_visual_graphic_frame_properties:
     std::boxed::Box<crate::schemas::wpg::NonVisualGraphicFrameProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "wpg:xfrm"))]
+  #[sdk(child(qname = "wpg:xfrm"))]
   pub transform2_d: std::boxed::Box<crate::schemas::wpg::Transform2D>,
   /// Graphic Object.
   #[sdk(child(qname = "a:graphic"))]
   pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wpg:extLst"))]
+  #[sdk(child(qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::wpg::OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:extLst")]
+#[sdk(qname = "wpc:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]

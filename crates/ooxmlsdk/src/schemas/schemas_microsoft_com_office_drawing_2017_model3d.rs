@@ -6,7 +6,7 @@
 
 /// Defines the Model3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:model3d")]
+#[sdk(qname = "am3d:model3d")]
 pub struct Model3D {
   /// Embedded Picture Reference
   #[sdk(attr(qname = "r:embed"))]
@@ -15,22 +15,22 @@ pub struct Model3D {
   #[sdk(attr(qname = "r:link"))]
   pub link: Option<crate::simple_type::StringValue>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2019, qname = "am3d:spPr"))]
+  #[sdk(child(qname = "am3d:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the Model3DCamera Class.
-  #[sdk(child(office2019, qname = "am3d:camera"))]
+  #[sdk(child(qname = "am3d:camera"))]
   pub model3_d_camera: std::boxed::Box<Model3DCamera>,
   /// Defines the Model3DTransform Class.
-  #[sdk(child(office2019, qname = "am3d:trans"))]
+  #[sdk(child(qname = "am3d:trans"))]
   pub model3_d_transform: std::boxed::Box<Model3DTransform>,
   /// Optional source attribution URL describes from whence the 3D model came.
-  #[sdk(child(office2019, qname = "am3d:attrSrcUrl"))]
+  #[sdk(child(qname = "am3d:attrSrcUrl"))]
   pub picture_attribution_source_url: Option<PictureAttributionSourceUrl>,
   /// Defines the Model3DRaster Class.
-  #[sdk(child(office2019, qname = "am3d:raster"))]
+  #[sdk(child(qname = "am3d:raster"))]
   pub model3_d_raster: Option<std::boxed::Box<Model3DRaster>>,
   /// Future Model3D extensions
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub model3_d_extension_list: Option<Model3DExtensionList>,
   #[sdk(
         choice(
@@ -40,7 +40,7 @@ pub struct Model3D {
     )]
   pub model3_d_choice1: Option<Model3DChoice>,
   /// Ambient light in a scene.
-  #[sdk(child(office2019, qname = "am3d:ambientLight"))]
+  #[sdk(child(qname = "am3d:ambientLight"))]
   pub ambient_light: Option<std::boxed::Box<AmbientLight>>,
   #[sdk(
         choice(
@@ -54,7 +54,7 @@ pub struct Model3D {
 }
 /// Defines the SxRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:sx")]
+#[sdk(qname = "am3d:sx")]
 pub struct SxRatio {
   /// Numerator
   #[sdk(attr(qname = ":n"))]
@@ -65,7 +65,7 @@ pub struct SxRatio {
 }
 /// Defines the SyRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:sy")]
+#[sdk(qname = "am3d:sy")]
 pub struct SyRatio {
   /// Numerator
   #[sdk(attr(qname = ":n"))]
@@ -76,7 +76,7 @@ pub struct SyRatio {
 }
 /// Defines the SzRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:sz")]
+#[sdk(qname = "am3d:sz")]
 pub struct SzRatio {
   /// Numerator
   #[sdk(attr(qname = ":n"))]
@@ -87,51 +87,51 @@ pub struct SzRatio {
 }
 /// Defines the MeterPerModelUnitPositiveRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:meterPerModelUnit")]
+#[sdk(qname = "am3d:meterPerModelUnit")]
 pub struct MeterPerModelUnitPositiveRatio {
   /// n
-  #[sdk(attr(office2019, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::UInt64Value,
   /// d
-  #[sdk(attr(office2019, qname = ":d"))]
+  #[sdk(attr(qname = ":d"))]
   pub d: crate::simple_type::UInt64Value,
 }
 /// Defines the SzPositiveRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:sz")]
+#[sdk(qname = "am3d:sz")]
 pub struct SzPositiveRatio {
   /// n
-  #[sdk(attr(office2019, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::UInt64Value,
   /// d
-  #[sdk(attr(office2019, qname = ":d"))]
+  #[sdk(attr(qname = ":d"))]
   pub d: crate::simple_type::UInt64Value,
 }
 /// Defines the IlluminancePositiveRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:illuminance")]
+#[sdk(qname = "am3d:illuminance")]
 pub struct IlluminancePositiveRatio {
   /// n
-  #[sdk(attr(office2019, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::UInt64Value,
   /// d
-  #[sdk(attr(office2019, qname = ":d"))]
+  #[sdk(attr(qname = ":d"))]
   pub d: crate::simple_type::UInt64Value,
 }
 /// Defines the IntensityPositiveRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:intensity")]
+#[sdk(qname = "am3d:intensity")]
 pub struct IntensityPositiveRatio {
   /// n
-  #[sdk(attr(office2019, qname = ":n"))]
+  #[sdk(attr(qname = ":n"))]
   pub n: crate::simple_type::UInt64Value,
   /// d
-  #[sdk(attr(office2019, qname = ":d"))]
+  #[sdk(attr(qname = ":d"))]
   pub d: crate::simple_type::UInt64Value,
 }
 /// Defines the PreTransVector3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:preTrans")]
+#[sdk(qname = "am3d:preTrans")]
 pub struct PreTransVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
@@ -148,7 +148,7 @@ pub struct PreTransVector3D {
 }
 /// Defines the PostTransVector3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:postTrans")]
+#[sdk(qname = "am3d:postTrans")]
 pub struct PostTransVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
@@ -165,7 +165,7 @@ pub struct PostTransVector3D {
 }
 /// Defines the UpVector3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:up")]
+#[sdk(qname = "am3d:up")]
 pub struct UpVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
@@ -182,35 +182,35 @@ pub struct UpVector3D {
 }
 /// Defines the Scale3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:scale")]
+#[sdk(qname = "am3d:scale")]
 pub struct Scale3D {
   /// Defines the SxRatio Class.
-  #[sdk(child(office2019, qname = "am3d:sx"))]
+  #[sdk(child(qname = "am3d:sx"))]
   pub sx_ratio: std::boxed::Box<SxRatio>,
   /// Defines the SyRatio Class.
-  #[sdk(child(office2019, qname = "am3d:sy"))]
+  #[sdk(child(qname = "am3d:sy"))]
   pub sy_ratio: std::boxed::Box<SyRatio>,
   /// Defines the SzRatio Class.
-  #[sdk(child(office2019, qname = "am3d:sz"))]
+  #[sdk(child(qname = "am3d:sz"))]
   pub sz_ratio: std::boxed::Box<SzRatio>,
 }
 /// Defines the Rotate3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:rot")]
+#[sdk(qname = "am3d:rot")]
 pub struct Rotate3D {
   /// ax
-  #[sdk(attr(office2019, qname = ":ax"))]
+  #[sdk(attr(qname = ":ax"))]
   pub ax: Option<crate::simple_type::Int32Value>,
   /// ay
-  #[sdk(attr(office2019, qname = ":ay"))]
+  #[sdk(attr(qname = ":ay"))]
   pub ay: Option<crate::simple_type::Int32Value>,
   /// az
-  #[sdk(attr(office2019, qname = ":az"))]
+  #[sdk(attr(qname = ":az"))]
   pub az: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:extLst")]
+#[sdk(qname = "am3d:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -218,7 +218,7 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the PosPoint3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:pos")]
+#[sdk(qname = "am3d:pos")]
 pub struct PosPoint3D {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
@@ -235,7 +235,7 @@ pub struct PosPoint3D {
 }
 /// Defines the LookAtPoint3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:lookAt")]
+#[sdk(qname = "am3d:lookAt")]
 pub struct LookAtPoint3D {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
@@ -252,30 +252,30 @@ pub struct LookAtPoint3D {
 }
 /// Defines the OrthographicProjection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:orthographic")]
+#[sdk(qname = "am3d:orthographic")]
 pub struct OrthographicProjection {
   /// Defines the SzPositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:sz"))]
+  #[sdk(child(qname = "am3d:sz"))]
   pub sz_positive_ratio: std::boxed::Box<SzPositiveRatio>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PerspectiveProjection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:perspective")]
+#[sdk(qname = "am3d:perspective")]
 pub struct PerspectiveProjection {
   /// fov
-  #[sdk(attr(office2019, qname = ":fov"))]
+  #[sdk(attr(qname = ":fov"))]
   #[sdk(number_range(range = 0..= 10800000))]
   pub fov: crate::simple_type::Int32Value,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the Blip Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:blip")]
+#[sdk(qname = "am3d:blip")]
 pub struct Blip {
   /// Embedded Picture Reference
   #[sdk(attr(qname = "r:embed"))]
@@ -315,7 +315,7 @@ pub struct Blip {
 }
 /// Defines the ColorType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:clr")]
+#[sdk(qname = "am3d:clr")]
 pub struct ColorType {
   #[sdk(
         choice(
@@ -331,10 +331,10 @@ pub struct ColorType {
 }
 /// Defines the Model3DExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:ext")]
+#[sdk(qname = "am3d:ext")]
 pub struct Model3DExtension {
   /// URI
-  #[sdk(attr(office2019, qname = ":uri"))]
+  #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(
@@ -348,7 +348,7 @@ pub struct Model3DExtension {
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:spPr")]
+#[sdk(qname = "am3d:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -397,16 +397,16 @@ pub struct ShapeProperties {
 }
 /// Defines the Model3DCamera Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:camera")]
+#[sdk(qname = "am3d:camera")]
 pub struct Model3DCamera {
   /// Defines the PosPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:pos"))]
+  #[sdk(child(qname = "am3d:pos"))]
   pub pos_point3_d: std::boxed::Box<PosPoint3D>,
   /// Defines the UpVector3D Class.
-  #[sdk(child(office2019, qname = "am3d:up"))]
+  #[sdk(child(qname = "am3d:up"))]
   pub up_vector3_d: std::boxed::Box<UpVector3D>,
   /// Defines the LookAtPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:lookAt"))]
+  #[sdk(child(qname = "am3d:lookAt"))]
   pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
   #[sdk(
         choice(
@@ -416,179 +416,179 @@ pub struct Model3DCamera {
     )]
   pub model3_d_camera_choice: Option<Model3DCameraChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the Model3DTransform Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:trans")]
+#[sdk(qname = "am3d:trans")]
 pub struct Model3DTransform {
   /// Defines the MeterPerModelUnitPositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:meterPerModelUnit"))]
+  #[sdk(child(qname = "am3d:meterPerModelUnit"))]
   pub meter_per_model_unit_positive_ratio: Option<MeterPerModelUnitPositiveRatio>,
   /// Defines the PreTransVector3D Class.
-  #[sdk(child(office2019, qname = "am3d:preTrans"))]
+  #[sdk(child(qname = "am3d:preTrans"))]
   pub pre_trans_vector3_d: Option<PreTransVector3D>,
   /// Defines the Scale3D Class.
-  #[sdk(child(office2019, qname = "am3d:scale"))]
+  #[sdk(child(qname = "am3d:scale"))]
   pub scale3_d: Option<std::boxed::Box<Scale3D>>,
   /// Defines the Rotate3D Class.
-  #[sdk(child(office2019, qname = "am3d:rot"))]
+  #[sdk(child(qname = "am3d:rot"))]
   pub rotate3_d: Option<Rotate3D>,
   /// Defines the PostTransVector3D Class.
-  #[sdk(child(office2019, qname = "am3d:postTrans"))]
+  #[sdk(child(qname = "am3d:postTrans"))]
   pub post_trans_vector3_d: Option<PostTransVector3D>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Optional source attribution URL describes from whence the 3D model came..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:attrSrcUrl")]
+#[sdk(qname = "am3d:attrSrcUrl")]
 pub struct PictureAttributionSourceUrl {
   /// id
-  #[sdk(attr(office2019, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the Model3DRaster Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:raster")]
+#[sdk(qname = "am3d:raster")]
 pub struct Model3DRaster {
   /// rName
-  #[sdk(attr(office2019, qname = ":rName"))]
+  #[sdk(attr(qname = ":rName"))]
   pub r_name: crate::simple_type::StringValue,
   /// rVer
-  #[sdk(attr(office2019, qname = ":rVer"))]
+  #[sdk(attr(qname = ":rVer"))]
   pub r_ver: crate::simple_type::StringValue,
   /// Defines the Blip Class.
-  #[sdk(child(office2019, qname = "am3d:blip"))]
+  #[sdk(child(qname = "am3d:blip"))]
   pub blip: Option<std::boxed::Box<Blip>>,
 }
 /// Future Model3D extensions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:extLst")]
+#[sdk(qname = "am3d:extLst")]
 pub struct Model3DExtensionList {
   /// Defines the Model3DExtension Class.
-  #[sdk(child(office2019, qname = "am3d:ext"))]
+  #[sdk(child(qname = "am3d:ext"))]
   pub model3_d_extension: Vec<Model3DExtension>,
 }
 /// Defines the ObjectViewport Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:objViewport")]
+#[sdk(qname = "am3d:objViewport")]
 pub struct ObjectViewport {
   /// viewportSz
-  #[sdk(attr(office2019, qname = ":viewportSz"))]
+  #[sdk(attr(qname = ":viewportSz"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub viewport_sz: crate::simple_type::Int64Value,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WindowViewport Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:winViewport")]
+#[sdk(qname = "am3d:winViewport")]
 pub struct WindowViewport {
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Ambient light in a scene.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:ambientLight")]
+#[sdk(qname = "am3d:ambientLight")]
 pub struct AmbientLight {
   /// enabled
-  #[sdk(attr(office2019, qname = ":enabled"))]
+  #[sdk(attr(qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// Defines the ColorType Class.
-  #[sdk(child(office2019, qname = "am3d:clr"))]
+  #[sdk(child(qname = "am3d:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IlluminancePositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:illuminance"))]
+  #[sdk(child(qname = "am3d:illuminance"))]
   pub illuminance_positive_ratio: std::boxed::Box<IlluminancePositiveRatio>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PointLight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:ptLight")]
+#[sdk(qname = "am3d:ptLight")]
 pub struct PointLight {
   /// enabled
-  #[sdk(attr(office2019, qname = ":enabled"))]
+  #[sdk(attr(qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// rad
-  #[sdk(attr(office2019, qname = ":rad"))]
+  #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub rad: crate::simple_type::Int64Value,
   /// Defines the ColorType Class.
-  #[sdk(child(office2019, qname = "am3d:clr"))]
+  #[sdk(child(qname = "am3d:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IntensityPositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:intensity"))]
+  #[sdk(child(qname = "am3d:intensity"))]
   pub intensity_positive_ratio: std::boxed::Box<IntensityPositiveRatio>,
   /// Defines the PosPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:pos"))]
+  #[sdk(child(qname = "am3d:pos"))]
   pub pos_point3_d: std::boxed::Box<PosPoint3D>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the SpotLight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:spotLight")]
+#[sdk(qname = "am3d:spotLight")]
 pub struct SpotLight {
   /// enabled
-  #[sdk(attr(office2019, qname = ":enabled"))]
+  #[sdk(attr(qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// rad
-  #[sdk(attr(office2019, qname = ":rad"))]
+  #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub rad: crate::simple_type::Int64Value,
   /// spotAng
-  #[sdk(attr(office2019, qname = ":spotAng"))]
+  #[sdk(attr(qname = ":spotAng"))]
   #[sdk(number_range(range = 0..= 10800000))]
   pub spot_ang: crate::simple_type::Int32Value,
   /// Defines the ColorType Class.
-  #[sdk(child(office2019, qname = "am3d:clr"))]
+  #[sdk(child(qname = "am3d:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IntensityPositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:intensity"))]
+  #[sdk(child(qname = "am3d:intensity"))]
   pub intensity_positive_ratio: std::boxed::Box<IntensityPositiveRatio>,
   /// Defines the PosPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:pos"))]
+  #[sdk(child(qname = "am3d:pos"))]
   pub pos_point3_d: std::boxed::Box<PosPoint3D>,
   /// Defines the LookAtPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:lookAt"))]
+  #[sdk(child(qname = "am3d:lookAt"))]
   pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DirectionalLight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:dirLight")]
+#[sdk(qname = "am3d:dirLight")]
 pub struct DirectionalLight {
   /// enabled
-  #[sdk(attr(office2019, qname = ":enabled"))]
+  #[sdk(attr(qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// angularRad
-  #[sdk(attr(office2019, qname = ":angularRad"))]
+  #[sdk(attr(qname = ":angularRad"))]
   #[sdk(number_range(range = 0..= 5400000))]
   pub angular_rad: crate::simple_type::Int32Value,
   /// Defines the ColorType Class.
-  #[sdk(child(office2019, qname = "am3d:clr"))]
+  #[sdk(child(qname = "am3d:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the IlluminancePositiveRatio Class.
-  #[sdk(child(office2019, qname = "am3d:illuminance"))]
+  #[sdk(child(qname = "am3d:illuminance"))]
   pub illuminance_positive_ratio: std::boxed::Box<IlluminancePositiveRatio>,
   /// Defines the PosPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:pos"))]
+  #[sdk(child(qname = "am3d:pos"))]
   pub pos_point3_d: std::boxed::Box<PosPoint3D>,
   /// Defines the LookAtPoint3D Class.
-  #[sdk(child(office2019, qname = "am3d:lookAt"))]
+  #[sdk(child(qname = "am3d:lookAt"))]
   pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "am3d:extLst"))]
+  #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -607,7 +607,7 @@ pub enum Model3DChoice2 {
   /// Defines the DirectionalLight Class.
   DirectionalLight(std::boxed::Box<DirectionalLight>),
   /// Defines the UnknownLight Class.
-  #[sdk(empty_child(office2019, qname = "am3d:unkLight"))]
+  #[sdk(empty_child(qname = "am3d:unkLight"))]
   UnknownLight,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

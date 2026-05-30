@@ -929,13 +929,13 @@ pub struct BackgroundStyleReference {
 }
 /// Data for the Windows platform..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p:ext")]
+#[sdk(qname = "p:ext")]
 pub struct CommentPropertiesExtension {
   /// Defines the TaskDetails Class.
-  #[sdk(child(microsoft365, qname = "p228:taskDetails"))]
+  #[sdk(child(qname = "p228:taskDetails"))]
   pub task_details: Option<std::boxed::Box<crate::schemas::p228::TaskDetails>>,
   /// Defines the Reactions Class.
-  #[sdk(child(microsoft365, qname = "p223:reactions"))]
+  #[sdk(child(qname = "p223:reactions"))]
   pub reactions: Option<crate::schemas::p223::Reactions>,
 }
 /// List of Comment Authors.
@@ -1352,23 +1352,23 @@ pub struct ViewProperties {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:contentPart")]
+#[sdk(qname = "p:contentPart")]
 pub struct ContentPart {
   /// bwMode
-  #[sdk(attr(office2010, qname = "p14:bwMode"))]
+  #[sdk(attr(qname = "p14:bwMode"))]
   pub p14_bw_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// Defines the NonVisualContentPartProperties Class.
-  #[sdk(child(office2010, qname = "p14:nvContentPartPr"))]
+  #[sdk(child(qname = "p14:nvContentPartPr"))]
   pub non_visual_content_part_properties:
     Option<std::boxed::Box<crate::schemas::p14::NonVisualContentPartProperties>>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "p14:xfrm"))]
+  #[sdk(child(qname = "p14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::p14::Transform2D>>,
   /// Defines the ExtensionListModify Class.
-  #[sdk(child(office2010, qname = "p14:extLst"))]
+  #[sdk(child(qname = "p14:extLst"))]
   pub extension_list_modify: Option<crate::schemas::p14::ExtensionListModify>,
 }
 /// Sound.
@@ -1574,7 +1574,7 @@ pub struct Animate {
   #[sdk(string_format(kind = "token"))]
   pub value_type: Option<AnimateBehaviorValues>,
   /// bounceEnd
-  #[sdk(attr(office2010, qname = "p14:bounceEnd"))]
+  #[sdk(attr(qname = "p14:bounceEnd"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1659,7 +1659,7 @@ pub struct AnimateMotion {
   #[sdk(attr(qname = ":ptsTypes"))]
   pub point_types: Option<crate::simple_type::StringValue>,
   /// bounceEnd
-  #[sdk(attr(office2010, qname = "p14:bounceEnd"))]
+  #[sdk(attr(qname = "p14:bounceEnd"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1699,7 +1699,7 @@ pub struct AnimateRotation {
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::Int32Value>,
   /// bounceEnd
-  #[sdk(attr(office2010, qname = "p14:bounceEnd"))]
+  #[sdk(attr(qname = "p14:bounceEnd"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1721,7 +1721,7 @@ pub struct AnimateScale {
   #[sdk(attr(qname = ":zoomContents"))]
   pub zoom_contents: Option<crate::simple_type::BooleanValue>,
   /// bounceEnd
-  #[sdk(attr(office2010, qname = "p14:bounceEnd"))]
+  #[sdk(attr(qname = "p14:bounceEnd"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1875,7 +1875,7 @@ pub struct CommonTimeNode {
   #[sdk(attr(qname = ":nodePh"))]
   pub node_placeholder: Option<crate::simple_type::BooleanValue>,
   /// presetBounceEnd
-  #[sdk(attr(office2010, qname = "p14:presetBounceEnd"))]
+  #[sdk(attr(qname = "p14:presetBounceEnd"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -3612,7 +3612,7 @@ pub struct Transition {
   #[sdk(string_format(kind = "token"))]
   pub speed: Option<TransitionSpeedValues>,
   /// dur
-  #[sdk(attr(office2010, qname = "p14:dur"))]
+  #[sdk(attr(qname = "p14:dur"))]
   pub duration: Option<crate::simple_type::StringValue>,
   /// Specifies whether a mouse click will advance the slide.
   #[sdk(attr(qname = ":advClick"))]
@@ -4342,16 +4342,16 @@ pub struct ModificationVerifier {
   #[sdk(attr(qname = ":cryptProviderTypeExtSource"))]
   pub cryptographic_provider_type_extensibility_source: Option<crate::simple_type::StringValue>,
   /// algorithmName
-  #[sdk(attr(office2010, qname = ":algorithmName"))]
+  #[sdk(attr(qname = ":algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  #[sdk(attr(office2010, qname = ":hashValue"))]
+  #[sdk(attr(qname = ":hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  #[sdk(attr(office2010, qname = ":saltValue"))]
+  #[sdk(attr(qname = ":saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinValue
-  #[sdk(attr(office2010, qname = ":spinValue"))]
+  #[sdk(attr(qname = ":spinValue"))]
   pub spin_value: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the PresentationExtensionList Class.
@@ -4812,10 +4812,10 @@ pub struct SoundAction {
 }
 /// Defines the PlaceholderExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p:ext")]
+#[sdk(qname = "p:ext")]
 pub struct PlaceholderExtension {
   /// Defines the PlaceholderTypeExtension Class.
-  #[sdk(child(microsoft365, qname = "p232:phTypeExt"))]
+  #[sdk(child(qname = "p232:phTypeExt"))]
   pub placeholder_type_extension:
     Option<std::boxed::Box<crate::schemas::p232::PlaceholderTypeExtension>>,
 }
@@ -5144,7 +5144,7 @@ pub enum TransitionChoice {
   /// Defines the ZoomTransition Class.
   ZoomTransition(std::boxed::Box<ZoomTransition>),
   /// Defines the FlashTransition Class.
-  #[sdk(empty_child(office2010, qname = "p14:flash"))]
+  #[sdk(empty_child(qname = "p14:flash"))]
   FlashTransition,
   VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
   SwitchTransition(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
@@ -5152,7 +5152,7 @@ pub enum TransitionChoice {
   RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
   GlitterTransition(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
   /// Defines the HoneycombTransition Class.
-  #[sdk(empty_child(office2010, qname = "p14:honeycomb"))]
+  #[sdk(empty_child(qname = "p14:honeycomb"))]
   HoneycombTransition,
   PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
   DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),

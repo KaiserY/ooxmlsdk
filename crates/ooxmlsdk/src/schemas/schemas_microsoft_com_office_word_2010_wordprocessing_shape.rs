@@ -6,13 +6,13 @@
 
 /// Defines the WordprocessingShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:wsp")]
+#[sdk(qname = "wps:wsp")]
 pub struct WordprocessingShape {
   /// normalEastAsianFlow
-  #[sdk(attr(office2010, qname = ":normalEastAsianFlow"))]
+  #[sdk(attr(qname = ":normalEastAsianFlow"))]
   pub normal_east_asian_flow: Option<crate::simple_type::BooleanValue>,
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "wps:cNvPr"))]
+  #[sdk(child(qname = "wps:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   #[sdk(
         choice(
@@ -22,13 +22,13 @@ pub struct WordprocessingShape {
     )]
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2010, qname = "wps:spPr"))]
+  #[sdk(child(qname = "wps:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(office2010, qname = "wps:style"))]
+  #[sdk(child(qname = "wps:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wps:extLst"))]
+  #[sdk(child(qname = "wps:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
   #[sdk(
         choice(
@@ -38,12 +38,12 @@ pub struct WordprocessingShape {
     )]
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2010, qname = "wps:bodyPr"))]
+  #[sdk(child(qname = "wps:bodyPr"))]
   pub text_body_properties: std::boxed::Box<TextBodyProperties>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:extLst")]
+#[sdk(qname = "wps:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -51,7 +51,7 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:cNvPr")]
+#[sdk(qname = "wps:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -81,7 +81,7 @@ pub struct NonVisualDrawingProperties {
 }
 /// Defines the NonVisualDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:cNvSpPr")]
+#[sdk(qname = "wps:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   /// Text Box
   #[sdk(attr(qname = ":txBox"))]
@@ -95,7 +95,7 @@ pub struct NonVisualDrawingShapeProperties {
 }
 /// Defines the NonVisualConnectorProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:cNvCnPr")]
+#[sdk(qname = "wps:cNvCnPr")]
 pub struct NonVisualConnectorProperties {
   /// Connection Shape Locks
   #[sdk(child(qname = "a:cxnSpLocks"))]
@@ -112,7 +112,7 @@ pub struct NonVisualConnectorProperties {
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:spPr")]
+#[sdk(qname = "wps:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -161,7 +161,7 @@ pub struct ShapeProperties {
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:style")]
+#[sdk(qname = "wps:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
   #[sdk(child(qname = "a:lnRef"))]
@@ -178,36 +178,36 @@ pub struct ShapeStyle {
 }
 /// Defines the TextBoxInfo2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:txbx")]
+#[sdk(qname = "wps:txbx")]
 pub struct TextBoxInfo2 {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// id
-  #[sdk(attr(office2010, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt16Value>,
   /// Rich Text Box Content Container.
   #[sdk(child(qname = "w:txbxContent"))]
   pub text_box_content: Option<crate::schemas::w::TextBoxContent>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wps:extLst"))]
+  #[sdk(child(qname = "wps:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LinkedTextBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:linkedTxbx")]
+#[sdk(qname = "wps:linkedTxbx")]
 pub struct LinkedTextBox {
   /// id
-  #[sdk(attr(office2010, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt16Value,
   /// seq
-  #[sdk(attr(office2010, qname = ":seq"))]
+  #[sdk(attr(qname = ":seq"))]
   pub sequence: crate::simple_type::UInt16Value,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wps:extLst"))]
+  #[sdk(child(qname = "wps:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wps:bodyPr")]
+#[sdk(qname = "wps:bodyPr")]
 pub struct TextBodyProperties {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]

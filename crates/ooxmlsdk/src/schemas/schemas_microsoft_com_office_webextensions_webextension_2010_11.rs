@@ -6,57 +6,57 @@
 
 /// Defines the WebExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:webextension")]
+#[sdk(qname = "we:webextension")]
 pub struct WebExtension {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// id
-  #[sdk(attr(office2013, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// frozen
-  #[sdk(attr(office2013, qname = ":frozen"))]
+  #[sdk(attr(qname = ":frozen"))]
   pub frozen: Option<crate::simple_type::BooleanValue>,
   /// Defines the WebExtensionStoreReference Class.
-  #[sdk(child(office2013, qname = "we:reference"))]
+  #[sdk(child(qname = "we:reference"))]
   pub web_extension_store_reference: std::boxed::Box<WebExtensionStoreReference>,
   /// Defines the WebExtensionReferenceList Class.
-  #[sdk(child(office2013, qname = "we:alternateReferences"))]
+  #[sdk(child(qname = "we:alternateReferences"))]
   pub web_extension_reference_list: Option<WebExtensionReferenceList>,
   /// Defines the WebExtensionPropertyBag Class.
-  #[sdk(child(office2013, qname = "we:properties"))]
+  #[sdk(child(qname = "we:properties"))]
   pub web_extension_property_bag: std::boxed::Box<WebExtensionPropertyBag>,
   /// Defines the WebExtensionBindingList Class.
-  #[sdk(child(office2013, qname = "we:bindings"))]
+  #[sdk(child(qname = "we:bindings"))]
   pub web_extension_binding_list: std::boxed::Box<WebExtensionBindingList>,
   /// Defines the Snapshot Class.
-  #[sdk(child(office2013, qname = "we:snapshot"))]
+  #[sdk(child(qname = "we:snapshot"))]
   pub snapshot: Option<std::boxed::Box<Snapshot>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "we:extLst"))]
+  #[sdk(child(qname = "we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:webextensionref")]
+#[sdk(qname = "we:webextensionref")]
 pub struct WebExtensionReference {
   /// id
-  #[sdk(attr(office2013, qname = "r:id"))]
+  #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the WebExtensionProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:property")]
+#[sdk(qname = "we:property")]
 pub struct WebExtensionProperty {
   /// name
-  #[sdk(attr(office2013, qname = ":name"))]
+  #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// value
-  #[sdk(attr(office2013, qname = ":value"))]
+  #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::StringValue,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:extLst")]
+#[sdk(qname = "we:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -64,68 +64,68 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the WebExtensionBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:binding")]
+#[sdk(qname = "we:binding")]
 pub struct WebExtensionBinding {
   /// id
-  #[sdk(attr(office2013, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// type
-  #[sdk(attr(office2013, qname = ":type"))]
+  #[sdk(attr(qname = ":type"))]
   pub r#type: crate::simple_type::StringValue,
   /// appref
-  #[sdk(attr(office2013, qname = ":appref"))]
+  #[sdk(attr(qname = ":appref"))]
   pub app_reference: crate::simple_type::StringValue,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "we:extLst"))]
+  #[sdk(child(qname = "we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionStoreReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:reference")]
+#[sdk(qname = "we:reference")]
 pub struct WebExtensionStoreReference {
   /// id
-  #[sdk(attr(office2013, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// version
-  #[sdk(attr(office2013, qname = ":version"))]
+  #[sdk(attr(qname = ":version"))]
   pub version: crate::simple_type::StringValue,
   /// store
-  #[sdk(attr(office2013, qname = ":store"))]
+  #[sdk(attr(qname = ":store"))]
   pub store: Option<crate::simple_type::StringValue>,
   /// storeType
-  #[sdk(attr(office2013, qname = ":storeType"))]
+  #[sdk(attr(qname = ":storeType"))]
   pub store_type: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "we:extLst"))]
+  #[sdk(child(qname = "we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionReferenceList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:alternateReferences")]
+#[sdk(qname = "we:alternateReferences")]
 pub struct WebExtensionReferenceList {
   /// Defines the WebExtensionStoreReference Class.
-  #[sdk(child(office2013, qname = "we:reference"))]
+  #[sdk(child(qname = "we:reference"))]
   pub web_extension_store_reference: Vec<WebExtensionStoreReference>,
 }
 /// Defines the WebExtensionPropertyBag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:properties")]
+#[sdk(qname = "we:properties")]
 pub struct WebExtensionPropertyBag {
   /// Defines the WebExtensionProperty Class.
-  #[sdk(child(office2013, qname = "we:property"))]
+  #[sdk(child(qname = "we:property"))]
   pub web_extension_property: Vec<WebExtensionProperty>,
 }
 /// Defines the WebExtensionBindingList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:bindings")]
+#[sdk(qname = "we:bindings")]
 pub struct WebExtensionBindingList {
   /// Defines the WebExtensionBinding Class.
-  #[sdk(child(office2013, qname = "we:binding"))]
+  #[sdk(child(qname = "we:binding"))]
   pub web_extension_binding: Vec<WebExtensionBinding>,
 }
 /// Defines the Snapshot Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:snapshot")]
+#[sdk(qname = "we:snapshot")]
 pub struct Snapshot {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Embedded Picture Reference

@@ -140,12 +140,12 @@ pub enum TitlePosition {
 }
 /// Defines the ColorStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:colorStyle")]
+#[sdk(qname = "cs:colorStyle")]
 pub struct ColorStyle {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// meth
-  #[sdk(attr(office2013, qname = ":meth"))]
+  #[sdk(attr(qname = ":meth"))]
   #[sdk(
         string_set(
             source = 1u32,
@@ -160,7 +160,7 @@ pub struct ColorStyle {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub method: crate::simple_type::StringValue,
   /// id
-  #[sdk(attr(office2013, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,
   #[sdk(
         choice(
@@ -174,121 +174,121 @@ pub struct ColorStyle {
     )]
   pub color_style_choice: Vec<ColorStyleChoice>,
   /// Defines the ColorStyleVariation Class.
-  #[sdk(child(office2013, qname = "cs:variation"))]
+  #[sdk(child(qname = "cs:variation"))]
   pub color_style_variation: Vec<ColorStyleVariation>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ChartStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:chartStyle")]
+#[sdk(qname = "cs:chartStyle")]
 pub struct ChartStyle {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// id
-  #[sdk(attr(office2013, qname = ":id"))]
+  #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,
   /// Defines the AxisTitle Class.
-  #[sdk(child(office2013, qname = "cs:axisTitle"))]
+  #[sdk(child(qname = "cs:axisTitle"))]
   pub axis_title: std::boxed::Box<AxisTitle>,
   /// Defines the CategoryAxis Class.
-  #[sdk(child(office2013, qname = "cs:categoryAxis"))]
+  #[sdk(child(qname = "cs:categoryAxis"))]
   pub category_axis: std::boxed::Box<CategoryAxis>,
   /// Defines the ChartArea Class.
-  #[sdk(child(office2013, qname = "cs:chartArea"))]
+  #[sdk(child(qname = "cs:chartArea"))]
   pub chart_area: std::boxed::Box<ChartArea>,
   /// Defines the DataLabel Class.
-  #[sdk(child(office2013, qname = "cs:dataLabel"))]
+  #[sdk(child(qname = "cs:dataLabel"))]
   pub data_label: std::boxed::Box<DataLabel>,
   /// Defines the DataLabelCallout Class.
-  #[sdk(child(office2013, qname = "cs:dataLabelCallout"))]
+  #[sdk(child(qname = "cs:dataLabelCallout"))]
   pub data_label_callout: Option<std::boxed::Box<DataLabelCallout>>,
   /// Defines the DataPoint Class.
-  #[sdk(child(office2013, qname = "cs:dataPoint"))]
+  #[sdk(child(qname = "cs:dataPoint"))]
   pub data_point: std::boxed::Box<DataPoint>,
   /// Defines the DataPoint3D Class.
-  #[sdk(child(office2013, qname = "cs:dataPoint3D"))]
+  #[sdk(child(qname = "cs:dataPoint3D"))]
   pub data_point3_d: std::boxed::Box<DataPoint3D>,
   /// Defines the DataPointLine Class.
-  #[sdk(child(office2013, qname = "cs:dataPointLine"))]
+  #[sdk(child(qname = "cs:dataPointLine"))]
   pub data_point_line: std::boxed::Box<DataPointLine>,
   /// Defines the DataPointMarker Class.
-  #[sdk(child(office2013, qname = "cs:dataPointMarker"))]
+  #[sdk(child(qname = "cs:dataPointMarker"))]
   pub data_point_marker: std::boxed::Box<DataPointMarker>,
   /// Defines the MarkerLayoutProperties Class.
-  #[sdk(child(office2013, qname = "cs:dataPointMarkerLayout"))]
+  #[sdk(child(qname = "cs:dataPointMarkerLayout"))]
   pub marker_layout_properties: Option<MarkerLayoutProperties>,
   /// Defines the DataPointWireframe Class.
-  #[sdk(child(office2013, qname = "cs:dataPointWireframe"))]
+  #[sdk(child(qname = "cs:dataPointWireframe"))]
   pub data_point_wireframe: std::boxed::Box<DataPointWireframe>,
   /// Defines the DataTableStyle Class.
-  #[sdk(child(office2013, qname = "cs:dataTable"))]
+  #[sdk(child(qname = "cs:dataTable"))]
   pub data_table_style: std::boxed::Box<DataTableStyle>,
   /// Defines the DownBar Class.
-  #[sdk(child(office2013, qname = "cs:downBar"))]
+  #[sdk(child(qname = "cs:downBar"))]
   pub down_bar: std::boxed::Box<DownBar>,
   /// Defines the DropLine Class.
-  #[sdk(child(office2013, qname = "cs:dropLine"))]
+  #[sdk(child(qname = "cs:dropLine"))]
   pub drop_line: std::boxed::Box<DropLine>,
   /// Defines the ErrorBar Class.
-  #[sdk(child(office2013, qname = "cs:errorBar"))]
+  #[sdk(child(qname = "cs:errorBar"))]
   pub error_bar: std::boxed::Box<ErrorBar>,
   /// Defines the Floor Class.
-  #[sdk(child(office2013, qname = "cs:floor"))]
+  #[sdk(child(qname = "cs:floor"))]
   pub floor: std::boxed::Box<Floor>,
   /// Defines the GridlineMajor Class.
-  #[sdk(child(office2013, qname = "cs:gridlineMajor"))]
+  #[sdk(child(qname = "cs:gridlineMajor"))]
   pub gridline_major: std::boxed::Box<GridlineMajor>,
   /// Defines the GridlineMinor Class.
-  #[sdk(child(office2013, qname = "cs:gridlineMinor"))]
+  #[sdk(child(qname = "cs:gridlineMinor"))]
   pub gridline_minor: std::boxed::Box<GridlineMinor>,
   /// Defines the HiLoLine Class.
-  #[sdk(child(office2013, qname = "cs:hiLoLine"))]
+  #[sdk(child(qname = "cs:hiLoLine"))]
   pub hi_lo_line: std::boxed::Box<HiLoLine>,
   /// Defines the LeaderLine Class.
-  #[sdk(child(office2013, qname = "cs:leaderLine"))]
+  #[sdk(child(qname = "cs:leaderLine"))]
   pub leader_line: std::boxed::Box<LeaderLine>,
   /// Defines the LegendStyle Class.
-  #[sdk(child(office2013, qname = "cs:legend"))]
+  #[sdk(child(qname = "cs:legend"))]
   pub legend_style: std::boxed::Box<LegendStyle>,
   /// Defines the PlotArea Class.
-  #[sdk(child(office2013, qname = "cs:plotArea"))]
+  #[sdk(child(qname = "cs:plotArea"))]
   pub plot_area: std::boxed::Box<PlotArea>,
   /// Defines the PlotArea3D Class.
-  #[sdk(child(office2013, qname = "cs:plotArea3D"))]
+  #[sdk(child(qname = "cs:plotArea3D"))]
   pub plot_area3_d: std::boxed::Box<PlotArea3D>,
   /// Defines the SeriesAxis Class.
-  #[sdk(child(office2013, qname = "cs:seriesAxis"))]
+  #[sdk(child(qname = "cs:seriesAxis"))]
   pub series_axis: std::boxed::Box<SeriesAxis>,
   /// Defines the SeriesLine Class.
-  #[sdk(child(office2013, qname = "cs:seriesLine"))]
+  #[sdk(child(qname = "cs:seriesLine"))]
   pub series_line: std::boxed::Box<SeriesLine>,
   /// Defines the TitleStyle Class.
-  #[sdk(child(office2013, qname = "cs:title"))]
+  #[sdk(child(qname = "cs:title"))]
   pub title_style: std::boxed::Box<TitleStyle>,
   /// Defines the TrendlineStyle Class.
-  #[sdk(child(office2013, qname = "cs:trendline"))]
+  #[sdk(child(qname = "cs:trendline"))]
   pub trendline_style: std::boxed::Box<TrendlineStyle>,
   /// Defines the TrendlineLabel Class.
-  #[sdk(child(office2013, qname = "cs:trendlineLabel"))]
+  #[sdk(child(qname = "cs:trendlineLabel"))]
   pub trendline_label: std::boxed::Box<TrendlineLabel>,
   /// Defines the UpBar Class.
-  #[sdk(child(office2013, qname = "cs:upBar"))]
+  #[sdk(child(qname = "cs:upBar"))]
   pub up_bar: std::boxed::Box<UpBar>,
   /// Defines the ValueAxis Class.
-  #[sdk(child(office2013, qname = "cs:valueAxis"))]
+  #[sdk(child(qname = "cs:valueAxis"))]
   pub value_axis: std::boxed::Box<ValueAxis>,
   /// Defines the Wall Class.
-  #[sdk(child(office2013, qname = "cs:wall"))]
+  #[sdk(child(qname = "cs:wall"))]
   pub wall: std::boxed::Box<Wall>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ColorStyleVariation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:variation")]
+#[sdk(qname = "cs:variation")]
 pub struct ColorStyleVariation {
   #[sdk(
         choice(
@@ -326,7 +326,7 @@ pub struct ColorStyleVariation {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:extLst")]
+#[sdk(qname = "cs:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -334,10 +334,10 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the StyleColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:styleClr")]
+#[sdk(qname = "cs:styleClr")]
 pub struct StyleColor {
   /// val
-  #[sdk(attr(office2013, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:unsignedInt"))]
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
@@ -378,13 +378,13 @@ pub struct StyleColor {
 }
 /// Defines the LineReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:lnRef")]
+#[sdk(qname = "cs:lnRef")]
 pub struct LineReference {
   /// idx
-  #[sdk(attr(office2013, qname = ":idx"))]
+  #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(
         choice(
@@ -398,18 +398,18 @@ pub struct LineReference {
     )]
   pub line_reference_choice: Option<LineReferenceChoice>,
   /// Defines the StyleColor Class.
-  #[sdk(child(office2013, qname = "cs:styleClr"))]
+  #[sdk(child(qname = "cs:styleClr"))]
   pub style_color: Option<StyleColor>,
 }
 /// Defines the FillReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:fillRef")]
+#[sdk(qname = "cs:fillRef")]
 pub struct FillReference {
   /// idx
-  #[sdk(attr(office2013, qname = ":idx"))]
+  #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(
         choice(
@@ -423,18 +423,18 @@ pub struct FillReference {
     )]
   pub fill_reference_choice: Option<FillReferenceChoice>,
   /// Defines the StyleColor Class.
-  #[sdk(child(office2013, qname = "cs:styleClr"))]
+  #[sdk(child(qname = "cs:styleClr"))]
   pub style_color: Option<StyleColor>,
 }
 /// Defines the EffectReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:effectRef")]
+#[sdk(qname = "cs:effectRef")]
 pub struct EffectReference {
   /// idx
-  #[sdk(attr(office2013, qname = ":idx"))]
+  #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(
         choice(
@@ -448,21 +448,21 @@ pub struct EffectReference {
     )]
   pub effect_reference_choice: Option<EffectReferenceChoice>,
   /// Defines the StyleColor Class.
-  #[sdk(child(office2013, qname = "cs:styleClr"))]
+  #[sdk(child(qname = "cs:styleClr"))]
   pub style_color: Option<StyleColor>,
 }
 /// Defines the LineWidthScale Class.
 pub type LineWidthScale = crate::simple_type::DoubleValue;
 /// Defines the FontReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:fontRef")]
+#[sdk(qname = "cs:fontRef")]
 pub struct FontReference {
   /// idx
-  #[sdk(attr(office2013, qname = ":idx"))]
+  #[sdk(attr(qname = ":idx"))]
   #[sdk(string_format(kind = "token"))]
   pub index: crate::schemas::a::FontCollectionIndexValues,
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(
         choice(
@@ -476,12 +476,12 @@ pub struct FontReference {
     )]
   pub font_reference_choice: Option<FontReferenceChoice>,
   /// Defines the StyleColor Class.
-  #[sdk(child(office2013, qname = "cs:styleClr"))]
+  #[sdk(child(qname = "cs:styleClr"))]
   pub style_color: Option<StyleColor>,
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:spPr")]
+#[sdk(qname = "cs:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -530,7 +530,7 @@ pub struct ShapeProperties {
 }
 /// Defines the TextCharacterPropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:defRPr")]
+#[sdk(qname = "cs:defRPr")]
 pub struct TextCharacterPropertiesType {
   /// kumimoji
   #[sdk(attr(qname = ":kumimoji"))]
@@ -660,7 +660,7 @@ pub struct TextCharacterPropertiesType {
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:bodyPr")]
+#[sdk(qname = "cs:bodyPr")]
 pub struct TextBodyProperties {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -753,1322 +753,1322 @@ pub struct TextBodyProperties {
 }
 /// Defines the CategoryAxisProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:categoryAxis")]
+#[sdk(qname = "cs:categoryAxis")]
 pub struct CategoryAxisProperties {
   /// visible
-  #[sdk(attr(office2013, qname = ":visible"))]
+  #[sdk(attr(qname = ":visible"))]
   #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
-  #[sdk(attr(office2013, qname = ":majorTick"))]
+  #[sdk(attr(qname = ":majorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
-  #[sdk(attr(office2013, qname = ":minorTick"))]
+  #[sdk(attr(qname = ":minorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
-  #[sdk(attr(office2013, qname = ":labelPosition"))]
+  #[sdk(attr(qname = ":labelPosition"))]
   #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
-  #[sdk(attr(office2013, qname = ":majorGridlines"))]
+  #[sdk(attr(qname = ":majorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
-  #[sdk(attr(office2013, qname = ":minorGridlines"))]
+  #[sdk(attr(qname = ":minorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
-  #[sdk(attr(office2013, qname = ":title"))]
+  #[sdk(attr(qname = ":title"))]
   #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the SeriesAxisProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:seriesAxis")]
+#[sdk(qname = "cs:seriesAxis")]
 pub struct SeriesAxisProperties {
   /// visible
-  #[sdk(attr(office2013, qname = ":visible"))]
+  #[sdk(attr(qname = ":visible"))]
   #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
-  #[sdk(attr(office2013, qname = ":majorTick"))]
+  #[sdk(attr(qname = ":majorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
-  #[sdk(attr(office2013, qname = ":minorTick"))]
+  #[sdk(attr(qname = ":minorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
-  #[sdk(attr(office2013, qname = ":labelPosition"))]
+  #[sdk(attr(qname = ":labelPosition"))]
   #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
-  #[sdk(attr(office2013, qname = ":majorGridlines"))]
+  #[sdk(attr(qname = ":majorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
-  #[sdk(attr(office2013, qname = ":minorGridlines"))]
+  #[sdk(attr(qname = ":minorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
-  #[sdk(attr(office2013, qname = ":title"))]
+  #[sdk(attr(qname = ":title"))]
   #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the ValueAxisProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:valueAxis")]
+#[sdk(qname = "cs:valueAxis")]
 pub struct ValueAxisProperties {
   /// visible
-  #[sdk(attr(office2013, qname = ":visible"))]
+  #[sdk(attr(qname = ":visible"))]
   #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
-  #[sdk(attr(office2013, qname = ":majorTick"))]
+  #[sdk(attr(qname = ":majorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
-  #[sdk(attr(office2013, qname = ":minorTick"))]
+  #[sdk(attr(qname = ":minorTick"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
-  #[sdk(attr(office2013, qname = ":labelPosition"))]
+  #[sdk(attr(qname = ":labelPosition"))]
   #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
-  #[sdk(attr(office2013, qname = ":majorGridlines"))]
+  #[sdk(attr(qname = ":majorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
-  #[sdk(attr(office2013, qname = ":minorGridlines"))]
+  #[sdk(attr(qname = ":minorGridlines"))]
   #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
-  #[sdk(attr(office2013, qname = ":title"))]
+  #[sdk(attr(qname = ":title"))]
   #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the DataSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataSeries")]
+#[sdk(qname = "cs:dataSeries")]
 pub struct DataSeries {
   /// overlap
-  #[sdk(attr(office2013, qname = ":overlap"))]
+  #[sdk(attr(qname = ":overlap"))]
   #[sdk(number_range(range = -100..= 100))]
   pub overlap: Option<crate::simple_type::SByteValue>,
   /// gapWidth
-  #[sdk(attr(office2013, qname = ":gapWidth"))]
+  #[sdk(attr(qname = ":gapWidth"))]
   #[sdk(number_range(range = 0..= 500))]
   pub gap_width: Option<crate::simple_type::UInt16Value>,
   /// gapDepth
-  #[sdk(attr(office2013, qname = ":gapDepth"))]
+  #[sdk(attr(qname = ":gapDepth"))]
   #[sdk(number_range(range = 0..= 500))]
   pub gap_depth: Option<crate::simple_type::UInt16Value>,
   /// doughnutHoleSize
-  #[sdk(attr(office2013, qname = ":doughnutHoleSize"))]
+  #[sdk(attr(qname = ":doughnutHoleSize"))]
   #[sdk(number_range(range = 10..= 90))]
   pub doughnut_hole_size: Option<crate::simple_type::ByteValue>,
   /// markerVisible
-  #[sdk(attr(office2013, qname = ":markerVisible"))]
+  #[sdk(attr(qname = ":markerVisible"))]
   #[sdk(string_format(kind = "token"))]
   pub marker_visible: Option<Boolean>,
   /// hiloLines
-  #[sdk(attr(office2013, qname = ":hiloLines"))]
+  #[sdk(attr(qname = ":hiloLines"))]
   #[sdk(string_format(kind = "token"))]
   pub hilo_lines: Option<Boolean>,
   /// dropLines
-  #[sdk(attr(office2013, qname = ":dropLines"))]
+  #[sdk(attr(qname = ":dropLines"))]
   #[sdk(string_format(kind = "token"))]
   pub drop_lines: Option<Boolean>,
   /// seriesLines
-  #[sdk(attr(office2013, qname = ":seriesLines"))]
+  #[sdk(attr(qname = ":seriesLines"))]
   #[sdk(string_format(kind = "token"))]
   pub series_lines: Option<Boolean>,
 }
 /// Defines the DataLabels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataLabels")]
+#[sdk(qname = "cs:dataLabels")]
 pub struct DataLabels {
   /// position
-  #[sdk(attr(office2013, qname = ":position"))]
+  #[sdk(attr(qname = ":position"))]
   #[sdk(string_format(kind = "token"))]
   pub position: Option<DataLabelsPosition>,
   /// value
-  #[sdk(attr(office2013, qname = ":value"))]
+  #[sdk(attr(qname = ":value"))]
   #[sdk(string_format(kind = "token"))]
   pub value: Option<Boolean>,
   /// seriesName
-  #[sdk(attr(office2013, qname = ":seriesName"))]
+  #[sdk(attr(qname = ":seriesName"))]
   #[sdk(string_format(kind = "token"))]
   pub series_name: Option<Boolean>,
   /// categoryName
-  #[sdk(attr(office2013, qname = ":categoryName"))]
+  #[sdk(attr(qname = ":categoryName"))]
   #[sdk(string_format(kind = "token"))]
   pub category_name: Option<Boolean>,
   /// legendKey
-  #[sdk(attr(office2013, qname = ":legendKey"))]
+  #[sdk(attr(qname = ":legendKey"))]
   #[sdk(string_format(kind = "token"))]
   pub legend_key: Option<Boolean>,
   /// percentage
-  #[sdk(attr(office2013, qname = ":percentage"))]
+  #[sdk(attr(qname = ":percentage"))]
   #[sdk(string_format(kind = "token"))]
   pub percentage: Option<Boolean>,
 }
 /// Defines the DataTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataTable")]
+#[sdk(qname = "cs:dataTable")]
 pub struct DataTable {
   /// legendKeys
-  #[sdk(attr(office2013, qname = ":legendKeys"))]
+  #[sdk(attr(qname = ":legendKeys"))]
   #[sdk(string_format(kind = "token"))]
   pub legend_keys: Option<Boolean>,
   /// horizontalBorder
-  #[sdk(attr(office2013, qname = ":horizontalBorder"))]
+  #[sdk(attr(qname = ":horizontalBorder"))]
   #[sdk(string_format(kind = "token"))]
   pub horizontal_border: Option<Boolean>,
   /// verticalBorder
-  #[sdk(attr(office2013, qname = ":verticalBorder"))]
+  #[sdk(attr(qname = ":verticalBorder"))]
   #[sdk(string_format(kind = "token"))]
   pub vertical_border: Option<Boolean>,
   /// outlineBorder
-  #[sdk(attr(office2013, qname = ":outlineBorder"))]
+  #[sdk(attr(qname = ":outlineBorder"))]
   #[sdk(string_format(kind = "token"))]
   pub outline_border: Option<Boolean>,
 }
 /// Defines the Legend Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:legend")]
+#[sdk(qname = "cs:legend")]
 pub struct Legend {
   /// visible
-  #[sdk(attr(office2013, qname = ":visible"))]
+  #[sdk(attr(qname = ":visible"))]
   #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// includeInLayout
-  #[sdk(attr(office2013, qname = ":includeInLayout"))]
+  #[sdk(attr(qname = ":includeInLayout"))]
   #[sdk(string_format(kind = "token"))]
   pub include_in_layout: Option<Boolean>,
   /// position
-  #[sdk(attr(office2013, qname = ":position"))]
+  #[sdk(attr(qname = ":position"))]
   #[sdk(string_format(kind = "token"))]
   pub position: Option<LegendPosition>,
 }
 /// Defines the Title Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:title")]
+#[sdk(qname = "cs:title")]
 pub struct Title {
   /// position
-  #[sdk(attr(office2013, qname = ":position"))]
+  #[sdk(attr(qname = ":position"))]
   #[sdk(string_format(kind = "token"))]
   pub position: Option<TitlePosition>,
 }
 /// Defines the Trendline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:trendline")]
+#[sdk(qname = "cs:trendline")]
 pub struct Trendline {
   /// add
-  #[sdk(attr(office2013, qname = ":add"))]
+  #[sdk(attr(qname = ":add"))]
   #[sdk(string_format(kind = "token"))]
   pub add: Option<Boolean>,
   /// equation
-  #[sdk(attr(office2013, qname = ":equation"))]
+  #[sdk(attr(qname = ":equation"))]
   #[sdk(string_format(kind = "token"))]
   pub equation: Option<Boolean>,
   /// rsquared
-  #[sdk(attr(office2013, qname = ":rsquared"))]
+  #[sdk(attr(qname = ":rsquared"))]
   #[sdk(string_format(kind = "token"))]
   pub r_squared: Option<Boolean>,
 }
 /// Defines the View3DProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:view3D")]
+#[sdk(qname = "cs:view3D")]
 pub struct View3DProperties {
   /// rotX
-  #[sdk(attr(office2013, qname = ":rotX"))]
+  #[sdk(attr(qname = ":rotX"))]
   #[sdk(number_range(range = -90..= 90))]
   pub rot_x: Option<crate::simple_type::SByteValue>,
   /// rotY
-  #[sdk(attr(office2013, qname = ":rotY"))]
+  #[sdk(attr(qname = ":rotY"))]
   #[sdk(number_range(range = 0..= 360))]
   pub rot_y: Option<crate::simple_type::UInt16Value>,
   /// rAngAx
-  #[sdk(attr(office2013, qname = ":rAngAx"))]
+  #[sdk(attr(qname = ":rAngAx"))]
   #[sdk(string_format(kind = "token"))]
   pub right_angle_axes: Option<Boolean>,
   /// perspective
-  #[sdk(attr(office2013, qname = ":perspective"))]
+  #[sdk(attr(qname = ":perspective"))]
   #[sdk(number_range(range = 0..= 240))]
   pub perspective: Option<crate::simple_type::ByteValue>,
   /// heightPercent
-  #[sdk(attr(office2013, qname = ":heightPercent"))]
+  #[sdk(attr(qname = ":heightPercent"))]
   #[sdk(number_range(range = 5..= 500))]
   pub height_percent: Option<crate::simple_type::UInt16Value>,
   /// depthPercent
-  #[sdk(attr(office2013, qname = ":depthPercent"))]
+  #[sdk(attr(qname = ":depthPercent"))]
   #[sdk(number_range(range = 20..= 2000))]
   pub depth_percent: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the AxisTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:axisTitle")]
+#[sdk(qname = "cs:axisTitle")]
 pub struct AxisTitle {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the CategoryAxis Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:categoryAxis")]
+#[sdk(qname = "cs:categoryAxis")]
 pub struct CategoryAxis {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ChartArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:chartArea")]
+#[sdk(qname = "cs:chartArea")]
 pub struct ChartArea {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataLabel")]
+#[sdk(qname = "cs:dataLabel")]
 pub struct DataLabel {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataLabelCallout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataLabelCallout")]
+#[sdk(qname = "cs:dataLabelCallout")]
 pub struct DataLabelCallout {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataPoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPoint")]
+#[sdk(qname = "cs:dataPoint")]
 pub struct DataPoint {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataPoint3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPoint3D")]
+#[sdk(qname = "cs:dataPoint3D")]
 pub struct DataPoint3D {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataPointLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPointLine")]
+#[sdk(qname = "cs:dataPointLine")]
 pub struct DataPointLine {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataPointMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPointMarker")]
+#[sdk(qname = "cs:dataPointMarker")]
 pub struct DataPointMarker {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataPointWireframe Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPointWireframe")]
+#[sdk(qname = "cs:dataPointWireframe")]
 pub struct DataPointWireframe {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DataTableStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataTable")]
+#[sdk(qname = "cs:dataTable")]
 pub struct DataTableStyle {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DownBar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:downBar")]
+#[sdk(qname = "cs:downBar")]
 pub struct DownBar {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DropLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dropLine")]
+#[sdk(qname = "cs:dropLine")]
 pub struct DropLine {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ErrorBar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:errorBar")]
+#[sdk(qname = "cs:errorBar")]
 pub struct ErrorBar {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the Floor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:floor")]
+#[sdk(qname = "cs:floor")]
 pub struct Floor {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GridlineMajor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:gridlineMajor")]
+#[sdk(qname = "cs:gridlineMajor")]
 pub struct GridlineMajor {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GridlineMinor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:gridlineMinor")]
+#[sdk(qname = "cs:gridlineMinor")]
 pub struct GridlineMinor {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the HiLoLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:hiLoLine")]
+#[sdk(qname = "cs:hiLoLine")]
 pub struct HiLoLine {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LeaderLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:leaderLine")]
+#[sdk(qname = "cs:leaderLine")]
 pub struct LeaderLine {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LegendStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:legend")]
+#[sdk(qname = "cs:legend")]
 pub struct LegendStyle {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PlotArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:plotArea")]
+#[sdk(qname = "cs:plotArea")]
 pub struct PlotArea {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PlotArea3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:plotArea3D")]
+#[sdk(qname = "cs:plotArea3D")]
 pub struct PlotArea3D {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the SeriesAxis Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:seriesAxis")]
+#[sdk(qname = "cs:seriesAxis")]
 pub struct SeriesAxis {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the SeriesLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:seriesLine")]
+#[sdk(qname = "cs:seriesLine")]
 pub struct SeriesLine {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the TitleStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:title")]
+#[sdk(qname = "cs:title")]
 pub struct TitleStyle {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the TrendlineStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:trendline")]
+#[sdk(qname = "cs:trendline")]
 pub struct TrendlineStyle {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the TrendlineLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:trendlineLabel")]
+#[sdk(qname = "cs:trendlineLabel")]
 pub struct TrendlineLabel {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the UpBar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:upBar")]
+#[sdk(qname = "cs:upBar")]
 pub struct UpBar {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ValueAxis Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:valueAxis")]
+#[sdk(qname = "cs:valueAxis")]
 pub struct ValueAxis {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the Wall Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:wall")]
+#[sdk(qname = "cs:wall")]
 pub struct Wall {
   /// mods
-  #[sdk(attr(office2013, list, qname = ":mods"))]
+  #[sdk(attr(list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
-  #[sdk(child(office2013, qname = "cs:lnRef"))]
+  #[sdk(child(qname = "cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cs:lineWidthScale"))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
-  #[sdk(child(office2013, qname = "cs:fillRef"))]
+  #[sdk(child(qname = "cs:fillRef"))]
   pub fill_reference: std::boxed::Box<FillReference>,
   /// Defines the EffectReference Class.
-  #[sdk(child(office2013, qname = "cs:effectRef"))]
+  #[sdk(child(qname = "cs:effectRef"))]
   pub effect_reference: std::boxed::Box<EffectReference>,
   /// Defines the FontReference Class.
-  #[sdk(child(office2013, qname = "cs:fontRef"))]
+  #[sdk(child(qname = "cs:fontRef"))]
   pub font_reference: std::boxed::Box<FontReference>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2013, qname = "cs:spPr"))]
+  #[sdk(child(qname = "cs:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TextCharacterPropertiesType Class.
-  #[sdk(child(office2013, qname = "cs:defRPr"))]
+  #[sdk(child(qname = "cs:defRPr"))]
   pub text_character_properties_type: Option<std::boxed::Box<TextCharacterPropertiesType>>,
   /// Defines the TextBodyProperties Class.
-  #[sdk(child(office2013, qname = "cs:bodyPr"))]
+  #[sdk(child(qname = "cs:bodyPr"))]
   pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "cs:extLst"))]
+  #[sdk(child(qname = "cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the MarkerLayoutProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:dataPointMarkerLayout")]
+#[sdk(qname = "cs:dataPointMarkerLayout")]
 pub struct MarkerLayoutProperties {
   /// symbol
-  #[sdk(attr(office2013, qname = ":symbol"))]
+  #[sdk(attr(qname = ":symbol"))]
   #[sdk(string_format(kind = "token"))]
   pub symbol: Option<MarkerStyle>,
   /// size
-  #[sdk(attr(office2013, qname = ":size"))]
+  #[sdk(attr(qname = ":size"))]
   #[sdk(number_range(range = 2..= 72))]
   pub size: Option<crate::simple_type::ByteValue>,
 }

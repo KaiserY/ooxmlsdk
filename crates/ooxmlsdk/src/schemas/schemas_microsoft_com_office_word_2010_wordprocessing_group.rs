@@ -6,17 +6,17 @@
 
 /// Defines the WordprocessingGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:wgp")]
+#[sdk(qname = "wpg:wgp")]
 pub struct WordprocessingGroup {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvPr"))]
+  #[sdk(child(qname = "wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// Defines the NonVisualGroupDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvGrpSpPr"))]
+  #[sdk(child(qname = "wpg:cNvGrpSpPr"))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "wpg:grpSpPr"))]
+  #[sdk(child(qname = "wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -29,22 +29,22 @@ pub struct WordprocessingGroup {
     )]
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wpg:extLst"))]
+  #[sdk(child(qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:grpSp")]
+#[sdk(qname = "wpg:grpSp")]
 pub struct GroupShape {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvPr"))]
+  #[sdk(child(qname = "wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// Defines the NonVisualGroupDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvGrpSpPr"))]
+  #[sdk(child(qname = "wpg:cNvGrpSpPr"))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "wpg:grpSpPr"))]
+  #[sdk(child(qname = "wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -57,12 +57,12 @@ pub struct GroupShape {
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wpg:extLst"))]
+  #[sdk(child(qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:cNvPr")]
+#[sdk(qname = "wpg:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -92,7 +92,7 @@ pub struct NonVisualDrawingProperties {
 }
 /// Defines the NonVisualGraphicFrameProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:cNvFrPr")]
+#[sdk(qname = "wpg:cNvFrPr")]
 pub struct NonVisualGraphicFrameProperties {
   /// Graphic Frame Locks
   #[sdk(child(qname = "a:graphicFrameLocks"))]
@@ -103,7 +103,7 @@ pub struct NonVisualGraphicFrameProperties {
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:xfrm")]
+#[sdk(qname = "wpg:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -123,7 +123,7 @@ pub struct Transform2D {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:extLst")]
+#[sdk(qname = "wpg:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
   #[sdk(child(qname = "a:ext"))]
@@ -131,7 +131,7 @@ pub struct OfficeArtExtensionList {
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:cNvGrpSpPr")]
+#[sdk(qname = "wpg:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProperties {
   /// Defines the GroupShapeLocks Class.
   #[sdk(child(qname = "a:grpSpLocks"))]
@@ -143,7 +143,7 @@ pub struct NonVisualGroupDrawingShapeProperties {
 }
 /// Defines the GroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:grpSpPr")]
+#[sdk(qname = "wpg:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -179,22 +179,22 @@ pub struct GroupShapeProperties {
 }
 /// Defines the GraphicFrame Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:graphicFrame")]
+#[sdk(qname = "wpg:graphicFrame")]
 pub struct GraphicFrame {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvPr"))]
+  #[sdk(child(qname = "wpg:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualGraphicFrameProperties Class.
-  #[sdk(child(office2010, qname = "wpg:cNvFrPr"))]
+  #[sdk(child(qname = "wpg:cNvFrPr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "wpg:xfrm"))]
+  #[sdk(child(qname = "wpg:xfrm"))]
   pub transform2_d: std::boxed::Box<Transform2D>,
   /// Graphic Object.
   #[sdk(child(qname = "a:graphic"))]
   pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "wpg:extLst"))]
+  #[sdk(child(qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

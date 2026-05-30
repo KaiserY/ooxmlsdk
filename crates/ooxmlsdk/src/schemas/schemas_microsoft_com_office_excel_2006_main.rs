@@ -86,7 +86,7 @@ pub struct Macrosheet {
   #[sdk(child(qname = "x:oleObjects"))]
   pub ole_objects: Option<crate::schemas::x::OleObjects>,
   /// Defines the DrawingHeaderFooter Class.
-  #[sdk(child(office2010, qname = "x:drawingHF"))]
+  #[sdk(child(qname = "x:drawingHF"))]
   pub drawing_header_footer: Option<crate::schemas::x::DrawingHeaderFooter>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:extLst"))]

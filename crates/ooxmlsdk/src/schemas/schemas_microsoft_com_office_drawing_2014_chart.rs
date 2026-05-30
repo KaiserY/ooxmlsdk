@@ -6,7 +6,7 @@
 
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:spPr")]
+#[sdk(qname = "c16:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
@@ -55,7 +55,7 @@ pub struct ShapeProperties {
 }
 /// Defines the UnsignedIntegerType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:explosion")]
+#[sdk(qname = "c16:explosion")]
 pub struct UnsignedIntegerType {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
@@ -63,7 +63,7 @@ pub struct UnsignedIntegerType {
 }
 /// Defines the InvertIfNegativeBoolean Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:invertIfNegative")]
+#[sdk(qname = "c16:invertIfNegative")]
 pub struct InvertIfNegativeBoolean {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -71,7 +71,7 @@ pub struct InvertIfNegativeBoolean {
 }
 /// Defines the Bubble3DBoolean Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:bubble3D")]
+#[sdk(qname = "c16:bubble3D")]
 pub struct Bubble3DBoolean {
   /// Boolean Value
   #[sdk(attr(qname = ":val"))]
@@ -79,7 +79,7 @@ pub struct Bubble3DBoolean {
 }
 /// Defines the Marker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:marker")]
+#[sdk(qname = "c16:marker")]
 pub struct Marker {
   /// Symbol
   #[sdk(child(qname = "c:symbol"))]
@@ -96,7 +96,7 @@ pub struct Marker {
 }
 /// Defines the DLbl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:dLbl")]
+#[sdk(qname = "c16:dLbl")]
 pub struct DLbl {
   /// Index.
   #[sdk(child(qname = "c:idx"))]
@@ -129,73 +129,73 @@ pub struct DLbl {
 }
 /// Defines the CategoryFilterExceptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:categoryFilterExceptions")]
+#[sdk(qname = "c16:categoryFilterExceptions")]
 pub struct CategoryFilterExceptions {
   /// Defines the CategoryFilterException Class.
-  #[sdk(child(office2016, qname = "c16:categoryFilterException"))]
+  #[sdk(child(qname = "c16:categoryFilterException"))]
   pub category_filter_exception: Vec<CategoryFilterException>,
 }
 /// Defines the PivotOptions16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:pivotOptions16")]
+#[sdk(qname = "c16:pivotOptions16")]
 pub struct PivotOptions16 {
   /// Defines the BooleanFalse Class.
-  #[sdk(child(office2016, qname = "c16:showExpandCollapseFieldButtons"))]
+  #[sdk(child(qname = "c16:showExpandCollapseFieldButtons"))]
   pub boolean_false: Option<BooleanFalse>,
 }
 /// Defines the ChartDataPointUniqueIDMap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:datapointuniqueidmap")]
+#[sdk(qname = "c16:datapointuniqueidmap")]
 pub struct ChartDataPointUniqueIdMap {
   /// Defines the ChartDataPointUniqueIDMapEntry Class.
-  #[sdk(child(office2016, qname = "c16:ptentry"))]
+  #[sdk(child(qname = "c16:ptentry"))]
   pub chart_data_point_unique_id_map_entry: Vec<ChartDataPointUniqueIdMapEntry>,
 }
 /// Defines the UniqueIdChartUniqueID Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:uniqueId")]
+#[sdk(qname = "c16:uniqueId")]
 pub struct UniqueIdChartUniqueId {
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the UniqueID Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:uniqueID")]
+#[sdk(qname = "c16:uniqueID")]
 pub struct UniqueId {
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the CategoryFilterException Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:categoryFilterException")]
+#[sdk(qname = "c16:categoryFilterException")]
 pub struct CategoryFilterException {
   /// Defines the UniqueIdChartUniqueID Class.
-  #[sdk(child(office2016, qname = "c16:uniqueId"))]
+  #[sdk(child(qname = "c16:uniqueId"))]
   pub unique_id_chart_unique_id: std::boxed::Box<UniqueIdChartUniqueId>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "c16:spPr"))]
+  #[sdk(child(qname = "c16:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the UnsignedIntegerType Class.
-  #[sdk(child(office2016, qname = "c16:explosion"))]
+  #[sdk(child(qname = "c16:explosion"))]
   pub unsigned_integer_type: Option<UnsignedIntegerType>,
   /// Defines the InvertIfNegativeBoolean Class.
-  #[sdk(child(office2016, qname = "c16:invertIfNegative"))]
+  #[sdk(child(qname = "c16:invertIfNegative"))]
   pub invert_if_negative_boolean: Option<InvertIfNegativeBoolean>,
   /// Defines the Bubble3DBoolean Class.
-  #[sdk(child(office2016, qname = "c16:bubble3D"))]
+  #[sdk(child(qname = "c16:bubble3D"))]
   pub bubble3_d_boolean: Option<Bubble3DBoolean>,
   /// Defines the Marker Class.
-  #[sdk(child(office2016, qname = "c16:marker"))]
+  #[sdk(child(qname = "c16:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
   /// Defines the DLbl Class.
-  #[sdk(child(office2016, qname = "c16:dLbl"))]
+  #[sdk(child(qname = "c16:dLbl"))]
   pub d_lbl: Option<std::boxed::Box<DLbl>>,
 }
 /// Defines the NumberDataType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:numCache")]
+#[sdk(qname = "c16:numCache")]
 pub struct NumberDataType {
   /// Format Code
   #[sdk(text_child(simple_type = "StringValue", qname = "c:formatCode"))]
@@ -212,15 +212,15 @@ pub struct NumberDataType {
 }
 /// Defines the NumFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:filteredLitCache")]
+#[sdk(qname = "c16:filteredLitCache")]
 pub struct NumFilteredLiteralCache {
   /// Defines the NumberDataType Class.
-  #[sdk(child(office2016, qname = "c16:numCache"))]
+  #[sdk(child(qname = "c16:numCache"))]
   pub number_data_type: std::boxed::Box<NumberDataType>,
 }
 /// Defines the StringDataType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:strCache")]
+#[sdk(qname = "c16:strCache")]
 pub struct StringDataType {
   /// Point Count.
   #[sdk(child(qname = "c:ptCount"))]
@@ -234,15 +234,15 @@ pub struct StringDataType {
 }
 /// Defines the StrFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:filteredLitCache")]
+#[sdk(qname = "c16:filteredLitCache")]
 pub struct StrFilteredLiteralCache {
   /// Defines the StringDataType Class.
-  #[sdk(child(office2016, qname = "c16:strCache"))]
+  #[sdk(child(qname = "c16:strCache"))]
   pub string_data_type: std::boxed::Box<StringDataType>,
 }
 /// Defines the MultiLvlStrData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:multiLvlStrCache")]
+#[sdk(qname = "c16:multiLvlStrCache")]
 pub struct MultiLvlStrData {
   /// Point Count.
   #[sdk(child(qname = "c:ptCount"))]
@@ -256,39 +256,39 @@ pub struct MultiLvlStrData {
 }
 /// Defines the MultiLvlStrFilteredLiteralCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:filteredLitCache")]
+#[sdk(qname = "c16:filteredLitCache")]
 pub struct MultiLvlStrFilteredLiteralCache {
   /// Defines the MultiLvlStrData Class.
-  #[sdk(child(office2016, qname = "c16:multiLvlStrCache"))]
+  #[sdk(child(qname = "c16:multiLvlStrCache"))]
   pub multi_lvl_str_data: std::boxed::Box<MultiLvlStrData>,
 }
 /// Defines the LiteralDataChart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:literalDataChart")]
+#[sdk(qname = "c16:literalDataChart")]
 pub struct LiteralDataChart {
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::BooleanValue,
 }
 /// Defines the BooleanFalse Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:showExpandCollapseFieldButtons")]
+#[sdk(qname = "c16:showExpandCollapseFieldButtons")]
 pub struct BooleanFalse {
   /// val
-  #[sdk(attr(office2016, qname = ":val"))]
+  #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the XsdunsignedInt Class.
 pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Defines the ChartDataPointUniqueIDMapEntry Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:ptentry")]
+#[sdk(qname = "c16:ptentry")]
 pub struct ChartDataPointUniqueIdMapEntry {
   /// Defines the XsdunsignedInt Class.
-  #[sdk(text_child(office2016, simple_type = "UInt32Value", qname = "c16:ptidx"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "c16:ptidx"))]
   pub xsdunsigned_int: XsdunsignedInt,
   /// Defines the UniqueID Class.
-  #[sdk(child(office2016, qname = "c16:uniqueID"))]
+  #[sdk(child(qname = "c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

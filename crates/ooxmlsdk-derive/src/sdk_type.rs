@@ -1321,8 +1321,7 @@ fn build_empty_child_skip_tokens(
       loop {
         match #reader_ident.next_tag_event()? {
           #next_tag_event::Start(e, next_empty) => {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             let _ = next_empty;
             return Err(crate::common::unexpected_tag(
               stringify!(#owner_ident),
@@ -1984,8 +1983,7 @@ fn expand_sequence_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             #( #child_dispatch_tokens_borrowed )*
             xml_reader.unread(if next_empty {
               quick_xml::events::Event::Empty(e)
@@ -2026,8 +2024,7 @@ fn expand_sequence_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             #( #child_dispatch_tokens_io )*
             xml_reader.unread(if next_empty {
               quick_xml::events::Event::Empty(e)
@@ -3131,8 +3128,7 @@ fn expand_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
@@ -3141,16 +3137,14 @@ fn expand_helper_struct(
             quick_xml::events::Event::Start(e) => {
               let e = e.into_owned();
               let next_empty = false;
-              let event_name = e.name();
-              let event_name = event_name.as_ref();
+              let event_name = e.name().into_inner();
               #main_dispatch_tokens_borrowed
               #unmatched_child_tokens_borrowed
             }
             quick_xml::events::Event::Empty(e) => {
               let e = e.into_owned();
               let next_empty = true;
-              let event_name = e.name();
-              let event_name = event_name.as_ref();
+              let event_name = e.name().into_inner();
               #main_dispatch_tokens_borrowed
               #unmatched_child_tokens_borrowed
             }
@@ -3182,8 +3176,7 @@ fn expand_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             #main_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -3198,8 +3191,7 @@ fn expand_helper_struct(
           };
 
           if let Some((e, next_empty)) = next_event {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            let event_name = e.name().into_inner();
             #main_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -4169,65 +4161,6 @@ fn expand_named_struct(
     }
   }
 
-  let mce_direct_child_match_arm_borrowed = if has_xml_other_children_field {
-    if compact_xml_other_children {
-      quote! {
-        b"mc:AlternateContent" | b"AlternateContent" => {
-          let xml = if next_empty {
-            crate::common::read_raw_empty_xml_borrowed_bytes(e)?
-          } else {
-            crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
-          };
-          xml_other_children.push(xml);
-          continue;
-        }
-      }
-    } else {
-      quote! {
-        b"mc:AlternateContent" | b"AlternateContent" => {
-          let xml = if next_empty {
-            crate::common::read_raw_empty_xml_borrowed_bytes(e)?
-          } else {
-            crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
-          };
-          xml_other_children.push((__xml_child_slot, xml));
-          continue;
-        }
-      }
-    }
-  } else {
-    quote! {}
-  };
-  let mce_direct_child_match_arm_io = if has_xml_other_children_field {
-    if compact_xml_other_children {
-      quote! {
-        b"mc:AlternateContent" | b"AlternateContent" => {
-          let xml = if next_empty {
-            crate::common::read_raw_empty_xml_io_bytes(e)?
-          } else {
-            crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
-          };
-          xml_other_children.push(xml);
-          continue;
-        }
-      }
-    } else {
-      quote! {
-        b"mc:AlternateContent" | b"AlternateContent" => {
-          let xml = if next_empty {
-            crate::common::read_raw_empty_xml_io_bytes(e)?
-          } else {
-            crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
-          };
-          xml_other_children.push((__xml_child_slot, xml));
-          continue;
-        }
-      }
-    }
-  } else {
-    quote! {}
-  };
-
   for field in &empty_child_fields {
     let field_ident = &field.ident;
     let xml_child_slot = xml_child_slot_by_field
@@ -5021,7 +4954,6 @@ fn expand_named_struct(
   } else {
     quote! {
       match event_name {
-        #mce_direct_child_match_arm_borrowed
         #( #flat_choice_match_tokens_borrowed )*
         _ => {}
       }
@@ -5032,7 +4964,6 @@ fn expand_named_struct(
   } else {
     quote! {
       match event_name {
-        #mce_direct_child_match_arm_io
         #( #flat_choice_match_tokens_io )*
         _ => {}
       }
@@ -5074,7 +5005,6 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           _ => {}
         }
@@ -5082,7 +5012,6 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
           _ => false,
@@ -5094,7 +5023,6 @@ fn expand_named_struct(
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           _ => {
@@ -5111,7 +5039,6 @@ fn expand_named_struct(
     } else if !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
@@ -5133,7 +5060,6 @@ fn expand_named_struct(
     } else {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_borrowed
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
@@ -5192,7 +5118,6 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           _ => {}
         }
@@ -5200,7 +5125,6 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #child_parse_tokens_io )*
           _ => false,
@@ -5212,7 +5136,6 @@ fn expand_named_struct(
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           _ => {
@@ -5229,7 +5152,6 @@ fn expand_named_struct(
     } else if !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
@@ -5251,7 +5173,6 @@ fn expand_named_struct(
     } else {
       quote! {
         let matched = match event_name {
-          #mce_direct_child_match_arm_io
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
@@ -5755,13 +5676,11 @@ fn expand_named_struct(
     quote! {}
   } else if use_local_name_child_dispatch {
     quote! {
-      let event_name = e.local_name();
-      let event_name = event_name.as_ref();
+      let event_name = e.local_name().into_inner();
     }
   } else {
     quote! {
-      let event_name = e.name();
-      let event_name = event_name.as_ref();
+      let event_name = e.name().into_inner();
     }
   };
   let borrowed_children_text_loop_tokens = quote! {
@@ -5783,7 +5702,7 @@ fn expand_named_struct(
           }
           #text_read_tokens
           quick_xml::events::Event::End(e) => {
-            if e.name().as_ref() == __end_name {
+            if e.name() == __end_qname {
               break;
             }
           }
@@ -5806,7 +5725,7 @@ fn expand_named_struct(
             #unmatched_child_tokens_borrowed
           }
           crate::common::SliceTagEvent::End(e) => {
-            if e.name().as_ref() == __end_name {
+            if e.name() == __end_qname {
               break;
             }
           }
@@ -5854,7 +5773,7 @@ fn expand_named_struct(
           }
           #text_read_tokens
           quick_xml::events::Event::End(e) => {
-            if e.name().as_ref() == __end_name {
+            if e.name() == __end_qname {
               break;
             }
           }
@@ -5877,7 +5796,7 @@ fn expand_named_struct(
             #unmatched_child_tokens_io
           }
           crate::common::IoTagEvent::End(e) => {
-            if e.name().as_ref() == __end_name {
+            if e.name() == __end_qname {
               break;
             }
           }
@@ -6198,7 +6117,6 @@ fn expand_named_struct(
       ) -> Result<Self, crate::common::SdkError> {
         #xml_header_decl_tokens
         let __end_qname = e.name();
-        let __end_name = __end_qname.as_ref();
         #( #attr_decl_tokens )*
         #namespace_attr_parse_tokens
         #( #child_decl_tokens )*
@@ -6230,7 +6148,6 @@ fn expand_named_struct(
       ) -> Result<Self, crate::common::SdkError> {
         #xml_header_decl_tokens
         let __end_qname = e.name();
-        let __end_name = __end_qname.as_ref();
         #( #attr_decl_tokens )*
         #namespace_attr_parse_tokens
         #( #child_decl_tokens )*

@@ -1015,7 +1015,7 @@ impl SdkPackageStorage {
   {
     writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
     writer.write_all(b"\n<pkg:package")?;
-    super::write_xmlns_attr(writer, Some("pkg"), FLAT_OPC_PACKAGE_NS)?;
+    super::write_xmlns_attr(writer, Some(b"pkg"), FLAT_OPC_PACKAGE_NS.as_bytes())?;
     writer.write_all(b">\n")?;
 
     if !self.package_relationships.is_empty() {

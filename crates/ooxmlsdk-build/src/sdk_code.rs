@@ -1,5 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -8,7 +8,7 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use syn::{Attribute, Ident, ItemMod, parse_str, parse2};
+use syn::{Attribute, Ident, ItemMod, LitByteStr, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
@@ -402,7 +402,7 @@ fn write_namespaces(
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
   let mut known_prefix_bytes_arms: Vec<syn::Arm> = vec![];
   let mut known_uri_bytes_arms: Vec<syn::Arm> = vec![];
-  let mut known_from_uri_arms: Vec<syn::Arm> = vec![];
+  let mut known_from_uri_bytes_arms: Vec<syn::Arm> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
   let mut seen_variants = HashSet::new();
@@ -434,9 +434,10 @@ fn write_namespaces(
           Self::#variant_ident => #uri.as_bytes(),
         })?);
       }
-      known_from_uri_arms.push(parse2(quote! {
+      let uri_bytes = LitByteStr::new(uri.as_bytes(), Span::call_site());
+      known_from_uri_bytes_arms.push(parse2(quote! {
         #( #attrs )*
-        #uri => Some(Self::#variant_ident),
+        #uri_bytes => Some(Self::#variant_ident),
       })?);
     }
 
@@ -471,9 +472,10 @@ fn write_namespaces(
       );
     };
     let uri = alias.uri.as_str();
-    known_from_uri_arms.push(parse2(quote! {
+    let uri_bytes = LitByteStr::new(uri.as_bytes(), Span::call_site());
+    known_from_uri_bytes_arms.push(parse2(quote! {
       #( #attrs )*
-      #uri => Some(Self::#variant_ident),
+      #uri_bytes => Some(Self::#variant_ident),
     })?);
   }
 
@@ -538,43 +540,17 @@ fn write_namespaces(
         }
 
         pub fn from_uri(uri: &str) -> Option<Self> {
+          Self::from_uri_bytes(uri.as_bytes())
+        }
+
+        pub fn from_uri_bytes(uri: &[u8]) -> Option<Self> {
           match uri {
-            #( #known_from_uri_arms )*
+            #( #known_from_uri_bytes_arms )*
             _ => None,
           }
         }
       }
 
-      #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-      pub struct XmlKnownNamespaceDecl {
-        pub namespace: XmlKnownNamespace,
-        pub flags: u8,
-      }
-
-      impl XmlKnownNamespaceDecl {
-        pub const DEFAULT_NAMESPACE: u8 = 1;
-
-        #[inline]
-        pub const fn new(namespace: XmlKnownNamespace) -> Self {
-          Self {
-            namespace,
-            flags: 0,
-          }
-        }
-
-        #[inline]
-        pub const fn new_default(namespace: XmlKnownNamespace) -> Self {
-          Self {
-            namespace,
-            flags: Self::DEFAULT_NAMESPACE,
-          }
-        }
-
-        #[inline]
-        pub const fn is_default(self) -> bool {
-          self.flags & Self::DEFAULT_NAMESPACE != 0
-        }
-      }
     }
   } else {
     quote! {}

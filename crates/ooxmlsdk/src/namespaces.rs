@@ -683,272 +683,257 @@ impl XmlKnownNamespace {
     unsafe { std::str::from_utf8_unchecked(self.uri_bytes()) }
   }
   pub fn from_uri(uri: &str) -> Option<Self> {
+    Self::from_uri_bytes(uri.as_bytes())
+  }
+  pub fn from_uri_bytes(uri: &[u8]) -> Option<Self> {
     match uri {
-      "http://schemas.openxmlformats.org/drawingml/2006/main" => Some(Self::A),
-      "http://schemas.microsoft.com/office/drawing/2010/main" => Some(Self::A14),
-      "http://schemas.microsoft.com/office/drawing/2012/main" => Some(Self::A15),
-      "http://schemas.microsoft.com/office/drawing/2014/main" => Some(Self::A16),
-      "http://schemas.microsoft.com/office/drawing/2016/11/main" => Some(Self::A1611),
-      "http://schemas.microsoft.com/office/drawing/2018/animation/model3d" => Some(Self::A3danim),
-      "http://schemas.microsoft.com/office/drawing/2018/animation" => Some(Self::Aanim),
-      "http://schemas.openxmlformats.org/officeDocument/2006/characteristics" => Some(Self::Ac),
-      "http://schemas.microsoft.com/office/drawing/2020/classificationShape" => Some(Self::Aclsh),
-      "http://schemas.microsoft.com/office/drawing/2017/decorative" => Some(Self::Adec),
-      "http://schemas.microsoft.com/office/drawing/2018/hyperlinkcolor" => Some(Self::Ahyp),
-      "http://schemas.microsoft.com/office/drawing/2022/imageformula" => Some(Self::Aif),
-      "http://schemas.microsoft.com/office/drawing/2016/ink" => Some(Self::Aink),
-      "http://schemas.microsoft.com/office/drawing/2021/livefeed" => Some(Self::Alf),
-      "http://schemas.microsoft.com/office/drawing/2017/model3d" => Some(Self::Am3d),
-      "http://schemas.microsoft.com/office/drawing/2021/oembed" => Some(Self::Aoe),
-      "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" => Some(Self::Ap),
-      "http://schemas.microsoft.com/office/drawing/2018/sketchyshapes" => Some(Self::Ask),
-      "http://schemas.microsoft.com/office/drawing/2021/scriptlink" => Some(Self::Asl),
-      "http://schemas.microsoft.com/office/drawing/2016/SVG/main" => Some(Self::Asvg),
-      "http://schemas.microsoft.com/office/2006/activeX" => Some(Self::Ax),
-      "http://schemas.openxmlformats.org/officeDocument/2006/bibliography" => Some(Self::B),
-      "http://schemas.openxmlformats.org/drawingml/2006/chart" => Some(Self::C),
-      "http://schemas.microsoft.com/office/drawing/2007/8/2/chart" => Some(Self::C14),
-      "http://schemas.microsoft.com/office/drawing/2012/chart" => Some(Self::C15),
-      "http://schemas.microsoft.com/office/drawing/2014/chart" => Some(Self::C16),
-      "http://schemas.microsoft.com/office/drawing/2014/chart/ac" => Some(Self::C16ac),
-      "http://schemas.microsoft.com/office/drawing/2015/06/chart" => Some(Self::C16r2),
-      "http://schemas.microsoft.com/office/drawing/2017/03/chart" => Some(Self::C16r3),
-      "http://schemas.microsoft.com/office/2006/customDocumentInformationPanel" => Some(Self::Cdip),
-      "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" => Some(Self::Cdr),
-      "http://schemas.microsoft.com/office/drawing/2010/chartDrawing" => Some(Self::Cdr14),
-      "http://schemas.microsoft.com/office/2020/mipLabelMetadata" => Some(Self::Clbl),
-      "http://schemas.microsoft.com/office/drawing/2010/compatibility" => Some(Self::Com14),
-      "http://schemas.openxmlformats.org/drawingml/2006/compatibility" => Some(Self::Comp),
-      "http://schemas.openxmlformats.org/package/2006/metadata/core-properties" => Some(Self::Cp),
-      "http://schemas.microsoft.com/office/2006/coverPageProps" => Some(Self::Cppr),
-      "http://schemas.microsoft.com/office/comments/2020/reactions" => Some(Self::Cr),
-      "http://schemas.microsoft.com/office/drawing/2012/chartStyle" => Some(Self::Cs),
-      "http://schemas.microsoft.com/office/2006/metadata/contentType" => Some(Self::Ct),
-      "http://schemas.microsoft.com/office/drawing/2014/chartex" => Some(Self::Cx),
-      "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" => Some(Self::Cx1),
-      "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" => Some(Self::Cx2),
-      "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex" => Some(Self::Cx3),
-      "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex" => Some(Self::Cx4),
-      "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex" => Some(Self::Cx5),
-      "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex" => Some(Self::Cx6),
-      "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex" => Some(Self::Cx7),
-      "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex" => Some(Self::Cx8),
-      "http://purl.org/dc/elements/1.1/" => Some(Self::Dc),
-      "http://purl.org/dc/dcmitype/" => Some(Self::Dcmitype),
-      "http://purl.org/dc/terms/" => Some(Self::Dcterms),
-      "http://schemas.openxmlformats.org/drawingml/2006/diagram" => Some(Self::Dgm),
-      "http://schemas.microsoft.com/office/drawing/2010/diagram" => Some(Self::Dgm14),
-      "http://schemas.microsoft.com/office/drawing/2016/11/diagram" => Some(Self::Dgm1611),
-      "http://schemas.microsoft.com/office/drawing/2016/12/diagram" => Some(Self::Dgm1612),
-      "http://schemas.microsoft.com/office/2006/documentManagement/types" => Some(Self::Dms),
-      "http://schemas.openxmlformats.org/officeDocument/2006/customXml" => Some(Self::Ds),
-      "http://schemas.microsoft.com/office/drawing/2008/diagram" => Some(Self::Dsp),
-      "http://www.w3.org/2003/04/emma" => Some(Self::Emma),
-      "http://www.w3.org/2003/InkML" => Some(Self::Inkml),
-      "http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas" => Some(Self::Lc),
-      "http://schemas.libreoffice.org/" => Some(Self::Loext),
-      "http://schemas.microsoft.com/office/2006/metadata/longProperties" => Some(Self::Lp),
-      "http://schemas.openxmlformats.org/officeDocument/2006/math" => Some(Self::M),
-      "http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes" => {
+      b"http://schemas.openxmlformats.org/drawingml/2006/main" => Some(Self::A),
+      b"http://schemas.microsoft.com/office/drawing/2010/main" => Some(Self::A14),
+      b"http://schemas.microsoft.com/office/drawing/2012/main" => Some(Self::A15),
+      b"http://schemas.microsoft.com/office/drawing/2014/main" => Some(Self::A16),
+      b"http://schemas.microsoft.com/office/drawing/2016/11/main" => Some(Self::A1611),
+      b"http://schemas.microsoft.com/office/drawing/2018/animation/model3d" => Some(Self::A3danim),
+      b"http://schemas.microsoft.com/office/drawing/2018/animation" => Some(Self::Aanim),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/characteristics" => Some(Self::Ac),
+      b"http://schemas.microsoft.com/office/drawing/2020/classificationShape" => Some(Self::Aclsh),
+      b"http://schemas.microsoft.com/office/drawing/2017/decorative" => Some(Self::Adec),
+      b"http://schemas.microsoft.com/office/drawing/2018/hyperlinkcolor" => Some(Self::Ahyp),
+      b"http://schemas.microsoft.com/office/drawing/2022/imageformula" => Some(Self::Aif),
+      b"http://schemas.microsoft.com/office/drawing/2016/ink" => Some(Self::Aink),
+      b"http://schemas.microsoft.com/office/drawing/2021/livefeed" => Some(Self::Alf),
+      b"http://schemas.microsoft.com/office/drawing/2017/model3d" => Some(Self::Am3d),
+      b"http://schemas.microsoft.com/office/drawing/2021/oembed" => Some(Self::Aoe),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" => {
+        Some(Self::Ap)
+      }
+      b"http://schemas.microsoft.com/office/drawing/2018/sketchyshapes" => Some(Self::Ask),
+      b"http://schemas.microsoft.com/office/drawing/2021/scriptlink" => Some(Self::Asl),
+      b"http://schemas.microsoft.com/office/drawing/2016/SVG/main" => Some(Self::Asvg),
+      b"http://schemas.microsoft.com/office/2006/activeX" => Some(Self::Ax),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/bibliography" => Some(Self::B),
+      b"http://schemas.openxmlformats.org/drawingml/2006/chart" => Some(Self::C),
+      b"http://schemas.microsoft.com/office/drawing/2007/8/2/chart" => Some(Self::C14),
+      b"http://schemas.microsoft.com/office/drawing/2012/chart" => Some(Self::C15),
+      b"http://schemas.microsoft.com/office/drawing/2014/chart" => Some(Self::C16),
+      b"http://schemas.microsoft.com/office/drawing/2014/chart/ac" => Some(Self::C16ac),
+      b"http://schemas.microsoft.com/office/drawing/2015/06/chart" => Some(Self::C16r2),
+      b"http://schemas.microsoft.com/office/drawing/2017/03/chart" => Some(Self::C16r3),
+      b"http://schemas.microsoft.com/office/2006/customDocumentInformationPanel" => {
+        Some(Self::Cdip)
+      }
+      b"http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" => Some(Self::Cdr),
+      b"http://schemas.microsoft.com/office/drawing/2010/chartDrawing" => Some(Self::Cdr14),
+      b"http://schemas.microsoft.com/office/2020/mipLabelMetadata" => Some(Self::Clbl),
+      b"http://schemas.microsoft.com/office/drawing/2010/compatibility" => Some(Self::Com14),
+      b"http://schemas.openxmlformats.org/drawingml/2006/compatibility" => Some(Self::Comp),
+      b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties" => Some(Self::Cp),
+      b"http://schemas.microsoft.com/office/2006/coverPageProps" => Some(Self::Cppr),
+      b"http://schemas.microsoft.com/office/comments/2020/reactions" => Some(Self::Cr),
+      b"http://schemas.microsoft.com/office/drawing/2012/chartStyle" => Some(Self::Cs),
+      b"http://schemas.microsoft.com/office/2006/metadata/contentType" => Some(Self::Ct),
+      b"http://schemas.microsoft.com/office/drawing/2014/chartex" => Some(Self::Cx),
+      b"http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" => Some(Self::Cx1),
+      b"http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" => Some(Self::Cx2),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/9/chartex" => Some(Self::Cx3),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/10/chartex" => Some(Self::Cx4),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/11/chartex" => Some(Self::Cx5),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/12/chartex" => Some(Self::Cx6),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/13/chartex" => Some(Self::Cx7),
+      b"http://schemas.microsoft.com/office/drawing/2016/5/14/chartex" => Some(Self::Cx8),
+      b"http://purl.org/dc/elements/1.1/" => Some(Self::Dc),
+      b"http://purl.org/dc/dcmitype/" => Some(Self::Dcmitype),
+      b"http://purl.org/dc/terms/" => Some(Self::Dcterms),
+      b"http://schemas.openxmlformats.org/drawingml/2006/diagram" => Some(Self::Dgm),
+      b"http://schemas.microsoft.com/office/drawing/2010/diagram" => Some(Self::Dgm14),
+      b"http://schemas.microsoft.com/office/drawing/2016/11/diagram" => Some(Self::Dgm1611),
+      b"http://schemas.microsoft.com/office/drawing/2016/12/diagram" => Some(Self::Dgm1612),
+      b"http://schemas.microsoft.com/office/2006/documentManagement/types" => Some(Self::Dms),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/customXml" => Some(Self::Ds),
+      b"http://schemas.microsoft.com/office/drawing/2008/diagram" => Some(Self::Dsp),
+      b"http://www.w3.org/2003/04/emma" => Some(Self::Emma),
+      b"http://www.w3.org/2003/InkML" => Some(Self::Inkml),
+      b"http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas" => Some(Self::Lc),
+      b"http://schemas.libreoffice.org/" => Some(Self::Loext),
+      b"http://schemas.microsoft.com/office/2006/metadata/longProperties" => Some(Self::Lp),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/math" => Some(Self::M),
+      b"http://schemas.microsoft.com/office/2006/metadata/properties/metaAttributes" => {
         Some(Self::Ma)
       }
-      "http://schemas.microsoft.com/office/mac/drawingml/2011/main" => Some(Self::Ma14),
-      "http://schemas.openxmlformats.org/markup-compatibility/2006" => Some(Self::Mc),
-      "http://schemas.microsoft.com/office/office/2011/9/metroDictionary" => Some(Self::Md),
-      "http://schemas.microsoft.com/office/mac/office/2008/main" => Some(Self::Mo),
-      "http://schemas.microsoft.com/ink/2010/main" => Some(Self::Msink),
-      "http://schemas.microsoft.com/office/2006/01/customui" => Some(Self::Mso),
-      "http://schemas.microsoft.com/office/2009/07/customui" => Some(Self::Mso14),
-      "urn:schemas-microsoft-com:mac:vml" => Some(Self::Mv),
-      "http://schemas.microsoft.com/office/mac/excel/2008/main" => Some(Self::Mx),
-      "http://schemas.microsoft.com/office/2006/metadata/customXsn" => Some(Self::Ntns),
-      "urn:schemas-microsoft-com:office:office" => Some(Self::O),
-      "urn:schemas-microsoft-com:office:activation" => Some(Self::Oa),
-      "http://schemas.microsoft.com/office/drawing/2013/main/command" => Some(Self::Oac),
-      "http://schemas.microsoft.com/internal/obd" => Some(Self::Odoc),
-      "http://schemas.microsoft.com/office/2019/extlst" => Some(Self::Oel),
-      "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" => Some(Self::Op),
-      "http://schemas.microsoft.com/office/2009/outspace/metadata" => Some(Self::Outs),
-      "http://schemas.openxmlformats.org/presentationml/2006/main" => Some(Self::P),
-      "http://schemas.microsoft.com/office/powerpoint/2010/main" => Some(Self::P14),
-      "http://schemas.microsoft.com/office/powerpoint/2012/main" => Some(Self::P15),
-      "http://schemas.microsoft.com/office/powerpoint/2015/10/main" => Some(Self::P1510),
-      "http://schemas.microsoft.com/office/powerpoint/2015/main" => Some(Self::P16),
-      "http://schemas.microsoft.com/office/powerpoint/2017/10/main" => Some(Self::P1710),
-      "http://schemas.microsoft.com/office/powerpoint/2017/3/main" => Some(Self::P173),
-      "http://schemas.microsoft.com/office/powerpoint/2018/4/main" => Some(Self::P184),
-      "http://schemas.microsoft.com/office/powerpoint/2018/8/main" => Some(Self::P188),
-      "http://schemas.microsoft.com/office/powerpoint/2019/12/main" => Some(Self::P1912),
-      "http://schemas.microsoft.com/office/powerpoint/2020/02/main" => Some(Self::P202),
-      "http://schemas.microsoft.com/office/powerpoint/2021/06/main" => Some(Self::P216),
-      "http://schemas.microsoft.com/office/powerpoint/2022/03/main" => Some(Self::P223),
-      "http://schemas.microsoft.com/office/powerpoint/2022/08/main" => Some(Self::P228),
-      "http://schemas.microsoft.com/office/powerpoint/2023/02/main" => Some(Self::P232),
-      "http://schemas.microsoft.com/office/powerpoint/2012/roamingSettings" => Some(Self::PRoam),
-      "http://schemas.microsoft.com/office/internal/2007/ofapi/packaging" => Some(Self::Packaging),
-      "http://schemas.microsoft.com/office/2007/6/19/audiovideo" => Some(Self::Pav),
-      "http://schemas.microsoft.com/office/powerpoint/2013/main/command" => Some(Self::Pc),
-      "http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" => Some(Self::Pc2),
-      "http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" => Some(Self::Pc226),
-      "http://schemas.openxmlformats.org/drawingml/2006/picture" => Some(Self::Pic),
-      "http://schemas.microsoft.com/office/drawing/2010/picture" => Some(Self::Pic14),
-      "http://schemas.microsoft.com/projectml/2012/main" => Some(Self::Pj15),
-      "urn:schemas-microsoft-com:office:powerpoint" => Some(Self::Pvml),
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships" => Some(Self::R),
-      "http://schemas.openxmlformats.org/schemaLibrary/2006/main" => Some(Self::Sl),
-      "http://schemas.microsoft.com/office/drawing/2010/slicer" => Some(Self::Sle),
-      "http://schemas.microsoft.com/sharepoint/events" => Some(Self::Spe),
-      "http://schemas.microsoft.com/office/tasks/2019/documenttasks" => Some(Self::T),
-      "http://schemas.microsoft.com/office/thememl/2012/main" => Some(Self::Thm15),
-      "http://schemas.microsoft.com/office/drawing/2012/timeslicer" => Some(Self::Tsle),
-      "urn:schemas-microsoft-com:vml" => Some(Self::V),
-      "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" => Some(Self::Vt),
-      "http://schemas.openxmlformats.org/wordprocessingml/2006/main" => Some(Self::W),
-      "urn:schemas-microsoft-com:office:word" => Some(Self::W10),
-      "http://schemas.microsoft.com/office/word/2010/wordml" => Some(Self::W14),
-      "http://schemas.microsoft.com/office/word/2012/wordml" => Some(Self::W15),
-      "http://schemas.microsoft.com/office/word/2018/wordml/cex" => Some(Self::W16cex),
-      "http://schemas.microsoft.com/office/word/2016/wordml/cid" => Some(Self::W16cid),
-      "http://schemas.microsoft.com/office/word/2018/wordml" => Some(Self::W16cur),
-      "http://schemas.microsoft.com/office/word/2023/wordml/word16du" => Some(Self::W16du),
-      "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash" => Some(Self::W16sdtdh),
-      "http://schemas.microsoft.com/office/word/2024/wordml/sdtformatlock" => Some(Self::W16sdtfl),
-      "http://schemas.microsoft.com/office/word/2015/wordml/symex" => Some(Self::W16se),
-      "http://schemas.microsoft.com/office/webextensions/webextension/2010/11" => Some(Self::We),
-      "http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11" => Some(Self::Wetp),
-      "http://schemas.microsoft.com/office/word/2006/wordml" => Some(Self::Wne),
-      "http://schemas.microsoft.com/office/word/2020/oembed" => Some(Self::Woe),
-      "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" => Some(Self::Wp),
-      "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" => Some(Self::Wp14),
-      "http://schemas.microsoft.com/office/word/2012/wordprocessingDrawing" => Some(Self::Wp15),
-      "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" => Some(Self::Wpc),
-      "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" => Some(Self::Wpg),
-      "http://schemas.microsoft.com/office/word/2010/wordprocessingInk" => Some(Self::Wpi),
-      "http://schemas.microsoft.com/office/word/2010/wordprocessingShape" => Some(Self::Wps),
-      "http://schemas.openxmlformats.org/spreadsheetml/2006/main" => Some(Self::X),
-      "http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac" => Some(Self::X12ac),
-      "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => Some(Self::X14),
-      "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" => Some(Self::X14ac),
-      "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" => Some(Self::X15),
-      "http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac" => Some(Self::X15ac),
-      "http://schemas.microsoft.com/office/spreadsheetml/2014/11/main" => Some(Self::X16),
-      "http://schemas.microsoft.com/office/spreadsheetml/2015/02/main" => Some(Self::X16r2),
-      "http://schemas.microsoft.com/office/spreadsheetml/2018/08/main" => Some(Self::X16r3),
-      "http://schemas.microsoft.com/office/spreadsheetml/2018/calcfeatures" => Some(Self::Xcalcf),
-      "http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray" => Some(Self::Xda),
-      "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" => Some(Self::Xdr),
-      "http://schemas.microsoft.com/office/excel/2010/spreadsheetDrawing" => Some(Self::Xdr14),
-      "http://schemas.microsoft.com/office/spreadsheetml/2022/featurepropertybag" => {
+      b"http://schemas.microsoft.com/office/mac/drawingml/2011/main" => Some(Self::Ma14),
+      b"http://schemas.openxmlformats.org/markup-compatibility/2006" => Some(Self::Mc),
+      b"http://schemas.microsoft.com/office/office/2011/9/metroDictionary" => Some(Self::Md),
+      b"http://schemas.microsoft.com/office/mac/office/2008/main" => Some(Self::Mo),
+      b"http://schemas.microsoft.com/ink/2010/main" => Some(Self::Msink),
+      b"http://schemas.microsoft.com/office/2006/01/customui" => Some(Self::Mso),
+      b"http://schemas.microsoft.com/office/2009/07/customui" => Some(Self::Mso14),
+      b"urn:schemas-microsoft-com:mac:vml" => Some(Self::Mv),
+      b"http://schemas.microsoft.com/office/mac/excel/2008/main" => Some(Self::Mx),
+      b"http://schemas.microsoft.com/office/2006/metadata/customXsn" => Some(Self::Ntns),
+      b"urn:schemas-microsoft-com:office:office" => Some(Self::O),
+      b"urn:schemas-microsoft-com:office:activation" => Some(Self::Oa),
+      b"http://schemas.microsoft.com/office/drawing/2013/main/command" => Some(Self::Oac),
+      b"http://schemas.microsoft.com/internal/obd" => Some(Self::Odoc),
+      b"http://schemas.microsoft.com/office/2019/extlst" => Some(Self::Oel),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" => Some(Self::Op),
+      b"http://schemas.microsoft.com/office/2009/outspace/metadata" => Some(Self::Outs),
+      b"http://schemas.openxmlformats.org/presentationml/2006/main" => Some(Self::P),
+      b"http://schemas.microsoft.com/office/powerpoint/2010/main" => Some(Self::P14),
+      b"http://schemas.microsoft.com/office/powerpoint/2012/main" => Some(Self::P15),
+      b"http://schemas.microsoft.com/office/powerpoint/2015/10/main" => Some(Self::P1510),
+      b"http://schemas.microsoft.com/office/powerpoint/2015/main" => Some(Self::P16),
+      b"http://schemas.microsoft.com/office/powerpoint/2017/10/main" => Some(Self::P1710),
+      b"http://schemas.microsoft.com/office/powerpoint/2017/3/main" => Some(Self::P173),
+      b"http://schemas.microsoft.com/office/powerpoint/2018/4/main" => Some(Self::P184),
+      b"http://schemas.microsoft.com/office/powerpoint/2018/8/main" => Some(Self::P188),
+      b"http://schemas.microsoft.com/office/powerpoint/2019/12/main" => Some(Self::P1912),
+      b"http://schemas.microsoft.com/office/powerpoint/2020/02/main" => Some(Self::P202),
+      b"http://schemas.microsoft.com/office/powerpoint/2021/06/main" => Some(Self::P216),
+      b"http://schemas.microsoft.com/office/powerpoint/2022/03/main" => Some(Self::P223),
+      b"http://schemas.microsoft.com/office/powerpoint/2022/08/main" => Some(Self::P228),
+      b"http://schemas.microsoft.com/office/powerpoint/2023/02/main" => Some(Self::P232),
+      b"http://schemas.microsoft.com/office/powerpoint/2012/roamingSettings" => Some(Self::PRoam),
+      b"http://schemas.microsoft.com/office/internal/2007/ofapi/packaging" => Some(Self::Packaging),
+      b"http://schemas.microsoft.com/office/2007/6/19/audiovideo" => Some(Self::Pav),
+      b"http://schemas.microsoft.com/office/powerpoint/2013/main/command" => Some(Self::Pc),
+      b"http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" => Some(Self::Pc2),
+      b"http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" => Some(Self::Pc226),
+      b"http://schemas.openxmlformats.org/drawingml/2006/picture" => Some(Self::Pic),
+      b"http://schemas.microsoft.com/office/drawing/2010/picture" => Some(Self::Pic14),
+      b"http://schemas.microsoft.com/projectml/2012/main" => Some(Self::Pj15),
+      b"urn:schemas-microsoft-com:office:powerpoint" => Some(Self::Pvml),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/relationships" => Some(Self::R),
+      b"http://schemas.openxmlformats.org/schemaLibrary/2006/main" => Some(Self::Sl),
+      b"http://schemas.microsoft.com/office/drawing/2010/slicer" => Some(Self::Sle),
+      b"http://schemas.microsoft.com/sharepoint/events" => Some(Self::Spe),
+      b"http://schemas.microsoft.com/office/tasks/2019/documenttasks" => Some(Self::T),
+      b"http://schemas.microsoft.com/office/thememl/2012/main" => Some(Self::Thm15),
+      b"http://schemas.microsoft.com/office/drawing/2012/timeslicer" => Some(Self::Tsle),
+      b"urn:schemas-microsoft-com:vml" => Some(Self::V),
+      b"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" => Some(Self::Vt),
+      b"http://schemas.openxmlformats.org/wordprocessingml/2006/main" => Some(Self::W),
+      b"urn:schemas-microsoft-com:office:word" => Some(Self::W10),
+      b"http://schemas.microsoft.com/office/word/2010/wordml" => Some(Self::W14),
+      b"http://schemas.microsoft.com/office/word/2012/wordml" => Some(Self::W15),
+      b"http://schemas.microsoft.com/office/word/2018/wordml/cex" => Some(Self::W16cex),
+      b"http://schemas.microsoft.com/office/word/2016/wordml/cid" => Some(Self::W16cid),
+      b"http://schemas.microsoft.com/office/word/2018/wordml" => Some(Self::W16cur),
+      b"http://schemas.microsoft.com/office/word/2023/wordml/word16du" => Some(Self::W16du),
+      b"http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash" => Some(Self::W16sdtdh),
+      b"http://schemas.microsoft.com/office/word/2024/wordml/sdtformatlock" => Some(Self::W16sdtfl),
+      b"http://schemas.microsoft.com/office/word/2015/wordml/symex" => Some(Self::W16se),
+      b"http://schemas.microsoft.com/office/webextensions/webextension/2010/11" => Some(Self::We),
+      b"http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11" => Some(Self::Wetp),
+      b"http://schemas.microsoft.com/office/word/2006/wordml" => Some(Self::Wne),
+      b"http://schemas.microsoft.com/office/word/2020/oembed" => Some(Self::Woe),
+      b"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" => Some(Self::Wp),
+      b"http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" => Some(Self::Wp14),
+      b"http://schemas.microsoft.com/office/word/2012/wordprocessingDrawing" => Some(Self::Wp15),
+      b"http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" => Some(Self::Wpc),
+      b"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" => Some(Self::Wpg),
+      b"http://schemas.microsoft.com/office/word/2010/wordprocessingInk" => Some(Self::Wpi),
+      b"http://schemas.microsoft.com/office/word/2010/wordprocessingShape" => Some(Self::Wps),
+      b"http://schemas.openxmlformats.org/spreadsheetml/2006/main" => Some(Self::X),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac" => Some(Self::X12ac),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => Some(Self::X14),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" => Some(Self::X14ac),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" => Some(Self::X15),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac" => Some(Self::X15ac),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2014/11/main" => Some(Self::X16),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2015/02/main" => Some(Self::X16r2),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2018/08/main" => Some(Self::X16r3),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2018/calcfeatures" => Some(Self::Xcalcf),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray" => Some(Self::Xda),
+      b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" => Some(Self::Xdr),
+      b"http://schemas.microsoft.com/office/excel/2010/spreadsheetDrawing" => Some(Self::Xdr14),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2022/featurepropertybag" => {
         Some(Self::Xfpb)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/01/main" => Some(Self::XlPr),
-      "http://schemas.microsoft.com/office/spreadsheetml/2023/externalCodeService" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/01/main" => Some(Self::XlPr),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2023/externalCodeService" => {
         Some(Self::Xlecs)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2025/externalCodeService2" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2025/externalCodeService2" => {
         Some(Self::Xlecs2)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2023/msForms" => Some(Self::Xlmsforms),
-      "http://schemas.microsoft.com/office/spreadsheetml/2024/pivotAutoRefresh" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2023/msForms" => Some(Self::Xlmsforms),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2024/pivotAutoRefresh" => {
         Some(Self::Xlpar)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2023/pivot2023Calculation" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2023/pivot2023Calculation" => {
         Some(Self::Xlpcalc)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2024/pivotDynamicArrays" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2024/pivotDynamicArrays" => {
         Some(Self::Xlpda)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2025/pivotDataSource" => Some(Self::Xlpds),
-      "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" => Some(Self::Xlrd),
-      "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2" => Some(Self::Xlrd2),
-      "http://schemas.microsoft.com/office/spreadsheetml/2020/richdatawebimage" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2025/pivotDataSource" => {
+        Some(Self::Xlpds)
+      }
+      b"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" => Some(Self::Xlrd),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2" => Some(Self::Xlrd2),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2020/richdatawebimage" => {
         Some(Self::Xlrdwi)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2020/richvaluerefresh" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2020/richvaluerefresh" => {
         Some(Self::Xlrvr)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2022/richvaluerel" => Some(Self::Xlrvrel),
-      "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments" => Some(Self::Xltc),
-      "http://schemas.microsoft.com/office/spreadsheetml/2020/threadedcomments2" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2022/richvaluerel" => Some(Self::Xlrvrel),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments" => {
+        Some(Self::Xltc)
+      }
+      b"http://schemas.microsoft.com/office/spreadsheetml/2020/threadedcomments2" => {
         Some(Self::Xltc2)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2024/workbookCompatibilityVersion" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2024/workbookCompatibilityVersion" => {
         Some(Self::Xlwcv)
       }
-      "http://www.w3.org/XML/1998/namespace" => Some(Self::Xml),
-      "http://schemas.microsoft.com/office/excel/2006/main" => Some(Self::Xne),
-      "http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" => Some(Self::Xnsv),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/pivotdefaultlayout" => {
+      b"http://www.w3.org/XML/1998/namespace" => Some(Self::Xml),
+      b"http://schemas.microsoft.com/office/excel/2006/main" => Some(Self::Xne),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" => Some(Self::Xnsv),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/pivotdefaultlayout" => {
         Some(Self::Xpdl)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2022/pivotRichData" => Some(Self::Xprd),
-      "http://schemas.microsoft.com/office/spreadsheetml/2014/revision" => Some(Self::Xr),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" => Some(Self::Xr10),
-      "http://schemas.microsoft.com/office/spreadsheetml/2017/revision16" => Some(Self::Xr16),
-      "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" => Some(Self::Xr2),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" => Some(Self::Xr3),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/revision5" => Some(Self::Xr5),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/revision6" => Some(Self::Xr6),
-      "http://schemas.microsoft.com/office/spreadsheetml/2016/revision9" => Some(Self::Xr9),
-      "http://www.w3.org/2001/XMLSchema" => Some(Self::Xsd),
-      "http://www.w3.org/2001/XMLSchema-instance" => Some(Self::Xsi),
-      "urn:schemas-microsoft-com:office:excel" => Some(Self::Xvml),
-      "http://schemas.microsoft.com/office/spreadsheetml/2023/dataSourceVersioning" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2022/pivotRichData" => Some(Self::Xprd),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2014/revision" => Some(Self::Xr),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" => Some(Self::Xr10),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2017/revision16" => Some(Self::Xr16),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" => Some(Self::Xr2),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" => Some(Self::Xr3),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision5" => Some(Self::Xr5),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision6" => Some(Self::Xr6),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2016/revision9" => Some(Self::Xr9),
+      b"http://www.w3.org/2001/XMLSchema" => Some(Self::Xsd),
+      b"http://www.w3.org/2001/XMLSchema-instance" => Some(Self::Xsi),
+      b"urn:schemas-microsoft-com:office:excel" => Some(Self::Xvml),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2023/dataSourceVersioning" => {
         Some(Self::Xxdsv)
       }
-      "http://schemas.microsoft.com/office/spreadsheetml/2021/extlinks2021" => Some(Self::Xxl21),
-      "http://schemas.microsoft.com/office/spreadsheetml/2019/extlinksprops" => Some(Self::Xxlnp),
-      "http://schemas.microsoft.com/office/spreadsheetml/2020/pivotNov2020" => Some(Self::Xxpim),
-      "http://schemas.microsoft.com/office/spreadsheetml/2022/pivotVersionInfo" => {
+      b"http://schemas.microsoft.com/office/spreadsheetml/2021/extlinks2021" => Some(Self::Xxl21),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2019/extlinksprops" => Some(Self::Xxlnp),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2020/pivotNov2020" => Some(Self::Xxpim),
+      b"http://schemas.microsoft.com/office/spreadsheetml/2022/pivotVersionInfo" => {
         Some(Self::Xxpvi)
       }
-      "http://purl.oclc.org/ooxml/drawingml/chart" => Some(Self::C),
-      "http://purl.oclc.org/ooxml/drawingml/chartDrawing" => Some(Self::Cdr),
-      "http://purl.oclc.org/ooxml/drawingml/compatibility" => Some(Self::Comp),
-      "http://purl.oclc.org/ooxml/drawingml/diagram" => Some(Self::Dgm),
-      "http://purl.oclc.org/ooxml/drawingml/lockedCanvas" => Some(Self::Lc),
-      "http://purl.oclc.org/ooxml/drawingml/main" => Some(Self::A),
-      "http://purl.oclc.org/ooxml/drawingml/picture" => Some(Self::Pic),
-      "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing" => Some(Self::Xdr),
-      "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" => Some(Self::Wp),
-      "http://purl.oclc.org/ooxml/officeDocument/bibliography" => Some(Self::B),
-      "http://purl.oclc.org/ooxml/officeDocument/customProperties" => Some(Self::Op),
-      "http://purl.oclc.org/ooxml/officeDocument/customXml" => Some(Self::Ds),
-      "http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes" => Some(Self::Vt),
-      "http://purl.oclc.org/ooxml/officeDocument/extendedProperties" => Some(Self::Ap),
-      "http://purl.oclc.org/ooxml/officeDocument/math" => Some(Self::M),
-      "http://purl.oclc.org/ooxml/officeDocument/relationships" => Some(Self::R),
-      "http://purl.oclc.org/ooxml/presentationml/main" => Some(Self::P),
-      "http://purl.oclc.org/ooxml/schemaLibrary/main" => Some(Self::Sl),
-      "http://purl.oclc.org/ooxml/spreadsheetml/main" => Some(Self::X),
-      "http://purl.oclc.org/ooxml/wordprocessingml/main" => Some(Self::W),
+      b"http://purl.oclc.org/ooxml/drawingml/chart" => Some(Self::C),
+      b"http://purl.oclc.org/ooxml/drawingml/chartDrawing" => Some(Self::Cdr),
+      b"http://purl.oclc.org/ooxml/drawingml/compatibility" => Some(Self::Comp),
+      b"http://purl.oclc.org/ooxml/drawingml/diagram" => Some(Self::Dgm),
+      b"http://purl.oclc.org/ooxml/drawingml/lockedCanvas" => Some(Self::Lc),
+      b"http://purl.oclc.org/ooxml/drawingml/main" => Some(Self::A),
+      b"http://purl.oclc.org/ooxml/drawingml/picture" => Some(Self::Pic),
+      b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing" => Some(Self::Xdr),
+      b"http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" => Some(Self::Wp),
+      b"http://purl.oclc.org/ooxml/officeDocument/bibliography" => Some(Self::B),
+      b"http://purl.oclc.org/ooxml/officeDocument/customProperties" => Some(Self::Op),
+      b"http://purl.oclc.org/ooxml/officeDocument/customXml" => Some(Self::Ds),
+      b"http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes" => Some(Self::Vt),
+      b"http://purl.oclc.org/ooxml/officeDocument/extendedProperties" => Some(Self::Ap),
+      b"http://purl.oclc.org/ooxml/officeDocument/math" => Some(Self::M),
+      b"http://purl.oclc.org/ooxml/officeDocument/relationships" => Some(Self::R),
+      b"http://purl.oclc.org/ooxml/presentationml/main" => Some(Self::P),
+      b"http://purl.oclc.org/ooxml/schemaLibrary/main" => Some(Self::Sl),
+      b"http://purl.oclc.org/ooxml/spreadsheetml/main" => Some(Self::X),
+      b"http://purl.oclc.org/ooxml/wordprocessingml/main" => Some(Self::W),
       _ => None,
     }
-  }
-}
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct XmlKnownNamespaceDecl {
-  pub namespace: XmlKnownNamespace,
-  pub flags: u8,
-}
-impl XmlKnownNamespaceDecl {
-  pub const DEFAULT_NAMESPACE: u8 = 1;
-  #[inline]
-  pub const fn new(namespace: XmlKnownNamespace) -> Self {
-    Self {
-      namespace,
-      flags: 0,
-    }
-  }
-  #[inline]
-  pub const fn new_default(namespace: XmlKnownNamespace) -> Self {
-    Self {
-      namespace,
-      flags: Self::DEFAULT_NAMESPACE,
-    }
-  }
-  #[inline]
-  pub const fn is_default(self) -> bool {
-    self.flags & Self::DEFAULT_NAMESPACE != 0
   }
 }

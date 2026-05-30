@@ -1112,10 +1112,9 @@ fn namespace_decls(
     let attr = attr?;
     let key = attr.key.as_ref();
     if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-      let uri = String::from_utf8_lossy(attr.value.as_ref());
       namespaces.push((
         crate::common::XmlPrefix::new(prefix),
-        crate::common::XmlNamespaceUri::new(uri.as_ref()),
+        crate::common::XmlNamespaceUri::new(attr.value.as_ref()),
       ));
     }
   }
@@ -1520,18 +1519,18 @@ where
 #[inline]
 pub(crate) fn write_xmlns_attr<W: std::io::Write>(
   writer: &mut W,
-  prefix: Option<&str>,
-  uri: &str,
+  prefix: Option<&[u8]>,
+  uri: &[u8],
 ) -> std::io::Result<()> {
   writer.write_all(b" xmlns")?;
   if let Some(prefix) = prefix
     && !prefix.is_empty()
   {
     writer.write_all(b":")?;
-    writer.write_all(prefix.as_bytes())?;
+    writer.write_all(prefix)?;
   }
   writer.write_all(b"=\"")?;
-  writer.write_all(uri.as_bytes())?;
+  writer.write_all(uri)?;
   writer.write_all(b"\"")
 }
 

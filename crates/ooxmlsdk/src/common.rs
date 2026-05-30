@@ -114,25 +114,30 @@ impl From<Box<str>> for XmlPrefix {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum XmlNamespaceUri {
   Known(crate::namespaces::XmlKnownNamespace),
-  Custom(Box<str>),
+  Custom(Box<[u8]>),
 }
 
 impl Default for XmlNamespaceUri {
   #[inline]
   fn default() -> Self {
-    Self::Custom(Box::from(""))
+    Self::Custom(Box::new([]))
   }
 }
 
 impl XmlNamespaceUri {
   #[inline]
-  pub fn new(uri: impl AsRef<str>) -> Self {
-    Self::from_uri(uri.as_ref())
+  pub fn new(uri: impl AsRef<[u8]>) -> Self {
+    Self::from_uri_bytes(uri.as_ref())
   }
 
   #[inline]
   pub fn from_uri(uri: &str) -> Self {
-    if let Some(namespace) = crate::namespaces::XmlKnownNamespace::from_uri(uri) {
+    Self::from_uri_bytes(uri.as_bytes())
+  }
+
+  #[inline]
+  pub fn from_uri_bytes(uri: &[u8]) -> Self {
+    if let Some(namespace) = crate::namespaces::XmlKnownNamespace::from_uri_bytes(uri) {
       Self::Known(namespace)
     } else {
       Self::Custom(uri.into())
@@ -141,16 +146,21 @@ impl XmlNamespaceUri {
 
   #[inline]
   pub fn as_str(&self) -> &str {
+    std::str::from_utf8(self.uri_bytes()).unwrap_or("")
+  }
+
+  #[inline]
+  pub fn uri_bytes(&self) -> &[u8] {
     match self {
-      Self::Known(namespace) => namespace.uri(),
+      Self::Known(namespace) => namespace.uri_bytes(),
       Self::Custom(uri) => uri.as_ref(),
     }
   }
 
   #[inline]
-  pub(crate) fn canonical_prefix<'a>(&self, prefix: &'a str) -> &'a str {
+  pub(crate) fn canonical_prefix_bytes<'a>(&self, prefix: &'a [u8]) -> &'a [u8] {
     match self {
-      Self::Known(namespace) => namespace.prefix(),
+      Self::Known(namespace) => namespace.prefix_bytes(),
       Self::Custom(_) => prefix,
     }
   }
@@ -171,7 +181,7 @@ pub struct XmlNamespace {
 
 impl XmlNamespace {
   #[inline]
-  pub fn new(prefix: impl AsRef<[u8]>, uri: impl AsRef<str>) -> Self {
+  pub fn new(prefix: impl AsRef<[u8]>, uri: impl AsRef<[u8]>) -> Self {
     Self {
       prefix: XmlPrefix::new(prefix),
       uri: XmlNamespaceUri::new(uri),
@@ -181,6 +191,16 @@ impl XmlNamespace {
   #[inline]
   pub fn is_default(&self) -> bool {
     self.prefix.is_empty()
+  }
+
+  #[inline]
+  pub fn prefix_bytes(&self) -> &[u8] {
+    self.prefix.as_bytes()
+  }
+
+  #[inline]
+  pub fn uri_bytes(&self) -> &[u8] {
+    self.uri.uri_bytes()
   }
 }
 

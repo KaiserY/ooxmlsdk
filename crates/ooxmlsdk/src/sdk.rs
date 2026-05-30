@@ -786,7 +786,9 @@ impl MceContext {
 
   pub(crate) fn namespace_for_prefix(&self, prefix: &str) -> Option<&str> {
     self.namespaces.iter().rev().find_map(|(candidate, uri)| {
-      (candidate.as_bytes() == prefix.as_bytes()).then_some(uri.as_str())
+      (candidate.as_bytes() == prefix.as_bytes())
+        .then(|| std::str::from_utf8(uri.uri_bytes()).ok())
+        .flatten()
     })
   }
 

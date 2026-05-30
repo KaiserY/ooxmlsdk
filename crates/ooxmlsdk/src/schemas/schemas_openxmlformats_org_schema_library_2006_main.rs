@@ -6,15 +6,15 @@
 
 /// Embedded Custom XML Schema Supplementary Data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "sl:CT_SchemaLibrary/sl:schemaLibrary")]
+#[sdk(qname = "sl:schemaLibrary")]
 pub struct SchemaLibrary {
   /// Custom XML Schema Reference.
-  #[sdk(child(qname = "sl:CT_Schema/sl:schema"))]
+  #[sdk(child(qname = "sl:schema"))]
   pub schema: Vec<Schema>,
 }
 /// Custom XML Schema Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "sl:CT_Schema/sl:schema")]
+#[sdk(qname = "sl:schema")]
 pub struct Schema {
   /// Custom XML Schema Namespace
   #[sdk(attr(qname = "sl:uri"))]

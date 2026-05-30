@@ -6,29 +6,20 @@
 
 /// Defines the CommentsExtensible Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "w16cex:CT_CommentsExtensible/w16cex:commentsExtensible"
-)]
+#[sdk(office2021, qname = "w16cex:commentsExtensible")]
 pub struct CommentsExtensible {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the CommentExtensible Class.
-  #[sdk(child(
-    office2021,
-    qname = "w16cex:CT_CommentExtensible/w16cex:commentExtensible"
-  ))]
+  #[sdk(child(office2021, qname = "w16cex:commentExtensible"))]
   pub comment_extensible: Vec<CommentExtensible>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst"))]
+  #[sdk(child(office2021, qname = "w16cex:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the CommentExtensible Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "w16cex:CT_CommentExtensible/w16cex:commentExtensible"
-)]
+#[sdk(office2021, qname = "w16cex:commentExtensible")]
 pub struct CommentExtensible {
   /// durableId
   #[sdk(attr(office2021, qname = "w16cex:durableId"))]
@@ -41,14 +32,14 @@ pub struct CommentExtensible {
   #[sdk(attr(office2021, qname = "w16cex:intelligentPlaceholder"))]
   pub w16cex_intelligent_placeholder: Option<crate::simple_type::OnOffValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst"))]
+  #[sdk(child(office2021, qname = "w16cex:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst")]
+#[sdk(office2021, qname = "w16cex:extLst")]
 pub struct ExtensionList {
   /// Defines the Extension Class.
-  #[sdk(child(office2021, qname = "w16cur:CT_Extension/w16cur:ext"))]
+  #[sdk(child(office2021, qname = "w16cur:ext"))]
   pub extension: Vec<crate::schemas::w16cur::Extension>,
 }

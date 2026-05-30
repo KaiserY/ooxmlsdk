@@ -172,7 +172,7 @@ pub enum StrokeFillTypeValues {
 }
 /// Defines the Path Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Path/v:path")]
+#[sdk(qname = "v:path")]
 pub struct Path {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -222,23 +222,23 @@ pub struct Path {
 }
 /// Defines the Formulas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Formulas/v:formulas")]
+#[sdk(qname = "v:formulas")]
 pub struct Formulas {
   /// Single Formula.
-  #[sdk(child(qname = "v:CT_F/v:f"))]
+  #[sdk(child(qname = "v:f"))]
   pub formula: Vec<Formula>,
 }
 /// Defines the ShapeHandles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Handles/v:handles")]
+#[sdk(qname = "v:handles")]
 pub struct ShapeHandles {
   /// Shape Handle.
-  #[sdk(child(qname = "v:CT_H/v:h"))]
+  #[sdk(child(qname = "v:h"))]
   pub shape_handle: Vec<ShapeHandle>,
 }
 /// Defines the Fill Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Fill/v:fill")]
+#[sdk(qname = "v:fill")]
 pub struct Fill {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -319,12 +319,12 @@ pub struct Fill {
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: Option<crate::simple_type::StringValue>,
   /// Shape Fill Extended Properties.
-  #[sdk(child(qname = "o:CT_Fill/o:fill"))]
+  #[sdk(child(qname = "o:fill"))]
   pub fill_extended_properties: Option<crate::schemas::o::FillExtendedProperties>,
 }
 /// Defines the Stroke Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Stroke/v:stroke")]
+#[sdk(qname = "v:stroke")]
 pub struct Stroke {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -411,24 +411,24 @@ pub struct Stroke {
   #[sdk(attr(qname = ":insetpen"))]
   pub insetpen: Option<crate::simple_type::TrueFalseValue>,
   /// Text Box Left Stroke.
-  #[sdk(child(qname = "o:CT_StrokeChild/o:left"))]
+  #[sdk(child(qname = "o:left"))]
   pub left_stroke: Option<crate::schemas::o::LeftStroke>,
   /// Text Box Top Stroke.
-  #[sdk(child(qname = "o:CT_StrokeChild/o:top"))]
+  #[sdk(child(qname = "o:top"))]
   pub top_stroke: Option<crate::schemas::o::TopStroke>,
   /// Text Box Right Stroke.
-  #[sdk(child(qname = "o:CT_StrokeChild/o:right"))]
+  #[sdk(child(qname = "o:right"))]
   pub right_stroke: Option<crate::schemas::o::RightStroke>,
   /// Text Box Bottom Stroke.
-  #[sdk(child(qname = "o:CT_StrokeChild/o:bottom"))]
+  #[sdk(child(qname = "o:bottom"))]
   pub bottom_stroke: Option<crate::schemas::o::BottomStroke>,
   /// Text Box Interior Stroke.
-  #[sdk(child(qname = "o:CT_StrokeChild/o:column"))]
+  #[sdk(child(qname = "o:column"))]
   pub column_stroke: Option<crate::schemas::o::ColumnStroke>,
 }
 /// Defines the Shadow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Shadow/v:shadow")]
+#[sdk(qname = "v:shadow")]
 pub struct Shadow {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -466,7 +466,7 @@ pub struct Shadow {
 }
 /// Defines the TextBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Textbox/v:textbox")]
+#[sdk(qname = "v:textbox")]
 pub struct TextBox {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -485,7 +485,7 @@ pub struct TextBox {
 }
 /// Defines the TextPath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_TextPath/v:textpath")]
+#[sdk(qname = "v:textpath")]
 pub struct TextPath {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -514,7 +514,7 @@ pub struct TextPath {
 }
 /// Defines the ImageData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_ImageData/v:imagedata")]
+#[sdk(qname = "v:imagedata")]
 pub struct ImageData {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -576,7 +576,7 @@ pub struct ImageData {
 }
 /// Shape Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Shape/v:shape")]
+#[sdk(qname = "v:shape")]
 pub struct Shape {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -781,7 +781,7 @@ pub struct Shape {
 }
 /// Shape Template.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Shapetype/v:shapetype")]
+#[sdk(qname = "v:shapetype")]
 pub struct Shapetype {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -976,12 +976,12 @@ pub struct Shapetype {
     )]
   pub shapetype_choice: Vec<ShapetypeChoice>,
   /// Complex.
-  #[sdk(child(qname = "o:CT_Complex/o:complex"))]
+  #[sdk(child(qname = "o:complex"))]
   pub complex: Option<crate::schemas::o::Complex>,
 }
 /// Shape Group.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Group/v:group")]
+#[sdk(qname = "v:group")]
 pub struct Group {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -1111,7 +1111,7 @@ pub struct Group {
 }
 /// Document Background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Background/v:background")]
+#[sdk(qname = "v:background")]
 pub struct Background {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -1137,12 +1137,12 @@ pub struct Background {
   #[sdk(attr(qname = "o:targetscreensize"))]
   pub target_screen_size: Option<crate::schemas::o::ScreenSizeValues>,
   /// Defines the Fill Class.
-  #[sdk(child(qname = "v:CT_Fill/v:fill"))]
+  #[sdk(child(qname = "v:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
 }
 /// Arc Segment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Arc/v:arc")]
+#[sdk(qname = "v:arc")]
 pub struct Arc {
   /// Optional String
   #[sdk(attr(qname = "o:spid"))]
@@ -1337,7 +1337,7 @@ pub struct Arc {
 }
 /// Bezier Curve.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Curve/v:curve")]
+#[sdk(qname = "v:curve")]
 pub struct Curve {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -1539,7 +1539,7 @@ pub struct Curve {
 }
 /// Image File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Image/v:image")]
+#[sdk(qname = "v:image")]
 pub struct ImageFile {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -1756,7 +1756,7 @@ pub struct ImageFile {
 }
 /// Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Line/v:line")]
+#[sdk(qname = "v:line")]
 pub struct Line {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -1953,7 +1953,7 @@ pub struct Line {
 }
 /// Oval.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Oval/v:oval")]
+#[sdk(qname = "v:oval")]
 pub struct Oval {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -2144,7 +2144,7 @@ pub struct Oval {
 }
 /// Multiple Path Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_PolyLine/v:polyline")]
+#[sdk(qname = "v:polyline")]
 pub struct PolyLine {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -2338,7 +2338,7 @@ pub struct PolyLine {
 }
 /// Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_Rect/v:rect")]
+#[sdk(qname = "v:rect")]
 pub struct Rectangle {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -2529,7 +2529,7 @@ pub struct Rectangle {
 }
 /// Rounded Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_RoundRect/v:roundrect")]
+#[sdk(qname = "v:roundrect")]
 pub struct RoundRectangle {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
@@ -2719,7 +2719,7 @@ pub struct RoundRectangle {
 }
 /// Shape Handle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_H/v:h")]
+#[sdk(qname = "v:h")]
 pub struct ShapeHandle {
   /// Handle Position
   #[sdk(attr(qname = ":position"))]
@@ -2751,7 +2751,7 @@ pub struct ShapeHandle {
 }
 /// Single Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:CT_F/v:f")]
+#[sdk(qname = "v:f")]
 pub struct Formula {
   /// Equation
   #[sdk(attr(qname = ":eqn"))]
@@ -2792,7 +2792,7 @@ pub enum ShapeChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -2802,7 +2802,7 @@ pub enum ShapeChoice {
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
   Ink(std::boxed::Box<crate::schemas::o::Ink>),
   /// Ink Annotation Flag.
-  #[sdk(empty_child(qname = "pvml:CT_Empty/pvml:iscomment"))]
+  #[sdk(empty_child(qname = "pvml:iscomment"))]
   InkAnnotationFlag,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2833,7 +2833,7 @@ pub enum ShapetypeChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -2875,7 +2875,7 @@ pub enum GroupChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Attached Object Data.
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
@@ -2915,7 +2915,7 @@ pub enum ArcChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -2965,7 +2965,7 @@ pub enum CurveChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -3015,7 +3015,7 @@ pub enum ImageFileChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -3065,7 +3065,7 @@ pub enum LineChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -3108,7 +3108,7 @@ pub enum OvalChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3145,7 +3145,7 @@ pub enum PolyLineChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3183,7 +3183,7 @@ pub enum RectangleChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3220,7 +3220,7 @@ pub enum RoundRectangleChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
+  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),

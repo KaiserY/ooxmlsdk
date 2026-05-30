@@ -6,20 +6,20 @@
 
 /// Defines the Slicer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "sle:CT_Slicer/sle:slicer")]
+#[sdk(office2010, qname = "sle:slicer")]
 pub struct Slicer {
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/sle:extLst"))]
+  #[sdk(child(office2010, qname = "sle:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/sle:extLst")]
+#[sdk(office2010, qname = "sle:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

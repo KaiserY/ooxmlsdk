@@ -12,7 +12,7 @@ pub enum Indefinite {
 }
 /// Defines the AnimationProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "aanim:CT_AnimationProperties/aanim:animPr")]
+#[sdk(office2019, qname = "aanim:animPr")]
 pub struct AnimationProperties {
   /// name
   #[sdk(attr(office2019, qname = ":name"))]
@@ -38,14 +38,14 @@ pub struct AnimationProperties {
   #[sdk(attr(office2019, qname = ":end"))]
   pub end: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/aanim:extLst"))]
+  #[sdk(child(office2019, qname = "aanim:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a:CT_OfficeArtExtensionList/aanim:extLst")]
+#[sdk(office2019, qname = "aanim:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

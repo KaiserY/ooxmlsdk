@@ -6,7 +6,7 @@
 
 /// Defines the CompatibilityShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "com14:CT_CompatShape/com14:compatSp")]
+#[sdk(office2010, qname = "com14:compatSp")]
 pub struct CompatibilityShape {
   /// spid
   #[sdk(attr(office2010, qname = ":spid"))]

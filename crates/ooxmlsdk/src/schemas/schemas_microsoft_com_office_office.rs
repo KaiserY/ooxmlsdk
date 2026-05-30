@@ -236,7 +236,7 @@ pub enum BlackAndWhiteModeValues {
 }
 /// New Shape Defaults.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_ShapeDefaults/o:shapedefaults")]
+#[sdk(qname = "o:shapedefaults")]
 pub struct ShapeDefaults {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -269,59 +269,59 @@ pub struct ShapeDefaults {
   #[sdk(attr(qname = "o:insetmode"))]
   pub inset_mode: Option<InsetMarginValues>,
   /// _
-  #[sdk(child(qname = "v:CT_Fill/v:fill"))]
+  #[sdk(child(qname = "v:fill"))]
   pub fill: Option<std::boxed::Box<crate::schemas::v::Fill>>,
   /// _
-  #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
+  #[sdk(child(qname = "v:imagedata"))]
   pub image_data: Option<crate::schemas::v::ImageData>,
   /// _
-  #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
+  #[sdk(child(qname = "v:stroke"))]
   pub stroke: Option<std::boxed::Box<crate::schemas::v::Stroke>>,
   /// _
-  #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
+  #[sdk(child(qname = "v:textbox"))]
   pub text_box: Option<std::boxed::Box<crate::schemas::v::TextBox>>,
   /// _
-  #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
+  #[sdk(child(qname = "v:shadow"))]
   pub shadow: Option<crate::schemas::v::Shadow>,
   /// _
-  #[sdk(child(qname = "o:CT_Skew/o:skew"))]
+  #[sdk(child(qname = "o:skew"))]
   pub skew: Option<Skew>,
   /// _
-  #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
+  #[sdk(child(qname = "o:extrusion"))]
   pub extrusion: Option<Extrusion>,
   /// Callout
-  #[sdk(child(qname = "o:CT_Callout/o:callout"))]
+  #[sdk(child(qname = "o:callout"))]
   pub callout: Option<Callout>,
   /// Shape Protections
-  #[sdk(child(qname = "o:CT_Lock/o:lock"))]
+  #[sdk(child(qname = "o:lock"))]
   pub lock: Option<Lock>,
   /// Most Recently Used Colors
-  #[sdk(child(qname = "o:CT_ColorMru/o:colormru"))]
+  #[sdk(child(qname = "o:colormru"))]
   pub color_most_recently_used: Option<ColorMostRecentlyUsed>,
   /// UI Default Colors
-  #[sdk(child(qname = "o:CT_ColorMenu/o:colormenu"))]
+  #[sdk(child(qname = "o:colormenu"))]
   pub color_menu: Option<ColorMenu>,
 }
 /// Shape Layout Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_ShapeLayout/o:shapelayout")]
+#[sdk(qname = "o:shapelayout")]
 pub struct ShapeLayout {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Shape ID Map
-  #[sdk(child(qname = "o:CT_IdMap/o:idmap"))]
+  #[sdk(child(qname = "o:idmap"))]
   pub shape_id_map: Option<ShapeIdMap>,
   /// Shape Grouping History
-  #[sdk(child(qname = "o:CT_RegroupTable/o:regrouptable"))]
+  #[sdk(child(qname = "o:regrouptable"))]
   pub regroup_table: Option<RegroupTable>,
   /// Rule Set
-  #[sdk(child(qname = "o:CT_Rules/o:rules"))]
+  #[sdk(child(qname = "o:rules"))]
   pub rules: Option<Rules>,
 }
 /// Digital Signature Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_SignatureLine/o:signatureline")]
+#[sdk(qname = "o:signatureline")]
 pub struct SignatureLine {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -369,7 +369,7 @@ pub struct SignatureLine {
 }
 /// Ink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Ink/o:ink")]
+#[sdk(qname = "o:ink")]
 pub struct Ink {
   /// Ink Data
   #[sdk(attr(qname = ":i"))]
@@ -380,7 +380,7 @@ pub struct Ink {
 }
 /// VML Diagram.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Diagram/o:diagram")]
+#[sdk(qname = "o:diagram")]
 pub struct Diagram {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -413,12 +413,12 @@ pub struct Diagram {
   #[sdk(attr(qname = ":dgmbasetextscale"))]
   pub base_text_scale: Option<crate::simple_type::IntegerValue>,
   /// Diagram Relationship Table
-  #[sdk(child(qname = "o:CT_RelationTable/o:relationtable"))]
+  #[sdk(child(qname = "o:relationtable"))]
   pub relation_table: Option<RelationTable>,
 }
 /// Skew Transform.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Skew/o:skew")]
+#[sdk(qname = "o:skew")]
 pub struct Skew {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -441,7 +441,7 @@ pub struct Skew {
 }
 /// 3D Extrusion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Extrusion/o:extrusion")]
+#[sdk(qname = "o:extrusion")]
 pub struct Extrusion {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -539,7 +539,7 @@ pub struct Extrusion {
 }
 /// Defines the Callout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Callout/o:callout")]
+#[sdk(qname = "o:callout")]
 pub struct Callout {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -586,7 +586,7 @@ pub struct Callout {
 }
 /// Defines the Lock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Lock/o:lock")]
+#[sdk(qname = "o:lock")]
 pub struct Lock {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -627,7 +627,7 @@ pub struct Lock {
 }
 /// Embedded OLE Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_OLEObject/o:OLEObject")]
+#[sdk(qname = "o:OLEObject")]
 pub struct OleObject {
   /// OLE Object Type
   #[sdk(attr(qname = ":Type"))]
@@ -651,21 +651,18 @@ pub struct OleObject {
   #[sdk(attr(qname = ":UpdateMode"))]
   pub update_mode: Option<OleUpdateModeValues>,
   /// Embedded Object Alternate Image Request
-  #[sdk(text_child(qname = "o:ST_OLELinkType/o:LinkType"))]
+  #[sdk(text_child(qname = "o:LinkType"))]
   pub link_type: Option<LinkType>,
   /// Embedded Object Cannot Be Refreshed
-  #[sdk(text_child(
-    simple_type = "TrueFalseBlankValue",
-    qname = "o:ST_TrueFalseBlank/o:LockedField"
-  ))]
+  #[sdk(text_child(simple_type = "TrueFalseBlankValue", qname = "o:LockedField"))]
   pub locked_field: Option<LockedField>,
   /// WordprocessingML Field Switches
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/o:FieldCodes"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "o:FieldCodes"))]
   pub field_codes: Option<FieldCodes>,
 }
 /// Complex.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Complex/o:complex")]
+#[sdk(qname = "o:complex")]
 pub struct Complex {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -673,7 +670,7 @@ pub struct Complex {
 }
 /// Text Box Left Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_StrokeChild/o:left")]
+#[sdk(qname = "o:left")]
 pub struct LeftStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -759,7 +756,7 @@ pub struct LeftStroke {
 }
 /// Text Box Top Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_StrokeChild/o:top")]
+#[sdk(qname = "o:top")]
 pub struct TopStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -845,7 +842,7 @@ pub struct TopStroke {
 }
 /// Text Box Right Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_StrokeChild/o:right")]
+#[sdk(qname = "o:right")]
 pub struct RightStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -931,7 +928,7 @@ pub struct RightStroke {
 }
 /// Text Box Bottom Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_StrokeChild/o:bottom")]
+#[sdk(qname = "o:bottom")]
 pub struct BottomStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1017,7 +1014,7 @@ pub struct BottomStroke {
 }
 /// Text Box Interior Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_StrokeChild/o:column")]
+#[sdk(qname = "o:column")]
 pub struct ColumnStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1103,7 +1100,7 @@ pub struct ColumnStroke {
 }
 /// Shape Clipping Path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_ClipPath/o:clippath")]
+#[sdk(qname = "o:clippath")]
 pub struct ClipPath {
   /// Path Definition
   #[sdk(attr(qname = "o:v"))]
@@ -1111,7 +1108,7 @@ pub struct ClipPath {
 }
 /// Shape Fill Extended Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Fill/o:fill")]
+#[sdk(qname = "o:fill")]
 pub struct FillExtendedProperties {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1122,7 +1119,7 @@ pub struct FillExtendedProperties {
 }
 /// Shape ID Map.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_IdMap/o:idmap")]
+#[sdk(qname = "o:idmap")]
 pub struct ShapeIdMap {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1133,29 +1130,29 @@ pub struct ShapeIdMap {
 }
 /// Shape Grouping History.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_RegroupTable/o:regrouptable")]
+#[sdk(qname = "o:regrouptable")]
 pub struct RegroupTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Regroup Entry.
-  #[sdk(child(qname = "o:CT_Entry/o:entry"))]
+  #[sdk(child(qname = "o:entry"))]
   pub entry: Vec<Entry>,
 }
 /// Rule Set.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Rules/o:rules")]
+#[sdk(qname = "o:rules")]
 pub struct Rules {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Rule.
-  #[sdk(child(qname = "o:CT_R/o:r"))]
+  #[sdk(child(qname = "o:r"))]
   pub rule: Vec<Rule>,
 }
 /// Regroup Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Entry/o:entry")]
+#[sdk(qname = "o:entry")]
 pub struct Entry {
   /// New Group ID
   #[sdk(attr(qname = ":new"))]
@@ -1166,7 +1163,7 @@ pub struct Entry {
 }
 /// Rule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_R/o:r")]
+#[sdk(qname = "o:r")]
 pub struct Rule {
   /// Rule ID
   #[sdk(attr(qname = ":id"))]
@@ -1182,23 +1179,23 @@ pub struct Rule {
   #[sdk(string_format(kind = "token"))]
   pub shape_reference: Option<crate::simple_type::StringValue>,
   /// Shape Reference.
-  #[sdk(child(qname = "o:CT_Proxy/o:proxy"))]
+  #[sdk(child(qname = "o:proxy"))]
   pub proxy: Vec<Proxy>,
 }
 /// Diagram Relationship Table.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_RelationTable/o:relationtable")]
+#[sdk(qname = "o:relationtable")]
 pub struct RelationTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Diagram Relationship.
-  #[sdk(child(qname = "o:CT_Relation/o:rel"))]
+  #[sdk(child(qname = "o:rel"))]
   pub relation: Vec<Relation>,
 }
 /// Diagram Relationship.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Relation/o:rel")]
+#[sdk(qname = "o:rel")]
 pub struct Relation {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1224,7 +1221,7 @@ pub type LockedField = crate::simple_type::TrueFalseBlankValue;
 pub type FieldCodes = crate::simple_type::StringValue;
 /// Shape Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_Proxy/o:proxy")]
+#[sdk(qname = "o:proxy")]
 pub struct Proxy {
   /// Start Point Connection Flag
   #[sdk(attr(qname = ":start"))]
@@ -1242,7 +1239,7 @@ pub struct Proxy {
 }
 /// Most Recently Used Colors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_ColorMru/o:colormru")]
+#[sdk(qname = "o:colormru")]
 pub struct ColorMostRecentlyUsed {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
@@ -1253,7 +1250,7 @@ pub struct ColorMostRecentlyUsed {
 }
 /// UI Default Colors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "o:CT_ColorMenu/o:colormenu")]
+#[sdk(qname = "o:colormenu")]
 pub struct ColorMenu {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]

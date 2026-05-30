@@ -6,10 +6,7 @@
 
 /// Defines the ExternalCodeService Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService"
-)]
+#[sdk(microsoft365, qname = "xlecs:externalCodeService")]
 pub struct ExternalCodeService {
   /// autoShow
   #[sdk(attr(microsoft365, qname = ":autoShow"))]

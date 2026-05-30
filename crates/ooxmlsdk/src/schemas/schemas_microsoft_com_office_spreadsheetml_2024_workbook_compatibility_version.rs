@@ -6,7 +6,7 @@
 
 /// Defines the Version Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlwcv:CT_Version/xlwcv:version")]
+#[sdk(microsoft365, qname = "xlwcv:version")]
 pub struct Version {
   /// warnBelowVersion
   #[sdk(attr(microsoft365, qname = ":warnBelowVersion"))]

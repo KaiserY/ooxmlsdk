@@ -6,7 +6,7 @@
 
 /// Custom XML Data Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ds:CT_DatastoreItem/ds:datastoreItem")]
+#[sdk(qname = "ds:datastoreItem")]
 pub struct DataStoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -16,12 +16,12 @@ pub struct DataStoreItem {
   #[sdk(string_format(kind = "token"))]
   pub item_id: crate::simple_type::StringValue,
   /// Set of Associated XML Schemas
-  #[sdk(child(qname = "ds:CT_DatastoreSchemaRefs/ds:schemaRefs"))]
+  #[sdk(child(qname = "ds:schemaRefs"))]
   pub schema_references: Option<SchemaReferences>,
 }
 /// Associated XML Schema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ds:CT_DatastoreSchemaRef/ds:schemaRef")]
+#[sdk(qname = "ds:schemaRef")]
 pub struct SchemaReference {
   /// Target Namespace of Associated XML Schema
   #[sdk(attr(qname = "ds:uri"))]
@@ -29,9 +29,9 @@ pub struct SchemaReference {
 }
 /// Set of Associated XML Schemas.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ds:CT_DatastoreSchemaRefs/ds:schemaRefs")]
+#[sdk(qname = "ds:schemaRefs")]
 pub struct SchemaReferences {
   /// Associated XML Schema.
-  #[sdk(child(qname = "ds:CT_DatastoreSchemaRef/ds:schemaRef"))]
+  #[sdk(child(qname = "ds:schemaRef"))]
   pub schema_reference: Vec<SchemaReference>,
 }

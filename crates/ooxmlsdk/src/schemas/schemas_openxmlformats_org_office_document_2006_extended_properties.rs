@@ -6,96 +6,90 @@
 
 /// Application Specific File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_Properties/ap:Properties")]
+#[sdk(qname = "ap:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Name of Document Template
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:Template"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Template"))]
   pub template: Option<Template>,
   /// Name of Manager
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:Manager"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Manager"))]
   pub manager: Option<Manager>,
   /// Name of Company
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:Company"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Company"))]
   pub company: Option<Company>,
   /// Total Number of Pages
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Pages"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Pages"))]
   pub pages: Option<Pages>,
   /// Word Count
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Words"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Words"))]
   pub words: Option<Words>,
   /// Total Number of Characters
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Characters"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Characters"))]
   pub characters: Option<Characters>,
   /// Intended Format of Presentation
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "xsd:string/ap:PresentationFormat"
-  ))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:PresentationFormat"))]
   pub presentation_format: Option<PresentationFormat>,
   /// Number of Lines
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Lines"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Lines"))]
   pub lines: Option<Lines>,
   /// Total Number of Paragraphs
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Paragraphs"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Paragraphs"))]
   pub paragraphs: Option<Paragraphs>,
   /// Slides Metadata Element
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Slides"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Slides"))]
   pub slides: Option<Slides>,
   /// Number of Slides Containing Notes
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:Notes"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:Notes"))]
   pub notes: Option<Notes>,
   /// Total Edit Time Metadata Element
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:TotalTime"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:TotalTime"))]
   pub total_time: Option<TotalTime>,
   /// Number of Hidden Slides
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:HiddenSlides"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:HiddenSlides"))]
   pub hidden_slides: Option<HiddenSlides>,
   /// Total Number of Multimedia Clips
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:MMClips"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:MMClips"))]
   pub multimedia_clips: Option<MultimediaClips>,
   /// Thumbnail Display Mode
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/ap:ScaleCrop"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:ScaleCrop"))]
   pub scale_crop: Option<ScaleCrop>,
   /// Heading Pairs
-  #[sdk(child(qname = "ap:CT_VectorVariant/ap:HeadingPairs"))]
+  #[sdk(child(qname = "ap:HeadingPairs"))]
   pub heading_pairs: Option<std::boxed::Box<HeadingPairs>>,
   /// Part Titles
-  #[sdk(child(qname = "ap:CT_VectorLpstr/ap:TitlesOfParts"))]
+  #[sdk(child(qname = "ap:TitlesOfParts"))]
   pub titles_of_parts: Option<std::boxed::Box<TitlesOfParts>>,
   /// Links Up-to-Date
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/ap:LinksUpToDate"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:LinksUpToDate"))]
   pub links_up_to_date: Option<LinksUpToDate>,
   /// Number of Characters (With Spaces)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:CharactersWithSpaces"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:CharactersWithSpaces"))]
   pub characters_with_spaces: Option<CharactersWithSpaces>,
   /// Shared Document
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/ap:SharedDoc"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:SharedDoc"))]
   pub shared_document: Option<SharedDocument>,
   /// Relative Hyperlink Base
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:HyperlinkBase"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:HyperlinkBase"))]
   pub hyperlink_base: Option<HyperlinkBase>,
   /// Hyperlink List
-  #[sdk(child(qname = "ap:CT_VectorVariant/ap:HLinks"))]
+  #[sdk(child(qname = "ap:HLinks"))]
   pub hyperlink_list: Option<std::boxed::Box<HyperlinkList>>,
   /// Hyperlinks Changed
-  #[sdk(text_child(
-    simple_type = "BooleanValue",
-    qname = "xsd:boolean/ap:HyperlinksChanged"
-  ))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "ap:HyperlinksChanged"))]
   pub hyperlinks_changed: Option<HyperlinksChanged>,
   /// Digital Signature
-  #[sdk(child(qname = "ap:CT_DigSigBlob/ap:DigSig"))]
+  #[sdk(child(qname = "ap:DigSig"))]
   pub digital_signature: Option<DigitalSignature>,
   /// Application Name
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:Application"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:Application"))]
   pub application: Option<Application>,
   /// Application Version
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ap:AppVersion"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ap:AppVersion"))]
   pub application_version: Option<ApplicationVersion>,
   /// Document Security
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/ap:DocSecurity"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "ap:DocSecurity"))]
   pub document_security: Option<DocumentSecurity>,
 }
 /// Name of Document Template.
@@ -146,33 +140,33 @@ pub type SharedDocument = crate::simple_type::BooleanValue;
 pub type HyperlinksChanged = crate::simple_type::BooleanValue;
 /// Heading Pairs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_VectorVariant/ap:HeadingPairs")]
+#[sdk(qname = "ap:HeadingPairs")]
 pub struct HeadingPairs {
   /// Vector
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
+  #[sdk(child(qname = "vt:vector"))]
   pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Hyperlink List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_VectorVariant/ap:HLinks")]
+#[sdk(qname = "ap:HLinks")]
 pub struct HyperlinkList {
   /// Vector
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
+  #[sdk(child(qname = "vt:vector"))]
   pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Part Titles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_VectorLpstr/ap:TitlesOfParts")]
+#[sdk(qname = "ap:TitlesOfParts")]
 pub struct TitlesOfParts {
   /// Vector
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
+  #[sdk(child(qname = "vt:vector"))]
   pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Digital Signature.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_DigSigBlob/ap:DigSig")]
+#[sdk(qname = "ap:DigSig")]
 pub struct DigitalSignature {
   /// Binary Blob
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "xsd:base64Binary/vt:blob"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:blob"))]
   pub vt_blob: crate::schemas::vt::VtBlob,
 }

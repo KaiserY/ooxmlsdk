@@ -6,7 +6,7 @@
 
 /// Defines the SymEx Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "w16se:CT_SymEx/w16se:symEx")]
+#[sdk(office2016, qname = "w16se:symEx")]
 pub struct SymEx {
   /// font
   #[sdk(attr(office2016, qname = "w16se:font"))]

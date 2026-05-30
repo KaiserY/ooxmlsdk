@@ -6,17 +6,17 @@
 
 /// Defines the Taskpanes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "wetp:CT_OsfTaskpanes/wetp:taskpanes")]
+#[sdk(office2013, qname = "wetp:taskpanes")]
 pub struct Taskpanes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the WebExtensionTaskpane Class.
-  #[sdk(child(office2013, qname = "wetp:CT_OsfTaskpane/wetp:taskpane"))]
+  #[sdk(child(office2013, qname = "wetp:taskpane"))]
   pub web_extension_taskpane: Vec<WebExtensionTaskpane>,
 }
 /// Defines the WebExtensionPartReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "we:CT_WebExtensionPartRef/wetp:webextensionref")]
+#[sdk(office2013, qname = "wetp:webextensionref")]
 pub struct WebExtensionPartReference {
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
@@ -24,15 +24,15 @@ pub struct WebExtensionPartReference {
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/wetp:extLst")]
+#[sdk(office2013, qname = "wetp:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the WebExtensionTaskpane Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "wetp:CT_OsfTaskpane/wetp:taskpane")]
+#[sdk(office2013, qname = "wetp:taskpane")]
 pub struct WebExtensionTaskpane {
   /// dockstate
   #[sdk(attr(office2013, qname = ":dockstate"))]
@@ -50,9 +50,9 @@ pub struct WebExtensionTaskpane {
   #[sdk(attr(office2013, qname = ":locked"))]
   pub locked: Option<crate::simple_type::BooleanValue>,
   /// Defines the WebExtensionPartReference Class.
-  #[sdk(child(office2013, qname = "we:CT_WebExtensionPartRef/wetp:webextensionref"))]
+  #[sdk(child(office2013, qname = "wetp:webextensionref"))]
   pub web_extension_part_reference: std::boxed::Box<WebExtensionPartReference>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/wetp:extLst"))]
+  #[sdk(child(office2013, qname = "wetp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }

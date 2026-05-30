@@ -6,20 +6,20 @@
 
 /// Defines the Tasks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_Tasks/t:Tasks")]
+#[sdk(office2021, qname = "t:Tasks")]
 pub struct Tasks {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Task Class.
-  #[sdk(child(office2021, qname = "t:CT_Task/t:Task"))]
+  #[sdk(child(office2021, qname = "t:Task"))]
   pub task: Vec<Task>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
+  #[sdk(child(office2021, qname = "t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Task Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_Task/t:Task")]
+#[sdk(office2021, qname = "t:Task")]
 pub struct Task {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -27,45 +27,45 @@ pub struct Task {
   #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the TaskAnchor Class.
-  #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
+  #[sdk(child(office2021, qname = "t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
   /// Defines the TaskHistory Class.
-  #[sdk(child(office2021, qname = "t:CT_TaskHistory/t:History"))]
+  #[sdk(child(office2021, qname = "t:History"))]
   pub task_history: Option<TaskHistory>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
+  #[sdk(child(office2021, qname = "t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "oel:CT_ExtensionList/t:extLst")]
+#[sdk(office2021, qname = "t:extLst")]
 pub struct ExtensionList {
   /// Defines the Extension Class.
-  #[sdk(child(office2021, qname = "oel:CT_Extension/oel:ext"))]
+  #[sdk(child(office2021, qname = "oel:ext"))]
   pub extension: Vec<crate::schemas::oel::Extension>,
 }
 /// Defines the TaskAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskAnchor/t:Anchor")]
+#[sdk(office2021, qname = "t:Anchor")]
 pub struct TaskAnchor {
   /// Defines the CommentAnchor Class.
-  #[sdk(child(office2021, qname = "t:CT_CommentAnchor/t:Comment"))]
+  #[sdk(child(office2021, qname = "t:Comment"))]
   pub comment_anchor: Option<CommentAnchor>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
+  #[sdk(child(office2021, qname = "t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TaskHistory Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskHistory/t:History")]
+#[sdk(office2021, qname = "t:History")]
 pub struct TaskHistory {
   /// Defines the TaskHistoryEvent Class.
-  #[sdk(child(office2021, qname = "t:CT_TaskHistoryEvent/t:Event"))]
+  #[sdk(child(office2021, qname = "t:Event"))]
   pub task_history_event: Vec<TaskHistoryEvent>,
 }
 /// Defines the TaskHistoryEvent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskHistoryEvent/t:Event")]
+#[sdk(office2021, qname = "t:Event")]
 pub struct TaskHistoryEvent {
   /// time
   #[sdk(attr(office2021, qname = ":time"))]
@@ -76,10 +76,10 @@ pub struct TaskHistoryEvent {
   #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the AttributionTaskUser Class.
-  #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Attribution"))]
+  #[sdk(child(office2021, qname = "t:Attribution"))]
   pub attribution_task_user: std::boxed::Box<AttributionTaskUser>,
   /// Defines the TaskAnchor Class.
-  #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
+  #[sdk(child(office2021, qname = "t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
   #[sdk(
         choice(
@@ -98,12 +98,12 @@ pub struct TaskHistoryEvent {
     )]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
+  #[sdk(child(office2021, qname = "t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the AttributionTaskUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskUser/t:Attribution")]
+#[sdk(office2021, qname = "t:Attribution")]
 pub struct AttributionTaskUser {
   /// userId
   #[sdk(attr(office2021, qname = ":userId"))]
@@ -117,7 +117,7 @@ pub struct AttributionTaskUser {
 }
 /// Defines the AssignTaskUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskUser/t:Assign")]
+#[sdk(office2021, qname = "t:Assign")]
 pub struct AssignTaskUser {
   /// userId
   #[sdk(attr(office2021, qname = ":userId"))]
@@ -131,7 +131,7 @@ pub struct AssignTaskUser {
 }
 /// Defines the UnassignTaskUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskUser/t:Unassign")]
+#[sdk(office2021, qname = "t:Unassign")]
 pub struct UnassignTaskUser {
   /// userId
   #[sdk(attr(office2021, qname = ":userId"))]
@@ -145,7 +145,7 @@ pub struct UnassignTaskUser {
 }
 /// Defines the TaskTitleEventInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskTitleEventInfo/t:SetTitle")]
+#[sdk(office2021, qname = "t:SetTitle")]
 pub struct TaskTitleEventInfo {
   /// title
   #[sdk(attr(office2021, qname = ":title"))]
@@ -153,7 +153,7 @@ pub struct TaskTitleEventInfo {
 }
 /// Defines the TaskScheduleEventInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskScheduleEventInfo/t:Schedule")]
+#[sdk(office2021, qname = "t:Schedule")]
 pub struct TaskScheduleEventInfo {
   /// startDate
   #[sdk(attr(office2021, qname = ":startDate"))]
@@ -164,7 +164,7 @@ pub struct TaskScheduleEventInfo {
 }
 /// Defines the TaskProgressEventInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskProgressEventInfo/t:Progress")]
+#[sdk(office2021, qname = "t:Progress")]
 pub struct TaskProgressEventInfo {
   /// percentComplete
   #[sdk(attr(office2021, qname = ":percentComplete"))]
@@ -173,7 +173,7 @@ pub struct TaskProgressEventInfo {
 }
 /// Defines the TaskPriorityEventInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskPriorityEventInfo/t:Priority")]
+#[sdk(office2021, qname = "t:Priority")]
 pub struct TaskPriorityEventInfo {
   /// value
   #[sdk(attr(office2021, qname = ":value"))]
@@ -182,7 +182,7 @@ pub struct TaskPriorityEventInfo {
 }
 /// Defines the TaskUndo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskUndo/t:Undo")]
+#[sdk(office2021, qname = "t:Undo")]
 pub struct TaskUndo {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -192,7 +192,7 @@ pub struct TaskUndo {
 }
 /// Defines the CommentAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_CommentAnchor/t:Comment")]
+#[sdk(office2021, qname = "t:Comment")]
 pub struct CommentAnchor {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -205,7 +205,7 @@ pub enum TaskHistoryEventChoice {
   /// Defines the UnassignTaskUser Class.
   UnassignTaskUser(std::boxed::Box<UnassignTaskUser>),
   /// Defines the TaskCreateEventInfo Class.
-  #[sdk(empty_child(office2021, qname = "t:CT_TaskCreateEventInfo/t:Create"))]
+  #[sdk(empty_child(office2021, qname = "t:Create"))]
   TaskCreateEventInfo,
   /// Defines the TaskTitleEventInfo Class.
   TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
@@ -216,13 +216,13 @@ pub enum TaskHistoryEventChoice {
   /// Defines the TaskPriorityEventInfo Class.
   TaskPriorityEventInfo(std::boxed::Box<TaskPriorityEventInfo>),
   /// Defines the TaskDeleteEventInfo Class.
-  #[sdk(empty_child(office2021, qname = "t:CT_TaskDeleteEventInfo/t:Delete"))]
+  #[sdk(empty_child(office2021, qname = "t:Delete"))]
   TaskDeleteEventInfo,
   /// Defines the TaskUndeleteEventInfo Class.
-  #[sdk(empty_child(office2021, qname = "t:CT_TaskUndeleteEventInfo/t:Undelete"))]
+  #[sdk(empty_child(office2021, qname = "t:Undelete"))]
   TaskUndeleteEventInfo,
   /// Defines the TaskUnassignAll Class.
-  #[sdk(empty_child(office2021, qname = "t:CT_TaskUnassignAll/t:UnassignAll"))]
+  #[sdk(empty_child(office2021, qname = "t:UnassignAll"))]
   TaskUnassignAll,
   /// Defines the TaskUndo Class.
   TaskUndo(std::boxed::Box<TaskUndo>),

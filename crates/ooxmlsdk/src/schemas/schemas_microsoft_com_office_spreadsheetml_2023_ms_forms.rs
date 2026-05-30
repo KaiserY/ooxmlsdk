@@ -6,18 +6,18 @@
 
 /// Defines the Question Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlmsforms:CT_Question/xlmsforms:question")]
+#[sdk(microsoft365, qname = "xlmsforms:question")]
 pub struct Question {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xlmsforms:extLst"))]
+  #[sdk(child(microsoft365, qname = "xlmsforms:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the MsForm Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlmsforms:CT_MsForm/xlmsforms:msForm")]
+#[sdk(microsoft365, qname = "xlmsforms:msForm")]
 pub struct MsForm {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
@@ -35,20 +35,20 @@ pub struct MsForm {
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "x:ST_Xstring/xlmsforms:syncedQuestionId"
+    qname = "xlmsforms:syncedQuestionId"
   ))]
   pub synced_question_id: Vec<SyncedQuestionId>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xlmsforms:extLst"))]
+  #[sdk(child(microsoft365, qname = "xlmsforms:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SyncedQuestionId Class.
 pub type SyncedQuestionId = crate::simple_type::StringValue;
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "x:CT_ExtensionList/xlmsforms:extLst")]
+#[sdk(microsoft365, qname = "xlmsforms:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }

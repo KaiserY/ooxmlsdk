@@ -12,7 +12,7 @@ pub enum TrueOnlyValues {
 }
 /// Defines the Dummy Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ma:CT_Dummy/ma:DummyContentTypeElement")]
+#[sdk(qname = "ma:DummyContentTypeElement")]
 pub struct Dummy {
   /// decimals
   #[sdk(attr(qname = ":decimals"))]

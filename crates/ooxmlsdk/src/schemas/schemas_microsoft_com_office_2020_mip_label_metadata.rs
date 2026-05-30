@@ -6,20 +6,20 @@
 
 /// Defines the ClassificationLabelList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:CT_ClassificationLabelList/clbl:labelList")]
+#[sdk(office2021, qname = "clbl:labelList")]
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ClassificationLabel Class.
-  #[sdk(child(office2021, qname = "clbl:CT_ClassificationLabel/clbl:label"))]
+  #[sdk(child(office2021, qname = "clbl:label"))]
   pub classification_label: Vec<ClassificationLabel>,
   /// Defines the ClassificationExtensionList Class.
-  #[sdk(child(office2021, qname = "clbl:CT_ClassificationExtensionList/clbl:extLst"))]
+  #[sdk(child(office2021, qname = "clbl:extLst"))]
   pub classification_extension_list: Option<ClassificationExtensionList>,
 }
 /// Defines the ClassificationExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:CT_ClassificationExtension/clbl:ext")]
+#[sdk(office2021, qname = "clbl:ext")]
 pub struct ClassificationExtension {
   /// uri
   #[sdk(attr(office2021, qname = ":uri"))]
@@ -30,7 +30,7 @@ pub struct ClassificationExtension {
 }
 /// Defines the ClassificationLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:CT_ClassificationLabel/clbl:label")]
+#[sdk(office2021, qname = "clbl:label")]
 pub struct ClassificationLabel {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -66,9 +66,9 @@ pub struct ClassificationLabel {
 }
 /// Defines the ClassificationExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "clbl:CT_ClassificationExtensionList/clbl:extLst")]
+#[sdk(office2021, qname = "clbl:extLst")]
 pub struct ClassificationExtensionList {
   /// Defines the ClassificationExtension Class.
-  #[sdk(child(office2021, qname = "clbl:CT_ClassificationExtension/clbl:ext"))]
+  #[sdk(child(office2021, qname = "clbl:ext"))]
   pub classification_extension: Vec<ClassificationExtension>,
 }

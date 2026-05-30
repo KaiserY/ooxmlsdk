@@ -16,52 +16,49 @@ pub enum CommentStatus {
 }
 /// Defines the TextBodyType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "a:CT_TextBody/p188:txBody")]
+#[sdk(office2021, qname = "p188:txBody")]
 pub struct TextBodyType {
   /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
+  #[sdk(child(qname = "a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  #[sdk(child(qname = "a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
+  #[sdk(child(qname = "a:p"))]
   pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the CommentPropertiesExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
-)]
+#[sdk(office2021, qname = "p188:extLst")]
 pub struct CommentPropertiesExtensionList {
   /// Data for the Windows platform..
-  #[sdk(child(office2021, qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
+  #[sdk(child(office2021, qname = "p:ext"))]
   pub comment_properties_extension: Vec<crate::schemas::p::CommentPropertiesExtension>,
 }
 /// Defines the AuthorList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_AuthorList/p188:authorLst")]
+#[sdk(office2021, qname = "p188:authorLst")]
 pub struct AuthorList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Author Class.
-  #[sdk(child(office2021, qname = "p188:CT_Author/p188:author"))]
+  #[sdk(child(office2021, qname = "p188:author"))]
   pub author: Vec<Author>,
 }
 /// Defines the CommentList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_CommentList/p188:cmLst")]
+#[sdk(office2021, qname = "p188:cmLst")]
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Comment Class.
-  #[sdk(child(office2021, qname = "p188:CT_Comment/p188:cm"))]
+  #[sdk(child(office2021, qname = "p188:cm"))]
   pub comment: Vec<Comment>,
 }
 /// Defines the CommentRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_CommentRelationship/p188:commentRel")]
+#[sdk(office2021, qname = "p188:commentRel")]
 pub struct CommentRelationship {
   /// id
   #[sdk(attr(office2021, qname = "r:id"))]
@@ -69,15 +66,15 @@ pub struct CommentRelationship {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p:CT_ExtensionList/p188:extLst")]
+#[sdk(office2021, qname = "p188:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "p:CT_Extension/p:ext"))]
+  #[sdk(child(qname = "p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the Author Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_Author/p188:author")]
+#[sdk(office2021, qname = "p188:author")]
 pub struct Author {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -96,12 +93,12 @@ pub struct Author {
   #[sdk(attr(office2021, qname = ":providerId"))]
   pub provider_id: crate::simple_type::StringValue,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "p:CT_ExtensionList/p188:extLst"))]
+  #[sdk(child(office2021, qname = "p188:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the CommentReply Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_CommentReply/p188:reply")]
+#[sdk(office2021, qname = "p188:reply")]
 pub struct CommentReply {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -125,18 +122,15 @@ pub struct CommentReply {
   #[sdk(attr(office2021, list, qname = ":likes"))]
   pub likes: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the TextBodyType Class.
-  #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
+  #[sdk(child(office2021, qname = "p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
   /// Defines the CommentPropertiesExtensionList Class.
-  #[sdk(child(
-    office2021,
-    qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
-  ))]
+  #[sdk(child(office2021, qname = "p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
 /// Defines the Point2DType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "a:CT_Point2D/p188:pos")]
+#[sdk(office2021, qname = "p188:pos")]
 pub struct Point2DType {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
@@ -149,15 +143,15 @@ pub struct Point2DType {
 }
 /// Defines the CommentReplyList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_CommentReplyList/p188:replyLst")]
+#[sdk(office2021, qname = "p188:replyLst")]
 pub struct CommentReplyList {
   /// Defines the CommentReply Class.
-  #[sdk(child(office2021, qname = "p188:CT_CommentReply/p188:reply"))]
+  #[sdk(child(office2021, qname = "p188:reply"))]
   pub comment_reply: Vec<CommentReply>,
 }
 /// Defines the Comment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "p188:CT_Comment/p188:cm")]
+#[sdk(office2021, qname = "p188:cm")]
 pub struct Comment {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
@@ -216,41 +210,38 @@ pub struct Comment {
     )]
   pub comment_choice: Vec<CommentChoice>,
   /// Defines the Point2DType Class.
-  #[sdk(child(office2021, qname = "a:CT_Point2D/p188:pos"))]
+  #[sdk(child(office2021, qname = "p188:pos"))]
   pub point2_d_type: Option<Point2DType>,
   /// Defines the CommentReplyList Class.
-  #[sdk(child(office2021, qname = "p188:CT_CommentReplyList/p188:replyLst"))]
+  #[sdk(child(office2021, qname = "p188:replyLst"))]
   pub comment_reply_list: Option<CommentReplyList>,
   /// Defines the TextBodyType Class.
-  #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
+  #[sdk(child(office2021, qname = "p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
   /// Defines the CommentPropertiesExtensionList Class.
-  #[sdk(child(
-    office2021,
-    qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
-  ))]
+  #[sdk(child(office2021, qname = "p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {
   SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
-  #[sdk(any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst"))]
+  #[sdk(any_child(office2016, qname = "pc:sldLayoutMkLst"))]
   SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),
-  #[sdk(any_child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst"))]
+  #[sdk(any_child(office2016, qname = "pc:sldMasterMkLst"))]
   MainMasterMonikerList(crate::schemas::pc::MainMasterMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:deMkLst"))]
   DeMkLstDrawingElementMonikerList(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:txBodyMkLst"))]
   TextBodyMonikerList(crate::schemas::oac::TextBodyMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:txMkLst"))]
   TextCharRangeMonikerList(crate::schemas::oac::TextCharRangeMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:tcMkLst"))]
   TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:trMkLst"))]
   TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
-  #[sdk(any_child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:gridColMkLst"))]
   TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
   /// Defines the CommentUnknownAnchor Class.
-  #[sdk(empty_child(office2021, qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"))]
+  #[sdk(empty_child(office2021, qname = "p188:unknownAnchor"))]
   CommentUnknownAnchor,
 }

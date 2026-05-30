@@ -6,26 +6,26 @@
 
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_ShapeStyle/pic14:style")]
+#[sdk(office2010, qname = "pic14:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
+  #[sdk(child(qname = "a:lnRef"))]
   pub line_reference: std::boxed::Box<crate::schemas::a::LineReference>,
   /// Fill Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
+  #[sdk(child(qname = "a:fillRef"))]
   pub fill_reference: std::boxed::Box<crate::schemas::a::FillReference>,
   /// Effect Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
+  #[sdk(child(qname = "a:effectRef"))]
   pub effect_reference: std::boxed::Box<crate::schemas::a::EffectReference>,
   /// Font Reference
-  #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
+  #[sdk(child(qname = "a:fontRef"))]
   pub font_reference: std::boxed::Box<crate::schemas::a::FontReference>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
+#[sdk(office2010, qname = "pic14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

@@ -36,26 +36,23 @@ pub enum TransitionLeftRightDirectionTypeValues {
 }
 /// Defines the NonVisualContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_ContentPartNonVisual/p14:nvContentPartPr")]
+#[sdk(office2010, qname = "p14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/p14:cNvPr"))]
+  #[sdk(child(office2010, qname = "p14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualInkContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_NonVisualInkContentPartProperties/p14:cNvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "p14:cNvContentPartPr"))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
   /// Defines the ApplicationNonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "p:CT_ApplicationNonVisualDrawingProps/p14:nvPr"))]
+  #[sdk(child(office2010, qname = "p14:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Transform2D/p14:xfrm")]
+#[sdk(office2010, qname = "p14:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -67,26 +64,26 @@ pub struct Transform2D {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the ExtensionListModify Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_ExtensionListModify/p14:extLst")]
+#[sdk(office2010, qname = "p14:extLst")]
 pub struct ExtensionListModify {
   /// Modify
   #[sdk(attr(qname = ":mod"))]
   pub modify: Option<crate::simple_type::BooleanValue>,
   /// Extension.
-  #[sdk(child(qname = "p:CT_Extension/p:ext"))]
+  #[sdk(child(qname = "p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the Media Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_Media/p14:media")]
+#[sdk(office2010, qname = "p14:media")]
 pub struct Media {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Embedded Picture Reference
@@ -96,21 +93,21 @@ pub struct Media {
   #[sdk(attr(qname = "r:link"))]
   pub link: Option<crate::simple_type::StringValue>,
   /// Defines the MediaTrim Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaTrim/p14:trim"))]
+  #[sdk(child(office2010, qname = "p14:trim"))]
   pub media_trim: Option<MediaTrim>,
   /// Defines the MediaFade Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaFade/p14:fade"))]
+  #[sdk(child(office2010, qname = "p14:fade"))]
   pub media_fade: Option<MediaFade>,
   /// Defines the MediaBookmarkList Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaBookmarkList/p14:bmkLst"))]
+  #[sdk(child(office2010, qname = "p14:bmkLst"))]
   pub media_bookmark_list: Option<MediaBookmarkList>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2010, qname = "p:CT_ExtensionList/p14:extLst"))]
+  #[sdk(child(office2010, qname = "p14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the VortexTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_SideDirectionTransition/p14:vortex")]
+#[sdk(office2010, qname = "p14:vortex")]
 pub struct VortexTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
@@ -119,7 +116,7 @@ pub struct VortexTransition {
 }
 /// Defines the PanTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_SideDirectionTransition/p14:pan")]
+#[sdk(office2010, qname = "p14:pan")]
 pub struct PanTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
@@ -128,7 +125,7 @@ pub struct PanTransition {
 }
 /// Defines the SwitchTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:switch")]
+#[sdk(office2010, qname = "p14:switch")]
 pub struct SwitchTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -137,7 +134,7 @@ pub struct SwitchTransition {
 }
 /// Defines the FlipTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:flip")]
+#[sdk(office2010, qname = "p14:flip")]
 pub struct FlipTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -146,7 +143,7 @@ pub struct FlipTransition {
 }
 /// Defines the FerrisTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:ferris")]
+#[sdk(office2010, qname = "p14:ferris")]
 pub struct FerrisTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -155,7 +152,7 @@ pub struct FerrisTransition {
 }
 /// Defines the GalleryTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:gallery")]
+#[sdk(office2010, qname = "p14:gallery")]
 pub struct GalleryTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -164,7 +161,7 @@ pub struct GalleryTransition {
 }
 /// Defines the ConveyorTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor")]
+#[sdk(office2010, qname = "p14:conveyor")]
 pub struct ConveyorTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -173,7 +170,7 @@ pub struct ConveyorTransition {
 }
 /// Defines the RippleTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_RippleTransition/p14:ripple")]
+#[sdk(office2010, qname = "p14:ripple")]
 pub struct RippleTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -183,7 +180,7 @@ pub struct RippleTransition {
 }
 /// Defines the PrismTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_PrismTransition/p14:prism")]
+#[sdk(office2010, qname = "p14:prism")]
 pub struct PrismTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -198,7 +195,7 @@ pub struct PrismTransition {
 }
 /// Defines the DoorsTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_OrientationTransition/p14:doors")]
+#[sdk(office2010, qname = "p14:doors")]
 pub struct DoorsTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
@@ -207,7 +204,7 @@ pub struct DoorsTransition {
 }
 /// Defines the WindowTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_OrientationTransition/p14:window")]
+#[sdk(office2010, qname = "p14:window")]
 pub struct WindowTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
@@ -216,7 +213,7 @@ pub struct WindowTransition {
 }
 /// Defines the GlitterTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_GlitterTransition/p14:glitter")]
+#[sdk(office2010, qname = "p14:glitter")]
 pub struct GlitterTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -229,7 +226,7 @@ pub struct GlitterTransition {
 }
 /// Defines the WarpTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_InOutTransition/p14:warp")]
+#[sdk(office2010, qname = "p14:warp")]
 pub struct WarpTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
@@ -238,7 +235,7 @@ pub struct WarpTransition {
 }
 /// Defines the FlythroughTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_FlyThroughTransition/p14:flythrough")]
+#[sdk(office2010, qname = "p14:flythrough")]
 pub struct FlythroughTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
@@ -250,7 +247,7 @@ pub struct FlythroughTransition {
 }
 /// Defines the ShredTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_ShredTransition/p14:shred")]
+#[sdk(office2010, qname = "p14:shred")]
 pub struct ShredTransition {
   /// pattern
   #[sdk(attr(office2010, qname = ":pattern"))]
@@ -263,7 +260,7 @@ pub struct ShredTransition {
 }
 /// Defines the RevealTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_RevealTransition/p14:reveal")]
+#[sdk(office2010, qname = "p14:reveal")]
 pub struct RevealTransition {
   /// thruBlk
   #[sdk(attr(office2010, qname = ":thruBlk"))]
@@ -275,7 +272,7 @@ pub struct RevealTransition {
 }
 /// Defines the WheelReverseTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_WheelTransition/p14:wheelReverse")]
+#[sdk(office2010, qname = "p14:wheelReverse")]
 pub struct WheelReverseTransition {
   /// Spokes
   #[sdk(attr(qname = ":spokes"))]
@@ -283,7 +280,7 @@ pub struct WheelReverseTransition {
 }
 /// Defines the BookmarkTarget Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt")]
+#[sdk(office2010, qname = "p14:bmkTgt")]
 pub struct BookmarkTarget {
   /// spid
   #[sdk(attr(office2010, qname = ":spid"))]
@@ -294,25 +291,25 @@ pub struct BookmarkTarget {
 }
 /// Defines the SectionProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_SectionProperties/p14:sectionPr")]
+#[sdk(office2010, qname = "p14:sectionPr")]
 pub struct SectionProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SectionOld Class.
-  #[sdk(child(office2010, qname = "p14:CT_SectionOld/p14:section"))]
+  #[sdk(child(office2010, qname = "p14:section"))]
   pub section_old: Vec<SectionOld>,
 }
 /// Defines the SectionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_SectionList/p14:sectionLst")]
+#[sdk(office2010, qname = "p14:sectionLst")]
 pub struct SectionList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the Section Class.
-  #[sdk(child(office2010, qname = "p14:CT_Section/p14:section"))]
+  #[sdk(child(office2010, qname = "p14:section"))]
   pub section: Vec<Section>,
 }
 /// Defines the BrowseMode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_BrowseMode/p14:browseMode")]
+#[sdk(office2010, qname = "p14:browseMode")]
 pub struct BrowseMode {
   /// showStatus
   #[sdk(attr(office2010, qname = ":showStatus"))]
@@ -320,7 +317,7 @@ pub struct BrowseMode {
 }
 /// Defines the LaserColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Color/p14:laserClr")]
+#[sdk(office2010, qname = "p14:laserClr")]
 pub struct LaserColor {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
@@ -337,7 +334,7 @@ pub struct LaserColor {
 }
 /// Defines the DefaultImageDpi Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi")]
+#[sdk(office2010, qname = "p14:defaultImageDpi")]
 pub struct DefaultImageDpi {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -346,10 +343,7 @@ pub struct DefaultImageDpi {
 }
 /// Defines the DiscardImageEditData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData"
-)]
+#[sdk(office2010, qname = "p14:discardImageEditData")]
 pub struct DiscardImageEditData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -358,7 +352,7 @@ pub struct DiscardImageEditData {
 }
 /// Defines the ShowMediaControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls")]
+#[sdk(office2010, qname = "p14:showMediaCtrls")]
 pub struct ShowMediaControls {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -367,15 +361,15 @@ pub struct ShowMediaControls {
 }
 /// Defines the LaserTraceList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LaserTraceList/p14:laserTraceLst")]
+#[sdk(office2010, qname = "p14:laserTraceLst")]
 pub struct LaserTraceList {
   /// Defines the TracePointList Class.
-  #[sdk(child(office2010, qname = "p14:CT_LaserTrace/p14:tracePtLst"))]
+  #[sdk(child(office2010, qname = "p14:tracePtLst"))]
   pub trace_point_list: Vec<TracePointList>,
 }
 /// Defines the CreationId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_RandomId/p14:creationId")]
+#[sdk(office2010, qname = "p14:creationId")]
 pub struct CreationId {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -384,7 +378,7 @@ pub struct CreationId {
 }
 /// Defines the ModificationId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_RandomId/p14:modId")]
+#[sdk(office2010, qname = "p14:modId")]
 pub struct ModificationId {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -393,7 +387,7 @@ pub struct ModificationId {
 }
 /// Defines the ShowEventRecordList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_ShowEventRecordList/p14:showEvtLst")]
+#[sdk(office2010, qname = "p14:showEvtLst")]
 pub struct ShowEventRecordList {
   #[sdk(
         choice(
@@ -410,7 +404,7 @@ pub struct ShowEventRecordList {
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/p14:cNvPr")]
+#[sdk(office2010, qname = "p14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -428,36 +422,33 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Hyperlink associated with clicking or selecting the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Hyperlink associated with hovering over the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Future extension
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_NonVisualInkContentPartProperties/p14:cNvContentPartPr"
-)]
+#[sdk(office2010, qname = "p14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
-  #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  #[sdk(child(office2010, qname = "a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the ApplicationNonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_ApplicationNonVisualDrawingProps/p14:nvPr")]
+#[sdk(office2010, qname = "p14:nvPr")]
 pub struct ApplicationNonVisualDrawingProperties {
   /// Is a Photo Album
   #[sdk(attr(qname = ":isPhoto"))]
@@ -466,7 +457,7 @@ pub struct ApplicationNonVisualDrawingProperties {
   #[sdk(attr(qname = ":userDrawn"))]
   pub user_drawn: Option<crate::simple_type::BooleanValue>,
   /// Placeholder Shape
-  #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
+  #[sdk(child(qname = "p:ph"))]
   pub placeholder_shape: Option<std::boxed::Box<crate::schemas::p::PlaceholderShape>>,
   #[sdk(
         choice(
@@ -480,16 +471,16 @@ pub struct ApplicationNonVisualDrawingProperties {
   pub application_non_visual_drawing_properties_choice:
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.
-  #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
+  #[sdk(child(qname = "p:custDataLst"))]
   pub customer_data_list: Option<std::boxed::Box<crate::schemas::p::CustomerDataList>>,
   /// Defines the ApplicationNonVisualDrawingPropertiesExtensionList Class.
-  #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst"))]
+  #[sdk(child(qname = "p:extLst"))]
   pub application_non_visual_drawing_properties_extension_list:
     Option<crate::schemas::p::ApplicationNonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the MediaBookmark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaBookmark/p14:bmk")]
+#[sdk(office2010, qname = "p14:bmk")]
 pub struct MediaBookmark {
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
@@ -500,7 +491,7 @@ pub struct MediaBookmark {
 }
 /// Defines the MediaTrim Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaTrim/p14:trim")]
+#[sdk(office2010, qname = "p14:trim")]
 pub struct MediaTrim {
   /// st
   #[sdk(attr(office2010, qname = ":st"))]
@@ -511,7 +502,7 @@ pub struct MediaTrim {
 }
 /// Defines the MediaFade Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaFade/p14:fade")]
+#[sdk(office2010, qname = "p14:fade")]
 pub struct MediaFade {
   /// in
   #[sdk(attr(office2010, qname = ":in"))]
@@ -522,23 +513,23 @@ pub struct MediaFade {
 }
 /// Defines the MediaBookmarkList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaBookmarkList/p14:bmkLst")]
+#[sdk(office2010, qname = "p14:bmkLst")]
 pub struct MediaBookmarkList {
   /// Defines the MediaBookmark Class.
-  #[sdk(child(office2010, qname = "p14:CT_MediaBookmark/p14:bmk"))]
+  #[sdk(child(office2010, qname = "p14:bmk"))]
   pub media_bookmark: Vec<MediaBookmark>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p:CT_ExtensionList/p14:extLst")]
+#[sdk(office2010, qname = "p14:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "p:CT_Extension/p:ext"))]
+  #[sdk(child(qname = "p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the SectionOld Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_SectionOld/p14:section")]
+#[sdk(office2010, qname = "p14:section")]
 pub struct SectionOld {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// name
@@ -554,12 +545,12 @@ pub struct SectionOld {
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2010, qname = "p:CT_ExtensionList/p14:extLst"))]
+  #[sdk(child(office2010, qname = "p14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SectionSlideIdListEntry Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_SectionSlideIdListEntry/p14:sldId")]
+#[sdk(office2010, qname = "p14:sldId")]
 pub struct SectionSlideIdListEntry {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
@@ -569,16 +560,16 @@ pub struct SectionSlideIdListEntry {
 }
 /// Defines the SectionSlideIdList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_SectionSlideIdList/p14:sldIdLst")]
+#[sdk(office2010, qname = "p14:sldIdLst")]
 pub struct SectionSlideIdList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SectionSlideIdListEntry Class.
-  #[sdk(child(office2010, qname = "p14:CT_SectionSlideIdListEntry/p14:sldId"))]
+  #[sdk(child(office2010, qname = "p14:sldId"))]
   pub section_slide_id_list_entry: Vec<SectionSlideIdListEntry>,
 }
 /// Defines the Section Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_Section/p14:section")]
+#[sdk(office2010, qname = "p14:section")]
 pub struct Section {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// name
@@ -590,15 +581,15 @@ pub struct Section {
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the SectionSlideIdList Class.
-  #[sdk(child(office2010, qname = "p14:CT_SectionSlideIdList/p14:sldIdLst"))]
+  #[sdk(child(office2010, qname = "p14:sldIdLst"))]
   pub section_slide_id_list: std::boxed::Box<SectionSlideIdList>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2010, qname = "p:CT_ExtensionList/p14:extLst"))]
+  #[sdk(child(office2010, qname = "p14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TracePoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LaserTracePoint/p14:tracePt")]
+#[sdk(office2010, qname = "p14:tracePt")]
 pub struct TracePoint {
   /// t
   #[sdk(attr(office2010, qname = ":t"))]
@@ -614,15 +605,15 @@ pub struct TracePoint {
 }
 /// Defines the TracePointList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LaserTrace/p14:tracePtLst")]
+#[sdk(office2010, qname = "p14:tracePtLst")]
 pub struct TracePointList {
   /// Defines the TracePoint Class.
-  #[sdk(child(office2010, qname = "p14:CT_LaserTracePoint/p14:tracePt"))]
+  #[sdk(child(office2010, qname = "p14:tracePt"))]
   pub trace_point: Vec<TracePoint>,
 }
 /// Defines the TriggerEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_TriggerEventRecord/p14:triggerEvt")]
+#[sdk(office2010, qname = "p14:triggerEvt")]
 pub struct TriggerEventRecord {
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
@@ -637,7 +628,7 @@ pub struct TriggerEventRecord {
 }
 /// Defines the PlayEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt")]
+#[sdk(office2010, qname = "p14:playEvt")]
 pub struct PlayEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
@@ -648,7 +639,7 @@ pub struct PlayEventRecord {
 }
 /// Defines the StopEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt")]
+#[sdk(office2010, qname = "p14:stopEvt")]
 pub struct StopEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
@@ -659,7 +650,7 @@ pub struct StopEventRecord {
 }
 /// Defines the PauseEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt")]
+#[sdk(office2010, qname = "p14:pauseEvt")]
 pub struct PauseEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
@@ -670,7 +661,7 @@ pub struct PauseEventRecord {
 }
 /// Defines the ResumeEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt")]
+#[sdk(office2010, qname = "p14:resumeEvt")]
 pub struct ResumeEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
@@ -681,7 +672,7 @@ pub struct ResumeEventRecord {
 }
 /// Defines the SeekEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt")]
+#[sdk(office2010, qname = "p14:seekEvt")]
 pub struct SeekEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
@@ -695,7 +686,7 @@ pub struct SeekEventRecord {
 }
 /// Defines the NullEventRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_NullEventRecord/p14:nullEvt")]
+#[sdk(office2010, qname = "p14:nullEvt")]
 pub struct NullEventRecord {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]

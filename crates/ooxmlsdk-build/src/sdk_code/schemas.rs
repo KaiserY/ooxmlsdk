@@ -1327,6 +1327,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     };
     let type_sdk_version_markers = sdk_version_markers(schema_type_version);
     let sdk_type_attrs = if let Some(qname) = &type_decl.xml_qname {
+      let qname = sdk_element_qname(qname);
       let default_ns = if ir.prefix == "x" {
         quote! { default_ns, }
       } else {
@@ -2350,6 +2351,7 @@ fn inline_single_field_sequence_variant_tokens(
 
   match &field.wire {
     FieldWireDecl::Child { qname } => {
+      let qname = sdk_element_qname(qname);
       if empty_leaf_marker_doc.is_some() {
         Ok(Some(quote! {
           #( #variant_attrs )*
@@ -2368,6 +2370,7 @@ fn inline_single_field_sequence_variant_tokens(
     FieldWireDecl::TextChild { qname } => {
       let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
       let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+      let qname = sdk_element_qname(qname);
       Ok(Some(quote! {
         #( #variant_attrs )*
         #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))]
@@ -2569,6 +2572,7 @@ fn gen_choice_variant_tokens(
         .iter()
         .map(|qname| {
           let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+          let qname = sdk_element_qname(qname);
           quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
         })
         .collect::<Vec<_>>();
@@ -2606,7 +2610,10 @@ fn gen_choice_variant_tokens(
         ) {
           let qname_attrs = qnames
             .iter()
-            .map(|qname| quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] })
+            .map(|qname| {
+              let qname = sdk_element_qname(qname);
+              quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
+            })
             .collect::<Vec<_>>();
           Ok(vec![quote! {
             #prefix_attrs
@@ -2629,6 +2636,7 @@ fn gen_choice_variant_tokens(
             qnames
               .iter()
               .map(|qname| {
+                let qname = sdk_element_qname(qname);
                 if is_any_children_alias {
                   quote! { #[sdk(any_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
                 } else {
@@ -3442,6 +3450,10 @@ fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
   }
 }
 
+fn sdk_element_qname(qname: &str) -> String {
+  schema_qname_element_name(qname).to_string()
+}
+
 fn module_type_namespace(module_name: &str) -> String {
   format!("crate::schemas::{module_name}")
 }
@@ -3826,17 +3838,21 @@ fn gen_direct_child_fields_from_decl_with_context(
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } if is_any_children_alias => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
         let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
       }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
@@ -3927,17 +3943,21 @@ fn gen_inline_sequence_variant_fields_from_decl(
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } if is_any_children_alias => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } => {
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
         let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        let qname = sdk_element_qname(qname);
         quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
       }
       _ => {
@@ -4352,8 +4372,8 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:CT_Empty/vt:empty\"))] VtEmpty"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:CT_Null/vt:null\"))] VtNull"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:empty\"))] VtEmpty"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:null\"))] VtNull"));
     assert!(!generated.contains("pub struct VtEmpty"));
     assert!(!generated.contains("pub struct VtNull"));
     assert!(!generated.contains("VtEmpty (std :: boxed :: Box < VtEmpty >)"));
@@ -4365,9 +4385,7 @@ mod tests {
     let generated =
       render_workspace_schema("schemas_microsoft_com_office_drawing_2013_main_command");
 
-    assert!(
-      generated.contains("# [sdk (empty_child (office2016 , qname = \"oac:CT_Empty/oac:fill\"))]")
-    );
+    assert!(generated.contains("# [sdk (empty_child (office2016 , qname = \"oac:fill\"))]"));
     assert!(generated.contains("pub fill_empty : Option < () >"));
     assert!(!generated.contains("pub struct FillEmpty"));
     assert!(!generated.contains("pub fill_empty : Option < FillEmpty >"));
@@ -4380,9 +4398,7 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(
-      generated.contains("# [sdk (empty_child (office2010 , qname = \"w:CT_Empty/w14:noFill\"))]")
-    );
+    assert!(generated.contains("# [sdk (empty_child (office2010 , qname = \"w14:noFill\"))]"));
     assert!(generated.contains("NoFillEmpty ,"));
     assert!(!generated.contains("pub struct NoFillEmpty"));
     assert!(!generated.contains("NoFillEmpty (std :: boxed :: Box < NoFillEmpty >)"));
@@ -4393,9 +4409,7 @@ mod tests {
     let generated = render_workspace_schema("schemas_microsoft_com_office_powerpoint_2022_08_main");
 
     assert!(!generated.contains("pub struct EmptyType"));
-    assert!(
-      generated.contains("# [sdk (empty_child (microsoft365 , qname = \"p:CT_Empty/p228:add\"))]")
-    );
+    assert!(generated.contains("# [sdk (empty_child (microsoft365 , qname = \"p228:add\"))]"));
   }
 
   #[test]
@@ -4725,9 +4739,10 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] EgThing (std :: boxed :: Box < First >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:first\"))] EgThing (std :: boxed :: Box < First >)")
+    );
     assert!(!generated.contains("# [sdk (sequence)] EgThing {"));
   }
 
@@ -4807,12 +4822,13 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("# [sdk (sequence)] Sequence {"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Formula/t:f\"))] formula : std :: boxed :: Box < Formula >"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:f\"))] formula : std :: boxed :: Box < Formula >")
+    );
     assert!(
       generated.contains(
-        "# [sdk (text_child (simple_type = \"StringValue\" , qname = \"xsd:string/t:v\"))] value : Option < crate :: simple_type :: StringValue >"
+        "# [sdk (text_child (simple_type = \"StringValue\" , qname = \"t:v\"))] value : Option < crate :: simple_type :: StringValue >"
       )
     );
     assert!(!generated.contains("pub struct HolderChoiceSequence1"));
@@ -5994,9 +6010,10 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Second (std :: boxed :: Box < Second >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:second\"))] Second (std :: boxed :: Box < Second >)")
+    );
     assert!(!generated.contains("Sequence32"));
   }
 
@@ -6097,12 +6114,14 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] First (std :: boxed :: Box < First >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Second (std :: boxed :: Box < Second >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:first\"))] First (std :: boxed :: Box < First >)")
+    );
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:second\"))] Second (std :: boxed :: Box < Second >)")
+    );
     assert!(!generated.contains("Sequence32"));
     assert!(!generated.contains("Sequence8"));
   }
@@ -6466,7 +6485,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("t:CT_Leaf/t:leaf"));
+    assert!(generated.contains("qname = \"t:leaf\""));
     assert!(!generated.contains("pub enum ChoiceHolderChoice"));
   }
 
@@ -6548,7 +6567,7 @@ mod tests {
     assert!(!generated.contains("pub struct Marker"));
     assert!(generated.contains("pub struct AttributedMarker"));
     assert!(generated.contains("# [doc = \" Defines the Marker Class.\"]"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"t:CT_Marker/t:marker\"))]"));
+    assert!(generated.contains("# [sdk (empty_child (qname = \"t:marker\"))]"));
     assert!(generated.contains("TMarker ,"));
     assert!(generated.contains("# [doc = \" Defines the AttributedMarker Class.\"]"));
     assert!(generated.contains("TAttributedMarker (std :: boxed :: Box < AttributedMarker >)"));
@@ -6679,7 +6698,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("# [sdk (text_child (list , qname = \"t:CT_List/t:list\"))]"));
+    assert!(generated.contains("# [sdk (text_child (list , qname = \"t:list\"))]"));
     assert!(generated.contains("pub list_child : Vec < crate :: simple_type :: StringValue >"));
   }
 
@@ -6913,14 +6932,12 @@ mod tests {
     assert!(generated.contains("# [sdk (sequence)] Sequence"));
     assert!(generated.contains("Sequence {"));
     assert!(
-      generated.contains(
-        "# [sdk (child (qname = \"t:CT_C/t:c\"))] leaf_c : std :: boxed :: Box < LeafC >"
-      )
+      generated
+        .contains("# [sdk (child (qname = \"t:c\"))] leaf_c : std :: boxed :: Box < LeafC >")
     );
     assert!(
-      generated.contains(
-        "# [sdk (child (qname = \"t:CT_D/t:d\"))] leaf_d : std :: boxed :: Box < LeafD >"
-      )
+      generated
+        .contains("# [sdk (child (qname = \"t:d\"))] leaf_d : std :: boxed :: Box < LeafD >")
     );
     assert!(!generated.contains("pub struct StructuredHolderChoiceSequence2"));
   }
@@ -7261,9 +7278,9 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("pub type TextMath = Vec < String >"));
-    assert!(generated.contains("# [sdk (any_child (qname = \"t:CT_TextMath/t:m\"))]"));
+    assert!(generated.contains("# [sdk (any_child (qname = \"t:m\"))]"));
     assert!(generated.contains("pub text_math : TextMath"));
     assert!(!generated.contains("pub struct TextMath"));
-    assert!(!generated.contains("# [sdk (empty_child (qname = \"t:CT_TextMath/t:m\"))]"));
+    assert!(!generated.contains("# [sdk (empty_child (qname = \"t:m\"))]"));
   }
 }

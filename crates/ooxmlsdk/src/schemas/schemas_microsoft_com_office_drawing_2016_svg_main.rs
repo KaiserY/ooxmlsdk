@@ -6,7 +6,7 @@
 
 /// Defines the SVGBlip Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "asvg:CT_SVGBlip/asvg:svgBlip")]
+#[sdk(office2019, qname = "asvg:svgBlip")]
 pub struct SvgBlip {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Embedded Picture Reference

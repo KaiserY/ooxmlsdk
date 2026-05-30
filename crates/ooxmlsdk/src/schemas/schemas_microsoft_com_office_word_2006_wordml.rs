@@ -6,57 +6,57 @@
 
 /// Defines the TemplateCommandGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Tcg/wne:tcg")]
+#[sdk(qname = "wne:tcg")]
 pub struct TemplateCommandGroup {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the KeyMapCustomizations Class.
-  #[sdk(child(qname = "wne:CT_Keymaps/wne:keymaps"))]
+  #[sdk(child(qname = "wne:keymaps"))]
   pub key_map_customizations: Vec<KeyMapCustomizations>,
   /// Defines the MismatchedKeyMapCustomization Class.
-  #[sdk(child(qname = "wne:CT_Keymaps/wne:keymapsBad"))]
+  #[sdk(child(qname = "wne:keymapsBad"))]
   pub mismatched_key_map_customization: Vec<MismatchedKeyMapCustomization>,
   /// Defines the Toolbars Class.
-  #[sdk(child(qname = "wne:CT_Toolbars/wne:toolbars"))]
+  #[sdk(child(qname = "wne:toolbars"))]
   pub toolbars: Option<Toolbars>,
   /// Defines the AllocatedCommands Class.
-  #[sdk(child(qname = "wne:CT_Acds/wne:acds"))]
+  #[sdk(child(qname = "wne:acds"))]
   pub allocated_commands: Vec<AllocatedCommands>,
 }
 /// Defines the Mcds Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Mcds/wne:mcds")]
+#[sdk(qname = "wne:mcds")]
 pub struct Mcds {
   /// Defines the Mcd Class.
-  #[sdk(child(qname = "wne:CT_Mcd/wne:mcd"))]
+  #[sdk(child(qname = "wne:mcd"))]
   pub mcd: Vec<Mcd>,
 }
 /// Defines the VbaSuppData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_VbaSuppData/wne:vbaSuppData")]
+#[sdk(qname = "wne:vbaSuppData")]
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the DocEvents Class.
-  #[sdk(child(qname = "wne:CT_DocEvents/wne:docEvents"))]
+  #[sdk(child(qname = "wne:docEvents"))]
   pub doc_events: Option<DocEvents>,
   /// Defines the Mcds Class.
-  #[sdk(child(qname = "wne:CT_Mcds/wne:mcds"))]
+  #[sdk(child(qname = "wne:mcds"))]
   pub mcds: Option<Mcds>,
 }
 /// Defines the MailMergeRecipients Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_HashedRecipients/wne:recipients")]
+#[sdk(qname = "wne:recipients")]
 pub struct MailMergeRecipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the SingleDataSourceRecord Class.
-  #[sdk(child(qname = "wne:CT_HashedRecipientData/wne:recipientData"))]
+  #[sdk(child(qname = "wne:recipientData"))]
   pub single_data_source_record: Vec<SingleDataSourceRecord>,
 }
 /// Defines the FixedCommandKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Fci/wne:fci")]
+#[sdk(qname = "wne:fci")]
 pub struct FixedCommandKeyboardCustomization {
   /// fciName
   #[sdk(attr(qname = "wne:fciName"))]
@@ -72,7 +72,7 @@ pub struct FixedCommandKeyboardCustomization {
 }
 /// Defines the MacroKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_MacroWll/wne:macro")]
+#[sdk(qname = "wne:macro")]
 pub struct MacroKeyboardCustomization {
   /// macroName
   #[sdk(attr(qname = "wne:macroName"))]
@@ -80,7 +80,7 @@ pub struct MacroKeyboardCustomization {
 }
 /// Defines the WllMacroKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_MacroWll/wne:wll")]
+#[sdk(qname = "wne:wll")]
 pub struct WllMacroKeyboardCustomization {
   /// macroName
   #[sdk(attr(qname = "wne:macroName"))]
@@ -88,7 +88,7 @@ pub struct WllMacroKeyboardCustomization {
 }
 /// Defines the AllocatedCommandKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_AcdKeymap/wne:acd")]
+#[sdk(qname = "wne:acd")]
 pub struct AllocatedCommandKeyboardCustomization {
   /// acdName
   #[sdk(attr(qname = "wne:acdName"))]
@@ -96,7 +96,7 @@ pub struct AllocatedCommandKeyboardCustomization {
 }
 /// Defines the AllocatedCommandManifestEntry Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_AcdKeymap/wne:acdEntry")]
+#[sdk(qname = "wne:acdEntry")]
 pub struct AllocatedCommandManifestEntry {
   /// acdName
   #[sdk(attr(qname = "wne:acdName"))]
@@ -104,7 +104,7 @@ pub struct AllocatedCommandManifestEntry {
 }
 /// Defines the CharacterInsertion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_LongHexNumber/wne:wch")]
+#[sdk(qname = "wne:wch")]
 pub struct CharacterInsertion {
   /// val
   #[sdk(attr(qname = "wne:val"))]
@@ -113,7 +113,7 @@ pub struct CharacterInsertion {
 }
 /// Defines the KeyMapEntry Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Keymap/wne:keymap")]
+#[sdk(qname = "wne:keymap")]
 pub struct KeyMapEntry {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// chmPrimary
@@ -148,7 +148,7 @@ pub struct KeyMapEntry {
 }
 /// Defines the AllocatedCommand Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Acd/wne:acd")]
+#[sdk(qname = "wne:acd")]
 pub struct AllocatedCommand {
   /// argValue
   #[sdk(attr(qname = "wne:argValue"))]
@@ -166,7 +166,7 @@ pub struct AllocatedCommand {
 }
 /// Defines the Mcd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Mcd/wne:mcd")]
+#[sdk(qname = "wne:mcd")]
 pub struct Mcd {
   /// macroName
   #[sdk(attr(qname = "wne:macroName"))]
@@ -214,89 +214,80 @@ pub type EventDocContentControlUpdateXsdString = crate::simple_type::StringValue
 pub type EventDocBuildingBlockAfterInsertXsdString = crate::simple_type::StringValue;
 /// Defines the DocEvents Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_DocEvents/wne:docEvents")]
+#[sdk(qname = "wne:docEvents")]
 pub struct DocEvents {
   /// Defines the EventDocNewXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/wne:eventDocNew"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocNew"))]
   pub event_doc_new_xsd_string: Option<EventDocNewXsdString>,
   /// Defines the EventDocOpenXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/wne:eventDocOpen"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocOpen"))]
   pub event_doc_open_xsd_string: Option<EventDocOpenXsdString>,
   /// Defines the EventDocCloseXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/wne:eventDocClose"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocClose"))]
   pub event_doc_close_xsd_string: Option<EventDocCloseXsdString>,
   /// Defines the EventDocSyncXsdString Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/wne:eventDocSync"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocSync"))]
   pub event_doc_sync_xsd_string: Option<EventDocSyncXsdString>,
   /// Defines the EventDocXmlAfterInsertXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocXmlAfterInsert"
-  ))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocXmlAfterInsert"))]
   pub event_doc_xml_after_insert_xsd_string: Option<EventDocXmlAfterInsertXsdString>,
   /// Defines the EventDocXmlBeforeDeleteXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocXmlBeforeDelete"
-  ))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocXmlBeforeDelete"))]
   pub event_doc_xml_before_delete_xsd_string: Option<EventDocXmlBeforeDeleteXsdString>,
   /// Defines the EventDocContentControlAfterInsertXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocContentControlAfterInsert"
+    qname = "wne:eventDocContentControlAfterInsert"
   ))]
   pub event_doc_content_control_after_insert_xsd_string:
     Option<EventDocContentControlAfterInsertXsdString>,
   /// Defines the EventDocContentControlBeforeDeleteXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocContentControlBeforeDelete"
+    qname = "wne:eventDocContentControlBeforeDelete"
   ))]
   pub event_doc_content_control_before_delete_xsd_string:
     Option<EventDocContentControlBeforeDeleteXsdString>,
   /// Defines the EventDocContentControlOnExistXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocContentControlOnExit"
+    qname = "wne:eventDocContentControlOnExit"
   ))]
   pub event_doc_content_control_on_exist_xsd_string: Option<EventDocContentControlOnExistXsdString>,
   /// Defines the EventDocContentControlOnEnterXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocContentControlOnEnter"
+    qname = "wne:eventDocContentControlOnEnter"
   ))]
   pub event_doc_content_control_on_enter_xsd_string: Option<EventDocContentControlOnEnterXsdString>,
   /// Defines the EventDocStoreUpdateXsdString Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocStoreUpdate"
-  ))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "wne:eventDocStoreUpdate"))]
   pub event_doc_store_update_xsd_string: Option<EventDocStoreUpdateXsdString>,
   /// Defines the EventDocContentControlUpdateXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocContentControlContentUpdate"
+    qname = "wne:eventDocContentControlContentUpdate"
   ))]
   pub event_doc_content_control_update_xsd_string: Option<EventDocContentControlUpdateXsdString>,
   /// Defines the EventDocBuildingBlockAfterInsertXsdString Class.
   #[sdk(text_child(
     simple_type = "StringValue",
-    qname = "xsd:string/wne:eventDocBuildingBlockAfterInsert"
+    qname = "wne:eventDocBuildingBlockAfterInsert"
   ))]
   pub event_doc_building_block_after_insert_xsd_string:
     Option<EventDocBuildingBlockAfterInsertXsdString>,
 }
 /// Defines the AllocatedCommandManifest Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_AcdManifest/wne:acdManifest")]
+#[sdk(qname = "wne:acdManifest")]
 pub struct AllocatedCommandManifest {
   /// Defines the AllocatedCommandManifestEntry Class.
-  #[sdk(child(qname = "wne:CT_AcdKeymap/wne:acdEntry"))]
+  #[sdk(child(qname = "wne:acdEntry"))]
   pub allocated_command_manifest_entry: Vec<AllocatedCommandManifestEntry>,
 }
 /// Defines the ToolbarData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Rel/wne:toolbarData")]
+#[sdk(qname = "wne:toolbarData")]
 pub struct ToolbarData {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -304,42 +295,42 @@ pub struct ToolbarData {
 }
 /// Defines the KeyMapCustomizations Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Keymaps/wne:keymaps")]
+#[sdk(qname = "wne:keymaps")]
 pub struct KeyMapCustomizations {
   /// Defines the KeyMapEntry Class.
-  #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
+  #[sdk(child(qname = "wne:keymap"))]
   pub key_map_entry: Vec<KeyMapEntry>,
 }
 /// Defines the MismatchedKeyMapCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Keymaps/wne:keymapsBad")]
+#[sdk(qname = "wne:keymapsBad")]
 pub struct MismatchedKeyMapCustomization {
   /// Defines the KeyMapEntry Class.
-  #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
+  #[sdk(child(qname = "wne:keymap"))]
   pub key_map_entry: Vec<KeyMapEntry>,
 }
 /// Defines the Toolbars Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Toolbars/wne:toolbars")]
+#[sdk(qname = "wne:toolbars")]
 pub struct Toolbars {
   /// Defines the AllocatedCommandManifest Class.
-  #[sdk(child(qname = "wne:CT_AcdManifest/wne:acdManifest"))]
+  #[sdk(child(qname = "wne:acdManifest"))]
   pub allocated_command_manifest: Vec<AllocatedCommandManifest>,
   /// Defines the ToolbarData Class.
-  #[sdk(child(qname = "wne:CT_Rel/wne:toolbarData"))]
+  #[sdk(child(qname = "wne:toolbarData"))]
   pub toolbar_data: Vec<ToolbarData>,
 }
 /// Defines the AllocatedCommands Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Acds/wne:acds")]
+#[sdk(qname = "wne:acds")]
 pub struct AllocatedCommands {
   /// Defines the AllocatedCommand Class.
-  #[sdk(child(qname = "wne:CT_Acd/wne:acd"))]
+  #[sdk(child(qname = "wne:acd"))]
   pub allocated_command: Vec<AllocatedCommand>,
 }
 /// Defines the RecordIncluded Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_OnOff/wne:active")]
+#[sdk(qname = "wne:active")]
 pub struct RecordIncluded {
   /// val
   #[sdk(attr(qname = "wne:val"))]
@@ -347,7 +338,7 @@ pub struct RecordIncluded {
 }
 /// Defines the RecordHashCode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_DecimalNumber/wne:hash")]
+#[sdk(qname = "wne:hash")]
 pub struct RecordHashCode {
   /// val
   #[sdk(attr(qname = "wne:val"))]
@@ -355,13 +346,13 @@ pub struct RecordHashCode {
 }
 /// Defines the SingleDataSourceRecord Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_HashedRecipientData/wne:recipientData")]
+#[sdk(qname = "wne:recipientData")]
 pub struct SingleDataSourceRecord {
   /// Defines the RecordIncluded Class.
-  #[sdk(child(qname = "wne:CT_OnOff/wne:active"))]
+  #[sdk(child(qname = "wne:active"))]
   pub record_included: Option<RecordIncluded>,
   /// Defines the RecordHashCode Class.
-  #[sdk(child(qname = "wne:CT_DecimalNumber/wne:hash"))]
+  #[sdk(child(qname = "wne:hash"))]
   pub record_hash_code: std::boxed::Box<RecordHashCode>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

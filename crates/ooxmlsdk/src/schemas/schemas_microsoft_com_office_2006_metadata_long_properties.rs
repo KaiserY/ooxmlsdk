@@ -6,15 +6,15 @@
 
 /// Defines the LongProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "lp:CT_LongProperties/lp:LongProperties")]
+#[sdk(qname = "lp:LongProperties")]
 pub struct LongProperties {
   /// Defines the LongProperty Class.
-  #[sdk(child(qname = "lp:CT_LongProp/lp:LongProp"))]
+  #[sdk(child(qname = "lp:LongProp"))]
   pub long_property: Vec<LongProperty>,
 }
 /// Defines the LongProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "lp:CT_LongProp/lp:LongProp")]
+#[sdk(qname = "lp:LongProp")]
 pub struct LongProperty {
   /// name
   #[sdk(attr(qname = ":name"))]

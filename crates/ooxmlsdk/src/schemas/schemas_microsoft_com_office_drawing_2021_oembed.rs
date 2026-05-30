@@ -6,7 +6,7 @@
 
 /// Defines the OEmbedShared Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "aoe:CT_OEmbedShared/aoe:oembedShared")]
+#[sdk(microsoft365, qname = "aoe:oembedShared")]
 pub struct OEmbedShared {
   /// srcUrl
   #[sdk(attr(microsoft365, qname = ":srcUrl"))]
@@ -15,14 +15,14 @@ pub struct OEmbedShared {
   #[sdk(attr(microsoft365, qname = ":type"))]
   pub r#type: crate::simple_type::StringValue,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(microsoft365, qname = "a:CT_OfficeArtExtensionList/aoe:extLst"))]
+  #[sdk(child(microsoft365, qname = "aoe:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "a:CT_OfficeArtExtensionList/aoe:extLst")]
+#[sdk(microsoft365, qname = "aoe:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

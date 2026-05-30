@@ -6,15 +6,12 @@
 
 /// Defines the PivotCacheDataSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpds:CT_PivotCacheDataSource/xlpds:pivotCacheDataSource"
-)]
+#[sdk(microsoft365, qname = "xlpds:pivotCacheDataSource")]
 pub struct PivotCacheDataSource {
   /// ref
   #[sdk(attr(microsoft365, qname = ":ref"))]
   pub r#ref: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
 }

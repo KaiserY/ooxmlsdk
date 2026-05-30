@@ -20,17 +20,17 @@ pub enum RelationValues {
 }
 /// Set of Additional Characteristics.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ac:CT_AdditionalCharacteristics/ac:additionalCharacteristics")]
+#[sdk(qname = "ac:additionalCharacteristics")]
 pub struct AdditionalCharacteristicsInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Single Characteristic.
-  #[sdk(child(qname = "ac:CT_Characteristic/ac:characteristic"))]
+  #[sdk(child(qname = "ac:characteristic"))]
   pub characteristic: Vec<Characteristic>,
 }
 /// Single Characteristic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ac:CT_Characteristic/ac:characteristic")]
+#[sdk(qname = "ac:characteristic")]
 pub struct Characteristic {
   /// Name of Characteristic
   #[sdk(attr(qname = ":name"))]

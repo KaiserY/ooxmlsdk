@@ -6,7 +6,7 @@
 
 /// VML Diagram Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "pvml:CT_Rel/pvml:textdata")]
+#[sdk(qname = "pvml:textdata")]
 pub struct TextData {
   /// Text Reference
   #[sdk(attr(qname = ":id"))]

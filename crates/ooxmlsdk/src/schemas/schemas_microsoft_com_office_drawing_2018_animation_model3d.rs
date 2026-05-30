@@ -6,21 +6,21 @@
 
 /// Defines the EmbeddedAnimation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim")]
+#[sdk(office2019, qname = "a3danim:embedAnim")]
 pub struct EmbeddedAnimation {
   /// animId
   #[sdk(attr(office2019, qname = ":animId"))]
   pub anim_id: crate::simple_type::UInt32Value,
   /// Defines the AnimationProperties Class.
-  #[sdk(child(office2019, qname = "aanim:CT_AnimationProperties/a3danim:animPr"))]
+  #[sdk(child(office2019, qname = "a3danim:animPr"))]
   pub animation_properties: std::boxed::Box<AnimationProperties>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/a3danim:extLst"))]
+  #[sdk(child(office2019, qname = "a3danim:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the PosterFrame Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a3danim:CT_PosterFrame/a3danim:posterFrame")]
+#[sdk(office2019, qname = "a3danim:posterFrame")]
 pub struct PosterFrame {
   /// animId
   #[sdk(attr(office2019, qname = ":animId"))]
@@ -32,7 +32,7 @@ pub struct PosterFrame {
 }
 /// Defines the AnimationProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "aanim:CT_AnimationProperties/a3danim:animPr")]
+#[sdk(office2019, qname = "a3danim:animPr")]
 pub struct AnimationProperties {
   /// name
   #[sdk(attr(office2019, qname = ":name"))]
@@ -58,14 +58,14 @@ pub struct AnimationProperties {
   #[sdk(attr(office2019, qname = ":end"))]
   pub end: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/aanim:extLst"))]
+  #[sdk(child(office2019, qname = "aanim:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::aanim::OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "a:CT_OfficeArtExtensionList/a3danim:extLst")]
+#[sdk(office2019, qname = "a3danim:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

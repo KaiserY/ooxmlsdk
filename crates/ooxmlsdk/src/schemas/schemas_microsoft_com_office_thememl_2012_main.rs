@@ -6,7 +6,7 @@
 
 /// Defines the ThemeFamily Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "thm15:CT_ThemeFamily/thm15:themeFamily")]
+#[sdk(office2013, qname = "thm15:themeFamily")]
 pub struct ThemeFamily {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// name
@@ -23,20 +23,20 @@ pub struct ThemeFamily {
   #[sdk(string_format(kind = "token"))]
   pub vid: crate::simple_type::StringValue,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst"))]
+  #[sdk(child(office2013, qname = "thm15:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst")]
+#[sdk(office2013, qname = "thm15:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the ThemeVariant Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "thm15:CT_ThemeVariant/thm15:themeVariant")]
+#[sdk(office2013, qname = "thm15:themeVariant")]
 pub struct ThemeVariant {
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
@@ -58,14 +58,14 @@ pub struct ThemeVariant {
   #[sdk(attr(office2013, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst"))]
+  #[sdk(child(office2013, qname = "thm15:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ThemeVariantList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "thm15:CT_ThemeVariantList/thm15:themeVariantLst")]
+#[sdk(office2013, qname = "thm15:themeVariantLst")]
 pub struct ThemeVariantList {
   /// Defines the ThemeVariant Class.
-  #[sdk(child(office2013, qname = "thm15:CT_ThemeVariant/thm15:themeVariant"))]
+  #[sdk(child(office2013, qname = "thm15:themeVariant"))]
   pub theme_variant: Vec<ThemeVariant>,
 }

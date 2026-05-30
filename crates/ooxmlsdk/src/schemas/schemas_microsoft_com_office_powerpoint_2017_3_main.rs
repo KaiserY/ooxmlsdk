@@ -14,18 +14,18 @@ pub enum DisplayLocation {
 }
 /// Defines the TracksInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:CT_TracksInfo/p173:tracksInfo")]
+#[sdk(office2019, qname = "p173:tracksInfo")]
 pub struct TracksInfo {
   /// displayLoc
   #[sdk(attr(office2019, qname = ":displayLoc"))]
   pub display_loc: DisplayLocation,
   /// Defines the TrackList Class.
-  #[sdk(child(office2019, qname = "p173:CT_TrackList/p173:trackLst"))]
+  #[sdk(child(office2019, qname = "p173:trackLst"))]
   pub track_list: Option<TrackList>,
 }
 /// Defines the Track Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:CT_Track/p173:track")]
+#[sdk(office2019, qname = "p173:track")]
 pub struct Track {
   /// id
   #[sdk(attr(office2019, qname = ":id"))]
@@ -47,9 +47,9 @@ pub struct Track {
 }
 /// Defines the TrackList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "p173:CT_TrackList/p173:trackLst")]
+#[sdk(office2019, qname = "p173:trackLst")]
 pub struct TrackList {
   /// Defines the Track Class.
-  #[sdk(child(office2019, qname = "p173:CT_Track/p173:track"))]
+  #[sdk(child(office2019, qname = "p173:track"))]
   pub track: Vec<Track>,
 }

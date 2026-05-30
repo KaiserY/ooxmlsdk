@@ -110,7 +110,7 @@ pub enum VerticalAnchorValues {
 }
 /// Top Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Border/w10:bordertop")]
+#[sdk(qname = "w10:bordertop")]
 pub struct TopBorder {
   /// Border Style
   #[sdk(attr(qname = ":type"))]
@@ -125,7 +125,7 @@ pub struct TopBorder {
 }
 /// Left Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Border/w10:borderleft")]
+#[sdk(qname = "w10:borderleft")]
 pub struct LeftBorder {
   /// Border Style
   #[sdk(attr(qname = ":type"))]
@@ -140,7 +140,7 @@ pub struct LeftBorder {
 }
 /// Right Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Border/w10:borderright")]
+#[sdk(qname = "w10:borderright")]
 pub struct RightBorder {
   /// Border Style
   #[sdk(attr(qname = ":type"))]
@@ -155,7 +155,7 @@ pub struct RightBorder {
 }
 /// Bottom Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Border/w10:borderbottom")]
+#[sdk(qname = "w10:borderbottom")]
 pub struct BottomBorder {
   /// Border Style
   #[sdk(attr(qname = ":type"))]
@@ -170,7 +170,7 @@ pub struct BottomBorder {
 }
 /// Text Wrapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Wrap/w10:wrap")]
+#[sdk(qname = "w10:wrap")]
 pub struct TextWrap {
   /// Wrapping type
   #[sdk(attr(qname = ":type"))]

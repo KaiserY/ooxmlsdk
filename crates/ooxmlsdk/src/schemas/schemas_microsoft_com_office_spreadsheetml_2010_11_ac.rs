@@ -6,7 +6,7 @@
 
 /// Defines the AbsolutePath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15ac:CT_AbsolutePath/x15ac:absPath")]
+#[sdk(office2013, qname = "x15ac:absPath")]
 pub struct AbsolutePath {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// url

@@ -6,23 +6,23 @@
 
 /// Defines the Reactions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p223:CT_Reactions/p223:reactions")]
+#[sdk(microsoft365, qname = "p223:reactions")]
 pub struct Reactions {
   /// Defines the Reaction Class.
-  #[sdk(child(microsoft365, qname = "p223:CT_Reaction/p223:rxn"))]
+  #[sdk(child(microsoft365, qname = "p223:rxn"))]
   pub reaction: Vec<Reaction>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p:CT_ExtensionList/p223:extLst")]
+#[sdk(microsoft365, qname = "p223:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "p:CT_Extension/p:ext"))]
+  #[sdk(child(qname = "p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the ReactionInstance Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p223:CT_ReactionInstance/p223:instance")]
+#[sdk(microsoft365, qname = "p223:instance")]
 pub struct ReactionInstance {
   /// time
   #[sdk(attr(microsoft365, qname = ":time"))]
@@ -32,17 +32,17 @@ pub struct ReactionInstance {
   #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p223:extLst"))]
+  #[sdk(child(microsoft365, qname = "p223:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Reaction Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p223:CT_Reaction/p223:rxn")]
+#[sdk(microsoft365, qname = "p223:rxn")]
 pub struct Reaction {
   /// type
   #[sdk(attr(microsoft365, qname = ":type"))]
   pub r#type: crate::simple_type::StringValue,
   /// Defines the ReactionInstance Class.
-  #[sdk(child(microsoft365, qname = "p223:CT_ReactionInstance/p223:instance"))]
+  #[sdk(child(microsoft365, qname = "p223:instance"))]
   pub reaction_instance: Vec<ReactionInstance>,
 }

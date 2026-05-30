@@ -364,7 +364,7 @@ pub enum TableInterpolationValues {
 }
 /// Defines the Ink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Ink/inkml:ink")]
+#[sdk(qname = "inkml:ink")]
 pub struct Ink {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -387,7 +387,7 @@ pub struct Ink {
 }
 /// Defines the Bind Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Bind/inkml:bind")]
+#[sdk(qname = "inkml:bind")]
 pub struct Bind {
   /// source
   #[sdk(attr(qname = ":source"))]
@@ -404,7 +404,7 @@ pub struct Bind {
 }
 /// Defines the Table Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Table/inkml:table")]
+#[sdk(qname = "inkml:table")]
 pub struct Table {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -420,7 +420,7 @@ pub struct Table {
 }
 /// Defines the Matrix Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Matrix/inkml:matrix")]
+#[sdk(qname = "inkml:matrix")]
 pub struct Matrix {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -430,7 +430,7 @@ pub struct Matrix {
 }
 /// Defines the Mapping Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Mapping/inkml:mapping")]
+#[sdk(qname = "inkml:mapping")]
 pub struct Mapping {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -443,7 +443,7 @@ pub struct Mapping {
   #[sdk(string_format(kind = "uri"))]
   pub mapping_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Bind Class.
-  #[sdk(child(qname = "inkml:CT_Bind/inkml:bind"))]
+  #[sdk(child(qname = "inkml:bind"))]
   pub bind: Vec<Bind>,
   #[sdk(
         choice(
@@ -453,12 +453,12 @@ pub struct Mapping {
     )]
   pub mapping_choice: Option<MappingChoice>,
   /// Defines the Mapping Class.
-  #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
+  #[sdk(child(qname = "inkml:mapping"))]
   pub mapping: Vec<Mapping>,
 }
 /// Defines the Channel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Channel/inkml:channel")]
+#[sdk(qname = "inkml:channel")]
 pub struct Channel {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -581,20 +581,20 @@ pub struct Channel {
   #[sdk(string_format(source = 10u32, union = 0u64, kind = "token"))]
   pub units: Option<crate::simple_type::StringValue>,
   /// Defines the Mapping Class.
-  #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
+  #[sdk(child(qname = "inkml:mapping"))]
   pub mapping: Vec<Mapping>,
 }
 /// Defines the IntermittentChannels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_IntermittentChannels/inkml:intermittentChannels")]
+#[sdk(qname = "inkml:intermittentChannels")]
 pub struct IntermittentChannels {
   /// Defines the Channel Class.
-  #[sdk(child(qname = "inkml:CT_Channel/inkml:channel"))]
+  #[sdk(child(qname = "inkml:channel"))]
   pub channel: Vec<Channel>,
 }
 /// Defines the ChannelProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_ChannelProperty/inkml:channelProperty")]
+#[sdk(qname = "inkml:channelProperty")]
 pub struct ChannelProperty {
   /// channel
   #[sdk(attr(qname = ":channel"))]
@@ -718,21 +718,21 @@ pub struct ChannelProperty {
 }
 /// Defines the TraceFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_TraceFormat/inkml:traceFormat")]
+#[sdk(qname = "inkml:traceFormat")]
 pub struct TraceFormat {
   /// id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the Channel Class.
-  #[sdk(child(qname = "inkml:CT_Channel/inkml:channel"))]
+  #[sdk(child(qname = "inkml:channel"))]
   pub channel: Vec<Channel>,
   /// Defines the IntermittentChannels Class.
-  #[sdk(child(qname = "inkml:CT_IntermittentChannels/inkml:intermittentChannels"))]
+  #[sdk(child(qname = "inkml:intermittentChannels"))]
   pub intermittent_channels: Option<IntermittentChannels>,
 }
 /// Defines the SampleRate Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_SampleRate/inkml:sampleRate")]
+#[sdk(qname = "inkml:sampleRate")]
 pub struct SampleRate {
   /// uniform
   #[sdk(attr(qname = ":uniform"))]
@@ -743,7 +743,7 @@ pub struct SampleRate {
 }
 /// Defines the Latency Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Latency/inkml:latency")]
+#[sdk(qname = "inkml:latency")]
 pub struct Latency {
   /// value
   #[sdk(attr(qname = ":value"))]
@@ -751,7 +751,7 @@ pub struct Latency {
 }
 /// Defines the ActiveArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_ActiveArea/inkml:activeArea")]
+#[sdk(qname = "inkml:activeArea")]
 pub struct ActiveArea {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -817,7 +817,7 @@ pub struct ActiveArea {
 }
 /// Defines the SourceProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_SrcProperty/inkml:srcProperty")]
+#[sdk(qname = "inkml:srcProperty")]
 pub struct SourceProperty {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -880,15 +880,15 @@ pub struct SourceProperty {
 }
 /// Defines the ChannelProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_ChannelProperties/inkml:channelProperties")]
+#[sdk(qname = "inkml:channelProperties")]
 pub struct ChannelProperties {
   /// Defines the ChannelProperty Class.
-  #[sdk(child(qname = "inkml:CT_ChannelProperty/inkml:channelProperty"))]
+  #[sdk(child(qname = "inkml:channelProperty"))]
   pub channel_property: Vec<ChannelProperty>,
 }
 /// Defines the Annotation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Annotation/inkml:annotation")]
+#[sdk(qname = "inkml:annotation")]
 pub struct Annotation {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -901,7 +901,7 @@ pub struct Annotation {
 }
 /// Defines the AnnotationXml Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_AnnotationXML/inkml:annotationXML")]
+#[sdk(qname = "inkml:annotationXML")]
 pub struct AnnotationXml {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -914,12 +914,12 @@ pub struct AnnotationXml {
   #[sdk(string_format(kind = "uri"))]
   pub href: Option<crate::simple_type::StringValue>,
   /// Defines the Emma Class.
-  #[sdk(child(qname = "emma:CT_Emma/emma:emma"))]
+  #[sdk(child(qname = "emma:emma"))]
   pub emma: Option<crate::schemas::emma::Emma>,
 }
 /// Defines the BrushProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_BrushProperty/inkml:brushProperty")]
+#[sdk(qname = "inkml:brushProperty")]
 pub struct BrushProperty {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -1030,15 +1030,15 @@ pub struct BrushProperty {
   #[sdk(string_format(source = 10u32, union = 0u64, kind = "token"))]
   pub units: Option<crate::simple_type::StringValue>,
   /// Defines the Annotation Class.
-  #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
+  #[sdk(child(qname = "inkml:annotation"))]
   pub annotation: Vec<Annotation>,
   /// Defines the AnnotationXml Class.
-  #[sdk(child(qname = "inkml:CT_AnnotationXML/inkml:annotationXML"))]
+  #[sdk(child(qname = "inkml:annotationXML"))]
   pub annotation_xml: Vec<AnnotationXml>,
 }
 /// Defines the Canvas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Canvas/inkml:canvas")]
+#[sdk(qname = "inkml:canvas")]
 pub struct Canvas {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1048,12 +1048,12 @@ pub struct Canvas {
   #[sdk(string_format(kind = "uri"))]
   pub trace_format_ref: Option<crate::simple_type::StringValue>,
   /// Defines the TraceFormat Class.
-  #[sdk(child(qname = "inkml:CT_TraceFormat/inkml:traceFormat"))]
+  #[sdk(child(qname = "inkml:traceFormat"))]
   pub trace_format: Option<std::boxed::Box<TraceFormat>>,
 }
 /// Defines the CanvasTransform Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_CanvasTransform/inkml:canvasTransform")]
+#[sdk(qname = "inkml:canvasTransform")]
 pub struct CanvasTransform {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1062,12 +1062,12 @@ pub struct CanvasTransform {
   #[sdk(attr(qname = ":invertible"))]
   pub invertible: Option<crate::simple_type::BooleanValue>,
   /// Defines the Mapping Class.
-  #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
+  #[sdk(child(qname = "inkml:mapping"))]
   pub mapping: Vec<Mapping>,
 }
 /// Defines the InkSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_InkSource/inkml:inkSource")]
+#[sdk(qname = "inkml:inkSource")]
 pub struct InkSource {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1089,27 +1089,27 @@ pub struct InkSource {
   #[sdk(attr(qname = ":description"))]
   pub description: Option<crate::simple_type::StringValue>,
   /// Defines the TraceFormat Class.
-  #[sdk(child(qname = "inkml:CT_TraceFormat/inkml:traceFormat"))]
+  #[sdk(child(qname = "inkml:traceFormat"))]
   pub trace_format: std::boxed::Box<TraceFormat>,
   /// Defines the SampleRate Class.
-  #[sdk(child(qname = "inkml:CT_SampleRate/inkml:sampleRate"))]
+  #[sdk(child(qname = "inkml:sampleRate"))]
   pub sample_rate: Option<SampleRate>,
   /// Defines the Latency Class.
-  #[sdk(child(qname = "inkml:CT_Latency/inkml:latency"))]
+  #[sdk(child(qname = "inkml:latency"))]
   pub latency: Option<Latency>,
   /// Defines the ActiveArea Class.
-  #[sdk(child(qname = "inkml:CT_ActiveArea/inkml:activeArea"))]
+  #[sdk(child(qname = "inkml:activeArea"))]
   pub active_area: Option<ActiveArea>,
   /// Defines the SourceProperty Class.
-  #[sdk(child(qname = "inkml:CT_SrcProperty/inkml:srcProperty"))]
+  #[sdk(child(qname = "inkml:srcProperty"))]
   pub source_property: Vec<SourceProperty>,
   /// Defines the ChannelProperties Class.
-  #[sdk(child(qname = "inkml:CT_ChannelProperties/inkml:channelProperties"))]
+  #[sdk(child(qname = "inkml:channelProperties"))]
   pub channel_properties: Option<ChannelProperties>,
 }
 /// Defines the Brush Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Brush/inkml:brush")]
+#[sdk(qname = "inkml:brush")]
 pub struct Brush {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1119,18 +1119,18 @@ pub struct Brush {
   #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Annotation Class.
-  #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
+  #[sdk(child(qname = "inkml:annotation"))]
   pub annotation: Vec<Annotation>,
   /// Defines the AnnotationXml Class.
-  #[sdk(child(qname = "inkml:CT_AnnotationXML/inkml:annotationXML"))]
+  #[sdk(child(qname = "inkml:annotationXML"))]
   pub annotation_xml: Vec<AnnotationXml>,
   /// Defines the BrushProperty Class.
-  #[sdk(child(qname = "inkml:CT_BrushProperty/inkml:brushProperty"))]
+  #[sdk(child(qname = "inkml:brushProperty"))]
   pub brush_property: Vec<BrushProperty>,
 }
 /// Defines the Timestamp Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Timestamp/inkml:timestamp")]
+#[sdk(qname = "inkml:timestamp")]
 pub struct Timestamp {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1151,7 +1151,7 @@ pub struct Timestamp {
 }
 /// Defines the Trace Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Trace/inkml:trace")]
+#[sdk(qname = "inkml:trace")]
 pub struct Trace {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1185,7 +1185,7 @@ pub struct Trace {
 }
 /// Defines the TraceGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_TraceGroup/inkml:traceGroup")]
+#[sdk(qname = "inkml:traceGroup")]
 pub struct TraceGroup {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1210,7 +1210,7 @@ pub struct TraceGroup {
 }
 /// Defines the TraceView Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_TraceView/inkml:traceView")]
+#[sdk(qname = "inkml:traceView")]
 pub struct TraceView {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1240,7 +1240,7 @@ pub struct TraceView {
 }
 /// Defines the Context Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Context/inkml:context")]
+#[sdk(qname = "inkml:context")]
 pub struct Context {
   /// id
   #[sdk(attr(qname = "xml:id"))]
@@ -1274,27 +1274,27 @@ pub struct Context {
   #[sdk(string_format(kind = "uri"))]
   pub timestamp_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Canvas Class.
-  #[sdk(child(qname = "inkml:CT_Canvas/inkml:canvas"))]
+  #[sdk(child(qname = "inkml:canvas"))]
   pub canvas: Option<std::boxed::Box<Canvas>>,
   /// Defines the CanvasTransform Class.
-  #[sdk(child(qname = "inkml:CT_CanvasTransform/inkml:canvasTransform"))]
+  #[sdk(child(qname = "inkml:canvasTransform"))]
   pub canvas_transform: Option<CanvasTransform>,
   /// Defines the TraceFormat Class.
-  #[sdk(child(qname = "inkml:CT_TraceFormat/inkml:traceFormat"))]
+  #[sdk(child(qname = "inkml:traceFormat"))]
   pub trace_format: Option<std::boxed::Box<TraceFormat>>,
   /// Defines the InkSource Class.
-  #[sdk(child(qname = "inkml:CT_InkSource/inkml:inkSource"))]
+  #[sdk(child(qname = "inkml:inkSource"))]
   pub ink_source: Option<std::boxed::Box<InkSource>>,
   /// Defines the Brush Class.
-  #[sdk(child(qname = "inkml:CT_Brush/inkml:brush"))]
+  #[sdk(child(qname = "inkml:brush"))]
   pub brush: Option<Brush>,
   /// Defines the Timestamp Class.
-  #[sdk(child(qname = "inkml:CT_Timestamp/inkml:timestamp"))]
+  #[sdk(child(qname = "inkml:timestamp"))]
   pub timestamp: Option<Timestamp>,
 }
 /// Defines the Definitions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "inkml:CT_Definitions/inkml:definitions")]
+#[sdk(qname = "inkml:definitions")]
 pub struct Definitions {
   #[sdk(
         choice(

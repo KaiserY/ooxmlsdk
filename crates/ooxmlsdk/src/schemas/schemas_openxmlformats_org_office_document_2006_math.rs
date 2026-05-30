@@ -140,7 +140,7 @@ pub enum BooleanValues {
 }
 /// Script.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Script/m:scr")]
+#[sdk(qname = "m:scr")]
 pub struct Script {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -148,7 +148,7 @@ pub struct Script {
 }
 /// style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Style/m:sty")]
+#[sdk(qname = "m:sty")]
 pub struct Style {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -156,13 +156,13 @@ pub struct Style {
 }
 /// Defines the Run Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_R/m:r")]
+#[sdk(qname = "m:r")]
 pub struct Run {
   /// Run Properties
-  #[sdk(child(qname = "m:CT_RPR/m:rPr"))]
+  #[sdk(child(qname = "m:rPr"))]
   pub math_run_properties: Option<std::boxed::Box<RunProperties>>,
   /// Run Properties
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties: Option<std::boxed::Box<crate::schemas::w::RunProperties>>,
   #[sdk(
         choice(
@@ -212,259 +212,259 @@ pub struct Run {
 }
 /// Accent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Acc/m:acc")]
+#[sdk(qname = "m:acc")]
 pub struct Accent {
   /// Accent Properties
-  #[sdk(child(qname = "m:CT_AccPr/m:accPr"))]
+  #[sdk(child(qname = "m:accPr"))]
   pub accent_properties: Option<std::boxed::Box<AccentProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Bar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Bar/m:bar")]
+#[sdk(qname = "m:bar")]
 pub struct Bar {
   /// Bar Properties
-  #[sdk(child(qname = "m:CT_BarPr/m:barPr"))]
+  #[sdk(child(qname = "m:barPr"))]
   pub bar_properties: Option<std::boxed::Box<BarProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Box Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Box/m:box")]
+#[sdk(qname = "m:box")]
 pub struct Box {
   /// Box Properties
-  #[sdk(child(qname = "m:CT_BoxPr/m:boxPr"))]
+  #[sdk(child(qname = "m:boxPr"))]
   pub box_properties: Option<std::boxed::Box<BoxProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Border-Box Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BorderBox/m:borderBox")]
+#[sdk(qname = "m:borderBox")]
 pub struct BorderBox {
   /// Border Box Properties
-  #[sdk(child(qname = "m:CT_BorderBoxPr/m:borderBoxPr"))]
+  #[sdk(child(qname = "m:borderBoxPr"))]
   pub border_box_properties: Option<std::boxed::Box<BorderBoxProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Delimiter Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_D/m:d")]
+#[sdk(qname = "m:d")]
 pub struct Delimiter {
   /// Delimiter Properties
-  #[sdk(child(qname = "m:CT_DPr/m:dPr"))]
+  #[sdk(child(qname = "m:dPr"))]
   pub delimiter_properties: Option<std::boxed::Box<DelimiterProperties>>,
   /// Base.
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: Vec<Base>,
 }
 /// Equation-Array Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_EqArr/m:eqArr")]
+#[sdk(qname = "m:eqArr")]
 pub struct EquationArray {
   /// Equation Array Properties
-  #[sdk(child(qname = "m:CT_EqArrPr/m:eqArrPr"))]
+  #[sdk(child(qname = "m:eqArrPr"))]
   pub equation_array_properties: Option<std::boxed::Box<EquationArrayProperties>>,
   /// Base.
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: Vec<Base>,
 }
 /// Fraction Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_F/m:f")]
+#[sdk(qname = "m:f")]
 pub struct Fraction {
   /// Fraction Properties
-  #[sdk(child(qname = "m:CT_FPr/m:fPr"))]
+  #[sdk(child(qname = "m:fPr"))]
   pub fraction_properties: Option<std::boxed::Box<FractionProperties>>,
   /// Numerator
-  #[sdk(child(qname = "m:CT_OMathArg/m:num"))]
+  #[sdk(child(qname = "m:num"))]
   pub numerator: std::boxed::Box<Numerator>,
   /// Denominator
-  #[sdk(child(qname = "m:CT_OMathArg/m:den"))]
+  #[sdk(child(qname = "m:den"))]
   pub denominator: std::boxed::Box<Denominator>,
 }
 /// Function Apply Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Func/m:func")]
+#[sdk(qname = "m:func")]
 pub struct MathFunction {
   /// Function Properties
-  #[sdk(child(qname = "m:CT_FuncPr/m:funcPr"))]
+  #[sdk(child(qname = "m:funcPr"))]
   pub function_properties: Option<std::boxed::Box<FunctionProperties>>,
   /// Function Name
-  #[sdk(child(qname = "m:CT_OMathArg/m:fName"))]
+  #[sdk(child(qname = "m:fName"))]
   pub function_name: std::boxed::Box<FunctionName>,
   /// Base (Argument)
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Group-Character Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_GroupChr/m:groupChr")]
+#[sdk(qname = "m:groupChr")]
 pub struct GroupChar {
   /// Group-Character Properties
-  #[sdk(child(qname = "m:CT_GroupChrPr/m:groupChrPr"))]
+  #[sdk(child(qname = "m:groupChrPr"))]
   pub group_char_properties: Option<std::boxed::Box<GroupCharProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Lower-Limit Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimLow/m:limLow")]
+#[sdk(qname = "m:limLow")]
 pub struct LimitLower {
   /// Lower Limit Properties
-  #[sdk(child(qname = "m:CT_LimLowPr/m:limLowPr"))]
+  #[sdk(child(qname = "m:limLowPr"))]
   pub limit_lower_properties: Option<std::boxed::Box<LimitLowerProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
   /// Limit (Lower)
-  #[sdk(child(qname = "m:CT_OMathArg/m:lim"))]
+  #[sdk(child(qname = "m:lim"))]
   pub limit: std::boxed::Box<Limit>,
 }
 /// Upper-Limit Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimUpp/m:limUpp")]
+#[sdk(qname = "m:limUpp")]
 pub struct LimitUpper {
   /// Upper Limit Properties
-  #[sdk(child(qname = "m:CT_LimUppPr/m:limUppPr"))]
+  #[sdk(child(qname = "m:limUppPr"))]
   pub limit_upper_properties: Option<std::boxed::Box<LimitUpperProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
   /// Limit (Upper)
-  #[sdk(child(qname = "m:CT_OMathArg/m:lim"))]
+  #[sdk(child(qname = "m:lim"))]
   pub limit: std::boxed::Box<Limit>,
 }
 /// Matrix Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_M/m:m")]
+#[sdk(qname = "m:m")]
 pub struct Matrix {
   /// Matrix Properties
-  #[sdk(child(qname = "m:CT_MPr/m:mPr"))]
+  #[sdk(child(qname = "m:mPr"))]
   pub matrix_properties: Option<std::boxed::Box<MatrixProperties>>,
   /// Matrix Row.
-  #[sdk(child(qname = "m:CT_MR/m:mr"))]
+  #[sdk(child(qname = "m:mr"))]
   pub matrix_row: Vec<MatrixRow>,
 }
 /// n-ary Operator Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Nary/m:nary")]
+#[sdk(qname = "m:nary")]
 pub struct Nary {
   /// n-ary Properties
-  #[sdk(child(qname = "m:CT_NaryPr/m:naryPr"))]
+  #[sdk(child(qname = "m:naryPr"))]
   pub nary_properties: Option<std::boxed::Box<NaryProperties>>,
   /// Lower limit (n-ary)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sub"))]
+  #[sdk(child(qname = "m:sub"))]
   pub sub_argument: std::boxed::Box<SubArgument>,
   /// Upper limit (n-ary)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sup"))]
+  #[sdk(child(qname = "m:sup"))]
   pub super_argument: std::boxed::Box<SuperArgument>,
   /// Base (Argument)
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Phantom Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Phant/m:phant")]
+#[sdk(qname = "m:phant")]
 pub struct Phantom {
   /// Phantom Properties
-  #[sdk(child(qname = "m:CT_PhantPr/m:phantPr"))]
+  #[sdk(child(qname = "m:phantPr"))]
   pub phantom_properties: Option<std::boxed::Box<PhantomProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Radical Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Rad/m:rad")]
+#[sdk(qname = "m:rad")]
 pub struct Radical {
   /// Radical Properties
-  #[sdk(child(qname = "m:CT_RadPr/m:radPr"))]
+  #[sdk(child(qname = "m:radPr"))]
   pub radical_properties: Option<std::boxed::Box<RadicalProperties>>,
   /// Degree
-  #[sdk(child(qname = "m:CT_OMathArg/m:deg"))]
+  #[sdk(child(qname = "m:deg"))]
   pub degree: std::boxed::Box<Degree>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Pre-Sub-Superscript Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SPre/m:sPre")]
+#[sdk(qname = "m:sPre")]
 pub struct PreSubSuper {
   /// Pre-Sub-Superscript Properties
-  #[sdk(child(qname = "m:CT_SPrePr/m:sPrePr"))]
+  #[sdk(child(qname = "m:sPrePr"))]
   pub pre_sub_super_properties: Option<std::boxed::Box<PreSubSuperProperties>>,
   /// Subscript (Pre-Sub-Superscript)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sub"))]
+  #[sdk(child(qname = "m:sub"))]
   pub sub_argument: std::boxed::Box<SubArgument>,
   /// Superscript(Pre-Sub-Superscript function)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sup"))]
+  #[sdk(child(qname = "m:sup"))]
   pub super_argument: std::boxed::Box<SuperArgument>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
 }
 /// Subscript Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSub/m:sSub")]
+#[sdk(qname = "m:sSub")]
 pub struct Subscript {
   /// Subscript Properties
-  #[sdk(child(qname = "m:CT_SSubPr/m:sSubPr"))]
+  #[sdk(child(qname = "m:sSubPr"))]
   pub subscript_properties: Option<std::boxed::Box<SubscriptProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
   /// Subscript (Subscript function)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sub"))]
+  #[sdk(child(qname = "m:sub"))]
   pub sub_argument: std::boxed::Box<SubArgument>,
 }
 /// Sub-Superscript Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSubSup/m:sSubSup")]
+#[sdk(qname = "m:sSubSup")]
 pub struct SubSuperscript {
   /// Sub-Superscript Properties
-  #[sdk(child(qname = "m:CT_SSubSupPr/m:sSubSupPr"))]
+  #[sdk(child(qname = "m:sSubSupPr"))]
   pub sub_superscript_properties: Option<std::boxed::Box<SubSuperscriptProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
   /// Subscript (Sub-Superscript)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sub"))]
+  #[sdk(child(qname = "m:sub"))]
   pub sub_argument: std::boxed::Box<SubArgument>,
   /// Superscript (Sub-Superscript function)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sup"))]
+  #[sdk(child(qname = "m:sup"))]
   pub super_argument: std::boxed::Box<SuperArgument>,
 }
 /// Superscript Function.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSup/m:sSup")]
+#[sdk(qname = "m:sSup")]
 pub struct Superscript {
   /// Superscript Properties
-  #[sdk(child(qname = "m:CT_SSupPr/m:sSupPr"))]
+  #[sdk(child(qname = "m:sSupPr"))]
   pub superscript_properties: Option<std::boxed::Box<SuperscriptProperties>>,
   /// Base
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: std::boxed::Box<Base>,
   /// Superscript (Superscript function)
-  #[sdk(child(qname = "m:CT_OMathArg/m:sup"))]
+  #[sdk(child(qname = "m:sup"))]
   pub super_argument: std::boxed::Box<SuperArgument>,
 }
 /// Defines the Paragraph Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathPara/m:oMathPara")]
+#[sdk(qname = "m:oMathPara")]
 pub struct Paragraph {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Office Math Paragraph Properties
-  #[sdk(child(qname = "m:CT_OMathParaPr/m:oMathParaPr"))]
+  #[sdk(child(qname = "m:oMathParaPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(
         choice(
@@ -532,7 +532,7 @@ pub struct Paragraph {
 }
 /// Defines the OfficeMath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMath/m:oMath")]
+#[sdk(qname = "m:oMath")]
 pub struct OfficeMath {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
@@ -623,43 +623,43 @@ pub struct OfficeMath {
 }
 /// Math Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MathPr/m:mathPr")]
+#[sdk(qname = "m:mathPr")]
 pub struct MathProperties {
   /// Math Font
-  #[sdk(child(qname = "m:CT_FontFace/m:mathFont"))]
+  #[sdk(child(qname = "m:mathFont"))]
   pub math_font: Option<MathFont>,
   /// Break on Binary Operators
-  #[sdk(child(qname = "m:CT_BreakBin/m:brkBin"))]
+  #[sdk(child(qname = "m:brkBin"))]
   pub break_binary: Option<BreakBinary>,
   /// Break on Binary Subtraction
-  #[sdk(child(qname = "m:CT_BreakBinSub/m:brkBinSub"))]
+  #[sdk(child(qname = "m:brkBinSub"))]
   pub break_binary_subtraction: Option<BreakBinarySubtraction>,
   /// Small Fraction
-  #[sdk(child(qname = "m:CT_OnOff/m:smallFrac"))]
+  #[sdk(child(qname = "m:smallFrac"))]
   pub small_fraction: Option<SmallFraction>,
   /// Use Display Math Defaults
-  #[sdk(child(qname = "m:CT_OnOff/m:dispDef"))]
+  #[sdk(child(qname = "m:dispDef"))]
   pub display_defaults: Option<DisplayDefaults>,
   /// Left Margin
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:lMargin"))]
+  #[sdk(child(qname = "m:lMargin"))]
   pub left_margin: Option<LeftMargin>,
   /// Right Margin
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:rMargin"))]
+  #[sdk(child(qname = "m:rMargin"))]
   pub right_margin: Option<RightMargin>,
   /// Default Justification
-  #[sdk(child(qname = "m:CT_OMathJc/m:defJc"))]
+  #[sdk(child(qname = "m:defJc"))]
   pub default_justification: Option<DefaultJustification>,
   /// Pre-Equation Spacing
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:preSp"))]
+  #[sdk(child(qname = "m:preSp"))]
   pub pre_spacing: Option<PreSpacing>,
   /// Post-Equation Spacing
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:postSp"))]
+  #[sdk(child(qname = "m:postSp"))]
   pub post_spacing: Option<PostSpacing>,
   /// Inter-Equation Spacing
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:interSp"))]
+  #[sdk(child(qname = "m:interSp"))]
   pub inter_spacing: Option<InterSpacing>,
   /// Intra-Equation Spacing
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:intraSp"))]
+  #[sdk(child(qname = "m:intraSp"))]
   pub intra_spacing: Option<IntraSpacing>,
   #[sdk(
         choice(
@@ -669,15 +669,15 @@ pub struct MathProperties {
     )]
   pub math_properties_choice: Option<MathPropertiesChoice>,
   /// Integral Limit Locations.
-  #[sdk(child(qname = "m:CT_LimLoc/m:intLim"))]
+  #[sdk(child(qname = "m:intLim"))]
   pub integral_limit_location: Option<IntegralLimitLocation>,
   /// n-ary Limit Location.
-  #[sdk(child(qname = "m:CT_LimLoc/m:naryLim"))]
+  #[sdk(child(qname = "m:naryLim"))]
   pub nary_limit_location: Option<NaryLimitLocation>,
 }
 /// Literal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:lit")]
+#[sdk(qname = "m:lit")]
 pub struct Literal {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -685,7 +685,7 @@ pub struct Literal {
 }
 /// Normal Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:nor")]
+#[sdk(qname = "m:nor")]
 pub struct NormalText {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -693,7 +693,7 @@ pub struct NormalText {
 }
 /// Align.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:aln")]
+#[sdk(qname = "m:aln")]
 pub struct Alignment {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -701,7 +701,7 @@ pub struct Alignment {
 }
 /// Operator Emulator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:opEmu")]
+#[sdk(qname = "m:opEmu")]
 pub struct OperatorEmulator {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -709,7 +709,7 @@ pub struct OperatorEmulator {
 }
 /// No Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:noBreak")]
+#[sdk(qname = "m:noBreak")]
 pub struct NoBreak {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -717,7 +717,7 @@ pub struct NoBreak {
 }
 /// Differential.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:diff")]
+#[sdk(qname = "m:diff")]
 pub struct Differential {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -725,7 +725,7 @@ pub struct Differential {
 }
 /// Hide Top Edge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:hideTop")]
+#[sdk(qname = "m:hideTop")]
 pub struct HideTop {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -733,7 +733,7 @@ pub struct HideTop {
 }
 /// Hide Bottom Edge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:hideBot")]
+#[sdk(qname = "m:hideBot")]
 pub struct HideBottom {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -741,7 +741,7 @@ pub struct HideBottom {
 }
 /// Hide Left Edge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:hideLeft")]
+#[sdk(qname = "m:hideLeft")]
 pub struct HideLeft {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -749,7 +749,7 @@ pub struct HideLeft {
 }
 /// Hide Right Edge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:hideRight")]
+#[sdk(qname = "m:hideRight")]
 pub struct HideRight {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -757,7 +757,7 @@ pub struct HideRight {
 }
 /// Border Box Strikethrough Horizontal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:strikeH")]
+#[sdk(qname = "m:strikeH")]
 pub struct StrikeHorizontal {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -765,7 +765,7 @@ pub struct StrikeHorizontal {
 }
 /// Border Box Strikethrough Vertical.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:strikeV")]
+#[sdk(qname = "m:strikeV")]
 pub struct StrikeVertical {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -773,7 +773,7 @@ pub struct StrikeVertical {
 }
 /// Border Box Strikethrough Bottom-Left to Top-Right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:strikeBLTR")]
+#[sdk(qname = "m:strikeBLTR")]
 pub struct StrikeBottomLeftToTopRight {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -781,7 +781,7 @@ pub struct StrikeBottomLeftToTopRight {
 }
 /// Border Box Strikethrough Top-Left to Bottom-Right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:strikeTLBR")]
+#[sdk(qname = "m:strikeTLBR")]
 pub struct StrikeTopLeftToBottomRight {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -789,7 +789,7 @@ pub struct StrikeTopLeftToBottomRight {
 }
 /// Delimiter Grow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:grow")]
+#[sdk(qname = "m:grow")]
 pub struct GrowOperators {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -797,7 +797,7 @@ pub struct GrowOperators {
 }
 /// Maximum Distribution.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:maxDist")]
+#[sdk(qname = "m:maxDist")]
 pub struct MaxDistribution {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -805,7 +805,7 @@ pub struct MaxDistribution {
 }
 /// Object Distribution.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:objDist")]
+#[sdk(qname = "m:objDist")]
 pub struct ObjectDistribution {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -813,7 +813,7 @@ pub struct ObjectDistribution {
 }
 /// Hide Placeholders (Matrix).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:plcHide")]
+#[sdk(qname = "m:plcHide")]
 pub struct HidePlaceholder {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -821,7 +821,7 @@ pub struct HidePlaceholder {
 }
 /// Hide Subscript (n-ary).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:subHide")]
+#[sdk(qname = "m:subHide")]
 pub struct HideSubArgument {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -829,7 +829,7 @@ pub struct HideSubArgument {
 }
 /// Hide Superscript (n-ary).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:supHide")]
+#[sdk(qname = "m:supHide")]
 pub struct HideSuperArgument {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -837,7 +837,7 @@ pub struct HideSuperArgument {
 }
 /// Phantom Show.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:show")]
+#[sdk(qname = "m:show")]
 pub struct ShowPhantom {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -845,7 +845,7 @@ pub struct ShowPhantom {
 }
 /// Phantom Zero Width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:zeroWid")]
+#[sdk(qname = "m:zeroWid")]
 pub struct ZeroWidth {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -853,7 +853,7 @@ pub struct ZeroWidth {
 }
 /// Phantom Zero Ascent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:zeroAsc")]
+#[sdk(qname = "m:zeroAsc")]
 pub struct ZeroAscent {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -861,7 +861,7 @@ pub struct ZeroAscent {
 }
 /// Phantom Zero Descent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:zeroDesc")]
+#[sdk(qname = "m:zeroDesc")]
 pub struct ZeroDescent {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -869,7 +869,7 @@ pub struct ZeroDescent {
 }
 /// Transparent (Phantom).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:transp")]
+#[sdk(qname = "m:transp")]
 pub struct Transparent {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -877,7 +877,7 @@ pub struct Transparent {
 }
 /// Hide Degree.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:degHide")]
+#[sdk(qname = "m:degHide")]
 pub struct HideDegree {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -885,7 +885,7 @@ pub struct HideDegree {
 }
 /// Align Scripts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:alnScr")]
+#[sdk(qname = "m:alnScr")]
 pub struct AlignScripts {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -893,7 +893,7 @@ pub struct AlignScripts {
 }
 /// Small Fraction.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:smallFrac")]
+#[sdk(qname = "m:smallFrac")]
 pub struct SmallFraction {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -901,7 +901,7 @@ pub struct SmallFraction {
 }
 /// Use Display Math Defaults.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:dispDef")]
+#[sdk(qname = "m:dispDef")]
 pub struct DisplayDefaults {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -909,7 +909,7 @@ pub struct DisplayDefaults {
 }
 /// Wrap Right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OnOff/m:wrapRight")]
+#[sdk(qname = "m:wrapRight")]
 pub struct WrapRight {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -917,7 +917,7 @@ pub struct WrapRight {
 }
 /// Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_ManualBreak/m:brk")]
+#[sdk(qname = "m:brk")]
 pub struct Break {
   /// Index of Operator to Align To
   #[sdk(attr(qname = "m:alnAt"))]
@@ -930,10 +930,10 @@ pub struct Break {
 }
 /// Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_RPR/m:rPr")]
+#[sdk(qname = "m:rPr")]
 pub struct RunProperties {
   /// Literal
-  #[sdk(child(qname = "m:CT_OnOff/m:lit"))]
+  #[sdk(child(qname = "m:lit"))]
   pub literal: Option<Literal>,
   #[sdk(
         choice(
@@ -943,15 +943,15 @@ pub struct RunProperties {
     )]
   pub run_properties_choice: Option<RunPropertiesChoice>,
   /// Break.
-  #[sdk(child(qname = "m:CT_ManualBreak/m:brk"))]
+  #[sdk(child(qname = "m:brk"))]
   pub r#break: Option<Break>,
   /// Align.
-  #[sdk(child(qname = "m:CT_OnOff/m:aln"))]
+  #[sdk(child(qname = "m:aln"))]
   pub alignment: Option<Alignment>,
 }
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Text/m:t")]
+#[sdk(qname = "m:t")]
 pub struct Text {
   /// space
   #[sdk(attr(qname = "xml:space"))]
@@ -961,7 +961,7 @@ pub struct Text {
 }
 /// Accent Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Char/m:chr")]
+#[sdk(qname = "m:chr")]
 pub struct AccentChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -970,7 +970,7 @@ pub struct AccentChar {
 }
 /// Delimiter Beginning Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Char/m:begChr")]
+#[sdk(qname = "m:begChr")]
 pub struct BeginChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -979,7 +979,7 @@ pub struct BeginChar {
 }
 /// Delimiter Separator Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Char/m:sepChr")]
+#[sdk(qname = "m:sepChr")]
 pub struct SeparatorChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -988,7 +988,7 @@ pub struct SeparatorChar {
 }
 /// Delimiter Ending Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Char/m:endChr")]
+#[sdk(qname = "m:endChr")]
 pub struct EndChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
@@ -997,7 +997,7 @@ pub struct EndChar {
 }
 /// Control Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_CtrlPr/m:ctrlPr")]
+#[sdk(qname = "m:ctrlPr")]
 pub struct ControlProperties {
   #[sdk(
         choice(
@@ -1013,21 +1013,21 @@ pub struct ControlProperties {
 }
 /// Accent Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_AccPr/m:accPr")]
+#[sdk(qname = "m:accPr")]
 pub struct AccentProperties {
   /// Accent Character
-  #[sdk(child(qname = "m:CT_Char/m:chr"))]
+  #[sdk(child(qname = "m:chr"))]
   pub accent_char: Option<AccentChar>,
   /// Control Properties
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Base.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:e")]
+#[sdk(qname = "m:e")]
 pub struct Base {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1115,15 +1115,15 @@ pub struct Base {
     )]
   pub base_choice: Vec<BaseChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Numerator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:num")]
+#[sdk(qname = "m:num")]
 pub struct Numerator {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1211,15 +1211,15 @@ pub struct Numerator {
     )]
   pub numerator_choice: Vec<NumeratorChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Denominator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:den")]
+#[sdk(qname = "m:den")]
 pub struct Denominator {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1307,15 +1307,15 @@ pub struct Denominator {
     )]
   pub denominator_choice: Vec<DenominatorChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Function Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:fName")]
+#[sdk(qname = "m:fName")]
 pub struct FunctionName {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1403,15 +1403,15 @@ pub struct FunctionName {
     )]
   pub function_name_choice: Vec<FunctionNameChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Limit (Lower).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:lim")]
+#[sdk(qname = "m:lim")]
 pub struct Limit {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1499,15 +1499,15 @@ pub struct Limit {
     )]
   pub limit_choice: Vec<LimitChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Lower limit (n-ary) .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:sub")]
+#[sdk(qname = "m:sub")]
 pub struct SubArgument {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1595,15 +1595,15 @@ pub struct SubArgument {
     )]
   pub sub_argument_choice: Vec<SubArgumentChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Upper limit (n-ary).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:sup")]
+#[sdk(qname = "m:sup")]
 pub struct SuperArgument {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1691,15 +1691,15 @@ pub struct SuperArgument {
     )]
   pub super_argument_choice: Vec<SuperArgumentChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Degree.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArg/m:deg")]
+#[sdk(qname = "m:deg")]
 pub struct Degree {
   /// Argument Properties
-  #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
+  #[sdk(child(qname = "m:argPr"))]
   pub argument_properties: Option<std::boxed::Box<ArgumentProperties>>,
   #[sdk(
         choice(
@@ -1787,12 +1787,12 @@ pub struct Degree {
     )]
   pub degree_choice: Vec<DegreeChoice>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Position (Bar).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TopBot/m:pos")]
+#[sdk(qname = "m:pos")]
 pub struct Position {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1800,7 +1800,7 @@ pub struct Position {
 }
 /// Vertical Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TopBot/m:vertJc")]
+#[sdk(qname = "m:vertJc")]
 pub struct VerticalJustification {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1808,73 +1808,73 @@ pub struct VerticalJustification {
 }
 /// Bar Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BarPr/m:barPr")]
+#[sdk(qname = "m:barPr")]
 pub struct BarProperties {
   /// Position (Bar)
-  #[sdk(child(qname = "m:CT_TopBot/m:pos"))]
+  #[sdk(child(qname = "m:pos"))]
   pub position: Option<Position>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Box Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BoxPr/m:boxPr")]
+#[sdk(qname = "m:boxPr")]
 pub struct BoxProperties {
   /// Operator Emulator
-  #[sdk(child(qname = "m:CT_OnOff/m:opEmu"))]
+  #[sdk(child(qname = "m:opEmu"))]
   pub operator_emulator: Option<OperatorEmulator>,
   /// No Break
-  #[sdk(child(qname = "m:CT_OnOff/m:noBreak"))]
+  #[sdk(child(qname = "m:noBreak"))]
   pub no_break: Option<NoBreak>,
   /// Differential
-  #[sdk(child(qname = "m:CT_OnOff/m:diff"))]
+  #[sdk(child(qname = "m:diff"))]
   pub differential: Option<Differential>,
   /// Break
-  #[sdk(child(qname = "m:CT_ManualBreak/m:brk"))]
+  #[sdk(child(qname = "m:brk"))]
   pub r#break: Option<Break>,
   /// Alignment
-  #[sdk(child(qname = "m:CT_OnOff/m:aln"))]
+  #[sdk(child(qname = "m:aln"))]
   pub alignment: Option<Alignment>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Border Box Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BorderBoxPr/m:borderBoxPr")]
+#[sdk(qname = "m:borderBoxPr")]
 pub struct BorderBoxProperties {
   /// Hide Top Edge
-  #[sdk(child(qname = "m:CT_OnOff/m:hideTop"))]
+  #[sdk(child(qname = "m:hideTop"))]
   pub hide_top: Option<HideTop>,
   /// Hide Bottom Edge
-  #[sdk(child(qname = "m:CT_OnOff/m:hideBot"))]
+  #[sdk(child(qname = "m:hideBot"))]
   pub hide_bottom: Option<HideBottom>,
   /// Hide Left Edge
-  #[sdk(child(qname = "m:CT_OnOff/m:hideLeft"))]
+  #[sdk(child(qname = "m:hideLeft"))]
   pub hide_left: Option<HideLeft>,
   /// Hide Right Edge
-  #[sdk(child(qname = "m:CT_OnOff/m:hideRight"))]
+  #[sdk(child(qname = "m:hideRight"))]
   pub hide_right: Option<HideRight>,
   /// Border Box Strikethrough Horizontal
-  #[sdk(child(qname = "m:CT_OnOff/m:strikeH"))]
+  #[sdk(child(qname = "m:strikeH"))]
   pub strike_horizontal: Option<StrikeHorizontal>,
   /// Border Box Strikethrough Vertical
-  #[sdk(child(qname = "m:CT_OnOff/m:strikeV"))]
+  #[sdk(child(qname = "m:strikeV"))]
   pub strike_vertical: Option<StrikeVertical>,
   /// Border Box Strikethrough Bottom-Left to Top-Right
-  #[sdk(child(qname = "m:CT_OnOff/m:strikeBLTR"))]
+  #[sdk(child(qname = "m:strikeBLTR"))]
   pub strike_bottom_left_to_top_right: Option<StrikeBottomLeftToTopRight>,
   /// Border Box Strikethrough Top-Left to Bottom-Right
-  #[sdk(child(qname = "m:CT_OnOff/m:strikeTLBR"))]
+  #[sdk(child(qname = "m:strikeTLBR"))]
   pub strike_top_left_to_bottom_right: Option<StrikeTopLeftToBottomRight>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Shape (Delimiters).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Shp/m:shp")]
+#[sdk(qname = "m:shp")]
 pub struct Shape {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1882,30 +1882,30 @@ pub struct Shape {
 }
 /// Delimiter Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_DPr/m:dPr")]
+#[sdk(qname = "m:dPr")]
 pub struct DelimiterProperties {
   /// Delimiter Beginning Character
-  #[sdk(child(qname = "m:CT_Char/m:begChr"))]
+  #[sdk(child(qname = "m:begChr"))]
   pub begin_char: Option<BeginChar>,
   /// Delimiter Separator Character
-  #[sdk(child(qname = "m:CT_Char/m:sepChr"))]
+  #[sdk(child(qname = "m:sepChr"))]
   pub separator_char: Option<SeparatorChar>,
   /// Delimiter Ending Character
-  #[sdk(child(qname = "m:CT_Char/m:endChr"))]
+  #[sdk(child(qname = "m:endChr"))]
   pub end_char: Option<EndChar>,
   /// Delimiter Grow
-  #[sdk(child(qname = "m:CT_OnOff/m:grow"))]
+  #[sdk(child(qname = "m:grow"))]
   pub grow_operators: Option<GrowOperators>,
   /// Shape (Delimiters)
-  #[sdk(child(qname = "m:CT_Shp/m:shp"))]
+  #[sdk(child(qname = "m:shp"))]
   pub shape: Option<Shape>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Equation Array Base Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_YAlign/m:baseJc")]
+#[sdk(qname = "m:baseJc")]
 pub struct BaseJustification {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1913,7 +1913,7 @@ pub struct BaseJustification {
 }
 /// Row Spacing Rule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SpacingRule/m:rSpRule")]
+#[sdk(qname = "m:rSpRule")]
 pub struct RowSpacingRule {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1922,7 +1922,7 @@ pub struct RowSpacingRule {
 }
 /// Matrix Column Gap Rule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SpacingRule/m:cGpRule")]
+#[sdk(qname = "m:cGpRule")]
 pub struct ColumnGapRule {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1931,7 +1931,7 @@ pub struct ColumnGapRule {
 }
 /// Row Spacing (Equation Array).
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_UnSignedShort/m:rSp")]
+#[sdk(qname = "m:rSp")]
 pub struct RowSpacing {
   /// val
   #[sdk(attr(qname = "m:val"))]
@@ -1939,7 +1939,7 @@ pub struct RowSpacing {
 }
 /// Matrix Column Gap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_UnSignedShort/m:cGp")]
+#[sdk(qname = "m:cGp")]
 pub struct ColumnGap {
   /// val
   #[sdk(attr(qname = "m:val"))]
@@ -1947,30 +1947,30 @@ pub struct ColumnGap {
 }
 /// Equation Array Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_EqArrPr/m:eqArrPr")]
+#[sdk(qname = "m:eqArrPr")]
 pub struct EquationArrayProperties {
   /// Equation Array Base Justification
-  #[sdk(child(qname = "m:CT_YAlign/m:baseJc"))]
+  #[sdk(child(qname = "m:baseJc"))]
   pub base_justification: Option<BaseJustification>,
   /// Maximum Distribution
-  #[sdk(child(qname = "m:CT_OnOff/m:maxDist"))]
+  #[sdk(child(qname = "m:maxDist"))]
   pub max_distribution: Option<MaxDistribution>,
   /// Object Distribution
-  #[sdk(child(qname = "m:CT_OnOff/m:objDist"))]
+  #[sdk(child(qname = "m:objDist"))]
   pub object_distribution: Option<ObjectDistribution>,
   /// Row Spacing Rule
-  #[sdk(child(qname = "m:CT_SpacingRule/m:rSpRule"))]
+  #[sdk(child(qname = "m:rSpRule"))]
   pub row_spacing_rule: Option<RowSpacingRule>,
   /// Row Spacing (Equation Array)
-  #[sdk(child(qname = "m:CT_UnSignedShort/m:rSp"))]
+  #[sdk(child(qname = "m:rSp"))]
   pub row_spacing: Option<RowSpacing>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Fraction type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_FType/m:type")]
+#[sdk(qname = "m:type")]
 pub struct FractionType {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -1978,59 +1978,59 @@ pub struct FractionType {
 }
 /// Fraction Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_FPr/m:fPr")]
+#[sdk(qname = "m:fPr")]
 pub struct FractionProperties {
   /// Fraction type
-  #[sdk(child(qname = "m:CT_FType/m:type"))]
+  #[sdk(child(qname = "m:type"))]
   pub fraction_type: Option<FractionType>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Function Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_FuncPr/m:funcPr")]
+#[sdk(qname = "m:funcPr")]
 pub struct FunctionProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Group-Character Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_GroupChrPr/m:groupChrPr")]
+#[sdk(qname = "m:groupChrPr")]
 pub struct GroupCharProperties {
   /// Group Character (Grouping Character)
-  #[sdk(child(qname = "m:CT_Char/m:chr"))]
+  #[sdk(child(qname = "m:chr"))]
   pub accent_char: Option<AccentChar>,
   /// Position (Group Character)
-  #[sdk(child(qname = "m:CT_TopBot/m:pos"))]
+  #[sdk(child(qname = "m:pos"))]
   pub position: Option<Position>,
   /// Vertical Justification
-  #[sdk(child(qname = "m:CT_TopBot/m:vertJc"))]
+  #[sdk(child(qname = "m:vertJc"))]
   pub vertical_justification: Option<VerticalJustification>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Lower Limit Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimLowPr/m:limLowPr")]
+#[sdk(qname = "m:limLowPr")]
 pub struct LimitLowerProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Upper Limit Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimUppPr/m:limUppPr")]
+#[sdk(qname = "m:limUppPr")]
 pub struct LimitUpperProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Matrix Column Count.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Integer64/m:count")]
+#[sdk(qname = "m:count")]
 pub struct MatrixColumnCount {
   /// val
   #[sdk(attr(qname = "m:val"))]
@@ -2039,7 +2039,7 @@ pub struct MatrixColumnCount {
 }
 /// Matrix Column Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_XAlign/m:mcJc")]
+#[sdk(qname = "m:mcJc")]
 pub struct MatrixColumnJustification {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2047,26 +2047,26 @@ pub struct MatrixColumnJustification {
 }
 /// Matrix Column Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MCPr/m:mcPr")]
+#[sdk(qname = "m:mcPr")]
 pub struct MatrixColumnProperties {
   /// Matrix Column Count
-  #[sdk(child(qname = "m:CT_Integer64/m:count"))]
+  #[sdk(child(qname = "m:count"))]
   pub matrix_column_count: Option<MatrixColumnCount>,
   /// Matrix Column Justification
-  #[sdk(child(qname = "m:CT_XAlign/m:mcJc"))]
+  #[sdk(child(qname = "m:mcJc"))]
   pub matrix_column_justification: Option<MatrixColumnJustification>,
 }
 /// Matrix Column.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MC/m:mc")]
+#[sdk(qname = "m:mc")]
 pub struct MatrixColumn {
   /// Matrix Column Properties
-  #[sdk(child(qname = "m:CT_MCPr/m:mcPr"))]
+  #[sdk(child(qname = "m:mcPr"))]
   pub matrix_column_properties: Option<std::boxed::Box<MatrixColumnProperties>>,
 }
 /// Matrix Column Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:cSp")]
+#[sdk(qname = "m:cSp")]
 pub struct ColumnSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2075,7 +2075,7 @@ pub struct ColumnSpacing {
 }
 /// Left Margin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:lMargin")]
+#[sdk(qname = "m:lMargin")]
 pub struct LeftMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2084,7 +2084,7 @@ pub struct LeftMargin {
 }
 /// Right Margin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:rMargin")]
+#[sdk(qname = "m:rMargin")]
 pub struct RightMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2093,7 +2093,7 @@ pub struct RightMargin {
 }
 /// Pre-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:preSp")]
+#[sdk(qname = "m:preSp")]
 pub struct PreSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2102,7 +2102,7 @@ pub struct PreSpacing {
 }
 /// Post-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:postSp")]
+#[sdk(qname = "m:postSp")]
 pub struct PostSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2111,7 +2111,7 @@ pub struct PostSpacing {
 }
 /// Inter-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:interSp")]
+#[sdk(qname = "m:interSp")]
 pub struct InterSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2120,7 +2120,7 @@ pub struct InterSpacing {
 }
 /// Intra-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:intraSp")]
+#[sdk(qname = "m:intraSp")]
 pub struct IntraSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2129,7 +2129,7 @@ pub struct IntraSpacing {
 }
 /// Wrap Indent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_TwipsMeasure/m:wrapIndent")]
+#[sdk(qname = "m:wrapIndent")]
 pub struct WrapIndent {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2138,55 +2138,55 @@ pub struct WrapIndent {
 }
 /// Matrix Columns.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MCS/m:mcs")]
+#[sdk(qname = "m:mcs")]
 pub struct MatrixColumns {
   /// Matrix Column.
-  #[sdk(child(qname = "m:CT_MC/m:mc"))]
+  #[sdk(child(qname = "m:mc"))]
   pub matrix_column: Vec<MatrixColumn>,
 }
 /// Matrix Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MPr/m:mPr")]
+#[sdk(qname = "m:mPr")]
 pub struct MatrixProperties {
   /// Matrix Base Justification
-  #[sdk(child(qname = "m:CT_YAlign/m:baseJc"))]
+  #[sdk(child(qname = "m:baseJc"))]
   pub base_justification: Option<BaseJustification>,
   /// Hide Placeholders (Matrix)
-  #[sdk(child(qname = "m:CT_OnOff/m:plcHide"))]
+  #[sdk(child(qname = "m:plcHide"))]
   pub hide_placeholder: Option<HidePlaceholder>,
   /// Row Spacing Rule
-  #[sdk(child(qname = "m:CT_SpacingRule/m:rSpRule"))]
+  #[sdk(child(qname = "m:rSpRule"))]
   pub row_spacing_rule: Option<RowSpacingRule>,
   /// Matrix Column Gap Rule
-  #[sdk(child(qname = "m:CT_SpacingRule/m:cGpRule"))]
+  #[sdk(child(qname = "m:cGpRule"))]
   pub column_gap_rule: Option<ColumnGapRule>,
   /// Row Spacing (Matrix)
-  #[sdk(child(qname = "m:CT_UnSignedShort/m:rSp"))]
+  #[sdk(child(qname = "m:rSp"))]
   pub row_spacing: Option<RowSpacing>,
   /// Matrix Column Spacing
-  #[sdk(child(qname = "m:CT_TwipsMeasure/m:cSp"))]
+  #[sdk(child(qname = "m:cSp"))]
   pub column_spacing: Option<ColumnSpacing>,
   /// Matrix Column Gap
-  #[sdk(child(qname = "m:CT_UnSignedShort/m:cGp"))]
+  #[sdk(child(qname = "m:cGp"))]
   pub column_gap: Option<ColumnGap>,
   /// Matrix Columns
-  #[sdk(child(qname = "m:CT_MCS/m:mcs"))]
+  #[sdk(child(qname = "m:mcs"))]
   pub matrix_columns: Option<MatrixColumns>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Matrix Row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_MR/m:mr")]
+#[sdk(qname = "m:mr")]
 pub struct MatrixRow {
   /// Base.
-  #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
+  #[sdk(child(qname = "m:e"))]
   pub base: Vec<Base>,
 }
 /// n-ary Limit Location.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimLoc/m:limLoc")]
+#[sdk(qname = "m:limLoc")]
 pub struct LimitLocation {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2194,7 +2194,7 @@ pub struct LimitLocation {
 }
 /// Integral Limit Locations.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimLoc/m:intLim")]
+#[sdk(qname = "m:intLim")]
 pub struct IntegralLimitLocation {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2202,7 +2202,7 @@ pub struct IntegralLimitLocation {
 }
 /// n-ary Limit Location.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_LimLoc/m:naryLim")]
+#[sdk(qname = "m:naryLim")]
 pub struct NaryLimitLocation {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2210,99 +2210,99 @@ pub struct NaryLimitLocation {
 }
 /// n-ary Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_NaryPr/m:naryPr")]
+#[sdk(qname = "m:naryPr")]
 pub struct NaryProperties {
   /// n-ary Operator Character
-  #[sdk(child(qname = "m:CT_Char/m:chr"))]
+  #[sdk(child(qname = "m:chr"))]
   pub accent_char: Option<AccentChar>,
   /// n-ary Limit Location
-  #[sdk(child(qname = "m:CT_LimLoc/m:limLoc"))]
+  #[sdk(child(qname = "m:limLoc"))]
   pub limit_location: Option<LimitLocation>,
   /// n-ary Grow
-  #[sdk(child(qname = "m:CT_OnOff/m:grow"))]
+  #[sdk(child(qname = "m:grow"))]
   pub grow_operators: Option<GrowOperators>,
   /// Hide Subscript (n-ary)
-  #[sdk(child(qname = "m:CT_OnOff/m:subHide"))]
+  #[sdk(child(qname = "m:subHide"))]
   pub hide_sub_argument: Option<HideSubArgument>,
   /// Hide Superscript (n-ary)
-  #[sdk(child(qname = "m:CT_OnOff/m:supHide"))]
+  #[sdk(child(qname = "m:supHide"))]
   pub hide_super_argument: Option<HideSuperArgument>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Phantom Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_PhantPr/m:phantPr")]
+#[sdk(qname = "m:phantPr")]
 pub struct PhantomProperties {
   /// Phantom Show
-  #[sdk(child(qname = "m:CT_OnOff/m:show"))]
+  #[sdk(child(qname = "m:show"))]
   pub show_phantom: Option<ShowPhantom>,
   /// Phantom Zero Width
-  #[sdk(child(qname = "m:CT_OnOff/m:zeroWid"))]
+  #[sdk(child(qname = "m:zeroWid"))]
   pub zero_width: Option<ZeroWidth>,
   /// Phantom Zero Ascent
-  #[sdk(child(qname = "m:CT_OnOff/m:zeroAsc"))]
+  #[sdk(child(qname = "m:zeroAsc"))]
   pub zero_ascent: Option<ZeroAscent>,
   /// Phantom Zero Descent
-  #[sdk(child(qname = "m:CT_OnOff/m:zeroDesc"))]
+  #[sdk(child(qname = "m:zeroDesc"))]
   pub zero_descent: Option<ZeroDescent>,
   /// Transparent (Phantom)
-  #[sdk(child(qname = "m:CT_OnOff/m:transp"))]
+  #[sdk(child(qname = "m:transp"))]
   pub transparent: Option<Transparent>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Radical Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_RadPr/m:radPr")]
+#[sdk(qname = "m:radPr")]
 pub struct RadicalProperties {
   /// Hide Degree
-  #[sdk(child(qname = "m:CT_OnOff/m:degHide"))]
+  #[sdk(child(qname = "m:degHide"))]
   pub hide_degree: Option<HideDegree>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Pre-Sub-Superscript Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SPrePr/m:sPrePr")]
+#[sdk(qname = "m:sPrePr")]
 pub struct PreSubSuperProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Subscript Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSubPr/m:sSubPr")]
+#[sdk(qname = "m:sSubPr")]
 pub struct SubscriptProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Sub-Superscript Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSubSupPr/m:sSubSupPr")]
+#[sdk(qname = "m:sSubSupPr")]
 pub struct SubSuperscriptProperties {
   /// Align Scripts
-  #[sdk(child(qname = "m:CT_OnOff/m:alnScr"))]
+  #[sdk(child(qname = "m:alnScr"))]
   pub align_scripts: Option<AlignScripts>,
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Superscript Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_SSupPr/m:sSupPr")]
+#[sdk(qname = "m:sSupPr")]
 pub struct SuperscriptProperties {
   /// Control Properties.
-  #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
+  #[sdk(child(qname = "m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Argument Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_Integer2/m:argSz")]
+#[sdk(qname = "m:argSz")]
 pub struct ArgumentSize {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2311,15 +2311,15 @@ pub struct ArgumentSize {
 }
 /// Argument Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathArgPr/m:argPr")]
+#[sdk(qname = "m:argPr")]
 pub struct ArgumentProperties {
   /// Argument Size
-  #[sdk(child(qname = "m:CT_Integer2/m:argSz"))]
+  #[sdk(child(qname = "m:argSz"))]
   pub argument_size: Option<ArgumentSize>,
 }
 /// Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathJc/m:jc")]
+#[sdk(qname = "m:jc")]
 pub struct Justification {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2327,7 +2327,7 @@ pub struct Justification {
 }
 /// Default Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathJc/m:defJc")]
+#[sdk(qname = "m:defJc")]
 pub struct DefaultJustification {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2335,7 +2335,7 @@ pub struct DefaultJustification {
 }
 /// Math Font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_FontFace/m:mathFont")]
+#[sdk(qname = "m:mathFont")]
 pub struct MathFont {
   /// val
   #[sdk(attr(qname = "m:val"))]
@@ -2344,7 +2344,7 @@ pub struct MathFont {
 }
 /// Break on Binary Operators.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BreakBin/m:brkBin")]
+#[sdk(qname = "m:brkBin")]
 pub struct BreakBinary {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2352,7 +2352,7 @@ pub struct BreakBinary {
 }
 /// Break on Binary Subtraction.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_BreakBinSub/m:brkBinSub")]
+#[sdk(qname = "m:brkBinSub")]
 pub struct BreakBinarySubtraction {
   /// Value
   #[sdk(attr(qname = "m:val"))]
@@ -2360,10 +2360,10 @@ pub struct BreakBinarySubtraction {
 }
 /// Office Math Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "m:CT_OMathParaPr/m:oMathParaPr")]
+#[sdk(qname = "m:oMathParaPr")]
 pub struct ParagraphProperties {
   /// Justification
-  #[sdk(child(qname = "m:CT_OMathJc/m:jc"))]
+  #[sdk(child(qname = "m:jc"))]
   pub justification: Option<Justification>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2371,7 +2371,7 @@ pub enum RunChoice {
   /// Break.
   Break(std::boxed::Box<crate::schemas::w::Break>),
   /// Text.
-  #[sdk(child(qname = "w:CT_Text/w:t"))]
+  #[sdk(child(qname = "w:t"))]
   WText(std::boxed::Box<crate::schemas::w::Text>),
   /// Deleted Text.
   DeletedText(std::boxed::Box<crate::schemas::w::DeletedText>),
@@ -2380,54 +2380,54 @@ pub enum RunChoice {
   /// Deleted Field Code.
   DeletedFieldCode(std::boxed::Box<crate::schemas::w::DeletedFieldCode>),
   /// Non Breaking Hyphen Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:noBreakHyphen"))]
+  #[sdk(empty_child(qname = "w:noBreakHyphen"))]
   NoBreakHyphen,
   /// Optional Hyphen Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:softHyphen"))]
+  #[sdk(empty_child(qname = "w:softHyphen"))]
   SoftHyphen,
   /// Date Block - Short Day Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:dayShort"))]
+  #[sdk(empty_child(qname = "w:dayShort"))]
   DayShort,
   /// Date Block - Short Month Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:monthShort"))]
+  #[sdk(empty_child(qname = "w:monthShort"))]
   MonthShort,
   /// Date Block - Short Year Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:yearShort"))]
+  #[sdk(empty_child(qname = "w:yearShort"))]
   YearShort,
   /// Date Block - Long Day Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:dayLong"))]
+  #[sdk(empty_child(qname = "w:dayLong"))]
   DayLong,
   /// Date Block - Long Month Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:monthLong"))]
+  #[sdk(empty_child(qname = "w:monthLong"))]
   MonthLong,
   /// Date Block - Long Year Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:yearLong"))]
+  #[sdk(empty_child(qname = "w:yearLong"))]
   YearLong,
   /// Comment Information Block.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:annotationRef"))]
+  #[sdk(empty_child(qname = "w:annotationRef"))]
   AnnotationReferenceMark,
   /// Footnote Reference Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:footnoteRef"))]
+  #[sdk(empty_child(qname = "w:footnoteRef"))]
   FootnoteReferenceMark,
   /// Endnote Reference Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:endnoteRef"))]
+  #[sdk(empty_child(qname = "w:endnoteRef"))]
   EndnoteReferenceMark,
   /// Footnote/Endnote Separator Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:separator"))]
+  #[sdk(empty_child(qname = "w:separator"))]
   SeparatorMark,
   /// Continuation Separator Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:continuationSeparator"))]
+  #[sdk(empty_child(qname = "w:continuationSeparator"))]
   ContinuationSeparatorMark,
   /// Symbol Character.
   SymbolChar(std::boxed::Box<crate::schemas::w::SymbolChar>),
   /// Page Number Block.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:pgNum"))]
+  #[sdk(empty_child(qname = "w:pgNum"))]
   PageNumber,
   /// Carriage Return.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:cr"))]
+  #[sdk(empty_child(qname = "w:cr"))]
   CarriageReturn,
   /// Tab Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:tab"))]
+  #[sdk(empty_child(qname = "w:tab"))]
   TabChar,
   /// Inline Embedded Object.
   EmbeddedObject(std::boxed::Box<crate::schemas::w::EmbeddedObject>),
@@ -2448,10 +2448,10 @@ pub enum RunChoice {
   /// Absolute Position Tab Character.
   PositionalTab(std::boxed::Box<crate::schemas::w::PositionalTab>),
   /// Position of Last Calculated Page Break.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:lastRenderedPageBreak"))]
+  #[sdk(empty_child(qname = "w:lastRenderedPageBreak"))]
   LastRenderedPageBreak,
   /// Text.
-  #[sdk(child(qname = "m:CT_Text/m:t"))]
+  #[sdk(child(qname = "m:t"))]
   MText(std::boxed::Box<Text>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -2462,7 +2462,7 @@ pub enum ParagraphChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<Run>),
   /// Defines the ProofError Class.
   ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -2533,7 +2533,7 @@ pub enum ParagraphChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -2672,10 +2672,10 @@ pub enum MathPropertiesChoice {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct RunPropertiesChoiceSequence {
   /// Script.
-  #[sdk(child(qname = "m:CT_Script/m:scr"))]
+  #[sdk(child(qname = "m:scr"))]
   pub script: Option<Script>,
   /// style.
-  #[sdk(child(qname = "m:CT_Style/m:sty"))]
+  #[sdk(child(qname = "m:sty"))]
   pub style: Option<Style>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2688,7 +2688,7 @@ pub enum RunPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ControlPropertiesChoice {
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<crate::schemas::w::RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<crate::schemas::w::InsertedMathControl>),

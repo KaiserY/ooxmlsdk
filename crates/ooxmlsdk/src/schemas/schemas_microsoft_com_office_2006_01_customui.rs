@@ -30,7 +30,7 @@ pub enum BoxStyleValues {
 }
 /// Defines the UnsizedControlClone Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ControlCloneRegular/mso:control")]
+#[sdk(qname = "mso:control")]
 pub struct UnsizedControlClone {
   /// idQ
   #[sdk(attr(qname = ":idQ"))]
@@ -147,7 +147,7 @@ pub struct UnsizedControlClone {
 }
 /// Defines the UnsizedButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ButtonRegular/mso:button")]
+#[sdk(qname = "mso:button")]
 pub struct UnsizedButton {
   /// onAction
   #[sdk(attr(qname = ":onAction"))]
@@ -283,7 +283,7 @@ pub struct UnsizedButton {
 }
 /// Defines the CheckBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_CheckBox/mso:checkBox")]
+#[sdk(qname = "mso:checkBox")]
 pub struct CheckBox {
   /// getPressed
   #[sdk(attr(qname = ":getPressed"))]
@@ -395,7 +395,7 @@ pub struct CheckBox {
 }
 /// Defines the UnsizedGallery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_GalleryRegular/mso:gallery")]
+#[sdk(qname = "mso:gallery")]
 pub struct UnsizedGallery {
   /// description
   #[sdk(attr(qname = ":description"))]
@@ -602,15 +602,15 @@ pub struct UnsizedGallery {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
-  #[sdk(child(qname = "mso:CT_Item/mso:item"))]
+  #[sdk(child(qname = "mso:item"))]
   pub item: Vec<Item>,
   /// Defines the UnsizedButton Class.
-  #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
+  #[sdk(child(qname = "mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
 /// Defines the UnsizedToggleButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ToggleButtonRegular/mso:toggleButton")]
+#[sdk(qname = "mso:toggleButton")]
 pub struct UnsizedToggleButton {
   /// getPressed
   #[sdk(attr(qname = ":getPressed"))]
@@ -750,7 +750,7 @@ pub struct UnsizedToggleButton {
 }
 /// Defines the MenuSeparator Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_MenuSeparator/mso:menuSeparator")]
+#[sdk(qname = "mso:menuSeparator")]
 pub struct MenuSeparator {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -797,7 +797,7 @@ pub struct MenuSeparator {
 }
 /// Defines the UnsizedSplitButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_SplitButtonRegular/mso:splitButton")]
+#[sdk(qname = "mso:splitButton")]
 pub struct UnsizedSplitButton {
   /// enabled
   #[sdk(attr(qname = ":enabled"))]
@@ -881,12 +881,12 @@ pub struct UnsizedSplitButton {
     )]
   pub unsized_split_button_choice: Option<UnsizedSplitButtonChoice>,
   /// Defines the UnsizedMenu Class.
-  #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
+  #[sdk(child(qname = "mso:menu"))]
   pub unsized_menu: Option<UnsizedMenu>,
 }
 /// Defines the UnsizedMenu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_MenuRegular/mso:menu")]
+#[sdk(qname = "mso:menu")]
 pub struct UnsizedMenu {
   /// itemSize
   #[sdk(attr(qname = ":itemSize"))]
@@ -1035,7 +1035,7 @@ pub struct UnsizedMenu {
 }
 /// Defines the UnsizedDynamicMenu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu")]
+#[sdk(qname = "mso:dynamicMenu")]
 pub struct UnsizedDynamicMenu {
   /// description
   #[sdk(attr(qname = ":description"))]
@@ -1174,7 +1174,7 @@ pub struct UnsizedDynamicMenu {
 }
 /// Defines the SplitButtonWithTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_SplitButtonWithTitle/mso:splitButton")]
+#[sdk(qname = "mso:splitButton")]
 pub struct SplitButtonWithTitle {
   /// enabled
   #[sdk(attr(qname = ":enabled"))]
@@ -1258,12 +1258,12 @@ pub struct SplitButtonWithTitle {
     )]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
   /// Defines the MenuWithTitle Class.
-  #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
+  #[sdk(child(qname = "mso:menu"))]
   pub menu_with_title: Option<MenuWithTitle>,
 }
 /// Defines the MenuWithTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_MenuWithTitle/mso:menu")]
+#[sdk(qname = "mso:menu")]
 pub struct MenuWithTitle {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -1412,7 +1412,7 @@ pub struct MenuWithTitle {
 }
 /// Defines the ControlClone Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ControlClone/mso:control")]
+#[sdk(qname = "mso:control")]
 pub struct ControlClone {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -1544,7 +1544,7 @@ pub struct ControlClone {
 }
 /// Defines the TextLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_LabelControl/mso:labelControl")]
+#[sdk(qname = "mso:labelControl")]
 pub struct TextLabel {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -1638,7 +1638,7 @@ pub struct TextLabel {
 }
 /// Defines the Button Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Button/mso:button")]
+#[sdk(qname = "mso:button")]
 pub struct Button {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -1781,7 +1781,7 @@ pub struct Button {
 }
 /// Defines the ToggleButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ToggleButton/mso:toggleButton")]
+#[sdk(qname = "mso:toggleButton")]
 pub struct ToggleButton {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -1928,7 +1928,7 @@ pub struct ToggleButton {
 }
 /// Defines the EditBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_EditBox/mso:editBox")]
+#[sdk(qname = "mso:editBox")]
 pub struct EditBox {
   /// enabled
   #[sdk(attr(qname = ":enabled"))]
@@ -2069,7 +2069,7 @@ pub struct EditBox {
 }
 /// Defines the ComboBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ComboBox/mso:comboBox")]
+#[sdk(qname = "mso:comboBox")]
 pub struct ComboBox {
   /// showItemImage
   #[sdk(attr(qname = ":showItemImage"))]
@@ -2238,12 +2238,12 @@ pub struct ComboBox {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
-  #[sdk(child(qname = "mso:CT_Item/mso:item"))]
+  #[sdk(child(qname = "mso:item"))]
   pub item: Vec<Item>,
 }
 /// Defines the DropDown Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_DropDownRegular/mso:dropDown")]
+#[sdk(qname = "mso:dropDown")]
 pub struct DropDown {
   /// onAction
   #[sdk(attr(qname = ":onAction"))]
@@ -2411,15 +2411,15 @@ pub struct DropDown {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
-  #[sdk(child(qname = "mso:CT_Item/mso:item"))]
+  #[sdk(child(qname = "mso:item"))]
   pub item: Vec<Item>,
   /// Defines the UnsizedButton Class.
-  #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
+  #[sdk(child(qname = "mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
 /// Defines the Gallery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Gallery/mso:gallery")]
+#[sdk(qname = "mso:gallery")]
 pub struct Gallery {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -2633,15 +2633,15 @@ pub struct Gallery {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
-  #[sdk(child(qname = "mso:CT_Item/mso:item"))]
+  #[sdk(child(qname = "mso:item"))]
   pub item: Vec<Item>,
   /// Defines the UnsizedButton Class.
-  #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
+  #[sdk(child(qname = "mso:button"))]
   pub unsized_button: Vec<UnsizedButton>,
 }
 /// Defines the Menu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Menu/mso:menu")]
+#[sdk(qname = "mso:menu")]
 pub struct Menu {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -2797,7 +2797,7 @@ pub struct Menu {
 }
 /// Defines the DynamicMenu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_DynamicMenu/mso:dynamicMenu")]
+#[sdk(qname = "mso:dynamicMenu")]
 pub struct DynamicMenu {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -2943,7 +2943,7 @@ pub struct DynamicMenu {
 }
 /// Defines the SplitButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_SplitButton/mso:splitButton")]
+#[sdk(qname = "mso:splitButton")]
 pub struct SplitButton {
   /// size
   #[sdk(attr(qname = ":size"))]
@@ -3034,12 +3034,12 @@ pub struct SplitButton {
     )]
   pub split_button_choice: Option<SplitButtonChoice>,
   /// Defines the UnsizedMenu Class.
-  #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
+  #[sdk(child(qname = "mso:menu"))]
   pub unsized_menu: Option<UnsizedMenu>,
 }
 /// Defines the Box Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Box/mso:box")]
+#[sdk(qname = "mso:box")]
 pub struct Box {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3107,7 +3107,7 @@ pub struct Box {
 }
 /// Defines the ButtonGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ButtonGroup/mso:buttonGroup")]
+#[sdk(qname = "mso:buttonGroup")]
 pub struct ButtonGroup {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3165,7 +3165,7 @@ pub struct ButtonGroup {
 }
 /// Defines the MenuRoot Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_MenuRoot/mso:menu")]
+#[sdk(qname = "mso:menu")]
 pub struct MenuRoot {
   /// title
   #[sdk(attr(qname = ":title"))]
@@ -3195,7 +3195,7 @@ pub struct MenuRoot {
 }
 /// Defines the CustomUI Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_CustomUI/mso:customUI")]
+#[sdk(qname = "mso:customUI")]
 pub struct CustomUi {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -3208,15 +3208,15 @@ pub struct CustomUi {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub load_image: Option<crate::simple_type::StringValue>,
   /// Defines the RepurposedCommands Class.
-  #[sdk(child(qname = "mso:CT_Commands/mso:commands"))]
+  #[sdk(child(qname = "mso:commands"))]
   pub repurposed_commands: Option<RepurposedCommands>,
   /// Defines the Ribbon Class.
-  #[sdk(child(qname = "mso:CT_Ribbon/mso:ribbon"))]
+  #[sdk(child(qname = "mso:ribbon"))]
   pub ribbon: Option<std::boxed::Box<Ribbon>>,
 }
 /// Defines the Item Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Item/mso:item")]
+#[sdk(qname = "mso:item")]
 pub struct Item {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3250,7 +3250,7 @@ pub struct Item {
 }
 /// Defines the VisibleButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_VisibleButton/mso:button")]
+#[sdk(qname = "mso:button")]
 pub struct VisibleButton {
   /// onAction
   #[sdk(attr(qname = ":onAction"))]
@@ -3379,7 +3379,7 @@ pub struct VisibleButton {
 }
 /// Defines the VisibleToggleButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_VisibleToggleButton/mso:toggleButton")]
+#[sdk(qname = "mso:toggleButton")]
 pub struct VisibleToggleButton {
   /// getPressed
   #[sdk(attr(qname = ":getPressed"))]
@@ -3512,7 +3512,7 @@ pub struct VisibleToggleButton {
 }
 /// Defines the VerticalSeparator Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Separator/mso:separator")]
+#[sdk(qname = "mso:separator")]
 pub struct VerticalSeparator {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3558,15 +3558,15 @@ pub struct VerticalSeparator {
 }
 /// Defines the DialogBoxLauncher Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_DialogLauncher/mso:dialogBoxLauncher")]
+#[sdk(qname = "mso:dialogBoxLauncher")]
 pub struct DialogBoxLauncher {
   /// Defines the UnsizedButton Class.
-  #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
+  #[sdk(child(qname = "mso:button"))]
   pub unsized_button: std::boxed::Box<UnsizedButton>,
 }
 /// Defines the Group Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Group/mso:group")]
+#[sdk(qname = "mso:group")]
 pub struct Group {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3687,12 +3687,12 @@ pub struct Group {
     )]
   pub group_choice: Vec<GroupChoice>,
   /// Defines the DialogBoxLauncher Class.
-  #[sdk(child(qname = "mso:CT_DialogLauncher/mso:dialogBoxLauncher"))]
+  #[sdk(child(qname = "mso:dialogBoxLauncher"))]
   pub dialog_box_launcher: Option<std::boxed::Box<DialogBoxLauncher>>,
 }
 /// Defines the QuickAccessToolbarControlClone Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ControlCloneQat/mso:control")]
+#[sdk(qname = "mso:control")]
 pub struct QuickAccessToolbarControlClone {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3826,7 +3826,7 @@ pub struct QuickAccessToolbarControlClone {
 }
 /// Defines the SharedQatControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_QatItems/mso:sharedControls")]
+#[sdk(qname = "mso:sharedControls")]
 pub struct SharedQatControls {
   #[sdk(
         choice(
@@ -3839,7 +3839,7 @@ pub struct SharedQatControls {
 }
 /// Defines the DocumentSpecificQuickAccessToolbarControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_QatItems/mso:documentControls")]
+#[sdk(qname = "mso:documentControls")]
 pub struct DocumentSpecificQuickAccessToolbarControls {
   #[sdk(
         choice(
@@ -3853,7 +3853,7 @@ pub struct DocumentSpecificQuickAccessToolbarControls {
 }
 /// Defines the Tab Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Tab/mso:tab")]
+#[sdk(qname = "mso:tab")]
 pub struct Tab {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -3924,12 +3924,12 @@ pub struct Tab {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the Group Class.
-  #[sdk(child(qname = "mso:CT_Group/mso:group"))]
+  #[sdk(child(qname = "mso:group"))]
   pub group: Vec<Group>,
 }
 /// Defines the ContextualTabSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_TabSet/mso:tabSet")]
+#[sdk(qname = "mso:tabSet")]
 pub struct ContextualTabSet {
   /// idMso
   #[sdk(attr(qname = ":idMso"))]
@@ -3945,12 +3945,12 @@ pub struct ContextualTabSet {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// Defines the Tab Class.
-  #[sdk(child(qname = "mso:CT_Tab/mso:tab"))]
+  #[sdk(child(qname = "mso:tab"))]
   pub tab: Vec<Tab>,
 }
 /// Defines the RepurposedCommand Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Command/mso:command")]
+#[sdk(qname = "mso:command")]
 pub struct RepurposedCommand {
   /// onAction
   #[sdk(attr(qname = ":onAction"))]
@@ -3972,7 +3972,7 @@ pub struct RepurposedCommand {
 }
 /// Defines the OfficeMenu Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_OfficeMenu/mso:officeMenu")]
+#[sdk(qname = "mso:officeMenu")]
 pub struct OfficeMenu {
   #[sdk(
         choice(
@@ -3991,58 +3991,58 @@ pub struct OfficeMenu {
 }
 /// Defines the QuickAccessToolbar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Qat/mso:qat")]
+#[sdk(qname = "mso:qat")]
 pub struct QuickAccessToolbar {
   /// Defines the SharedQatControls Class.
-  #[sdk(child(qname = "mso:CT_QatItems/mso:sharedControls"))]
+  #[sdk(child(qname = "mso:sharedControls"))]
   pub shared_qat_controls: Option<SharedQatControls>,
   /// Defines the DocumentSpecificQuickAccessToolbarControls Class.
-  #[sdk(child(qname = "mso:CT_QatItems/mso:documentControls"))]
+  #[sdk(child(qname = "mso:documentControls"))]
   pub document_specific_quick_access_toolbar_controls:
     Option<DocumentSpecificQuickAccessToolbarControls>,
 }
 /// Defines the Tabs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Tabs/mso:tabs")]
+#[sdk(qname = "mso:tabs")]
 pub struct Tabs {
   /// Defines the Tab Class.
-  #[sdk(child(qname = "mso:CT_Tab/mso:tab"))]
+  #[sdk(child(qname = "mso:tab"))]
   pub tab: Vec<Tab>,
 }
 /// Defines the ContextualTabSets Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_ContextualTabs/mso:contextualTabs")]
+#[sdk(qname = "mso:contextualTabs")]
 pub struct ContextualTabSets {
   /// Defines the ContextualTabSet Class.
-  #[sdk(child(qname = "mso:CT_TabSet/mso:tabSet"))]
+  #[sdk(child(qname = "mso:tabSet"))]
   pub contextual_tab_set: Vec<ContextualTabSet>,
 }
 /// Defines the RepurposedCommands Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Commands/mso:commands")]
+#[sdk(qname = "mso:commands")]
 pub struct RepurposedCommands {
   /// Defines the RepurposedCommand Class.
-  #[sdk(child(qname = "mso:CT_Command/mso:command"))]
+  #[sdk(child(qname = "mso:command"))]
   pub repurposed_command: Vec<RepurposedCommand>,
 }
 /// Defines the Ribbon Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_Ribbon/mso:ribbon")]
+#[sdk(qname = "mso:ribbon")]
 pub struct Ribbon {
   /// startFromScratch
   #[sdk(attr(qname = ":startFromScratch"))]
   pub start_from_scratch: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "mso:CT_OfficeMenu/mso:officeMenu"))]
+  #[sdk(child(qname = "mso:officeMenu"))]
   pub office_menu: Option<OfficeMenu>,
   /// _
-  #[sdk(child(qname = "mso:CT_Qat/mso:qat"))]
+  #[sdk(child(qname = "mso:qat"))]
   pub quick_access_toolbar: Option<std::boxed::Box<QuickAccessToolbar>>,
   /// _
-  #[sdk(child(qname = "mso:CT_Tabs/mso:tabs"))]
+  #[sdk(child(qname = "mso:tabs"))]
   pub tabs: Option<Tabs>,
   /// _
-  #[sdk(child(qname = "mso:CT_ContextualTabs/mso:contextualTabs"))]
+  #[sdk(child(qname = "mso:contextualTabs"))]
   pub contextual_tab_sets: Option<ContextualTabSets>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

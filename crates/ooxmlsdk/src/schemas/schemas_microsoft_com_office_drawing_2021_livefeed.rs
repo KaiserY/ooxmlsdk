@@ -6,64 +6,58 @@
 
 /// Defines the BackgroundNormalProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "alf:CT_BackgroundNormalProperties/alf:Normal")]
+#[sdk(office2021, qname = "alf:Normal")]
 pub struct BackgroundNormalProperties {
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundRemovedProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "alf:CT_BackgroundRemovedProperties/alf:Removed")]
+#[sdk(office2021, qname = "alf:Removed")]
 pub struct BackgroundRemovedProperties {
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundBlurProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "alf:CT_BackgroundBlurProperties/alf:Blur")]
+#[sdk(office2021, qname = "alf:Blur")]
 pub struct BackgroundBlurProperties {
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundCustomProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "alf:CT_BackgroundCustomProperties/alf:Custom")]
+#[sdk(office2021, qname = "alf:Custom")]
 pub struct BackgroundCustomProperties {
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the LiveFeedProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps")]
+#[sdk(office2021, qname = "alf:liveFeedProps")]
 pub struct LiveFeedProperties {
   /// Defines the LiveFeedBackgroundProperties Class.
-  #[sdk(child(
-    office2021,
-    qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps"
-  ))]
+  #[sdk(child(office2021, qname = "alf:backgroundProps"))]
   pub live_feed_background_properties: Option<std::boxed::Box<LiveFeedBackgroundProperties>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst")]
+#[sdk(office2021, qname = "alf:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the LiveFeedBackgroundProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps"
-)]
+#[sdk(office2021, qname = "alf:backgroundProps")]
 pub struct LiveFeedBackgroundProperties {
   #[sdk(
         choice(
@@ -75,7 +69,7 @@ pub struct LiveFeedBackgroundProperties {
     )]
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
+  #[sdk(child(office2021, qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

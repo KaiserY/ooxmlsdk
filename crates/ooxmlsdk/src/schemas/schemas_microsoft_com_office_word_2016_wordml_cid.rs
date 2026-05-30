@@ -6,17 +6,17 @@
 
 /// Defines the CommentsIds Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "w16cid:CT_CommentsIds/w16cid:commentsIds")]
+#[sdk(office2019, qname = "w16cid:commentsIds")]
 pub struct CommentsIds {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the CommentId Class.
-  #[sdk(child(office2019, qname = "w16cid:CT_CommentId/w16cid:commentId"))]
+  #[sdk(child(office2019, qname = "w16cid:commentId"))]
   pub comment_id: Vec<CommentId>,
 }
 /// Defines the CommentId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "w16cid:CT_CommentId/w16cid:commentId")]
+#[sdk(office2019, qname = "w16cid:commentId")]
 pub struct CommentId {
   /// paraId
   #[sdk(attr(office2019, qname = "w16cid:paraId"))]

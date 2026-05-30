@@ -32,7 +32,7 @@ pub enum TargetScreenSize {
 }
 /// Defines the BackgroundProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a15:CT_BackgroundPr/a15:backgroundPr")]
+#[sdk(office2013, qname = "a15:backgroundPr")]
 pub struct BackgroundProperties {
   /// bwMode
   #[sdk(attr(office2013, qname = ":bwMode"))]
@@ -53,10 +53,7 @@ pub struct BackgroundProperties {
 }
 /// Defines the NonVisualGroupProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"
-)]
+#[sdk(office2013, qname = "a15:nonVisualGroupProps")]
 pub struct NonVisualGroupProperties {
   /// isLegacyGroup
   #[sdk(attr(office2013, qname = ":isLegacyGroup"))]
@@ -64,7 +61,7 @@ pub struct NonVisualGroupProperties {
 }
 /// Defines the ObjectProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a15:CT_ObjectPr/a15:objectPr")]
+#[sdk(office2013, qname = "a15:objectPr")]
 pub struct ObjectProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// objectId
@@ -79,7 +76,7 @@ pub struct ObjectProperties {
 }
 /// Defines the SignatureLine Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a15:CT_SignatureLine/a15:signatureLine")]
+#[sdk(office2013, qname = "a15:signatureLine")]
 pub struct SignatureLine {
   /// isSignatureLine
   #[sdk(attr(office2013, qname = ":isSignatureLine"))]

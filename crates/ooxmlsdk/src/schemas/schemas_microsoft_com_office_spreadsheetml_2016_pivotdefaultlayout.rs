@@ -6,10 +6,7 @@
 
 /// Defines the PivotTableDefinition16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2019,
-  qname = "xpdl:CT_PivotTableDefinition16/xpdl:pivotTableDefinition16"
-)]
+#[sdk(office2019, qname = "xpdl:pivotTableDefinition16")]
 pub struct PivotTableDefinition16 {
   /// EnabledSubtotalsDefault
   #[sdk(attr(office2019, qname = ":EnabledSubtotalsDefault"))]

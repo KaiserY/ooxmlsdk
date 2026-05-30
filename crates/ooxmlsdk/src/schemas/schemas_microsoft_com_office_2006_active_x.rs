@@ -18,7 +18,7 @@ pub enum PersistenceValues {
 }
 /// Defines the ActiveXControlData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ax:CT_Ocx/ax:ocx")]
+#[sdk(qname = "ax:ocx")]
 pub struct ActiveXControlData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
@@ -35,12 +35,12 @@ pub struct ActiveXControlData {
   #[sdk(attr(qname = "ax:persistence"))]
   pub persistence: PersistenceValues,
   /// Defines the ActiveXObjectProperty Class.
-  #[sdk(child(qname = "ax:CT_OcxPr/ax:ocxPr"))]
+  #[sdk(child(qname = "ax:ocxPr"))]
   pub active_x_object_property: Vec<ActiveXObjectProperty>,
 }
 /// Defines the ActiveXObjectProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ax:CT_OcxPr/ax:ocxPr")]
+#[sdk(qname = "ax:ocxPr")]
 pub struct ActiveXObjectProperty {
   /// name
   #[sdk(attr(qname = "ax:name"))]
@@ -58,7 +58,7 @@ pub struct ActiveXObjectProperty {
 }
 /// Defines the SharedComFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ax:CT_Font/ax:font")]
+#[sdk(qname = "ax:font")]
 pub struct SharedComFont {
   /// persistence
   #[sdk(attr(qname = "ax:persistence"))]
@@ -67,12 +67,12 @@ pub struct SharedComFont {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the ActiveXObjectProperty Class.
-  #[sdk(child(qname = "ax:CT_OcxPr/ax:ocxPr"))]
+  #[sdk(child(qname = "ax:ocxPr"))]
   pub active_x_object_property: Vec<ActiveXObjectProperty>,
 }
 /// Defines the SharedComPicture Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ax:CT_Picture/ax:picture")]
+#[sdk(qname = "ax:picture")]
 pub struct SharedComPicture {
   /// id
   #[sdk(attr(qname = "r:id"))]

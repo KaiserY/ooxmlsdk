@@ -6,27 +6,27 @@
 
 /// Defines the VersionInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xxdsv:CT_VersionInfo/xxdsv:versionInfo")]
+#[sdk(microsoft365, qname = "xxdsv:versionInfo")]
 pub struct VersionInfo {
   /// Defines the RequiredFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxdsv:requiredFeature"
+    qname = "xxdsv:requiredFeature"
   ))]
   pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastRefreshFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxdsv:lastRefreshFeature"
+    qname = "xxdsv:lastRefreshFeature"
   ))]
   pub last_refresh_feature_xsdstring: Vec<LastRefreshFeatureXsdstring>,
   /// Defines the LastEditFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxdsv:lastEditFeature"
+    qname = "xxdsv:lastEditFeature"
   ))]
   pub last_edit_feature_xsdstring: Vec<LastEditFeatureXsdstring>,
 }

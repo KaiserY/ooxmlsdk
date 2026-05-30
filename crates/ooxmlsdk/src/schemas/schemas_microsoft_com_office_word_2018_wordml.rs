@@ -6,7 +6,7 @@
 
 /// Defines the Extension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "w16cur:CT_Extension/w16cur:ext")]
+#[sdk(office2021, qname = "w16cur:ext")]
 pub struct Extension {
   /// uri
   #[sdk(attr(office2021, qname = "w16cur:uri"))]

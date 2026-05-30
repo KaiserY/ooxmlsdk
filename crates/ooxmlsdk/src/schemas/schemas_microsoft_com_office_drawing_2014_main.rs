@@ -6,7 +6,7 @@
 
 /// Defines the CreationId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:CT_CreationId/a16:creationId")]
+#[sdk(office2016, qname = "a16:creationId")]
 pub struct CreationId {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
@@ -17,10 +17,7 @@ pub struct CreationId {
 }
 /// Defines the PredecessorDrawingElementReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef"
-)]
+#[sdk(office2016, qname = "a16:predDERef")]
 pub struct PredecessorDrawingElementReference {
   /// pred
   #[sdk(attr(office2016, qname = ":pred"))]
@@ -30,7 +27,7 @@ pub struct PredecessorDrawingElementReference {
 }
 /// Defines the ConnectableReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:CT_ConnectableReferences/a16:cxnDERefs")]
+#[sdk(office2016, qname = "a16:cxnDERefs")]
 pub struct ConnectableReferences {
   /// st
   #[sdk(attr(office2016, qname = ":st"))]
@@ -45,7 +42,7 @@ pub struct ConnectableReferences {
 }
 /// Defines the RowIdIdentifier Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:CT_Identifier/a16:rowId")]
+#[sdk(office2016, qname = "a16:rowId")]
 pub struct RowIdIdentifier {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -54,7 +51,7 @@ pub struct RowIdIdentifier {
 }
 /// Defines the ColIdIdentifier Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:CT_Identifier/a16:colId")]
+#[sdk(office2016, qname = "a16:colId")]
 pub struct ColIdIdentifier {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val

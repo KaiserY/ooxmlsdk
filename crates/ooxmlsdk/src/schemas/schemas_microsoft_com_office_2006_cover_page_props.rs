@@ -6,29 +6,26 @@
 
 /// Defines the CoverPageProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cppr:CT_CoverPageProperties/cppr:CoverPageProperties")]
+#[sdk(qname = "cppr:CoverPageProperties")]
 pub struct CoverPageProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the PublishDate Class.
-  #[sdk(text_child(
-    simple_type = "StringValue",
-    qname = "cppr:ST_PublishDate/cppr:PublishDate"
-  ))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:PublishDate"))]
   pub publish_date: PublishDate,
   /// Defines the DocumentAbstract Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/cppr:Abstract"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:Abstract"))]
   pub document_abstract: DocumentAbstract,
   /// Defines the CompanyAddress Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/cppr:CompanyAddress"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:CompanyAddress"))]
   pub company_address: CompanyAddress,
   /// Defines the CompanyPhoneNumber Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/cppr:CompanyPhone"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:CompanyPhone"))]
   pub company_phone_number: CompanyPhoneNumber,
   /// Defines the CompanyFaxNumber Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/cppr:CompanyFax"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:CompanyFax"))]
   pub company_fax_number: CompanyFaxNumber,
   /// Defines the CompanyEmailAddress Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/cppr:CompanyEmail"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "cppr:CompanyEmail"))]
   pub company_email_address: CompanyEmailAddress,
 }
 /// Defines the PublishDate Class.

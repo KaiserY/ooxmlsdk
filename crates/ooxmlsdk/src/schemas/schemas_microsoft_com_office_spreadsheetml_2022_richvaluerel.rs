@@ -6,24 +6,18 @@
 
 /// Defines the RichValueRels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlrvrel:CT_RichValueRels/xlrvrel:richValueRels")]
+#[sdk(microsoft365, qname = "xlrvrel:richValueRels")]
 pub struct RichValueRels {
   /// Defines the RichValueRelRelationship Class.
-  #[sdk(child(
-    microsoft365,
-    qname = "xlrvrel:CT_RichValueRelRelationship/xlrvrel:rel"
-  ))]
+  #[sdk(child(microsoft365, qname = "xlrvrel:rel"))]
   pub rich_value_rel_relationship: Vec<RichValueRelRelationship>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xlrvrel:extLst"))]
+  #[sdk(child(microsoft365, qname = "xlrvrel:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueRelRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlrvrel:CT_RichValueRelRelationship/xlrvrel:rel"
-)]
+#[sdk(microsoft365, qname = "xlrvrel:rel")]
 pub struct RichValueRelRelationship {
   /// id
   #[sdk(attr(microsoft365, qname = "r:id"))]
@@ -31,9 +25,9 @@ pub struct RichValueRelRelationship {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "x:CT_ExtensionList/xlrvrel:extLst")]
+#[sdk(microsoft365, qname = "xlrvrel:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }

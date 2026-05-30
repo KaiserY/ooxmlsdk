@@ -14,17 +14,17 @@ pub enum TargetMode {
 }
 /// Relationships.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "CT_Relationships/Relationships")]
+#[sdk(qname = "Relationships")]
 pub struct Relationships {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Relationship
-  #[sdk(child(qname = "CT_Relationship/Relationship"))]
+  #[sdk(child(qname = "Relationship"))]
   pub relationship: Vec<Relationship>,
 }
 /// Relationship.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "CT_Relationship/Relationship")]
+#[sdk(qname = "Relationship")]
 pub struct Relationship {
   /// TARGET MODE
   #[sdk(attr(qname = "TargetMode"))]

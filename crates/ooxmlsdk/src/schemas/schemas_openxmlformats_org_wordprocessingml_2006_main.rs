@@ -2048,7 +2048,7 @@ pub enum CompatSettingNameValues {
 }
 /// Table Cell Insertion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:cellIns")]
+#[sdk(qname = "w:cellIns")]
 pub struct CellInsertion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2080,7 +2080,7 @@ pub struct CellInsertion {
 }
 /// Table Cell Deletion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:cellDel")]
+#[sdk(qname = "w:cellDel")]
 pub struct CellDeletion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2112,7 +2112,7 @@ pub struct CellDeletion {
 }
 /// Defines the CustomXmlInsRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:customXmlInsRangeStart")]
+#[sdk(qname = "w:customXmlInsRangeStart")]
 pub struct CustomXmlInsRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2144,7 +2144,7 @@ pub struct CustomXmlInsRangeStart {
 }
 /// Defines the CustomXmlDelRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:customXmlDelRangeStart")]
+#[sdk(qname = "w:customXmlDelRangeStart")]
 pub struct CustomXmlDelRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2176,7 +2176,7 @@ pub struct CustomXmlDelRangeStart {
 }
 /// Defines the CustomXmlMoveFromRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart")]
+#[sdk(qname = "w:customXmlMoveFromRangeStart")]
 pub struct CustomXmlMoveFromRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2208,7 +2208,7 @@ pub struct CustomXmlMoveFromRangeStart {
 }
 /// Defines the CustomXmlMoveToRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart")]
+#[sdk(qname = "w:customXmlMoveToRangeStart")]
 pub struct CustomXmlMoveToRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2240,7 +2240,7 @@ pub struct CustomXmlMoveToRangeStart {
 }
 /// Inserted Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:ins")]
+#[sdk(qname = "w:ins")]
 pub struct Inserted {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
@@ -2273,7 +2273,7 @@ pub struct Inserted {
 }
 /// Deleted Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:del")]
+#[sdk(qname = "w:del")]
 pub struct Deleted {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// author
@@ -2306,7 +2306,7 @@ pub struct Deleted {
 }
 /// Move Source Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:moveFrom")]
+#[sdk(qname = "w:moveFrom")]
 pub struct MoveFrom {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2338,7 +2338,7 @@ pub struct MoveFrom {
 }
 /// Move Destination Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w:moveTo")]
+#[sdk(qname = "w:moveTo")]
 pub struct MoveTo {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2370,7 +2370,7 @@ pub struct MoveTo {
 }
 /// Vertically Merged/Split Table Cells.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CellMergeTrackChange/w:cellMerge")]
+#[sdk(qname = "w:cellMerge")]
 pub struct CellMerge {
   /// vMerge
   #[sdk(attr(qname = "w:vMerge"))]
@@ -2408,7 +2408,7 @@ pub struct CellMerge {
 }
 /// Defines the BookmarkStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Bookmark/w:bookmarkStart")]
+#[sdk(qname = "w:bookmarkStart")]
 pub struct BookmarkStart {
   /// name
   #[sdk(attr(qname = "w:name"))]
@@ -2443,7 +2443,7 @@ pub struct BookmarkStart {
 }
 /// Defines the BookmarkEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MarkupRange/w:bookmarkEnd")]
+#[sdk(qname = "w:bookmarkEnd")]
 pub struct BookmarkEnd {
   /// displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
@@ -2468,7 +2468,7 @@ pub struct BookmarkEnd {
 }
 /// Defines the CommentRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MarkupRange/w:commentRangeStart")]
+#[sdk(qname = "w:commentRangeStart")]
 pub struct CommentRangeStart {
   /// displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
@@ -2493,7 +2493,7 @@ pub struct CommentRangeStart {
 }
 /// Defines the CommentRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MarkupRange/w:commentRangeEnd")]
+#[sdk(qname = "w:commentRangeEnd")]
 pub struct CommentRangeEnd {
   /// displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
@@ -2518,7 +2518,7 @@ pub struct CommentRangeEnd {
 }
 /// Defines the MoveFromRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MarkupRange/w:moveFromRangeEnd")]
+#[sdk(qname = "w:moveFromRangeEnd")]
 pub struct MoveFromRangeEnd {
   /// displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
@@ -2543,7 +2543,7 @@ pub struct MoveFromRangeEnd {
 }
 /// Defines the MoveToRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MarkupRange/w:moveToRangeEnd")]
+#[sdk(qname = "w:moveToRangeEnd")]
 pub struct MoveToRangeEnd {
   /// displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
@@ -2568,7 +2568,7 @@ pub struct MoveToRangeEnd {
 }
 /// Defines the MoveFromRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MoveBookmark/w:moveFromRangeStart")]
+#[sdk(qname = "w:moveFromRangeStart")]
 pub struct MoveFromRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2609,7 +2609,7 @@ pub struct MoveFromRangeStart {
 }
 /// Defines the MoveToRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MoveBookmark/w:moveToRangeStart")]
+#[sdk(qname = "w:moveToRangeStart")]
 pub struct MoveToRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -2650,7 +2650,7 @@ pub struct MoveToRangeStart {
 }
 /// Defines the CustomXmlInsRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w:customXmlInsRangeEnd")]
+#[sdk(qname = "w:customXmlInsRangeEnd")]
 pub struct CustomXmlInsRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2672,7 +2672,7 @@ pub struct CustomXmlInsRangeEnd {
 }
 /// Defines the CustomXmlDelRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w:customXmlDelRangeEnd")]
+#[sdk(qname = "w:customXmlDelRangeEnd")]
 pub struct CustomXmlDelRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2694,7 +2694,7 @@ pub struct CustomXmlDelRangeEnd {
 }
 /// Defines the CustomXmlMoveFromRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd")]
+#[sdk(qname = "w:customXmlMoveFromRangeEnd")]
 pub struct CustomXmlMoveFromRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2716,7 +2716,7 @@ pub struct CustomXmlMoveFromRangeEnd {
 }
 /// Defines the CustomXmlMoveToRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd")]
+#[sdk(qname = "w:customXmlMoveToRangeEnd")]
 pub struct CustomXmlMoveToRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2738,7 +2738,7 @@ pub struct CustomXmlMoveToRangeEnd {
 }
 /// Comment Content Reference Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w:commentReference")]
+#[sdk(qname = "w:commentReference")]
 pub struct CommentReference {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -2760,7 +2760,7 @@ pub struct CommentReference {
 }
 /// Defines the ParagraphStyleId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:pStyle")]
+#[sdk(qname = "w:pStyle")]
 pub struct ParagraphStyleId {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2768,7 +2768,7 @@ pub struct ParagraphStyleId {
 }
 /// Date Display Mask.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:dateFormat")]
+#[sdk(qname = "w:dateFormat")]
 pub struct DateFormat {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2776,7 +2776,7 @@ pub struct DateFormat {
 }
 /// Document Part Gallery Filter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:docPartGallery")]
+#[sdk(qname = "w:docPartGallery")]
 pub struct DocPartGallery {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2784,7 +2784,7 @@ pub struct DocPartGallery {
 }
 /// Document Part Category Filter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:docPartCategory")]
+#[sdk(qname = "w:docPartCategory")]
 pub struct DocPartCategory {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2792,7 +2792,7 @@ pub struct DocPartCategory {
 }
 /// Document Part Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:docPart")]
+#[sdk(qname = "w:docPart")]
 pub struct DocPartReference {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2800,7 +2800,7 @@ pub struct DocPartReference {
 }
 /// Custom XML Element Placeholder Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:placeholder")]
+#[sdk(qname = "w:placeholder")]
 pub struct CustomXmlPlaceholder {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2808,7 +2808,7 @@ pub struct CustomXmlPlaceholder {
 }
 /// Defines the TableCaption Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_String/w:tblCaption")]
+#[sdk(office2010, qname = "w:tblCaption")]
 pub struct TableCaption {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2816,7 +2816,7 @@ pub struct TableCaption {
 }
 /// Defines the TableDescription Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_String/w:tblDescription")]
+#[sdk(office2010, qname = "w:tblDescription")]
 pub struct TableDescription {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2824,7 +2824,7 @@ pub struct TableDescription {
 }
 /// Data Source Name for Column.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:name")]
+#[sdk(qname = "w:name")]
 pub struct Name {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2832,7 +2832,7 @@ pub struct Name {
 }
 /// Predefined Merge Field Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:mappedName")]
+#[sdk(qname = "w:mappedName")]
 pub struct MappedName {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2840,7 +2840,7 @@ pub struct MappedName {
 }
 /// UDL Connection String.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:udl")]
+#[sdk(qname = "w:udl")]
 pub struct UdlConnectionString {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2848,7 +2848,7 @@ pub struct UdlConnectionString {
 }
 /// Data Source Table Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:table")]
+#[sdk(qname = "w:table")]
 pub struct DataSourceTableName {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2856,7 +2856,7 @@ pub struct DataSourceTableName {
 }
 /// Data Source Connection String.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:connectString")]
+#[sdk(qname = "w:connectString")]
 pub struct ConnectString {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2864,7 +2864,7 @@ pub struct ConnectString {
 }
 /// Query For Data Source Records To Merge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:query")]
+#[sdk(qname = "w:query")]
 pub struct Query {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2872,7 +2872,7 @@ pub struct Query {
 }
 /// Column Containing E-mail Address.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:addressFieldName")]
+#[sdk(qname = "w:addressFieldName")]
 pub struct AddressFieldName {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2880,7 +2880,7 @@ pub struct AddressFieldName {
 }
 /// Merged E-mail or Fax Subject Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:mailSubject")]
+#[sdk(qname = "w:mailSubject")]
 pub struct MailSubject {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2888,7 +2888,7 @@ pub struct MailSubject {
 }
 /// Frame Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:sz")]
+#[sdk(qname = "w:sz")]
 pub struct FrameSize {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2896,7 +2896,7 @@ pub struct FrameSize {
 }
 /// Associated Paragraph Style Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:style")]
+#[sdk(qname = "w:style")]
 pub struct StyleId {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2904,7 +2904,7 @@ pub struct StyleId {
 }
 /// Description for Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:description")]
+#[sdk(qname = "w:description")]
 pub struct Description {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2912,7 +2912,7 @@ pub struct Description {
 }
 /// Defines the SdtAlias Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:alias")]
+#[sdk(qname = "w:alias")]
 pub struct SdtAlias {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2920,7 +2920,7 @@ pub struct SdtAlias {
 }
 /// Defines the Tag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:tag")]
+#[sdk(qname = "w:tag")]
 pub struct Tag {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2928,7 +2928,7 @@ pub struct Tag {
 }
 /// Attached Custom XML Schema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:attachedSchema")]
+#[sdk(qname = "w:attachedSchema")]
 pub struct AttachedSchema {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2936,7 +2936,7 @@ pub struct AttachedSchema {
 }
 /// Radix Point for Field Code Evaluation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:decimalSymbol")]
+#[sdk(qname = "w:decimalSymbol")]
 pub struct DecimalSymbol {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2944,7 +2944,7 @@ pub struct DecimalSymbol {
 }
 /// List Separator for Field Code Evaluation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:listSeparator")]
+#[sdk(qname = "w:listSeparator")]
 pub struct ListSeparator {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2952,7 +2952,7 @@ pub struct ListSeparator {
 }
 /// Defines the WebPageEncoding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:encoding")]
+#[sdk(qname = "w:encoding")]
 pub struct WebPageEncoding {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2960,7 +2960,7 @@ pub struct WebPageEncoding {
 }
 /// Defines the AltName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:altName")]
+#[sdk(qname = "w:altName")]
 pub struct AltName {
   /// String Value
   #[sdk(attr(qname = "w:val"))]
@@ -2968,7 +2968,7 @@ pub struct AltName {
 }
 /// Defines the KeepNext Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:keepNext")]
+#[sdk(qname = "w:keepNext")]
 pub struct KeepNext {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -2976,7 +2976,7 @@ pub struct KeepNext {
 }
 /// Defines the KeepLines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:keepLines")]
+#[sdk(qname = "w:keepLines")]
 pub struct KeepLines {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -2984,7 +2984,7 @@ pub struct KeepLines {
 }
 /// Defines the PageBreakBefore Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:pageBreakBefore")]
+#[sdk(qname = "w:pageBreakBefore")]
 pub struct PageBreakBefore {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -2992,7 +2992,7 @@ pub struct PageBreakBefore {
 }
 /// Defines the WidowControl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:widowControl")]
+#[sdk(qname = "w:widowControl")]
 pub struct WidowControl {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3000,7 +3000,7 @@ pub struct WidowControl {
 }
 /// Defines the SuppressLineNumbers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressLineNumbers")]
+#[sdk(qname = "w:suppressLineNumbers")]
 pub struct SuppressLineNumbers {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3008,7 +3008,7 @@ pub struct SuppressLineNumbers {
 }
 /// Defines the SuppressAutoHyphens Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressAutoHyphens")]
+#[sdk(qname = "w:suppressAutoHyphens")]
 pub struct SuppressAutoHyphens {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3016,7 +3016,7 @@ pub struct SuppressAutoHyphens {
 }
 /// Defines the Kinsoku Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:kinsoku")]
+#[sdk(qname = "w:kinsoku")]
 pub struct Kinsoku {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3024,7 +3024,7 @@ pub struct Kinsoku {
 }
 /// Defines the WordWrap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:wordWrap")]
+#[sdk(qname = "w:wordWrap")]
 pub struct WordWrap {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3032,7 +3032,7 @@ pub struct WordWrap {
 }
 /// Defines the OverflowPunctuation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:overflowPunct")]
+#[sdk(qname = "w:overflowPunct")]
 pub struct OverflowPunctuation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3040,7 +3040,7 @@ pub struct OverflowPunctuation {
 }
 /// Defines the TopLinePunctuation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:topLinePunct")]
+#[sdk(qname = "w:topLinePunct")]
 pub struct TopLinePunctuation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3048,7 +3048,7 @@ pub struct TopLinePunctuation {
 }
 /// Defines the AutoSpaceDE Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoSpaceDE")]
+#[sdk(qname = "w:autoSpaceDE")]
 pub struct AutoSpaceDe {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3056,7 +3056,7 @@ pub struct AutoSpaceDe {
 }
 /// Defines the AutoSpaceDN Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoSpaceDN")]
+#[sdk(qname = "w:autoSpaceDN")]
 pub struct AutoSpaceDn {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3064,7 +3064,7 @@ pub struct AutoSpaceDn {
 }
 /// Defines the BiDi Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bidi")]
+#[sdk(qname = "w:bidi")]
 pub struct BiDi {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3072,7 +3072,7 @@ pub struct BiDi {
 }
 /// Defines the AdjustRightIndent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:adjustRightInd")]
+#[sdk(qname = "w:adjustRightInd")]
 pub struct AdjustRightIndent {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3080,7 +3080,7 @@ pub struct AdjustRightIndent {
 }
 /// Defines the SnapToGrid Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:snapToGrid")]
+#[sdk(qname = "w:snapToGrid")]
 pub struct SnapToGrid {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3088,7 +3088,7 @@ pub struct SnapToGrid {
 }
 /// Defines the ContextualSpacing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:contextualSpacing")]
+#[sdk(qname = "w:contextualSpacing")]
 pub struct ContextualSpacing {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3096,7 +3096,7 @@ pub struct ContextualSpacing {
 }
 /// Defines the MirrorIndents Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:mirrorIndents")]
+#[sdk(qname = "w:mirrorIndents")]
 pub struct MirrorIndents {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3104,7 +3104,7 @@ pub struct MirrorIndents {
 }
 /// Defines the SuppressOverlap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressOverlap")]
+#[sdk(qname = "w:suppressOverlap")]
 pub struct SuppressOverlap {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3112,7 +3112,7 @@ pub struct SuppressOverlap {
 }
 /// Defines the Bold Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:b")]
+#[sdk(qname = "w:b")]
 pub struct Bold {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3120,7 +3120,7 @@ pub struct Bold {
 }
 /// Defines the BoldComplexScript Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bCs")]
+#[sdk(qname = "w:bCs")]
 pub struct BoldComplexScript {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3128,7 +3128,7 @@ pub struct BoldComplexScript {
 }
 /// Defines the Italic Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:i")]
+#[sdk(qname = "w:i")]
 pub struct Italic {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3136,7 +3136,7 @@ pub struct Italic {
 }
 /// Defines the ItalicComplexScript Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:iCs")]
+#[sdk(qname = "w:iCs")]
 pub struct ItalicComplexScript {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3144,7 +3144,7 @@ pub struct ItalicComplexScript {
 }
 /// Defines the Caps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:caps")]
+#[sdk(qname = "w:caps")]
 pub struct Caps {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3152,7 +3152,7 @@ pub struct Caps {
 }
 /// Defines the SmallCaps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:smallCaps")]
+#[sdk(qname = "w:smallCaps")]
 pub struct SmallCaps {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3160,7 +3160,7 @@ pub struct SmallCaps {
 }
 /// Defines the Strike Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:strike")]
+#[sdk(qname = "w:strike")]
 pub struct Strike {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3168,7 +3168,7 @@ pub struct Strike {
 }
 /// Defines the DoubleStrike Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:dstrike")]
+#[sdk(qname = "w:dstrike")]
 pub struct DoubleStrike {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3176,7 +3176,7 @@ pub struct DoubleStrike {
 }
 /// Defines the Outline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:outline")]
+#[sdk(qname = "w:outline")]
 pub struct Outline {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3184,7 +3184,7 @@ pub struct Outline {
 }
 /// Defines the Shadow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:shadow")]
+#[sdk(qname = "w:shadow")]
 pub struct Shadow {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3192,7 +3192,7 @@ pub struct Shadow {
 }
 /// Defines the Emboss Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:emboss")]
+#[sdk(qname = "w:emboss")]
 pub struct Emboss {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3200,7 +3200,7 @@ pub struct Emboss {
 }
 /// Defines the Imprint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:imprint")]
+#[sdk(qname = "w:imprint")]
 pub struct Imprint {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3208,7 +3208,7 @@ pub struct Imprint {
 }
 /// Defines the NoProof Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noProof")]
+#[sdk(qname = "w:noProof")]
 pub struct NoProof {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3216,7 +3216,7 @@ pub struct NoProof {
 }
 /// Defines the Vanish Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:vanish")]
+#[sdk(qname = "w:vanish")]
 pub struct Vanish {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3224,7 +3224,7 @@ pub struct Vanish {
 }
 /// Defines the WebHidden Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:webHidden")]
+#[sdk(qname = "w:webHidden")]
 pub struct WebHidden {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3232,7 +3232,7 @@ pub struct WebHidden {
 }
 /// Defines the RightToLeftText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:rtl")]
+#[sdk(qname = "w:rtl")]
 pub struct RightToLeftText {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3240,7 +3240,7 @@ pub struct RightToLeftText {
 }
 /// Defines the ComplexScript Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:cs")]
+#[sdk(qname = "w:cs")]
 pub struct ComplexScript {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3248,7 +3248,7 @@ pub struct ComplexScript {
 }
 /// Defines the SpecVanish Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:specVanish")]
+#[sdk(qname = "w:specVanish")]
 pub struct SpecVanish {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3256,7 +3256,7 @@ pub struct SpecVanish {
 }
 /// Defines the OfficeMath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:oMath")]
+#[sdk(qname = "w:oMath")]
 pub struct OfficeMath {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3264,7 +3264,7 @@ pub struct OfficeMath {
 }
 /// Defines the Hidden Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:hidden")]
+#[sdk(qname = "w:hidden")]
 pub struct Hidden {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3272,7 +3272,7 @@ pub struct Hidden {
 }
 /// Defines the FormProtection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:formProt")]
+#[sdk(qname = "w:formProt")]
 pub struct FormProtection {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3280,7 +3280,7 @@ pub struct FormProtection {
 }
 /// Defines the NoEndnote Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noEndnote")]
+#[sdk(qname = "w:noEndnote")]
 pub struct NoEndnote {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3288,7 +3288,7 @@ pub struct NoEndnote {
 }
 /// Defines the TitlePage Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:titlePg")]
+#[sdk(qname = "w:titlePg")]
 pub struct TitlePage {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3296,7 +3296,7 @@ pub struct TitlePage {
 }
 /// Defines the GutterOnRight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:rtlGutter")]
+#[sdk(qname = "w:rtlGutter")]
 pub struct GutterOnRight {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3304,7 +3304,7 @@ pub struct GutterOnRight {
 }
 /// Form Field Enabled.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:enabled")]
+#[sdk(qname = "w:enabled")]
 pub struct Enabled {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3312,7 +3312,7 @@ pub struct Enabled {
 }
 /// Recalculate Fields When Current Field Is Modified.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:calcOnExit")]
+#[sdk(qname = "w:calcOnExit")]
 pub struct CalculateOnExit {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3320,7 +3320,7 @@ pub struct CalculateOnExit {
 }
 /// Automatically Size Form Field.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:sizeAuto")]
+#[sdk(qname = "w:sizeAuto")]
 pub struct AutomaticallySizeFormField {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3328,7 +3328,7 @@ pub struct AutomaticallySizeFormField {
 }
 /// Default Checkbox Form Field State.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:default")]
+#[sdk(qname = "w:default")]
 pub struct DefaultCheckBoxFormFieldState {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3336,7 +3336,7 @@ pub struct DefaultCheckBoxFormFieldState {
 }
 /// Checkbox Form Field State.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:checked")]
+#[sdk(qname = "w:checked")]
 pub struct Checked {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3344,7 +3344,7 @@ pub struct Checked {
 }
 /// Keep Source Formatting on Import.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:matchSrc")]
+#[sdk(qname = "w:matchSrc")]
 pub struct MatchSource {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3352,7 +3352,7 @@ pub struct MatchSource {
 }
 /// Invalidated Field Cache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:dirty")]
+#[sdk(qname = "w:dirty")]
 pub struct Dirty {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3360,7 +3360,7 @@ pub struct Dirty {
 }
 /// Built-In Document Part.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:docPartUnique")]
+#[sdk(qname = "w:docPartUnique")]
 pub struct DocPartUnique {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3368,7 +3368,7 @@ pub struct DocPartUnique {
 }
 /// Record Is Included in Mail Merge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:active")]
+#[sdk(qname = "w:active")]
 pub struct Active {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3376,7 +3376,7 @@ pub struct Active {
 }
 /// Use Country/Region-Based Address Field Ordering.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:dynamicAddress")]
+#[sdk(qname = "w:dynamicAddress")]
 pub struct DynamicAddress {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3384,7 +3384,7 @@ pub struct DynamicAddress {
 }
 /// First Row of Data Source Contains Column Names.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:fHdr")]
+#[sdk(qname = "w:fHdr")]
 pub struct FirstRowHeader {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3392,7 +3392,7 @@ pub struct FirstRowHeader {
 }
 /// Query Contains Link to External Query File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:linkToQuery")]
+#[sdk(qname = "w:linkToQuery")]
 pub struct LinkToQuery {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3400,7 +3400,7 @@ pub struct LinkToQuery {
 }
 /// Remove Blank Lines from Merged Documents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotSuppressBlankLines")]
+#[sdk(qname = "w:doNotSuppressBlankLines")]
 pub struct DoNotSuppressBlankLines {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3408,7 +3408,7 @@ pub struct DoNotSuppressBlankLines {
 }
 /// Merged Document To E-Mail Attachment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:mailAsAttachment")]
+#[sdk(qname = "w:mailAsAttachment")]
 pub struct MailAsAttachment {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3416,7 +3416,7 @@ pub struct MailAsAttachment {
 }
 /// View Merged Data Within Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:viewMergedData")]
+#[sdk(qname = "w:viewMergedData")]
 pub struct ViewMergedData {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3424,7 +3424,7 @@ pub struct ViewMergedData {
 }
 /// Display All Levels Using Arabic Numerals.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:isLgl")]
+#[sdk(qname = "w:isLgl")]
 pub struct IsLegalNumberingStyle {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3432,7 +3432,7 @@ pub struct IsLegalNumberingStyle {
 }
 /// Data for HTML blockquote Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:blockQuote")]
+#[sdk(qname = "w:blockQuote")]
 pub struct BlockQuote {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3440,7 +3440,7 @@ pub struct BlockQuote {
 }
 /// Data for HTML body Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bodyDiv")]
+#[sdk(qname = "w:bodyDiv")]
 pub struct BodyDiv {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3448,7 +3448,7 @@ pub struct BodyDiv {
 }
 /// Use Simplified Rules For Table Border Conflicts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useSingleBorderforContiguousCells")]
+#[sdk(qname = "w:useSingleBorderforContiguousCells")]
 pub struct UseSingleBorderForContiguousCells {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3456,7 +3456,7 @@ pub struct UseSingleBorderForContiguousCells {
 }
 /// Emulate WordPerfect 6.x Paragraph Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:wpJustification")]
+#[sdk(qname = "w:wpJustification")]
 pub struct WordPerfectJustification {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3464,7 +3464,7 @@ pub struct WordPerfectJustification {
 }
 /// Do Not Create Custom Tab Stop for Hanging Indent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noTabHangInd")]
+#[sdk(qname = "w:noTabHangInd")]
 pub struct NoTabHangIndent {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3472,7 +3472,7 @@ pub struct NoTabHangIndent {
 }
 /// Do Not Add Leading Between Lines of Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noLeading")]
+#[sdk(qname = "w:noLeading")]
 pub struct NoLeading {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3480,7 +3480,7 @@ pub struct NoLeading {
 }
 /// Add Additional Space Below Baseline For Underlined East Asian Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:spaceForUL")]
+#[sdk(qname = "w:spaceForUL")]
 pub struct SpaceForUnderline {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3488,7 +3488,7 @@ pub struct SpaceForUnderline {
 }
 /// Do Not Balance Text Columns within a Section.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noColumnBalance")]
+#[sdk(qname = "w:noColumnBalance")]
 pub struct NoColumnBalance {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3496,7 +3496,7 @@ pub struct NoColumnBalance {
 }
 /// Balance Single Byte and Double Byte Characters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:balanceSingleByteDoubleByteWidth")]
+#[sdk(qname = "w:balanceSingleByteDoubleByteWidth")]
 pub struct BalanceSingleByteDoubleByteWidth {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3504,7 +3504,7 @@ pub struct BalanceSingleByteDoubleByteWidth {
 }
 /// Do Not Center Content on Lines With Exact Line Height.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noExtraLineSpacing")]
+#[sdk(qname = "w:noExtraLineSpacing")]
 pub struct NoExtraLineSpacing {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3512,7 +3512,7 @@ pub struct NoExtraLineSpacing {
 }
 /// Convert Backslash To Yen Sign When Entered.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotLeaveBackslashAlone")]
+#[sdk(qname = "w:doNotLeaveBackslashAlone")]
 pub struct DoNotLeaveBackslashAlone {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3520,7 +3520,7 @@ pub struct DoNotLeaveBackslashAlone {
 }
 /// Underline All Trailing Spaces.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:ulTrailSpace")]
+#[sdk(qname = "w:ulTrailSpace")]
 pub struct UnderlineTrailingSpaces {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3528,7 +3528,7 @@ pub struct UnderlineTrailingSpaces {
 }
 /// Don't Justify Lines Ending in Soft Line Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotExpandShiftReturn")]
+#[sdk(qname = "w:doNotExpandShiftReturn")]
 pub struct DoNotExpandShiftReturn {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3536,7 +3536,7 @@ pub struct DoNotExpandShiftReturn {
 }
 /// Only Expand/Condense Text By Whole Points.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:spacingInWholePoints")]
+#[sdk(qname = "w:spacingInWholePoints")]
 pub struct SpacingInWholePoints {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3544,7 +3544,7 @@ pub struct SpacingInWholePoints {
 }
 /// Emulate Word 6.0 Line Wrapping for East Asian Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:lineWrapLikeWord6")]
+#[sdk(qname = "w:lineWrapLikeWord6")]
 pub struct LineWrapLikeWord6 {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3552,7 +3552,7 @@ pub struct LineWrapLikeWord6 {
 }
 /// Print Body Text before Header/Footer Contents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printBodyTextBeforeHeader")]
+#[sdk(qname = "w:printBodyTextBeforeHeader")]
 pub struct PrintBodyTextBeforeHeader {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3560,7 +3560,7 @@ pub struct PrintBodyTextBeforeHeader {
 }
 /// Print Colors as Black And White without Dithering.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printColBlack")]
+#[sdk(qname = "w:printColBlack")]
 pub struct PrintColorBlackWhite {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3568,7 +3568,7 @@ pub struct PrintColorBlackWhite {
 }
 /// Space width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:wpSpaceWidth")]
+#[sdk(qname = "w:wpSpaceWidth")]
 pub struct WordPerfectSpaceWidth {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3576,7 +3576,7 @@ pub struct WordPerfectSpaceWidth {
 }
 /// Display Page/Column Breaks Present in Frames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:showBreaksInFrames")]
+#[sdk(qname = "w:showBreaksInFrames")]
 pub struct ShowBreaksInFrames {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3584,7 +3584,7 @@ pub struct ShowBreaksInFrames {
 }
 /// Increase Priority Of Font Size During Font Substitution.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:subFontBySize")]
+#[sdk(qname = "w:subFontBySize")]
 pub struct SubFontBySize {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3592,7 +3592,7 @@ pub struct SubFontBySize {
 }
 /// Ignore Exact Line Height for Last Line on Page.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressBottomSpacing")]
+#[sdk(qname = "w:suppressBottomSpacing")]
 pub struct SuppressBottomSpacing {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3600,7 +3600,7 @@ pub struct SuppressBottomSpacing {
 }
 /// Ignore Minimum and Exact Line Height for First Line on Page.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressTopSpacing")]
+#[sdk(qname = "w:suppressTopSpacing")]
 pub struct SuppressTopSpacing {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3608,7 +3608,7 @@ pub struct SuppressTopSpacing {
 }
 /// Ignore Minimum Line Height for First Line on Page.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressSpacingAtTopOfPage")]
+#[sdk(qname = "w:suppressSpacingAtTopOfPage")]
 pub struct SuppressSpacingAtTopOfPage {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3616,7 +3616,7 @@ pub struct SuppressSpacingAtTopOfPage {
 }
 /// Emulate WordPerfect 5.x Line Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressTopSpacingWP")]
+#[sdk(qname = "w:suppressTopSpacingWP")]
 pub struct SuppressTopSpacingWordPerfect {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3624,7 +3624,7 @@ pub struct SuppressTopSpacingWordPerfect {
 }
 /// Do Not Use Space Before On First Line After a Page Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:suppressSpBfAfterPgBrk")]
+#[sdk(qname = "w:suppressSpBfAfterPgBrk")]
 pub struct SuppressSpacingBeforeAfterPageBreak {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3632,7 +3632,7 @@ pub struct SuppressSpacingBeforeAfterPageBreak {
 }
 /// Swap Paragraph Borders on Odd Numbered Pages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:swapBordersFacingPages")]
+#[sdk(qname = "w:swapBordersFacingPages")]
 pub struct SwapBordersFacingPages {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3640,7 +3640,7 @@ pub struct SwapBordersFacingPages {
 }
 /// Treat Backslash Quotation Delimiter as Two Quotation Marks.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:convMailMergeEsc")]
+#[sdk(qname = "w:convMailMergeEsc")]
 pub struct ConvertMailMergeEscape {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3648,7 +3648,7 @@ pub struct ConvertMailMergeEscape {
 }
 /// Emulate WordPerfect 6.x Font Height Calculation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:truncateFontHeightsLikeWP6")]
+#[sdk(qname = "w:truncateFontHeightsLikeWP6")]
 pub struct TruncateFontHeightsLikeWordPerfect {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3656,7 +3656,7 @@ pub struct TruncateFontHeightsLikeWordPerfect {
 }
 /// Emulate Word 5.x for the Macintosh Small Caps Formatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:mwSmallCaps")]
+#[sdk(qname = "w:mwSmallCaps")]
 pub struct MacWordSmallCaps {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3664,7 +3664,7 @@ pub struct MacWordSmallCaps {
 }
 /// Use Printer Metrics To Display Documents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:usePrinterMetrics")]
+#[sdk(qname = "w:usePrinterMetrics")]
 pub struct UsePrinterMetrics {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3672,7 +3672,7 @@ pub struct UsePrinterMetrics {
 }
 /// Do Not Suppress Paragraph Borders Next To Frames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotSuppressParagraphBorders")]
+#[sdk(qname = "w:doNotSuppressParagraphBorders")]
 pub struct DoNotSuppressParagraphBorders {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3680,7 +3680,7 @@ pub struct DoNotSuppressParagraphBorders {
 }
 /// Line Wrap Trailing Spaces.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:wrapTrailSpaces")]
+#[sdk(qname = "w:wrapTrailSpaces")]
 pub struct WrapTrailSpaces {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3688,7 +3688,7 @@ pub struct WrapTrailSpaces {
 }
 /// Emulate Word 6.x/95/97 Footnote Placement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:footnoteLayoutLikeWW8")]
+#[sdk(qname = "w:footnoteLayoutLikeWW8")]
 pub struct FootnoteLayoutLikeWord8 {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3696,7 +3696,7 @@ pub struct FootnoteLayoutLikeWord8 {
 }
 /// Emulate Word 97 Text Wrapping Around Floating Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:shapeLayoutLikeWW8")]
+#[sdk(qname = "w:shapeLayoutLikeWW8")]
 pub struct ShapeLayoutLikeWord8 {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3704,7 +3704,7 @@ pub struct ShapeLayoutLikeWord8 {
 }
 /// Align Table Rows Independently.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:alignTablesRowByRow")]
+#[sdk(qname = "w:alignTablesRowByRow")]
 pub struct AlignTablesRowByRow {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3712,7 +3712,7 @@ pub struct AlignTablesRowByRow {
 }
 /// Ignore Width of Last Tab Stop When Aligning Paragraph If It Is Not Left Aligned.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:forgetLastTabAlignment")]
+#[sdk(qname = "w:forgetLastTabAlignment")]
 pub struct ForgetLastTabAlignment {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3720,7 +3720,7 @@ pub struct ForgetLastTabAlignment {
 }
 /// Add Document Grid Line Pitch To Lines in Table Cells.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:adjustLineHeightInTable")]
+#[sdk(qname = "w:adjustLineHeightInTable")]
 pub struct AdjustLineHeightInTable {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3728,7 +3728,7 @@ pub struct AdjustLineHeightInTable {
 }
 /// Emulate Word 95 Full-Width Character Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoSpaceLikeWord95")]
+#[sdk(qname = "w:autoSpaceLikeWord95")]
 pub struct AutoSpaceLikeWord95 {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3736,7 +3736,7 @@ pub struct AutoSpaceLikeWord95 {
 }
 /// Do Not Increase Line Height for Raised/Lowered Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noSpaceRaiseLower")]
+#[sdk(qname = "w:noSpaceRaiseLower")]
 pub struct NoSpaceRaiseLower {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3744,7 +3744,7 @@ pub struct NoSpaceRaiseLower {
 }
 /// Use Fixed Paragraph Spacing for HTML Auto Setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotUseHTMLParagraphAutoSpacing")]
+#[sdk(qname = "w:doNotUseHTMLParagraphAutoSpacing")]
 pub struct DoNotUseHtmlParagraphAutoSpacing {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3752,7 +3752,7 @@ pub struct DoNotUseHtmlParagraphAutoSpacing {
 }
 /// Ignore Space Before Table When Deciding If Table Should Wrap Floating Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:layoutRawTableWidth")]
+#[sdk(qname = "w:layoutRawTableWidth")]
 pub struct LayoutRawTableWidth {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3760,7 +3760,7 @@ pub struct LayoutRawTableWidth {
 }
 /// Allow Table Rows to Wrap Inline Objects Independently.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:layoutTableRowsApart")]
+#[sdk(qname = "w:layoutTableRowsApart")]
 pub struct LayoutTableRowsApart {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3768,7 +3768,7 @@ pub struct LayoutTableRowsApart {
 }
 /// Emulate Word 97 East Asian Line Breaking.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useWord97LineBreakRules")]
+#[sdk(qname = "w:useWord97LineBreakRules")]
 pub struct UseWord97LineBreakRules {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3776,7 +3776,7 @@ pub struct UseWord97LineBreakRules {
 }
 /// Do Not Allow Floating Tables To Break Across Pages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotBreakWrappedTables")]
+#[sdk(qname = "w:doNotBreakWrappedTables")]
 pub struct DoNotBreakWrappedTables {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3784,7 +3784,7 @@ pub struct DoNotBreakWrappedTables {
 }
 /// Do Not Snap to Document Grid in Table Cells with Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotSnapToGridInCell")]
+#[sdk(qname = "w:doNotSnapToGridInCell")]
 pub struct DoNotSnapToGridInCell {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3792,7 +3792,7 @@ pub struct DoNotSnapToGridInCell {
 }
 /// Select Field When First or Last Character Is Selected.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:selectFldWithFirstOrLastChar")]
+#[sdk(qname = "w:selectFldWithFirstOrLastChar")]
 pub struct SelectFieldWithFirstOrLastChar {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3800,7 +3800,7 @@ pub struct SelectFieldWithFirstOrLastChar {
 }
 /// Use Legacy Ethiopic and Amharic Line Breaking Rules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:applyBreakingRules")]
+#[sdk(qname = "w:applyBreakingRules")]
 pub struct ApplyBreakingRules {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3808,7 +3808,7 @@ pub struct ApplyBreakingRules {
 }
 /// Do Not Allow Hanging Punctuation With Character Grid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotWrapTextWithPunct")]
+#[sdk(qname = "w:doNotWrapTextWithPunct")]
 pub struct DoNotWrapTextWithPunctuation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3816,7 +3816,7 @@ pub struct DoNotWrapTextWithPunctuation {
 }
 /// Do Not Compress Compressible Characters When Using Document Grid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotUseEastAsianBreakRules")]
+#[sdk(qname = "w:doNotUseEastAsianBreakRules")]
 pub struct DoNotUseEastAsianBreakRules {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3824,7 +3824,7 @@ pub struct DoNotUseEastAsianBreakRules {
 }
 /// Emulate Word 2002 Table Style Rules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useWord2002TableStyleRules")]
+#[sdk(qname = "w:useWord2002TableStyleRules")]
 pub struct UseWord2002TableStyleRules {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3832,7 +3832,7 @@ pub struct UseWord2002TableStyleRules {
 }
 /// Allow Tables to AutoFit Into Page Margins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:growAutofit")]
+#[sdk(qname = "w:growAutofit")]
 pub struct GrowAutofit {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3840,7 +3840,7 @@ pub struct GrowAutofit {
 }
 /// Do Not Bypass East Asian/Complex Script Layout Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useFELayout")]
+#[sdk(qname = "w:useFELayout")]
 pub struct UseFarEastLayout {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3848,7 +3848,7 @@ pub struct UseFarEastLayout {
 }
 /// Do Not Automatically Apply List Paragraph Style To Bulleted/Numbered Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useNormalStyleForList")]
+#[sdk(qname = "w:useNormalStyleForList")]
 pub struct UseNormalStyleForList {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3856,7 +3856,7 @@ pub struct UseNormalStyleForList {
 }
 /// Ignore Hanging Indent When Creating Tab Stop After Numbering.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotUseIndentAsNumberingTabStop")]
+#[sdk(qname = "w:doNotUseIndentAsNumberingTabStop")]
 pub struct DoNotUseIndentAsNumberingTabStop {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3864,7 +3864,7 @@ pub struct DoNotUseIndentAsNumberingTabStop {
 }
 /// Use Alternate Set of East Asian Line Breaking Rules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useAltKinsokuLineBreakRules")]
+#[sdk(qname = "w:useAltKinsokuLineBreakRules")]
 pub struct UseAltKinsokuLineBreakRules {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3872,7 +3872,7 @@ pub struct UseAltKinsokuLineBreakRules {
 }
 /// Allow Contextual Spacing of Paragraphs in Tables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:allowSpaceOfSameStyleInTable")]
+#[sdk(qname = "w:allowSpaceOfSameStyleInTable")]
 pub struct AllowSpaceOfSameStyleInTable {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3880,7 +3880,7 @@ pub struct AllowSpaceOfSameStyleInTable {
 }
 /// Do Not Ignore Floating Objects When Calculating Paragraph Indentation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotSuppressIndentation")]
+#[sdk(qname = "w:doNotSuppressIndentation")]
 pub struct DoNotSuppressIndentation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3888,7 +3888,7 @@ pub struct DoNotSuppressIndentation {
 }
 /// Do Not AutoFit Tables To Fit Next To Wrapped Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotAutofitConstrainedTables")]
+#[sdk(qname = "w:doNotAutofitConstrainedTables")]
 pub struct DoNotAutofitConstrainedTables {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3896,7 +3896,7 @@ pub struct DoNotAutofitConstrainedTables {
 }
 /// Allow Table Columns To Exceed Preferred Widths of Constituent Cells.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autofitToFirstFixedWidthCell")]
+#[sdk(qname = "w:autofitToFirstFixedWidthCell")]
 pub struct AutofitToFirstFixedWidthCell {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3904,7 +3904,7 @@ pub struct AutofitToFirstFixedWidthCell {
 }
 /// Underline Following Character Following Numbering.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:underlineTabInNumList")]
+#[sdk(qname = "w:underlineTabInNumList")]
 pub struct UnderlineTabInNumberingList {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3912,7 +3912,7 @@ pub struct UnderlineTabInNumberingList {
 }
 /// Always Use Fixed Width for Hangul Characters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:displayHangulFixedWidth")]
+#[sdk(qname = "w:displayHangulFixedWidth")]
 pub struct DisplayHangulFixedWidth {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3920,7 +3920,7 @@ pub struct DisplayHangulFixedWidth {
 }
 /// Always Move Paragraph Mark to Page after a Page Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:splitPgBreakAndParaMark")]
+#[sdk(qname = "w:splitPgBreakAndParaMark")]
 pub struct SplitPageBreakAndParagraphMark {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3928,7 +3928,7 @@ pub struct SplitPageBreakAndParagraphMark {
 }
 /// Don't Vertically Align Cells Containing Floating Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotVertAlignCellWithSp")]
+#[sdk(qname = "w:doNotVertAlignCellWithSp")]
 pub struct DoNotVerticallyAlignCellWithShape {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3936,7 +3936,7 @@ pub struct DoNotVerticallyAlignCellWithShape {
 }
 /// Don't Break Table Rows Around Floating Tables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotBreakConstrainedForcedTable")]
+#[sdk(qname = "w:doNotBreakConstrainedForcedTable")]
 pub struct DoNotBreakConstrainedForcedTable {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3944,7 +3944,7 @@ pub struct DoNotBreakConstrainedForcedTable {
 }
 /// Ignore Vertical Alignment in Textboxes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotVertAlignInTxbx")]
+#[sdk(qname = "w:doNotVertAlignInTxbx")]
 pub struct DoNotVerticallyAlignInTextBox {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3952,7 +3952,7 @@ pub struct DoNotVerticallyAlignInTextBox {
 }
 /// Use ANSI Kerning Pairs from Fonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useAnsiKerningPairs")]
+#[sdk(qname = "w:useAnsiKerningPairs")]
 pub struct UseAnsiKerningPairs {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3960,7 +3960,7 @@ pub struct UseAnsiKerningPairs {
 }
 /// Use Cached Paragraph Information for Column Balancing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:cachedColBalance")]
+#[sdk(qname = "w:cachedColBalance")]
 pub struct CachedColumnBalance {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3968,7 +3968,7 @@ pub struct CachedColumnBalance {
 }
 /// Defines the ShowingPlaceholder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:showingPlcHdr")]
+#[sdk(qname = "w:showingPlcHdr")]
 pub struct ShowingPlaceholder {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3976,7 +3976,7 @@ pub struct ShowingPlaceholder {
 }
 /// Defines the TemporarySdt Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:temporary")]
+#[sdk(qname = "w:temporary")]
 pub struct TemporarySdt {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3984,7 +3984,7 @@ pub struct TemporarySdt {
 }
 /// Remove Personal Information from Document Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:removePersonalInformation")]
+#[sdk(qname = "w:removePersonalInformation")]
 pub struct RemovePersonalInformation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -3992,7 +3992,7 @@ pub struct RemovePersonalInformation {
 }
 /// Remove Date and Time from Annotations.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:removeDateAndTime")]
+#[sdk(qname = "w:removeDateAndTime")]
 pub struct RemoveDateAndTime {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4000,7 +4000,7 @@ pub struct RemoveDateAndTime {
 }
 /// Do Not Display Visual Boundary For Header/Footer or Between Pages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotDisplayPageBoundaries")]
+#[sdk(qname = "w:doNotDisplayPageBoundaries")]
 pub struct DoNotDisplayPageBoundaries {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4008,7 +4008,7 @@ pub struct DoNotDisplayPageBoundaries {
 }
 /// Display Background Objects When Displaying Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:displayBackgroundShape")]
+#[sdk(qname = "w:displayBackgroundShape")]
 pub struct DisplayBackgroundShape {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4016,7 +4016,7 @@ pub struct DisplayBackgroundShape {
 }
 /// Print PostScript Codes With Document Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printPostScriptOverText")]
+#[sdk(qname = "w:printPostScriptOverText")]
 pub struct PrintPostScriptOverText {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4024,7 +4024,7 @@ pub struct PrintPostScriptOverText {
 }
 /// Print Fractional Character Widths.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printFractionalCharacterWidth")]
+#[sdk(qname = "w:printFractionalCharacterWidth")]
 pub struct PrintFractionalCharacterWidth {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4032,7 +4032,7 @@ pub struct PrintFractionalCharacterWidth {
 }
 /// Only Print Form Field Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printFormsData")]
+#[sdk(qname = "w:printFormsData")]
 pub struct PrintFormsData {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4040,7 +4040,7 @@ pub struct PrintFormsData {
 }
 /// Embed TrueType Fonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:embedTrueTypeFonts")]
+#[sdk(qname = "w:embedTrueTypeFonts")]
 pub struct EmbedTrueTypeFonts {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4048,7 +4048,7 @@ pub struct EmbedTrueTypeFonts {
 }
 /// Embed Common System Fonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:embedSystemFonts")]
+#[sdk(qname = "w:embedSystemFonts")]
 pub struct EmbedSystemFonts {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4056,7 +4056,7 @@ pub struct EmbedSystemFonts {
 }
 /// Subset Fonts When Embedding.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:saveSubsetFonts")]
+#[sdk(qname = "w:saveSubsetFonts")]
 pub struct SaveSubsetFonts {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4064,7 +4064,7 @@ pub struct SaveSubsetFonts {
 }
 /// Only Save Form Field Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:saveFormsData")]
+#[sdk(qname = "w:saveFormsData")]
 pub struct SaveFormsData {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4072,7 +4072,7 @@ pub struct SaveFormsData {
 }
 /// Mirror Page Margins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:mirrorMargins")]
+#[sdk(qname = "w:mirrorMargins")]
 pub struct MirrorMargins {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4080,7 +4080,7 @@ pub struct MirrorMargins {
 }
 /// Align Paragraph and Table Borders with Page Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:alignBordersAndEdges")]
+#[sdk(qname = "w:alignBordersAndEdges")]
 pub struct AlignBorderAndEdges {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4088,7 +4088,7 @@ pub struct AlignBorderAndEdges {
 }
 /// Page Border Excludes Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bordersDoNotSurroundHeader")]
+#[sdk(qname = "w:bordersDoNotSurroundHeader")]
 pub struct BordersDoNotSurroundHeader {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4096,7 +4096,7 @@ pub struct BordersDoNotSurroundHeader {
 }
 /// Page Border Excludes Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bordersDoNotSurroundFooter")]
+#[sdk(qname = "w:bordersDoNotSurroundFooter")]
 pub struct BordersDoNotSurroundFooter {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4104,7 +4104,7 @@ pub struct BordersDoNotSurroundFooter {
 }
 /// Position Gutter At Top of Page.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:gutterAtTop")]
+#[sdk(qname = "w:gutterAtTop")]
 pub struct GutterAtTop {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4112,7 +4112,7 @@ pub struct GutterAtTop {
 }
 /// Do Not Display Visual Indication of Spelling Errors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:hideSpellingErrors")]
+#[sdk(qname = "w:hideSpellingErrors")]
 pub struct HideSpellingErrors {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4120,7 +4120,7 @@ pub struct HideSpellingErrors {
 }
 /// Do Not Display Visual Indication of Grammatical Errors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:hideGrammaticalErrors")]
+#[sdk(qname = "w:hideGrammaticalErrors")]
 pub struct HideGrammaticalErrors {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4128,7 +4128,7 @@ pub struct HideGrammaticalErrors {
 }
 /// Structured Document Tag Placeholder Text Should be Resaved.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:formsDesign")]
+#[sdk(qname = "w:formsDesign")]
 pub struct FormsDesign {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4136,7 +4136,7 @@ pub struct FormsDesign {
 }
 /// Automatically Update Styles From Document Template.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:linkStyles")]
+#[sdk(qname = "w:linkStyles")]
 pub struct LinkStyles {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4144,7 +4144,7 @@ pub struct LinkStyles {
 }
 /// Track Revisions to Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:trackRevisions")]
+#[sdk(qname = "w:trackRevisions")]
 pub struct TrackRevisions {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4152,7 +4152,7 @@ pub struct TrackRevisions {
 }
 /// Do Not Use Move Syntax When Tracking Revisions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotTrackMoves")]
+#[sdk(qname = "w:doNotTrackMoves")]
 pub struct DoNotTrackMoves {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4160,7 +4160,7 @@ pub struct DoNotTrackMoves {
 }
 /// Do Not Track Formatting Revisions When Tracking Revisions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotTrackFormatting")]
+#[sdk(qname = "w:doNotTrackFormatting")]
 pub struct DoNotTrackFormatting {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4168,7 +4168,7 @@ pub struct DoNotTrackFormatting {
 }
 /// Allow Automatic Formatting to Override Formatting Protection Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoFormatOverride")]
+#[sdk(qname = "w:autoFormatOverride")]
 pub struct AutoFormatOverride {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4176,7 +4176,7 @@ pub struct AutoFormatOverride {
 }
 /// Prevent Modification of Themes Part.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:styleLockTheme")]
+#[sdk(qname = "w:styleLockTheme")]
 pub struct StyleLockThemesPart {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4184,7 +4184,7 @@ pub struct StyleLockThemesPart {
 }
 /// Prevent Replacement of Styles Part.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:styleLockQFSet")]
+#[sdk(qname = "w:styleLockQFSet")]
 pub struct StyleLockStylesPart {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4192,7 +4192,7 @@ pub struct StyleLockStylesPart {
 }
 /// Automatically Hyphenate Document Contents When Displayed.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoHyphenation")]
+#[sdk(qname = "w:autoHyphenation")]
 pub struct AutoHyphenation {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4200,7 +4200,7 @@ pub struct AutoHyphenation {
 }
 /// Do Not Hyphenate Words in ALL CAPITAL LETTERS.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotHyphenateCaps")]
+#[sdk(qname = "w:doNotHyphenateCaps")]
 pub struct DoNotHyphenateCaps {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4208,7 +4208,7 @@ pub struct DoNotHyphenateCaps {
 }
 /// Show E-Mail Message Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:showEnvelope")]
+#[sdk(qname = "w:showEnvelope")]
 pub struct ShowEnvelope {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4216,7 +4216,7 @@ pub struct ShowEnvelope {
 }
 /// Different Even/Odd Page Headers and Footers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:evenAndOddHeaders")]
+#[sdk(qname = "w:evenAndOddHeaders")]
 pub struct EvenAndOddHeaders {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4224,7 +4224,7 @@ pub struct EvenAndOddHeaders {
 }
 /// Reverse Book Fold Printing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bookFoldRevPrinting")]
+#[sdk(qname = "w:bookFoldRevPrinting")]
 pub struct BookFoldReversePrinting {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4232,7 +4232,7 @@ pub struct BookFoldReversePrinting {
 }
 /// Book Fold Printing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bookFoldPrinting")]
+#[sdk(qname = "w:bookFoldPrinting")]
 pub struct BookFoldPrinting {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4240,7 +4240,7 @@ pub struct BookFoldPrinting {
 }
 /// Do Not Use Margins for Drawing Grid Origin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotUseMarginsForDrawingGridOrigin")]
+#[sdk(qname = "w:doNotUseMarginsForDrawingGridOrigin")]
 pub struct DoNotUseMarginsForDrawingGridOrigin {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4248,7 +4248,7 @@ pub struct DoNotUseMarginsForDrawingGridOrigin {
 }
 /// Do Not Show Visual Indicator For Form Fields.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotShadeFormData")]
+#[sdk(qname = "w:doNotShadeFormData")]
 pub struct DoNotShadeFormData {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4256,7 +4256,7 @@ pub struct DoNotShadeFormData {
 }
 /// Never Kern Punctuation Characters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noPunctuationKerning")]
+#[sdk(qname = "w:noPunctuationKerning")]
 pub struct NoPunctuationKerning {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4264,7 +4264,7 @@ pub struct NoPunctuationKerning {
 }
 /// Print Two Pages Per Sheet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:printTwoOnOne")]
+#[sdk(qname = "w:printTwoOnOne")]
 pub struct PrintTwoOnOne {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4272,7 +4272,7 @@ pub struct PrintTwoOnOne {
 }
 /// Use Strict Kinsoku Rules for Japanese Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:strictFirstAndLastChars")]
+#[sdk(qname = "w:strictFirstAndLastChars")]
 pub struct StrictFirstAndLastChars {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4280,7 +4280,7 @@ pub struct StrictFirstAndLastChars {
 }
 /// Generate Thumbnail For Document On Save.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:savePreviewPicture")]
+#[sdk(qname = "w:savePreviewPicture")]
 pub struct SavePreviewPicture {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4288,7 +4288,7 @@ pub struct SavePreviewPicture {
 }
 /// Do Not Validate Custom XML Markup Against Schemas.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotValidateAgainstSchema")]
+#[sdk(qname = "w:doNotValidateAgainstSchema")]
 pub struct DoNotValidateAgainstSchema {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4296,7 +4296,7 @@ pub struct DoNotValidateAgainstSchema {
 }
 /// Allow Saving Document As XML File When Custom XML Markup Is Invalid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:saveInvalidXml")]
+#[sdk(qname = "w:saveInvalidXml")]
 pub struct SaveInvalidXml {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4304,7 +4304,7 @@ pub struct SaveInvalidXml {
 }
 /// Ignore Mixed Content When Validating Custom XML Markup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:ignoreMixedContent")]
+#[sdk(qname = "w:ignoreMixedContent")]
 pub struct IgnoreMixedContent {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4312,7 +4312,7 @@ pub struct IgnoreMixedContent {
 }
 /// Use Custom XML Element Names as Default Placeholder Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:alwaysShowPlaceholderText")]
+#[sdk(qname = "w:alwaysShowPlaceholderText")]
 pub struct AlwaysShowPlaceholderText {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4320,7 +4320,7 @@ pub struct AlwaysShowPlaceholderText {
 }
 /// Do Not Show Visual Indicator For Invalid Custom XML Markup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotDemarcateInvalidXml")]
+#[sdk(qname = "w:doNotDemarcateInvalidXml")]
 pub struct DoNotDemarcateInvalidXml {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4328,7 +4328,7 @@ pub struct DoNotDemarcateInvalidXml {
 }
 /// Only Save Custom XML Markup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:saveXmlDataOnly")]
+#[sdk(qname = "w:saveXmlDataOnly")]
 pub struct SaveXmlDataOnly {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4336,7 +4336,7 @@ pub struct SaveXmlDataOnly {
 }
 /// Save Document as XML File through Custom XSL Transform.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:useXSLTWhenSaving")]
+#[sdk(qname = "w:useXSLTWhenSaving")]
 pub struct UseXsltWhenSaving {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4344,7 +4344,7 @@ pub struct UseXsltWhenSaving {
 }
 /// Show Visual Indicators for Custom XML Markup Start/End Locations.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:showXMLTags")]
+#[sdk(qname = "w:showXMLTags")]
 pub struct ShowXmlTags {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4352,7 +4352,7 @@ pub struct ShowXmlTags {
 }
 /// Do Not Mark Custom XML Elements With No Namespace As Invalid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:alwaysMergeEmptyNamespace")]
+#[sdk(qname = "w:alwaysMergeEmptyNamespace")]
 pub struct AlwaysMergeEmptyNamespace {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4360,7 +4360,7 @@ pub struct AlwaysMergeEmptyNamespace {
 }
 /// Automatically Recalculate Fields on Open.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:updateFields")]
+#[sdk(qname = "w:updateFields")]
 pub struct UpdateFieldsOnOpen {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4368,7 +4368,7 @@ pub struct UpdateFieldsOnOpen {
 }
 /// Disable Features Incompatible With Earlier Word Processing Formats.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:uiCompat97To2003")]
+#[sdk(qname = "w:uiCompat97To2003")]
 pub struct UiCompatibleWith97To2003 {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4376,7 +4376,7 @@ pub struct UiCompatibleWith97To2003 {
 }
 /// Do Not Include Content in Text Boxes, Footnotes, and Endnotes in Document Statistics.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotIncludeSubdocsInStats")]
+#[sdk(qname = "w:doNotIncludeSubdocsInStats")]
 pub struct DoNotIncludeSubdocsInStats {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4384,7 +4384,7 @@ pub struct DoNotIncludeSubdocsInStats {
 }
 /// Do Not Automatically Compress Images.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotAutoCompressPictures")]
+#[sdk(qname = "w:doNotAutoCompressPictures")]
 pub struct DoNotAutoCompressPictures {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4392,7 +4392,7 @@ pub struct DoNotAutoCompressPictures {
 }
 /// Defines the OptimizeForBrowser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:optimizeForBrowser")]
+#[sdk(qname = "w:optimizeForBrowser")]
 pub struct OptimizeForBrowser {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4400,7 +4400,7 @@ pub struct OptimizeForBrowser {
 }
 /// Defines the RelyOnVML Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:relyOnVML")]
+#[sdk(qname = "w:relyOnVML")]
 pub struct RelyOnVml {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4408,7 +4408,7 @@ pub struct RelyOnVml {
 }
 /// Defines the AllowPNG Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:allowPNG")]
+#[sdk(qname = "w:allowPNG")]
 pub struct AllowPng {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4416,7 +4416,7 @@ pub struct AllowPng {
 }
 /// Defines the DoNotRelyOnCSS Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotRelyOnCSS")]
+#[sdk(qname = "w:doNotRelyOnCSS")]
 pub struct DoNotRelyOnCss {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4424,7 +4424,7 @@ pub struct DoNotRelyOnCss {
 }
 /// Defines the DoNotSaveAsSingleFile Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotSaveAsSingleFile")]
+#[sdk(qname = "w:doNotSaveAsSingleFile")]
 pub struct DoNotSaveAsSingleFile {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4432,7 +4432,7 @@ pub struct DoNotSaveAsSingleFile {
 }
 /// Defines the DoNotOrganizeInFolder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotOrganizeInFolder")]
+#[sdk(qname = "w:doNotOrganizeInFolder")]
 pub struct DoNotOrganizeInFolder {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4440,7 +4440,7 @@ pub struct DoNotOrganizeInFolder {
 }
 /// Defines the DoNotUseLongFileNames Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:doNotUseLongFileNames")]
+#[sdk(qname = "w:doNotUseLongFileNames")]
 pub struct DoNotUseLongFileNames {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4448,7 +4448,7 @@ pub struct DoNotUseLongFileNames {
 }
 /// Defines the NotTrueType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:notTrueType")]
+#[sdk(qname = "w:notTrueType")]
 pub struct NotTrueType {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -4456,7 +4456,7 @@ pub struct NotTrueType {
 }
 /// Defines the FrameProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FramePr/w:framePr")]
+#[sdk(qname = "w:framePr")]
 pub struct FrameProperties {
   /// Drop Cap Frame
   #[sdk(attr(qname = "w:dropCap"))]
@@ -4543,48 +4543,48 @@ pub struct FrameProperties {
 }
 /// Defines the NumberingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NumPr/w:numPr")]
+#[sdk(qname = "w:numPr")]
 pub struct NumberingProperties {
   /// Numbering Level Reference
-  #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber255/w:ilvl"))]
+  #[sdk(child(qname = "w:ilvl"))]
   pub numbering_level_reference: Option<NumberingLevelReference>,
   /// Numbering Definition Instance Reference
-  #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:numId"))]
+  #[sdk(child(qname = "w:numId"))]
   pub numbering_id: Option<NumberingId>,
   /// Previous Paragraph Numbering Properties
-  #[sdk(child(qname = "w:CT_TrackChangeNumbering/w:numberingChange"))]
+  #[sdk(child(qname = "w:numberingChange"))]
   pub numbering_change: Option<NumberingChange>,
   /// Inserted Numbering Properties
-  #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
+  #[sdk(child(qname = "w:ins"))]
   pub inserted: Option<Inserted>,
 }
 /// Defines the ParagraphBorders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PBdr/w:pBdr")]
+#[sdk(qname = "w:pBdr")]
 pub struct ParagraphBorders {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Paragraph Border Above Identical Paragraphs
-  #[sdk(child(qname = "w:CT_Border/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_border: Option<TopBorder>,
   /// Left Paragraph Border
-  #[sdk(child(qname = "w:CT_Border/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Paragraph Border Between Identical Paragraphs
-  #[sdk(child(qname = "w:CT_Border/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_border: Option<BottomBorder>,
   /// Right Paragraph Border
-  #[sdk(child(qname = "w:CT_Border/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
   /// Paragraph Border Between Identical Paragraphs
-  #[sdk(child(qname = "w:CT_Border/w:between"))]
+  #[sdk(child(qname = "w:between"))]
   pub between_border: Option<BetweenBorder>,
   /// Paragraph Border Between Facing Pages
-  #[sdk(child(qname = "w:CT_Border/w:bar"))]
+  #[sdk(child(qname = "w:bar"))]
   pub bar_border: Option<BarBorder>,
 }
 /// Defines the Shading Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Shd/w:shd")]
+#[sdk(qname = "w:shd")]
 pub struct Shading {
   /// Shading Pattern
   #[sdk(attr(qname = "w:val"))]
@@ -4640,15 +4640,15 @@ pub struct Shading {
 }
 /// Defines the Tabs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Tabs/w:tabs")]
+#[sdk(qname = "w:tabs")]
 pub struct Tabs {
   /// Custom Tab Stop.
-  #[sdk(child(qname = "w:CT_TabStop/w:tab"))]
+  #[sdk(child(qname = "w:tab"))]
   pub tab_stop: Vec<TabStop>,
 }
 /// Defines the SpacingBetweenLines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Spacing/w:spacing")]
+#[sdk(qname = "w:spacing")]
 pub struct SpacingBetweenLines {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Spacing Above Paragraph
@@ -4699,7 +4699,7 @@ pub struct SpacingBetweenLines {
 }
 /// Defines the Indentation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Ind/w:ind")]
+#[sdk(qname = "w:ind")]
 pub struct Indentation {
   /// Left Indentation
   #[sdk(attr(qname = "w:left"))]
@@ -4782,7 +4782,7 @@ pub struct Indentation {
 }
 /// Defines the Justification Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Jc/w:jc")]
+#[sdk(qname = "w:jc")]
 pub struct Justification {
   /// Alignment Type
   #[sdk(attr(qname = "w:val"))]
@@ -4790,7 +4790,7 @@ pub struct Justification {
 }
 /// Defines the TextDirection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TextDirection/w:textDirection")]
+#[sdk(qname = "w:textDirection")]
 pub struct TextDirection {
   /// Direction of Text Flow
   #[sdk(attr(qname = "w:val"))]
@@ -4798,7 +4798,7 @@ pub struct TextDirection {
 }
 /// Defines the TextAlignment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TextAlignment/w:textAlignment")]
+#[sdk(qname = "w:textAlignment")]
 pub struct TextAlignment {
   /// Vertical Character Alignment Position
   #[sdk(attr(qname = "w:val"))]
@@ -4806,7 +4806,7 @@ pub struct TextAlignment {
 }
 /// Defines the TextBoxTightWrap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap")]
+#[sdk(qname = "w:textboxTightWrap")]
 pub struct TextBoxTightWrap {
   /// Lines to Tight Wrap to Paragraph Extents
   #[sdk(attr(qname = "w:val"))]
@@ -4814,7 +4814,7 @@ pub struct TextBoxTightWrap {
 }
 /// Defines the OutlineLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:outlineLvl")]
+#[sdk(qname = "w:outlineLvl")]
 pub struct OutlineLevel {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4822,7 +4822,7 @@ pub struct OutlineLevel {
 }
 /// Defines the GridSpan Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:gridSpan")]
+#[sdk(qname = "w:gridSpan")]
 pub struct GridSpan {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4830,7 +4830,7 @@ pub struct GridSpan {
 }
 /// Defines the GridBefore Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:gridBefore")]
+#[sdk(qname = "w:gridBefore")]
 pub struct GridBefore {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4838,7 +4838,7 @@ pub struct GridBefore {
 }
 /// Defines the GridAfter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:gridAfter")]
+#[sdk(qname = "w:gridAfter")]
 pub struct GridAfter {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4846,7 +4846,7 @@ pub struct GridAfter {
 }
 /// Drop-Down List Selection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:result")]
+#[sdk(qname = "w:result")]
 pub struct DropDownListSelection {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4854,7 +4854,7 @@ pub struct DropDownListSelection {
 }
 /// Record Currently Displayed In Merged Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:activeRecord")]
+#[sdk(qname = "w:activeRecord")]
 pub struct ActiveRecord {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4862,7 +4862,7 @@ pub struct ActiveRecord {
 }
 /// Mail Merge Error Reporting Setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:checkErrors")]
+#[sdk(qname = "w:checkErrors")]
 pub struct CheckErrors {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4870,7 +4870,7 @@ pub struct CheckErrors {
 }
 /// Restart Numbering Level Symbol.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:lvlRestart")]
+#[sdk(qname = "w:lvlRestart")]
 pub struct LevelRestart {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4878,7 +4878,7 @@ pub struct LevelRestart {
 }
 /// Picture Numbering Symbol Definition Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:lvlPicBulletId")]
+#[sdk(qname = "w:lvlPicBulletId")]
 pub struct LevelPictureBulletId {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4886,7 +4886,7 @@ pub struct LevelPictureBulletId {
 }
 /// Numbering Level Starting Value Override.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:startOverride")]
+#[sdk(qname = "w:startOverride")]
 pub struct StartOverrideNumberingValue {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4894,7 +4894,7 @@ pub struct StartOverrideNumberingValue {
 }
 /// Last Reviewed Abstract Numbering Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:numIdMacAtCleanup")]
+#[sdk(qname = "w:numIdMacAtCleanup")]
 pub struct NumberingIdMacAtCleanup {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4902,7 +4902,7 @@ pub struct NumberingIdMacAtCleanup {
 }
 /// Defines the SdtId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:id")]
+#[sdk(qname = "w:id")]
 pub struct SdtId {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4910,7 +4910,7 @@ pub struct SdtId {
 }
 /// Defines the PixelsPerInch Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DecimalNumber/w:pixelsPerInch")]
+#[sdk(qname = "w:pixelsPerInch")]
 pub struct PixelsPerInch {
   /// Decimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -4918,7 +4918,7 @@ pub struct PixelsPerInch {
 }
 /// Defines the ParagraphPropertiesChange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrChange/w:pPrChange")]
+#[sdk(qname = "w:pPrChange")]
 pub struct ParagraphPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -4948,12 +4948,12 @@ pub struct ParagraphPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrExtended/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties_extended: std::boxed::Box<ParagraphPropertiesExtended>,
 }
 /// Header Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HdrFtrRef/w:headerReference")]
+#[sdk(qname = "w:headerReference")]
 pub struct HeaderReference {
   /// type
   #[sdk(attr(qname = "w:type"))]
@@ -4964,7 +4964,7 @@ pub struct HeaderReference {
 }
 /// Footer Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HdrFtrRef/w:footerReference")]
+#[sdk(qname = "w:footerReference")]
 pub struct FooterReference {
   /// type
   #[sdk(attr(qname = "w:type"))]
@@ -4975,7 +4975,7 @@ pub struct FooterReference {
 }
 /// Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Br/w:br")]
+#[sdk(qname = "w:br")]
 pub struct Break {
   /// Break Type
   #[sdk(attr(qname = "w:type"))]
@@ -4986,11 +4986,11 @@ pub struct Break {
 }
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Text/w:t")]
+#[sdk(qname = "w:t")]
 pub struct Text(pub TextType);
 /// Deleted Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Text/w:delText")]
+#[sdk(qname = "w:delText")]
 pub struct DeletedText {
   /// space
   #[sdk(attr(qname = "xml:space"))]
@@ -5000,7 +5000,7 @@ pub struct DeletedText {
 }
 /// Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Text/w:instrText")]
+#[sdk(qname = "w:instrText")]
 pub struct FieldCode {
   /// space
   #[sdk(attr(qname = "xml:space"))]
@@ -5010,7 +5010,7 @@ pub struct FieldCode {
 }
 /// Deleted Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Text/w:delInstrText")]
+#[sdk(qname = "w:delInstrText")]
 pub struct DeletedFieldCode {
   /// space
   #[sdk(attr(qname = "xml:space"))]
@@ -5020,7 +5020,7 @@ pub struct DeletedFieldCode {
 }
 /// Defines the TextType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Text/")]
+#[sdk(qname = "")]
 pub struct TextType {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// space
@@ -5031,7 +5031,7 @@ pub struct TextType {
 }
 /// Symbol Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Sym/w:sym")]
+#[sdk(qname = "w:sym")]
 pub struct SymbolChar {
   /// Symbol Character Font
   #[sdk(attr(qname = "w:font"))]
@@ -5044,7 +5044,7 @@ pub struct SymbolChar {
 }
 /// Inline Embedded Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Object/w:object")]
+#[sdk(qname = "w:object")]
 pub struct EmbeddedObject {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// dxaOrig
@@ -5075,7 +5075,7 @@ pub struct EmbeddedObject {
     )]
   pub embedded_object_choice1: Vec<EmbeddedObjectChoice>,
   /// DrawingML Object.
-  #[sdk(child(qname = "w:CT_Drawing/w:drawing"))]
+  #[sdk(child(qname = "w:drawing"))]
   pub drawing: Option<std::boxed::Box<Drawing>>,
   #[sdk(
         choice(
@@ -5088,7 +5088,7 @@ pub struct EmbeddedObject {
 }
 /// VML Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Picture/w:pict")]
+#[sdk(qname = "w:pict")]
 pub struct Picture {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// anchorId
@@ -5113,15 +5113,15 @@ pub struct Picture {
     )]
   pub picture_choice: Vec<PictureChoice>,
   /// Defines the MovieReference Class.
-  #[sdk(child(qname = "w:CT_Rel/w:movie"))]
+  #[sdk(child(qname = "w:movie"))]
   pub movie_reference: Option<MovieReference>,
   /// Defines the Control Class.
-  #[sdk(child(qname = "w:CT_Control/w:control"))]
+  #[sdk(child(qname = "w:control"))]
   pub control: Option<Control>,
 }
 /// Complex Field Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FldChar/w:fldChar")]
+#[sdk(qname = "w:fldChar")]
 pub struct FieldChar {
   /// Field Character Type
   #[sdk(attr(qname = "w:fldCharType"))]
@@ -5143,21 +5143,21 @@ pub struct FieldChar {
 }
 /// Phonetic Guide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Ruby/w:ruby")]
+#[sdk(qname = "w:ruby")]
 pub struct Ruby {
   /// Phonetic Guide Properties
-  #[sdk(child(qname = "w:CT_RubyPr/w:rubyPr"))]
+  #[sdk(child(qname = "w:rubyPr"))]
   pub ruby_properties: std::boxed::Box<RubyProperties>,
   /// Phonetic Guide Text
-  #[sdk(child(qname = "w:CT_RubyContent/w:rt"))]
+  #[sdk(child(qname = "w:rt"))]
   pub ruby_content: std::boxed::Box<RubyContent>,
   /// Phonetic Guide Base Text
-  #[sdk(child(qname = "w:CT_RubyContent/w:rubyBase"))]
+  #[sdk(child(qname = "w:rubyBase"))]
   pub ruby_base: std::boxed::Box<RubyBase>,
 }
 /// Footnote Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdnRef/w:footnoteReference")]
+#[sdk(qname = "w:footnoteReference")]
 pub struct FootnoteReference {
   /// Suppress Footnote/Endnote Reference Mark
   #[sdk(attr(qname = "w:customMarkFollows"))]
@@ -5169,7 +5169,7 @@ pub struct FootnoteReference {
 }
 /// Endnote Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdnRef/w:endnoteReference")]
+#[sdk(qname = "w:endnoteReference")]
 pub struct EndnoteReference {
   /// Suppress Footnote/Endnote Reference Mark
   #[sdk(attr(qname = "w:customMarkFollows"))]
@@ -5181,7 +5181,7 @@ pub struct EndnoteReference {
 }
 /// DrawingML Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Drawing/w:drawing")]
+#[sdk(qname = "w:drawing")]
 pub struct Drawing {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
@@ -5194,7 +5194,7 @@ pub struct Drawing {
 }
 /// Absolute Position Tab Character.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PTab/w:ptab")]
+#[sdk(qname = "w:ptab")]
 pub struct PositionalTab {
   /// Positional Tab Stop Alignment
   #[sdk(attr(qname = "w:alignment"))]
@@ -5208,7 +5208,7 @@ pub struct PositionalTab {
 }
 /// Defines the RunStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:rStyle")]
+#[sdk(qname = "w:rStyle")]
 pub struct RunStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5217,7 +5217,7 @@ pub struct RunStyle {
 }
 /// Defines the TableStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:tblStyle")]
+#[sdk(qname = "w:tblStyle")]
 pub struct TableStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5226,7 +5226,7 @@ pub struct TableStyle {
 }
 /// Paragraph Style's Associated Numbering Level.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:pStyle")]
+#[sdk(qname = "w:pStyle")]
 pub struct ParagraphStyleIdInLevel {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5235,7 +5235,7 @@ pub struct ParagraphStyleIdInLevel {
 }
 /// Abstract Numbering Definition Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:name")]
+#[sdk(qname = "w:name")]
 pub struct AbstractNumDefinitionName {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5244,7 +5244,7 @@ pub struct AbstractNumDefinitionName {
 }
 /// Numbering Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:styleLink")]
+#[sdk(qname = "w:styleLink")]
 pub struct StyleLink {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5253,7 +5253,7 @@ pub struct StyleLink {
 }
 /// Numbering Style Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:numStyleLink")]
+#[sdk(qname = "w:numStyleLink")]
 pub struct NumberingStyleLink {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5262,7 +5262,7 @@ pub struct NumberingStyleLink {
 }
 /// Alternate Style Names.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:aliases")]
+#[sdk(qname = "w:aliases")]
 pub struct Aliases {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5271,7 +5271,7 @@ pub struct Aliases {
 }
 /// Parent Style ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:basedOn")]
+#[sdk(qname = "w:basedOn")]
 pub struct BasedOn {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5280,7 +5280,7 @@ pub struct BasedOn {
 }
 /// Style For Next Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:next")]
+#[sdk(qname = "w:next")]
 pub struct NextParagraphStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5289,7 +5289,7 @@ pub struct NextParagraphStyle {
 }
 /// Linked Style Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:link")]
+#[sdk(qname = "w:link")]
 pub struct LinkedStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5298,7 +5298,7 @@ pub struct LinkedStyle {
 }
 /// Paragraph Style Applied to Automatically Generated Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:clickAndTypeStyle")]
+#[sdk(qname = "w:clickAndTypeStyle")]
 pub struct ClickAndTypeStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5307,7 +5307,7 @@ pub struct ClickAndTypeStyle {
 }
 /// Default Table Style for Newly Inserted Tables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String253/w:defaultTableStyle")]
+#[sdk(qname = "w:defaultTableStyle")]
 pub struct DefaultTableStyle {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5316,7 +5316,7 @@ pub struct DefaultTableStyle {
 }
 /// Defines the RunFonts Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Fonts/w:rFonts")]
+#[sdk(qname = "w:rFonts")]
 pub struct RunFonts {
   /// Font Content Type
   #[sdk(attr(qname = "w:hint"))]
@@ -5352,7 +5352,7 @@ pub struct RunFonts {
 }
 /// Defines the Color Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Color/w:color")]
+#[sdk(qname = "w:color")]
 pub struct Color {
   /// Run Content Color
   #[sdk(attr(qname = "w:val"))]
@@ -5381,7 +5381,7 @@ pub struct Color {
 }
 /// Defines the Spacing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ShortTwipsMeasure/w:spacing")]
+#[sdk(qname = "w:spacing")]
 pub struct Spacing {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5390,7 +5390,7 @@ pub struct Spacing {
 }
 /// Defines the CharacterScale Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TextScale/w:w")]
+#[sdk(qname = "w:w")]
 pub struct CharacterScale {
   /// Text Expansion/Compression Value
   #[sdk(attr(qname = "w:val"))]
@@ -5399,7 +5399,7 @@ pub struct CharacterScale {
 }
 /// Defines the Kern Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsKern/w:kern")]
+#[sdk(qname = "w:kern")]
 pub struct Kern {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -5408,7 +5408,7 @@ pub struct Kern {
 }
 /// Defines the Position Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SignedHpsMeasure/w:position")]
+#[sdk(qname = "w:position")]
 pub struct Position {
   /// Signed Half-Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5423,7 +5423,7 @@ pub struct Position {
 }
 /// Defines the FontSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsMeasure/w:sz")]
+#[sdk(qname = "w:sz")]
 pub struct FontSize {
   /// Half Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5445,7 +5445,7 @@ pub struct FontSize {
 }
 /// Defines the FontSizeComplexScript Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsMeasure/w:szCs")]
+#[sdk(qname = "w:szCs")]
 pub struct FontSizeComplexScript {
   /// Half Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5467,7 +5467,7 @@ pub struct FontSizeComplexScript {
 }
 /// Checkbox Form Field Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsMeasure/w:size")]
+#[sdk(qname = "w:size")]
 pub struct FormFieldSize {
   /// Half Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5489,7 +5489,7 @@ pub struct FormFieldSize {
 }
 /// Phonetic Guide Text Font Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsMeasure/w:hps")]
+#[sdk(qname = "w:hps")]
 pub struct PhoneticGuideTextFontSize {
   /// Half Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5511,7 +5511,7 @@ pub struct PhoneticGuideTextFontSize {
 }
 /// Phonetic Guide Base Text Font Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsMeasure/w:hpsBaseText")]
+#[sdk(qname = "w:hpsBaseText")]
 pub struct PhoneticGuideBaseTextSize {
   /// Half Point Measurement
   #[sdk(attr(qname = "w:val"))]
@@ -5533,7 +5533,7 @@ pub struct PhoneticGuideBaseTextSize {
 }
 /// Defines the Highlight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Highlight/w:highlight")]
+#[sdk(qname = "w:highlight")]
 pub struct Highlight {
   /// Highlighting Color
   #[sdk(attr(qname = "w:val"))]
@@ -5541,7 +5541,7 @@ pub struct Highlight {
 }
 /// Defines the Underline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Underline/w:u")]
+#[sdk(qname = "w:u")]
 pub struct Underline {
   /// Underline Style
   #[sdk(attr(qname = "w:val"))]
@@ -5573,7 +5573,7 @@ pub struct Underline {
 }
 /// Defines the TextEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TextEffect/w:effect")]
+#[sdk(qname = "w:effect")]
 pub struct TextEffect {
   /// Animated Text Effect Type
   #[sdk(attr(qname = "w:val"))]
@@ -5581,7 +5581,7 @@ pub struct TextEffect {
 }
 /// Defines the Border Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:bdr")]
+#[sdk(qname = "w:bdr")]
 pub struct Border {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5626,7 +5626,7 @@ pub struct Border {
 }
 /// Paragraph Border Above Identical Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:top")]
+#[sdk(qname = "w:top")]
 pub struct TopBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5671,7 +5671,7 @@ pub struct TopBorder {
 }
 /// Left Paragraph Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:left")]
+#[sdk(qname = "w:left")]
 pub struct LeftBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5716,7 +5716,7 @@ pub struct LeftBorder {
 }
 /// Paragraph Border Between Identical Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:bottom")]
+#[sdk(qname = "w:bottom")]
 pub struct BottomBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5761,7 +5761,7 @@ pub struct BottomBorder {
 }
 /// Right Paragraph Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:right")]
+#[sdk(qname = "w:right")]
 pub struct RightBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5806,7 +5806,7 @@ pub struct RightBorder {
 }
 /// Paragraph Border Between Identical Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:between")]
+#[sdk(qname = "w:between")]
 pub struct BetweenBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5851,7 +5851,7 @@ pub struct BetweenBorder {
 }
 /// Paragraph Border Between Facing Pages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:bar")]
+#[sdk(qname = "w:bar")]
 pub struct BarBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5896,7 +5896,7 @@ pub struct BarBorder {
 }
 /// Defines the StartBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_Border/w:start")]
+#[sdk(office2010, qname = "w:start")]
 pub struct StartBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5941,7 +5941,7 @@ pub struct StartBorder {
 }
 /// Defines the EndBorder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_Border/w:end")]
+#[sdk(office2010, qname = "w:end")]
 pub struct EndBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -5986,7 +5986,7 @@ pub struct EndBorder {
 }
 /// Table Inside Horizontal Edges Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:insideH")]
+#[sdk(qname = "w:insideH")]
 pub struct InsideHorizontalBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -6031,7 +6031,7 @@ pub struct InsideHorizontalBorder {
 }
 /// Table Inside Vertical Edges Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:insideV")]
+#[sdk(qname = "w:insideV")]
 pub struct InsideVerticalBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -6076,7 +6076,7 @@ pub struct InsideVerticalBorder {
 }
 /// Table Cell Top Left to Bottom Right Diagonal Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:tl2br")]
+#[sdk(qname = "w:tl2br")]
 pub struct TopLeftToBottomRightCellBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -6121,7 +6121,7 @@ pub struct TopLeftToBottomRightCellBorder {
 }
 /// Table Cell Top Right to Bottom Left Diagonal Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:tr2bl")]
+#[sdk(qname = "w:tr2bl")]
 pub struct TopRightToBottomLeftCellBorder {
   /// Border Style
   #[sdk(attr(qname = "w:val"))]
@@ -6166,7 +6166,7 @@ pub struct TopRightToBottomLeftCellBorder {
 }
 /// Defines the FitText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FitText/w:fitText")]
+#[sdk(qname = "w:fitText")]
 pub struct FitText {
   /// Value
   #[sdk(attr(qname = "w:val"))]
@@ -6178,7 +6178,7 @@ pub struct FitText {
 }
 /// Defines the VerticalTextAlignment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_VerticalAlignRun/w:vertAlign")]
+#[sdk(qname = "w:vertAlign")]
 pub struct VerticalTextAlignment {
   /// Subscript/Superscript Value
   #[sdk(attr(qname = "w:val"))]
@@ -6186,7 +6186,7 @@ pub struct VerticalTextAlignment {
 }
 /// Defines the Emphasis Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Em/w:em")]
+#[sdk(qname = "w:em")]
 pub struct Emphasis {
   /// Emphasis Mark Type
   #[sdk(attr(qname = "w:val"))]
@@ -6194,7 +6194,7 @@ pub struct Emphasis {
 }
 /// Defines the Languages Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Language/w:lang")]
+#[sdk(qname = "w:lang")]
 pub struct Languages {
   /// Latin Language
   #[sdk(attr(qname = "w:val"))]
@@ -6211,7 +6211,7 @@ pub struct Languages {
 }
 /// Theme Font Languages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Language/w:themeFontLang")]
+#[sdk(qname = "w:themeFontLang")]
 pub struct ThemeFontLanguages {
   /// Latin Language
   #[sdk(attr(qname = "w:val"))]
@@ -6228,7 +6228,7 @@ pub struct ThemeFontLanguages {
 }
 /// Defines the EastAsianLayout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_EastAsianLayout/w:eastAsianLayout")]
+#[sdk(qname = "w:eastAsianLayout")]
 pub struct EastAsianLayout {
   /// East Asian Typography Run ID
   #[sdk(attr(qname = "w:id"))]
@@ -6248,7 +6248,7 @@ pub struct EastAsianLayout {
 }
 /// Defines the RunPropertiesChange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrChange/w:rPrChange")]
+#[sdk(qname = "w:rPrChange")]
 pub struct RunPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -6278,12 +6278,12 @@ pub struct RunPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Run Properties
-  #[sdk(child(qname = "w:CT_RPrOriginal/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub previous_run_properties: std::boxed::Box<PreviousRunProperties>,
 }
 /// Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPr/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct RunProperties {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
@@ -6331,48 +6331,48 @@ pub struct RunProperties {
     )]
   pub run_properties_choice: Vec<RunPropertiesChoice>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
+  #[sdk(child(office2010, qname = "w14:shadow"))]
   pub shadow14: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:reflection"))]
   pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:textOutline"))]
   pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:textFill"))]
   pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:scene3d"))]
   pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:props3d"))]
   pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:ligatures"))]
   pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:numForm"))]
   pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:numSpacing"))]
   pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
   pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the RunPropertiesChange Class.
-  #[sdk(child(qname = "w:CT_RPrChange/w:rPrChange"))]
+  #[sdk(child(qname = "w:rPrChange"))]
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
 }
 /// Defines the InsertedMathControl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MathCtrlIns/w:ins")]
+#[sdk(qname = "w:ins")]
 pub struct InsertedMathControl {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -6411,7 +6411,7 @@ pub struct InsertedMathControl {
 }
 /// Defines the DeletedMathControl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MathCtrlDel/w:del")]
+#[sdk(qname = "w:del")]
 pub struct DeletedMathControl {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -6441,12 +6441,12 @@ pub struct DeletedMathControl {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Run Properties.
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
 }
 /// Defines the MoveFromMathControl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MathCtrlMove/w:moveFrom")]
+#[sdk(qname = "w:moveFrom")]
 pub struct MoveFromMathControl {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -6486,7 +6486,7 @@ pub struct MoveFromMathControl {
 }
 /// Defines the MoveToMathControl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MathCtrlMove/w:moveTo")]
+#[sdk(qname = "w:moveTo")]
 pub struct MoveToMathControl {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -6526,11 +6526,11 @@ pub struct MoveToMathControl {
 }
 /// Defines the CustomXmlRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlRuby/w:customXml")]
+#[sdk(qname = "w:customXml")]
 pub struct CustomXmlRuby {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Custom XML Element Properties.
-  #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
+  #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(
         choice(
@@ -6621,7 +6621,7 @@ pub struct CustomXmlRuby {
 }
 /// Defines the SimpleFieldRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SimpleFieldRuby/w:fldSimple")]
+#[sdk(qname = "w:fldSimple")]
 pub struct SimpleFieldRuby {
   /// instr
   #[sdk(attr(qname = "w:instr"))]
@@ -6633,10 +6633,7 @@ pub struct SimpleFieldRuby {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "w:CT_Base64BinaryText/w:fldData"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
   pub field_data: Option<FieldData>,
   #[sdk(
         choice(
@@ -6727,7 +6724,7 @@ pub struct SimpleFieldRuby {
 }
 /// Defines the HyperlinkRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HyperlinkRuby/w:hyperlink")]
+#[sdk(qname = "w:hyperlink")]
 pub struct HyperlinkRuby {
   /// tgtFrame
   #[sdk(attr(qname = "w:tgtFrame"))]
@@ -6840,7 +6837,7 @@ pub struct HyperlinkRuby {
 }
 /// Phonetic Guide Text Run.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_R/w:r")]
+#[sdk(qname = "w:r")]
 pub struct Run {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Run Properties
@@ -6856,7 +6853,7 @@ pub struct Run {
   #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rsid_run_addition: Option<crate::simple_type::HexBinaryValue>,
   /// Run Properties
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
   #[sdk(
         choice(
@@ -6905,16 +6902,16 @@ pub struct Run {
 }
 /// Defines the SdtRunRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtRunRuby/w:sdt")]
+#[sdk(qname = "w:sdt")]
 pub struct SdtRunRuby {
   /// Structured Document Tag Properties.
-  #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
+  #[sdk(child(qname = "w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
   /// Structured Document Tag End Character Properties.
-  #[sdk(child(qname = "w:CT_SdtEndPr/w:sdtEndPr"))]
+  #[sdk(child(qname = "w:sdtEndPr"))]
   pub sdt_end_char_properties: Option<SdtEndCharProperties>,
   /// Defines the SdtContentRunRuby Class.
-  #[sdk(child(qname = "w:CT_SdtContentRunRuby/w:sdtContent"))]
+  #[sdk(child(qname = "w:sdtContent"))]
   pub sdt_content_run_ruby: Option<SdtContentRunRuby>,
   #[sdk(
         choice(
@@ -6968,7 +6965,7 @@ pub struct SdtRunRuby {
 }
 /// Defines the ProofError Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ProofErr/w:proofErr")]
+#[sdk(qname = "w:proofErr")]
 pub struct ProofError {
   /// Proofing Error Anchor Type
   #[sdk(attr(qname = "w:type"))]
@@ -6976,7 +6973,7 @@ pub struct ProofError {
 }
 /// Defines the PermStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PermStart/w:permStart")]
+#[sdk(qname = "w:permStart")]
 pub struct PermStart {
   /// edGrp
   #[sdk(attr(qname = "w:edGrp"))]
@@ -7001,7 +6998,7 @@ pub struct PermStart {
 }
 /// Defines the PermEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Perm/w:permEnd")]
+#[sdk(qname = "w:permEnd")]
 pub struct PermEnd {
   /// Annotation ID
   #[sdk(attr(qname = "w:id"))]
@@ -7012,7 +7009,7 @@ pub struct PermEnd {
 }
 /// Inserted Run Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w:ins")]
+#[sdk(qname = "w:ins")]
 pub struct InsertedRun {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -7129,7 +7126,7 @@ pub struct InsertedRun {
 }
 /// Deleted Run Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w:del")]
+#[sdk(qname = "w:del")]
 pub struct DeletedRun {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -7246,7 +7243,7 @@ pub struct DeletedRun {
 }
 /// Move Source Run Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w:moveFrom")]
+#[sdk(qname = "w:moveFrom")]
 pub struct MoveFromRun {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -7363,7 +7360,7 @@ pub struct MoveFromRun {
 }
 /// Move Destination Run Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w:moveTo")]
+#[sdk(qname = "w:moveTo")]
 pub struct MoveToRun {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -7480,7 +7477,7 @@ pub struct MoveToRun {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_ContentPart/w:contentPart")]
+#[sdk(office2010, qname = "w:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -7488,16 +7485,16 @@ pub struct ContentPart {
 }
 /// Defines the SdtRun Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtRun/w:sdt")]
+#[sdk(qname = "w:sdt")]
 pub struct SdtRun {
   /// Structured Document Tag Properties.
-  #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
+  #[sdk(child(qname = "w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
   /// Structured Document Tag End Character Properties.
-  #[sdk(child(qname = "w:CT_SdtEndPr/w:sdtEndPr"))]
+  #[sdk(child(qname = "w:sdtEndPr"))]
   pub sdt_end_char_properties: Option<SdtEndCharProperties>,
   /// Inline-Level Structured Document Tag Content
-  #[sdk(child(qname = "w:CT_SdtContentRun/w:sdtContent"))]
+  #[sdk(child(qname = "w:sdtContent"))]
   pub sdt_content_run: Option<SdtContentRun>,
   #[sdk(
         choice(
@@ -7551,11 +7548,11 @@ pub struct SdtRun {
 }
 /// Defines the CustomXmlBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlBlock/w:customXml")]
+#[sdk(qname = "w:customXml")]
 pub struct CustomXmlBlock {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Custom XML Element Properties.
-  #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
+  #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(
         choice(
@@ -7623,16 +7620,16 @@ pub struct CustomXmlBlock {
 }
 /// Defines the SdtBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtBlock/w:sdt")]
+#[sdk(qname = "w:sdt")]
 pub struct SdtBlock {
   /// Structured Document Tag Properties.
-  #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
+  #[sdk(child(qname = "w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
   /// Structured Document Tag End Character Properties.
-  #[sdk(child(qname = "w:CT_SdtEndPr/w:sdtEndPr"))]
+  #[sdk(child(qname = "w:sdtEndPr"))]
   pub sdt_end_char_properties: Option<SdtEndCharProperties>,
   /// Block-Level Structured Document Tag Content
-  #[sdk(child(qname = "w:CT_SdtContentBlock/w:sdtContent"))]
+  #[sdk(child(qname = "w:sdtContent"))]
   pub sdt_content_block: Option<SdtContentBlock>,
   #[sdk(
         choice(
@@ -7686,7 +7683,7 @@ pub struct SdtBlock {
 }
 /// Defines the Paragraph Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_P/w:p")]
+#[sdk(qname = "w:p")]
 pub struct Paragraph {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Paragraph Glyph Formatting
@@ -7721,7 +7718,7 @@ pub struct Paragraph {
   #[sdk(attr(office2010, qname = "w14:noSpellErr"))]
   pub no_spell_error: Option<crate::simple_type::OnOffValue>,
   /// Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   #[sdk(
         choice(
@@ -7816,7 +7813,7 @@ pub struct Paragraph {
 }
 /// Defines the Table Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Tbl/w:tbl")]
+#[sdk(qname = "w:tbl")]
 pub struct Table {
   #[sdk(
         choice(
@@ -7868,10 +7865,10 @@ pub struct Table {
     )]
   pub table_choice1: Vec<TableChoice>,
   /// Table Properties.
-  #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
+  #[sdk(child(qname = "w:tblPr"))]
   pub table_properties: std::boxed::Box<TableProperties>,
   /// Table Grid.
-  #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
+  #[sdk(child(qname = "w:tblGrid"))]
   pub table_grid: std::boxed::Box<TableGrid>,
   #[sdk(
         choice(
@@ -7938,7 +7935,7 @@ pub struct Table {
 }
 /// Table Row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Row/w:tr")]
+#[sdk(qname = "w:tr")]
 pub struct TableRow {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Table Row Glyph Formatting
@@ -7966,10 +7963,10 @@ pub struct TableRow {
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// Table-Level Property Exceptions
-  #[sdk(child(qname = "w:CT_TblPrEx/w:tblPrEx"))]
+  #[sdk(child(qname = "w:tblPrEx"))]
   pub table_property_exceptions: Option<std::boxed::Box<TablePropertyExceptions>>,
   /// Table Row Properties
-  #[sdk(child(qname = "w:CT_TrPr/w:trPr"))]
+  #[sdk(child(qname = "w:trPr"))]
   pub table_row_properties: Option<std::boxed::Box<TableRowProperties>>,
   #[sdk(
         choice(
@@ -8036,10 +8033,10 @@ pub struct TableRow {
 }
 /// Row-Level Custom XML Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlRow/w:customXml")]
+#[sdk(qname = "w:customXml")]
 pub struct CustomXmlRow {
   /// Custom XML Element Properties.
-  #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
+  #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(
         choice(
@@ -8106,16 +8103,16 @@ pub struct CustomXmlRow {
 }
 /// Row-Level Structured Document Tag.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtRow/w:sdt")]
+#[sdk(qname = "w:sdt")]
 pub struct SdtRow {
   /// Structured Document Tag Properties.
-  #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
+  #[sdk(child(qname = "w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
   /// Structured Document Tag End Character Properties.
-  #[sdk(child(qname = "w:CT_SdtEndPr/w:sdtEndPr"))]
+  #[sdk(child(qname = "w:sdtEndPr"))]
   pub sdt_end_char_properties: Option<SdtEndCharProperties>,
   /// Row-Level Structured Document Tag Content
-  #[sdk(child(qname = "w:CT_SdtContentRow/w:sdtContent"))]
+  #[sdk(child(qname = "w:sdtContent"))]
   pub sdt_content_row: Option<SdtContentRow>,
   #[sdk(
         choice(
@@ -8169,10 +8166,10 @@ pub struct SdtRow {
 }
 /// Table Cell.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Tc/w:tc")]
+#[sdk(qname = "w:tc")]
 pub struct TableCell {
   /// Table Cell Properties
-  #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
+  #[sdk(child(qname = "w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
   #[sdk(
         choice(
@@ -8241,10 +8238,10 @@ pub struct TableCell {
 }
 /// Cell-Level Custom XML Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlCell/w:customXml")]
+#[sdk(qname = "w:customXml")]
 pub struct CustomXmlCell {
   /// Custom XML Element Properties.
-  #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
+  #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(
         choice(
@@ -8311,16 +8308,16 @@ pub struct CustomXmlCell {
 }
 /// Cell-Level Structured Document Tag.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtCell/w:sdt")]
+#[sdk(qname = "w:sdt")]
 pub struct SdtCell {
   /// Structured Document Tag Properties.
-  #[sdk(child(qname = "w:CT_SdtPr/w:sdtPr"))]
+  #[sdk(child(qname = "w:sdtPr"))]
   pub sdt_properties: Option<SdtProperties>,
   /// Structured Document Tag End Character Properties.
-  #[sdk(child(qname = "w:CT_SdtEndPr/w:sdtEndPr"))]
+  #[sdk(child(qname = "w:sdtEndPr"))]
   pub sdt_end_char_properties: Option<SdtEndCharProperties>,
   /// Cell-Level Structured Document Tag Content
-  #[sdk(child(qname = "w:CT_SdtContentCell/w:sdtContent"))]
+  #[sdk(child(qname = "w:sdtContent"))]
   pub sdt_content_cell: Option<SdtContentCell>,
   #[sdk(
         choice(
@@ -8374,10 +8371,10 @@ pub struct SdtCell {
 }
 /// Defines the CustomXmlRun Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlRun/w:customXml")]
+#[sdk(qname = "w:customXml")]
 pub struct CustomXmlRun {
   /// Custom XML Element Properties.
-  #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
+  #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
   #[sdk(
         choice(
@@ -8471,7 +8468,7 @@ pub struct CustomXmlRun {
 }
 /// Defines the SimpleField Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SimpleField/w:fldSimple")]
+#[sdk(qname = "w:fldSimple")]
 pub struct SimpleField {
   /// Field Codes
   #[sdk(attr(qname = "w:instr"))]
@@ -8483,10 +8480,7 @@ pub struct SimpleField {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "w:CT_Base64BinaryText/w:fldData"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
   pub field_data: Option<FieldData>,
   #[sdk(
         choice(
@@ -8580,7 +8574,7 @@ pub struct SimpleField {
 }
 /// Defines the Hyperlink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Hyperlink/w:hyperlink")]
+#[sdk(qname = "w:hyperlink")]
 pub struct Hyperlink {
   /// Hyperlink Target Frame
   #[sdk(attr(qname = "w:tgtFrame"))]
@@ -8696,7 +8690,7 @@ pub struct Hyperlink {
 }
 /// Defines the BidirectionalOverride Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_BdoContentRun/w:bdo")]
+#[sdk(office2010, qname = "w:bdo")]
 pub struct BidirectionalOverride {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -8793,7 +8787,7 @@ pub struct BidirectionalOverride {
 }
 /// Defines the BidirectionalEmbedding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_DirContentRun/w:dir")]
+#[sdk(office2010, qname = "w:dir")]
 pub struct BidirectionalEmbedding {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -8890,7 +8884,7 @@ pub struct BidirectionalEmbedding {
 }
 /// Anchor for Subdocument Location.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:subDoc")]
+#[sdk(qname = "w:subDoc")]
 pub struct SubDocumentReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8898,7 +8892,7 @@ pub struct SubDocumentReference {
 }
 /// Defines the PrinterSettingsReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:printerSettings")]
+#[sdk(qname = "w:printerSettings")]
 pub struct PrinterSettingsReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8906,7 +8900,7 @@ pub struct PrinterSettingsReference {
 }
 /// ODSO Data Source File Path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:src")]
+#[sdk(qname = "w:src")]
 pub struct SourceReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8914,7 +8908,7 @@ pub struct SourceReference {
 }
 /// Reference to Inclusion/Exclusion Data for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:recipientData")]
+#[sdk(qname = "w:recipientData")]
 pub struct RecipientDataReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8922,7 +8916,7 @@ pub struct RecipientDataReference {
 }
 /// Data Source File Path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:dataSource")]
+#[sdk(qname = "w:dataSource")]
 pub struct DataSourceReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8930,7 +8924,7 @@ pub struct DataSourceReference {
 }
 /// Header Definition File Path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:headerSource")]
+#[sdk(qname = "w:headerSource")]
 pub struct HeaderSource {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8938,7 +8932,7 @@ pub struct HeaderSource {
 }
 /// Source File for Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:sourceFileName")]
+#[sdk(qname = "w:sourceFileName")]
 pub struct SourceFileReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8946,7 +8940,7 @@ pub struct SourceFileReference {
 }
 /// Defines the MovieReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:movie")]
+#[sdk(qname = "w:movie")]
 pub struct MovieReference {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8954,7 +8948,7 @@ pub struct MovieReference {
 }
 /// Attached Document Template.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Rel/w:attachedTemplate")]
+#[sdk(qname = "w:attachedTemplate")]
 pub struct AttachedTemplate {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
@@ -8962,7 +8956,7 @@ pub struct AttachedTemplate {
 }
 /// Defines the ConditionalFormatStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Cnf/w:cnfStyle")]
+#[sdk(qname = "w:cnfStyle")]
 pub struct ConditionalFormatStyle {
   /// Conditional Formatting Bit Mask
   #[sdk(attr(qname = "w:val"))]
@@ -9008,7 +9002,7 @@ pub struct ConditionalFormatStyle {
 }
 /// Defines the TableCellWidth Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:tcW")]
+#[sdk(qname = "w:tcW")]
 pub struct TableCellWidth {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9024,7 +9018,7 @@ pub struct TableCellWidth {
 }
 /// Defines the WidthBeforeTableRow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:wBefore")]
+#[sdk(qname = "w:wBefore")]
 pub struct WidthBeforeTableRow {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9040,7 +9034,7 @@ pub struct WidthBeforeTableRow {
 }
 /// Defines the WidthAfterTableRow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:wAfter")]
+#[sdk(qname = "w:wAfter")]
 pub struct WidthAfterTableRow {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9056,7 +9050,7 @@ pub struct WidthAfterTableRow {
 }
 /// Defines the TableCellSpacing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:tblCellSpacing")]
+#[sdk(qname = "w:tblCellSpacing")]
 pub struct TableCellSpacing {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9072,7 +9066,7 @@ pub struct TableCellSpacing {
 }
 /// Defines the TableWidth Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:tblW")]
+#[sdk(qname = "w:tblW")]
 pub struct TableWidth {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9088,7 +9082,7 @@ pub struct TableWidth {
 }
 /// Table Cell Top Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:top")]
+#[sdk(qname = "w:top")]
 pub struct TopMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9104,7 +9098,7 @@ pub struct TopMargin {
 }
 /// Defines the StartMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_TblWidth/w:start")]
+#[sdk(office2010, qname = "w:start")]
 pub struct StartMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9120,7 +9114,7 @@ pub struct StartMargin {
 }
 /// Table Cell Bottom Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:bottom")]
+#[sdk(qname = "w:bottom")]
 pub struct BottomMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9136,7 +9130,7 @@ pub struct BottomMargin {
 }
 /// Defines the EndMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_TblWidth/w:end")]
+#[sdk(office2010, qname = "w:end")]
 pub struct EndMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9152,7 +9146,7 @@ pub struct EndMargin {
 }
 /// Table Cell Left Margin Exception.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:left")]
+#[sdk(qname = "w:left")]
 pub struct LeftMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9168,7 +9162,7 @@ pub struct LeftMargin {
 }
 /// Table Cell Right Margin Exception.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:right")]
+#[sdk(qname = "w:right")]
 pub struct RightMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9184,7 +9178,7 @@ pub struct RightMargin {
 }
 /// Defines the HorizontalMerge Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HMerge/w:hMerge")]
+#[sdk(qname = "w:hMerge")]
 pub struct HorizontalMerge {
   /// Horizontal Merge Type
   #[sdk(attr(qname = "w:val"))]
@@ -9192,7 +9186,7 @@ pub struct HorizontalMerge {
 }
 /// Defines the VerticalMerge Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_VMerge/w:vMerge")]
+#[sdk(qname = "w:vMerge")]
 pub struct VerticalMerge {
   /// Vertical Merge Type
   #[sdk(attr(qname = "w:val"))]
@@ -9200,42 +9194,42 @@ pub struct VerticalMerge {
 }
 /// Defines the TableCellBorders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcBorders/w:tcBorders")]
+#[sdk(qname = "w:tcBorders")]
 pub struct TableCellBorders {
   /// Table Cell Top Border
-  #[sdk(child(qname = "w:CT_Border/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_border: Option<TopBorder>,
   /// Table Cell Left Border
-  #[sdk(child(qname = "w:CT_Border/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Defines the StartBorder Class.
-  #[sdk(child(office2010, qname = "w:CT_Border/w:start"))]
+  #[sdk(child(office2010, qname = "w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Cell Bottom Border
-  #[sdk(child(qname = "w:CT_Border/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_border: Option<BottomBorder>,
   /// Table Cell Right Border
-  #[sdk(child(qname = "w:CT_Border/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
   /// Defines the EndBorder Class.
-  #[sdk(child(office2010, qname = "w:CT_Border/w:end"))]
+  #[sdk(child(office2010, qname = "w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Cell Inside Horizontal Edges Border
-  #[sdk(child(qname = "w:CT_Border/w:insideH"))]
+  #[sdk(child(qname = "w:insideH"))]
   pub inside_horizontal_border: Option<InsideHorizontalBorder>,
   /// Table Cell Inside Vertical Edges Border
-  #[sdk(child(qname = "w:CT_Border/w:insideV"))]
+  #[sdk(child(qname = "w:insideV"))]
   pub inside_vertical_border: Option<InsideVerticalBorder>,
   /// Table Cell Top Left to Bottom Right Diagonal Border
-  #[sdk(child(qname = "w:CT_Border/w:tl2br"))]
+  #[sdk(child(qname = "w:tl2br"))]
   pub top_left_to_bottom_right_cell_border: Option<TopLeftToBottomRightCellBorder>,
   /// Table Cell Top Right to Bottom Left Diagonal Border
-  #[sdk(child(qname = "w:CT_Border/w:tr2bl"))]
+  #[sdk(child(qname = "w:tr2bl"))]
   pub top_right_to_bottom_left_cell_border: Option<TopRightToBottomLeftCellBorder>,
 }
 /// Defines the NoWrap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noWrap")]
+#[sdk(qname = "w:noWrap")]
 pub struct NoWrap {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9243,7 +9237,7 @@ pub struct NoWrap {
 }
 /// Defines the TableCellFitText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:tcFitText")]
+#[sdk(qname = "w:tcFitText")]
 pub struct TableCellFitText {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9251,7 +9245,7 @@ pub struct TableCellFitText {
 }
 /// Defines the HideMark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:hideMark")]
+#[sdk(qname = "w:hideMark")]
 pub struct HideMark {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9259,7 +9253,7 @@ pub struct HideMark {
 }
 /// Defines the CantSplit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:cantSplit")]
+#[sdk(qname = "w:cantSplit")]
 pub struct CantSplit {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9267,7 +9261,7 @@ pub struct CantSplit {
 }
 /// Defines the TableHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:tblHeader")]
+#[sdk(qname = "w:tblHeader")]
 pub struct TableHeader {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9275,7 +9269,7 @@ pub struct TableHeader {
 }
 /// Defines the BiDiVisual Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:bidiVisual")]
+#[sdk(qname = "w:bidiVisual")]
 pub struct BiDiVisual {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9283,7 +9277,7 @@ pub struct BiDiVisual {
 }
 /// Frame Cannot Be Resized.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noResizeAllowed")]
+#[sdk(qname = "w:noResizeAllowed")]
 pub struct NoResizeAllowed {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9291,7 +9285,7 @@ pub struct NoResizeAllowed {
 }
 /// Maintain Link to Existing File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:linkedToFile")]
+#[sdk(qname = "w:linkedToFile")]
 pub struct LinkedToFile {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9299,7 +9293,7 @@ pub struct LinkedToFile {
 }
 /// Do Not Display Frameset Splitters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:noBorder")]
+#[sdk(qname = "w:noBorder")]
 pub struct NoBorder {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9307,7 +9301,7 @@ pub struct NoBorder {
 }
 /// Frameset Splitter Border Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:flatBorders")]
+#[sdk(qname = "w:flatBorders")]
 pub struct FlatBorders {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9315,7 +9309,7 @@ pub struct FlatBorders {
 }
 /// Automatically Merge User Formatting Into Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:autoRedefine")]
+#[sdk(qname = "w:autoRedefine")]
 pub struct AutoRedefine {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9323,7 +9317,7 @@ pub struct AutoRedefine {
 }
 /// Hide Style From User Interface.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:hidden")]
+#[sdk(qname = "w:hidden")]
 pub struct StyleHidden {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9331,7 +9325,7 @@ pub struct StyleHidden {
 }
 /// Hide Style From Main User Interface.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:semiHidden")]
+#[sdk(qname = "w:semiHidden")]
 pub struct SemiHidden {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9339,7 +9333,7 @@ pub struct SemiHidden {
 }
 /// Remove Semi-Hidden Property When Style Is Used.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:unhideWhenUsed")]
+#[sdk(qname = "w:unhideWhenUsed")]
 pub struct UnhideWhenUsed {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9347,7 +9341,7 @@ pub struct UnhideWhenUsed {
 }
 /// Primary Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:qFormat")]
+#[sdk(qname = "w:qFormat")]
 pub struct PrimaryStyle {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9355,7 +9349,7 @@ pub struct PrimaryStyle {
 }
 /// Style Cannot Be Applied.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:locked")]
+#[sdk(qname = "w:locked")]
 pub struct Locked {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9363,7 +9357,7 @@ pub struct Locked {
 }
 /// E-Mail Message Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:personal")]
+#[sdk(qname = "w:personal")]
 pub struct Personal {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9371,7 +9365,7 @@ pub struct Personal {
 }
 /// E-Mail Message Composition Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:personalCompose")]
+#[sdk(qname = "w:personalCompose")]
 pub struct PersonalCompose {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9379,7 +9373,7 @@ pub struct PersonalCompose {
 }
 /// E-Mail Message Reply Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/w:personalReply")]
+#[sdk(qname = "w:personalReply")]
 pub struct PersonalReply {
   /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
@@ -9387,30 +9381,30 @@ pub struct PersonalReply {
 }
 /// Defines the TableCellMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcMar/w:tcMar")]
+#[sdk(qname = "w:tcMar")]
 pub struct TableCellMargin {
   /// Table Cell Top Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
-  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(office2010, qname = "w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_margin: Option<BottomMargin>,
   /// Table Cell Right Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
-  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(office2010, qname = "w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Defines the TableCellVerticalAlignment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_VerticalTblJc/w:vAlign")]
+#[sdk(qname = "w:vAlign")]
 pub struct TableCellVerticalAlignment {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9418,7 +9412,7 @@ pub struct TableCellVerticalAlignment {
 }
 /// Defines the DivId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonZeroDecimalNumber/w:divId")]
+#[sdk(qname = "w:divId")]
 pub struct DivId {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9440,7 +9434,7 @@ pub struct DivId {
 }
 /// Defines the TableRowHeight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Height/w:trHeight")]
+#[sdk(qname = "w:trHeight")]
 pub struct TableRowHeight {
   /// Table Row Height
   #[sdk(attr(qname = "w:val"))]
@@ -9452,7 +9446,7 @@ pub struct TableRowHeight {
 }
 /// Defines the TableJustification Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblJc/w:jc")]
+#[sdk(qname = "w:jc")]
 pub struct TableJustification {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9460,7 +9454,7 @@ pub struct TableJustification {
 }
 /// Defines the TablePositionProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPPr/w:tblpPr")]
+#[sdk(qname = "w:tblpPr")]
 pub struct TablePositionProperties {
   /// Distance From Left of Table to Text
   #[sdk(attr(qname = "w:leftFromText"))]
@@ -9501,7 +9495,7 @@ pub struct TablePositionProperties {
 }
 /// Defines the TableOverlap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblOverlap/w:tblOverlap")]
+#[sdk(qname = "w:tblOverlap")]
 pub struct TableOverlap {
   /// Floating Table Overlap Setting
   #[sdk(attr(qname = "w:val"))]
@@ -9509,7 +9503,7 @@ pub struct TableOverlap {
 }
 /// Defines the TableStyleRowBandSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleRowBandSize")]
+#[sdk(qname = "w:tblStyleRowBandSize")]
 pub struct TableStyleRowBandSize {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9518,7 +9512,7 @@ pub struct TableStyleRowBandSize {
 }
 /// Defines the TableStyleColumnBandSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleColBandSize")]
+#[sdk(qname = "w:tblStyleColBandSize")]
 pub struct TableStyleColumnBandSize {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9527,7 +9521,7 @@ pub struct TableStyleColumnBandSize {
 }
 /// Defines the TableIndentation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:tblInd")]
+#[sdk(qname = "w:tblInd")]
 pub struct TableIndentation {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -9543,36 +9537,36 @@ pub struct TableIndentation {
 }
 /// Defines the TableBorders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblBorders/w:tblBorders")]
+#[sdk(qname = "w:tblBorders")]
 pub struct TableBorders {
   /// Table Top Border
-  #[sdk(child(qname = "w:CT_Border/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_border: Option<TopBorder>,
   /// Table Left Border
-  #[sdk(child(qname = "w:CT_Border/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Defines the StartBorder Class.
-  #[sdk(child(office2010, qname = "w:CT_Border/w:start"))]
+  #[sdk(child(office2010, qname = "w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Bottom Border
-  #[sdk(child(qname = "w:CT_Border/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_border: Option<BottomBorder>,
   /// Table Right Border
-  #[sdk(child(qname = "w:CT_Border/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
   /// Defines the EndBorder Class.
-  #[sdk(child(office2010, qname = "w:CT_Border/w:end"))]
+  #[sdk(child(office2010, qname = "w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Inside Horizontal Edges Border
-  #[sdk(child(qname = "w:CT_Border/w:insideH"))]
+  #[sdk(child(qname = "w:insideH"))]
   pub inside_horizontal_border: Option<InsideHorizontalBorder>,
   /// Table Inside Vertical Edges Border
-  #[sdk(child(qname = "w:CT_Border/w:insideV"))]
+  #[sdk(child(qname = "w:insideV"))]
   pub inside_vertical_border: Option<InsideVerticalBorder>,
 }
 /// Defines the TableLayout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblLayoutType/w:tblLayout")]
+#[sdk(qname = "w:tblLayout")]
 pub struct TableLayout {
   /// Table Layout Setting
   #[sdk(attr(qname = "w:type"))]
@@ -9580,30 +9574,30 @@ pub struct TableLayout {
 }
 /// Defines the TableCellMarginDefault Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblCellMar/w:tblCellMar")]
+#[sdk(qname = "w:tblCellMar")]
 pub struct TableCellMarginDefault {
   /// Table Cell Top Margin Default
-  #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Default
-  #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
-  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(office2010, qname = "w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Default
-  #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_margin: Option<BottomMargin>,
   /// Table Cell Right Margin Default
-  #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
-  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(office2010, qname = "w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Footnote and Endnote Numbering Starting Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdnNumStart/w:numStart")]
+#[sdk(qname = "w:numStart")]
 pub struct NumberingStart {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9611,7 +9605,7 @@ pub struct NumberingStart {
 }
 /// Footnote and Endnote Numbering Restart Location.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NumRestart/w:numRestart")]
+#[sdk(qname = "w:numRestart")]
 pub struct NumberingRestart {
   /// Automatic Numbering Restart Value
   #[sdk(attr(qname = "w:val"))]
@@ -9619,18 +9613,18 @@ pub struct NumberingRestart {
 }
 /// Defines the AltChunk Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_AltChunk/w:altChunk")]
+#[sdk(qname = "w:altChunk")]
 pub struct AltChunk {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// External Content Import Properties
-  #[sdk(child(qname = "w:CT_AltChunkPr/w:altChunkPr"))]
+  #[sdk(child(qname = "w:altChunkPr"))]
   pub alt_chunk_properties: Option<std::boxed::Box<AltChunkProperties>>,
 }
 /// Defines the TableLook Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblLook/w:tblLook")]
+#[sdk(qname = "w:tblLook")]
 pub struct TableLook {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -9657,41 +9651,41 @@ pub struct TableLook {
 }
 /// Defines the FootnoteProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnProps/w:footnotePr")]
+#[sdk(qname = "w:footnotePr")]
 pub struct FootnoteProperties {
   /// Footnote Placement
-  #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
+  #[sdk(child(qname = "w:pos"))]
   pub footnote_position: Option<FootnotePosition>,
   /// Footnote Numbering Format
-  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
-  #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
+  #[sdk(child(qname = "w:numStart"))]
   pub numbering_start: Option<NumberingStart>,
   /// Footnote and Endnote Numbering Restart Location
-  #[sdk(child(qname = "w:CT_NumRestart/w:numRestart"))]
+  #[sdk(child(qname = "w:numRestart"))]
   pub numbering_restart: Option<NumberingRestart>,
 }
 /// Defines the EndnoteProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_EdnProps/w:endnotePr")]
+#[sdk(qname = "w:endnotePr")]
 pub struct EndnoteProperties {
   /// Endnote Placement
-  #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
+  #[sdk(child(qname = "w:pos"))]
   pub endnote_position: Option<EndnotePosition>,
   /// Endnote Numbering Format
-  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
-  #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
+  #[sdk(child(qname = "w:numStart"))]
   pub numbering_start: Option<NumberingStart>,
   /// Footnote and Endnote Numbering Restart Location
-  #[sdk(child(qname = "w:CT_NumRestart/w:numRestart"))]
+  #[sdk(child(qname = "w:numRestart"))]
   pub numbering_restart: Option<NumberingRestart>,
 }
 /// Defines the SectionType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SectType/w:type")]
+#[sdk(qname = "w:type")]
 pub struct SectionType {
   /// Section Type Setting
   #[sdk(attr(qname = "w:val"))]
@@ -9699,7 +9693,7 @@ pub struct SectionType {
 }
 /// Defines the PageSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PageSz/w:pgSz")]
+#[sdk(qname = "w:pgSz")]
 pub struct PageSize {
   /// Page Width
   #[sdk(attr(qname = "w:w"))]
@@ -9718,7 +9712,7 @@ pub struct PageSize {
 }
 /// Defines the PageMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PageMar/w:pgMar")]
+#[sdk(qname = "w:pgMar")]
 pub struct PageMargin {
   /// Top Margin Spacing
   #[sdk(attr(qname = "w:top"))]
@@ -9751,7 +9745,7 @@ pub struct PageMargin {
 }
 /// Defines the PaperSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PaperSource/w:paperSrc")]
+#[sdk(qname = "w:paperSrc")]
 pub struct PaperSource {
   /// First Page Printer Tray Code
   #[sdk(attr(qname = "w:first"))]
@@ -9762,7 +9756,7 @@ pub struct PaperSource {
 }
 /// Defines the PageBorders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PageBorders/w:pgBorders")]
+#[sdk(qname = "w:pgBorders")]
 pub struct PageBorders {
   /// Z-Ordering of Page Border
   #[sdk(attr(qname = "w:zOrder"))]
@@ -9774,21 +9768,21 @@ pub struct PageBorders {
   #[sdk(attr(qname = "w:offsetFrom"))]
   pub offset_from: Option<PageBorderOffsetValues>,
   /// Top Border
-  #[sdk(child(qname = "w:CT_Border/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_border: Option<TopBorder>,
   /// Left Border
-  #[sdk(child(qname = "w:CT_Border/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Bottom Border
-  #[sdk(child(qname = "w:CT_Border/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_border: Option<BottomBorder>,
   /// Right Border
-  #[sdk(child(qname = "w:CT_Border/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
 }
 /// Defines the LineNumberType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LineNumber/w:lnNumType")]
+#[sdk(qname = "w:lnNumType")]
 pub struct LineNumberType {
   /// Line Number Increments to Display
   #[sdk(attr(qname = "w:countBy"))]
@@ -9814,7 +9808,7 @@ pub struct LineNumberType {
 }
 /// Defines the PageNumberType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PageNumber/w:pgNumType")]
+#[sdk(qname = "w:pgNumType")]
 pub struct PageNumberType {
   /// Page Number Format
   #[sdk(attr(qname = "w:fmt"))]
@@ -9832,7 +9826,7 @@ pub struct PageNumberType {
 }
 /// Defines the Columns Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Columns/w:cols")]
+#[sdk(qname = "w:cols")]
 pub struct Columns {
   /// Equal Column Widths
   #[sdk(attr(qname = "w:equalWidth"))]
@@ -9855,12 +9849,12 @@ pub struct Columns {
   #[sdk(attr(qname = "w:sep"))]
   pub separator: Option<crate::simple_type::OnOffValue>,
   /// Single Column Definition.
-  #[sdk(child(qname = "w:CT_Column/w:col"))]
+  #[sdk(child(qname = "w:col"))]
   pub column: Vec<Column>,
 }
 /// Defines the VerticalTextAlignmentOnPage Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_VerticalJc/w:vAlign")]
+#[sdk(qname = "w:vAlign")]
 pub struct VerticalTextAlignmentOnPage {
   /// Vertical Alignment Setting
   #[sdk(attr(qname = "w:val"))]
@@ -9868,7 +9862,7 @@ pub struct VerticalTextAlignmentOnPage {
 }
 /// Defines the DocGrid Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocGrid/w:docGrid")]
+#[sdk(qname = "w:docGrid")]
 pub struct DocGrid {
   /// Document Grid Type
   #[sdk(attr(qname = "w:type"))]
@@ -9882,17 +9876,17 @@ pub struct DocGrid {
 }
 /// Inclusion/Exclusion Data for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Recipients/w:recipients")]
+#[sdk(qname = "w:recipients")]
 pub struct Recipients {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Data About Single Data Source Record.
-  #[sdk(child(qname = "w:CT_RecipientData/w:recipientData"))]
+  #[sdk(child(qname = "w:recipientData"))]
   pub recipient_data: Vec<RecipientData>,
 }
 /// Rich Text Box Content Container.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
+#[sdk(qname = "w:txbxContent")]
 pub struct TextBoxContent {
   #[sdk(
         choice(
@@ -9961,40 +9955,40 @@ pub struct TextBoxContent {
 }
 /// Comments Collection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Comments/w:comments")]
+#[sdk(qname = "w:comments")]
 pub struct Comments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Comment Content.
-  #[sdk(child(qname = "w:CT_Comment/w:comment"))]
+  #[sdk(child(qname = "w:comment"))]
   pub comment: Vec<Comment>,
 }
 /// Document Footnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Footnotes/w:footnotes")]
+#[sdk(qname = "w:footnotes")]
 pub struct Footnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Footnote Content.
-  #[sdk(child(qname = "w:CT_FtnEdn/w:footnote"))]
+  #[sdk(child(qname = "w:footnote"))]
   pub footnote: Vec<Footnote>,
 }
 /// Document Endnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Endnotes/w:endnotes")]
+#[sdk(qname = "w:endnotes")]
 pub struct Endnotes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Endnote Content.
-  #[sdk(child(qname = "w:CT_FtnEdn/w:endnote"))]
+  #[sdk(child(qname = "w:endnote"))]
   pub endnote: Vec<Endnote>,
 }
 /// Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HdrFtr/w:hdr")]
+#[sdk(qname = "w:hdr")]
 pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -10066,7 +10060,7 @@ pub struct Header {
 }
 /// Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HdrFtr/w:ftr")]
+#[sdk(qname = "w:ftr")]
 pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -10138,369 +10132,369 @@ pub struct Footer {
 }
 /// Document Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Settings/w:settings")]
+#[sdk(qname = "w:settings")]
 pub struct Settings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Write Protection
-  #[sdk(child(qname = "w:CT_WriteProtection/w:writeProtection"))]
+  #[sdk(child(qname = "w:writeProtection"))]
   pub write_protection: Option<WriteProtection>,
   /// Document View Setting
-  #[sdk(child(qname = "w:CT_View/w:view"))]
+  #[sdk(child(qname = "w:view"))]
   pub view: Option<View>,
   /// Magnification Setting
-  #[sdk(child(qname = "w:CT_Zoom/w:zoom"))]
+  #[sdk(child(qname = "w:zoom"))]
   pub zoom: Option<Zoom>,
   /// Remove Personal Information from Document Properties
-  #[sdk(child(qname = "w:CT_OnOff/w:removePersonalInformation"))]
+  #[sdk(child(qname = "w:removePersonalInformation"))]
   pub remove_personal_information: Option<RemovePersonalInformation>,
   /// Remove Date and Time from Annotations
-  #[sdk(child(qname = "w:CT_OnOff/w:removeDateAndTime"))]
+  #[sdk(child(qname = "w:removeDateAndTime"))]
   pub remove_date_and_time: Option<RemoveDateAndTime>,
   /// Do Not Display Visual Boundary For Header/Footer or Between Pages
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotDisplayPageBoundaries"))]
+  #[sdk(child(qname = "w:doNotDisplayPageBoundaries"))]
   pub do_not_display_page_boundaries: Option<DoNotDisplayPageBoundaries>,
   /// Display Background Objects When Displaying Document
-  #[sdk(child(qname = "w:CT_OnOff/w:displayBackgroundShape"))]
+  #[sdk(child(qname = "w:displayBackgroundShape"))]
   pub display_background_shape: Option<DisplayBackgroundShape>,
   /// Print PostScript Codes With Document Text
-  #[sdk(child(qname = "w:CT_OnOff/w:printPostScriptOverText"))]
+  #[sdk(child(qname = "w:printPostScriptOverText"))]
   pub print_post_script_over_text: Option<PrintPostScriptOverText>,
   /// Print Fractional Character Widths
-  #[sdk(child(qname = "w:CT_OnOff/w:printFractionalCharacterWidth"))]
+  #[sdk(child(qname = "w:printFractionalCharacterWidth"))]
   pub print_fractional_character_width: Option<PrintFractionalCharacterWidth>,
   /// Only Print Form Field Content
-  #[sdk(child(qname = "w:CT_OnOff/w:printFormsData"))]
+  #[sdk(child(qname = "w:printFormsData"))]
   pub print_forms_data: Option<PrintFormsData>,
   /// Embed TrueType Fonts
-  #[sdk(child(qname = "w:CT_OnOff/w:embedTrueTypeFonts"))]
+  #[sdk(child(qname = "w:embedTrueTypeFonts"))]
   pub embed_true_type_fonts: Option<EmbedTrueTypeFonts>,
   /// Embed Common System Fonts
-  #[sdk(child(qname = "w:CT_OnOff/w:embedSystemFonts"))]
+  #[sdk(child(qname = "w:embedSystemFonts"))]
   pub embed_system_fonts: Option<EmbedSystemFonts>,
   /// Subset Fonts When Embedding
-  #[sdk(child(qname = "w:CT_OnOff/w:saveSubsetFonts"))]
+  #[sdk(child(qname = "w:saveSubsetFonts"))]
   pub save_subset_fonts: Option<SaveSubsetFonts>,
   /// Only Save Form Field Content
-  #[sdk(child(qname = "w:CT_OnOff/w:saveFormsData"))]
+  #[sdk(child(qname = "w:saveFormsData"))]
   pub save_forms_data: Option<SaveFormsData>,
   /// Mirror Page Margins
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorMargins"))]
+  #[sdk(child(qname = "w:mirrorMargins"))]
   pub mirror_margins: Option<MirrorMargins>,
   /// Align Paragraph and Table Borders with Page Border
-  #[sdk(child(qname = "w:CT_OnOff/w:alignBordersAndEdges"))]
+  #[sdk(child(qname = "w:alignBordersAndEdges"))]
   pub align_border_and_edges: Option<AlignBorderAndEdges>,
   /// Page Border Excludes Header
-  #[sdk(child(qname = "w:CT_OnOff/w:bordersDoNotSurroundHeader"))]
+  #[sdk(child(qname = "w:bordersDoNotSurroundHeader"))]
   pub borders_do_not_surround_header: Option<BordersDoNotSurroundHeader>,
   /// Page Border Excludes Footer
-  #[sdk(child(qname = "w:CT_OnOff/w:bordersDoNotSurroundFooter"))]
+  #[sdk(child(qname = "w:bordersDoNotSurroundFooter"))]
   pub borders_do_not_surround_footer: Option<BordersDoNotSurroundFooter>,
   /// Position Gutter At Top of Page
-  #[sdk(child(qname = "w:CT_OnOff/w:gutterAtTop"))]
+  #[sdk(child(qname = "w:gutterAtTop"))]
   pub gutter_at_top: Option<GutterAtTop>,
   /// Do Not Display Visual Indication of Spelling Errors
-  #[sdk(child(qname = "w:CT_OnOff/w:hideSpellingErrors"))]
+  #[sdk(child(qname = "w:hideSpellingErrors"))]
   pub hide_spelling_errors: Option<HideSpellingErrors>,
   /// Do Not Display Visual Indication of Grammatical Errors
-  #[sdk(child(qname = "w:CT_OnOff/w:hideGrammaticalErrors"))]
+  #[sdk(child(qname = "w:hideGrammaticalErrors"))]
   pub hide_grammatical_errors: Option<HideGrammaticalErrors>,
   /// Grammar Checking Settings.
-  #[sdk(child(qname = "w:CT_WritingStyle/w:activeWritingStyle"))]
+  #[sdk(child(qname = "w:activeWritingStyle"))]
   pub active_writing_style: Vec<ActiveWritingStyle>,
   /// Spelling and Grammatical Checking State.
-  #[sdk(child(qname = "w:CT_Proof/w:proofState"))]
+  #[sdk(child(qname = "w:proofState"))]
   pub proof_state: Option<ProofState>,
   /// Structured Document Tag Placeholder Text Should be Resaved.
-  #[sdk(child(qname = "w:CT_OnOff/w:formsDesign"))]
+  #[sdk(child(qname = "w:formsDesign"))]
   pub forms_design: Option<FormsDesign>,
   /// Attached Document Template.
-  #[sdk(child(qname = "w:CT_Rel/w:attachedTemplate"))]
+  #[sdk(child(qname = "w:attachedTemplate"))]
   pub attached_template: Option<AttachedTemplate>,
   /// Automatically Update Styles From Document Template.
-  #[sdk(child(qname = "w:CT_OnOff/w:linkStyles"))]
+  #[sdk(child(qname = "w:linkStyles"))]
   pub link_styles: Option<LinkStyles>,
   /// Suggested Filtering for List of Document Styles.
-  #[sdk(child(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter"))]
+  #[sdk(child(qname = "w:stylePaneFormatFilter"))]
   pub style_pane_format_filter: Option<StylePaneFormatFilter>,
   /// Suggested Sorting for List of Document Styles.
-  #[sdk(child(qname = "w:CT_StylePaneSortMethods/w:stylePaneSortMethod"))]
+  #[sdk(child(qname = "w:stylePaneSortMethod"))]
   pub style_pane_sort_methods: Option<StylePaneSortMethods>,
   /// Document Classification.
-  #[sdk(child(qname = "w:CT_DocType/w:documentType"))]
+  #[sdk(child(qname = "w:documentType"))]
   pub document_type: Option<DocumentType>,
   /// Mail Merge Settings.
-  #[sdk(child(qname = "w:CT_MailMerge/w:mailMerge"))]
+  #[sdk(child(qname = "w:mailMerge"))]
   pub mail_merge: Option<std::boxed::Box<MailMerge>>,
   /// Visibility of Annotation Types.
-  #[sdk(child(qname = "w:CT_TrackChangesView/w:revisionView"))]
+  #[sdk(child(qname = "w:revisionView"))]
   pub revision_view: Option<RevisionView>,
   /// Track Revisions to Document.
-  #[sdk(child(qname = "w:CT_OnOff/w:trackRevisions"))]
+  #[sdk(child(qname = "w:trackRevisions"))]
   pub track_revisions: Option<TrackRevisions>,
   /// Do Not Use Move Syntax When Tracking Revisions.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotTrackMoves"))]
+  #[sdk(child(qname = "w:doNotTrackMoves"))]
   pub do_not_track_moves: Option<DoNotTrackMoves>,
   /// Do Not Track Formatting Revisions When Tracking Revisions.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotTrackFormatting"))]
+  #[sdk(child(qname = "w:doNotTrackFormatting"))]
   pub do_not_track_formatting: Option<DoNotTrackFormatting>,
   /// Document Editing Restrictions.
-  #[sdk(child(qname = "w:CT_DocProtect/w:documentProtection"))]
+  #[sdk(child(qname = "w:documentProtection"))]
   pub document_protection: Option<DocumentProtection>,
   /// Allow Automatic Formatting to Override Formatting Protection Settings.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoFormatOverride"))]
+  #[sdk(child(qname = "w:autoFormatOverride"))]
   pub auto_format_override: Option<AutoFormatOverride>,
   /// Prevent Modification of Themes Part.
-  #[sdk(child(qname = "w:CT_OnOff/w:styleLockTheme"))]
+  #[sdk(child(qname = "w:styleLockTheme"))]
   pub style_lock_themes_part: Option<StyleLockThemesPart>,
   /// Prevent Replacement of Styles Part.
-  #[sdk(child(qname = "w:CT_OnOff/w:styleLockQFSet"))]
+  #[sdk(child(qname = "w:styleLockQFSet"))]
   pub style_lock_styles_part: Option<StyleLockStylesPart>,
   /// Distance Between Automatic Tab Stops.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:defaultTabStop"))]
+  #[sdk(child(qname = "w:defaultTabStop"))]
   pub default_tab_stop: Option<DefaultTabStop>,
   /// Automatically Hyphenate Document Contents When Displayed.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoHyphenation"))]
+  #[sdk(child(qname = "w:autoHyphenation"))]
   pub auto_hyphenation: Option<AutoHyphenation>,
   /// Maximum Number of Consecutively Hyphenated Lines.
-  #[sdk(child(qname = "w:CT_UnsignedShortNumber/w:consecutiveHyphenLimit"))]
+  #[sdk(child(qname = "w:consecutiveHyphenLimit"))]
   pub consecutive_hyphen_limit: Option<ConsecutiveHyphenLimit>,
   /// Hyphenation Zone.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:hyphenationZone"))]
+  #[sdk(child(qname = "w:hyphenationZone"))]
   pub hyphenation_zone: Option<HyphenationZone>,
   /// Do Not Hyphenate Words in ALL CAPITAL LETTERS.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotHyphenateCaps"))]
+  #[sdk(child(qname = "w:doNotHyphenateCaps"))]
   pub do_not_hyphenate_caps: Option<DoNotHyphenateCaps>,
   /// Show E-Mail Message Header.
-  #[sdk(child(qname = "w:CT_OnOff/w:showEnvelope"))]
+  #[sdk(child(qname = "w:showEnvelope"))]
   pub show_envelope: Option<ShowEnvelope>,
   /// Percentage of Document to Use When Generating Summary.
-  #[sdk(child(qname = "w:CT_UnsignedInt100/w:summaryLength"))]
+  #[sdk(child(qname = "w:summaryLength"))]
   pub summary_length: Option<SummaryLength>,
   /// Paragraph Style Applied to Automatically Generated Paragraphs.
-  #[sdk(child(qname = "w:CT_String253/w:clickAndTypeStyle"))]
+  #[sdk(child(qname = "w:clickAndTypeStyle"))]
   pub click_and_type_style: Option<ClickAndTypeStyle>,
   /// Default Table Style for Newly Inserted Tables.
-  #[sdk(child(qname = "w:CT_String253/w:defaultTableStyle"))]
+  #[sdk(child(qname = "w:defaultTableStyle"))]
   pub default_table_style: Option<DefaultTableStyle>,
   /// Different Even/Odd Page Headers and Footers.
-  #[sdk(child(qname = "w:CT_OnOff/w:evenAndOddHeaders"))]
+  #[sdk(child(qname = "w:evenAndOddHeaders"))]
   pub even_and_odd_headers: Option<EvenAndOddHeaders>,
   /// Reverse Book Fold Printing.
-  #[sdk(child(qname = "w:CT_OnOff/w:bookFoldRevPrinting"))]
+  #[sdk(child(qname = "w:bookFoldRevPrinting"))]
   pub book_fold_reverse_printing: Option<BookFoldReversePrinting>,
   /// Book Fold Printing.
-  #[sdk(child(qname = "w:CT_OnOff/w:bookFoldPrinting"))]
+  #[sdk(child(qname = "w:bookFoldPrinting"))]
   pub book_fold_printing: Option<BookFoldPrinting>,
   /// Number of Pages Per Booklet.
-  #[sdk(child(qname = "w:CT_NonNegativeShort/w:bookFoldPrintingSheets"))]
+  #[sdk(child(qname = "w:bookFoldPrintingSheets"))]
   pub book_fold_printing_sheets: Option<BookFoldPrintingSheets>,
   /// Drawing Grid Horizontal Grid Unit Size.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalSpacing"))]
+  #[sdk(child(qname = "w:drawingGridHorizontalSpacing"))]
   pub drawing_grid_horizontal_spacing: Option<DrawingGridHorizontalSpacing>,
   /// Drawing Grid Vertical Grid Unit Size.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalSpacing"))]
+  #[sdk(child(qname = "w:drawingGridVerticalSpacing"))]
   pub drawing_grid_vertical_spacing: Option<DrawingGridVerticalSpacing>,
   /// Distance between Horizontal Gridlines.
-  #[sdk(child(qname = "w:CT_UnsignedInt7/w:displayHorizontalDrawingGridEvery"))]
+  #[sdk(child(qname = "w:displayHorizontalDrawingGridEvery"))]
   pub display_horizontal_drawing_grid: Option<DisplayHorizontalDrawingGrid>,
   /// Distance between Vertical Gridlines.
-  #[sdk(child(qname = "w:CT_UnsignedInt7/w:displayVerticalDrawingGridEvery"))]
+  #[sdk(child(qname = "w:displayVerticalDrawingGridEvery"))]
   pub display_vertical_drawing_grid: Option<DisplayVerticalDrawingGrid>,
   /// Do Not Use Margins for Drawing Grid Origin.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotUseMarginsForDrawingGridOrigin"))]
+  #[sdk(child(qname = "w:doNotUseMarginsForDrawingGridOrigin"))]
   pub do_not_use_margins_for_drawing_grid_origin: Option<DoNotUseMarginsForDrawingGridOrigin>,
   /// Drawing Grid Horizontal Origin Point.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalOrigin"))]
+  #[sdk(child(qname = "w:drawingGridHorizontalOrigin"))]
   pub drawing_grid_horizontal_origin: Option<DrawingGridHorizontalOrigin>,
   /// Drawing Grid Vertical Origin Point.
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalOrigin"))]
+  #[sdk(child(qname = "w:drawingGridVerticalOrigin"))]
   pub drawing_grid_vertical_origin: Option<DrawingGridVerticalOrigin>,
   /// Do Not Show Visual Indicator For Form Fields.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotShadeFormData"))]
+  #[sdk(child(qname = "w:doNotShadeFormData"))]
   pub do_not_shade_form_data: Option<DoNotShadeFormData>,
   /// Never Kern Punctuation Characters.
-  #[sdk(child(qname = "w:CT_OnOff/w:noPunctuationKerning"))]
+  #[sdk(child(qname = "w:noPunctuationKerning"))]
   pub no_punctuation_kerning: Option<NoPunctuationKerning>,
   /// Character-Level Whitespace Compression.
-  #[sdk(child(qname = "w:CT_CharacterSpacing/w:characterSpacingControl"))]
+  #[sdk(child(qname = "w:characterSpacingControl"))]
   pub character_spacing_control: Option<CharacterSpacingControl>,
   /// Print Two Pages Per Sheet.
-  #[sdk(child(qname = "w:CT_OnOff/w:printTwoOnOne"))]
+  #[sdk(child(qname = "w:printTwoOnOne"))]
   pub print_two_on_one: Option<PrintTwoOnOne>,
   /// Use Strict Kinsoku Rules for Japanese Text.
-  #[sdk(child(qname = "w:CT_OnOff/w:strictFirstAndLastChars"))]
+  #[sdk(child(qname = "w:strictFirstAndLastChars"))]
   pub strict_first_and_last_chars: Option<StrictFirstAndLastChars>,
   /// Custom Set of Characters Which Cannot End a Line.
-  #[sdk(child(qname = "w:CT_KinsokuAfter/w:noLineBreaksAfter"))]
+  #[sdk(child(qname = "w:noLineBreaksAfter"))]
   pub no_line_breaks_after_kinsoku: Option<NoLineBreaksAfterKinsoku>,
   /// Custom Set Of Characters Which Cannot Begin A Line.
-  #[sdk(child(qname = "w:CT_KinsokuBefore/w:noLineBreaksBefore"))]
+  #[sdk(child(qname = "w:noLineBreaksBefore"))]
   pub no_line_breaks_before_kinsoku: Option<NoLineBreaksBeforeKinsoku>,
   /// Generate Thumbnail For Document On Save.
-  #[sdk(child(qname = "w:CT_OnOff/w:savePreviewPicture"))]
+  #[sdk(child(qname = "w:savePreviewPicture"))]
   pub save_preview_picture: Option<SavePreviewPicture>,
   /// Do Not Validate Custom XML Markup Against Schemas.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotValidateAgainstSchema"))]
+  #[sdk(child(qname = "w:doNotValidateAgainstSchema"))]
   pub do_not_validate_against_schema: Option<DoNotValidateAgainstSchema>,
   /// Allow Saving Document As XML File When Custom XML Markup Is Invalid.
-  #[sdk(child(qname = "w:CT_OnOff/w:saveInvalidXml"))]
+  #[sdk(child(qname = "w:saveInvalidXml"))]
   pub save_invalid_xml: Option<SaveInvalidXml>,
   /// Ignore Mixed Content When Validating Custom XML Markup.
-  #[sdk(child(qname = "w:CT_OnOff/w:ignoreMixedContent"))]
+  #[sdk(child(qname = "w:ignoreMixedContent"))]
   pub ignore_mixed_content: Option<IgnoreMixedContent>,
   /// Use Custom XML Element Names as Default Placeholder Text.
-  #[sdk(child(qname = "w:CT_OnOff/w:alwaysShowPlaceholderText"))]
+  #[sdk(child(qname = "w:alwaysShowPlaceholderText"))]
   pub always_show_placeholder_text: Option<AlwaysShowPlaceholderText>,
   /// Do Not Show Visual Indicator For Invalid Custom XML Markup.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotDemarcateInvalidXml"))]
+  #[sdk(child(qname = "w:doNotDemarcateInvalidXml"))]
   pub do_not_demarcate_invalid_xml: Option<DoNotDemarcateInvalidXml>,
   /// Only Save Custom XML Markup.
-  #[sdk(child(qname = "w:CT_OnOff/w:saveXmlDataOnly"))]
+  #[sdk(child(qname = "w:saveXmlDataOnly"))]
   pub save_xml_data_only: Option<SaveXmlDataOnly>,
   /// Save Document as XML File through Custom XSL Transform.
-  #[sdk(child(qname = "w:CT_OnOff/w:useXSLTWhenSaving"))]
+  #[sdk(child(qname = "w:useXSLTWhenSaving"))]
   pub use_xslt_when_saving: Option<UseXsltWhenSaving>,
   /// Custom XSL Transform To Use When Saving As XML File.
-  #[sdk(child(qname = "w:CT_SaveThroughXslt/w:saveThroughXslt"))]
+  #[sdk(child(qname = "w:saveThroughXslt"))]
   pub save_through_xslt: Option<SaveThroughXslt>,
   /// Show Visual Indicators for Custom XML Markup Start/End Locations.
-  #[sdk(child(qname = "w:CT_OnOff/w:showXMLTags"))]
+  #[sdk(child(qname = "w:showXMLTags"))]
   pub show_xml_tags: Option<ShowXmlTags>,
   /// Do Not Mark Custom XML Elements With No Namespace As Invalid.
-  #[sdk(child(qname = "w:CT_OnOff/w:alwaysMergeEmptyNamespace"))]
+  #[sdk(child(qname = "w:alwaysMergeEmptyNamespace"))]
   pub always_merge_empty_namespace: Option<AlwaysMergeEmptyNamespace>,
   /// Automatically Recalculate Fields on Open.
-  #[sdk(child(qname = "w:CT_OnOff/w:updateFields"))]
+  #[sdk(child(qname = "w:updateFields"))]
   pub update_fields_on_open: Option<UpdateFieldsOnOpen>,
   /// Default Properties for VML Objects in Header and Footer.
-  #[sdk(child(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults"))]
+  #[sdk(child(qname = "w:hdrShapeDefaults"))]
   pub header_shape_defaults: Option<HeaderShapeDefaults>,
   /// Document-Wide Footnote Properties.
-  #[sdk(child(qname = "w:CT_FtnDocProps/w:footnotePr"))]
+  #[sdk(child(qname = "w:footnotePr"))]
   pub footnote_document_wide_properties: Option<std::boxed::Box<FootnoteDocumentWideProperties>>,
   /// Document-Wide Endnote Properties.
-  #[sdk(child(qname = "w:CT_EdnDocProps/w:endnotePr"))]
+  #[sdk(child(qname = "w:endnotePr"))]
   pub endnote_document_wide_properties: Option<std::boxed::Box<EndnoteDocumentWideProperties>>,
   /// Compatibility Settings.
-  #[sdk(child(qname = "w:CT_Compat/w:compat"))]
+  #[sdk(child(qname = "w:compat"))]
   pub compatibility: Option<std::boxed::Box<Compatibility>>,
   /// Document Variables.
-  #[sdk(child(qname = "w:CT_DocVars/w:docVars"))]
+  #[sdk(child(qname = "w:docVars"))]
   pub document_variables: Option<DocumentVariables>,
   /// Listing of All Revision Save ID Values.
-  #[sdk(child(qname = "w:CT_DocRsids/w:rsids"))]
+  #[sdk(child(qname = "w:rsids"))]
   pub rsids: Option<std::boxed::Box<Rsids>>,
   /// Math Properties.
-  #[sdk(child(qname = "m:CT_MathPr/m:mathPr"))]
+  #[sdk(child(qname = "m:mathPr"))]
   pub math_properties: Option<std::boxed::Box<crate::schemas::m::MathProperties>>,
   /// Disable Features Incompatible With Earlier Word Processing Formats.
-  #[sdk(child(qname = "w:CT_OnOff/w:uiCompat97To2003"))]
+  #[sdk(child(qname = "w:uiCompat97To2003"))]
   pub ui_compatible_with97_to2003: Option<UiCompatibleWith97To2003>,
   /// Attached Custom XML Schema.
-  #[sdk(child(qname = "w:CT_String/w:attachedSchema"))]
+  #[sdk(child(qname = "w:attachedSchema"))]
   pub attached_schema: Vec<AttachedSchema>,
   /// Theme Font Languages.
-  #[sdk(child(qname = "w:CT_Language/w:themeFontLang"))]
+  #[sdk(child(qname = "w:themeFontLang"))]
   pub theme_font_languages: Option<ThemeFontLanguages>,
   /// Theme Color Mappings.
-  #[sdk(child(qname = "w:CT_ColorSchemeMapping/w:clrSchemeMapping"))]
+  #[sdk(child(qname = "w:clrSchemeMapping"))]
   pub color_scheme_mapping: Option<ColorSchemeMapping>,
   /// Do Not Include Content in Text Boxes, Footnotes, and Endnotes in Document Statistics.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotIncludeSubdocsInStats"))]
+  #[sdk(child(qname = "w:doNotIncludeSubdocsInStats"))]
   pub do_not_include_subdocs_in_stats: Option<DoNotIncludeSubdocsInStats>,
   /// Do Not Automatically Compress Images.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotAutoCompressPictures"))]
+  #[sdk(child(qname = "w:doNotAutoCompressPictures"))]
   pub do_not_auto_compress_pictures: Option<DoNotAutoCompressPictures>,
   /// Upgrade Document on Open.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:forceUpgrade"))]
+  #[sdk(empty_child(qname = "w:forceUpgrade"))]
   pub force_upgrade: Option<()>,
   /// Caption Settings.
-  #[sdk(child(qname = "w:CT_Captions/w:captions"))]
+  #[sdk(child(qname = "w:captions"))]
   pub captions: Option<std::boxed::Box<Captions>>,
   /// Freeze Document Layout.
-  #[sdk(child(qname = "w:CT_ReadingModeInkLockDown/w:readModeInkLockDown"))]
+  #[sdk(child(qname = "w:readModeInkLockDown"))]
   pub read_mode_ink_lock_down: Option<ReadModeInkLockDown>,
   /// Embedded Custom XML Schema Supplementary Data.
-  #[sdk(child(qname = "sl:CT_SchemaLibrary/sl:schemaLibrary"))]
+  #[sdk(child(qname = "sl:schemaLibrary"))]
   pub schema_library: Option<crate::schemas::sl::SchemaLibrary>,
   /// Default Properties for VML Objects in Main Document.
-  #[sdk(child(qname = "w:CT_ShapeDefaults/w:shapeDefaults"))]
+  #[sdk(child(qname = "w:shapeDefaults"))]
   pub shape_defaults: Option<ShapeDefaults>,
   /// Radix Point for Field Code Evaluation.
-  #[sdk(child(qname = "w:CT_String/w:decimalSymbol"))]
+  #[sdk(child(qname = "w:decimalSymbol"))]
   pub decimal_symbol: Option<DecimalSymbol>,
   /// List Separator for Field Code Evaluation.
-  #[sdk(child(qname = "w:CT_String/w:listSeparator"))]
+  #[sdk(child(qname = "w:listSeparator"))]
   pub list_separator: Option<ListSeparator>,
   /// Defines the DocumentId Class.
-  #[sdk(child(office2010, qname = "w14:CT_LongHexNumber/w14:docId"))]
+  #[sdk(child(office2010, qname = "w14:docId"))]
   pub document_id: Option<crate::schemas::w14::DocumentId>,
   /// Defines the DiscardImageEditingData Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
+  #[sdk(child(office2010, qname = "w14:discardImageEditingData"))]
   pub discard_image_editing_data: Option<crate::schemas::w14::DiscardImageEditingData>,
   /// Defines the DefaultImageDpi Class.
-  #[sdk(child(office2010, qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
+  #[sdk(child(office2010, qname = "w14:defaultImageDpi"))]
   pub default_image_dpi: Option<crate::schemas::w14::DefaultImageDpi>,
   /// Defines the ConflictMode Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:conflictMode"))]
+  #[sdk(child(office2010, qname = "w14:conflictMode"))]
   pub conflict_mode: Option<crate::schemas::w14::ConflictMode>,
   /// Defines the ChartTrackingRefBased Class.
-  #[sdk(child(office2013, qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
+  #[sdk(child(office2013, qname = "w15:chartTrackingRefBased"))]
   pub chart_tracking_ref_based: Option<crate::schemas::w15::ChartTrackingRefBased>,
   /// Defines the PersistentDocumentId Class.
-  #[sdk(child(office2013, qname = "w15:CT_Guid/w15:docId"))]
+  #[sdk(child(office2013, qname = "w15:docId"))]
   pub persistent_document_id: Option<crate::schemas::w15::PersistentDocumentId>,
 }
 /// Web Page Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_WebSettings/w:webSettings")]
+#[sdk(qname = "w:webSettings")]
 pub struct WebSettings {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Nested Frameset Definition.
-  #[sdk(child(qname = "w:CT_Frameset/w:frameset"))]
+  #[sdk(child(qname = "w:frameset"))]
   pub frameset: Option<std::boxed::Box<Frameset>>,
   /// Defines the Divs Class.
-  #[sdk(child(qname = "w:CT_Divs/w:divs"))]
+  #[sdk(child(qname = "w:divs"))]
   pub divs: Option<Divs>,
   /// Defines the WebPageEncoding Class.
-  #[sdk(child(qname = "w:CT_String/w:encoding"))]
+  #[sdk(child(qname = "w:encoding"))]
   pub web_page_encoding: Option<WebPageEncoding>,
   /// Defines the OptimizeForBrowser Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:optimizeForBrowser"))]
+  #[sdk(child(qname = "w:optimizeForBrowser"))]
   pub optimize_for_browser: Option<OptimizeForBrowser>,
   /// Defines the RelyOnVML Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:relyOnVML"))]
+  #[sdk(child(qname = "w:relyOnVML"))]
   pub rely_on_vml: Option<RelyOnVml>,
   /// Defines the AllowPNG Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:allowPNG"))]
+  #[sdk(child(qname = "w:allowPNG"))]
   pub allow_png: Option<AllowPng>,
   /// Defines the DoNotRelyOnCSS Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotRelyOnCSS"))]
+  #[sdk(child(qname = "w:doNotRelyOnCSS"))]
   pub do_not_rely_on_css: Option<DoNotRelyOnCss>,
   /// Defines the DoNotSaveAsSingleFile Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotSaveAsSingleFile"))]
+  #[sdk(child(qname = "w:doNotSaveAsSingleFile"))]
   pub do_not_save_as_single_file: Option<DoNotSaveAsSingleFile>,
   /// Defines the DoNotOrganizeInFolder Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotOrganizeInFolder"))]
+  #[sdk(child(qname = "w:doNotOrganizeInFolder"))]
   pub do_not_organize_in_folder: Option<DoNotOrganizeInFolder>,
   /// Defines the DoNotUseLongFileNames Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotUseLongFileNames"))]
+  #[sdk(child(qname = "w:doNotUseLongFileNames"))]
   pub do_not_use_long_file_names: Option<DoNotUseLongFileNames>,
   /// Defines the PixelsPerInch Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:pixelsPerInch"))]
+  #[sdk(child(qname = "w:pixelsPerInch"))]
   pub pixels_per_inch: Option<PixelsPerInch>,
   /// Defines the TargetScreenSize Class.
-  #[sdk(child(qname = "w:CT_TargetScreenSz/w:targetScreenSz"))]
+  #[sdk(child(qname = "w:targetScreenSz"))]
   pub target_screen_size: Option<TargetScreenSize>,
 }
 /// Font Table Root Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontsList/w:fonts")]
+#[sdk(qname = "w:fonts")]
 pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -10510,44 +10504,44 @@ pub struct Fonts {
 }
 /// Numbering Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Numbering/w:numbering")]
+#[sdk(qname = "w:numbering")]
 pub struct Numbering {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Picture Numbering Symbol Definition.
-  #[sdk(child(qname = "w:CT_NumPicBullet/w:numPicBullet"))]
+  #[sdk(child(qname = "w:numPicBullet"))]
   pub numbering_picture_bullet: Vec<NumberingPictureBullet>,
   /// Abstract Numbering Definition.
-  #[sdk(child(qname = "w:CT_AbstractNum/w:abstractNum"))]
+  #[sdk(child(qname = "w:abstractNum"))]
   pub abstract_num: Vec<AbstractNum>,
   /// Numbering Definition Instance.
-  #[sdk(child(qname = "w:CT_Num/w:num"))]
+  #[sdk(child(qname = "w:num"))]
   pub numbering_instance: Vec<NumberingInstance>,
   /// Last Reviewed Abstract Numbering Definition.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:numIdMacAtCleanup"))]
+  #[sdk(child(qname = "w:numIdMacAtCleanup"))]
   pub numbering_id_mac_at_cleanup: Option<NumberingIdMacAtCleanup>,
 }
 /// Style Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Styles/w:styles")]
+#[sdk(qname = "w:styles")]
 pub struct Styles {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Document Default Paragraph and Run Properties
-  #[sdk(child(qname = "w:CT_DocDefaults/w:docDefaults"))]
+  #[sdk(child(qname = "w:docDefaults"))]
   pub doc_defaults: Option<std::boxed::Box<DocDefaults>>,
   /// Latent Style Information
-  #[sdk(child(qname = "w:CT_LatentStyles/w:latentStyles"))]
+  #[sdk(child(qname = "w:latentStyles"))]
   pub latent_styles: Option<LatentStyles>,
   /// Style Definition.
-  #[sdk(child(qname = "w:CT_Style/w:style"))]
+  #[sdk(child(qname = "w:style"))]
   pub style: Vec<Style>,
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Document/w:document")]
+#[sdk(qname = "w:document")]
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -10556,100 +10550,100 @@ pub struct Document {
   #[sdk(attr(qname = "w:conformance"))]
   pub w_conformance: Option<DocumentConformance>,
   /// Document Background
-  #[sdk(child(qname = "w:CT_Background/w:background"))]
+  #[sdk(child(qname = "w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
   /// Defines the Body Class.
-  #[sdk(child(qname = "w:CT_Body/w:body"))]
+  #[sdk(child(qname = "w:body"))]
   pub body: Option<std::boxed::Box<Body>>,
 }
 /// Glossary Document Root Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_GlossaryDocument/w:glossaryDocument")]
+#[sdk(qname = "w:glossaryDocument")]
 pub struct GlossaryDocument {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Document Background
-  #[sdk(child(qname = "w:CT_Background/w:background"))]
+  #[sdk(child(qname = "w:background"))]
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
   /// List of Glossary Document Entries
-  #[sdk(child(qname = "w:CT_DocParts/w:docParts"))]
+  #[sdk(child(qname = "w:docParts"))]
   pub doc_parts: Option<DocParts>,
 }
 /// Previous Table-Level Property Exceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrExBase/w:tblPrEx")]
+#[sdk(qname = "w:tblPrEx")]
 pub struct PreviousTablePropertyExceptions {
   /// Preferred Table Width Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
+  #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
   /// Table Alignment Exception
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Table Cell Spacing Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Table Indent from Leading Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Table Borders Exceptions
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Table Shading Exception
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Table Layout Exception
-  #[sdk(child(qname = "w:CT_TblLayoutType/w:tblLayout"))]
+  #[sdk(child(qname = "w:tblLayout"))]
   pub table_layout: Option<TableLayout>,
   /// Table Cell Margin Exceptions
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
   /// Table Style Conditional Formatting Settings Exception
-  #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
+  #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
 }
 /// Previous Table Cell Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcPrInner/w:tcPr")]
+#[sdk(qname = "w:tcPr")]
 pub struct PreviousTableCellProperties {
   /// Defines the ConditionalFormatStyle Class.
-  #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
+  #[sdk(child(qname = "w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
   /// Defines the TableCellWidth Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tcW"))]
+  #[sdk(child(qname = "w:tcW"))]
   pub table_cell_width: Option<TableCellWidth>,
   /// Defines the GridSpan Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:gridSpan"))]
+  #[sdk(child(qname = "w:gridSpan"))]
   pub grid_span: Option<GridSpan>,
   /// Defines the HorizontalMerge Class.
-  #[sdk(child(qname = "w:CT_HMerge/w:hMerge"))]
+  #[sdk(child(qname = "w:hMerge"))]
   pub horizontal_merge: Option<HorizontalMerge>,
   /// Defines the VerticalMerge Class.
-  #[sdk(child(qname = "w:CT_VMerge/w:vMerge"))]
+  #[sdk(child(qname = "w:vMerge"))]
   pub vertical_merge: Option<VerticalMerge>,
   /// Defines the TableCellBorders Class.
-  #[sdk(child(qname = "w:CT_TcBorders/w:tcBorders"))]
+  #[sdk(child(qname = "w:tcBorders"))]
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
+  #[sdk(child(qname = "w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
-  #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
+  #[sdk(child(qname = "w:tcMar"))]
   pub table_cell_margin: Option<std::boxed::Box<TableCellMargin>>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TableCellFitText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:tcFitText"))]
+  #[sdk(child(qname = "w:tcFitText"))]
   pub table_cell_fit_text: Option<TableCellFitText>,
   /// Defines the TableCellVerticalAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
   /// Defines the HideMark Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
+  #[sdk(child(qname = "w:hideMark"))]
   pub hide_mark: Option<HideMark>,
   #[sdk(
         choice(
@@ -10662,7 +10656,7 @@ pub struct PreviousTableCellProperties {
 }
 /// Previous Table Row Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrPrBase/w:trPr")]
+#[sdk(qname = "w:trPr")]
 pub struct PreviousTableRowProperties {
   #[sdk(
         choice(
@@ -10684,57 +10678,57 @@ pub struct PreviousTableRowProperties {
 }
 /// Previous Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrBase/w:tblPr")]
+#[sdk(qname = "w:tblPr")]
 pub struct PreviousTableProperties {
   /// Defines the TableStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:tblStyle"))]
+  #[sdk(child(qname = "w:tblStyle"))]
   pub table_style: Option<TableStyle>,
   /// Defines the TablePositionProperties Class.
-  #[sdk(child(qname = "w:CT_TblPPr/w:tblpPr"))]
+  #[sdk(child(qname = "w:tblpPr"))]
   pub table_position_properties: Option<TablePositionProperties>,
   /// Defines the TableOverlap Class.
-  #[sdk(child(qname = "w:CT_TblOverlap/w:tblOverlap"))]
+  #[sdk(child(qname = "w:tblOverlap"))]
   pub table_overlap: Option<TableOverlap>,
   /// Defines the BiDiVisual Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidiVisual"))]
+  #[sdk(child(qname = "w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
   /// Defines the TableWidth Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
+  #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
   /// Defines the TableJustification Class.
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Defines the TableCellSpacing Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the TableLayout Class.
-  #[sdk(child(qname = "w:CT_TblLayoutType/w:tblLayout"))]
+  #[sdk(child(qname = "w:tblLayout"))]
   pub table_layout: Option<TableLayout>,
   /// Defines the TableCellMarginDefault Class.
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
   /// Defines the TableLook Class.
-  #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
+  #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Defines the TableCaption Class.
-  #[sdk(child(office2010, qname = "w:CT_String/w:tblCaption"))]
+  #[sdk(child(office2010, qname = "w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// Defines the TableDescription Class.
-  #[sdk(child(office2010, qname = "w:CT_String/w:tblDescription"))]
+  #[sdk(child(office2010, qname = "w:tblDescription"))]
   pub table_description: Option<TableDescription>,
 }
 /// Previous Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SectPrBase/w:sectPr")]
+#[sdk(qname = "w:sectPr")]
 pub struct PreviousSectionProperties {
   /// Physical Section Mark Character Revision ID
   #[sdk(attr(qname = "w:rsidRPr"))]
@@ -10753,174 +10747,174 @@ pub struct PreviousSectionProperties {
   #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
   /// Defines the FootnoteProperties Class.
-  #[sdk(child(qname = "w:CT_FtnProps/w:footnotePr"))]
+  #[sdk(child(qname = "w:footnotePr"))]
   pub footnote_properties: Option<std::boxed::Box<FootnoteProperties>>,
   /// Defines the EndnoteProperties Class.
-  #[sdk(child(qname = "w:CT_EdnProps/w:endnotePr"))]
+  #[sdk(child(qname = "w:endnotePr"))]
   pub endnote_properties: Option<std::boxed::Box<EndnoteProperties>>,
   /// Defines the SectionType Class.
-  #[sdk(child(qname = "w:CT_SectType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub section_type: Option<SectionType>,
   /// Defines the PageSize Class.
-  #[sdk(child(qname = "w:CT_PageSz/w:pgSz"))]
+  #[sdk(child(qname = "w:pgSz"))]
   pub page_size: Option<PageSize>,
   /// Defines the PageMargin Class.
-  #[sdk(child(qname = "w:CT_PageMar/w:pgMar"))]
+  #[sdk(child(qname = "w:pgMar"))]
   pub page_margin: Option<PageMargin>,
   /// Defines the PaperSource Class.
-  #[sdk(child(qname = "w:CT_PaperSource/w:paperSrc"))]
+  #[sdk(child(qname = "w:paperSrc"))]
   pub paper_source: Option<PaperSource>,
   /// Defines the PageBorders Class.
-  #[sdk(child(qname = "w:CT_PageBorders/w:pgBorders"))]
+  #[sdk(child(qname = "w:pgBorders"))]
   pub page_borders: Option<std::boxed::Box<PageBorders>>,
   /// Defines the LineNumberType Class.
-  #[sdk(child(qname = "w:CT_LineNumber/w:lnNumType"))]
+  #[sdk(child(qname = "w:lnNumType"))]
   pub line_number_type: Option<LineNumberType>,
   /// Defines the PageNumberType Class.
-  #[sdk(child(qname = "w:CT_PageNumber/w:pgNumType"))]
+  #[sdk(child(qname = "w:pgNumType"))]
   pub page_number_type: Option<PageNumberType>,
   /// Defines the Columns Class.
-  #[sdk(child(qname = "w:CT_Columns/w:cols"))]
+  #[sdk(child(qname = "w:cols"))]
   pub columns: Option<Columns>,
   /// Defines the FormProtection Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:formProt"))]
+  #[sdk(child(qname = "w:formProt"))]
   pub form_protection: Option<FormProtection>,
   /// Defines the VerticalTextAlignmentOnPage Class.
-  #[sdk(child(qname = "w:CT_VerticalJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub vertical_text_alignment_on_page: Option<VerticalTextAlignmentOnPage>,
   /// Defines the NoEndnote Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noEndnote"))]
+  #[sdk(child(qname = "w:noEndnote"))]
   pub no_endnote: Option<NoEndnote>,
   /// Defines the TitlePage Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:titlePg"))]
+  #[sdk(child(qname = "w:titlePg"))]
   pub title_page: Option<TitlePage>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the GutterOnRight Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtlGutter"))]
+  #[sdk(child(qname = "w:rtlGutter"))]
   pub gutter_on_right: Option<GutterOnRight>,
   /// Defines the DocGrid Class.
-  #[sdk(child(qname = "w:CT_DocGrid/w:docGrid"))]
+  #[sdk(child(qname = "w:docGrid"))]
   pub doc_grid: Option<DocGrid>,
   /// Defines the PrinterSettingsReference Class.
-  #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
+  #[sdk(child(qname = "w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(office2013, qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
+  #[sdk(child(office2013, qname = "w15:footnoteColumns"))]
   pub footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
 }
 /// Previous Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrExtended/w:pPr")]
+#[sdk(qname = "w:pPr")]
 pub struct ParagraphPropertiesExtended {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the ParagraphStyleId Class.
-  #[sdk(child(qname = "w:CT_String/w:pStyle"))]
+  #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
   /// Defines the KeepNext Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
+  #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
   /// Defines the KeepLines Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepLines"))]
+  #[sdk(child(qname = "w:keepLines"))]
   pub keep_lines: Option<KeepLines>,
   /// Defines the PageBreakBefore Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:pageBreakBefore"))]
+  #[sdk(child(qname = "w:pageBreakBefore"))]
   pub page_break_before: Option<PageBreakBefore>,
   /// Defines the FrameProperties Class.
-  #[sdk(child(qname = "w:CT_FramePr/w:framePr"))]
+  #[sdk(child(qname = "w:framePr"))]
   pub frame_properties: Option<FrameProperties>,
   /// Defines the WidowControl Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:widowControl"))]
+  #[sdk(child(qname = "w:widowControl"))]
   pub widow_control: Option<WidowControl>,
   /// Defines the NumberingProperties Class.
-  #[sdk(child(qname = "w:CT_NumPr/w:numPr"))]
+  #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
   /// Defines the SuppressLineNumbers Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressLineNumbers"))]
+  #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
   /// Defines the ParagraphBorders Class.
-  #[sdk(child(qname = "w:CT_PBdr/w:pBdr"))]
+  #[sdk(child(qname = "w:pBdr"))]
   pub paragraph_borders: Option<std::boxed::Box<ParagraphBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the Tabs Class.
-  #[sdk(child(qname = "w:CT_Tabs/w:tabs"))]
+  #[sdk(child(qname = "w:tabs"))]
   pub tabs: Option<Tabs>,
   /// Defines the SuppressAutoHyphens Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressAutoHyphens"))]
+  #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
   /// Defines the Kinsoku Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:kinsoku"))]
+  #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
   /// Defines the WordWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:wordWrap"))]
+  #[sdk(child(qname = "w:wordWrap"))]
   pub word_wrap: Option<WordWrap>,
   /// Defines the OverflowPunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:overflowPunct"))]
+  #[sdk(child(qname = "w:overflowPunct"))]
   pub overflow_punctuation: Option<OverflowPunctuation>,
   /// Defines the TopLinePunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:topLinePunct"))]
+  #[sdk(child(qname = "w:topLinePunct"))]
   pub top_line_punctuation: Option<TopLinePunctuation>,
   /// Defines the AutoSpaceDE Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDE"))]
+  #[sdk(child(qname = "w:autoSpaceDE"))]
   pub auto_space_de: Option<AutoSpaceDe>,
   /// Defines the AutoSpaceDN Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDN"))]
+  #[sdk(child(qname = "w:autoSpaceDN"))]
   pub auto_space_dn: Option<AutoSpaceDn>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the AdjustRightIndent Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustRightInd"))]
+  #[sdk(child(qname = "w:adjustRightInd"))]
   pub adjust_right_indent: Option<AdjustRightIndent>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the SpacingBetweenLines Class.
-  #[sdk(child(qname = "w:CT_Spacing/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing_between_lines: Option<SpacingBetweenLines>,
   /// Defines the Indentation Class.
-  #[sdk(child(qname = "w:CT_Ind/w:ind"))]
+  #[sdk(child(qname = "w:ind"))]
   pub indentation: Option<Indentation>,
   /// Defines the ContextualSpacing Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:contextualSpacing"))]
+  #[sdk(child(qname = "w:contextualSpacing"))]
   pub contextual_spacing: Option<ContextualSpacing>,
   /// Defines the MirrorIndents Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorIndents"))]
+  #[sdk(child(qname = "w:mirrorIndents"))]
   pub mirror_indents: Option<MirrorIndents>,
   /// Defines the SuppressOverlap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressOverlap"))]
+  #[sdk(child(qname = "w:suppressOverlap"))]
   pub suppress_overlap: Option<SuppressOverlap>,
   /// Defines the Justification Class.
-  #[sdk(child(qname = "w:CT_Jc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub justification: Option<Justification>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TextAlignment Class.
-  #[sdk(child(qname = "w:CT_TextAlignment/w:textAlignment"))]
+  #[sdk(child(qname = "w:textAlignment"))]
   pub text_alignment: Option<TextAlignment>,
   /// Defines the TextBoxTightWrap Class.
-  #[sdk(child(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap"))]
+  #[sdk(child(qname = "w:textboxTightWrap"))]
   pub text_box_tight_wrap: Option<TextBoxTightWrap>,
   /// Defines the OutlineLevel Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:outlineLvl"))]
+  #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
   /// Defines the DivId Class.
-  #[sdk(child(qname = "w:CT_NonZeroDecimalNumber/w:divId"))]
+  #[sdk(child(qname = "w:divId"))]
   pub div_id: Option<DivId>,
   /// Defines the ConditionalFormatStyle Class.
-  #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
+  #[sdk(child(qname = "w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
 }
 /// Previous Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrOriginal/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct PreviousRunProperties {
   #[sdk(
         choice(
@@ -10966,57 +10960,57 @@ pub struct PreviousRunProperties {
     )]
   pub run_properties_choice: Vec<PreviousRunPropertiesChoice>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
+  #[sdk(child(office2010, qname = "w14:shadow"))]
   pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:textOutline"))]
   pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:textFill"))]
   pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:props3d"))]
   pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:numForm"))]
   pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:numSpacing"))]
   pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
   pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
 }
 /// Previous Run Properties for the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ParaRPrOriginal/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct PreviousParagraphMarkRunProperties {
   /// Inserted Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
+  #[sdk(child(qname = "w:ins"))]
   pub inserted: Option<Inserted>,
   /// Deleted Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:del"))]
+  #[sdk(child(qname = "w:del"))]
   pub deleted: Option<Deleted>,
   /// Move Source Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:moveFrom"))]
+  #[sdk(child(qname = "w:moveFrom"))]
   pub move_from: Option<MoveFrom>,
   /// Move Destination Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
+  #[sdk(child(qname = "w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(
         choice(
@@ -11071,48 +11065,48 @@ pub struct PreviousParagraphMarkRunProperties {
   pub previous_paragraph_mark_run_properties_choice2:
     Vec<PreviousParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:glow"))]
   pub glow: Vec<crate::schemas::w14::Glow>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
+  #[sdk(child(office2010, qname = "w14:shadow"))]
   pub shadow: Vec<crate::schemas::w14::Shadow>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:reflection"))]
   pub reflection: Vec<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:textOutline"))]
   pub text_outline_effect: Vec<crate::schemas::w14::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:textFill"))]
   pub fill_text_effect: Vec<crate::schemas::w14::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::w14::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:props3d"))]
   pub properties3_d: Vec<crate::schemas::w14::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:numForm"))]
   pub numbering_format: Vec<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:numSpacing"))]
   pub number_spacing: Vec<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
   pub stylistic_sets: Vec<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Vec<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
+  #[sdk(child(qname = "w:oMath"))]
   pub office_math: Vec<OfficeMath>,
 }
 /// Numbering Level Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeDecimalNumber255/w:ilvl")]
+#[sdk(qname = "w:ilvl")]
 pub struct NumberingLevelReference {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11121,7 +11115,7 @@ pub struct NumberingLevelReference {
 }
 /// Numbering Definition Instance Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:numId")]
+#[sdk(qname = "w:numId")]
 pub struct NumberingId {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11130,7 +11124,7 @@ pub struct NumberingId {
 }
 /// Starting Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:start")]
+#[sdk(qname = "w:start")]
 pub struct StartNumberingValue {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11139,7 +11133,7 @@ pub struct StartNumberingValue {
 }
 /// Defines the AbstractNumId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:abstractNumId")]
+#[sdk(qname = "w:abstractNumId")]
 pub struct AbstractNumId {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11148,7 +11142,7 @@ pub struct AbstractNumId {
 }
 /// Previous Paragraph Numbering Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChangeNumbering/w:numberingChange")]
+#[sdk(qname = "w:numberingChange")]
 pub struct NumberingChange {
   /// original
   #[sdk(attr(qname = "w:original"))]
@@ -11183,7 +11177,7 @@ pub struct NumberingChange {
 }
 /// Custom Tab Stop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TabStop/w:tab")]
+#[sdk(qname = "w:tab")]
 pub struct TabStop {
   /// Tab Stop Type
   #[sdk(attr(qname = "w:val"))]
@@ -11198,19 +11192,19 @@ pub struct TabStop {
 }
 /// Run Properties for the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ParaRPr/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct ParagraphMarkRunProperties {
   /// Inserted Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
+  #[sdk(child(qname = "w:ins"))]
   pub inserted: Option<Inserted>,
   /// Deleted Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:del"))]
+  #[sdk(child(qname = "w:del"))]
   pub deleted: Option<Deleted>,
   /// Move Source Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:moveFrom"))]
+  #[sdk(child(qname = "w:moveFrom"))]
   pub move_from: Option<MoveFrom>,
   /// Move Destination Paragraph
-  #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
+  #[sdk(child(qname = "w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(
         choice(
@@ -11263,52 +11257,52 @@ pub struct ParagraphMarkRunProperties {
     )]
   pub paragraph_mark_run_properties_choice2: Vec<ParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:glow"))]
   pub glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
   /// Defines the Shadow Class.
-  #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
+  #[sdk(child(office2010, qname = "w14:shadow"))]
   pub shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:reflection"))]
   pub reflection: Option<crate::schemas::w14::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:textOutline"))]
   pub text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:textFill"))]
   pub fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
   /// Defines the Scene3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:scene3d"))]
   pub scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:props3d"))]
   pub properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the Ligatures Class.
-  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:ligatures"))]
   pub ligatures: Option<crate::schemas::w14::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:numForm"))]
   pub numbering_format: Option<crate::schemas::w14::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:numSpacing"))]
   pub number_spacing: Option<crate::schemas::w14::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:stylisticSets"))]
   pub stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:cntxtAlts"))]
   pub contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:oMath"))]
+  #[sdk(child(qname = "w:oMath"))]
   pub office_math: Option<OfficeMath>,
   /// Revision Information for Run Properties on the Paragraph Mark.
-  #[sdk(child(qname = "w:CT_ParaRPrChange/w:rPrChange"))]
+  #[sdk(child(qname = "w:rPrChange"))]
   pub paragraph_mark_run_properties_change:
     Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
 }
 /// Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SectPr/w:sectPr")]
+#[sdk(qname = "w:sectPr")]
 pub struct SectionProperties {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Physical Section Mark Character Revision ID
@@ -11335,74 +11329,74 @@ pub struct SectionProperties {
     )]
   pub section_properties_choice: Vec<SectionPropertiesChoice>,
   /// Defines the FootnoteProperties Class.
-  #[sdk(child(qname = "w:CT_FtnProps/w:footnotePr"))]
+  #[sdk(child(qname = "w:footnotePr"))]
   pub footnote_properties: Option<std::boxed::Box<FootnoteProperties>>,
   /// Defines the EndnoteProperties Class.
-  #[sdk(child(qname = "w:CT_EdnProps/w:endnotePr"))]
+  #[sdk(child(qname = "w:endnotePr"))]
   pub endnote_properties: Option<std::boxed::Box<EndnoteProperties>>,
   /// Defines the SectionType Class.
-  #[sdk(child(qname = "w:CT_SectType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub section_type: Option<SectionType>,
   /// Defines the PageSize Class.
-  #[sdk(child(qname = "w:CT_PageSz/w:pgSz"))]
+  #[sdk(child(qname = "w:pgSz"))]
   pub page_size: Option<PageSize>,
   /// Defines the PageMargin Class.
-  #[sdk(child(qname = "w:CT_PageMar/w:pgMar"))]
+  #[sdk(child(qname = "w:pgMar"))]
   pub page_margin: Option<PageMargin>,
   /// Defines the PaperSource Class.
-  #[sdk(child(qname = "w:CT_PaperSource/w:paperSrc"))]
+  #[sdk(child(qname = "w:paperSrc"))]
   pub paper_source: Option<PaperSource>,
   /// Defines the PageBorders Class.
-  #[sdk(child(qname = "w:CT_PageBorders/w:pgBorders"))]
+  #[sdk(child(qname = "w:pgBorders"))]
   pub page_borders: Option<std::boxed::Box<PageBorders>>,
   /// Defines the LineNumberType Class.
-  #[sdk(child(qname = "w:CT_LineNumber/w:lnNumType"))]
+  #[sdk(child(qname = "w:lnNumType"))]
   pub line_number_type: Option<LineNumberType>,
   /// Defines the PageNumberType Class.
-  #[sdk(child(qname = "w:CT_PageNumber/w:pgNumType"))]
+  #[sdk(child(qname = "w:pgNumType"))]
   pub page_number_type: Option<PageNumberType>,
   /// Defines the Columns Class.
-  #[sdk(child(qname = "w:CT_Columns/w:cols"))]
+  #[sdk(child(qname = "w:cols"))]
   pub columns: Option<Columns>,
   /// Defines the FormProtection Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:formProt"))]
+  #[sdk(child(qname = "w:formProt"))]
   pub form_protection: Option<FormProtection>,
   /// Defines the VerticalTextAlignmentOnPage Class.
-  #[sdk(child(qname = "w:CT_VerticalJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub vertical_text_alignment_on_page: Option<VerticalTextAlignmentOnPage>,
   /// Defines the NoEndnote Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noEndnote"))]
+  #[sdk(child(qname = "w:noEndnote"))]
   pub no_endnote: Option<NoEndnote>,
   /// Defines the TitlePage Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:titlePg"))]
+  #[sdk(child(qname = "w:titlePg"))]
   pub title_page: Option<TitlePage>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the GutterOnRight Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtlGutter"))]
+  #[sdk(child(qname = "w:rtlGutter"))]
   pub gutter_on_right: Option<GutterOnRight>,
   /// Defines the DocGrid Class.
-  #[sdk(child(qname = "w:CT_DocGrid/w:docGrid"))]
+  #[sdk(child(qname = "w:docGrid"))]
   pub doc_grid: Option<DocGrid>,
   /// Defines the PrinterSettingsReference Class.
-  #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
+  #[sdk(child(qname = "w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(office2013, qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
+  #[sdk(child(office2013, qname = "w15:footnoteColumns"))]
   pub footnote_columns: Option<crate::schemas::w15::FootnoteColumns>,
   /// Revision Information for Section Properties.
-  #[sdk(child(qname = "w:CT_SectPrChange/w:sectPrChange"))]
+  #[sdk(child(qname = "w:sectPrChange"))]
   pub section_properties_change: Option<std::boxed::Box<SectionPropertiesChange>>,
 }
 /// Custom Field Data.
 pub type FieldData = crate::simple_type::Base64BinaryValue;
 /// Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFData/w:ffData")]
+#[sdk(qname = "w:ffData")]
 pub struct FormFieldData {
   #[sdk(
         choice(
@@ -11422,7 +11416,7 @@ pub struct FormFieldData {
 }
 /// Form Field Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFName/w:name")]
+#[sdk(qname = "w:name")]
 pub struct FormFieldName {
   /// Form Field Name Value
   #[sdk(attr(qname = "w:val"))]
@@ -11431,7 +11425,7 @@ pub struct FormFieldName {
 }
 /// Script Function to Execute on Form Field Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MacroName/w:entryMacro")]
+#[sdk(qname = "w:entryMacro")]
 pub struct EntryMacro {
   /// Name of Script Function
   #[sdk(attr(qname = "w:val"))]
@@ -11440,7 +11434,7 @@ pub struct EntryMacro {
 }
 /// Script Function to Execute on Form Field Exit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MacroName/w:exitMacro")]
+#[sdk(qname = "w:exitMacro")]
 pub struct ExitMacro {
   /// Name of Script Function
   #[sdk(attr(qname = "w:val"))]
@@ -11449,7 +11443,7 @@ pub struct ExitMacro {
 }
 /// Associated Help Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFHelpText/w:helpText")]
+#[sdk(qname = "w:helpText")]
 pub struct HelpText {
   /// Help Text Type
   #[sdk(attr(qname = "w:type"))]
@@ -11461,7 +11455,7 @@ pub struct HelpText {
 }
 /// Associated Status Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFStatusText/w:statusText")]
+#[sdk(qname = "w:statusText")]
 pub struct StatusText {
   /// Status Text Type
   #[sdk(attr(qname = "w:type"))]
@@ -11474,7 +11468,7 @@ pub struct StatusText {
 }
 /// Checkbox Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFCheckBox/w:checkBox")]
+#[sdk(qname = "w:checkBox")]
 pub struct CheckBox {
   #[sdk(
         choice(
@@ -11484,46 +11478,46 @@ pub struct CheckBox {
     )]
   pub check_box_choice: Option<CheckBoxChoice>,
   /// Default Checkbox Form Field State.
-  #[sdk(child(qname = "w:CT_OnOff/w:default"))]
+  #[sdk(child(qname = "w:default"))]
   pub default_check_box_form_field_state: Option<DefaultCheckBoxFormFieldState>,
   /// Checkbox Form Field State.
-  #[sdk(child(qname = "w:CT_OnOff/w:checked"))]
+  #[sdk(child(qname = "w:checked"))]
   pub checked: Option<Checked>,
 }
 /// Drop-Down List Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFDDList/w:ddList")]
+#[sdk(qname = "w:ddList")]
 pub struct DropDownListFormField {
   /// Drop-Down List Selection
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:result"))]
+  #[sdk(child(qname = "w:result"))]
   pub drop_down_list_selection: Option<DropDownListSelection>,
   /// Default Drop-Down List Item Index
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumberMax24/w:default"))]
+  #[sdk(child(qname = "w:default"))]
   pub default_drop_down_list_item_index: Option<DefaultDropDownListItemIndex>,
   /// Drop-Down List Entry.
-  #[sdk(child(qname = "w:CT_String255/w:listEntry"))]
+  #[sdk(child(qname = "w:listEntry"))]
   pub list_entry_form_field: Vec<ListEntryFormField>,
 }
 /// Text Box Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFTextInput/w:textInput")]
+#[sdk(qname = "w:textInput")]
 pub struct TextInput {
   /// Text Box Form Field Type
-  #[sdk(child(qname = "w:CT_FFTextType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub text_box_form_field_type: Option<TextBoxFormFieldType>,
   /// Default Text Box Form Field String
-  #[sdk(child(qname = "w:CT_String255/w:default"))]
+  #[sdk(child(qname = "w:default"))]
   pub default_text_box_form_field_string: Option<DefaultTextBoxFormFieldString>,
   /// Text Box Form Field Maximum Length
-  #[sdk(child(qname = "w:CT_PositiveShort/w:maxLength"))]
+  #[sdk(child(qname = "w:maxLength"))]
   pub max_length: Option<MaxLength>,
   /// Text Box Form Field Formatting
-  #[sdk(child(qname = "w:CT_String64/w:format"))]
+  #[sdk(child(qname = "w:format"))]
   pub format: Option<Format>,
 }
 /// Default Drop-Down List Item Index.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedDecimalNumberMax24/w:default")]
+#[sdk(qname = "w:default")]
 pub struct DefaultDropDownListItemIndex {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11532,7 +11526,7 @@ pub struct DefaultDropDownListItemIndex {
 }
 /// Drop-Down List Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String255/w:listEntry")]
+#[sdk(qname = "w:listEntry")]
 pub struct ListEntryFormField {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11541,7 +11535,7 @@ pub struct ListEntryFormField {
 }
 /// Default Text Box Form Field String.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String255/w:default")]
+#[sdk(qname = "w:default")]
 pub struct DefaultTextBoxFormFieldString {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11550,7 +11544,7 @@ pub struct DefaultTextBoxFormFieldString {
 }
 /// Frame Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String255/w:name")]
+#[sdk(qname = "w:name")]
 pub struct FrameName {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11559,7 +11553,7 @@ pub struct FrameName {
 }
 /// Text Box Form Field Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FFTextType/w:type")]
+#[sdk(qname = "w:type")]
 pub struct TextBoxFormFieldType {
   /// Text Box Form Field Type Values
   #[sdk(attr(qname = "w:val"))]
@@ -11567,7 +11561,7 @@ pub struct TextBoxFormFieldType {
 }
 /// Text Box Form Field Maximum Length.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PositiveShort/w:maxLength")]
+#[sdk(qname = "w:maxLength")]
 pub struct MaxLength {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11576,7 +11570,7 @@ pub struct MaxLength {
 }
 /// Text Box Form Field Formatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String64/w:format")]
+#[sdk(qname = "w:format")]
 pub struct Format {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11585,7 +11579,7 @@ pub struct Format {
 }
 /// Single Column Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Column/w:col")]
+#[sdk(qname = "w:col")]
 pub struct Column {
   /// Column Width
   #[sdk(attr(qname = "w:w"))]
@@ -11610,7 +11604,7 @@ pub struct Column {
 }
 /// Revision Information for Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SectPrChange/w:sectPrChange")]
+#[sdk(qname = "w:sectPrChange")]
 pub struct SectionPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -11640,12 +11634,12 @@ pub struct SectionPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Section Properties
-  #[sdk(child(qname = "w:CT_SectPrBase/w:sectPr"))]
+  #[sdk(child(qname = "w:sectPr"))]
   pub previous_section_properties: Option<std::boxed::Box<PreviousSectionProperties>>,
 }
 /// Revision Information for Run Properties on the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ParaRPrChange/w:rPrChange")]
+#[sdk(qname = "w:rPrChange")]
 pub struct ParagraphMarkRunPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -11675,20 +11669,20 @@ pub struct ParagraphMarkRunPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Run Properties for the Paragraph Mark
-  #[sdk(child(qname = "w:CT_ParaRPrOriginal/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub previous_paragraph_mark_run_properties: std::boxed::Box<PreviousParagraphMarkRunProperties>,
 }
 /// External Content Import Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_AltChunkPr/w:altChunkPr")]
+#[sdk(qname = "w:altChunkPr")]
 pub struct AltChunkProperties {
   /// Keep Source Formatting on Import
-  #[sdk(child(qname = "w:CT_OnOff/w:matchSrc"))]
+  #[sdk(child(qname = "w:matchSrc"))]
   pub match_source: Option<MatchSource>,
 }
 /// Phonetic Guide Text Alignment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RubyAlign/w:rubyAlign")]
+#[sdk(qname = "w:rubyAlign")]
 pub struct RubyAlign {
   /// Phonetic Guide Text Alignment Value
   #[sdk(attr(qname = "w:val"))]
@@ -11696,7 +11690,7 @@ pub struct RubyAlign {
 }
 /// Distance Between Phonetic Guide Text and Phonetic Guide Base Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_HpsRaise/w:hpsRaise")]
+#[sdk(qname = "w:hpsRaise")]
 pub struct PhoneticGuideRaise {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -11704,7 +11698,7 @@ pub struct PhoneticGuideRaise {
 }
 /// Language ID for Phonetic Guide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Lang/w:lid")]
+#[sdk(qname = "w:lid")]
 pub struct LanguageId {
   /// Language Code
   #[sdk(attr(qname = "w:val"))]
@@ -11713,30 +11707,30 @@ pub struct LanguageId {
 }
 /// Phonetic Guide Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RubyPr/w:rubyPr")]
+#[sdk(qname = "w:rubyPr")]
 pub struct RubyProperties {
   /// Phonetic Guide Text Alignment
-  #[sdk(child(qname = "w:CT_RubyAlign/w:rubyAlign"))]
+  #[sdk(child(qname = "w:rubyAlign"))]
   pub ruby_align: std::boxed::Box<RubyAlign>,
   /// Phonetic Guide Text Font Size
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:hps"))]
+  #[sdk(child(qname = "w:hps"))]
   pub phonetic_guide_text_font_size: std::boxed::Box<PhoneticGuideTextFontSize>,
   /// Distance Between Phonetic Guide Text and Phonetic Guide Base Text
-  #[sdk(child(qname = "w:CT_HpsRaise/w:hpsRaise"))]
+  #[sdk(child(qname = "w:hpsRaise"))]
   pub phonetic_guide_raise: std::boxed::Box<PhoneticGuideRaise>,
   /// Phonetic Guide Base Text Font Size
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:hpsBaseText"))]
+  #[sdk(child(qname = "w:hpsBaseText"))]
   pub phonetic_guide_base_text_size: std::boxed::Box<PhoneticGuideBaseTextSize>,
   /// Language ID for Phonetic Guide
-  #[sdk(child(qname = "w:CT_Lang/w:lid"))]
+  #[sdk(child(qname = "w:lid"))]
   pub language_id: std::boxed::Box<LanguageId>,
   /// Invalidated Field Cache
-  #[sdk(child(qname = "w:CT_OnOff/w:dirty"))]
+  #[sdk(child(qname = "w:dirty"))]
   pub dirty: Option<Dirty>,
 }
 /// Phonetic Guide Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RubyContent/w:rt")]
+#[sdk(qname = "w:rt")]
 pub struct RubyContent {
   #[sdk(
         choice(
@@ -11827,7 +11821,7 @@ pub struct RubyContent {
 }
 /// Phonetic Guide Base Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
+#[sdk(qname = "w:rubyBase")]
 pub struct RubyBase {
   #[sdk(
         choice(
@@ -11918,7 +11912,7 @@ pub struct RubyBase {
 }
 /// Custom XML Data Date Storage Format.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtDateMappingType/w:storeMappedDataAs")]
+#[sdk(qname = "w:storeMappedDataAs")]
 pub struct SdtDateMappingType {
   /// Date Storage Type
   #[sdk(attr(qname = "w:val"))]
@@ -11926,7 +11920,7 @@ pub struct SdtDateMappingType {
 }
 /// Date Picker Calendar Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CalendarType/w:calendar")]
+#[sdk(qname = "w:calendar")]
 pub struct Calendar {
   /// Calendar Type Value
   #[sdk(attr(qname = "w:val"))]
@@ -11934,7 +11928,7 @@ pub struct Calendar {
 }
 /// Combo Box List Item.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtListItem/w:listItem")]
+#[sdk(qname = "w:listItem")]
 pub struct ListItem {
   /// List Entry Display Text
   #[sdk(attr(qname = "w:displayText"))]
@@ -11945,7 +11939,7 @@ pub struct ListItem {
 }
 /// Structured Document Tag Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
+#[sdk(qname = "w:sdtPr")]
 pub struct SdtProperties {
   #[sdk(
         choice(
@@ -11988,15 +11982,15 @@ pub struct SdtProperties {
 }
 /// Structured Document Tag End Character Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtEndPr/w:sdtEndPr")]
+#[sdk(qname = "w:sdtEndPr")]
 pub struct SdtEndCharProperties {
   /// Run Properties.
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties: Vec<RunProperties>,
 }
 /// Block-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
+#[sdk(qname = "w:sdtContent")]
 pub struct SdtContentBlock {
   #[sdk(
         choice(
@@ -12064,7 +12058,7 @@ pub struct SdtContentBlock {
 }
 /// Inline-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
+#[sdk(qname = "w:sdtContent")]
 pub struct SdtContentRun {
   #[sdk(
         choice(
@@ -12158,7 +12152,7 @@ pub struct SdtContentRun {
 }
 /// Defines the SdtContentRunRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
+#[sdk(qname = "w:sdtContent")]
 pub struct SdtContentRunRuby {
   #[sdk(
         choice(
@@ -12249,7 +12243,7 @@ pub struct SdtContentRunRuby {
 }
 /// Cell-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
+#[sdk(qname = "w:sdtContent")]
 pub struct SdtContentCell {
   #[sdk(
         choice(
@@ -12316,7 +12310,7 @@ pub struct SdtContentCell {
 }
 /// Row-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
+#[sdk(qname = "w:sdtContent")]
 pub struct SdtContentRow {
   #[sdk(
         choice(
@@ -12383,18 +12377,18 @@ pub struct SdtContentRow {
 }
 /// Custom XML Element Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CustomXmlPr/w:customXmlPr")]
+#[sdk(qname = "w:customXmlPr")]
 pub struct CustomXmlProperties {
   /// Custom XML Element Placeholder Text
-  #[sdk(child(qname = "w:CT_String/w:placeholder"))]
+  #[sdk(child(qname = "w:placeholder"))]
   pub custom_xml_placeholder: Option<CustomXmlPlaceholder>,
   /// Custom XML Attribute.
-  #[sdk(child(qname = "w:CT_XmlAttr/w:attr"))]
+  #[sdk(child(qname = "w:attr"))]
   pub custom_xml_attribute: Vec<CustomXmlAttribute>,
 }
 /// Custom XML Attribute.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_XmlAttr/w:attr")]
+#[sdk(qname = "w:attr")]
 pub struct CustomXmlAttribute {
   /// uri
   #[sdk(attr(qname = "w:uri"))]
@@ -12411,7 +12405,7 @@ pub struct CustomXmlAttribute {
 }
 /// Grid Column Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblGridCol/w:gridCol")]
+#[sdk(qname = "w:gridCol")]
 pub struct GridColumn {
   /// Grid Column Width
   #[sdk(attr(qname = "w:w"))]
@@ -12426,7 +12420,7 @@ pub struct GridColumn {
 }
 /// Revision Information for Table Grid Column Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblGridChange/w:tblGridChange")]
+#[sdk(qname = "w:tblGridChange")]
 pub struct TableGridChange {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -12446,12 +12440,12 @@ pub struct TableGridChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Table Grid
-  #[sdk(child(qname = "w:CT_TblGridBase/w:tblGrid"))]
+  #[sdk(child(qname = "w:tblGrid"))]
   pub previous_table_grid: std::boxed::Box<PreviousTableGrid>,
 }
 /// Revision Information for Table Cell Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcPrChange/w:tcPrChange")]
+#[sdk(qname = "w:tcPrChange")]
 pub struct TableCellPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -12481,51 +12475,51 @@ pub struct TableCellPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Table Cell Properties
-  #[sdk(child(qname = "w:CT_TcPrInner/w:tcPr"))]
+  #[sdk(child(qname = "w:tcPr"))]
   pub previous_table_cell_properties: std::boxed::Box<PreviousTableCellProperties>,
 }
 /// Table Cell Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcPr/w:tcPr")]
+#[sdk(qname = "w:tcPr")]
 pub struct TableCellProperties {
   /// Defines the ConditionalFormatStyle Class.
-  #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
+  #[sdk(child(qname = "w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
   /// Defines the TableCellWidth Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tcW"))]
+  #[sdk(child(qname = "w:tcW"))]
   pub table_cell_width: Option<TableCellWidth>,
   /// Defines the GridSpan Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:gridSpan"))]
+  #[sdk(child(qname = "w:gridSpan"))]
   pub grid_span: Option<GridSpan>,
   /// Defines the HorizontalMerge Class.
-  #[sdk(child(qname = "w:CT_HMerge/w:hMerge"))]
+  #[sdk(child(qname = "w:hMerge"))]
   pub horizontal_merge: Option<HorizontalMerge>,
   /// Defines the VerticalMerge Class.
-  #[sdk(child(qname = "w:CT_VMerge/w:vMerge"))]
+  #[sdk(child(qname = "w:vMerge"))]
   pub vertical_merge: Option<VerticalMerge>,
   /// Defines the TableCellBorders Class.
-  #[sdk(child(qname = "w:CT_TcBorders/w:tcBorders"))]
+  #[sdk(child(qname = "w:tcBorders"))]
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
+  #[sdk(child(qname = "w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
-  #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
+  #[sdk(child(qname = "w:tcMar"))]
   pub table_cell_margin: Option<std::boxed::Box<TableCellMargin>>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TableCellFitText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:tcFitText"))]
+  #[sdk(child(qname = "w:tcFitText"))]
   pub table_cell_fit_text: Option<TableCellFitText>,
   /// Defines the TableCellVerticalAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
   /// Defines the HideMark Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
+  #[sdk(child(qname = "w:hideMark"))]
   pub hide_mark: Option<HideMark>,
   #[sdk(
         choice(
@@ -12536,12 +12530,12 @@ pub struct TableCellProperties {
     )]
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   /// Revision Information for Table Cell Properties.
-  #[sdk(child(qname = "w:CT_TcPrChange/w:tcPrChange"))]
+  #[sdk(child(qname = "w:tcPrChange"))]
   pub table_cell_properties_change: Option<std::boxed::Box<TableCellPropertiesChange>>,
 }
 /// Revision Information for Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrChange/w:tblPrChange")]
+#[sdk(qname = "w:tblPrChange")]
 pub struct TablePropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -12571,12 +12565,12 @@ pub struct TablePropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Table Properties
-  #[sdk(child(qname = "w:CT_TblPrBase/w:tblPr"))]
+  #[sdk(child(qname = "w:tblPr"))]
   pub previous_table_properties: std::boxed::Box<PreviousTableProperties>,
 }
 /// Revision Information for Table-Level Property Exceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrExChange/w:tblPrExChange")]
+#[sdk(qname = "w:tblPrExChange")]
 pub struct TablePropertyExceptionsChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -12606,76 +12600,76 @@ pub struct TablePropertyExceptionsChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Table-Level Property Exceptions
-  #[sdk(child(qname = "w:CT_TblPrExBase/w:tblPrEx"))]
+  #[sdk(child(qname = "w:tblPrEx"))]
   pub previous_table_property_exceptions: std::boxed::Box<PreviousTablePropertyExceptions>,
 }
 /// Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPr/w:tblPr")]
+#[sdk(qname = "w:tblPr")]
 pub struct TableProperties {
   /// Defines the TableStyle Class.
-  #[sdk(child(qname = "w:CT_String253/w:tblStyle"))]
+  #[sdk(child(qname = "w:tblStyle"))]
   pub table_style: Option<TableStyle>,
   /// Defines the TablePositionProperties Class.
-  #[sdk(child(qname = "w:CT_TblPPr/w:tblpPr"))]
+  #[sdk(child(qname = "w:tblpPr"))]
   pub table_position_properties: Option<TablePositionProperties>,
   /// Defines the TableOverlap Class.
-  #[sdk(child(qname = "w:CT_TblOverlap/w:tblOverlap"))]
+  #[sdk(child(qname = "w:tblOverlap"))]
   pub table_overlap: Option<TableOverlap>,
   /// Defines the BiDiVisual Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidiVisual"))]
+  #[sdk(child(qname = "w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
   /// Defines the TableWidth Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
+  #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
   /// Defines the TableJustification Class.
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Defines the TableCellSpacing Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the TableLayout Class.
-  #[sdk(child(qname = "w:CT_TblLayoutType/w:tblLayout"))]
+  #[sdk(child(qname = "w:tblLayout"))]
   pub table_layout: Option<TableLayout>,
   /// Defines the TableCellMarginDefault Class.
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
   /// Defines the TableLook Class.
-  #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
+  #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Defines the TableCaption Class.
-  #[sdk(child(office2010, qname = "w:CT_String/w:tblCaption"))]
+  #[sdk(child(office2010, qname = "w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// Defines the TableDescription Class.
-  #[sdk(child(office2010, qname = "w:CT_String/w:tblDescription"))]
+  #[sdk(child(office2010, qname = "w:tblDescription"))]
   pub table_description: Option<TableDescription>,
   /// Revision Information for Table Properties
-  #[sdk(child(qname = "w:CT_TblPrChange/w:tblPrChange"))]
+  #[sdk(child(qname = "w:tblPrChange"))]
   pub table_properties_change: Option<std::boxed::Box<TablePropertiesChange>>,
 }
 /// Table Grid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblGrid/w:tblGrid")]
+#[sdk(qname = "w:tblGrid")]
 pub struct TableGrid {
   /// Grid Column Definition.
-  #[sdk(child(qname = "w:CT_TblGridCol/w:gridCol"))]
+  #[sdk(child(qname = "w:gridCol"))]
   pub grid_column: Vec<GridColumn>,
   /// Revision Information for Table Grid Column Definitions.
-  #[sdk(child(qname = "w:CT_TblGridChange/w:tblGridChange"))]
+  #[sdk(child(qname = "w:tblGridChange"))]
   pub table_grid_change: Option<std::boxed::Box<TableGridChange>>,
 }
 /// Footnote Placement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnPos/w:pos")]
+#[sdk(qname = "w:pos")]
 pub struct FootnotePosition {
   /// Footnote Position Type
   #[sdk(attr(qname = "w:val"))]
@@ -12683,7 +12677,7 @@ pub struct FootnotePosition {
 }
 /// Footnote Numbering Format.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NumFmt/w:numFmt")]
+#[sdk(qname = "w:numFmt")]
 pub struct NumberingFormat {
   /// Numbering Format Type
   #[sdk(attr(qname = "w:val"))]
@@ -12694,7 +12688,7 @@ pub struct NumberingFormat {
 }
 /// Endnote Placement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_EdnPos/w:pos")]
+#[sdk(qname = "w:pos")]
 pub struct EndnotePosition {
   /// Endnote Position Type
   #[sdk(attr(qname = "w:val"))]
@@ -12702,7 +12696,7 @@ pub struct EndnotePosition {
 }
 /// Special Footnote List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdnSepRef/w:footnote")]
+#[sdk(qname = "w:footnote")]
 pub struct FootnoteSpecialReference {
   /// Footnote/Endnote ID
   #[sdk(attr(qname = "w:id"))]
@@ -12711,7 +12705,7 @@ pub struct FootnoteSpecialReference {
 }
 /// Special Endnote List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdnSepRef/w:endnote")]
+#[sdk(qname = "w:endnote")]
 pub struct EndnoteSpecialReference {
   /// Footnote/Endnote ID
   #[sdk(attr(qname = "w:id"))]
@@ -12720,7 +12714,7 @@ pub struct EndnoteSpecialReference {
 }
 /// Index of Column Containing Unique Values for Record.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedDecimalNumber/w:column")]
+#[sdk(qname = "w:column")]
 pub struct ColumnIndex {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -12728,7 +12722,7 @@ pub struct ColumnIndex {
 }
 /// Column Delimiter for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedDecimalNumber/w:colDelim")]
+#[sdk(qname = "w:colDelim")]
 pub struct ColumnDelimiter {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -12736,7 +12730,7 @@ pub struct ColumnDelimiter {
 }
 /// Unique Value for Record.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Base64Binary/w:uniqueTag")]
+#[sdk(qname = "w:uniqueTag")]
 pub struct UniqueTag {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -12744,21 +12738,21 @@ pub struct UniqueTag {
 }
 /// Data About Single Data Source Record.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RecipientData/w:recipientData")]
+#[sdk(qname = "w:recipientData")]
 pub struct RecipientData {
   /// Record Is Included in Mail Merge
-  #[sdk(child(qname = "w:CT_OnOff/w:active"))]
+  #[sdk(child(qname = "w:active"))]
   pub active: Option<Active>,
   /// Index of Column Containing Unique Values for Record
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumber/w:column"))]
+  #[sdk(child(qname = "w:column"))]
   pub column_index: std::boxed::Box<ColumnIndex>,
   /// Unique Value for Record
-  #[sdk(child(qname = "w:CT_Base64Binary/w:uniqueTag"))]
+  #[sdk(child(qname = "w:uniqueTag"))]
   pub unique_tag: std::boxed::Box<UniqueTag>,
 }
 /// Merge Field Mapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMergeOdsoFMDFieldType/w:type")]
+#[sdk(qname = "w:type")]
 pub struct MailMergeFieldType {
   /// Merge Field Mapping Type
   #[sdk(attr(qname = "w:val"))]
@@ -12766,7 +12760,7 @@ pub struct MailMergeFieldType {
 }
 /// ODSO Data Source Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMergeSourceType/w:type")]
+#[sdk(qname = "w:type")]
 pub struct MailMergeSource {
   /// Data Source Type Value
   #[sdk(attr(qname = "w:val"))]
@@ -12774,30 +12768,30 @@ pub struct MailMergeSource {
 }
 /// External Data Source to Merge Field Mapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OdsoFieldMapData/w:fieldMapData")]
+#[sdk(qname = "w:fieldMapData")]
 pub struct FieldMapData {
   /// Merge Field Mapping
-  #[sdk(child(qname = "w:CT_MailMergeOdsoFMDFieldType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub mail_merge_field_type: Option<MailMergeFieldType>,
   /// Data Source Name for Column
-  #[sdk(child(qname = "w:CT_String/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub name: Option<Name>,
   /// Predefined Merge Field Name
-  #[sdk(child(qname = "w:CT_String/w:mappedName"))]
+  #[sdk(child(qname = "w:mappedName"))]
   pub mapped_name: Option<MappedName>,
   /// Index of Column Being Mapped
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumber/w:column"))]
+  #[sdk(child(qname = "w:column"))]
   pub column_index: Option<ColumnIndex>,
   /// Merge Field Name Language ID
-  #[sdk(child(qname = "w:CT_Lang/w:lid"))]
+  #[sdk(child(qname = "w:lid"))]
   pub language_id: Option<LanguageId>,
   /// Use Country/Region-Based Address Field Ordering
-  #[sdk(child(qname = "w:CT_OnOff/w:dynamicAddress"))]
+  #[sdk(child(qname = "w:dynamicAddress"))]
   pub dynamic_address: Option<DynamicAddress>,
 }
 /// Source Document Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMergeDocType/w:mainDocumentType")]
+#[sdk(qname = "w:mainDocumentType")]
 pub struct MainDocumentType {
   /// Mail Merge Source Document Type
   #[sdk(attr(qname = "w:val"))]
@@ -12805,7 +12799,7 @@ pub struct MainDocumentType {
 }
 /// Data Source Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMergeDataType/w:dataType")]
+#[sdk(qname = "w:dataType")]
 pub struct DataType {
   /// Value
   #[sdk(attr(qname = "w:val"))]
@@ -12813,7 +12807,7 @@ pub struct DataType {
 }
 /// Merged Document Destination.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMergeDest/w:destination")]
+#[sdk(qname = "w:destination")]
 pub struct Destination {
   /// Mail Merge Merged Document Type
   #[sdk(attr(qname = "w:val"))]
@@ -12821,36 +12815,36 @@ pub struct Destination {
 }
 /// Office Data Source Object Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Odso/w:odso")]
+#[sdk(qname = "w:odso")]
 pub struct DataSourceObject {
   /// UDL Connection String
-  #[sdk(child(qname = "w:CT_String/w:udl"))]
+  #[sdk(child(qname = "w:udl"))]
   pub udl_connection_string: Option<UdlConnectionString>,
   /// Data Source Table Name
-  #[sdk(child(qname = "w:CT_String/w:table"))]
+  #[sdk(child(qname = "w:table"))]
   pub data_source_table_name: Option<DataSourceTableName>,
   /// ODSO Data Source File Path
-  #[sdk(child(qname = "w:CT_Rel/w:src"))]
+  #[sdk(child(qname = "w:src"))]
   pub source_reference: Option<SourceReference>,
   /// Column Delimiter for Data Source
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumber/w:colDelim"))]
+  #[sdk(child(qname = "w:colDelim"))]
   pub column_delimiter: Option<ColumnDelimiter>,
   /// ODSO Data Source Type
-  #[sdk(child(qname = "w:CT_MailMergeSourceType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub mail_merge_source: Option<MailMergeSource>,
   /// First Row of Data Source Contains Column Names
-  #[sdk(child(qname = "w:CT_OnOff/w:fHdr"))]
+  #[sdk(child(qname = "w:fHdr"))]
   pub first_row_header: Option<FirstRowHeader>,
   /// External Data Source to Merge Field Mapping.
-  #[sdk(child(qname = "w:CT_OdsoFieldMapData/w:fieldMapData"))]
+  #[sdk(child(qname = "w:fieldMapData"))]
   pub field_map_data: Vec<FieldMapData>,
   /// Reference to Inclusion/Exclusion Data for Data Source.
-  #[sdk(child(qname = "w:CT_Rel/w:recipientData"))]
+  #[sdk(child(qname = "w:recipientData"))]
   pub recipient_data_reference: Option<RecipientDataReference>,
 }
 /// Single Document Variable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocVar/w:docVar")]
+#[sdk(qname = "w:docVar")]
 pub struct DocumentVariable {
   /// Document Variable Name
   #[sdk(attr(qname = "w:name"))]
@@ -12863,7 +12857,7 @@ pub struct DocumentVariable {
 }
 /// Original Document Revision Save ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LongHexNumber/w:rsidRoot")]
+#[sdk(qname = "w:rsidRoot")]
 pub struct RsidRoot {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -12872,7 +12866,7 @@ pub struct RsidRoot {
 }
 /// Single Session Revision Save ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LongHexNumber/w:rsid")]
+#[sdk(qname = "w:rsid")]
 pub struct Rsid {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -12881,7 +12875,7 @@ pub struct Rsid {
 }
 /// Abstract Numbering Definition Identifier.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LongHexNumber/w:nsid")]
+#[sdk(qname = "w:nsid")]
 pub struct Nsid {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -12890,7 +12884,7 @@ pub struct Nsid {
 }
 /// Numbering Template Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LongHexNumber/w:tmpl")]
+#[sdk(qname = "w:tmpl")]
 pub struct TemplateCode {
   /// Long Hexadecimal Number Value
   #[sdk(attr(qname = "w:val"))]
@@ -12899,229 +12893,229 @@ pub struct TemplateCode {
 }
 /// Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrBaseStyleable/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct RunPropertiesBaseStyle {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
+  #[sdk(child(qname = "w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
   /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
+  #[sdk(child(qname = "w:b"))]
   pub bold: Option<Bold>,
   /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
+  #[sdk(child(qname = "w:bCs"))]
   pub bold_complex_script: Option<BoldComplexScript>,
   /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
+  #[sdk(child(qname = "w:i"))]
   pub italic: Option<Italic>,
   /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
+  #[sdk(child(qname = "w:iCs"))]
   pub italic_complex_script: Option<ItalicComplexScript>,
   /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
+  #[sdk(child(qname = "w:caps"))]
   pub caps: Option<Caps>,
   /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
+  #[sdk(child(qname = "w:smallCaps"))]
   pub small_caps: Option<SmallCaps>,
   /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
+  #[sdk(child(qname = "w:strike"))]
   pub strike: Option<Strike>,
   /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
+  #[sdk(child(qname = "w:dstrike"))]
   pub double_strike: Option<DoubleStrike>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
+  #[sdk(child(qname = "w:outline"))]
   pub outline: Option<Outline>,
   /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
+  #[sdk(child(qname = "w:shadow"))]
   pub shadow: Option<Shadow>,
   /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
+  #[sdk(child(qname = "w:emboss"))]
   pub emboss: Option<Emboss>,
   /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
+  #[sdk(child(qname = "w:imprint"))]
   pub imprint: Option<Imprint>,
   /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
+  #[sdk(child(qname = "w:noProof"))]
   pub no_proof: Option<NoProof>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
+  #[sdk(child(qname = "w:vanish"))]
   pub vanish: Option<Vanish>,
   /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
+  #[sdk(child(qname = "w:webHidden"))]
   pub web_hidden: Option<WebHidden>,
   /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
+  #[sdk(child(qname = "w:color"))]
   pub color: Option<Color>,
   /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing: Option<Spacing>,
   /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
+  #[sdk(child(qname = "w:w"))]
   pub character_scale: Option<CharacterScale>,
   /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
+  #[sdk(child(qname = "w:kern"))]
   pub kern: Option<Kern>,
   /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
+  #[sdk(child(qname = "w:position"))]
   pub position: Option<Position>,
   /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
+  #[sdk(child(qname = "w:sz"))]
   pub font_size: Option<FontSize>,
   /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
+  #[sdk(child(qname = "w:szCs"))]
   pub font_size_complex_script: Option<FontSizeComplexScript>,
   /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
+  #[sdk(child(qname = "w:u"))]
   pub underline: Option<Underline>,
   /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
+  #[sdk(child(qname = "w:effect"))]
   pub text_effect: Option<TextEffect>,
   /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
+  #[sdk(child(qname = "w:bdr"))]
   pub border: Option<Border>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
+  #[sdk(child(qname = "w:fitText"))]
   pub fit_text: Option<FitText>,
   /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
+  #[sdk(child(qname = "w:vertAlign"))]
   pub vertical_text_alignment: Option<VerticalTextAlignment>,
   /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
+  #[sdk(child(qname = "w:em"))]
   pub emphasis: Option<Emphasis>,
   /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
+  #[sdk(child(qname = "w:lang"))]
   pub languages: Option<Languages>,
   /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
+  #[sdk(child(qname = "w:eastAsianLayout"))]
   pub east_asian_layout: Option<EastAsianLayout>,
   /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
+  #[sdk(child(qname = "w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
 }
 /// Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrBaseStyleable/w:pPr")]
+#[sdk(qname = "w:pPr")]
 pub struct ParagraphPropertiesBaseStyle {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the KeepNext Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
+  #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
   /// Defines the KeepLines Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepLines"))]
+  #[sdk(child(qname = "w:keepLines"))]
   pub keep_lines: Option<KeepLines>,
   /// Defines the PageBreakBefore Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:pageBreakBefore"))]
+  #[sdk(child(qname = "w:pageBreakBefore"))]
   pub page_break_before: Option<PageBreakBefore>,
   /// Defines the FrameProperties Class.
-  #[sdk(child(qname = "w:CT_FramePr/w:framePr"))]
+  #[sdk(child(qname = "w:framePr"))]
   pub frame_properties: Option<FrameProperties>,
   /// Defines the WidowControl Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:widowControl"))]
+  #[sdk(child(qname = "w:widowControl"))]
   pub widow_control: Option<WidowControl>,
   /// Defines the NumberingProperties Class.
-  #[sdk(child(qname = "w:CT_NumPr/w:numPr"))]
+  #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
   /// Defines the SuppressLineNumbers Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressLineNumbers"))]
+  #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
   /// Defines the ParagraphBorders Class.
-  #[sdk(child(qname = "w:CT_PBdr/w:pBdr"))]
+  #[sdk(child(qname = "w:pBdr"))]
   pub paragraph_borders: Option<std::boxed::Box<ParagraphBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the Tabs Class.
-  #[sdk(child(qname = "w:CT_Tabs/w:tabs"))]
+  #[sdk(child(qname = "w:tabs"))]
   pub tabs: Option<Tabs>,
   /// Defines the SuppressAutoHyphens Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressAutoHyphens"))]
+  #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
   /// Defines the Kinsoku Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:kinsoku"))]
+  #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
   /// Defines the WordWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:wordWrap"))]
+  #[sdk(child(qname = "w:wordWrap"))]
   pub word_wrap: Option<WordWrap>,
   /// Defines the OverflowPunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:overflowPunct"))]
+  #[sdk(child(qname = "w:overflowPunct"))]
   pub overflow_punctuation: Option<OverflowPunctuation>,
   /// Defines the TopLinePunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:topLinePunct"))]
+  #[sdk(child(qname = "w:topLinePunct"))]
   pub top_line_punctuation: Option<TopLinePunctuation>,
   /// Defines the AutoSpaceDE Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDE"))]
+  #[sdk(child(qname = "w:autoSpaceDE"))]
   pub auto_space_de: Option<AutoSpaceDe>,
   /// Defines the AutoSpaceDN Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDN"))]
+  #[sdk(child(qname = "w:autoSpaceDN"))]
   pub auto_space_dn: Option<AutoSpaceDn>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the AdjustRightIndent Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustRightInd"))]
+  #[sdk(child(qname = "w:adjustRightInd"))]
   pub adjust_right_indent: Option<AdjustRightIndent>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the SpacingBetweenLines Class.
-  #[sdk(child(qname = "w:CT_Spacing/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing_between_lines: Option<SpacingBetweenLines>,
   /// Defines the Indentation Class.
-  #[sdk(child(qname = "w:CT_Ind/w:ind"))]
+  #[sdk(child(qname = "w:ind"))]
   pub indentation: Option<Indentation>,
   /// Defines the ContextualSpacing Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:contextualSpacing"))]
+  #[sdk(child(qname = "w:contextualSpacing"))]
   pub contextual_spacing: Option<ContextualSpacing>,
   /// Defines the MirrorIndents Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorIndents"))]
+  #[sdk(child(qname = "w:mirrorIndents"))]
   pub mirror_indents: Option<MirrorIndents>,
   /// Defines the SuppressOverlap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressOverlap"))]
+  #[sdk(child(qname = "w:suppressOverlap"))]
   pub suppress_overlap: Option<SuppressOverlap>,
   /// Defines the Justification Class.
-  #[sdk(child(qname = "w:CT_Jc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub justification: Option<Justification>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TextAlignment Class.
-  #[sdk(child(qname = "w:CT_TextAlignment/w:textAlignment"))]
+  #[sdk(child(qname = "w:textAlignment"))]
   pub text_alignment: Option<TextAlignment>,
   /// Defines the TextBoxTightWrap Class.
-  #[sdk(child(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap"))]
+  #[sdk(child(qname = "w:textboxTightWrap"))]
   pub text_box_tight_wrap: Option<TextBoxTightWrap>,
   /// Defines the OutlineLevel Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:outlineLvl"))]
+  #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
 }
 /// Default Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrDefault/w:rPrDefault")]
+#[sdk(qname = "w:rPrDefault")]
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Run Properties
-  #[sdk(child(qname = "w:CT_RPrBaseStyleable/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
 }
 /// Default Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrDefault/w:pPrDefault")]
+#[sdk(qname = "w:pPrDefault")]
 pub struct ParagraphPropertiesDefault {
   /// Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrBaseStyleable/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties_base_style: Option<std::boxed::Box<ParagraphPropertiesBaseStyle>>,
 }
 /// Left and Right Margin for Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PixelsMeasure/w:marW")]
+#[sdk(qname = "w:marW")]
 pub struct MarginWidth {
   /// Measurement in Pixels
   #[sdk(attr(qname = "w:val"))]
@@ -13129,7 +13123,7 @@ pub struct MarginWidth {
 }
 /// Top and Bottom Margin for Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PixelsMeasure/w:marH")]
+#[sdk(qname = "w:marH")]
 pub struct MarginHeight {
   /// Measurement in Pixels
   #[sdk(attr(qname = "w:val"))]
@@ -13137,7 +13131,7 @@ pub struct MarginHeight {
 }
 /// Scrollbar Display Option.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FrameScrollbar/w:scrollbar")]
+#[sdk(qname = "w:scrollbar")]
 pub struct ScrollbarVisibility {
   /// Scrollbar Display Option Value
   #[sdk(attr(qname = "w:val"))]
@@ -13145,7 +13139,7 @@ pub struct ScrollbarVisibility {
 }
 /// Frameset Splitter Width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:w")]
+#[sdk(qname = "w:w")]
 pub struct Width {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13160,7 +13154,7 @@ pub struct Width {
 }
 /// Hyphenation Zone.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:hyphenationZone")]
+#[sdk(qname = "w:hyphenationZone")]
 pub struct HyphenationZone {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13175,7 +13169,7 @@ pub struct HyphenationZone {
 }
 /// Drawing Grid Horizontal Grid Unit Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalSpacing")]
+#[sdk(qname = "w:drawingGridHorizontalSpacing")]
 pub struct DrawingGridHorizontalSpacing {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13190,7 +13184,7 @@ pub struct DrawingGridHorizontalSpacing {
 }
 /// Drawing Grid Vertical Grid Unit Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalSpacing")]
+#[sdk(qname = "w:drawingGridVerticalSpacing")]
 pub struct DrawingGridVerticalSpacing {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13205,7 +13199,7 @@ pub struct DrawingGridVerticalSpacing {
 }
 /// Drawing Grid Horizontal Origin Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalOrigin")]
+#[sdk(qname = "w:drawingGridHorizontalOrigin")]
 pub struct DrawingGridHorizontalOrigin {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13220,7 +13214,7 @@ pub struct DrawingGridHorizontalOrigin {
 }
 /// Drawing Grid Vertical Origin Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalOrigin")]
+#[sdk(qname = "w:drawingGridVerticalOrigin")]
 pub struct DrawingGridVerticalOrigin {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -13235,24 +13229,24 @@ pub struct DrawingGridVerticalOrigin {
 }
 /// Frameset Splitter Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FramesetSplitbar/w:framesetSplitbar")]
+#[sdk(qname = "w:framesetSplitbar")]
 pub struct FramesetSplitbar {
   /// Frameset Splitter Width
-  #[sdk(child(qname = "w:CT_TwipsMeasure/w:w"))]
+  #[sdk(child(qname = "w:w"))]
   pub width: Option<Width>,
   /// Frameset Splitter Color
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
+  #[sdk(child(qname = "w:color"))]
   pub color: Option<Color>,
   /// Do Not Display Frameset Splitters
-  #[sdk(child(qname = "w:CT_OnOff/w:noBorder"))]
+  #[sdk(child(qname = "w:noBorder"))]
   pub no_border: Option<NoBorder>,
   /// Frameset Splitter Border Style
-  #[sdk(child(qname = "w:CT_OnOff/w:flatBorders"))]
+  #[sdk(child(qname = "w:flatBorders"))]
   pub flat_borders: Option<FlatBorders>,
 }
 /// Frameset Layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FrameLayout/w:frameLayout")]
+#[sdk(qname = "w:frameLayout")]
 pub struct FrameLayout {
   /// Frameset Layout Value
   #[sdk(attr(qname = "w:val"))]
@@ -13260,16 +13254,16 @@ pub struct FrameLayout {
 }
 /// Nested Frameset Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Frameset/w:frameset")]
+#[sdk(qname = "w:frameset")]
 pub struct Frameset {
   /// Nested Frameset Size
-  #[sdk(child(qname = "w:CT_String/w:sz"))]
+  #[sdk(child(qname = "w:sz"))]
   pub frame_size: Option<FrameSize>,
   /// Frameset Splitter Properties
-  #[sdk(child(qname = "w:CT_FramesetSplitbar/w:framesetSplitbar"))]
+  #[sdk(child(qname = "w:framesetSplitbar"))]
   pub frameset_splitbar: Option<std::boxed::Box<FramesetSplitbar>>,
   /// Frameset Layout
-  #[sdk(child(qname = "w:CT_FrameLayout/w:frameLayout"))]
+  #[sdk(child(qname = "w:frameLayout"))]
   pub frame_layout: Option<FrameLayout>,
   #[sdk(
         choice(
@@ -13281,36 +13275,36 @@ pub struct Frameset {
 }
 /// Single Frame Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Frame/w:frame")]
+#[sdk(qname = "w:frame")]
 pub struct Frame {
   /// Frame Size
-  #[sdk(child(qname = "w:CT_String/w:sz"))]
+  #[sdk(child(qname = "w:sz"))]
   pub frame_size: Option<FrameSize>,
   /// Frame Name
-  #[sdk(child(qname = "w:CT_String255/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub frame_name: Option<FrameName>,
   /// Source File for Frame
-  #[sdk(child(qname = "w:CT_Rel/w:sourceFileName"))]
+  #[sdk(child(qname = "w:sourceFileName"))]
   pub source_file_reference: Option<SourceFileReference>,
   /// Left and Right Margin for Frame
-  #[sdk(child(qname = "w:CT_PixelsMeasure/w:marW"))]
+  #[sdk(child(qname = "w:marW"))]
   pub margin_width: Option<MarginWidth>,
   /// Top and Bottom Margin for Frame
-  #[sdk(child(qname = "w:CT_PixelsMeasure/w:marH"))]
+  #[sdk(child(qname = "w:marH"))]
   pub margin_height: Option<MarginHeight>,
   /// Scrollbar Display Option
-  #[sdk(child(qname = "w:CT_FrameScrollbar/w:scrollbar"))]
+  #[sdk(child(qname = "w:scrollbar"))]
   pub scrollbar_visibility: Option<ScrollbarVisibility>,
   /// Frame Cannot Be Resized
-  #[sdk(child(qname = "w:CT_OnOff/w:noResizeAllowed"))]
+  #[sdk(child(qname = "w:noResizeAllowed"))]
   pub no_resize_allowed: Option<NoResizeAllowed>,
   /// Maintain Link to Existing File
-  #[sdk(child(qname = "w:CT_OnOff/w:linkedToFile"))]
+  #[sdk(child(qname = "w:linkedToFile"))]
   pub linked_to_file: Option<LinkedToFile>,
 }
 /// Content Between Numbering Symbol and Paragraph Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LevelSuffix/w:suff")]
+#[sdk(qname = "w:suff")]
 pub struct LevelSuffix {
   /// Character Type Between Numbering and Text
   #[sdk(attr(qname = "w:val"))]
@@ -13318,7 +13312,7 @@ pub struct LevelSuffix {
 }
 /// Numbering Level Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LevelText/w:lvlText")]
+#[sdk(qname = "w:lvlText")]
 pub struct LevelText {
   /// Level Text
   #[sdk(attr(qname = "w:val"))]
@@ -13329,7 +13323,7 @@ pub struct LevelText {
 }
 /// Legacy Numbering Level Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LvlLegacy/w:legacy")]
+#[sdk(qname = "w:legacy")]
 pub struct LegacyNumbering {
   /// Use Legacy Numbering Properties
   #[sdk(attr(qname = "w:legacy"))]
@@ -13357,7 +13351,7 @@ pub struct LegacyNumbering {
 }
 /// Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LevelJustification/w:lvlJc")]
+#[sdk(qname = "w:lvlJc")]
 pub struct LevelJustification {
   /// Alignment Type
   #[sdk(attr(qname = "w:val"))]
@@ -13365,219 +13359,219 @@ pub struct LevelJustification {
 }
 /// Numbering Level Associated Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrBase/w:pPr")]
+#[sdk(qname = "w:pPr")]
 pub struct PreviousParagraphProperties {
   /// Defines the ParagraphStyleId Class.
-  #[sdk(child(qname = "w:CT_String/w:pStyle"))]
+  #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
   /// Defines the KeepNext Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
+  #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
   /// Defines the KeepLines Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepLines"))]
+  #[sdk(child(qname = "w:keepLines"))]
   pub keep_lines: Option<KeepLines>,
   /// Defines the PageBreakBefore Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:pageBreakBefore"))]
+  #[sdk(child(qname = "w:pageBreakBefore"))]
   pub page_break_before: Option<PageBreakBefore>,
   /// Defines the FrameProperties Class.
-  #[sdk(child(qname = "w:CT_FramePr/w:framePr"))]
+  #[sdk(child(qname = "w:framePr"))]
   pub frame_properties: Option<FrameProperties>,
   /// Defines the WidowControl Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:widowControl"))]
+  #[sdk(child(qname = "w:widowControl"))]
   pub widow_control: Option<WidowControl>,
   /// Defines the NumberingProperties Class.
-  #[sdk(child(qname = "w:CT_NumPr/w:numPr"))]
+  #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
   /// Defines the SuppressLineNumbers Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressLineNumbers"))]
+  #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
   /// Defines the ParagraphBorders Class.
-  #[sdk(child(qname = "w:CT_PBdr/w:pBdr"))]
+  #[sdk(child(qname = "w:pBdr"))]
   pub paragraph_borders: Option<std::boxed::Box<ParagraphBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the Tabs Class.
-  #[sdk(child(qname = "w:CT_Tabs/w:tabs"))]
+  #[sdk(child(qname = "w:tabs"))]
   pub tabs: Option<Tabs>,
   /// Defines the SuppressAutoHyphens Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressAutoHyphens"))]
+  #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
   /// Defines the Kinsoku Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:kinsoku"))]
+  #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
   /// Defines the WordWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:wordWrap"))]
+  #[sdk(child(qname = "w:wordWrap"))]
   pub word_wrap: Option<WordWrap>,
   /// Defines the OverflowPunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:overflowPunct"))]
+  #[sdk(child(qname = "w:overflowPunct"))]
   pub overflow_punctuation: Option<OverflowPunctuation>,
   /// Defines the TopLinePunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:topLinePunct"))]
+  #[sdk(child(qname = "w:topLinePunct"))]
   pub top_line_punctuation: Option<TopLinePunctuation>,
   /// Defines the AutoSpaceDE Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDE"))]
+  #[sdk(child(qname = "w:autoSpaceDE"))]
   pub auto_space_de: Option<AutoSpaceDe>,
   /// Defines the AutoSpaceDN Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDN"))]
+  #[sdk(child(qname = "w:autoSpaceDN"))]
   pub auto_space_dn: Option<AutoSpaceDn>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the AdjustRightIndent Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustRightInd"))]
+  #[sdk(child(qname = "w:adjustRightInd"))]
   pub adjust_right_indent: Option<AdjustRightIndent>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the SpacingBetweenLines Class.
-  #[sdk(child(qname = "w:CT_Spacing/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing_between_lines: Option<SpacingBetweenLines>,
   /// Defines the Indentation Class.
-  #[sdk(child(qname = "w:CT_Ind/w:ind"))]
+  #[sdk(child(qname = "w:ind"))]
   pub indentation: Option<Indentation>,
   /// Defines the ContextualSpacing Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:contextualSpacing"))]
+  #[sdk(child(qname = "w:contextualSpacing"))]
   pub contextual_spacing: Option<ContextualSpacing>,
   /// Defines the MirrorIndents Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorIndents"))]
+  #[sdk(child(qname = "w:mirrorIndents"))]
   pub mirror_indents: Option<MirrorIndents>,
   /// Defines the SuppressOverlap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressOverlap"))]
+  #[sdk(child(qname = "w:suppressOverlap"))]
   pub suppress_overlap: Option<SuppressOverlap>,
   /// Defines the Justification Class.
-  #[sdk(child(qname = "w:CT_Jc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub justification: Option<Justification>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TextAlignment Class.
-  #[sdk(child(qname = "w:CT_TextAlignment/w:textAlignment"))]
+  #[sdk(child(qname = "w:textAlignment"))]
   pub text_alignment: Option<TextAlignment>,
   /// Defines the TextBoxTightWrap Class.
-  #[sdk(child(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap"))]
+  #[sdk(child(qname = "w:textboxTightWrap"))]
   pub text_box_tight_wrap: Option<TextBoxTightWrap>,
   /// Defines the OutlineLevel Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:outlineLvl"))]
+  #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
 }
 /// Numbering Symbol Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrList/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct NumberingSymbolRunProperties {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
+  #[sdk(child(qname = "w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
   /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
+  #[sdk(child(qname = "w:b"))]
   pub bold: Option<Bold>,
   /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
+  #[sdk(child(qname = "w:bCs"))]
   pub bold_complex_script: Option<BoldComplexScript>,
   /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
+  #[sdk(child(qname = "w:i"))]
   pub italic: Option<Italic>,
   /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
+  #[sdk(child(qname = "w:iCs"))]
   pub italic_complex_script: Option<ItalicComplexScript>,
   /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
+  #[sdk(child(qname = "w:caps"))]
   pub caps: Option<Caps>,
   /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
+  #[sdk(child(qname = "w:smallCaps"))]
   pub small_caps: Option<SmallCaps>,
   /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
+  #[sdk(child(qname = "w:strike"))]
   pub strike: Option<Strike>,
   /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
+  #[sdk(child(qname = "w:dstrike"))]
   pub double_strike: Option<DoubleStrike>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
+  #[sdk(child(qname = "w:outline"))]
   pub outline: Option<Outline>,
   /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
+  #[sdk(child(qname = "w:shadow"))]
   pub shadow: Option<Shadow>,
   /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
+  #[sdk(child(qname = "w:emboss"))]
   pub emboss: Option<Emboss>,
   /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
+  #[sdk(child(qname = "w:imprint"))]
   pub imprint: Option<Imprint>,
   /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
+  #[sdk(child(qname = "w:noProof"))]
   pub no_proof: Option<NoProof>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
+  #[sdk(child(qname = "w:vanish"))]
   pub vanish: Option<Vanish>,
   /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
+  #[sdk(child(qname = "w:webHidden"))]
   pub web_hidden: Option<WebHidden>,
   /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
+  #[sdk(child(qname = "w:color"))]
   pub color: Option<Color>,
   /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing: Option<Spacing>,
   /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
+  #[sdk(child(qname = "w:w"))]
   pub character_scale: Option<CharacterScale>,
   /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
+  #[sdk(child(qname = "w:kern"))]
   pub kern: Option<Kern>,
   /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
+  #[sdk(child(qname = "w:position"))]
   pub position: Option<Position>,
   /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
+  #[sdk(child(qname = "w:sz"))]
   pub font_size: Option<FontSize>,
   /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
+  #[sdk(child(qname = "w:szCs"))]
   pub font_size_complex_script: Option<FontSizeComplexScript>,
   /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
+  #[sdk(child(qname = "w:u"))]
   pub underline: Option<Underline>,
   /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
+  #[sdk(child(qname = "w:effect"))]
   pub text_effect: Option<TextEffect>,
   /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
+  #[sdk(child(qname = "w:bdr"))]
   pub border: Option<Border>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
+  #[sdk(child(qname = "w:fitText"))]
   pub fit_text: Option<FitText>,
   /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
+  #[sdk(child(qname = "w:vertAlign"))]
   pub vertical_text_alignment: Option<VerticalTextAlignment>,
   /// Defines the RightToLeftText Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:rtl"))]
+  #[sdk(child(qname = "w:rtl"))]
   pub right_to_left_text: Option<RightToLeftText>,
   /// Defines the ComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:cs"))]
+  #[sdk(child(qname = "w:cs"))]
   pub complex_script: Option<ComplexScript>,
   /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
+  #[sdk(child(qname = "w:em"))]
   pub emphasis: Option<Emphasis>,
   /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
+  #[sdk(child(qname = "w:lang"))]
   pub languages: Option<Languages>,
   /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
+  #[sdk(child(qname = "w:eastAsianLayout"))]
   pub east_asian_layout: Option<EastAsianLayout>,
   /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
+  #[sdk(child(qname = "w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
 }
 /// Abstract Numbering Definition Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MultiLevelType/w:multiLevelType")]
+#[sdk(qname = "w:multiLevelType")]
 pub struct MultiLevelType {
   /// Abstract Numbering Definition Type
   #[sdk(attr(qname = "w:val"))]
@@ -13585,7 +13579,7 @@ pub struct MultiLevelType {
 }
 /// Numbering Level Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Lvl/w:lvl")]
+#[sdk(qname = "w:lvl")]
 pub struct Level {
   /// Numbering Level
   #[sdk(attr(qname = "w:ilvl"))]
@@ -13598,45 +13592,45 @@ pub struct Level {
   #[sdk(attr(qname = "w:tentative"))]
   pub tentative: Option<crate::simple_type::OnOffValue>,
   /// Starting Value
-  #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:start"))]
+  #[sdk(child(qname = "w:start"))]
   pub start_numbering_value: Option<StartNumberingValue>,
   /// Numbering Format
-  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Restart Numbering Level Symbol
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:lvlRestart"))]
+  #[sdk(child(qname = "w:lvlRestart"))]
   pub level_restart: Option<LevelRestart>,
   /// Paragraph Style's Associated Numbering Level
-  #[sdk(child(qname = "w:CT_String253/w:pStyle"))]
+  #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id_in_level: Option<ParagraphStyleIdInLevel>,
   /// Display All Levels Using Arabic Numerals
-  #[sdk(child(qname = "w:CT_OnOff/w:isLgl"))]
+  #[sdk(child(qname = "w:isLgl"))]
   pub is_legal_numbering_style: Option<IsLegalNumberingStyle>,
   /// Content Between Numbering Symbol and Paragraph Text
-  #[sdk(child(qname = "w:CT_LevelSuffix/w:suff"))]
+  #[sdk(child(qname = "w:suff"))]
   pub level_suffix: Option<LevelSuffix>,
   /// Numbering Level Text
-  #[sdk(child(qname = "w:CT_LevelText/w:lvlText"))]
+  #[sdk(child(qname = "w:lvlText"))]
   pub level_text: Option<LevelText>,
   /// Picture Numbering Symbol Definition Reference
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:lvlPicBulletId"))]
+  #[sdk(child(qname = "w:lvlPicBulletId"))]
   pub level_picture_bullet_id: Option<LevelPictureBulletId>,
   /// Legacy Numbering Level Properties
-  #[sdk(child(qname = "w:CT_LvlLegacy/w:legacy"))]
+  #[sdk(child(qname = "w:legacy"))]
   pub legacy_numbering: Option<LegacyNumbering>,
   /// Justification
-  #[sdk(child(qname = "w:CT_LevelJustification/w:lvlJc"))]
+  #[sdk(child(qname = "w:lvlJc"))]
   pub level_justification: Option<LevelJustification>,
   /// Numbering Level Associated Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrBase/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub previous_paragraph_properties: Option<std::boxed::Box<PreviousParagraphProperties>>,
   /// Numbering Symbol Run Properties
-  #[sdk(child(qname = "w:CT_RPrList/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub numbering_symbol_run_properties: Option<std::boxed::Box<NumberingSymbolRunProperties>>,
 }
 /// Picture Numbering Symbol Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NumPicBullet/w:numPicBullet")]
+#[sdk(qname = "w:numPicBullet")]
 pub struct NumberingPictureBullet {
   /// numPicBulletId
   #[sdk(attr(qname = "w:numPicBulletId"))]
@@ -13651,7 +13645,7 @@ pub struct NumberingPictureBullet {
 }
 /// Abstract Numbering Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_AbstractNum/w:abstractNum")]
+#[sdk(qname = "w:abstractNum")]
 pub struct AbstractNum {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Abstract Numbering Definition ID
@@ -13659,30 +13653,30 @@ pub struct AbstractNum {
   #[sdk(number_range(range = 0..))]
   pub abstract_number_id: crate::simple_type::Int32Value,
   /// Abstract Numbering Definition Identifier
-  #[sdk(child(qname = "w:CT_LongHexNumber/w:nsid"))]
+  #[sdk(child(qname = "w:nsid"))]
   pub nsid: Option<Nsid>,
   /// Abstract Numbering Definition Type
-  #[sdk(child(qname = "w:CT_MultiLevelType/w:multiLevelType"))]
+  #[sdk(child(qname = "w:multiLevelType"))]
   pub multi_level_type: Option<MultiLevelType>,
   /// Numbering Template Code
-  #[sdk(child(qname = "w:CT_LongHexNumber/w:tmpl"))]
+  #[sdk(child(qname = "w:tmpl"))]
   pub template_code: Option<TemplateCode>,
   /// Abstract Numbering Definition Name
-  #[sdk(child(qname = "w:CT_String253/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub abstract_num_definition_name: Option<AbstractNumDefinitionName>,
   /// Numbering Style Definition
-  #[sdk(child(qname = "w:CT_String253/w:styleLink"))]
+  #[sdk(child(qname = "w:styleLink"))]
   pub style_link: Option<StyleLink>,
   /// Numbering Style Reference
-  #[sdk(child(qname = "w:CT_String253/w:numStyleLink"))]
+  #[sdk(child(qname = "w:numStyleLink"))]
   pub numbering_style_link: Option<NumberingStyleLink>,
   /// Numbering Level Definition.
-  #[sdk(child(qname = "w:CT_Lvl/w:lvl"))]
+  #[sdk(child(qname = "w:lvl"))]
   pub level: Vec<Level>,
 }
 /// Numbering Definition Instance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Num/w:num")]
+#[sdk(qname = "w:num")]
 pub struct NumberingInstance {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// numId
@@ -13692,136 +13686,136 @@ pub struct NumberingInstance {
   #[sdk(attr(qname = "w:durableId"))]
   pub w_durable_id: Option<crate::simple_type::Int32Value>,
   /// Defines the AbstractNumId Class.
-  #[sdk(child(qname = "w:CT_NonNegativeDecimalNumber/w:abstractNumId"))]
+  #[sdk(child(qname = "w:abstractNumId"))]
   pub abstract_num_id: std::boxed::Box<AbstractNumId>,
   /// Defines the LevelOverride Class.
-  #[sdk(child(qname = "w:CT_NumLvl/w:lvlOverride"))]
+  #[sdk(child(qname = "w:lvlOverride"))]
   pub level_override: Vec<LevelOverride>,
 }
 /// Table Style Conditional Formatting Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPrStyle/w:pPr")]
+#[sdk(qname = "w:pPr")]
 pub struct StyleParagraphProperties {
   /// Defines the KeepNext Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
+  #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
   /// Defines the KeepLines Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepLines"))]
+  #[sdk(child(qname = "w:keepLines"))]
   pub keep_lines: Option<KeepLines>,
   /// Defines the PageBreakBefore Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:pageBreakBefore"))]
+  #[sdk(child(qname = "w:pageBreakBefore"))]
   pub page_break_before: Option<PageBreakBefore>,
   /// Defines the FrameProperties Class.
-  #[sdk(child(qname = "w:CT_FramePr/w:framePr"))]
+  #[sdk(child(qname = "w:framePr"))]
   pub frame_properties: Option<FrameProperties>,
   /// Defines the WidowControl Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:widowControl"))]
+  #[sdk(child(qname = "w:widowControl"))]
   pub widow_control: Option<WidowControl>,
   /// Defines the NumberingProperties Class.
-  #[sdk(child(qname = "w:CT_NumPr/w:numPr"))]
+  #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
   /// Defines the SuppressLineNumbers Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressLineNumbers"))]
+  #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
   /// Defines the ParagraphBorders Class.
-  #[sdk(child(qname = "w:CT_PBdr/w:pBdr"))]
+  #[sdk(child(qname = "w:pBdr"))]
   pub paragraph_borders: Option<std::boxed::Box<ParagraphBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the Tabs Class.
-  #[sdk(child(qname = "w:CT_Tabs/w:tabs"))]
+  #[sdk(child(qname = "w:tabs"))]
   pub tabs: Option<Tabs>,
   /// Defines the SuppressAutoHyphens Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressAutoHyphens"))]
+  #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
   /// Defines the Kinsoku Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:kinsoku"))]
+  #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
   /// Defines the WordWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:wordWrap"))]
+  #[sdk(child(qname = "w:wordWrap"))]
   pub word_wrap: Option<WordWrap>,
   /// Defines the OverflowPunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:overflowPunct"))]
+  #[sdk(child(qname = "w:overflowPunct"))]
   pub overflow_punctuation: Option<OverflowPunctuation>,
   /// Defines the TopLinePunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:topLinePunct"))]
+  #[sdk(child(qname = "w:topLinePunct"))]
   pub top_line_punctuation: Option<TopLinePunctuation>,
   /// Defines the AutoSpaceDE Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDE"))]
+  #[sdk(child(qname = "w:autoSpaceDE"))]
   pub auto_space_de: Option<AutoSpaceDe>,
   /// Defines the AutoSpaceDN Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDN"))]
+  #[sdk(child(qname = "w:autoSpaceDN"))]
   pub auto_space_dn: Option<AutoSpaceDn>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the AdjustRightIndent Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustRightInd"))]
+  #[sdk(child(qname = "w:adjustRightInd"))]
   pub adjust_right_indent: Option<AdjustRightIndent>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the SpacingBetweenLines Class.
-  #[sdk(child(qname = "w:CT_Spacing/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing_between_lines: Option<SpacingBetweenLines>,
   /// Defines the Indentation Class.
-  #[sdk(child(qname = "w:CT_Ind/w:ind"))]
+  #[sdk(child(qname = "w:ind"))]
   pub indentation: Option<Indentation>,
   /// Defines the ContextualSpacing Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:contextualSpacing"))]
+  #[sdk(child(qname = "w:contextualSpacing"))]
   pub contextual_spacing: Option<ContextualSpacing>,
   /// Defines the MirrorIndents Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorIndents"))]
+  #[sdk(child(qname = "w:mirrorIndents"))]
   pub mirror_indents: Option<MirrorIndents>,
   /// Defines the SuppressOverlap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressOverlap"))]
+  #[sdk(child(qname = "w:suppressOverlap"))]
   pub suppress_overlap: Option<SuppressOverlap>,
   /// Defines the Justification Class.
-  #[sdk(child(qname = "w:CT_Jc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub justification: Option<Justification>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TextAlignment Class.
-  #[sdk(child(qname = "w:CT_TextAlignment/w:textAlignment"))]
+  #[sdk(child(qname = "w:textAlignment"))]
   pub text_alignment: Option<TextAlignment>,
   /// Defines the TextBoxTightWrap Class.
-  #[sdk(child(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap"))]
+  #[sdk(child(qname = "w:textboxTightWrap"))]
   pub text_box_tight_wrap: Option<TextBoxTightWrap>,
   /// Defines the OutlineLevel Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:outlineLvl"))]
+  #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
   /// Defines the ParagraphPropertiesChange Class.
-  #[sdk(child(qname = "w:CT_PPrChange/w:pPrChange"))]
+  #[sdk(child(qname = "w:pPrChange"))]
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
 }
 /// Table Style Conditional Formatting Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrStyleOverride/w:tblPr")]
+#[sdk(qname = "w:tblPr")]
 pub struct TableStyleConditionalFormattingTableProperties {
   /// Defines the TableJustification Class.
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Defines the TableCellSpacing Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the TableCellMarginDefault Class.
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
 }
 /// Table Style Conditional Formatting Table Row Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrPrBaseStyleable/w:trPr")]
+#[sdk(qname = "w:trPr")]
 pub struct TableStyleConditionalFormattingTableRowProperties {
   #[sdk(
         choice(
@@ -13837,27 +13831,27 @@ pub struct TableStyleConditionalFormattingTableRowProperties {
 }
 /// Table Style Conditional Formatting Table Cell Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcPrStyleOverride/w:tcPr")]
+#[sdk(qname = "w:tcPr")]
 pub struct TableStyleConditionalFormattingTableCellProperties {
   /// Defines the TableCellBorders Class.
-  #[sdk(child(qname = "w:CT_TcBorders/w:tcBorders"))]
+  #[sdk(child(qname = "w:tcBorders"))]
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
+  #[sdk(child(qname = "w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
-  #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
+  #[sdk(child(qname = "w:tcMar"))]
   pub table_cell_margin: Option<std::boxed::Box<TableCellMargin>>,
   /// Defines the TableCellVerticalAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
 }
 /// Primary Style Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_StyleName/w:name")]
+#[sdk(qname = "w:name")]
 pub struct StyleName {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -13866,7 +13860,7 @@ pub struct StyleName {
 }
 /// Optional User Interface Sorting Order.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UiPriority/w:uiPriority")]
+#[sdk(qname = "w:uiPriority")]
 pub struct UiPriority {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -13875,190 +13869,190 @@ pub struct UiPriority {
 }
 /// Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RPrStyle/w:rPr")]
+#[sdk(qname = "w:rPr")]
 pub struct StyleRunProperties {
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
-  #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
+  #[sdk(child(qname = "w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
   /// Defines the Bold Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:b"))]
+  #[sdk(child(qname = "w:b"))]
   pub bold: Option<Bold>,
   /// Defines the BoldComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bCs"))]
+  #[sdk(child(qname = "w:bCs"))]
   pub bold_complex_script: Option<BoldComplexScript>,
   /// Defines the Italic Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:i"))]
+  #[sdk(child(qname = "w:i"))]
   pub italic: Option<Italic>,
   /// Defines the ItalicComplexScript Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:iCs"))]
+  #[sdk(child(qname = "w:iCs"))]
   pub italic_complex_script: Option<ItalicComplexScript>,
   /// Defines the Caps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:caps"))]
+  #[sdk(child(qname = "w:caps"))]
   pub caps: Option<Caps>,
   /// Defines the SmallCaps Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:smallCaps"))]
+  #[sdk(child(qname = "w:smallCaps"))]
   pub small_caps: Option<SmallCaps>,
   /// Defines the Strike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:strike"))]
+  #[sdk(child(qname = "w:strike"))]
   pub strike: Option<Strike>,
   /// Defines the DoubleStrike Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:dstrike"))]
+  #[sdk(child(qname = "w:dstrike"))]
   pub double_strike: Option<DoubleStrike>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:outline"))]
+  #[sdk(child(qname = "w:outline"))]
   pub outline: Option<Outline>,
   /// Defines the Shadow Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:shadow"))]
+  #[sdk(child(qname = "w:shadow"))]
   pub shadow: Option<Shadow>,
   /// Defines the Emboss Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:emboss"))]
+  #[sdk(child(qname = "w:emboss"))]
   pub emboss: Option<Emboss>,
   /// Defines the Imprint Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:imprint"))]
+  #[sdk(child(qname = "w:imprint"))]
   pub imprint: Option<Imprint>,
   /// Defines the NoProof Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noProof"))]
+  #[sdk(child(qname = "w:noProof"))]
   pub no_proof: Option<NoProof>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the Vanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:vanish"))]
+  #[sdk(child(qname = "w:vanish"))]
   pub vanish: Option<Vanish>,
   /// Defines the WebHidden Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:webHidden"))]
+  #[sdk(child(qname = "w:webHidden"))]
   pub web_hidden: Option<WebHidden>,
   /// Defines the Color Class.
-  #[sdk(child(qname = "w:CT_Color/w:color"))]
+  #[sdk(child(qname = "w:color"))]
   pub color: Option<Color>,
   /// Defines the Spacing Class.
-  #[sdk(child(qname = "w:CT_ShortTwipsMeasure/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing: Option<Spacing>,
   /// Defines the CharacterScale Class.
-  #[sdk(child(qname = "w:CT_TextScale/w:w"))]
+  #[sdk(child(qname = "w:w"))]
   pub character_scale: Option<CharacterScale>,
   /// Defines the Kern Class.
-  #[sdk(child(qname = "w:CT_HpsKern/w:kern"))]
+  #[sdk(child(qname = "w:kern"))]
   pub kern: Option<Kern>,
   /// Defines the Position Class.
-  #[sdk(child(qname = "w:CT_SignedHpsMeasure/w:position"))]
+  #[sdk(child(qname = "w:position"))]
   pub position: Option<Position>,
   /// Defines the FontSize Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
+  #[sdk(child(qname = "w:sz"))]
   pub font_size: Option<FontSize>,
   /// Defines the FontSizeComplexScript Class.
-  #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
+  #[sdk(child(qname = "w:szCs"))]
   pub font_size_complex_script: Option<FontSizeComplexScript>,
   /// Defines the Underline Class.
-  #[sdk(child(qname = "w:CT_Underline/w:u"))]
+  #[sdk(child(qname = "w:u"))]
   pub underline: Option<Underline>,
   /// Defines the TextEffect Class.
-  #[sdk(child(qname = "w:CT_TextEffect/w:effect"))]
+  #[sdk(child(qname = "w:effect"))]
   pub text_effect: Option<TextEffect>,
   /// Defines the Border Class.
-  #[sdk(child(qname = "w:CT_Border/w:bdr"))]
+  #[sdk(child(qname = "w:bdr"))]
   pub border: Option<Border>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the FitText Class.
-  #[sdk(child(qname = "w:CT_FitText/w:fitText"))]
+  #[sdk(child(qname = "w:fitText"))]
   pub fit_text: Option<FitText>,
   /// Defines the VerticalTextAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalAlignRun/w:vertAlign"))]
+  #[sdk(child(qname = "w:vertAlign"))]
   pub vertical_text_alignment: Option<VerticalTextAlignment>,
   /// Defines the Emphasis Class.
-  #[sdk(child(qname = "w:CT_Em/w:em"))]
+  #[sdk(child(qname = "w:em"))]
   pub emphasis: Option<Emphasis>,
   /// Defines the Languages Class.
-  #[sdk(child(qname = "w:CT_Language/w:lang"))]
+  #[sdk(child(qname = "w:lang"))]
   pub languages: Option<Languages>,
   /// Defines the EastAsianLayout Class.
-  #[sdk(child(qname = "w:CT_EastAsianLayout/w:eastAsianLayout"))]
+  #[sdk(child(qname = "w:eastAsianLayout"))]
   pub east_asian_layout: Option<EastAsianLayout>,
   /// Defines the SpecVanish Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
+  #[sdk(child(qname = "w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the RunPropertiesChange Class.
-  #[sdk(child(qname = "w:CT_RPrChange/w:rPrChange"))]
+  #[sdk(child(qname = "w:rPrChange"))]
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
 }
 /// Style Table Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrStyle/w:tblPr")]
+#[sdk(qname = "w:tblPr")]
 pub struct StyleTableProperties {
   /// Defines the TableStyleRowBandSize Class.
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleRowBandSize"))]
+  #[sdk(child(qname = "w:tblStyleRowBandSize"))]
   pub table_style_row_band_size: Option<TableStyleRowBandSize>,
   /// Defines the TableStyleColumnBandSize Class.
-  #[sdk(child(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleColBandSize"))]
+  #[sdk(child(qname = "w:tblStyleColBandSize"))]
   pub table_style_column_band_size: Option<TableStyleColumnBandSize>,
   /// Defines the TableJustification Class.
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Defines the TableCellSpacing Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the TableCellMarginDefault Class.
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
 }
 /// Style Table Cell Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TcPrStyle/w:tcPr")]
+#[sdk(qname = "w:tcPr")]
 pub struct StyleTableCellProperties {
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
+  #[sdk(child(qname = "w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
-  #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
+  #[sdk(child(qname = "w:tcMar"))]
   pub table_cell_margin: Option<std::boxed::Box<TableCellMargin>>,
   /// Defines the TableCellVerticalAlignment Class.
-  #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
+  #[sdk(child(qname = "w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
 }
 /// Style Conditional Table Formatting Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblStylePr/w:tblStylePr")]
+#[sdk(qname = "w:tblStylePr")]
 pub struct TableStyleProperties {
   /// Table Style Conditional Formatting Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: TableStyleOverrideValues,
   /// Table Style Conditional Formatting Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrStyle/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub style_paragraph_properties: Option<std::boxed::Box<StyleParagraphProperties>>,
   /// Table Style Conditional Formatting Run Properties
-  #[sdk(child(qname = "w:CT_RPrBaseStyleable/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
   /// Table Style Conditional Formatting Table Properties
-  #[sdk(child(qname = "w:CT_TblPrStyleOverride/w:tblPr"))]
+  #[sdk(child(qname = "w:tblPr"))]
   pub table_style_conditional_formatting_table_properties:
     Option<std::boxed::Box<TableStyleConditionalFormattingTableProperties>>,
   /// Table Style Conditional Formatting Table Row Properties
-  #[sdk(child(qname = "w:CT_TrPrBaseStyleable/w:trPr"))]
+  #[sdk(child(qname = "w:trPr"))]
   pub table_style_conditional_formatting_table_row_properties:
     Option<TableStyleConditionalFormattingTableRowProperties>,
   /// Table Style Conditional Formatting Table Cell Properties
-  #[sdk(child(qname = "w:CT_TcPrStyleOverride/w:tcPr"))]
+  #[sdk(child(qname = "w:tcPr"))]
   pub table_style_conditional_formatting_table_cell_properties:
     Option<std::boxed::Box<TableStyleConditionalFormattingTableCellProperties>>,
 }
 /// Latent Style Exception.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LsdException/w:lsdException")]
+#[sdk(qname = "w:lsdException")]
 pub struct LatentStyleExceptionInfo {
   /// Primary Style Name
   #[sdk(attr(qname = "w:name"))]
@@ -14082,19 +14076,19 @@ pub struct LatentStyleExceptionInfo {
 }
 /// Document Default Paragraph and Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocDefaults/w:docDefaults")]
+#[sdk(qname = "w:docDefaults")]
 pub struct DocDefaults {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Default Run Properties
-  #[sdk(child(qname = "w:CT_RPrDefault/w:rPrDefault"))]
+  #[sdk(child(qname = "w:rPrDefault"))]
   pub run_properties_default: Option<std::boxed::Box<RunPropertiesDefault>>,
   /// Default Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrDefault/w:pPrDefault"))]
+  #[sdk(child(qname = "w:pPrDefault"))]
   pub paragraph_properties_default: Option<std::boxed::Box<ParagraphPropertiesDefault>>,
 }
 /// Latent Style Information.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_LatentStyles/w:latentStyles")]
+#[sdk(qname = "w:latentStyles")]
 pub struct LatentStyles {
   /// Default Style Locking Setting
   #[sdk(attr(qname = "w:defLockedState"))]
@@ -14116,12 +14110,12 @@ pub struct LatentStyles {
   #[sdk(attr(qname = "w:count"))]
   pub count: Option<crate::simple_type::Int32Value>,
   /// Latent Style Exception.
-  #[sdk(child(qname = "w:CT_LsdException/w:lsdException"))]
+  #[sdk(child(qname = "w:lsdException"))]
   pub latent_style_exception_info: Vec<LatentStyleExceptionInfo>,
 }
 /// Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Style/w:style")]
+#[sdk(qname = "w:style")]
 pub struct Style {
   /// Style Type
   #[sdk(attr(qname = "w:type"))]
@@ -14137,117 +14131,117 @@ pub struct Style {
   #[sdk(attr(qname = "w:customStyle"))]
   pub custom_style: Option<crate::simple_type::OnOffValue>,
   /// Primary Style Name
-  #[sdk(child(qname = "w:CT_StyleName/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub style_name: Option<StyleName>,
   /// Alternate Style Names
-  #[sdk(child(qname = "w:CT_String253/w:aliases"))]
+  #[sdk(child(qname = "w:aliases"))]
   pub aliases: Option<Aliases>,
   /// Parent Style ID
-  #[sdk(child(qname = "w:CT_String253/w:basedOn"))]
+  #[sdk(child(qname = "w:basedOn"))]
   pub based_on: Option<BasedOn>,
   /// Style For Next Paragraph
-  #[sdk(child(qname = "w:CT_String253/w:next"))]
+  #[sdk(child(qname = "w:next"))]
   pub next_paragraph_style: Option<NextParagraphStyle>,
   /// Linked Style Reference
-  #[sdk(child(qname = "w:CT_String253/w:link"))]
+  #[sdk(child(qname = "w:link"))]
   pub linked_style: Option<LinkedStyle>,
   /// Automatically Merge User Formatting Into Style Definition
-  #[sdk(child(qname = "w:CT_OnOff/w:autoRedefine"))]
+  #[sdk(child(qname = "w:autoRedefine"))]
   pub auto_redefine: Option<AutoRedefine>,
   /// Hide Style From User Interface
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:hidden"))]
+  #[sdk(child(qname = "w:hidden"))]
   pub style_hidden: Option<StyleHidden>,
   /// Optional User Interface Sorting Order
-  #[sdk(child(qname = "w:CT_UiPriority/w:uiPriority"))]
+  #[sdk(child(qname = "w:uiPriority"))]
   pub ui_priority: Option<UiPriority>,
   /// Hide Style From Main User Interface
-  #[sdk(child(qname = "w:CT_OnOff/w:semiHidden"))]
+  #[sdk(child(qname = "w:semiHidden"))]
   pub semi_hidden: Option<SemiHidden>,
   /// Remove Semi-Hidden Property When Style Is Used
-  #[sdk(child(qname = "w:CT_OnOff/w:unhideWhenUsed"))]
+  #[sdk(child(qname = "w:unhideWhenUsed"))]
   pub unhide_when_used: Option<UnhideWhenUsed>,
   /// Primary Style
-  #[sdk(child(qname = "w:CT_OnOff/w:qFormat"))]
+  #[sdk(child(qname = "w:qFormat"))]
   pub primary_style: Option<PrimaryStyle>,
   /// Style Cannot Be Applied
-  #[sdk(child(qname = "w:CT_OnOff/w:locked"))]
+  #[sdk(child(qname = "w:locked"))]
   pub locked: Option<Locked>,
   /// E-Mail Message Text Style
-  #[sdk(child(qname = "w:CT_OnOff/w:personal"))]
+  #[sdk(child(qname = "w:personal"))]
   pub personal: Option<Personal>,
   /// E-Mail Message Composition Style
-  #[sdk(child(qname = "w:CT_OnOff/w:personalCompose"))]
+  #[sdk(child(qname = "w:personalCompose"))]
   pub personal_compose: Option<PersonalCompose>,
   /// E-Mail Message Reply Style
-  #[sdk(child(qname = "w:CT_OnOff/w:personalReply"))]
+  #[sdk(child(qname = "w:personalReply"))]
   pub personal_reply: Option<PersonalReply>,
   /// Revision Identifier for Style Definition
-  #[sdk(child(qname = "w:CT_LongHexNumber/w:rsid"))]
+  #[sdk(child(qname = "w:rsid"))]
   pub rsid: Option<Rsid>,
   /// Style Paragraph Properties
-  #[sdk(child(qname = "w:CT_PPrStyle/w:pPr"))]
+  #[sdk(child(qname = "w:pPr"))]
   pub style_paragraph_properties: Option<std::boxed::Box<StyleParagraphProperties>>,
   /// Run Properties
-  #[sdk(child(qname = "w:CT_RPrStyle/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub style_run_properties: Option<std::boxed::Box<StyleRunProperties>>,
   /// Style Table Properties
-  #[sdk(child(qname = "w:CT_TblPrStyle/w:tblPr"))]
+  #[sdk(child(qname = "w:tblPr"))]
   pub style_table_properties: Option<std::boxed::Box<StyleTableProperties>>,
   /// Style Table Row Properties
-  #[sdk(child(qname = "w:CT_TrPrBaseStyleable/w:trPr"))]
+  #[sdk(child(qname = "w:trPr"))]
   pub table_style_conditional_formatting_table_row_properties:
     Option<TableStyleConditionalFormattingTableRowProperties>,
   /// Style Table Cell Properties
-  #[sdk(child(qname = "w:CT_TcPrStyle/w:tcPr"))]
+  #[sdk(child(qname = "w:tcPr"))]
   pub style_table_cell_properties: Option<std::boxed::Box<StyleTableCellProperties>>,
   /// Style Conditional Table Formatting Properties.
-  #[sdk(child(qname = "w:CT_TblStylePr/w:tblStylePr"))]
+  #[sdk(child(qname = "w:tblStylePr"))]
   pub table_style_properties: Vec<TableStyleProperties>,
 }
 /// Properties for a Single Font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Font/w:font")]
+#[sdk(qname = "w:font")]
 pub struct Font {
   /// name
   #[sdk(attr(qname = "w:name"))]
   pub name: crate::simple_type::StringValue,
   /// Defines the AltName Class.
-  #[sdk(child(qname = "w:CT_String/w:altName"))]
+  #[sdk(child(qname = "w:altName"))]
   pub alt_name: Option<AltName>,
   /// Defines the Panose1Number Class.
-  #[sdk(child(qname = "w:CT_Panose/w:panose1"))]
+  #[sdk(child(qname = "w:panose1"))]
   pub panose1_number: Option<Panose1Number>,
   /// Defines the FontCharSet Class.
-  #[sdk(child(qname = "w:CT_CharacterSet/w:charset"))]
+  #[sdk(child(qname = "w:charset"))]
   pub font_char_set: Option<FontCharSet>,
   /// Defines the FontFamily Class.
-  #[sdk(child(qname = "w:CT_FontFamily/w:family"))]
+  #[sdk(child(qname = "w:family"))]
   pub font_family: Option<FontFamily>,
   /// Defines the NotTrueType Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:notTrueType"))]
+  #[sdk(child(qname = "w:notTrueType"))]
   pub not_true_type: Option<NotTrueType>,
   /// Defines the Pitch Class.
-  #[sdk(child(qname = "w:CT_Pitch/w:pitch"))]
+  #[sdk(child(qname = "w:pitch"))]
   pub pitch: Option<Pitch>,
   /// Defines the FontSignature Class.
-  #[sdk(child(qname = "w:CT_FontSig/w:sig"))]
+  #[sdk(child(qname = "w:sig"))]
   pub font_signature: Option<FontSignature>,
   /// Defines the EmbedRegularFont Class.
-  #[sdk(child(qname = "w:CT_FontRel/w:embedRegular"))]
+  #[sdk(child(qname = "w:embedRegular"))]
   pub embed_regular_font: Option<EmbedRegularFont>,
   /// Defines the EmbedBoldFont Class.
-  #[sdk(child(qname = "w:CT_FontRel/w:embedBold"))]
+  #[sdk(child(qname = "w:embedBold"))]
   pub embed_bold_font: Option<EmbedBoldFont>,
   /// Defines the EmbedItalicFont Class.
-  #[sdk(child(qname = "w:CT_FontRel/w:embedItalic"))]
+  #[sdk(child(qname = "w:embedItalic"))]
   pub embed_italic_font: Option<EmbedItalicFont>,
   /// Defines the EmbedBoldItalicFont Class.
-  #[sdk(child(qname = "w:CT_FontRel/w:embedBoldItalic"))]
+  #[sdk(child(qname = "w:embedBoldItalic"))]
   pub embed_bold_italic_font: Option<EmbedBoldItalicFont>,
 }
 /// Left Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SignedTwipsMeasure/w:marLeft")]
+#[sdk(qname = "w:marLeft")]
 pub struct LeftMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -14262,7 +14256,7 @@ pub struct LeftMarginDiv {
 }
 /// Right Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SignedTwipsMeasure/w:marRight")]
+#[sdk(qname = "w:marRight")]
 pub struct RightMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -14277,7 +14271,7 @@ pub struct RightMarginDiv {
 }
 /// Top Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SignedTwipsMeasure/w:marTop")]
+#[sdk(qname = "w:marTop")]
 pub struct TopMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -14292,7 +14286,7 @@ pub struct TopMarginDiv {
 }
 /// Bottom Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SignedTwipsMeasure/w:marBottom")]
+#[sdk(qname = "w:marBottom")]
 pub struct BottomMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -14307,40 +14301,40 @@ pub struct BottomMarginDiv {
 }
 /// Set of Borders for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DivBdr/w:divBdr")]
+#[sdk(qname = "w:divBdr")]
 pub struct DivBorder {
   /// Top Border for HTML div
-  #[sdk(child(qname = "w:CT_Border/w:top"))]
+  #[sdk(child(qname = "w:top"))]
   pub top_border: Option<TopBorder>,
   /// Left Border for HTML div
-  #[sdk(child(qname = "w:CT_Border/w:left"))]
+  #[sdk(child(qname = "w:left"))]
   pub left_border: Option<LeftBorder>,
   /// Bottom Border for HTML div
-  #[sdk(child(qname = "w:CT_Border/w:bottom"))]
+  #[sdk(child(qname = "w:bottom"))]
   pub bottom_border: Option<BottomBorder>,
   /// Right Border for HTML div
-  #[sdk(child(qname = "w:CT_Border/w:right"))]
+  #[sdk(child(qname = "w:right"))]
   pub right_border: Option<RightBorder>,
 }
 /// Child div Elements Contained within Current div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Divs/w:divsChild")]
+#[sdk(qname = "w:divsChild")]
 pub struct DivsChild {
   /// Information About Single HTML div Element.
-  #[sdk(child(qname = "w:CT_Div/w:div"))]
+  #[sdk(child(qname = "w:div"))]
   pub div: Vec<Div>,
 }
 /// Defines the Divs Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Divs/w:divs")]
+#[sdk(qname = "w:divs")]
 pub struct Divs {
   /// Information About Single HTML div Element.
-  #[sdk(child(qname = "w:CT_Div/w:div"))]
+  #[sdk(child(qname = "w:div"))]
   pub div: Vec<Div>,
 }
 /// Information About Single HTML div Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Div/w:div")]
+#[sdk(qname = "w:div")]
 pub struct Div {
   /// div Data ID
   #[sdk(attr(qname = "w:id"))]
@@ -14360,33 +14354,33 @@ pub struct Div {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Data for HTML blockquote Element
-  #[sdk(child(qname = "w:CT_OnOff/w:blockQuote"))]
+  #[sdk(child(qname = "w:blockQuote"))]
   pub block_quote: Option<BlockQuote>,
   /// Data for HTML body Element
-  #[sdk(child(qname = "w:CT_OnOff/w:bodyDiv"))]
+  #[sdk(child(qname = "w:bodyDiv"))]
   pub body_div: Option<BodyDiv>,
   /// Left Margin for HTML div
-  #[sdk(child(qname = "w:CT_SignedTwipsMeasure/w:marLeft"))]
+  #[sdk(child(qname = "w:marLeft"))]
   pub left_margin_div: std::boxed::Box<LeftMarginDiv>,
   /// Right Margin for HTML div
-  #[sdk(child(qname = "w:CT_SignedTwipsMeasure/w:marRight"))]
+  #[sdk(child(qname = "w:marRight"))]
   pub right_margin_div: std::boxed::Box<RightMarginDiv>,
   /// Top Margin for HTML div
-  #[sdk(child(qname = "w:CT_SignedTwipsMeasure/w:marTop"))]
+  #[sdk(child(qname = "w:marTop"))]
   pub top_margin_div: std::boxed::Box<TopMarginDiv>,
   /// Bottom Margin for HTML div
-  #[sdk(child(qname = "w:CT_SignedTwipsMeasure/w:marBottom"))]
+  #[sdk(child(qname = "w:marBottom"))]
   pub bottom_margin_div: std::boxed::Box<BottomMarginDiv>,
   /// Set of Borders for HTML div
-  #[sdk(child(qname = "w:CT_DivBdr/w:divBdr"))]
+  #[sdk(child(qname = "w:divBdr"))]
   pub div_border: Option<std::boxed::Box<DivBorder>>,
   /// Child div Elements Contained within Current div.
-  #[sdk(child(qname = "w:CT_Divs/w:divsChild"))]
+  #[sdk(child(qname = "w:divsChild"))]
   pub divs_child: Vec<DivsChild>,
 }
 /// Comment Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Comment/w:comment")]
+#[sdk(qname = "w:comment")]
 pub struct Comment {
   /// initials
   #[sdk(attr(qname = "w:initials"))]
@@ -14439,7 +14433,7 @@ pub struct Comment {
 }
 /// Footnote Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdn/w:footnote")]
+#[sdk(qname = "w:footnote")]
 pub struct Footnote {
   /// Footnote/Endnote Type
   #[sdk(attr(qname = "w:type"))]
@@ -14515,7 +14509,7 @@ pub struct Footnote {
 }
 /// Endnote Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnEdn/w:endnote")]
+#[sdk(qname = "w:endnote")]
 pub struct Endnote {
   /// Footnote/Endnote Type
   #[sdk(attr(qname = "w:type"))]
@@ -14591,7 +14585,7 @@ pub struct Endnote {
 }
 /// Entry Insertion Behavior.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartBehavior/w:behavior")]
+#[sdk(qname = "w:behavior")]
 pub struct Behavior {
   /// Insertion Behavior Value
   #[sdk(attr(qname = "w:val"))]
@@ -14599,7 +14593,7 @@ pub struct Behavior {
 }
 /// Entry Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartType/w:type")]
+#[sdk(qname = "w:type")]
 pub struct DocPartType {
   /// Type Value
   #[sdk(attr(qname = "w:val"))]
@@ -14607,7 +14601,7 @@ pub struct DocPartType {
 }
 /// Gallery Associated With Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartGallery/w:gallery")]
+#[sdk(qname = "w:gallery")]
 pub struct Gallery {
   /// Gallery Value
   #[sdk(attr(qname = "w:val"))]
@@ -14615,7 +14609,7 @@ pub struct Gallery {
 }
 /// Single Automatic Captioning Setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_AutoCaption/w:autoCaption")]
+#[sdk(qname = "w:autoCaption")]
 pub struct AutoCaption {
   /// Identifier of Object to be Automatically Captioned
   #[sdk(attr(qname = "w:name"))]
@@ -14628,7 +14622,7 @@ pub struct AutoCaption {
 }
 /// Single Caption Type Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Caption/w:caption")]
+#[sdk(qname = "w:caption")]
 pub struct Caption {
   /// Caption Type Name
   #[sdk(attr(qname = "w:name"))]
@@ -14655,15 +14649,15 @@ pub struct Caption {
 }
 /// Automatic Captioning Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_AutoCaptions/w:autoCaptions")]
+#[sdk(qname = "w:autoCaptions")]
 pub struct AutoCaptions {
   /// Single Automatic Captioning Setting.
-  #[sdk(child(qname = "w:CT_AutoCaption/w:autoCaption"))]
+  #[sdk(child(qname = "w:autoCaption"))]
   pub auto_caption: Vec<AutoCaption>,
 }
 /// Document Background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Background/w:background")]
+#[sdk(qname = "w:background")]
 pub struct DocumentBackground {
   /// color
   #[sdk(attr(qname = "w:color"))]
@@ -14690,20 +14684,20 @@ pub struct DocumentBackground {
   #[sdk(string_length(min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Document Background.
-  #[sdk(child(qname = "v:CT_Background/v:background"))]
+  #[sdk(child(qname = "v:background"))]
   pub background: Option<std::boxed::Box<crate::schemas::v::Background>>,
 }
 /// List of Glossary Document Entries.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocParts/w:docParts")]
+#[sdk(qname = "w:docParts")]
 pub struct DocParts {
   /// Glossary Document Entry.
-  #[sdk(child(qname = "w:CT_DocPart/w:docPart"))]
+  #[sdk(child(qname = "w:docPart"))]
   pub doc_part: Vec<DocPart>,
 }
 /// Entry Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartName/w:name")]
+#[sdk(qname = "w:name")]
 pub struct DocPartName {
   /// Name Value
   #[sdk(attr(qname = "w:val"))]
@@ -14714,37 +14708,37 @@ pub struct DocPartName {
 }
 /// Entry Categorization.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartCategory/w:category")]
+#[sdk(qname = "w:category")]
 pub struct Category {
   /// Category Associated With Entry
-  #[sdk(child(qname = "w:CT_String/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub name: std::boxed::Box<Name>,
   /// Gallery Associated With Entry
-  #[sdk(child(qname = "w:CT_DocPartGallery/w:gallery"))]
+  #[sdk(child(qname = "w:gallery"))]
   pub gallery: std::boxed::Box<Gallery>,
 }
 /// Entry Types.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartTypes/w:types")]
+#[sdk(qname = "w:types")]
 pub struct DocPartTypes {
   /// Entry Is Of All Types
   #[sdk(attr(qname = "w:all"))]
   pub all: Option<crate::simple_type::OnOffValue>,
   /// Entry Type.
-  #[sdk(child(qname = "w:CT_DocPartType/w:type"))]
+  #[sdk(child(qname = "w:type"))]
   pub doc_part_type: Vec<DocPartType>,
 }
 /// Entry Insertion Behaviors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartBehaviors/w:behaviors")]
+#[sdk(qname = "w:behaviors")]
 pub struct Behaviors {
   /// Entry Insertion Behavior.
-  #[sdk(child(qname = "w:CT_DocPartBehavior/w:behavior"))]
+  #[sdk(child(qname = "w:behavior"))]
   pub behavior: Vec<Behavior>,
 }
 /// Entry ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Guid/w:guid")]
+#[sdk(qname = "w:guid")]
 pub struct DocPartId {
   /// GUID Value
   #[sdk(attr(qname = "w:val"))]
@@ -14754,33 +14748,33 @@ pub struct DocPartId {
 }
 /// Glossary Document Entry Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPartPr/w:docPartPr")]
+#[sdk(qname = "w:docPartPr")]
 pub struct DocPartProperties {
   /// Entry Name
-  #[sdk(child(qname = "w:CT_DocPartName/w:name"))]
+  #[sdk(child(qname = "w:name"))]
   pub doc_part_name: Option<DocPartName>,
   /// Associated Paragraph Style Name
-  #[sdk(child(qname = "w:CT_String/w:style"))]
+  #[sdk(child(qname = "w:style"))]
   pub style_id: Option<StyleId>,
   /// Entry Categorization
-  #[sdk(child(qname = "w:CT_DocPartCategory/w:category"))]
+  #[sdk(child(qname = "w:category"))]
   pub category: Option<std::boxed::Box<Category>>,
   /// Entry Types
-  #[sdk(child(qname = "w:CT_DocPartTypes/w:types"))]
+  #[sdk(child(qname = "w:types"))]
   pub doc_part_types: Option<DocPartTypes>,
   /// Entry Insertion Behaviors
-  #[sdk(child(qname = "w:CT_DocPartBehaviors/w:behaviors"))]
+  #[sdk(child(qname = "w:behaviors"))]
   pub behaviors: Option<Behaviors>,
   /// Description for Entry
-  #[sdk(child(qname = "w:CT_String/w:description"))]
+  #[sdk(child(qname = "w:description"))]
   pub description: Option<Description>,
   /// Entry ID
-  #[sdk(child(qname = "w:CT_Guid/w:guid"))]
+  #[sdk(child(qname = "w:guid"))]
   pub doc_part_id: Option<DocPartId>,
 }
 /// Contents of Glossary Document Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Body/w:docPartBody")]
+#[sdk(qname = "w:docPartBody")]
 pub struct DocPartBody {
   #[sdk(
         choice(
@@ -14847,12 +14841,12 @@ pub struct DocPartBody {
     )]
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
   /// Section Properties.
-  #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
+  #[sdk(child(qname = "w:sectPr"))]
   pub section_properties: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Defines the Body Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Body/w:body")]
+#[sdk(qname = "w:body")]
 pub struct Body {
   #[sdk(
         choice(
@@ -14920,23 +14914,23 @@ pub struct Body {
     )]
   pub body_choice: Vec<BodyChoice>,
   /// Section Properties.
-  #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
+  #[sdk(child(qname = "w:sectPr"))]
   pub section_properties: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Glossary Document Entry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocPart/w:docPart")]
+#[sdk(qname = "w:docPart")]
 pub struct DocPart {
   /// Glossary Document Entry Properties
-  #[sdk(child(qname = "w:CT_DocPartPr/w:docPartPr"))]
+  #[sdk(child(qname = "w:docPartPr"))]
   pub doc_part_properties: Option<std::boxed::Box<DocPartProperties>>,
   /// Contents of Glossary Document Entry
-  #[sdk(child(qname = "w:CT_Body/w:docPartBody"))]
+  #[sdk(child(qname = "w:docPartBody"))]
   pub doc_part_body: Option<std::boxed::Box<DocPartBody>>,
 }
 /// Defines the CompatibilitySetting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CompatSetting/w:compatSetting")]
+#[sdk(qname = "w:compatSetting")]
 pub struct CompatibilitySetting {
   /// name
   #[sdk(attr(qname = "w:name"))]
@@ -14950,7 +14944,7 @@ pub struct CompatibilitySetting {
 }
 /// Table Cell Left Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:left")]
+#[sdk(qname = "w:left")]
 pub struct TableCellLeftMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -14966,7 +14960,7 @@ pub struct TableCellLeftMargin {
 }
 /// Table Cell Right Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:right")]
+#[sdk(qname = "w:right")]
 pub struct TableCellRightMargin {
   /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
@@ -14982,42 +14976,42 @@ pub struct TableCellRightMargin {
 }
 /// Table-Level Property Exceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblPrEx/w:tblPrEx")]
+#[sdk(qname = "w:tblPrEx")]
 pub struct TablePropertyExceptions {
   /// Preferred Table Width Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
+  #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
   /// Table Alignment Exception
-  #[sdk(child(qname = "w:CT_TblJc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub table_justification: Option<TableJustification>,
   /// Table Cell Spacing Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
+  #[sdk(child(qname = "w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Table Indent from Leading Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
+  #[sdk(child(qname = "w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Table Borders Exceptions
-  #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
+  #[sdk(child(qname = "w:tblBorders"))]
   pub table_borders: Option<std::boxed::Box<TableBorders>>,
   /// Table Shading Exception
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Table Layout Exception
-  #[sdk(child(qname = "w:CT_TblLayoutType/w:tblLayout"))]
+  #[sdk(child(qname = "w:tblLayout"))]
   pub table_layout: Option<TableLayout>,
   /// Table Cell Margin Exceptions
-  #[sdk(child(qname = "w:CT_TblCellMar/w:tblCellMar"))]
+  #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
   /// Table Style Conditional Formatting Settings Exception
-  #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
+  #[sdk(child(qname = "w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Revision Information for Table-Level Property Exceptions
-  #[sdk(child(qname = "w:CT_TblPrExChange/w:tblPrExChange"))]
+  #[sdk(child(qname = "w:tblPrExChange"))]
   pub table_property_exceptions_change: Option<std::boxed::Box<TablePropertyExceptionsChange>>,
 }
 /// Table Row Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrPr/w:trPr")]
+#[sdk(qname = "w:trPr")]
 pub struct TableRowProperties {
   #[sdk(
         choice(
@@ -15037,13 +15031,13 @@ pub struct TableRowProperties {
     )]
   pub table_row_properties_choice1: Vec<TableRowPropertiesChoice>,
   /// Inserted Paragraph.
-  #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
+  #[sdk(child(qname = "w:ins"))]
   pub inserted: Option<Inserted>,
   /// Deleted Paragraph.
-  #[sdk(child(qname = "w:CT_TrackChange/w:del"))]
+  #[sdk(child(qname = "w:del"))]
   pub deleted: Option<Deleted>,
   /// Revision Information for Table Row Properties.
-  #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
+  #[sdk(child(qname = "w:trPrChange"))]
   pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
   #[sdk(
         choice(
@@ -15055,7 +15049,7 @@ pub struct TableRowProperties {
 }
 /// Revision Information for Table Row Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrPrChange/w:trPrChange")]
+#[sdk(qname = "w:trPrChange")]
 pub struct TableRowPropertiesChange {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -15085,127 +15079,127 @@ pub struct TableRowPropertiesChange {
   ))]
   pub id: crate::simple_type::StringValue,
   /// Previous Table Row Properties
-  #[sdk(child(qname = "w:CT_TrPrBase/w:trPr"))]
+  #[sdk(child(qname = "w:trPr"))]
   pub previous_table_row_properties: std::boxed::Box<PreviousTableRowProperties>,
 }
 /// Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PPr/w:pPr")]
+#[sdk(qname = "w:pPr")]
 pub struct ParagraphProperties {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the ParagraphStyleId Class.
-  #[sdk(child(qname = "w:CT_String/w:pStyle"))]
+  #[sdk(child(qname = "w:pStyle"))]
   pub paragraph_style_id: Option<ParagraphStyleId>,
   /// Defines the KeepNext Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
+  #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
   /// Defines the KeepLines Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:keepLines"))]
+  #[sdk(child(qname = "w:keepLines"))]
   pub keep_lines: Option<KeepLines>,
   /// Defines the PageBreakBefore Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:pageBreakBefore"))]
+  #[sdk(child(qname = "w:pageBreakBefore"))]
   pub page_break_before: Option<PageBreakBefore>,
   /// Defines the FrameProperties Class.
-  #[sdk(child(qname = "w:CT_FramePr/w:framePr"))]
+  #[sdk(child(qname = "w:framePr"))]
   pub frame_properties: Option<FrameProperties>,
   /// Defines the WidowControl Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:widowControl"))]
+  #[sdk(child(qname = "w:widowControl"))]
   pub widow_control: Option<WidowControl>,
   /// Defines the NumberingProperties Class.
-  #[sdk(child(qname = "w:CT_NumPr/w:numPr"))]
+  #[sdk(child(qname = "w:numPr"))]
   pub numbering_properties: Option<std::boxed::Box<NumberingProperties>>,
   /// Defines the SuppressLineNumbers Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressLineNumbers"))]
+  #[sdk(child(qname = "w:suppressLineNumbers"))]
   pub suppress_line_numbers: Option<SuppressLineNumbers>,
   /// Defines the ParagraphBorders Class.
-  #[sdk(child(qname = "w:CT_PBdr/w:pBdr"))]
+  #[sdk(child(qname = "w:pBdr"))]
   pub paragraph_borders: Option<std::boxed::Box<ParagraphBorders>>,
   /// Defines the Shading Class.
-  #[sdk(child(qname = "w:CT_Shd/w:shd"))]
+  #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the Tabs Class.
-  #[sdk(child(qname = "w:CT_Tabs/w:tabs"))]
+  #[sdk(child(qname = "w:tabs"))]
   pub tabs: Option<Tabs>,
   /// Defines the SuppressAutoHyphens Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressAutoHyphens"))]
+  #[sdk(child(qname = "w:suppressAutoHyphens"))]
   pub suppress_auto_hyphens: Option<SuppressAutoHyphens>,
   /// Defines the Kinsoku Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:kinsoku"))]
+  #[sdk(child(qname = "w:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
   /// Defines the WordWrap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:wordWrap"))]
+  #[sdk(child(qname = "w:wordWrap"))]
   pub word_wrap: Option<WordWrap>,
   /// Defines the OverflowPunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:overflowPunct"))]
+  #[sdk(child(qname = "w:overflowPunct"))]
   pub overflow_punctuation: Option<OverflowPunctuation>,
   /// Defines the TopLinePunctuation Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:topLinePunct"))]
+  #[sdk(child(qname = "w:topLinePunct"))]
   pub top_line_punctuation: Option<TopLinePunctuation>,
   /// Defines the AutoSpaceDE Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDE"))]
+  #[sdk(child(qname = "w:autoSpaceDE"))]
   pub auto_space_de: Option<AutoSpaceDe>,
   /// Defines the AutoSpaceDN Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceDN"))]
+  #[sdk(child(qname = "w:autoSpaceDN"))]
   pub auto_space_dn: Option<AutoSpaceDn>,
   /// Defines the BiDi Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:bidi"))]
+  #[sdk(child(qname = "w:bidi"))]
   pub bi_di: Option<BiDi>,
   /// Defines the AdjustRightIndent Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustRightInd"))]
+  #[sdk(child(qname = "w:adjustRightInd"))]
   pub adjust_right_indent: Option<AdjustRightIndent>,
   /// Defines the SnapToGrid Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:snapToGrid"))]
+  #[sdk(child(qname = "w:snapToGrid"))]
   pub snap_to_grid: Option<SnapToGrid>,
   /// Defines the SpacingBetweenLines Class.
-  #[sdk(child(qname = "w:CT_Spacing/w:spacing"))]
+  #[sdk(child(qname = "w:spacing"))]
   pub spacing_between_lines: Option<SpacingBetweenLines>,
   /// Defines the Indentation Class.
-  #[sdk(child(qname = "w:CT_Ind/w:ind"))]
+  #[sdk(child(qname = "w:ind"))]
   pub indentation: Option<Indentation>,
   /// Defines the ContextualSpacing Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:contextualSpacing"))]
+  #[sdk(child(qname = "w:contextualSpacing"))]
   pub contextual_spacing: Option<ContextualSpacing>,
   /// Defines the MirrorIndents Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:mirrorIndents"))]
+  #[sdk(child(qname = "w:mirrorIndents"))]
   pub mirror_indents: Option<MirrorIndents>,
   /// Defines the SuppressOverlap Class.
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressOverlap"))]
+  #[sdk(child(qname = "w:suppressOverlap"))]
   pub suppress_overlap: Option<SuppressOverlap>,
   /// Defines the Justification Class.
-  #[sdk(child(qname = "w:CT_Jc/w:jc"))]
+  #[sdk(child(qname = "w:jc"))]
   pub justification: Option<Justification>,
   /// Defines the TextDirection Class.
-  #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
+  #[sdk(child(qname = "w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TextAlignment Class.
-  #[sdk(child(qname = "w:CT_TextAlignment/w:textAlignment"))]
+  #[sdk(child(qname = "w:textAlignment"))]
   pub text_alignment: Option<TextAlignment>,
   /// Defines the TextBoxTightWrap Class.
-  #[sdk(child(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap"))]
+  #[sdk(child(qname = "w:textboxTightWrap"))]
   pub text_box_tight_wrap: Option<TextBoxTightWrap>,
   /// Defines the OutlineLevel Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:outlineLvl"))]
+  #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
   /// Defines the DivId Class.
-  #[sdk(child(qname = "w:CT_NonZeroDecimalNumber/w:divId"))]
+  #[sdk(child(qname = "w:divId"))]
   pub div_id: Option<DivId>,
   /// Defines the ConditionalFormatStyle Class.
-  #[sdk(child(qname = "w:CT_Cnf/w:cnfStyle"))]
+  #[sdk(child(qname = "w:cnfStyle"))]
   pub conditional_format_style: Option<ConditionalFormatStyle>,
   /// Run Properties for the Paragraph Mark
-  #[sdk(child(qname = "w:CT_ParaRPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   pub paragraph_mark_run_properties: Option<std::boxed::Box<ParagraphMarkRunProperties>>,
   /// Section Properties
-  #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
+  #[sdk(child(qname = "w:sectPr"))]
   pub section_properties: Option<std::boxed::Box<SectionProperties>>,
   /// Defines the ParagraphPropertiesChange Class.
-  #[sdk(child(qname = "w:CT_PPrChange/w:pPrChange"))]
+  #[sdk(child(qname = "w:pPrChange"))]
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
 }
 /// Defines the Control Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Control/w:control")]
+#[sdk(qname = "w:control")]
 pub struct Control {
   /// Unique Name for Embedded Control
   #[sdk(attr(qname = "w:name"))]
@@ -15220,15 +15214,15 @@ pub struct Control {
 }
 /// Previous Table Grid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblGridBase/w:tblGrid")]
+#[sdk(qname = "w:tblGrid")]
 pub struct PreviousTableGrid {
   /// Grid Column Definition.
-  #[sdk(child(qname = "w:CT_TblGridCol/w:gridCol"))]
+  #[sdk(child(qname = "w:gridCol"))]
   pub grid_column: Vec<GridColumn>,
 }
 /// Defines the ObjectEmbed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ObjectEmbed/w:objectEmbed")]
+#[sdk(qname = "w:objectEmbed")]
 pub struct ObjectEmbed {
   /// drawAspect
   #[sdk(attr(qname = "w:drawAspect"))]
@@ -15248,7 +15242,7 @@ pub struct ObjectEmbed {
 }
 /// Defines the ObjectLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ObjectLink/w:objectLink")]
+#[sdk(qname = "w:objectLink")]
 pub struct ObjectLink {
   /// updateMode
   #[sdk(attr(qname = "w:updateMode"))]
@@ -15274,7 +15268,7 @@ pub struct ObjectLink {
 }
 /// Defines the Lock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Lock/w:lock")]
+#[sdk(qname = "w:lock")]
 pub struct Lock {
   /// Locking Type
   #[sdk(attr(qname = "w:val"))]
@@ -15282,15 +15276,15 @@ pub struct Lock {
 }
 /// Defines the SdtPlaceholder Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Placeholder/w:placeholder")]
+#[sdk(qname = "w:placeholder")]
 pub struct SdtPlaceholder {
   /// Document Part Reference
-  #[sdk(child(qname = "w:CT_String/w:docPart"))]
+  #[sdk(child(qname = "w:docPart"))]
   pub doc_part_reference: Option<DocPartReference>,
 }
 /// Defines the DataBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DataBinding/w:dataBinding")]
+#[sdk(qname = "w:dataBinding")]
 pub struct DataBinding {
   /// XML Namespace Prefix Mappings
   #[sdk(attr(qname = "w:prefixMappings"))]
@@ -15304,77 +15298,77 @@ pub struct DataBinding {
 }
 /// Defines the SdtContentComboBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtComboBox/w:comboBox")]
+#[sdk(qname = "w:comboBox")]
 pub struct SdtContentComboBox {
   /// Combo Box Last Saved Value
   #[sdk(attr(qname = "w:lastValue"))]
   pub last_value: Option<crate::simple_type::StringValue>,
   /// Combo Box List Item.
-  #[sdk(child(qname = "w:CT_SdtListItem/w:listItem"))]
+  #[sdk(child(qname = "w:listItem"))]
   pub list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentDate Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtDate/w:date")]
+#[sdk(qname = "w:date")]
 pub struct SdtContentDate {
   /// Last Known Date in XML Schema DateTime Format
   #[sdk(attr(qname = "w:fullDate"))]
   pub full_date: Option<crate::simple_type::DateTimeValue>,
   /// Date Display Mask
-  #[sdk(child(qname = "w:CT_String/w:dateFormat"))]
+  #[sdk(child(qname = "w:dateFormat"))]
   pub date_format: Option<DateFormat>,
   /// Date Picker Language ID
-  #[sdk(child(qname = "w:CT_Lang/w:lid"))]
+  #[sdk(child(qname = "w:lid"))]
   pub language_id: Option<LanguageId>,
   /// Custom XML Data Date Storage Format
-  #[sdk(child(qname = "w:CT_SdtDateMappingType/w:storeMappedDataAs"))]
+  #[sdk(child(qname = "w:storeMappedDataAs"))]
   pub sdt_date_mapping_type: Option<SdtDateMappingType>,
   /// Date Picker Calendar Type
-  #[sdk(child(qname = "w:CT_CalendarType/w:calendar"))]
+  #[sdk(child(qname = "w:calendar"))]
   pub calendar: Option<Calendar>,
 }
 /// Defines the SdtContentDocPartObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtDocPart/w:docPartObj")]
+#[sdk(qname = "w:docPartObj")]
 pub struct SdtContentDocPartObject {
   /// Document Part Gallery Filter
-  #[sdk(child(qname = "w:CT_String/w:docPartGallery"))]
+  #[sdk(child(qname = "w:docPartGallery"))]
   pub doc_part_gallery: Option<DocPartGallery>,
   /// Document Part Category Filter
-  #[sdk(child(qname = "w:CT_String/w:docPartCategory"))]
+  #[sdk(child(qname = "w:docPartCategory"))]
   pub doc_part_category: Option<DocPartCategory>,
   /// Built-In Document Part
-  #[sdk(child(qname = "w:CT_OnOff/w:docPartUnique"))]
+  #[sdk(child(qname = "w:docPartUnique"))]
   pub doc_part_unique: Option<DocPartUnique>,
 }
 /// Defines the SdtContentDocPartList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtDocPart/w:docPartList")]
+#[sdk(qname = "w:docPartList")]
 pub struct SdtContentDocPartList {
   /// Document Part Gallery Filter
-  #[sdk(child(qname = "w:CT_String/w:docPartGallery"))]
+  #[sdk(child(qname = "w:docPartGallery"))]
   pub doc_part_gallery: Option<DocPartGallery>,
   /// Document Part Category Filter
-  #[sdk(child(qname = "w:CT_String/w:docPartCategory"))]
+  #[sdk(child(qname = "w:docPartCategory"))]
   pub doc_part_category: Option<DocPartCategory>,
   /// Built-In Document Part
-  #[sdk(child(qname = "w:CT_OnOff/w:docPartUnique"))]
+  #[sdk(child(qname = "w:docPartUnique"))]
   pub doc_part_unique: Option<DocPartUnique>,
 }
 /// Defines the SdtContentDropDownList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtDropDownList/w:dropDownList")]
+#[sdk(qname = "w:dropDownList")]
 pub struct SdtContentDropDownList {
   /// Drop-down List Last Saved Value
   #[sdk(attr(qname = "w:lastValue"))]
   pub last_value: Option<crate::simple_type::StringValue>,
   /// Combo Box List Item.
-  #[sdk(child(qname = "w:CT_SdtListItem/w:listItem"))]
+  #[sdk(child(qname = "w:listItem"))]
   pub list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SdtText/w:text")]
+#[sdk(qname = "w:text")]
 pub struct SdtContentText {
   /// Allow Soft Line Breaks
   #[sdk(attr(qname = "w:multiLine"))]
@@ -15382,7 +15376,7 @@ pub struct SdtContentText {
 }
 /// Write Protection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_WriteProtection/w:writeProtection")]
+#[sdk(qname = "w:writeProtection")]
 pub struct WriteProtection {
   /// Recommend Write Protection in User Interface
   #[sdk(attr(qname = "w:recommended"))]
@@ -15441,7 +15435,7 @@ pub struct WriteProtection {
 }
 /// Document View Setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_View/w:view")]
+#[sdk(qname = "w:view")]
 pub struct View {
   /// Document View Setting  Value
   #[sdk(attr(qname = "w:val"))]
@@ -15449,7 +15443,7 @@ pub struct View {
 }
 /// Magnification Setting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Zoom/w:zoom")]
+#[sdk(qname = "w:zoom")]
 pub struct Zoom {
   /// Zoom Type
   #[sdk(attr(qname = "w:val"))]
@@ -15465,7 +15459,7 @@ pub struct Zoom {
 }
 /// Grammar Checking Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_WritingStyle/w:activeWritingStyle")]
+#[sdk(qname = "w:activeWritingStyle")]
 pub struct ActiveWritingStyle {
   /// Writing Style Language
   #[sdk(attr(qname = "w:lang"))]
@@ -15490,7 +15484,7 @@ pub struct ActiveWritingStyle {
 }
 /// Spelling and Grammatical Checking State.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Proof/w:proofState")]
+#[sdk(qname = "w:proofState")]
 pub struct ProofState {
   /// Spell Checking State
   #[sdk(attr(qname = "w:spelling"))]
@@ -15501,7 +15495,7 @@ pub struct ProofState {
 }
 /// Suggested Filtering for List of Document Styles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter")]
+#[sdk(qname = "w:stylePaneFormatFilter")]
 pub struct StylePaneFormatFilter {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15555,7 +15549,7 @@ pub struct StylePaneFormatFilter {
 }
 /// Suggested Sorting for List of Document Styles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_StylePaneSortMethods/w:stylePaneSortMethod")]
+#[sdk(qname = "w:stylePaneSortMethod")]
 pub struct StylePaneSortMethods {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15588,7 +15582,7 @@ pub struct StylePaneSortMethods {
 }
 /// Document Classification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocType/w:documentType")]
+#[sdk(qname = "w:documentType")]
 pub struct DocumentType {
   /// Document Classification Value
   #[sdk(attr(qname = "w:val"))]
@@ -15596,60 +15590,60 @@ pub struct DocumentType {
 }
 /// Mail Merge Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_MailMerge/w:mailMerge")]
+#[sdk(qname = "w:mailMerge")]
 pub struct MailMerge {
   /// Source Document Type
-  #[sdk(child(qname = "w:CT_MailMergeDocType/w:mainDocumentType"))]
+  #[sdk(child(qname = "w:mainDocumentType"))]
   pub main_document_type: Option<MainDocumentType>,
   /// Query Contains Link to External Query File
-  #[sdk(child(qname = "w:CT_OnOff/w:linkToQuery"))]
+  #[sdk(child(qname = "w:linkToQuery"))]
   pub link_to_query: Option<LinkToQuery>,
   /// Data Source Type
-  #[sdk(child(qname = "w:CT_MailMergeDataType/w:dataType"))]
+  #[sdk(child(qname = "w:dataType"))]
   pub data_type: std::boxed::Box<DataType>,
   /// Data Source Connection String
-  #[sdk(child(qname = "w:CT_String/w:connectString"))]
+  #[sdk(child(qname = "w:connectString"))]
   pub connect_string: Option<ConnectString>,
   /// Query For Data Source Records To Merge
-  #[sdk(child(qname = "w:CT_String/w:query"))]
+  #[sdk(child(qname = "w:query"))]
   pub query: Option<Query>,
   /// Data Source File Path
-  #[sdk(child(qname = "w:CT_Rel/w:dataSource"))]
+  #[sdk(child(qname = "w:dataSource"))]
   pub data_source_reference: Option<DataSourceReference>,
   /// Header Definition File Path
-  #[sdk(child(qname = "w:CT_Rel/w:headerSource"))]
+  #[sdk(child(qname = "w:headerSource"))]
   pub header_source: Option<HeaderSource>,
   /// Remove Blank Lines from Merged Documents
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotSuppressBlankLines"))]
+  #[sdk(child(qname = "w:doNotSuppressBlankLines"))]
   pub do_not_suppress_blank_lines: Option<DoNotSuppressBlankLines>,
   /// Merged Document Destination
-  #[sdk(child(qname = "w:CT_MailMergeDest/w:destination"))]
+  #[sdk(child(qname = "w:destination"))]
   pub destination: Option<Destination>,
   /// Column Containing E-mail Address
-  #[sdk(child(qname = "w:CT_String/w:addressFieldName"))]
+  #[sdk(child(qname = "w:addressFieldName"))]
   pub address_field_name: Option<AddressFieldName>,
   /// Merged E-mail or Fax Subject Line
-  #[sdk(child(qname = "w:CT_String/w:mailSubject"))]
+  #[sdk(child(qname = "w:mailSubject"))]
   pub mail_subject: Option<MailSubject>,
   /// Merged Document To E-Mail Attachment
-  #[sdk(child(qname = "w:CT_OnOff/w:mailAsAttachment"))]
+  #[sdk(child(qname = "w:mailAsAttachment"))]
   pub mail_as_attachment: Option<MailAsAttachment>,
   /// View Merged Data Within Document
-  #[sdk(child(qname = "w:CT_OnOff/w:viewMergedData"))]
+  #[sdk(child(qname = "w:viewMergedData"))]
   pub view_merged_data: Option<ViewMergedData>,
   /// Record Currently Displayed In Merged Document
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:activeRecord"))]
+  #[sdk(child(qname = "w:activeRecord"))]
   pub active_record: Option<ActiveRecord>,
   /// Mail Merge Error Reporting Setting
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:checkErrors"))]
+  #[sdk(child(qname = "w:checkErrors"))]
   pub check_errors: Option<CheckErrors>,
   /// Office Data Source Object Settings
-  #[sdk(child(qname = "w:CT_Odso/w:odso"))]
+  #[sdk(child(qname = "w:odso"))]
   pub data_source_object: Option<std::boxed::Box<DataSourceObject>>,
 }
 /// Visibility of Annotation Types.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChangesView/w:revisionView")]
+#[sdk(qname = "w:revisionView")]
 pub struct RevisionView {
   /// Display Visual Indicator Of Markup Area
   #[sdk(attr(qname = "w:markup"))]
@@ -15669,7 +15663,7 @@ pub struct RevisionView {
 }
 /// Document Editing Restrictions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocProtect/w:documentProtection")]
+#[sdk(qname = "w:documentProtection")]
 pub struct DocumentProtection {
   /// Document Editing Restrictions
   #[sdk(attr(qname = "w:edit"))]
@@ -15734,7 +15728,7 @@ pub struct DocumentProtection {
 }
 /// Distance Between Automatic Tab Stops.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TwipsMeasure/w:defaultTabStop")]
+#[sdk(qname = "w:defaultTabStop")]
 pub struct DefaultTabStop {
   /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
@@ -15749,7 +15743,7 @@ pub struct DefaultTabStop {
 }
 /// Number of Pages Per Booklet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeShort/w:bookFoldPrintingSheets")]
+#[sdk(qname = "w:bookFoldPrintingSheets")]
 pub struct BookFoldPrintingSheets {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15758,7 +15752,7 @@ pub struct BookFoldPrintingSheets {
 }
 /// Maximum Number of Consecutively Hyphenated Lines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedShortNumber/w:consecutiveHyphenLimit")]
+#[sdk(qname = "w:consecutiveHyphenLimit")]
 pub struct ConsecutiveHyphenLimit {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15766,7 +15760,7 @@ pub struct ConsecutiveHyphenLimit {
 }
 /// Percentage of Document to Use When Generating Summary.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedInt100/w:summaryLength")]
+#[sdk(qname = "w:summaryLength")]
 pub struct SummaryLength {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15775,7 +15769,7 @@ pub struct SummaryLength {
 }
 /// Distance between Horizontal Gridlines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedInt7/w:displayHorizontalDrawingGridEvery")]
+#[sdk(qname = "w:displayHorizontalDrawingGridEvery")]
 pub struct DisplayHorizontalDrawingGrid {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15784,7 +15778,7 @@ pub struct DisplayHorizontalDrawingGrid {
 }
 /// Distance between Vertical Gridlines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_UnsignedInt7/w:displayVerticalDrawingGridEvery")]
+#[sdk(qname = "w:displayVerticalDrawingGridEvery")]
 pub struct DisplayVerticalDrawingGrid {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -15793,7 +15787,7 @@ pub struct DisplayVerticalDrawingGrid {
 }
 /// Character-Level Whitespace Compression.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CharacterSpacing/w:characterSpacingControl")]
+#[sdk(qname = "w:characterSpacingControl")]
 pub struct CharacterSpacingControl {
   /// Value
   #[sdk(attr(qname = "w:val"))]
@@ -15801,7 +15795,7 @@ pub struct CharacterSpacingControl {
 }
 /// Custom Set of Characters Which Cannot End a Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_KinsokuAfter/w:noLineBreaksAfter")]
+#[sdk(qname = "w:noLineBreaksAfter")]
 pub struct NoLineBreaksAfterKinsoku {
   /// lang
   #[sdk(attr(qname = "w:lang"))]
@@ -15814,7 +15808,7 @@ pub struct NoLineBreaksAfterKinsoku {
 }
 /// Custom Set Of Characters Which Cannot Begin A Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_KinsokuBefore/w:noLineBreaksBefore")]
+#[sdk(qname = "w:noLineBreaksBefore")]
 pub struct NoLineBreaksBeforeKinsoku {
   /// lang
   #[sdk(attr(qname = "w:lang"))]
@@ -15827,7 +15821,7 @@ pub struct NoLineBreaksBeforeKinsoku {
 }
 /// Custom XSL Transform To Use When Saving As XML File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_SaveThroughXslt/w:saveThroughXslt")]
+#[sdk(qname = "w:saveThroughXslt")]
 pub struct SaveThroughXslt {
   /// XSL Transformation Location
   #[sdk(attr(qname = "r:id"))]
@@ -15838,7 +15832,7 @@ pub struct SaveThroughXslt {
 }
 /// Default Properties for VML Objects in Header and Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults")]
+#[sdk(qname = "w:hdrShapeDefaults")]
 pub struct HeaderShapeDefaults {
   #[sdk(
         choice(
@@ -15850,7 +15844,7 @@ pub struct HeaderShapeDefaults {
 }
 /// Default Properties for VML Objects in Main Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ShapeDefaults/w:shapeDefaults")]
+#[sdk(qname = "w:shapeDefaults")]
 pub struct ShapeDefaults {
   #[sdk(
         choice(
@@ -15862,269 +15856,269 @@ pub struct ShapeDefaults {
 }
 /// Document-Wide Footnote Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FtnDocProps/w:footnotePr")]
+#[sdk(qname = "w:footnotePr")]
 pub struct FootnoteDocumentWideProperties {
   /// Footnote Placement
-  #[sdk(child(qname = "w:CT_FtnPos/w:pos"))]
+  #[sdk(child(qname = "w:pos"))]
   pub footnote_position: Option<FootnotePosition>,
   /// Footnote Numbering Format
-  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
-  #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
+  #[sdk(child(qname = "w:numStart"))]
   pub numbering_start: Option<NumberingStart>,
   /// Footnote and Endnote Numbering Restart Location
-  #[sdk(child(qname = "w:CT_NumRestart/w:numRestart"))]
+  #[sdk(child(qname = "w:numRestart"))]
   pub numbering_restart: Option<NumberingRestart>,
   /// Special Footnote List.
-  #[sdk(child(qname = "w:CT_FtnEdnSepRef/w:footnote"))]
+  #[sdk(child(qname = "w:footnote"))]
   pub footnote_special_reference: Vec<FootnoteSpecialReference>,
 }
 /// Document-Wide Endnote Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_EdnDocProps/w:endnotePr")]
+#[sdk(qname = "w:endnotePr")]
 pub struct EndnoteDocumentWideProperties {
   /// Endnote Placement
-  #[sdk(child(qname = "w:CT_EdnPos/w:pos"))]
+  #[sdk(child(qname = "w:pos"))]
   pub endnote_position: Option<EndnotePosition>,
   /// Endnote Numbering Format
-  #[sdk(child(qname = "w:CT_NumFmt/w:numFmt"))]
+  #[sdk(child(qname = "w:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
   /// Footnote and Endnote Numbering Starting Value
-  #[sdk(child(qname = "w:CT_FtnEdnNumStart/w:numStart"))]
+  #[sdk(child(qname = "w:numStart"))]
   pub numbering_start: Option<NumberingStart>,
   /// Footnote and Endnote Numbering Restart Location
-  #[sdk(child(qname = "w:CT_NumRestart/w:numRestart"))]
+  #[sdk(child(qname = "w:numRestart"))]
   pub numbering_restart: Option<NumberingRestart>,
   /// Special Endnote List.
-  #[sdk(child(qname = "w:CT_FtnEdnSepRef/w:endnote"))]
+  #[sdk(child(qname = "w:endnote"))]
   pub endnote_special_reference: Vec<EndnoteSpecialReference>,
 }
 /// Compatibility Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Compat/w:compat")]
+#[sdk(qname = "w:compat")]
 pub struct Compatibility {
   /// Use Simplified Rules For Table Border Conflicts
-  #[sdk(child(qname = "w:CT_OnOff/w:useSingleBorderforContiguousCells"))]
+  #[sdk(child(qname = "w:useSingleBorderforContiguousCells"))]
   pub use_single_border_for_contiguous_cells: Option<UseSingleBorderForContiguousCells>,
   /// Emulate WordPerfect 6.x Paragraph Justification
-  #[sdk(child(qname = "w:CT_OnOff/w:wpJustification"))]
+  #[sdk(child(qname = "w:wpJustification"))]
   pub word_perfect_justification: Option<WordPerfectJustification>,
   /// Do Not Create Custom Tab Stop for Hanging Indent
-  #[sdk(child(qname = "w:CT_OnOff/w:noTabHangInd"))]
+  #[sdk(child(qname = "w:noTabHangInd"))]
   pub no_tab_hang_indent: Option<NoTabHangIndent>,
   /// Do Not Add Leading Between Lines of Text
-  #[sdk(child(qname = "w:CT_OnOff/w:noLeading"))]
+  #[sdk(child(qname = "w:noLeading"))]
   pub no_leading: Option<NoLeading>,
   /// Add Additional Space Below Baseline For Underlined East Asian Text
-  #[sdk(child(qname = "w:CT_OnOff/w:spaceForUL"))]
+  #[sdk(child(qname = "w:spaceForUL"))]
   pub space_for_underline: Option<SpaceForUnderline>,
   /// Do Not Balance Text Columns within a Section
-  #[sdk(child(qname = "w:CT_OnOff/w:noColumnBalance"))]
+  #[sdk(child(qname = "w:noColumnBalance"))]
   pub no_column_balance: Option<NoColumnBalance>,
   /// Balance Single Byte and Double Byte Characters
-  #[sdk(child(qname = "w:CT_OnOff/w:balanceSingleByteDoubleByteWidth"))]
+  #[sdk(child(qname = "w:balanceSingleByteDoubleByteWidth"))]
   pub balance_single_byte_double_byte_width: Option<BalanceSingleByteDoubleByteWidth>,
   /// Do Not Center Content on Lines With Exact Line Height
-  #[sdk(child(qname = "w:CT_OnOff/w:noExtraLineSpacing"))]
+  #[sdk(child(qname = "w:noExtraLineSpacing"))]
   pub no_extra_line_spacing: Option<NoExtraLineSpacing>,
   /// Convert Backslash To Yen Sign When Entered
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotLeaveBackslashAlone"))]
+  #[sdk(child(qname = "w:doNotLeaveBackslashAlone"))]
   pub do_not_leave_backslash_alone: Option<DoNotLeaveBackslashAlone>,
   /// Underline All Trailing Spaces
-  #[sdk(child(qname = "w:CT_OnOff/w:ulTrailSpace"))]
+  #[sdk(child(qname = "w:ulTrailSpace"))]
   pub underline_trailing_spaces: Option<UnderlineTrailingSpaces>,
   /// Don't Justify Lines Ending in Soft Line Break
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotExpandShiftReturn"))]
+  #[sdk(child(qname = "w:doNotExpandShiftReturn"))]
   pub do_not_expand_shift_return: Option<DoNotExpandShiftReturn>,
   /// Only Expand/Condense Text By Whole Points
-  #[sdk(child(qname = "w:CT_OnOff/w:spacingInWholePoints"))]
+  #[sdk(child(qname = "w:spacingInWholePoints"))]
   pub spacing_in_whole_points: Option<SpacingInWholePoints>,
   /// Emulate Word 6.0 Line Wrapping for East Asian Text
-  #[sdk(child(qname = "w:CT_OnOff/w:lineWrapLikeWord6"))]
+  #[sdk(child(qname = "w:lineWrapLikeWord6"))]
   pub line_wrap_like_word6: Option<LineWrapLikeWord6>,
   /// Print Body Text before Header/Footer Contents
-  #[sdk(child(qname = "w:CT_OnOff/w:printBodyTextBeforeHeader"))]
+  #[sdk(child(qname = "w:printBodyTextBeforeHeader"))]
   pub print_body_text_before_header: Option<PrintBodyTextBeforeHeader>,
   /// Print Colors as Black And White without Dithering
-  #[sdk(child(qname = "w:CT_OnOff/w:printColBlack"))]
+  #[sdk(child(qname = "w:printColBlack"))]
   pub print_color_black_white: Option<PrintColorBlackWhite>,
   /// Space width
-  #[sdk(child(qname = "w:CT_OnOff/w:wpSpaceWidth"))]
+  #[sdk(child(qname = "w:wpSpaceWidth"))]
   pub word_perfect_space_width: Option<WordPerfectSpaceWidth>,
   /// Display Page/Column Breaks Present in Frames
-  #[sdk(child(qname = "w:CT_OnOff/w:showBreaksInFrames"))]
+  #[sdk(child(qname = "w:showBreaksInFrames"))]
   pub show_breaks_in_frames: Option<ShowBreaksInFrames>,
   /// Increase Priority Of Font Size During Font Substitution
-  #[sdk(child(qname = "w:CT_OnOff/w:subFontBySize"))]
+  #[sdk(child(qname = "w:subFontBySize"))]
   pub sub_font_by_size: Option<SubFontBySize>,
   /// Ignore Exact Line Height for Last Line on Page
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressBottomSpacing"))]
+  #[sdk(child(qname = "w:suppressBottomSpacing"))]
   pub suppress_bottom_spacing: Option<SuppressBottomSpacing>,
   /// Ignore Minimum and Exact Line Height for First Line on Page
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressTopSpacing"))]
+  #[sdk(child(qname = "w:suppressTopSpacing"))]
   pub suppress_top_spacing: Option<SuppressTopSpacing>,
   /// Ignore Minimum Line Height for First Line on Page
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressSpacingAtTopOfPage"))]
+  #[sdk(child(qname = "w:suppressSpacingAtTopOfPage"))]
   pub suppress_spacing_at_top_of_page: Option<SuppressSpacingAtTopOfPage>,
   /// Emulate WordPerfect 5.x Line Spacing
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressTopSpacingWP"))]
+  #[sdk(child(qname = "w:suppressTopSpacingWP"))]
   pub suppress_top_spacing_word_perfect: Option<SuppressTopSpacingWordPerfect>,
   /// Do Not Use Space Before On First Line After a Page Break
-  #[sdk(child(qname = "w:CT_OnOff/w:suppressSpBfAfterPgBrk"))]
+  #[sdk(child(qname = "w:suppressSpBfAfterPgBrk"))]
   pub suppress_spacing_before_after_page_break: Option<SuppressSpacingBeforeAfterPageBreak>,
   /// Swap Paragraph Borders on Odd Numbered Pages
-  #[sdk(child(qname = "w:CT_OnOff/w:swapBordersFacingPages"))]
+  #[sdk(child(qname = "w:swapBordersFacingPages"))]
   pub swap_borders_facing_pages: Option<SwapBordersFacingPages>,
   /// Treat Backslash Quotation Delimiter as Two Quotation Marks
-  #[sdk(child(qname = "w:CT_OnOff/w:convMailMergeEsc"))]
+  #[sdk(child(qname = "w:convMailMergeEsc"))]
   pub convert_mail_merge_escape: Option<ConvertMailMergeEscape>,
   /// Emulate WordPerfect 6.x Font Height Calculation
-  #[sdk(child(qname = "w:CT_OnOff/w:truncateFontHeightsLikeWP6"))]
+  #[sdk(child(qname = "w:truncateFontHeightsLikeWP6"))]
   pub truncate_font_heights_like_word_perfect: Option<TruncateFontHeightsLikeWordPerfect>,
   /// Emulate Word 5.x for the Macintosh Small Caps Formatting
-  #[sdk(child(qname = "w:CT_OnOff/w:mwSmallCaps"))]
+  #[sdk(child(qname = "w:mwSmallCaps"))]
   pub mac_word_small_caps: Option<MacWordSmallCaps>,
   /// Use Printer Metrics To Display Documents
-  #[sdk(child(qname = "w:CT_OnOff/w:usePrinterMetrics"))]
+  #[sdk(child(qname = "w:usePrinterMetrics"))]
   pub use_printer_metrics: Option<UsePrinterMetrics>,
   /// Do Not Suppress Paragraph Borders Next To Frames
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotSuppressParagraphBorders"))]
+  #[sdk(child(qname = "w:doNotSuppressParagraphBorders"))]
   pub do_not_suppress_paragraph_borders: Option<DoNotSuppressParagraphBorders>,
   /// Line Wrap Trailing Spaces
-  #[sdk(child(qname = "w:CT_OnOff/w:wrapTrailSpaces"))]
+  #[sdk(child(qname = "w:wrapTrailSpaces"))]
   pub wrap_trail_spaces: Option<WrapTrailSpaces>,
   /// Emulate Word 6.x/95/97 Footnote Placement
-  #[sdk(child(qname = "w:CT_OnOff/w:footnoteLayoutLikeWW8"))]
+  #[sdk(child(qname = "w:footnoteLayoutLikeWW8"))]
   pub footnote_layout_like_word8: Option<FootnoteLayoutLikeWord8>,
   /// Emulate Word 97 Text Wrapping Around Floating Objects
-  #[sdk(child(qname = "w:CT_OnOff/w:shapeLayoutLikeWW8"))]
+  #[sdk(child(qname = "w:shapeLayoutLikeWW8"))]
   pub shape_layout_like_word8: Option<ShapeLayoutLikeWord8>,
   /// Align Table Rows Independently
-  #[sdk(child(qname = "w:CT_OnOff/w:alignTablesRowByRow"))]
+  #[sdk(child(qname = "w:alignTablesRowByRow"))]
   pub align_tables_row_by_row: Option<AlignTablesRowByRow>,
   /// Ignore Width of Last Tab Stop When Aligning Paragraph If It Is Not Left Aligned
-  #[sdk(child(qname = "w:CT_OnOff/w:forgetLastTabAlignment"))]
+  #[sdk(child(qname = "w:forgetLastTabAlignment"))]
   pub forget_last_tab_alignment: Option<ForgetLastTabAlignment>,
   /// Add Document Grid Line Pitch To Lines in Table Cells
-  #[sdk(child(qname = "w:CT_OnOff/w:adjustLineHeightInTable"))]
+  #[sdk(child(qname = "w:adjustLineHeightInTable"))]
   pub adjust_line_height_in_table: Option<AdjustLineHeightInTable>,
   /// Emulate Word 95 Full-Width Character Spacing
-  #[sdk(child(qname = "w:CT_OnOff/w:autoSpaceLikeWord95"))]
+  #[sdk(child(qname = "w:autoSpaceLikeWord95"))]
   pub auto_space_like_word95: Option<AutoSpaceLikeWord95>,
   /// Do Not Increase Line Height for Raised/Lowered Text
-  #[sdk(child(qname = "w:CT_OnOff/w:noSpaceRaiseLower"))]
+  #[sdk(child(qname = "w:noSpaceRaiseLower"))]
   pub no_space_raise_lower: Option<NoSpaceRaiseLower>,
   /// Use Fixed Paragraph Spacing for HTML Auto Setting
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotUseHTMLParagraphAutoSpacing"))]
+  #[sdk(child(qname = "w:doNotUseHTMLParagraphAutoSpacing"))]
   pub do_not_use_html_paragraph_auto_spacing: Option<DoNotUseHtmlParagraphAutoSpacing>,
   /// Ignore Space Before Table When Deciding If Table Should Wrap Floating Object
-  #[sdk(child(qname = "w:CT_OnOff/w:layoutRawTableWidth"))]
+  #[sdk(child(qname = "w:layoutRawTableWidth"))]
   pub layout_raw_table_width: Option<LayoutRawTableWidth>,
   /// Allow Table Rows to Wrap Inline Objects Independently
-  #[sdk(child(qname = "w:CT_OnOff/w:layoutTableRowsApart"))]
+  #[sdk(child(qname = "w:layoutTableRowsApart"))]
   pub layout_table_rows_apart: Option<LayoutTableRowsApart>,
   /// Emulate Word 97 East Asian Line Breaking
-  #[sdk(child(qname = "w:CT_OnOff/w:useWord97LineBreakRules"))]
+  #[sdk(child(qname = "w:useWord97LineBreakRules"))]
   pub use_word97_line_break_rules: Option<UseWord97LineBreakRules>,
   /// Do Not Allow Floating Tables To Break Across Pages
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotBreakWrappedTables"))]
+  #[sdk(child(qname = "w:doNotBreakWrappedTables"))]
   pub do_not_break_wrapped_tables: Option<DoNotBreakWrappedTables>,
   /// Do Not Snap to Document Grid in Table Cells with Objects
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotSnapToGridInCell"))]
+  #[sdk(child(qname = "w:doNotSnapToGridInCell"))]
   pub do_not_snap_to_grid_in_cell: Option<DoNotSnapToGridInCell>,
   /// Select Field When First or Last Character Is Selected
-  #[sdk(child(qname = "w:CT_OnOff/w:selectFldWithFirstOrLastChar"))]
+  #[sdk(child(qname = "w:selectFldWithFirstOrLastChar"))]
   pub select_field_with_first_or_last_char: Option<SelectFieldWithFirstOrLastChar>,
   /// Use Legacy Ethiopic and Amharic Line Breaking Rules
-  #[sdk(child(qname = "w:CT_OnOff/w:applyBreakingRules"))]
+  #[sdk(child(qname = "w:applyBreakingRules"))]
   pub apply_breaking_rules: Option<ApplyBreakingRules>,
   /// Do Not Allow Hanging Punctuation With Character Grid
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotWrapTextWithPunct"))]
+  #[sdk(child(qname = "w:doNotWrapTextWithPunct"))]
   pub do_not_wrap_text_with_punctuation: Option<DoNotWrapTextWithPunctuation>,
   /// Do Not Compress Compressible Characters When Using Document Grid
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotUseEastAsianBreakRules"))]
+  #[sdk(child(qname = "w:doNotUseEastAsianBreakRules"))]
   pub do_not_use_east_asian_break_rules: Option<DoNotUseEastAsianBreakRules>,
   /// Emulate Word 2002 Table Style Rules
-  #[sdk(child(qname = "w:CT_OnOff/w:useWord2002TableStyleRules"))]
+  #[sdk(child(qname = "w:useWord2002TableStyleRules"))]
   pub use_word2002_table_style_rules: Option<UseWord2002TableStyleRules>,
   /// Allow Tables to AutoFit Into Page Margins
-  #[sdk(child(qname = "w:CT_OnOff/w:growAutofit"))]
+  #[sdk(child(qname = "w:growAutofit"))]
   pub grow_autofit: Option<GrowAutofit>,
   /// Do Not Bypass East Asian/Complex Script Layout Code
-  #[sdk(child(qname = "w:CT_OnOff/w:useFELayout"))]
+  #[sdk(child(qname = "w:useFELayout"))]
   pub use_far_east_layout: Option<UseFarEastLayout>,
   /// Do Not Automatically Apply List Paragraph Style To Bulleted/Numbered Text
-  #[sdk(child(qname = "w:CT_OnOff/w:useNormalStyleForList"))]
+  #[sdk(child(qname = "w:useNormalStyleForList"))]
   pub use_normal_style_for_list: Option<UseNormalStyleForList>,
   /// Ignore Hanging Indent When Creating Tab Stop After Numbering
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotUseIndentAsNumberingTabStop"))]
+  #[sdk(child(qname = "w:doNotUseIndentAsNumberingTabStop"))]
   pub do_not_use_indent_as_numbering_tab_stop: Option<DoNotUseIndentAsNumberingTabStop>,
   /// Use Alternate Set of East Asian Line Breaking Rules
-  #[sdk(child(qname = "w:CT_OnOff/w:useAltKinsokuLineBreakRules"))]
+  #[sdk(child(qname = "w:useAltKinsokuLineBreakRules"))]
   pub use_alt_kinsoku_line_break_rules: Option<UseAltKinsokuLineBreakRules>,
   /// Allow Contextual Spacing of Paragraphs in Tables
-  #[sdk(child(qname = "w:CT_OnOff/w:allowSpaceOfSameStyleInTable"))]
+  #[sdk(child(qname = "w:allowSpaceOfSameStyleInTable"))]
   pub allow_space_of_same_style_in_table: Option<AllowSpaceOfSameStyleInTable>,
   /// Do Not Ignore Floating Objects When Calculating Paragraph Indentation
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotSuppressIndentation"))]
+  #[sdk(child(qname = "w:doNotSuppressIndentation"))]
   pub do_not_suppress_indentation: Option<DoNotSuppressIndentation>,
   /// Do Not AutoFit Tables To Fit Next To Wrapped Objects
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotAutofitConstrainedTables"))]
+  #[sdk(child(qname = "w:doNotAutofitConstrainedTables"))]
   pub do_not_autofit_constrained_tables: Option<DoNotAutofitConstrainedTables>,
   /// Allow Table Columns To Exceed Preferred Widths of Constituent Cells
-  #[sdk(child(qname = "w:CT_OnOff/w:autofitToFirstFixedWidthCell"))]
+  #[sdk(child(qname = "w:autofitToFirstFixedWidthCell"))]
   pub autofit_to_first_fixed_width_cell: Option<AutofitToFirstFixedWidthCell>,
   /// Underline Following Character Following Numbering
-  #[sdk(child(qname = "w:CT_OnOff/w:underlineTabInNumList"))]
+  #[sdk(child(qname = "w:underlineTabInNumList"))]
   pub underline_tab_in_numbering_list: Option<UnderlineTabInNumberingList>,
   /// Always Use Fixed Width for Hangul Characters
-  #[sdk(child(qname = "w:CT_OnOff/w:displayHangulFixedWidth"))]
+  #[sdk(child(qname = "w:displayHangulFixedWidth"))]
   pub display_hangul_fixed_width: Option<DisplayHangulFixedWidth>,
   /// Always Move Paragraph Mark to Page after a Page Break
-  #[sdk(child(qname = "w:CT_OnOff/w:splitPgBreakAndParaMark"))]
+  #[sdk(child(qname = "w:splitPgBreakAndParaMark"))]
   pub split_page_break_and_paragraph_mark: Option<SplitPageBreakAndParagraphMark>,
   /// Don't Vertically Align Cells Containing Floating Objects
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotVertAlignCellWithSp"))]
+  #[sdk(child(qname = "w:doNotVertAlignCellWithSp"))]
   pub do_not_vertically_align_cell_with_shape: Option<DoNotVerticallyAlignCellWithShape>,
   /// Don't Break Table Rows Around Floating Tables
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotBreakConstrainedForcedTable"))]
+  #[sdk(child(qname = "w:doNotBreakConstrainedForcedTable"))]
   pub do_not_break_constrained_forced_table: Option<DoNotBreakConstrainedForcedTable>,
   /// Ignore Vertical Alignment in Textboxes
-  #[sdk(child(qname = "w:CT_OnOff/w:doNotVertAlignInTxbx"))]
+  #[sdk(child(qname = "w:doNotVertAlignInTxbx"))]
   pub do_not_vertically_align_in_text_box: Option<DoNotVerticallyAlignInTextBox>,
   /// Use ANSI Kerning Pairs from Fonts
-  #[sdk(child(qname = "w:CT_OnOff/w:useAnsiKerningPairs"))]
+  #[sdk(child(qname = "w:useAnsiKerningPairs"))]
   pub use_ansi_kerning_pairs: Option<UseAnsiKerningPairs>,
   /// Use Cached Paragraph Information for Column Balancing
-  #[sdk(child(qname = "w:CT_OnOff/w:cachedColBalance"))]
+  #[sdk(child(qname = "w:cachedColBalance"))]
   pub cached_column_balance: Option<CachedColumnBalance>,
   /// Defines the CompatibilitySetting Class.
-  #[sdk(child(qname = "w:CT_CompatSetting/w:compatSetting"))]
+  #[sdk(child(qname = "w:compatSetting"))]
   pub compatibility_setting: Vec<CompatibilitySetting>,
 }
 /// Document Variables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocVars/w:docVars")]
+#[sdk(qname = "w:docVars")]
 pub struct DocumentVariables {
   /// Single Document Variable.
-  #[sdk(child(qname = "w:CT_DocVar/w:docVar"))]
+  #[sdk(child(qname = "w:docVar"))]
   pub document_variable: Vec<DocumentVariable>,
 }
 /// Listing of All Revision Save ID Values.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DocRsids/w:rsids")]
+#[sdk(qname = "w:rsids")]
 pub struct Rsids {
   /// Original Document Revision Save ID
-  #[sdk(child(qname = "w:CT_LongHexNumber/w:rsidRoot"))]
+  #[sdk(child(qname = "w:rsidRoot"))]
   pub rsid_root: Option<RsidRoot>,
   /// Single Session Revision Save ID.
-  #[sdk(child(qname = "w:CT_LongHexNumber/w:rsid"))]
+  #[sdk(child(qname = "w:rsid"))]
   pub rsid: Vec<Rsid>,
 }
 /// Theme Color Mappings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ColorSchemeMapping/w:clrSchemeMapping")]
+#[sdk(qname = "w:clrSchemeMapping")]
 pub struct ColorSchemeMapping {
   /// Background 1 Theme Color Mapping
   #[sdk(attr(qname = "w:bg1"))]
@@ -16165,18 +16159,18 @@ pub struct ColorSchemeMapping {
 }
 /// Caption Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Captions/w:captions")]
+#[sdk(qname = "w:captions")]
 pub struct Captions {
   /// Single Caption Type Definition.
-  #[sdk(child(qname = "w:CT_Caption/w:caption"))]
+  #[sdk(child(qname = "w:caption"))]
   pub caption: Vec<Caption>,
   /// Automatic Captioning Settings.
-  #[sdk(child(qname = "w:CT_AutoCaptions/w:autoCaptions"))]
+  #[sdk(child(qname = "w:autoCaptions"))]
   pub auto_captions: Option<AutoCaptions>,
 }
 /// Freeze Document Layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ReadingModeInkLockDown/w:readModeInkLockDown")]
+#[sdk(qname = "w:readModeInkLockDown")]
 pub struct ReadModeInkLockDown {
   /// Use Actual Pages, Not Virtual Pages
   #[sdk(attr(qname = "w:actualPg"))]
@@ -16198,7 +16192,7 @@ pub struct ReadModeInkLockDown {
 }
 /// Defines the TargetScreenSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TargetScreenSz/w:targetScreenSz")]
+#[sdk(qname = "w:targetScreenSz")]
 pub struct TargetScreenSize {
   /// Target Screen Size Value
   #[sdk(attr(qname = "w:val"))]
@@ -16206,7 +16200,7 @@ pub struct TargetScreenSize {
 }
 /// Defines the PictureBulletBase Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_PictureBulletBase/w:pict")]
+#[sdk(qname = "w:pict")]
 pub struct PictureBulletBase {
   #[sdk(
         choice(
@@ -16225,7 +16219,7 @@ pub struct PictureBulletBase {
 }
 /// Defines the Panose1Number Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Panose/w:panose1")]
+#[sdk(qname = "w:panose1")]
 pub struct Panose1Number {
   /// Value
   #[sdk(attr(qname = "w:val"))]
@@ -16234,7 +16228,7 @@ pub struct Panose1Number {
 }
 /// Defines the FontCharSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_CharacterSet/w:charset")]
+#[sdk(qname = "w:charset")]
 pub struct FontCharSet {
   /// val
   #[sdk(attr(qname = "w:val"))]
@@ -16247,7 +16241,7 @@ pub struct FontCharSet {
 }
 /// Defines the FontFamily Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontFamily/w:family")]
+#[sdk(qname = "w:family")]
 pub struct FontFamily {
   /// Font Family Value
   #[sdk(attr(qname = "w:val"))]
@@ -16255,7 +16249,7 @@ pub struct FontFamily {
 }
 /// Defines the Pitch Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Pitch/w:pitch")]
+#[sdk(qname = "w:pitch")]
 pub struct Pitch {
   /// Value
   #[sdk(attr(qname = "w:val"))]
@@ -16263,7 +16257,7 @@ pub struct Pitch {
 }
 /// Defines the FontSignature Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontSig/w:sig")]
+#[sdk(qname = "w:sig")]
 pub struct FontSignature {
   /// First 32 Bits of Unicode Subset Bitfield
   #[sdk(attr(qname = "w:usb0"))]
@@ -16292,7 +16286,7 @@ pub struct FontSignature {
 }
 /// Defines the EmbedRegularFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontRel/w:embedRegular")]
+#[sdk(qname = "w:embedRegular")]
 pub struct EmbedRegularFont {
   /// fontKey
   #[sdk(attr(qname = "w:fontKey"))]
@@ -16308,7 +16302,7 @@ pub struct EmbedRegularFont {
 }
 /// Defines the EmbedBoldFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontRel/w:embedBold")]
+#[sdk(qname = "w:embedBold")]
 pub struct EmbedBoldFont {
   /// fontKey
   #[sdk(attr(qname = "w:fontKey"))]
@@ -16324,7 +16318,7 @@ pub struct EmbedBoldFont {
 }
 /// Defines the EmbedItalicFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontRel/w:embedItalic")]
+#[sdk(qname = "w:embedItalic")]
 pub struct EmbedItalicFont {
   /// fontKey
   #[sdk(attr(qname = "w:fontKey"))]
@@ -16340,7 +16334,7 @@ pub struct EmbedItalicFont {
 }
 /// Defines the EmbedBoldItalicFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_FontRel/w:embedBoldItalic")]
+#[sdk(qname = "w:embedBoldItalic")]
 pub struct EmbedBoldItalicFont {
   /// fontKey
   #[sdk(attr(qname = "w:fontKey"))]
@@ -16356,16 +16350,16 @@ pub struct EmbedBoldItalicFont {
 }
 /// Defines the LevelOverride Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NumLvl/w:lvlOverride")]
+#[sdk(qname = "w:lvlOverride")]
 pub struct LevelOverride {
   /// Numbering Level ID
   #[sdk(attr(qname = "w:ilvl"))]
   pub level_index: crate::simple_type::Int32Value,
   /// Numbering Level Starting Value Override
-  #[sdk(child(qname = "w:CT_DecimalNumber/w:startOverride"))]
+  #[sdk(child(qname = "w:startOverride"))]
   pub start_override_numbering_value: Option<StartOverrideNumberingValue>,
   /// Numbering Level Override Definition
-  #[sdk(child(qname = "w:CT_Lvl/w:lvl"))]
+  #[sdk(child(qname = "w:lvl"))]
   pub level: Option<std::boxed::Box<Level>>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -16434,10 +16428,7 @@ pub enum PictureChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FieldCharChoice {
   /// Custom Field Data.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "w:CT_Base64BinaryText/w:fldData"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
   FieldData(FieldData),
   /// Form Field Properties.
   FormFieldData(std::boxed::Box<FormFieldData>),
@@ -16532,14 +16523,14 @@ pub enum RunPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum InsertedMathControlChoice {
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the DeletedMathControl Class.
   DeletedMathControl(std::boxed::Box<DeletedMathControl>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromMathControlChoice {
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<InsertedMathControl>),
@@ -16548,7 +16539,7 @@ pub enum MoveFromMathControlChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToMathControlChoice {
-  #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
+  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<InsertedMathControl>),
@@ -16564,7 +16555,7 @@ pub enum CustomXmlRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16679,7 +16670,7 @@ pub enum CustomXmlRubyChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -16691,7 +16682,7 @@ pub enum SimpleFieldRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16806,7 +16797,7 @@ pub enum SimpleFieldRubyChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -16818,7 +16809,7 @@ pub enum HyperlinkRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16905,7 +16896,7 @@ pub enum HyperlinkRubyChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -16921,54 +16912,54 @@ pub enum RunChoice {
   /// Deleted Field Code.
   DeletedFieldCode(std::boxed::Box<DeletedFieldCode>),
   /// Non Breaking Hyphen Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:noBreakHyphen"))]
+  #[sdk(empty_child(qname = "w:noBreakHyphen"))]
   NoBreakHyphen,
   /// Optional Hyphen Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:softHyphen"))]
+  #[sdk(empty_child(qname = "w:softHyphen"))]
   SoftHyphen,
   /// Date Block - Short Day Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:dayShort"))]
+  #[sdk(empty_child(qname = "w:dayShort"))]
   DayShort,
   /// Date Block - Short Month Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:monthShort"))]
+  #[sdk(empty_child(qname = "w:monthShort"))]
   MonthShort,
   /// Date Block - Short Year Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:yearShort"))]
+  #[sdk(empty_child(qname = "w:yearShort"))]
   YearShort,
   /// Date Block - Long Day Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:dayLong"))]
+  #[sdk(empty_child(qname = "w:dayLong"))]
   DayLong,
   /// Date Block - Long Month Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:monthLong"))]
+  #[sdk(empty_child(qname = "w:monthLong"))]
   MonthLong,
   /// Date Block - Long Year Format.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:yearLong"))]
+  #[sdk(empty_child(qname = "w:yearLong"))]
   YearLong,
   /// Comment Information Block.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:annotationRef"))]
+  #[sdk(empty_child(qname = "w:annotationRef"))]
   AnnotationReferenceMark,
   /// Footnote Reference Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:footnoteRef"))]
+  #[sdk(empty_child(qname = "w:footnoteRef"))]
   FootnoteReferenceMark,
   /// Endnote Reference Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:endnoteRef"))]
+  #[sdk(empty_child(qname = "w:endnoteRef"))]
   EndnoteReferenceMark,
   /// Footnote/Endnote Separator Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:separator"))]
+  #[sdk(empty_child(qname = "w:separator"))]
   SeparatorMark,
   /// Continuation Separator Mark.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:continuationSeparator"))]
+  #[sdk(empty_child(qname = "w:continuationSeparator"))]
   ContinuationSeparatorMark,
   /// Symbol Character.
   SymbolChar(std::boxed::Box<SymbolChar>),
   /// Page Number Block.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:pgNum"))]
+  #[sdk(empty_child(qname = "w:pgNum"))]
   PageNumber,
   /// Carriage Return.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:cr"))]
+  #[sdk(empty_child(qname = "w:cr"))]
   CarriageReturn,
   /// Tab Character.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:tab"))]
+  #[sdk(empty_child(qname = "w:tab"))]
   TabChar,
   /// Inline Embedded Object.
   EmbeddedObject(std::boxed::Box<EmbeddedObject>),
@@ -16989,7 +16980,7 @@ pub enum RunChoice {
   /// Absolute Position Tab Character.
   PositionalTab(std::boxed::Box<PositionalTab>),
   /// Position of Last Calculated Page Break.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:lastRenderedPageBreak"))]
+  #[sdk(empty_child(qname = "w:lastRenderedPageBreak"))]
   LastRenderedPageBreak,
   /// Unknown XML child.
   #[sdk(any)]
@@ -17161,10 +17152,10 @@ pub enum InsertedRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -17286,10 +17277,10 @@ pub enum DeletedRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -17411,10 +17402,10 @@ pub enum MoveFromRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -17536,10 +17527,10 @@ pub enum MoveToRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -17848,10 +17839,10 @@ pub enum ParagraphChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18526,10 +18517,10 @@ pub enum CustomXmlRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18659,10 +18650,10 @@ pub enum SimpleFieldChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18764,10 +18755,10 @@ pub enum HyperlinkChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18869,10 +18860,10 @@ pub enum BidirectionalOverrideChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18974,10 +18965,10 @@ pub enum BidirectionalEmbeddingChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -19552,7 +19543,7 @@ pub enum RubyContentChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -19639,7 +19630,7 @@ pub enum RubyContentChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -19651,7 +19642,7 @@ pub enum RubyBaseChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -19738,7 +19729,7 @@ pub enum RubyBaseChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -19754,9 +19745,9 @@ pub enum SdtPropertiesChoice {
   /// Defines the ShowingPlaceholder Class.
   ShowingPlaceholder(std::boxed::Box<ShowingPlaceholder>),
   /// Defines the DataBinding Class.
-  #[sdk(child(qname = "w:CT_DataBinding/w:dataBinding"))]
+  #[sdk(child(qname = "w:dataBinding"))]
   WDataBinding(std::boxed::Box<DataBinding>),
-  #[sdk(child(office2013, qname = "w:CT_DataBinding/w15:dataBinding"))]
+  #[sdk(child(office2013, qname = "w15:dataBinding"))]
   W15DataBinding(std::boxed::Box<crate::schemas::w15::DataBinding>),
   /// Defines the TemporarySdt Class.
   TemporarySdt(std::boxed::Box<TemporarySdt>),
@@ -19769,7 +19760,7 @@ pub enum SdtPropertiesChoice {
   WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
   WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
   /// Defines the SdtContentEquation Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:equation"))]
+  #[sdk(empty_child(qname = "w:equation"))]
   SdtContentEquation,
   /// Defines the SdtContentComboBox Class.
   SdtContentComboBox(std::boxed::Box<SdtContentComboBox>),
@@ -19782,29 +19773,29 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtContentDropDownList Class.
   SdtContentDropDownList(std::boxed::Box<SdtContentDropDownList>),
   /// Defines the SdtContentPicture Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:picture"))]
+  #[sdk(empty_child(qname = "w:picture"))]
   SdtContentPicture,
   /// Defines the SdtContentRichText Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:richText"))]
+  #[sdk(empty_child(qname = "w:richText"))]
   SdtContentRichText,
   /// Defines the SdtContentText Class.
   SdtContentText(std::boxed::Box<SdtContentText>),
   /// Defines the SdtContentCitation Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:citation"))]
+  #[sdk(empty_child(qname = "w:citation"))]
   SdtContentCitation,
   /// Defines the SdtContentGroup Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:group"))]
+  #[sdk(empty_child(qname = "w:group"))]
   SdtContentGroup,
   /// Defines the SdtContentBibliography Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w:bibliography"))]
+  #[sdk(empty_child(qname = "w:bibliography"))]
   SdtContentBibliography,
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:entityPicker"))]
+  #[sdk(empty_child(office2010, qname = "w14:entityPicker"))]
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(office2013, qname = "w:CT_Empty/w15:repeatingSectionItem"))]
+  #[sdk(empty_child(office2013, qname = "w15:repeatingSectionItem"))]
   SdtRepeatedSectionItem,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -19882,7 +19873,7 @@ pub enum SdtContentBlockChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtContentRunChoice {
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -19976,7 +19967,7 @@ pub enum SdtContentRunChoice {
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -19994,7 +19985,7 @@ pub enum SdtContentRunRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -20081,7 +20072,7 @@ pub enum SdtContentRunRubyChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

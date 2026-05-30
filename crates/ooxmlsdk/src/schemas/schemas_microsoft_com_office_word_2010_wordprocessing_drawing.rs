@@ -42,7 +42,7 @@ pub type PercentagePositionHeightOffset = crate::simple_type::DrawingmlPercentag
 pub type PercentagePositionVerticalOffset = crate::simple_type::DrawingmlPercentageValue;
 /// Defines the RelativeWidth Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wp14:CT_SizeRelH/wp14:sizeRelH")]
+#[sdk(office2010, qname = "wp14:sizeRelH")]
 pub struct RelativeWidth {
   /// relativeFrom
   #[sdk(attr(office2010, qname = ":relativeFrom"))]
@@ -52,13 +52,13 @@ pub struct RelativeWidth {
   #[sdk(text_child(
     office2010,
     simple_type = "PositiveDrawingmlPercentageValue",
-    qname = "a:ST_PositivePercentage/wp14:pctWidth"
+    qname = "wp14:pctWidth"
   ))]
   pub percentage_width: PercentageWidth,
 }
 /// Defines the RelativeHeight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wp14:CT_SizeRelV/wp14:sizeRelV")]
+#[sdk(office2010, qname = "wp14:sizeRelV")]
 pub struct RelativeHeight {
   /// relativeFrom
   #[sdk(attr(office2010, qname = ":relativeFrom"))]
@@ -68,7 +68,7 @@ pub struct RelativeHeight {
   #[sdk(text_child(
     office2010,
     simple_type = "PositiveDrawingmlPercentageValue",
-    qname = "a:ST_PositivePercentage/wp14:pctHeight"
+    qname = "wp14:pctHeight"
   ))]
   pub percentage_height: PercentageHeight,
 }

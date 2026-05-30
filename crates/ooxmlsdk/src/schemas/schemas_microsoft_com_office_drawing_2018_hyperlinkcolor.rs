@@ -14,7 +14,7 @@ pub enum HyperlinkColorEnum {
 }
 /// Defines the HyperlinkColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr")]
+#[sdk(office2019, qname = "ahyp:hlinkClr")]
 pub struct HyperlinkColor {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val

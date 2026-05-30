@@ -14,21 +14,15 @@ pub enum STorageType {
 }
 /// Defines the NumberDiagramInfoList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2019,
-  qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"
-)]
+#[sdk(office2019, qname = "dgm1611:autoBuNodeInfoLst")]
 pub struct NumberDiagramInfoList {
   /// Defines the NumberDiagramInfo Class.
-  #[sdk(child(
-    office2019,
-    qname = "dgm1611:CT_NumberDiagramInfo/dgm1611:autoBuNodeInfo"
-  ))]
+  #[sdk(child(office2019, qname = "dgm1611:autoBuNodeInfo"))]
   pub number_diagram_info: Vec<NumberDiagramInfo>,
 }
 /// Defines the DiagramAutoBullet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr")]
+#[sdk(office2019, qname = "dgm1611:buPr")]
 pub struct DiagramAutoBullet {
   /// prefix
   #[sdk(attr(office2019, qname = ":prefix"))]
@@ -48,10 +42,7 @@ pub struct DiagramAutoBullet {
 }
 /// Defines the NumberDiagramInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2019,
-  qname = "dgm1611:CT_NumberDiagramInfo/dgm1611:autoBuNodeInfo"
-)]
+#[sdk(office2019, qname = "dgm1611:autoBuNodeInfo")]
 pub struct NumberDiagramInfo {
   /// lvl
   #[sdk(attr(office2019, qname = ":lvl"))]
@@ -61,13 +52,13 @@ pub struct NumberDiagramInfo {
   #[sdk(string_format(kind = "token"))]
   pub pt_type: STorageType,
   /// Defines the DiagramAutoBullet Class.
-  #[sdk(child(office2019, qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr"))]
+  #[sdk(child(office2019, qname = "dgm1611:buPr"))]
   pub diagram_auto_bullet: std::boxed::Box<DiagramAutoBullet>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramAutoBulletChoice {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
+  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),

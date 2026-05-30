@@ -18,10 +18,7 @@ pub enum ClassificationOutcomeType {
 }
 /// Defines the ClassificationOutcome Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2019,
-  qname = "p184:CT_ClassificationOutcome/p184:classification"
-)]
+#[sdk(office2019, qname = "p184:classification")]
 pub struct ClassificationOutcome {
   /// val
   #[sdk(attr(office2019, qname = ":val"))]

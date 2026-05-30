@@ -6,7 +6,7 @@
 
 /// Defines the WebVideoProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "wp15:CT_WebVideoPr/wp15:webVideoPr")]
+#[sdk(office2013, qname = "wp15:webVideoPr")]
 pub struct WebVideoProperty {
   /// embeddedHtml
   #[sdk(attr(office2013, qname = ":embeddedHtml"))]

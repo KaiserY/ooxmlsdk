@@ -18,10 +18,7 @@ pub enum ClassificationOutcomeType {
 }
 /// Defines the ClassificationOutcome Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "aclsh:CT_ClassificationOutcome/aclsh:classification"
-)]
+#[sdk(office2021, qname = "aclsh:classification")]
 pub struct ClassificationOutcome {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// classificationOutcomeType

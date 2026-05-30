@@ -10,20 +10,12 @@ pub type Key = crate::simple_type::StringValue;
 pub type Value = crate::simple_type::StringValue;
 /// Defines the RoamingProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "pRoam:CT_RoamingProperty/pRoam:props")]
+#[sdk(office2013, qname = "pRoam:props")]
 pub struct RoamingProperty {
   /// Defines the Key Class.
-  #[sdk(text_child(
-    office2013,
-    simple_type = "StringValue",
-    qname = "xsd:string/pRoam:key"
-  ))]
+  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "pRoam:key"))]
   pub key: Key,
   /// Defines the Value Class.
-  #[sdk(text_child(
-    office2013,
-    simple_type = "StringValue",
-    qname = "xsd:string/pRoam:value"
-  ))]
+  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "pRoam:value"))]
   pub value: Value,
 }

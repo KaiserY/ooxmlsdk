@@ -6,7 +6,7 @@
 
 /// Defines the PresetTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_PresetTransition/p15:prstTrans")]
+#[sdk(office2013, qname = "p15:prstTrans")]
 pub struct PresetTransition {
   /// prst
   #[sdk(attr(office2013, qname = ":prst"))]
@@ -20,7 +20,7 @@ pub struct PresetTransition {
 }
 /// Defines the PresenceInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_PresenceInfo/p15:presenceInfo")]
+#[sdk(office2013, qname = "p15:presenceInfo")]
 pub struct PresenceInfo {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// userId
@@ -32,45 +32,42 @@ pub struct PresenceInfo {
 }
 /// Defines the ThreadingInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_CommentThreading/p15:threadingInfo")]
+#[sdk(office2013, qname = "p15:threadingInfo")]
 pub struct ThreadingInfo {
   /// timeZoneBias
   #[sdk(attr(office2013, qname = ":timeZoneBias"))]
   pub time_zone_bias: Option<crate::simple_type::Int32Value>,
   /// Defines the ParentCommentIdentifier Class.
-  #[sdk(child(office2013, qname = "p15:CT_ParentCommentIdentifier/p15:parentCm"))]
+  #[sdk(child(office2013, qname = "p15:parentCm"))]
   pub parent_comment_identifier: Option<ParentCommentIdentifier>,
 }
 /// Defines the SlideGuideList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst")]
+#[sdk(office2013, qname = "p15:sldGuideLst")]
 pub struct SlideGuideList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ExtendedGuide Class.
-  #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
+  #[sdk(child(office2013, qname = "p15:guide"))]
   pub extended_guide: Vec<ExtendedGuide>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
+  #[sdk(child(office2013, qname = "p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the NotesGuideList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst")]
+#[sdk(office2013, qname = "p15:notesGuideLst")]
 pub struct NotesGuideList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ExtendedGuide Class.
-  #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
+  #[sdk(child(office2013, qname = "p15:guide"))]
   pub extended_guide: Vec<ExtendedGuide>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
+  #[sdk(child(office2013, qname = "p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ChartTrackingReferenceBased Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"
-)]
+#[sdk(office2013, qname = "p15:chartTrackingRefBased")]
 pub struct ChartTrackingReferenceBased {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -79,7 +76,7 @@ pub struct ChartTrackingReferenceBased {
 }
 /// Defines the ParentCommentIdentifier Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_ParentCommentIdentifier/p15:parentCm")]
+#[sdk(office2013, qname = "p15:parentCm")]
 pub struct ParentCommentIdentifier {
   /// authorId
   #[sdk(attr(office2013, qname = ":authorId"))]
@@ -90,7 +87,7 @@ pub struct ParentCommentIdentifier {
 }
 /// Defines the ColorType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "a:CT_Color/p15:clr")]
+#[sdk(office2013, qname = "p15:clr")]
 pub struct ColorType {
   #[sdk(
         choice(
@@ -106,15 +103,15 @@ pub struct ColorType {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p:CT_ExtensionList/p15:extLst")]
+#[sdk(office2013, qname = "p15:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "p:CT_Extension/p:ext"))]
+  #[sdk(child(qname = "p:ext"))]
   pub extension: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the ExtendedGuide Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_ExtendedGuide/p15:guide")]
+#[sdk(office2013, qname = "p15:guide")]
 pub struct ExtendedGuide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
@@ -134,10 +131,10 @@ pub struct ExtendedGuide {
   #[sdk(attr(office2013, qname = ":userDrawn"))]
   pub is_user_drawn: Option<crate::simple_type::BooleanValue>,
   /// Defines the ColorType Class.
-  #[sdk(child(office2013, qname = "a:CT_Color/p15:clr"))]
+  #[sdk(child(office2013, qname = "p15:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
+  #[sdk(child(office2013, qname = "p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

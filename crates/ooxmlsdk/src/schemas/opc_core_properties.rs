@@ -12,55 +12,55 @@ pub enum XsiTypeValue {
 }
 /// Core File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cp:CT_CoreProperties/cp:coreProperties")]
+#[sdk(qname = "cp:coreProperties")]
 pub struct CoreProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// cp:category
-  #[sdk(text_child(qname = "cp:CT_Category/cp:category"))]
+  #[sdk(text_child(qname = "cp:category"))]
   pub category: Option<Category>,
   /// cp:contentStatus
-  #[sdk(text_child(qname = "cp:CT_ContentStatus/cp:contentStatus"))]
+  #[sdk(text_child(qname = "cp:contentStatus"))]
   pub content_status: Option<ContentStatus>,
   /// dcterms:created
-  #[sdk(child(qname = "dcterms:CT_Created/dcterms:created"))]
+  #[sdk(child(qname = "dcterms:created"))]
   pub created: Option<Created>,
   /// dc:creator
-  #[sdk(text_child(qname = "dc:CT_Creator/dc:creator"))]
+  #[sdk(text_child(qname = "dc:creator"))]
   pub creator: Option<Creator>,
   /// dc:description
-  #[sdk(text_child(qname = "dc:CT_Description/dc:description"))]
+  #[sdk(text_child(qname = "dc:description"))]
   pub description: Option<Description>,
   /// dc:identifier
-  #[sdk(text_child(qname = "dc:CT_Identifier/dc:identifier"))]
+  #[sdk(text_child(qname = "dc:identifier"))]
   pub identifier: Option<Identifier>,
   /// cp:keywords
-  #[sdk(child(qname = "cp:CT_Keywords/cp:keywords"))]
+  #[sdk(child(qname = "cp:keywords"))]
   pub keywords: Option<Keywords>,
   /// dc:language
-  #[sdk(text_child(qname = "dc:CT_Language/dc:language"))]
+  #[sdk(text_child(qname = "dc:language"))]
   pub language: Option<Language>,
   /// cp:lastModifiedBy
-  #[sdk(text_child(qname = "cp:CT_LastModifiedBy/cp:lastModifiedBy"))]
+  #[sdk(text_child(qname = "cp:lastModifiedBy"))]
   pub last_modified_by: Option<LastModifiedBy>,
   /// cp:lastPrinted
-  #[sdk(text_child(qname = "cp:CT_LastPrinted/cp:lastPrinted"))]
+  #[sdk(text_child(qname = "cp:lastPrinted"))]
   pub last_printed: Option<LastPrinted>,
   /// dcterms:modified
-  #[sdk(child(qname = "dcterms:CT_Modified/dcterms:modified"))]
+  #[sdk(child(qname = "dcterms:modified"))]
   pub modified: Option<Modified>,
   /// cp:revision
-  #[sdk(text_child(qname = "cp:CT_Revision/cp:revision"))]
+  #[sdk(text_child(qname = "cp:revision"))]
   pub revision: Option<Revision>,
   /// dc:subject
-  #[sdk(text_child(qname = "dc:CT_Subject/dc:subject"))]
+  #[sdk(text_child(qname = "dc:subject"))]
   pub subject: Option<Subject>,
   /// dc:title
-  #[sdk(text_child(qname = "dc:CT_Title/dc:title"))]
+  #[sdk(text_child(qname = "dc:title"))]
   pub title: Option<Title>,
   /// cp:version
-  #[sdk(text_child(qname = "cp:CT_Version/cp:version"))]
+  #[sdk(text_child(qname = "cp:version"))]
   pub version: Option<Version>,
 }
 /// cp:category
@@ -69,7 +69,7 @@ pub type Category = crate::simple_type::StringValue;
 pub type ContentStatus = crate::simple_type::StringValue;
 /// dcterms:created
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dcterms:CT_Created/dcterms:created")]
+#[sdk(qname = "dcterms:created")]
 pub struct Created {
   /// type
   #[sdk(attr(qname = "xsi:type"))]
@@ -91,7 +91,7 @@ pub type LastModifiedBy = crate::simple_type::StringValue;
 pub type LastPrinted = crate::simple_type::StringValue;
 /// dcterms:modified
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dcterms:CT_Modified/dcterms:modified")]
+#[sdk(qname = "dcterms:modified")]
 pub struct Modified {
   /// type
   #[sdk(attr(qname = "xsi:type"))]
@@ -109,7 +109,7 @@ pub type Title = crate::simple_type::StringValue;
 pub type Version = crate::simple_type::StringValue;
 /// Keywords.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cp:CT_Keywords/cp:keywords")]
+#[sdk(qname = "cp:keywords")]
 pub struct Keywords {
   /// lang
   #[sdk(attr(qname = "xml:lang"))]
@@ -117,12 +117,12 @@ pub struct Keywords {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
   /// cp:value
-  #[sdk(child(qname = "cp:CT_Keyword/cp:value"))]
+  #[sdk(child(qname = "cp:value"))]
   pub value: Vec<Keyword>,
 }
 /// Keyword.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cp:CT_Keyword/cp:value")]
+#[sdk(qname = "cp:value")]
 pub struct Keyword {
   /// lang
   #[sdk(attr(qname = "xml:lang"))]

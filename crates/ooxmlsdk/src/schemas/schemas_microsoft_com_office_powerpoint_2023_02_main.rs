@@ -6,18 +6,15 @@
 
 /// Defines the PlaceholderTypeExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt"
-)]
+#[sdk(microsoft365, qname = "p232:phTypeExt")]
 pub struct PlaceholderTypeExtension {
   /// Defines the PlaceholderTypeACB Class.
-  #[sdk(child(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type"))]
+  #[sdk(child(microsoft365, qname = "p232:type"))]
   pub placeholder_type_acb: std::boxed::Box<PlaceholderTypeAcb>,
 }
 /// Defines the PlaceholderTypeACB Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type")]
+#[sdk(microsoft365, qname = "p232:type")]
 pub struct PlaceholderTypeAcb {
   #[sdk(
         choice(
@@ -30,9 +27,9 @@ pub struct PlaceholderTypeAcb {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlaceholderTypeAcbChoice {
   /// Defines the CameoEmpty Class.
-  #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p232:cameo"))]
+  #[sdk(empty_child(microsoft365, qname = "p232:cameo"))]
   CameoEmpty,
   /// Defines the UnknownEmpty Class.
-  #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p232:unknown"))]
+  #[sdk(empty_child(microsoft365, qname = "p232:unknown"))]
   UnknownEmpty,
 }

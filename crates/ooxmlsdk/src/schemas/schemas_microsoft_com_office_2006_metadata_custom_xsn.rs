@@ -6,19 +6,19 @@
 
 /// Defines the CustomXsn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ntns:CT_CustomXsn/ntns:customXsn")]
+#[sdk(qname = "ntns:customXsn")]
 pub struct CustomXsn {
   /// Defines the XsnLocation Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:xsnLocation"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ntns:xsnLocation"))]
   pub xsn_location: XsnLocation,
   /// Defines the CachedView Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:cached"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ntns:cached"))]
   pub cached_view: CachedView,
   /// Defines the OpenByDefault Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:openByDefault"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ntns:openByDefault"))]
   pub open_by_default: OpenByDefault,
   /// Defines the Scope Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:xsnScope"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "ntns:xsnScope"))]
   pub scope: Scope,
 }
 /// Defines the XsnLocation Class.

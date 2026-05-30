@@ -6,7 +6,7 @@
 
 /// Defines the ContentTypeSchema Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ct:CT_ContentTypeSchema/ct:contentTypeSchema")]
+#[sdk(qname = "ct:contentTypeSchema")]
 pub struct ContentTypeSchema {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,

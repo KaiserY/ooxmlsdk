@@ -6,7 +6,7 @@
 
 /// Defines the OEmbed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "woe:CT_OEmbed/woe:oembed")]
+#[sdk(microsoft365, qname = "woe:oembed")]
 pub struct OEmbed {
   /// oEmbedUrl
   #[sdk(attr(microsoft365, qname = ":oEmbedUrl"))]

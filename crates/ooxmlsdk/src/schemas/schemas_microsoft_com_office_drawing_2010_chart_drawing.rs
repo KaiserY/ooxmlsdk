@@ -6,7 +6,7 @@
 
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart")]
+#[sdk(office2010, qname = "cdr14:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(office2010, qname = "r:id"))]
@@ -16,27 +16,21 @@ pub struct ContentPart {
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// Defines the NonVisualContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "cdr14:CT_ContentPartNonVisual/cdr14:nvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "cdr14:nvContentPartPr"))]
   pub non_visual_content_part_properties: Option<std::boxed::Box<NonVisualContentPartProperties>>,
   /// Defines the ApplicationNonVisualDrawingProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "cdr14:CT_ApplicationNonVisualDrawingProps/cdr14:nvPr"
-  ))]
+  #[sdk(child(office2010, qname = "cdr14:nvPr"))]
   pub application_non_visual_drawing_properties: Option<ApplicationNonVisualDrawingProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/cdr14:xfrm"))]
+  #[sdk(child(office2010, qname = "cdr14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/cdr14:extLst"))]
+  #[sdk(child(office2010, qname = "cdr14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/cdr14:cNvPr")]
+#[sdk(office2010, qname = "cdr14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -54,57 +48,45 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Hyperlink associated with clicking or selecting the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Hyperlink associated with hovering over the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Future extension
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_NonVisualInkContentPartProperties/cdr14:cNvContentPartPr"
-)]
+#[sdk(office2010, qname = "cdr14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
-  #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  #[sdk(child(office2010, qname = "a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the NonVisualContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "cdr14:CT_ContentPartNonVisual/cdr14:nvContentPartPr"
-)]
+#[sdk(office2010, qname = "cdr14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/cdr14:cNvPr"))]
+  #[sdk(child(office2010, qname = "cdr14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualInkContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_NonVisualInkContentPartProperties/cdr14:cNvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "cdr14:cNvContentPartPr"))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
 }
 /// Defines the ApplicationNonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "cdr14:CT_ApplicationNonVisualDrawingProps/cdr14:nvPr"
-)]
+#[sdk(office2010, qname = "cdr14:nvPr")]
 pub struct ApplicationNonVisualDrawingProperties {
   /// macro
   #[sdk(attr(office2010, qname = ":macro"))]
@@ -115,7 +97,7 @@ pub struct ApplicationNonVisualDrawingProperties {
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Transform2D/cdr14:xfrm")]
+#[sdk(office2010, qname = "cdr14:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -127,17 +109,17 @@ pub struct Transform2D {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/cdr14:extLst")]
+#[sdk(office2010, qname = "cdr14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }

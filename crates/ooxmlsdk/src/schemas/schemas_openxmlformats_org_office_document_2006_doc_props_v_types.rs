@@ -90,7 +90,7 @@ pub enum ArrayBaseValues {
 }
 /// Variant.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Variant/vt:variant")]
+#[sdk(qname = "vt:variant")]
 pub struct Variant {
   #[sdk(
         choice(
@@ -135,7 +135,7 @@ pub struct Variant {
 }
 /// Vector.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Vector/vt:vector")]
+#[sdk(qname = "vt:vector")]
 pub struct VtVector {
   /// Vector Base Type
   #[sdk(attr(qname = ":baseType"))]
@@ -172,7 +172,7 @@ pub struct VtVector {
 }
 /// Array.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Array/vt:array")]
+#[sdk(qname = "vt:array")]
 pub struct VtArray {
   /// Array Lower Bounds Attribute
   #[sdk(attr(qname = ":lBound"))]
@@ -262,7 +262,7 @@ pub type VtCurrency = crate::simple_type::StringValue;
 pub type VtError = crate::simple_type::StringValue;
 /// Binary Versioned Stream.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Vstream/vt:vstream")]
+#[sdk(qname = "vt:vstream")]
 pub struct VtvStreamData {
   /// VSTREAM Version Attribute
   #[sdk(attr(qname = ":version"))]
@@ -277,7 +277,7 @@ pub struct VtvStreamData {
 pub type VtClassId = crate::simple_type::StringValue;
 /// Clipboard Data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "vt:CT_Cf/vt:cf")]
+#[sdk(qname = "vt:cf")]
 pub struct VtClipboardData {
   /// Format Attribute
   #[sdk(attr(qname = ":format"))]
@@ -298,108 +298,96 @@ pub enum VariantChoice {
   /// Array.
   VtArray(std::boxed::Box<VtArray>),
   /// Binary Blob.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "xsd:base64Binary/vt:blob"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:blob"))]
   VtBlob(VtBlob),
   /// Binary Blob Object.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "xsd:base64Binary/vt:oblob"))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:oblob"))]
   VtoBlob(VtoBlob),
   /// Empty.
-  #[sdk(empty_child(qname = "vt:CT_Empty/vt:empty"))]
+  #[sdk(empty_child(qname = "vt:empty"))]
   VtEmpty,
   /// Null.
-  #[sdk(empty_child(qname = "vt:CT_Null/vt:null"))]
+  #[sdk(empty_child(qname = "vt:null"))]
   VtNull,
   /// 1-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "SByteValue", qname = "xsd:byte/vt:i1"))]
+  #[sdk(text_child(simple_type = "SByteValue", qname = "vt:i1"))]
   VtByte(VtByte),
   /// 2-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int16Value", qname = "xsd:short/vt:i2"))]
+  #[sdk(text_child(simple_type = "Int16Value", qname = "vt:i2"))]
   VtShort(VtShort),
   /// 4-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/vt:i4"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "vt:i4"))]
   VtInt32(VtInt32),
   /// 8-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int64Value", qname = "xsd:long/vt:i8"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "vt:i8"))]
   VtInt64(VtInt64),
   /// Integer.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/vt:int"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "vt:int"))]
   VtInteger(VtInteger),
   /// 1-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "ByteValue", qname = "xsd:unsignedByte/vt:ui1"))]
+  #[sdk(text_child(simple_type = "ByteValue", qname = "vt:ui1"))]
   VtUnsignedByte(VtUnsignedByte),
   /// 2-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt16Value", qname = "xsd:unsignedShort/vt:ui2"))]
+  #[sdk(text_child(simple_type = "UInt16Value", qname = "vt:ui2"))]
   VtUnsignedShort(VtUnsignedShort),
   /// 4-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xsd:unsignedInt/vt:ui4"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "vt:ui4"))]
   VtUnsignedInt32(VtUnsignedInt32),
   /// 8-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt64Value", qname = "xsd:unsignedLong/vt:ui8"))]
+  #[sdk(text_child(simple_type = "UInt64Value", qname = "vt:ui8"))]
   VtUnsignedInt64(VtUnsignedInt64),
   /// Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xsd:unsignedInt/vt:uint"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "vt:uint"))]
   VtUnsignedInteger(VtUnsignedInteger),
   /// 4-Byte Real Number.
-  #[sdk(text_child(simple_type = "SingleValue", qname = "xsd:float/vt:r4"))]
+  #[sdk(text_child(simple_type = "SingleValue", qname = "vt:r4"))]
   VtFloat(VtFloat),
   /// 8-Byte Real Number.
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "xsd:double/vt:r8"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "vt:r8"))]
   VtDouble(VtDouble),
   /// Decimal.
-  #[sdk(text_child(simple_type = "DecimalValue", qname = "xsd:decimal/vt:decimal"))]
+  #[sdk(text_child(simple_type = "DecimalValue", qname = "vt:decimal"))]
   VtDecimal(VtDecimal),
   /// LPSTR.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:lpstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:lpstr"))]
   Vtlpstr(Vtlpstr),
   /// LPWSTR.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:lpwstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:lpwstr"))]
   Vtlpwstr(Vtlpwstr),
   /// Basic String.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:bstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:bstr"))]
   VtbString(VtbString),
   /// Date and Time.
-  #[sdk(text_child(simple_type = "DateTimeValue", qname = "xsd:dateTime/vt:date"))]
+  #[sdk(text_child(simple_type = "DateTimeValue", qname = "vt:date"))]
   VtDate(VtDate),
   /// File Time.
-  #[sdk(text_child(simple_type = "DateTimeValue", qname = "xsd:dateTime/vt:filetime"))]
+  #[sdk(text_child(simple_type = "DateTimeValue", qname = "vt:filetime"))]
   VtFileTime(VtFileTime),
   /// Boolean.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/vt:bool"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "vt:bool"))]
   VtBool(VtBool),
   /// Currency.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Cy/vt:cy"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:cy"))]
   VtCurrency(VtCurrency),
   /// Error Status Code.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Error/vt:error"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:error"))]
   VtError(VtError),
   /// Binary Stream.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "xsd:base64Binary/vt:stream"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:stream"))]
   VtStreamData(VtStreamData),
   /// Binary Stream Object.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "xsd:base64Binary/vt:ostream"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:ostream"))]
   VtoStreamData(VtoStreamData),
   /// Binary Storage.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "xsd:base64Binary/vt:storage"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:storage"))]
   VtStorage(VtStorage),
   /// Binary Storage Object.
-  #[sdk(text_child(
-    simple_type = "Base64BinaryValue",
-    qname = "xsd:base64Binary/vt:ostorage"
-  ))]
+  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "vt:ostorage"))]
   VtoStorage(VtoStorage),
   /// Binary Versioned Stream.
   VtvStreamData(std::boxed::Box<VtvStreamData>),
   /// Class ID.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Clsid/vt:clsid"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:clsid"))]
   VtClassId(VtClassId),
   /// Clipboard Data.
   VtClipboardData(std::boxed::Box<VtClipboardData>),
@@ -409,61 +397,61 @@ pub enum VtVectorChoice {
   /// Variant.
   Variant(std::boxed::Box<Variant>),
   /// 1-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "SByteValue", qname = "xsd:byte/vt:i1"))]
+  #[sdk(text_child(simple_type = "SByteValue", qname = "vt:i1"))]
   VtByte(VtByte),
   /// 2-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int16Value", qname = "xsd:short/vt:i2"))]
+  #[sdk(text_child(simple_type = "Int16Value", qname = "vt:i2"))]
   VtShort(VtShort),
   /// 4-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/vt:i4"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "vt:i4"))]
   VtInt32(VtInt32),
   /// 8-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int64Value", qname = "xsd:long/vt:i8"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "vt:i8"))]
   VtInt64(VtInt64),
   /// 1-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "ByteValue", qname = "xsd:unsignedByte/vt:ui1"))]
+  #[sdk(text_child(simple_type = "ByteValue", qname = "vt:ui1"))]
   VtUnsignedByte(VtUnsignedByte),
   /// 2-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt16Value", qname = "xsd:unsignedShort/vt:ui2"))]
+  #[sdk(text_child(simple_type = "UInt16Value", qname = "vt:ui2"))]
   VtUnsignedShort(VtUnsignedShort),
   /// 4-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xsd:unsignedInt/vt:ui4"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "vt:ui4"))]
   VtUnsignedInt32(VtUnsignedInt32),
   /// 8-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt64Value", qname = "xsd:unsignedLong/vt:ui8"))]
+  #[sdk(text_child(simple_type = "UInt64Value", qname = "vt:ui8"))]
   VtUnsignedInt64(VtUnsignedInt64),
   /// 4-Byte Real Number.
-  #[sdk(text_child(simple_type = "SingleValue", qname = "xsd:float/vt:r4"))]
+  #[sdk(text_child(simple_type = "SingleValue", qname = "vt:r4"))]
   VtFloat(VtFloat),
   /// 8-Byte Real Number.
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "xsd:double/vt:r8"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "vt:r8"))]
   VtDouble(VtDouble),
   /// LPSTR.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:lpstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:lpstr"))]
   Vtlpstr(Vtlpstr),
   /// LPWSTR.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:lpwstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:lpwstr"))]
   Vtlpwstr(Vtlpwstr),
   /// Basic String.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:bstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:bstr"))]
   VtbString(VtbString),
   /// Date and Time.
-  #[sdk(text_child(simple_type = "DateTimeValue", qname = "xsd:dateTime/vt:date"))]
+  #[sdk(text_child(simple_type = "DateTimeValue", qname = "vt:date"))]
   VtDate(VtDate),
   /// File Time.
-  #[sdk(text_child(simple_type = "DateTimeValue", qname = "xsd:dateTime/vt:filetime"))]
+  #[sdk(text_child(simple_type = "DateTimeValue", qname = "vt:filetime"))]
   VtFileTime(VtFileTime),
   /// Boolean.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/vt:bool"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "vt:bool"))]
   VtBool(VtBool),
   /// Currency.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Cy/vt:cy"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:cy"))]
   VtCurrency(VtCurrency),
   /// Error Status Code.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Error/vt:error"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:error"))]
   VtError(VtError),
   /// Class ID.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Clsid/vt:clsid"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:clsid"))]
   VtClassId(VtClassId),
   /// Clipboard Data.
   VtClipboardData(std::boxed::Box<VtClipboardData>),
@@ -473,51 +461,51 @@ pub enum VtArrayChoice {
   /// Variant.
   Variant(std::boxed::Box<Variant>),
   /// 1-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "SByteValue", qname = "xsd:byte/vt:i1"))]
+  #[sdk(text_child(simple_type = "SByteValue", qname = "vt:i1"))]
   VtByte(VtByte),
   /// 2-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int16Value", qname = "xsd:short/vt:i2"))]
+  #[sdk(text_child(simple_type = "Int16Value", qname = "vt:i2"))]
   VtShort(VtShort),
   /// 4-Byte Signed Integer.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/vt:i4"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "vt:i4"))]
   VtInt32(VtInt32),
   /// Integer.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xsd:int/vt:int"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "vt:int"))]
   VtInteger(VtInteger),
   /// 1-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "ByteValue", qname = "xsd:unsignedByte/vt:ui1"))]
+  #[sdk(text_child(simple_type = "ByteValue", qname = "vt:ui1"))]
   VtUnsignedByte(VtUnsignedByte),
   /// 2-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt16Value", qname = "xsd:unsignedShort/vt:ui2"))]
+  #[sdk(text_child(simple_type = "UInt16Value", qname = "vt:ui2"))]
   VtUnsignedShort(VtUnsignedShort),
   /// 4-Byte Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xsd:unsignedInt/vt:ui4"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "vt:ui4"))]
   VtUnsignedInt32(VtUnsignedInt32),
   /// Unsigned Integer.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xsd:unsignedInt/vt:uint"))]
+  #[sdk(text_child(simple_type = "UInt32Value", qname = "vt:uint"))]
   VtUnsignedInteger(VtUnsignedInteger),
   /// 4-Byte Real Number.
-  #[sdk(text_child(simple_type = "SingleValue", qname = "xsd:float/vt:r4"))]
+  #[sdk(text_child(simple_type = "SingleValue", qname = "vt:r4"))]
   VtFloat(VtFloat),
   /// 8-Byte Real Number.
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "xsd:double/vt:r8"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "vt:r8"))]
   VtDouble(VtDouble),
   /// Decimal.
-  #[sdk(text_child(simple_type = "DecimalValue", qname = "xsd:decimal/vt:decimal"))]
+  #[sdk(text_child(simple_type = "DecimalValue", qname = "vt:decimal"))]
   VtDecimal(VtDecimal),
   /// Basic String.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/vt:bstr"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:bstr"))]
   VtbString(VtbString),
   /// Date and Time.
-  #[sdk(text_child(simple_type = "DateTimeValue", qname = "xsd:dateTime/vt:date"))]
+  #[sdk(text_child(simple_type = "DateTimeValue", qname = "vt:date"))]
   VtDate(VtDate),
   /// Boolean.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xsd:boolean/vt:bool"))]
+  #[sdk(text_child(simple_type = "BooleanValue", qname = "vt:bool"))]
   VtBool(VtBool),
   /// Error Status Code.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Error/vt:error"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:error"))]
   VtError(VtError),
   /// Currency.
-  #[sdk(text_child(simple_type = "StringValue", qname = "vt:ST_Cy/vt:cy"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "vt:cy"))]
   VtCurrency(VtCurrency),
 }

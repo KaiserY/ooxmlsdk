@@ -6,45 +6,39 @@
 
 /// Defines the CacheVersionInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo"
-)]
+#[sdk(microsoft365, qname = "xxpvi:cacheVersionInfo")]
 pub struct CacheVersionInfo {
   /// Defines the RequiredFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxpvi:requiredFeature"
+    qname = "xxpvi:requiredFeature"
   ))]
   pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastRefreshFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxpvi:lastRefreshFeature"
+    qname = "xxpvi:lastRefreshFeature"
   ))]
   pub last_refresh_feature_xsdstring: Vec<LastRefreshFeatureXsdstring>,
 }
 /// Defines the PivotVersionInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"
-)]
+#[sdk(microsoft365, qname = "xxpvi:pivotVersionInfo")]
 pub struct PivotVersionInfo {
   /// Defines the RequiredFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxpvi:requiredFeature"
+    qname = "xxpvi:requiredFeature"
   ))]
   pub required_feature_xsdstring: Vec<RequiredFeatureXsdstring>,
   /// Defines the LastUpdateFeatureXsdstring Class.
   #[sdk(text_child(
     microsoft365,
     simple_type = "StringValue",
-    qname = "xsd:string/xxpvi:lastUpdateFeature"
+    qname = "xxpvi:lastUpdateFeature"
   ))]
   pub last_update_feature_xsdstring: Vec<LastUpdateFeatureXsdstring>,
 }

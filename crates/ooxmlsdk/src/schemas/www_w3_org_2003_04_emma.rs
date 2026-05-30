@@ -48,7 +48,7 @@ pub enum DisjunctionTypeValues {
 }
 /// Defines the DerivedFrom Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_DerivedFrom/emma:derived-from")]
+#[sdk(qname = "emma:derived-from")]
 pub struct DerivedFrom {
   /// resource
   #[sdk(attr(qname = ":resource"))]
@@ -60,7 +60,7 @@ pub struct DerivedFrom {
 }
 /// Defines the Info Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Info/emma:info")]
+#[sdk(qname = "emma:info")]
 pub struct Info {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -73,7 +73,7 @@ pub struct Info {
 }
 /// Defines the Lattice Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Lattice/emma:lattice")]
+#[sdk(qname = "emma:lattice")]
 pub struct Lattice {
   /// initial
   #[sdk(attr(qname = ":initial"))]
@@ -100,7 +100,7 @@ pub struct Lattice {
 pub type Literal = crate::simple_type::StringValue;
 /// Defines the Interpretation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Interpretation/emma:interpretation")]
+#[sdk(qname = "emma:interpretation")]
 pub struct Interpretation {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -198,7 +198,7 @@ pub struct Interpretation {
 }
 /// Defines the OneOf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_OneOf/emma:one-of")]
+#[sdk(qname = "emma:one-of")]
 pub struct OneOf {
   /// disjunction-type
   #[sdk(attr(qname = ":disjunction-type"))]
@@ -294,7 +294,7 @@ pub struct OneOf {
 }
 /// Defines the Group Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Group/emma:group")]
+#[sdk(qname = "emma:group")]
 pub struct Group {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -388,7 +388,7 @@ pub struct Group {
 }
 /// Defines the Sequence Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Sequence/emma:sequence")]
+#[sdk(qname = "emma:sequence")]
 pub struct Sequence {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -481,7 +481,7 @@ pub struct Sequence {
 }
 /// Defines the GroupInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_GroupInfo/emma:group-info")]
+#[sdk(qname = "emma:group-info")]
 pub struct GroupInfo {
   /// ref
   #[sdk(attr(qname = ":ref"))]
@@ -492,7 +492,7 @@ pub struct GroupInfo {
 }
 /// Defines the Derivation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Derivation/emma:derivation")]
+#[sdk(qname = "emma:derivation")]
 pub struct Derivation {
   #[sdk(
         choice(
@@ -506,7 +506,7 @@ pub struct Derivation {
 }
 /// Defines the Grammar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Grammar/emma:grammar")]
+#[sdk(qname = "emma:grammar")]
 pub struct Grammar {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -521,7 +521,7 @@ pub struct Grammar {
 }
 /// Defines the Model Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Model/emma:model")]
+#[sdk(qname = "emma:model")]
 pub struct Model {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -538,7 +538,7 @@ pub struct Model {
 }
 /// Defines the EndPointInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_EndPointInfo/emma:endpoint-info")]
+#[sdk(qname = "emma:endpoint-info")]
 pub struct EndPointInfo {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -547,12 +547,12 @@ pub struct EndPointInfo {
   #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the EndPoint Class.
-  #[sdk(child(qname = "emma:CT_EndPoint/emma:endpoint"))]
+  #[sdk(child(qname = "emma:endpoint"))]
   pub end_point: Vec<EndPoint>,
 }
 /// Defines the EndPoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_EndPoint/emma:endpoint")]
+#[sdk(qname = "emma:endpoint")]
 pub struct EndPoint {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -595,7 +595,7 @@ pub struct EndPoint {
 }
 /// Defines the Node Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Node/emma:node")]
+#[sdk(qname = "emma:node")]
 pub struct Node {
   /// node-number
   #[sdk(attr(qname = ":node-number"))]
@@ -610,12 +610,12 @@ pub struct Node {
   #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// Defines the Info Class.
-  #[sdk(child(qname = "emma:CT_Info/emma:info"))]
+  #[sdk(child(qname = "emma:info"))]
   pub info: Vec<Info>,
 }
 /// Defines the Arc Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Arc/emma:arc")]
+#[sdk(qname = "emma:arc")]
 pub struct Arc {
   /// from
   #[sdk(attr(qname = ":from"))]
@@ -658,12 +658,12 @@ pub struct Arc {
   #[sdk(attr(qname = "emma:source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Defines the Info Class.
-  #[sdk(child(qname = "emma:CT_Info/emma:info"))]
+  #[sdk(child(qname = "emma:info"))]
   pub info: Vec<Info>,
 }
 /// Defines the Emma Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "emma:CT_Emma/emma:emma")]
+#[sdk(qname = "emma:emma")]
 pub struct Emma {
   /// version
   #[sdk(attr(qname = ":version"))]
@@ -699,7 +699,7 @@ pub enum InterpretationChoice {
   /// Defines the Lattice Class.
   Lattice(std::boxed::Box<Lattice>),
   /// Defines the Literal Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "emma:CT_Literal/emma:literal"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "emma:literal"))]
   Literal(Literal),
   /// Defines the ContextNode Class.
   ContextNode(std::boxed::Box<crate::schemas::msink::ContextNode>),

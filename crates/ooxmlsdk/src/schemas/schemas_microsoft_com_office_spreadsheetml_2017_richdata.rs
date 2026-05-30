@@ -38,7 +38,7 @@ pub enum RichValueValueType {
 }
 /// Defines the RichValueBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValueBlock/xlrd:rvb")]
+#[sdk(office2019, qname = "xlrd:rvb")]
 pub struct RichValueBlock {
   /// i
   #[sdk(attr(office2019, qname = ":i"))]
@@ -46,7 +46,7 @@ pub struct RichValueBlock {
 }
 /// Defines the RichValueData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValueData/xlrd:rvData")]
+#[sdk(office2019, qname = "xlrd:rvData")]
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -54,15 +54,15 @@ pub struct RichValueData {
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValue Class.
-  #[sdk(child(office2019, qname = "xlrd:CT_RichValue/xlrd:rv"))]
+  #[sdk(child(office2019, qname = "xlrd:rv"))]
   pub rich_value: Vec<RichValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
+  #[sdk(child(office2019, qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValueStructures/xlrd:rvStructures")]
+#[sdk(office2019, qname = "xlrd:rvStructures")]
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -70,41 +70,37 @@ pub struct RichValueStructures {
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValueStructure Class.
-  #[sdk(child(office2019, qname = "xlrd:CT_RichValueStructure/xlrd:s"))]
+  #[sdk(child(office2019, qname = "xlrd:s"))]
   pub rich_value_structure: Vec<RichValueStructure>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
+  #[sdk(child(office2019, qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValue/xlrd:rv")]
+#[sdk(office2019, qname = "xlrd:rv")]
 pub struct RichValue {
   /// s
   #[sdk(attr(office2019, qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the RichValueFallback Class.
-  #[sdk(child(office2019, qname = "xlrd:CT_RichValueFallback/xlrd:fb"))]
+  #[sdk(child(office2019, qname = "xlrd:fb"))]
   pub rich_value_fallback: Option<RichValueFallback>,
   /// Defines the Value Class.
-  #[sdk(text_child(
-    office2019,
-    simple_type = "StringValue",
-    qname = "xlrd:CT_Value/xlrd:v"
-  ))]
+  #[sdk(text_child(office2019, simple_type = "StringValue", qname = "xlrd:v"))]
   pub value: Vec<Value>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "x:CT_ExtensionList/xlrd:extLst")]
+#[sdk(office2019, qname = "xlrd:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the RichValueFallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValueFallback/xlrd:fb")]
+#[sdk(office2019, qname = "xlrd:fb")]
 pub struct RichValueFallback {
   /// t
   #[sdk(attr(office2019, qname = ":t"))]
@@ -116,18 +112,18 @@ pub struct RichValueFallback {
 pub type Value = crate::simple_type::StringValue;
 /// Defines the RichValueStructure Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_RichValueStructure/xlrd:s")]
+#[sdk(office2019, qname = "xlrd:s")]
 pub struct RichValueStructure {
   /// t
   #[sdk(attr(office2019, qname = ":t"))]
   pub t: crate::simple_type::StringValue,
   /// Defines the Key Class.
-  #[sdk(child(office2019, qname = "xlrd:CT_Key/xlrd:k"))]
+  #[sdk(child(office2019, qname = "xlrd:k"))]
   pub key: Vec<Key>,
 }
 /// Defines the Key Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "xlrd:CT_Key/xlrd:k")]
+#[sdk(office2019, qname = "xlrd:k")]
 pub struct Key {
   /// n
   #[sdk(attr(office2019, qname = ":n"))]

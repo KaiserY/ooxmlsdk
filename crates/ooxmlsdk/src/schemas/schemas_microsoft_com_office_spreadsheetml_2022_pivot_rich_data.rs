@@ -6,7 +6,7 @@
 
 /// Defines the PivotCacheRichInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo")]
+#[sdk(microsoft365, qname = "xprd:richInfo")]
 pub struct PivotCacheRichInfo {
   /// pivotCacheGuid
   #[sdk(attr(microsoft365, qname = ":pivotCacheGuid"))]

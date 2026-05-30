@@ -6,7 +6,7 @@
 
 /// Defines the Decorative Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "adec:CT_Decorative/adec:decorative")]
+#[sdk(office2019, qname = "adec:decorative")]
 pub struct Decorative {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val

@@ -6,7 +6,7 @@
 
 /// Legacy Drawing Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "comp:CT_Compat/comp:legacyDrawing")]
+#[sdk(qname = "comp:legacyDrawing")]
 pub struct LegacyDrawing {
   /// Shape ID
   #[sdk(attr(qname = ":spid"))]

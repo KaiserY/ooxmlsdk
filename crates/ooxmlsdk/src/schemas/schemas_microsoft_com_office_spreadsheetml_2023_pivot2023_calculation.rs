@@ -20,10 +20,7 @@ pub enum AggregationType {
 }
 /// Defines the AggregationInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_AggregationInfo/xlpcalc:aggregationInfo"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:aggregationInfo")]
 pub struct AggregationInfo {
   /// aggregationType
   #[sdk(attr(microsoft365, qname = ":aggregationType"))]
@@ -34,10 +31,7 @@ pub struct AggregationInfo {
 }
 /// Defines the FeatureSupport Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_FeatureSupport/xlpcalc:featureSupportInfo"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:featureSupportInfo")]
 pub struct FeatureSupport {
   /// featureName
   #[sdk(attr(microsoft365, qname = ":featureName"))]
@@ -45,43 +39,31 @@ pub struct FeatureSupport {
 }
 /// Defines the PivotFieldSubtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_PivotFieldSubtotals/xlpcalc:pivotFieldSubtotals"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:pivotFieldSubtotals")]
 pub struct PivotFieldSubtotals {
   /// Defines the SubtotalPivotItemSubtotal Class.
-  #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotal"))]
+  #[sdk(child(microsoft365, qname = "xlpcalc:subtotal"))]
   pub subtotal_pivot_item_subtotal: Vec<SubtotalPivotItemSubtotal>,
 }
 /// Defines the PivotAreaReferenceSubtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_PivotAreaReferenceSubtotals/xlpcalc:pivotAreaReferenceSubtotals"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:pivotAreaReferenceSubtotals")]
 pub struct PivotAreaReferenceSubtotals {
   /// Defines the PivotSubtotalType Class.
-  #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal"))]
+  #[sdk(child(microsoft365, qname = "xlpcalc:subtotal"))]
   pub pivot_subtotal_type: Vec<PivotSubtotalType>,
 }
 /// Defines the PivotTableSubtotalLineItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_PivotTableSubtotalLineItems/xlpcalc:pivotFieldSubtotalLineItems"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:pivotFieldSubtotalLineItems")]
 pub struct PivotTableSubtotalLineItems {
   /// Defines the SubtotalLineItemPivotItemSubtotal Class.
-  #[sdk(child(
-    microsoft365,
-    qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotalLineItem"
-  ))]
+  #[sdk(child(microsoft365, qname = "xlpcalc:subtotalLineItem"))]
   pub subtotal_line_item_pivot_item_subtotal: Vec<SubtotalLineItemPivotItemSubtotal>,
 }
 /// Defines the SubtotalPivotItemSubtotal Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotal")]
+#[sdk(microsoft365, qname = "xlpcalc:subtotal")]
 pub struct SubtotalPivotItemSubtotal {
   /// subtotalType
   #[sdk(attr(microsoft365, qname = ":subtotalType"))]
@@ -92,10 +74,7 @@ pub struct SubtotalPivotItemSubtotal {
 }
 /// Defines the SubtotalLineItemPivotItemSubtotal Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotalLineItem"
-)]
+#[sdk(microsoft365, qname = "xlpcalc:subtotalLineItem")]
 pub struct SubtotalLineItemPivotItemSubtotal {
   /// subtotalType
   #[sdk(attr(microsoft365, qname = ":subtotalType"))]
@@ -106,7 +85,7 @@ pub struct SubtotalLineItemPivotItemSubtotal {
 }
 /// Defines the PivotSubtotalType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal")]
+#[sdk(microsoft365, qname = "xlpcalc:subtotal")]
 pub struct PivotSubtotalType {
   /// subtotalType
   #[sdk(attr(microsoft365, qname = ":subtotalType"))]

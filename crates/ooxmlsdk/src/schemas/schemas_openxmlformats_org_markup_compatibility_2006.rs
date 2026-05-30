@@ -6,7 +6,7 @@
 
 /// Defines the AlternateContent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
+#[sdk(qname = "mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
@@ -19,7 +19,7 @@ pub struct AlternateContent {
 }
 /// Defines the Choice Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mc:CT_Choice/mc:Choice")]
+#[sdk(qname = "mc:Choice")]
 pub struct Choice {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(any)]
@@ -27,7 +27,7 @@ pub struct Choice {
 }
 /// Defines the Fallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mc:CT_Fallback/mc:Fallback")]
+#[sdk(qname = "mc:Fallback")]
 pub struct Fallback {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(any)]

@@ -16,17 +16,17 @@ pub enum EditAsValues {
 }
 /// Two Cell Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")]
+#[sdk(qname = "xdr:twoCellAnchor")]
 pub struct TwoCellAnchor {
   /// Positioning and Resizing Behaviors
   #[sdk(attr(qname = ":editAs"))]
   #[sdk(string_format(kind = "token"))]
   pub edit_as: Option<EditAsValues>,
   /// Starting Anchor Point
-  #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
+  #[sdk(child(qname = "xdr:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
   /// Ending Anchor Point
-  #[sdk(child(qname = "xdr:CT_Marker/xdr:to"))]
+  #[sdk(child(qname = "xdr:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
   #[sdk(
         choice(
@@ -41,18 +41,18 @@ pub struct TwoCellAnchor {
     )]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// Client Data.
-  #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
+  #[sdk(child(qname = "xdr:clientData"))]
   pub client_data: std::boxed::Box<ClientData>,
 }
 /// One Cell Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor")]
+#[sdk(qname = "xdr:oneCellAnchor")]
 pub struct OneCellAnchor {
   /// Starting Anchor Point.
-  #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
+  #[sdk(child(qname = "xdr:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
   /// Defines the Extent Class.
-  #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
+  #[sdk(child(qname = "xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
   #[sdk(
         choice(
@@ -66,18 +66,18 @@ pub struct OneCellAnchor {
     )]
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// Client Data.
-  #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
+  #[sdk(child(qname = "xdr:clientData"))]
   pub client_data: std::boxed::Box<ClientData>,
 }
 /// Absolute Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor")]
+#[sdk(qname = "xdr:absoluteAnchor")]
 pub struct AbsoluteAnchor {
   /// Position
-  #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
+  #[sdk(child(qname = "xdr:pos"))]
   pub position: std::boxed::Box<Position>,
   /// Shape Extent
-  #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
+  #[sdk(child(qname = "xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
   #[sdk(
         choice(
@@ -91,12 +91,12 @@ pub struct AbsoluteAnchor {
     )]
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// Client Data.
-  #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
+  #[sdk(child(qname = "xdr:clientData"))]
   pub client_data: std::boxed::Box<ClientData>,
 }
 /// Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Shape/xdr:sp")]
+#[sdk(qname = "xdr:sp")]
 pub struct Shape {
   /// Reference to Custom Function
   #[sdk(attr(qname = ":macro"))]
@@ -111,27 +111,27 @@ pub struct Shape {
   #[sdk(attr(qname = ":fPublished"))]
   pub published: Option<crate::simple_type::BooleanValue>,
   /// Non-Visual Properties for a Shape
-  #[sdk(child(qname = "xdr:CT_ShapeNonVisual/xdr:nvSpPr"))]
+  #[sdk(child(qname = "xdr:nvSpPr"))]
   pub non_visual_shape_properties: std::boxed::Box<NonVisualShapeProperties>,
   /// Shape Properties
-  #[sdk(child(qname = "a:CT_ShapeProperties/xdr:spPr"))]
+  #[sdk(child(qname = "xdr:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(qname = "a:CT_ShapeStyle/xdr:style"))]
+  #[sdk(child(qname = "xdr:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// Shape Text Body
-  #[sdk(child(qname = "a:CT_TextBody/xdr:txBody"))]
+  #[sdk(child(qname = "xdr:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
 }
 /// Group Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_GroupShape/xdr:grpSp")]
+#[sdk(qname = "xdr:grpSp")]
 pub struct GroupShape {
   /// Non-Visual Properties for a Group Shape
-  #[sdk(child(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr"))]
+  #[sdk(child(qname = "xdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Group Shape Properties
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
+  #[sdk(child(qname = "xdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -147,7 +147,7 @@ pub struct GroupShape {
 }
 /// Graphic Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame")]
+#[sdk(qname = "xdr:graphicFrame")]
 pub struct GraphicFrame {
   /// Reference To Custom Function
   #[sdk(attr(qname = ":macro"))]
@@ -156,18 +156,18 @@ pub struct GraphicFrame {
   #[sdk(attr(qname = ":fPublished"))]
   pub published: Option<crate::simple_type::BooleanValue>,
   /// Non-Visual Properties for a Graphic Frame
-  #[sdk(child(qname = "xdr:CT_GraphicalObjectFrameNonVisual/xdr:nvGraphicFramePr"))]
+  #[sdk(child(qname = "xdr:nvGraphicFramePr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
   /// 2D Transform for Graphic Frames
-  #[sdk(child(qname = "a:CT_Transform2D/xdr:xfrm"))]
+  #[sdk(child(qname = "xdr:xfrm"))]
   pub transform: std::boxed::Box<Transform>,
   /// Graphic Object.
-  #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
+  #[sdk(child(qname = "a:graphic"))]
   pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
 }
 /// Connection Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Connector/xdr:cxnSp")]
+#[sdk(qname = "xdr:cxnSp")]
 pub struct ConnectionShape {
   /// Reference to Custom Function
   #[sdk(attr(qname = ":macro"))]
@@ -176,18 +176,18 @@ pub struct ConnectionShape {
   #[sdk(attr(qname = ":fPublished"))]
   pub published: Option<crate::simple_type::BooleanValue>,
   /// Non-Visual Properties for a Connection Shape
-  #[sdk(child(qname = "xdr:CT_ConnectorNonVisual/xdr:nvCxnSpPr"))]
+  #[sdk(child(qname = "xdr:nvCxnSpPr"))]
   pub non_visual_connection_shape_properties: std::boxed::Box<NonVisualConnectionShapeProperties>,
   /// Connector Shape Properties
-  #[sdk(child(qname = "a:CT_ShapeProperties/xdr:spPr"))]
+  #[sdk(child(qname = "xdr:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(qname = "a:CT_ShapeStyle/xdr:style"))]
+  #[sdk(child(qname = "xdr:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
 }
 /// Defines the Picture Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Picture/xdr:pic")]
+#[sdk(qname = "xdr:pic")]
 pub struct Picture {
   /// Reference To Custom Function
   #[sdk(attr(qname = ":macro"))]
@@ -196,21 +196,21 @@ pub struct Picture {
   #[sdk(attr(qname = ":fPublished"))]
   pub published: Option<crate::simple_type::BooleanValue>,
   /// Non-Visual Properties for a Picture
-  #[sdk(child(qname = "xdr:CT_PictureNonVisual/xdr:nvPicPr"))]
+  #[sdk(child(qname = "xdr:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
   /// Picture Fill
-  #[sdk(child(qname = "a:CT_BlipFillProperties2/xdr:blipFill"))]
+  #[sdk(child(qname = "xdr:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
   /// Shape Properties.
-  #[sdk(child(qname = "a:CT_ShapeProperties/xdr:spPr"))]
+  #[sdk(child(qname = "xdr:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Shape Style
-  #[sdk(child(qname = "a:CT_ShapeStyle/xdr:style"))]
+  #[sdk(child(qname = "xdr:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart")]
+#[sdk(office2010, qname = "xdr:contentPart")]
 pub struct ContentPart {
   /// id
   #[sdk(attr(office2010, qname = "r:id"))]
@@ -220,29 +220,23 @@ pub struct ContentPart {
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// Defines the ExcelNonVisualContentPartShapeProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "xdr14:CT_ContentPartNonVisual/xdr14:nvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "xdr14:nvContentPartPr"))]
   pub excel_non_visual_content_part_shape_properties:
     Option<std::boxed::Box<crate::schemas::xdr14::ExcelNonVisualContentPartShapeProperties>>,
   /// Defines the ApplicationNonVisualDrawingProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "xdr14:CT_ApplicationNonVisualDrawingProps/xdr14:nvPr"
-  ))]
+  #[sdk(child(office2010, qname = "xdr14:nvPr"))]
   pub application_non_visual_drawing_properties:
     Option<crate::schemas::xdr14::ApplicationNonVisualDrawingProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/xdr14:xfrm"))]
+  #[sdk(child(office2010, qname = "xdr14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::xdr14::Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/xdr14:extLst"))]
+  #[sdk(child(office2010, qname = "xdr14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::xdr14::OfficeArtExtensionList>,
 }
 /// Worksheet Drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Drawing/xdr:wsDr")]
+#[sdk(qname = "xdr:wsDr")]
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -258,25 +252,25 @@ pub struct WorksheetDrawing {
 }
 /// Non-Visual Properties for a Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_ShapeNonVisual/xdr:nvSpPr")]
+#[sdk(qname = "xdr:nvSpPr")]
 pub struct NonVisualShapeProperties {
   /// Non-Visual Drawing Properties
-  #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
+  #[sdk(child(qname = "xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Connection Non-Visual Shape Properties
-  #[sdk(child(qname = "a:CT_NonVisualDrawingShapeProps/xdr:cNvSpPr"))]
+  #[sdk(child(qname = "xdr:cNvSpPr"))]
   pub non_visual_shape_drawing_properties: std::boxed::Box<NonVisualShapeDrawingProperties>,
 }
 /// Shape Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/xdr:spPr")]
+#[sdk(qname = "xdr:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
-  #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
+  #[sdk(child(qname = "a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
@@ -297,7 +291,7 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
+  #[sdk(child(qname = "a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
@@ -307,81 +301,81 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
-  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  #[sdk(child(qname = "a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
-  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
+  #[sdk(child(qname = "a:sp3d"))]
   pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
-  #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeStyle/xdr:style")]
+#[sdk(qname = "xdr:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
+  #[sdk(child(qname = "a:lnRef"))]
   pub line_reference: std::boxed::Box<crate::schemas::a::LineReference>,
   /// Fill Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
+  #[sdk(child(qname = "a:fillRef"))]
   pub fill_reference: std::boxed::Box<crate::schemas::a::FillReference>,
   /// Effect Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
+  #[sdk(child(qname = "a:effectRef"))]
   pub effect_reference: std::boxed::Box<crate::schemas::a::EffectReference>,
   /// Font Reference
-  #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
+  #[sdk(child(qname = "a:fontRef"))]
   pub font_reference: std::boxed::Box<crate::schemas::a::FontReference>,
 }
 /// Shape Text Body.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBody/xdr:txBody")]
+#[sdk(qname = "xdr:txBody")]
 pub struct TextBody {
   /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
+  #[sdk(child(qname = "a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  #[sdk(child(qname = "a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
+  #[sdk(child(qname = "a:p"))]
   pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Non-Visual Properties for a Connection Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_ConnectorNonVisual/xdr:nvCxnSpPr")]
+#[sdk(qname = "xdr:nvCxnSpPr")]
 pub struct NonVisualConnectionShapeProperties {
   /// Connection Non-Visual Properties
-  #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
+  #[sdk(child(qname = "xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Non-Visual Connector Shape Drawing Properties
-  #[sdk(child(qname = "a:CT_NonVisualConnectorProperties/xdr:cNvCxnSpPr"))]
+  #[sdk(child(qname = "xdr:cNvCxnSpPr"))]
   pub non_visual_connector_shape_drawing_properties:
     std::boxed::Box<NonVisualConnectorShapeDrawingProperties>,
 }
 /// Non-Visual Properties for a Picture.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_PictureNonVisual/xdr:nvPicPr")]
+#[sdk(qname = "xdr:nvPicPr")]
 pub struct NonVisualPictureProperties {
   /// Non-Visual Drawing Properties.
-  #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
+  #[sdk(child(qname = "xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Non-Visual Picture Drawing Properties
-  #[sdk(child(qname = "a:CT_NonVisualPictureProperties/xdr:cNvPicPr"))]
+  #[sdk(child(qname = "xdr:cNvPicPr"))]
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
 }
 /// Picture Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_BlipFillProperties2/xdr:blipFill")]
+#[sdk(qname = "xdr:blipFill")]
 pub struct BlipFill {
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
   /// Defines the Blip Class.
-  #[sdk(child(qname = "a:CT_Blip/a:blip"))]
+  #[sdk(child(qname = "a:blip"))]
   pub blip: Option<std::boxed::Box<crate::schemas::a::Blip>>,
   /// Source Rectangle
-  #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
+  #[sdk(child(qname = "a:srcRect"))]
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
   #[sdk(
         choice(
@@ -393,19 +387,19 @@ pub struct BlipFill {
 }
 /// Non-Visual Properties for a Graphic Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_GraphicalObjectFrameNonVisual/xdr:nvGraphicFramePr")]
+#[sdk(qname = "xdr:nvGraphicFramePr")]
 pub struct NonVisualGraphicFrameProperties {
   /// Connection Non-Visual Properties
-  #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
+  #[sdk(child(qname = "xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Non-Visual Graphic Frame Drawing Properties
-  #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/xdr:cNvGraphicFramePr"))]
+  #[sdk(child(qname = "xdr:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:
     std::boxed::Box<NonVisualGraphicFrameDrawingProperties>,
 }
 /// 2D Transform for Graphic Frames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Transform2D/xdr:xfrm")]
+#[sdk(qname = "xdr:xfrm")]
 pub struct Transform {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -417,10 +411,10 @@ pub struct Transform {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Column).
@@ -433,41 +427,41 @@ pub type RowOffset = crate::simple_type::CoordinateValue;
 pub type RowId = crate::simple_type::Int32Value;
 /// Starting Anchor Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Marker/xdr:from")]
+#[sdk(qname = "xdr:from")]
 pub struct FromMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Ending Anchor Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Marker/xdr:to")]
+#[sdk(qname = "xdr:to")]
 pub struct ToMarker {
   /// Column)
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Client Data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_AnchorClientData/xdr:clientData")]
+#[sdk(qname = "xdr:clientData")]
 pub struct ClientData {
   /// Locks With Sheet Flag
   #[sdk(attr(qname = ":fLocksWithSheet"))]
@@ -478,7 +472,7 @@ pub struct ClientData {
 }
 /// Defines the Extent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_PositiveSize2D/xdr:ext")]
+#[sdk(qname = "xdr:ext")]
 pub struct Extent {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
@@ -491,7 +485,7 @@ pub struct Extent {
 }
 /// Position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point2D/xdr:pos")]
+#[sdk(qname = "xdr:pos")]
 pub struct Position {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
@@ -504,7 +498,7 @@ pub struct Position {
 }
 /// Non-Visual Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr")]
+#[sdk(qname = "xdr:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -522,107 +516,107 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Defines the HyperlinkOnClick Class.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Defines the HyperlinkOnHover Class.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Defines the NonVisualDrawingPropertiesExtensionList Class.
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Connection Non-Visual Shape Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingShapeProps/xdr:cNvSpPr")]
+#[sdk(qname = "xdr:cNvSpPr")]
 pub struct NonVisualShapeDrawingProperties {
   /// Text Box
   #[sdk(attr(qname = ":txBox"))]
   pub text_box: Option<crate::simple_type::BooleanValue>,
   /// Shape Locks
-  #[sdk(child(qname = "a:CT_ShapeLocking/a:spLocks"))]
+  #[sdk(child(qname = "a:spLocks"))]
   pub shape_locks: Option<std::boxed::Box<crate::schemas::a::ShapeLocks>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Connector Shape Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualConnectorProperties/xdr:cNvCxnSpPr")]
+#[sdk(qname = "xdr:cNvCxnSpPr")]
 pub struct NonVisualConnectorShapeDrawingProperties {
   /// Connection Shape Locks
-  #[sdk(child(qname = "a:CT_ConnectorLocking/a:cxnSpLocks"))]
+  #[sdk(child(qname = "a:cxnSpLocks"))]
   pub connection_shape_locks: Option<std::boxed::Box<crate::schemas::a::ConnectionShapeLocks>>,
   /// Connection Start
-  #[sdk(child(qname = "a:CT_Connection/a:stCxn"))]
+  #[sdk(child(qname = "a:stCxn"))]
   pub start_connection: Option<crate::schemas::a::StartConnection>,
   /// Connection End
-  #[sdk(child(qname = "a:CT_Connection/a:endCxn"))]
+  #[sdk(child(qname = "a:endCxn"))]
   pub end_connection: Option<crate::schemas::a::EndConnection>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Picture Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualPictureProperties/xdr:cNvPicPr")]
+#[sdk(qname = "xdr:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
   /// preferRelativeResize
   #[sdk(attr(qname = ":preferRelativeResize"))]
   pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
   /// Defines the PictureLocks Class.
-  #[sdk(child(qname = "a:CT_PictureLocking/a:picLocks"))]
+  #[sdk(child(qname = "a:picLocks"))]
   pub picture_locks: Option<std::boxed::Box<crate::schemas::a::PictureLocks>>,
   /// Defines the NonVisualPicturePropertiesExtensionList Class.
-  #[sdk(child(qname = "a:CT_NonVisualPicturePropertiesExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_picture_properties_extension_list:
     Option<crate::schemas::a::NonVisualPicturePropertiesExtensionList>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/xdr:cNvGraphicFramePr")]
+#[sdk(qname = "xdr:cNvGraphicFramePr")]
 pub struct NonVisualGraphicFrameDrawingProperties {
   /// Graphic Frame Locks
-  #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
+  #[sdk(child(qname = "a:graphicFrameLocks"))]
   pub graphic_frame_locks: Option<std::boxed::Box<crate::schemas::a::GraphicFrameLocks>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Group Shape Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/xdr:cNvGrpSpPr")]
+#[sdk(qname = "xdr:cNvGrpSpPr")]
 pub struct NonVisualGroupShapeDrawingProperties {
   /// Defines the GroupShapeLocks Class.
-  #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
+  #[sdk(child(qname = "a:grpSpLocks"))]
   pub group_shape_locks: Option<std::boxed::Box<crate::schemas::a::GroupShapeLocks>>,
   /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_group_drawing_shape_props_extension_list:
     Option<crate::schemas::a::NonVisualGroupDrawingShapePropsExtensionList>,
 }
 /// Non-Visual Properties for a Group Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr")]
+#[sdk(qname = "xdr:nvGrpSpPr")]
 pub struct NonVisualGroupShapeProperties {
   /// Connection Non-Visual Properties
-  #[sdk(child(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr"))]
+  #[sdk(child(qname = "xdr:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Non-Visual Group Shape Drawing Properties
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/xdr:cNvGrpSpPr"))]
+  #[sdk(child(qname = "xdr:cNvGrpSpPr"))]
   pub non_visual_group_shape_drawing_properties:
     std::boxed::Box<NonVisualGroupShapeDrawingProperties>,
 }
 /// Group Shape Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr")]
+#[sdk(qname = "xdr:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
-  #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
+  #[sdk(child(qname = "a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
   #[sdk(
         choice(
@@ -643,10 +637,10 @@ pub struct GroupShapeProperties {
     )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
-  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  #[sdk(child(qname = "a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -743,7 +737,7 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -771,7 +765,7 @@ pub enum GroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

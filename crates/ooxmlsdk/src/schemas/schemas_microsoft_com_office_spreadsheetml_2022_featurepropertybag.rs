@@ -6,10 +6,7 @@
 
 /// Defines the FeaturePropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  microsoft365,
-  qname = "xfpb:CT_FeaturePropertyBags/xfpb:FeaturePropertyBags"
-)]
+#[sdk(microsoft365, qname = "xfpb:FeaturePropertyBags")]
 pub struct FeaturePropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -17,35 +14,35 @@ pub struct FeaturePropertyBags {
   #[sdk(attr(microsoft365, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the BagExtensions Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
+  #[sdk(child(microsoft365, qname = "xfpb:bagExt"))]
   pub bag_extensions: Vec<BagExtensions>,
   /// Defines the FeaturePropertyBag Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
+  #[sdk(child(microsoft365, qname = "xfpb:bag"))]
   pub feature_property_bag: Vec<FeaturePropertyBag>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
+  #[sdk(child(microsoft365, qname = "xfpb:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FpbsFeaturePropertyBags Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs")]
+#[sdk(microsoft365, qname = "xfpb:fpbs")]
 pub struct FpbsFeaturePropertyBags {
   /// count
   #[sdk(attr(microsoft365, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the BagExtensions Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
+  #[sdk(child(microsoft365, qname = "xfpb:bagExt"))]
   pub bag_extensions: Vec<BagExtensions>,
   /// Defines the FeaturePropertyBag Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
+  #[sdk(child(microsoft365, qname = "xfpb:bag"))]
   pub feature_property_bag: Vec<FeaturePropertyBag>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
+  #[sdk(child(microsoft365, qname = "xfpb:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the XfComplement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_XfComplement/xfpb:xfComplement")]
+#[sdk(microsoft365, qname = "xfpb:xfComplement")]
 pub struct XfComplement {
   /// i
   #[sdk(attr(microsoft365, qname = ":i"))]
@@ -53,7 +50,7 @@ pub struct XfComplement {
 }
 /// Defines the DXFComplement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_DXFComplement/xfpb:DXFComplement")]
+#[sdk(microsoft365, qname = "xfpb:DXFComplement")]
 pub struct DxfComplement {
   /// i
   #[sdk(attr(microsoft365, qname = ":i"))]
@@ -61,125 +58,125 @@ pub struct DxfComplement {
 }
 /// Defines the RevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_RevDxf/xfpb:revdxf")]
+#[sdk(microsoft365, qname = "xfpb:revdxf")]
 pub struct RevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the HeaderRowRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:headerRowRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:headerRowRevDxf")]
 pub struct HeaderRowRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the DataRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:dataRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:dataRevDxf")]
 pub struct DataRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the TotalsRowRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:totalsRowRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:totalsRowRevDxf")]
 pub struct TotalsRowRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the HeaderRowBorderRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:headerRowBorderRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:headerRowBorderRevDxf")]
 pub struct HeaderRowBorderRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the TableBorderRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:tableBorderRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:tableBorderRevDxf")]
 pub struct TableBorderRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the TotalsRowBorderRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:totalsRowBorderRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:totalsRowBorderRevDxf")]
 pub struct TotalsRowBorderRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the ColumnHeaderRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:columnHeaderRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:columnHeaderRevDxf")]
 pub struct ColumnHeaderRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the ColumnBodyRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:columnBodyRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:columnBodyRevDxf")]
 pub struct ColumnBodyRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the ColumnTotalsRevDxfTableRevDxf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/xfpb:columnTotalsRevDxf")]
+#[sdk(microsoft365, qname = "xfpb:columnTotalsRevDxf")]
 pub struct ColumnTotalsRevDxfTableRevDxf {
   /// Defines the FpbsFeaturePropertyBags Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
+  #[sdk(child(microsoft365, qname = "xfpb:fpbs"))]
   pub fpbs_feature_property_bags: std::boxed::Box<FpbsFeaturePropertyBags>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
+  #[sdk(child(microsoft365, qname = "xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
 }
 /// Defines the BagExtensions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt")]
+#[sdk(microsoft365, qname = "xfpb:bagExt")]
 pub struct BagExtensions {
   /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
+  #[sdk(child(microsoft365, qname = "xfpb:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FeaturePropertyBag Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag")]
+#[sdk(microsoft365, qname = "xfpb:bag")]
 pub struct FeaturePropertyBag {
   /// type
   #[sdk(attr(microsoft365, qname = ":type"))]
@@ -208,15 +205,15 @@ pub struct FeaturePropertyBag {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst")]
+#[sdk(microsoft365, qname = "xfpb:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the ArrayFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a")]
+#[sdk(microsoft365, qname = "xfpb:a")]
 pub struct ArrayFeatureProperty {
   /// Name of the key for the key value pair.
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -235,7 +232,7 @@ pub struct ArrayFeatureProperty {
 }
 /// Defines the BagFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId")]
+#[sdk(microsoft365, qname = "xfpb:bagId")]
 pub struct BagFeatureProperty {
   /// k
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -245,7 +242,7 @@ pub struct BagFeatureProperty {
 }
 /// Defines the IntFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_IntFeatureProperty/xfpb:i")]
+#[sdk(microsoft365, qname = "xfpb:i")]
 pub struct IntFeatureProperty {
   /// k
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -255,7 +252,7 @@ pub struct IntFeatureProperty {
 }
 /// Defines the StringFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_StringFeatureProperty/xfpb:s")]
+#[sdk(microsoft365, qname = "xfpb:s")]
 pub struct StringFeatureProperty {
   /// k
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -265,7 +262,7 @@ pub struct StringFeatureProperty {
 }
 /// Defines the BoolFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_BoolFeatureProperty/xfpb:b")]
+#[sdk(microsoft365, qname = "xfpb:b")]
 pub struct BoolFeatureProperty {
   /// k
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -275,7 +272,7 @@ pub struct BoolFeatureProperty {
 }
 /// Defines the DecimalFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d")]
+#[sdk(microsoft365, qname = "xfpb:d")]
 pub struct DecimalFeatureProperty {
   /// k
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -285,7 +282,7 @@ pub struct DecimalFeatureProperty {
 }
 /// Defines the RelFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_RelFeatureProperty/xfpb:rel")]
+#[sdk(microsoft365, qname = "xfpb:rel")]
 pub struct RelFeatureProperty {
   /// Name of the key for the key value pair.
   #[sdk(attr(microsoft365, qname = ":k"))]
@@ -295,28 +292,28 @@ pub struct RelFeatureProperty {
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "x:CT_Dxf/xfpb:dxf")]
+#[sdk(microsoft365, qname = "xfpb:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
-  #[sdk(child(qname = "x:CT_Font/x:font"))]
+  #[sdk(child(qname = "x:font"))]
   pub font: Option<crate::schemas::x::Font>,
   /// Number Format
-  #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
+  #[sdk(child(qname = "x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
   /// Fill
-  #[sdk(child(qname = "x:CT_Fill/x:fill"))]
+  #[sdk(child(qname = "x:fill"))]
   pub fill: Option<std::boxed::Box<crate::schemas::x::Fill>>,
   /// Alignment
-  #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
+  #[sdk(child(qname = "x:alignment"))]
   pub alignment: Option<crate::schemas::x::Alignment>,
   /// Border Properties
-  #[sdk(child(qname = "x:CT_Border/x:border"))]
+  #[sdk(child(qname = "x:border"))]
   pub border: Option<std::boxed::Box<crate::schemas::x::Border>>,
   /// Protection Properties
-  #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
+  #[sdk(child(qname = "x:protection"))]
   pub protection: Option<crate::schemas::x::Protection>,
   /// Future Feature Data Storage Area
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the XsdunsignedInt Class.
@@ -351,37 +348,21 @@ pub enum FeaturePropertyBagChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArrayFeaturePropertyChoice {
   /// Defines the XsdunsignedInt Class.
-  #[sdk(text_child(
-    microsoft365,
-    simple_type = "UInt32Value",
-    qname = "xsd:unsignedInt/xfpb:bagId"
-  ))]
+  #[sdk(text_child(microsoft365, simple_type = "UInt32Value", qname = "xfpb:bagId"))]
   XsdunsignedInt(XsdunsignedInt),
   /// Defines the Xsdinteger Class.
-  #[sdk(text_child(
-    microsoft365,
-    simple_type = "IntegerValue",
-    qname = "xsd:integer/xfpb:i"
-  ))]
+  #[sdk(text_child(microsoft365, simple_type = "IntegerValue", qname = "xfpb:i"))]
   Xsdinteger(Xsdinteger),
   /// Defines the SXsdstring Class.
-  #[sdk(text_child(microsoft365, simple_type = "StringValue", qname = "xsd:string/xfpb:s"))]
+  #[sdk(text_child(microsoft365, simple_type = "StringValue", qname = "xfpb:s"))]
   SXsdstring(SXsdstring),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(
-    microsoft365,
-    simple_type = "BooleanValue",
-    qname = "xsd:boolean/xfpb:b"
-  ))]
+  #[sdk(text_child(microsoft365, simple_type = "BooleanValue", qname = "xfpb:b"))]
   Xsdboolean(Xsdboolean),
   /// Defines the Xsddouble Class.
-  #[sdk(text_child(microsoft365, simple_type = "DoubleValue", qname = "xsd:double/xfpb:d"))]
+  #[sdk(text_child(microsoft365, simple_type = "DoubleValue", qname = "xfpb:d"))]
   Xsddouble(Xsddouble),
   /// Defines the RelXsdstring Class.
-  #[sdk(text_child(
-    microsoft365,
-    simple_type = "StringValue",
-    qname = "xsd:string/xfpb:rel"
-  ))]
+  #[sdk(text_child(microsoft365, simple_type = "StringValue", qname = "xfpb:rel"))]
   RelXsdstring(RelXsdstring),
 }

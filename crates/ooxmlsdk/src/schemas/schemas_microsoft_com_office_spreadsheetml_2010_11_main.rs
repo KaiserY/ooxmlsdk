@@ -120,37 +120,31 @@ pub enum SurveyPosition {
 }
 /// Defines the PivotCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_PivotCaches/x15:pivotCaches")]
+#[sdk(office2013, qname = "x15:pivotCaches")]
 pub struct PivotCaches {
   /// PivotCache.
-  #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
+  #[sdk(child(qname = "x:pivotCache"))]
   pub pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the TimelineCachePivotCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches")]
+#[sdk(office2013, qname = "x15:timelineCachePivotCaches")]
 pub struct TimelineCachePivotCaches {
   /// PivotCache.
-  #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
+  #[sdk(child(qname = "x:pivotCache"))]
   pub pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the PivotTableReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences"
-)]
+#[sdk(office2013, qname = "x15:pivotTableReferences")]
 pub struct PivotTableReferences {
   /// Defines the PivotTableReference Class.
-  #[sdk(child(
-    office2013,
-    qname = "x15:CT_PivotTableReference/x15:pivotTableReference"
-  ))]
+  #[sdk(child(office2013, qname = "x15:pivotTableReference"))]
   pub pivot_table_reference: Vec<PivotTableReference>,
 }
 /// Defines the QueryTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_QueryTable/x15:queryTable")]
+#[sdk(office2013, qname = "x15:queryTable")]
 pub struct QueryTable {
   /// clipped
   #[sdk(attr(office2013, qname = ":clipped"))]
@@ -164,31 +158,31 @@ pub struct QueryTable {
 }
 /// Defines the WebExtensions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_WebExtensions/x15:webExtensions")]
+#[sdk(office2013, qname = "x15:webExtensions")]
 pub struct WebExtensions {
   /// Defines the WebExtension Class.
-  #[sdk(child(office2013, qname = "x15:CT_WebExtension/x15:webExtension"))]
+  #[sdk(child(office2013, qname = "x15:webExtension"))]
   pub web_extension: Vec<WebExtension>,
 }
 /// Defines the TimelineCacheReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs")]
+#[sdk(office2013, qname = "x15:timelineCacheRefs")]
 pub struct TimelineCacheReferences {
   /// Defines the TimelineCacheReference Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineCacheRef/x15:timelineCacheRef"))]
+  #[sdk(child(office2013, qname = "x15:timelineCacheRef"))]
   pub timeline_cache_reference: Vec<TimelineCacheReference>,
 }
 /// Defines the TimelineReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineRefs/x15:timelineRefs")]
+#[sdk(office2013, qname = "x15:timelineRefs")]
 pub struct TimelineReferences {
   /// Defines the TimelineReference Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineRef/x15:timelineRef"))]
+  #[sdk(child(office2013, qname = "x15:timelineRef"))]
   pub timeline_reference: Vec<TimelineReference>,
 }
 /// Defines the WorkbookProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_WorkbookPr/x15:workbookPr")]
+#[sdk(office2013, qname = "x15:workbookPr")]
 pub struct WorkbookProperties {
   /// chartTrackingRefBase
   #[sdk(attr(office2013, qname = ":chartTrackingRefBase"))]
@@ -196,29 +190,29 @@ pub struct WorkbookProperties {
 }
 /// Defines the TimelineStyles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineStyles/x15:timelineStyles")]
+#[sdk(office2013, qname = "x15:timelineStyles")]
 pub struct TimelineStyles {
   /// defaultTimelineStyle
   #[sdk(attr(office2013, qname = ":defaultTimelineStyle"))]
   pub default_timeline_style: crate::simple_type::StringValue,
   /// Defines the TimelineStyle Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineStyle/x15:timelineStyle"))]
+  #[sdk(child(office2013, qname = "x15:timelineStyle"))]
   pub timeline_style: Vec<TimelineStyle>,
 }
 /// Defines the DifferentialFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_Dxfs/x15:dxfs")]
+#[sdk(office2013, qname = "x15:dxfs")]
 pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Formatting.
-  #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
+  #[sdk(child(qname = "x:dxf"))]
   pub differential_format: Vec<crate::schemas::x::DifferentialFormat>,
 }
 /// Defines the Connection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_Connection/x15:connection")]
+#[sdk(office2013, qname = "x15:connection")]
 pub struct Connection {
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
@@ -236,24 +230,24 @@ pub struct Connection {
   #[sdk(attr(office2013, qname = ":usedByAddin"))]
   pub used_by_addin: Option<crate::simple_type::BooleanValue>,
   /// Defines the TextProperties Class.
-  #[sdk(child(office2013, qname = "x:CT_TextPr/x15:textPr"))]
+  #[sdk(child(office2013, qname = "x15:textPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Defines the ModelTextProperties Class.
-  #[sdk(child(office2013, qname = "x15:CT_ModelTextPr/x15:modelTextPr"))]
+  #[sdk(child(office2013, qname = "x15:modelTextPr"))]
   pub model_text_properties: Option<ModelTextProperties>,
   /// Defines the RangeProperties Class.
-  #[sdk(child(office2013, qname = "x15:CT_RangePr/x15:rangePr"))]
+  #[sdk(child(office2013, qname = "x15:rangePr"))]
   pub range_properties: Option<RangeProperties>,
   /// Defines the OleDbPrpoperties Class.
-  #[sdk(child(office2013, qname = "x15:CT_OledbPr/x15:oledbPr"))]
+  #[sdk(child(office2013, qname = "x15:oledbPr"))]
   pub ole_db_prpoperties: Option<std::boxed::Box<OleDbPrpoperties>>,
   /// Defines the DataFeedProperties Class.
-  #[sdk(child(office2013, qname = "x15:CT_DataFeedPr/x15:dataFeedPr"))]
+  #[sdk(child(office2013, qname = "x15:dataFeedPr"))]
   pub data_feed_properties: Option<std::boxed::Box<DataFeedProperties>>,
 }
 /// Defines the CalculatedMember Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_CalculatedMember/x15:calculatedMember")]
+#[sdk(office2013, qname = "x15:calculatedMember")]
 pub struct CalculatedMember {
   /// measureGroup
   #[sdk(attr(office2013, qname = ":measureGroup"))]
@@ -267,10 +261,7 @@ pub struct CalculatedMember {
 }
 /// Defines the PivotTableUISettings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings"
-)]
+#[sdk(office2013, qname = "x15:pivotTableUISettings")]
 pub struct PivotTableUiSettings {
   /// sourceDataName
   #[sdk(attr(office2013, qname = ":sourceDataName"))]
@@ -279,18 +270,15 @@ pub struct PivotTableUiSettings {
   #[sdk(attr(office2013, qname = ":relNeededHidden"))]
   pub rel_needed_hidden: Option<crate::simple_type::BooleanValue>,
   /// Defines the FieldListActiveTabTopLevelEntity Class.
-  #[sdk(child(
-    office2013,
-    qname = "x15:CT_FieldListActiveTabTopLevelEntity/x15:activeTabTopLevelEntity"
-  ))]
+  #[sdk(child(office2013, qname = "x15:activeTabTopLevelEntity"))]
   pub field_list_active_tab_top_level_entity: Vec<FieldListActiveTabTopLevelEntity>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_PivotFilter/x15:pivotFilter")]
+#[sdk(office2013, qname = "x15:pivotFilter")]
 pub struct PivotFilter {
   /// useWholeDay
   #[sdk(attr(office2013, qname = ":useWholeDay"))]
@@ -298,15 +286,15 @@ pub struct PivotFilter {
 }
 /// Defines the CachedUniqueNames Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames")]
+#[sdk(office2013, qname = "x15:cachedUniqueNames")]
 pub struct CachedUniqueNames {
   /// Defines the CachedUniqueName Class.
-  #[sdk(child(office2013, qname = "x15:CT_CachedUniqueName/x15:cachedUniqueName"))]
+  #[sdk(child(office2013, qname = "x15:cachedUniqueName"))]
   pub cached_unique_name: Vec<CachedUniqueName>,
 }
 /// Defines the CacheHierarchy Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy")]
+#[sdk(office2013, qname = "x15:cacheHierarchy")]
 pub struct CacheHierarchy {
   /// aggregatedColumn
   #[sdk(attr(office2013, qname = ":aggregatedColumn"))]
@@ -314,10 +302,7 @@ pub struct CacheHierarchy {
 }
 /// Defines the TimelinePivotCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition"
-)]
+#[sdk(office2013, qname = "x15:timelinePivotCacheDefinition")]
 pub struct TimelinePivotCacheDefinition {
   /// timelineData
   #[sdk(attr(office2013, qname = ":timelineData"))]
@@ -325,10 +310,7 @@ pub struct TimelinePivotCacheDefinition {
 }
 /// Defines the PivotCacheIdVersion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion"
-)]
+#[sdk(office2013, qname = "x15:pivotCacheIdVersion")]
 pub struct PivotCacheIdVersion {
   /// cacheIdSupportedVersion
   #[sdk(attr(office2013, qname = ":cacheIdSupportedVersion"))]
@@ -339,24 +321,24 @@ pub struct PivotCacheIdVersion {
 }
 /// Defines the DataModel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DataModel/x15:dataModel")]
+#[sdk(office2013, qname = "x15:dataModel")]
 pub struct DataModel {
   /// minVersionLoad
   #[sdk(attr(office2013, qname = ":minVersionLoad"))]
   pub min_version_load: Option<crate::simple_type::ByteValue>,
   /// Defines the ModelTables Class.
-  #[sdk(child(office2013, qname = "x15:CT_ModelTables/x15:modelTables"))]
+  #[sdk(child(office2013, qname = "x15:modelTables"))]
   pub model_tables: Option<ModelTables>,
   /// Defines the ModelRelationships Class.
-  #[sdk(child(office2013, qname = "x15:CT_ModelRelationships/x15:modelRelationships"))]
+  #[sdk(child(office2013, qname = "x15:modelRelationships"))]
   pub model_relationships: Option<ModelRelationships>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotTableData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_PivotTableData/x15:pivotTableData")]
+#[sdk(office2013, qname = "x15:pivotTableData")]
 pub struct PivotTableData {
   /// rowCount
   #[sdk(attr(office2013, qname = ":rowCount"))]
@@ -368,15 +350,12 @@ pub struct PivotTableData {
   #[sdk(attr(office2013, qname = ":cacheId"))]
   pub cache_id: crate::simple_type::UInt32Value,
   /// Defines the PivotRow Class.
-  #[sdk(child(office2013, qname = "x15:CT_PivotRow/x15:pivotRow"))]
+  #[sdk(child(office2013, qname = "x15:pivotRow"))]
   pub pivot_row: Vec<PivotRow>,
 }
 /// Defines the PivotCacheDecoupled Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled"
-)]
+#[sdk(office2013, qname = "x15:pivotCacheDecoupled")]
 pub struct PivotCacheDecoupled {
   /// decoupled
   #[sdk(attr(office2013, qname = ":decoupled"))]
@@ -384,7 +363,7 @@ pub struct PivotCacheDecoupled {
 }
 /// Defines the DataField Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DataField/x15:dataField")]
+#[sdk(office2013, qname = "x15:dataField")]
 pub struct DataField {
   /// isCountDistinct
   #[sdk(attr(office2013, qname = ":isCountDistinct"))]
@@ -392,7 +371,7 @@ pub struct DataField {
 }
 /// Defines the MovingPeriodState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_MovingPeriodState/x15:movingPeriodState")]
+#[sdk(office2013, qname = "x15:movingPeriodState")]
 pub struct MovingPeriodState {
   /// referenceDateBegin
   #[sdk(attr(office2013, qname = ":referenceDateBegin"))]
@@ -412,15 +391,15 @@ pub struct MovingPeriodState {
 }
 /// Defines the SlicerCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x14:CT_SlicerCaches/x15:slicerCaches")]
+#[sdk(office2013, qname = "x15:slicerCaches")]
 pub struct SlicerCaches {
   /// Defines the SlicerCache Class.
-  #[sdk(child(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache"))]
+  #[sdk(child(office2010, qname = "x14:slicerCache"))]
   pub slicer_cache: Vec<crate::schemas::x14::SlicerCache>,
 }
 /// Defines the TableSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache")]
+#[sdk(office2013, qname = "x15:tableSlicerCache")]
 pub struct TableSlicerCache {
   /// tableId
   #[sdk(attr(office2013, qname = ":tableId"))]
@@ -438,40 +417,31 @@ pub struct TableSlicerCache {
   #[sdk(attr(office2010, qname = ":crossFilter"))]
   pub cross_filter: Option<crate::schemas::x14::SlicerCacheCrossFilterValues>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SlicerCacheHideItemsWithNoData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData"
-)]
+#[sdk(office2013, qname = "x15:slicerCacheHideItemsWithNoData")]
 pub struct SlicerCacheHideItemsWithNoData {
   /// count
   #[sdk(attr(office2013, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Defines the SlicerCacheOlapLevelName Class.
-  #[sdk(child(
-    office2013,
-    qname = "x15:CT_SlicerCacheOlapLevelName/x15:slicerCacheOlapLevelName"
-  ))]
+  #[sdk(child(office2013, qname = "x15:slicerCacheOlapLevelName"))]
   pub slicer_cache_olap_level_name: Vec<SlicerCacheOlapLevelName>,
 }
 /// Defines the SlicerCachePivotTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"
-)]
+#[sdk(office2013, qname = "x15:slicerCachePivotTables")]
 pub struct SlicerCachePivotTables {
   /// Defines the SlicerCachePivotTable Class.
-  #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
+  #[sdk(child(office2010, qname = "x14:pivotTable"))]
   pub slicer_cache_pivot_table: Vec<crate::schemas::x14::SlicerCachePivotTable>,
 }
 /// Defines the Survey Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_Survey/x15:survey")]
+#[sdk(office2013, qname = "x15:survey")]
 pub struct Survey {
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
@@ -488,37 +458,34 @@ pub struct Survey {
   #[sdk(attr(office2013, qname = ":description"))]
   pub description: Option<crate::simple_type::StringValue>,
   /// Defines the SurveyPrSurveyElementPr Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyElementPr/x15:surveyPr"))]
+  #[sdk(child(office2013, qname = "x15:surveyPr"))]
   pub survey_pr_survey_element_pr: Option<std::boxed::Box<SurveyPrSurveyElementPr>>,
   /// Defines the TitlePrSurveyElementPr Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyElementPr/x15:titlePr"))]
+  #[sdk(child(office2013, qname = "x15:titlePr"))]
   pub title_pr_survey_element_pr: Option<std::boxed::Box<TitlePrSurveyElementPr>>,
   /// Defines the DescriptionPrSurveyElementPr Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyElementPr/x15:descriptionPr"))]
+  #[sdk(child(office2013, qname = "x15:descriptionPr"))]
   pub description_pr_survey_element_pr: Option<std::boxed::Box<DescriptionPrSurveyElementPr>>,
   /// Defines the SurveyQuestions Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyQuestions/x15:questions"))]
+  #[sdk(child(office2013, qname = "x15:questions"))]
   pub survey_questions: std::boxed::Box<SurveyQuestions>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Timelines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_Timelines/x15:timelines")]
+#[sdk(office2013, qname = "x15:timelines")]
 pub struct Timelines {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Timeline Class.
-  #[sdk(child(office2013, qname = "x15:CT_Timeline/x15:timeline"))]
+  #[sdk(child(office2013, qname = "x15:timeline"))]
   pub timeline: Vec<Timeline>,
 }
 /// Defines the TimelineCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_TimelineCacheDefinition/x15:timelineCacheDefinition"
-)]
+#[sdk(office2013, qname = "x15:timelineCacheDefinition")]
 pub struct TimelineCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -529,21 +496,18 @@ pub struct TimelineCacheDefinition {
   #[sdk(attr(office2013, qname = ":sourceName"))]
   pub source_name: crate::simple_type::StringValue,
   /// Defines the TimelineCachePivotTables Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineCachePivotTables/x15:pivotTables"))]
+  #[sdk(child(office2013, qname = "x15:pivotTables"))]
   pub timeline_cache_pivot_tables: Option<TimelineCachePivotTables>,
   /// Defines the TimelineState Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineState/x15:state"))]
+  #[sdk(child(office2013, qname = "x15:state"))]
   pub timeline_state: std::boxed::Box<TimelineState>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotTableReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotTableReference/x15:pivotTableReference"
-)]
+#[sdk(office2013, qname = "x15:pivotTableReference")]
 pub struct PivotTableReference {
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
@@ -551,18 +515,18 @@ pub struct PivotTableReference {
 }
 /// Defines the WebExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_WebExtension/x15:webExtension")]
+#[sdk(office2013, qname = "x15:webExtension")]
 pub struct WebExtension {
   /// appRef
   #[sdk(attr(office2013, qname = ":appRef"))]
   pub application_reference: crate::simple_type::StringValue,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the TimelineCacheReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineCacheRef/x15:timelineCacheRef")]
+#[sdk(office2013, qname = "x15:timelineCacheRef")]
 pub struct TimelineCacheReference {
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
@@ -570,7 +534,7 @@ pub struct TimelineCacheReference {
 }
 /// Defines the TimelineReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineRef/x15:timelineRef")]
+#[sdk(office2013, qname = "x15:timelineRef")]
 pub struct TimelineReference {
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
@@ -578,24 +542,18 @@ pub struct TimelineReference {
 }
 /// Defines the TimelineStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineStyle/x15:timelineStyle")]
+#[sdk(office2013, qname = "x15:timelineStyle")]
 pub struct TimelineStyle {
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// Defines the TimelineStyleElements Class.
-  #[sdk(child(
-    office2013,
-    qname = "x15:CT_TimelineStyleElements/x15:timelineStyleElements"
-  ))]
+  #[sdk(child(office2013, qname = "x15:timelineStyleElements"))]
   pub timeline_style_elements: Option<TimelineStyleElements>,
 }
 /// Defines the TimelineStyleElement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_TimelineStyleElement/x15:timelineStyleElement"
-)]
+#[sdk(office2013, qname = "x15:timelineStyleElement")]
 pub struct TimelineStyleElement {
   /// type
   #[sdk(attr(office2013, qname = ":type"))]
@@ -606,21 +564,15 @@ pub struct TimelineStyleElement {
 }
 /// Defines the TimelineStyleElements Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_TimelineStyleElements/x15:timelineStyleElements"
-)]
+#[sdk(office2013, qname = "x15:timelineStyleElements")]
 pub struct TimelineStyleElements {
   /// Defines the TimelineStyleElement Class.
-  #[sdk(child(
-    office2013,
-    qname = "x15:CT_TimelineStyleElement/x15:timelineStyleElement"
-  ))]
+  #[sdk(child(office2013, qname = "x15:timelineStyleElement"))]
   pub timeline_style_element: Vec<TimelineStyleElement>,
 }
 /// Defines the DbTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DbTable/x15:dbTable")]
+#[sdk(office2013, qname = "x15:dbTable")]
 pub struct DbTable {
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
@@ -628,15 +580,15 @@ pub struct DbTable {
 }
 /// Defines the DbTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DbTables/x15:dbTables")]
+#[sdk(office2013, qname = "x15:dbTables")]
 pub struct DbTables {
   /// Defines the DbTable Class.
-  #[sdk(child(office2013, qname = "x15:CT_DbTable/x15:dbTable"))]
+  #[sdk(child(office2013, qname = "x15:dbTable"))]
   pub db_table: Vec<DbTable>,
 }
 /// Defines the DbCommand Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DbCommand/x15:dbCommand")]
+#[sdk(office2013, qname = "x15:dbCommand")]
 pub struct DbCommand {
   /// text
   #[sdk(attr(office2013, qname = ":text"))]
@@ -644,7 +596,7 @@ pub struct DbCommand {
 }
 /// Defines the TextProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_TextPr/x15:textPr")]
+#[sdk(office2013, qname = "x15:textPr")]
 pub struct TextProperties {
   /// prompt
   #[sdk(attr(qname = ":prompt"))]
@@ -695,12 +647,12 @@ pub struct TextProperties {
   #[sdk(attr(qname = ":delimiter"))]
   pub delimiter: Option<crate::simple_type::StringValue>,
   /// Defines the TextFields Class.
-  #[sdk(child(qname = "x:CT_TextFields/x:textFields"))]
+  #[sdk(child(qname = "x:textFields"))]
   pub text_fields: Option<crate::schemas::x::TextFields>,
 }
 /// Defines the ModelTextProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_ModelTextPr/x15:modelTextPr")]
+#[sdk(office2013, qname = "x15:modelTextPr")]
 pub struct ModelTextProperties {
   /// headers
   #[sdk(attr(office2013, qname = ":headers"))]
@@ -708,7 +660,7 @@ pub struct ModelTextProperties {
 }
 /// Defines the RangeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_RangePr/x15:rangePr")]
+#[sdk(office2013, qname = "x15:rangePr")]
 pub struct RangeProperties {
   /// sourceName
   #[sdk(attr(office2013, qname = ":sourceName"))]
@@ -716,7 +668,7 @@ pub struct RangeProperties {
 }
 /// Defines the OleDbPrpoperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_OledbPr/x15:oledbPr")]
+#[sdk(office2013, qname = "x15:oledbPr")]
 pub struct OleDbPrpoperties {
   /// connection
   #[sdk(attr(office2013, qname = ":connection"))]
@@ -731,21 +683,18 @@ pub struct OleDbPrpoperties {
 }
 /// Defines the DataFeedProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_DataFeedPr/x15:dataFeedPr")]
+#[sdk(office2013, qname = "x15:dataFeedPr")]
 pub struct DataFeedProperties {
   /// connection
   #[sdk(attr(office2013, qname = ":connection"))]
   pub connection: crate::simple_type::StringValue,
   /// Defines the DbTables Class.
-  #[sdk(child(office2013, qname = "x15:CT_DbTables/x15:dbTables"))]
+  #[sdk(child(office2013, qname = "x15:dbTables"))]
   pub db_tables: std::boxed::Box<DbTables>,
 }
 /// Defines the FieldListActiveTabTopLevelEntity Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_FieldListActiveTabTopLevelEntity/x15:activeTabTopLevelEntity"
-)]
+#[sdk(office2013, qname = "x15:activeTabTopLevelEntity")]
 pub struct FieldListActiveTabTopLevelEntity {
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
@@ -756,15 +705,15 @@ pub struct FieldListActiveTabTopLevelEntity {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_ExtensionList/x15:extLst")]
+#[sdk(office2013, qname = "x15:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the CachedUniqueName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_CachedUniqueName/x15:cachedUniqueName")]
+#[sdk(office2013, qname = "x15:cachedUniqueName")]
 pub struct CachedUniqueName {
   /// index
   #[sdk(attr(office2013, qname = ":index"))]
@@ -775,7 +724,7 @@ pub struct CachedUniqueName {
 }
 /// Defines the ModelTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_ModelTable/x15:modelTable")]
+#[sdk(office2013, qname = "x15:modelTable")]
 pub struct ModelTable {
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
@@ -789,7 +738,7 @@ pub struct ModelTable {
 }
 /// Defines the ModelRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_ModelRelationship/x15:modelRelationship")]
+#[sdk(office2013, qname = "x15:modelRelationship")]
 pub struct ModelRelationship {
   /// fromTable
   #[sdk(attr(office2013, qname = ":fromTable"))]
@@ -806,23 +755,23 @@ pub struct ModelRelationship {
 }
 /// Defines the ModelTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_ModelTables/x15:modelTables")]
+#[sdk(office2013, qname = "x15:modelTables")]
 pub struct ModelTables {
   /// Defines the ModelTable Class.
-  #[sdk(child(office2013, qname = "x15:CT_ModelTable/x15:modelTable"))]
+  #[sdk(child(office2013, qname = "x15:modelTable"))]
   pub model_table: Vec<ModelTable>,
 }
 /// Defines the ModelRelationships Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_ModelRelationships/x15:modelRelationships")]
+#[sdk(office2013, qname = "x15:modelRelationships")]
 pub struct ModelRelationships {
   /// Defines the ModelRelationship Class.
-  #[sdk(child(office2013, qname = "x15:CT_ModelRelationship/x15:modelRelationship"))]
+  #[sdk(child(office2013, qname = "x15:modelRelationship"))]
   pub model_relationship: Vec<ModelRelationship>,
 }
 /// Defines the PivotValueCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_PivotValueCell/x15:c")]
+#[sdk(office2013, qname = "x15:c")]
 pub struct PivotValueCell {
   /// i
   #[sdk(attr(office2013, qname = ":i"))]
@@ -831,17 +780,17 @@ pub struct PivotValueCell {
   #[sdk(attr(office2013, qname = ":t"))]
   pub text: Option<SxvCellType>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x:ST_Xstring/x15:v"))]
+  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x15:v"))]
   pub xstring: Xstring,
   /// Defines the PivotValueCellExtra Class.
-  #[sdk(child(office2013, qname = "x15:CT_PivotValueCellExtra/x15:x"))]
+  #[sdk(child(office2013, qname = "x15:x"))]
   pub pivot_value_cell_extra: Option<PivotValueCellExtra>,
 }
 /// Defines the Xstring Class.
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the PivotValueCellExtra Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_PivotValueCellExtra/x15:x")]
+#[sdk(office2013, qname = "x15:x")]
 pub struct PivotValueCellExtra {
   /// in
   #[sdk(attr(office2013, qname = ":in"))]
@@ -869,21 +818,18 @@ pub struct PivotValueCellExtra {
 }
 /// Defines the PivotTableServerFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_PivotTableServerFormats/x15:pivotTableServerFormats"
-)]
+#[sdk(office2013, qname = "x15:pivotTableServerFormats")]
 pub struct PivotTableServerFormats {
   /// count
   #[sdk(attr(office2013, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the ServerFormat Class.
-  #[sdk(child(office2013, qname = "x:CT_ServerFormat/x15:serverFormat"))]
+  #[sdk(child(office2013, qname = "x15:serverFormat"))]
   pub server_format: Vec<ServerFormat>,
 }
 /// Defines the ServerFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_ServerFormat/x15:serverFormat")]
+#[sdk(office2013, qname = "x15:serverFormat")]
 pub struct ServerFormat {
   /// Culture
   #[sdk(attr(qname = ":culture"))]
@@ -894,10 +840,7 @@ pub struct ServerFormat {
 }
 /// Defines the SlicerCacheOlapLevelName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2013,
-  qname = "x15:CT_SlicerCacheOlapLevelName/x15:slicerCacheOlapLevelName"
-)]
+#[sdk(office2013, qname = "x15:slicerCacheOlapLevelName")]
 pub struct SlicerCacheOlapLevelName {
   /// uniqueName
   #[sdk(attr(office2013, qname = ":uniqueName"))]
@@ -908,7 +851,7 @@ pub struct SlicerCacheOlapLevelName {
 }
 /// Defines the SurveyPrSurveyElementPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/x15:surveyPr")]
+#[sdk(office2013, qname = "x15:surveyPr")]
 pub struct SurveyPrSurveyElementPr {
   /// cssClass
   #[sdk(attr(office2013, qname = ":cssClass"))]
@@ -935,12 +878,12 @@ pub struct SurveyPrSurveyElementPr {
   #[sdk(attr(office2013, qname = ":position"))]
   pub position: Option<SurveyPosition>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TitlePrSurveyElementPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/x15:titlePr")]
+#[sdk(office2013, qname = "x15:titlePr")]
 pub struct TitlePrSurveyElementPr {
   /// cssClass
   #[sdk(attr(office2013, qname = ":cssClass"))]
@@ -967,12 +910,12 @@ pub struct TitlePrSurveyElementPr {
   #[sdk(attr(office2013, qname = ":position"))]
   pub position: Option<SurveyPosition>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DescriptionPrSurveyElementPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/x15:descriptionPr")]
+#[sdk(office2013, qname = "x15:descriptionPr")]
 pub struct DescriptionPrSurveyElementPr {
   /// cssClass
   #[sdk(attr(office2013, qname = ":cssClass"))]
@@ -999,12 +942,12 @@ pub struct DescriptionPrSurveyElementPr {
   #[sdk(attr(office2013, qname = ":position"))]
   pub position: Option<SurveyPosition>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the QuestionsPrSurveyElementPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/x15:questionsPr")]
+#[sdk(office2013, qname = "x15:questionsPr")]
 pub struct QuestionsPrSurveyElementPr {
   /// cssClass
   #[sdk(attr(office2013, qname = ":cssClass"))]
@@ -1031,12 +974,12 @@ pub struct QuestionsPrSurveyElementPr {
   #[sdk(attr(office2013, qname = ":position"))]
   pub position: Option<SurveyPosition>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the QuestionPrSurveyElementPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/x15:questionPr")]
+#[sdk(office2013, qname = "x15:questionPr")]
 pub struct QuestionPrSurveyElementPr {
   /// cssClass
   #[sdk(attr(office2013, qname = ":cssClass"))]
@@ -1063,23 +1006,23 @@ pub struct QuestionPrSurveyElementPr {
   #[sdk(attr(office2013, qname = ":position"))]
   pub position: Option<SurveyPosition>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SurveyQuestions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyQuestions/x15:questions")]
+#[sdk(office2013, qname = "x15:questions")]
 pub struct SurveyQuestions {
   /// Defines the QuestionsPrSurveyElementPr Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyElementPr/x15:questionsPr"))]
+  #[sdk(child(office2013, qname = "x15:questionsPr"))]
   pub questions_pr_survey_element_pr: Option<std::boxed::Box<QuestionsPrSurveyElementPr>>,
   /// Defines the SurveyQuestion Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyQuestion/x15:question"))]
+  #[sdk(child(office2013, qname = "x15:question"))]
   pub survey_question: Vec<SurveyQuestion>,
 }
 /// Defines the SurveyQuestion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyQuestion/x15:question")]
+#[sdk(office2013, qname = "x15:question")]
 pub struct SurveyQuestion {
   /// binding
   #[sdk(attr(office2013, qname = ":binding"))]
@@ -1109,15 +1052,15 @@ pub struct SurveyQuestion {
   #[sdk(attr(office2013, qname = ":rowSource"))]
   pub row_source: Option<crate::simple_type::StringValue>,
   /// Defines the QuestionPrSurveyElementPr Class.
-  #[sdk(child(office2013, qname = "x15:CT_SurveyElementPr/x15:questionPr"))]
+  #[sdk(child(office2013, qname = "x15:questionPr"))]
   pub question_pr_survey_element_pr: Option<std::boxed::Box<QuestionPrSurveyElementPr>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Timeline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_Timeline/x15:timeline")]
+#[sdk(office2013, qname = "x15:timeline")]
 pub struct Timeline {
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
@@ -1153,12 +1096,12 @@ pub struct Timeline {
   #[sdk(attr(office2013, qname = ":style"))]
   pub style: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TimelineCachePivotTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineCachePivotTable/x15:pivotTable")]
+#[sdk(office2013, qname = "x15:pivotTable")]
 pub struct TimelineCachePivotTable {
   /// tabId
   #[sdk(attr(office2013, qname = ":tabId"))]
@@ -1169,7 +1112,7 @@ pub struct TimelineCachePivotTable {
 }
 /// Defines the SelectionTimelineRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineRange/x15:selection")]
+#[sdk(office2013, qname = "x15:selection")]
 pub struct SelectionTimelineRange {
   /// startDate
   #[sdk(attr(office2013, qname = ":startDate"))]
@@ -1180,7 +1123,7 @@ pub struct SelectionTimelineRange {
 }
 /// Defines the BoundsTimelineRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineRange/x15:bounds")]
+#[sdk(office2013, qname = "x15:bounds")]
 pub struct BoundsTimelineRange {
   /// startDate
   #[sdk(attr(office2013, qname = ":startDate"))]
@@ -1191,32 +1134,32 @@ pub struct BoundsTimelineRange {
 }
 /// Defines the AutoFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x:CT_AutoFilter/x15:autoFilter")]
+#[sdk(office2013, qname = "x15:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
-  #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
+  #[sdk(child(qname = "x:filterColumn"))]
   pub filter_column: Vec<crate::schemas::x::FilterColumn>,
   /// Sort State for Auto Filter.
-  #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
+  #[sdk(child(qname = "x:sortState"))]
   pub sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the TimelineCachePivotTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineCachePivotTables/x15:pivotTables")]
+#[sdk(office2013, qname = "x15:pivotTables")]
 pub struct TimelineCachePivotTables {
   /// Defines the TimelineCachePivotTable Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineCachePivotTable/x15:pivotTable"))]
+  #[sdk(child(office2013, qname = "x15:pivotTable"))]
   pub timeline_cache_pivot_table: Vec<TimelineCachePivotTable>,
 }
 /// Defines the TimelineState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineState/x15:state")]
+#[sdk(office2013, qname = "x15:state")]
 pub struct TimelineState {
   /// singleRangeFilterState
   #[sdk(attr(office2013, qname = ":singleRangeFilterState"))]
@@ -1243,21 +1186,21 @@ pub struct TimelineState {
   #[sdk(attr(office2013, qname = ":filterPivotName"))]
   pub filter_pivot_name: Option<crate::simple_type::StringValue>,
   /// Defines the SelectionTimelineRange Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineRange/x15:selection"))]
+  #[sdk(child(office2013, qname = "x15:selection"))]
   pub selection_timeline_range: Option<SelectionTimelineRange>,
   /// Defines the BoundsTimelineRange Class.
-  #[sdk(child(office2013, qname = "x15:CT_TimelineRange/x15:bounds"))]
+  #[sdk(child(office2013, qname = "x15:bounds"))]
   pub bounds_timeline_range: std::boxed::Box<BoundsTimelineRange>,
   /// Defines the MovingPeriodState Class.
-  #[sdk(child(office2013, qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"))]
+  #[sdk(child(office2013, qname = "x15:movingPeriodState"))]
   pub moving_period_state: Option<MovingPeriodState>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  #[sdk(child(office2013, qname = "x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotRow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_PivotRow/x15:pivotRow")]
+#[sdk(office2013, qname = "x15:pivotRow")]
 pub struct PivotRow {
   /// r
   #[sdk(attr(office2013, qname = ":r"))]
@@ -1266,7 +1209,7 @@ pub struct PivotRow {
   #[sdk(attr(office2013, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the PivotValueCell Class.
-  #[sdk(child(office2013, qname = "x15:CT_PivotValueCell/x15:c"))]
+  #[sdk(child(office2013, qname = "x15:c"))]
   pub pivot_value_cell: Vec<PivotValueCell>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -6,66 +6,45 @@
 
 /// Defines the WebImagesSupportingRichData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImagesSupportingRichData/xlrdwi:webImagesSrd"
-)]
+#[sdk(office2021, qname = "xlrdwi:webImagesSrd")]
 pub struct WebImagesSupportingRichData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the WebImageSupportingRichData Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrdwi:CT_WebImageSupportingRichData/xlrdwi:webImageSrd"
-  ))]
+  #[sdk(child(office2021, qname = "xlrdwi:webImageSrd"))]
   pub web_image_supporting_rich_data: Vec<WebImageSupportingRichData>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xlrdwi:extLst"))]
+  #[sdk(child(office2021, qname = "xlrdwi:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the WebImageSupportingRichData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImageSupportingRichData/xlrdwi:webImageSrd"
-)]
+#[sdk(office2021, qname = "xlrdwi:webImageSrd")]
 pub struct WebImageSupportingRichData {
   /// Defines the AddressWebImageSupportingRichDataRelationship Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:address"
-  ))]
+  #[sdk(child(office2021, qname = "xlrdwi:address"))]
   pub address_web_image_supporting_rich_data_relationship:
     std::boxed::Box<AddressWebImageSupportingRichDataRelationship>,
   /// Defines the MoreImagesAddressWebImageSupportingRichDataRelationship Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:moreImagesAddress"
-  ))]
+  #[sdk(child(office2021, qname = "xlrdwi:moreImagesAddress"))]
   pub more_images_address_web_image_supporting_rich_data_relationship:
     Option<MoreImagesAddressWebImageSupportingRichDataRelationship>,
   /// Defines the BlipWebImageSupportingRichDataRelationship Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:blip"
-  ))]
+  #[sdk(child(office2021, qname = "xlrdwi:blip"))]
   pub blip_web_image_supporting_rich_data_relationship:
     Option<BlipWebImageSupportingRichDataRelationship>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "x:CT_ExtensionList/xlrdwi:extLst")]
+#[sdk(office2021, qname = "xlrdwi:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the AddressWebImageSupportingRichDataRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:address"
-)]
+#[sdk(office2021, qname = "xlrdwi:address")]
 pub struct AddressWebImageSupportingRichDataRelationship {
   /// id
   #[sdk(attr(office2021, qname = "r:id"))]
@@ -73,10 +52,7 @@ pub struct AddressWebImageSupportingRichDataRelationship {
 }
 /// Defines the MoreImagesAddressWebImageSupportingRichDataRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:moreImagesAddress"
-)]
+#[sdk(office2021, qname = "xlrdwi:moreImagesAddress")]
 pub struct MoreImagesAddressWebImageSupportingRichDataRelationship {
   /// id
   #[sdk(attr(office2021, qname = "r:id"))]
@@ -84,10 +60,7 @@ pub struct MoreImagesAddressWebImageSupportingRichDataRelationship {
 }
 /// Defines the BlipWebImageSupportingRichDataRelationship Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/xlrdwi:blip"
-)]
+#[sdk(office2021, qname = "xlrdwi:blip")]
 pub struct BlipWebImageSupportingRichDataRelationship {
   /// id
   #[sdk(attr(office2021, qname = "r:id"))]

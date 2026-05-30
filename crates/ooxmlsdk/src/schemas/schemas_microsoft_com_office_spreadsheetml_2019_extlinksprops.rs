@@ -6,7 +6,7 @@
 
 /// Defines the ExternalLinksPr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "xxlnp:CT_ExternalLinksPr/xxlnp:externalLinksPr")]
+#[sdk(office2021, qname = "xxlnp:externalLinksPr")]
 pub struct ExternalLinksPr {
   /// autoRefresh
   #[sdk(attr(office2021, qname = ":autoRefresh"))]

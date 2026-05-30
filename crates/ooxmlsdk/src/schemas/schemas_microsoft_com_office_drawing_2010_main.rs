@@ -6,7 +6,7 @@
 
 /// Defines the CameraTool Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_CameraTool/a14:cameraTool")]
+#[sdk(office2010, qname = "a14:cameraTool")]
 pub struct CameraTool {
   /// cellRange
   #[sdk(attr(office2010, qname = ":cellRange"))]
@@ -17,7 +17,7 @@ pub struct CameraTool {
 }
 /// Defines the CompatExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_CompatExt/a14:compatExt")]
+#[sdk(office2010, qname = "a14:compatExt")]
 pub struct CompatExtension {
   /// spid
   #[sdk(attr(office2010, qname = ":spid"))]
@@ -25,7 +25,7 @@ pub struct CompatExtension {
 }
 /// Defines the IsCanvas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_IsGvmlCanvas/a14:isCanvas")]
+#[sdk(office2010, qname = "a14:isCanvas")]
 pub struct IsCanvas {
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
@@ -33,7 +33,7 @@ pub struct IsCanvas {
 }
 /// Defines the GvmlContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart")]
+#[sdk(office2010, qname = "a14:contentPart")]
 pub struct GvmlContentPart {
   /// bwMode
   #[sdk(attr(office2010, qname = ":bwMode"))]
@@ -43,21 +43,18 @@ pub struct GvmlContentPart {
   #[sdk(attr(office2010, qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
   /// Defines the NonVisualContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_GvmlContentPartNonVisual/a14:nvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "a14:nvContentPartPr"))]
   pub non_visual_content_part_properties: Option<std::boxed::Box<NonVisualContentPartProperties>>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/a14:xfrm"))]
+  #[sdk(child(office2010, qname = "a14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ShadowObscured Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_ShadowObscured/a14:shadowObscured")]
+#[sdk(office2010, qname = "a14:shadowObscured")]
 pub struct ShadowObscured {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -66,7 +63,7 @@ pub struct ShadowObscured {
 }
 /// Defines the HiddenFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_FillProperties/a14:hiddenFill")]
+#[sdk(office2010, qname = "a14:hiddenFill")]
 pub struct HiddenFillProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
@@ -83,7 +80,7 @@ pub struct HiddenFillProperties {
 }
 /// Defines the HiddenLineProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_LineProperties/a14:hiddenLine")]
+#[sdk(office2010, qname = "a14:hiddenLine")]
 pub struct HiddenLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// line width
@@ -127,18 +124,18 @@ pub struct HiddenLineProperties {
     )]
   pub hidden_line_properties_choice3: Option<HiddenLinePropertiesChoice3>,
   /// default head line end style is none.
-  #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
+  #[sdk(child(qname = "a:headEnd"))]
   pub head_end: Option<crate::schemas::a::HeadEnd>,
   /// default tail line end style is none.
-  #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
+  #[sdk(child(qname = "a:tailEnd"))]
   pub tail_end: Option<crate::schemas::a::TailEnd>,
   /// Future extensions..
-  #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub line_properties_extension_list: Option<crate::schemas::a::LinePropertiesExtensionList>,
 }
 /// Defines the HiddenEffectsProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_EffectProperties/a14:hiddenEffects")]
+#[sdk(office2010, qname = "a14:hiddenEffects")]
 pub struct HiddenEffectsProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   #[sdk(
@@ -151,24 +148,24 @@ pub struct HiddenEffectsProperties {
 }
 /// Defines the HiddenScene3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Scene3D/a14:hiddenScene3d")]
+#[sdk(office2010, qname = "a14:hiddenScene3d")]
 pub struct HiddenScene3D {
   /// Camera
-  #[sdk(child(qname = "a:CT_Camera/a:camera"))]
+  #[sdk(child(qname = "a:camera"))]
   pub camera: std::boxed::Box<crate::schemas::a::Camera>,
   /// Light Rig
-  #[sdk(child(qname = "a:CT_LightRig/a:lightRig"))]
+  #[sdk(child(qname = "a:lightRig"))]
   pub light_rig: std::boxed::Box<crate::schemas::a::LightRig>,
   /// Backdrop Plane
-  #[sdk(child(qname = "a:CT_Backdrop/a:backdrop"))]
+  #[sdk(child(qname = "a:backdrop"))]
   pub backdrop: Option<std::boxed::Box<crate::schemas::a::Backdrop>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the HiddenShape3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Shape3D/a14:hiddenSp3d")]
+#[sdk(office2010, qname = "a14:hiddenSp3d")]
 pub struct HiddenShape3D {
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
@@ -187,33 +184,33 @@ pub struct HiddenShape3D {
   #[sdk(string_format(kind = "token"))]
   pub preset_material: Option<crate::schemas::a::PresetMaterialTypeValues>,
   /// Top Bevel
-  #[sdk(child(qname = "a:CT_Bevel/a:bevelT"))]
+  #[sdk(child(qname = "a:bevelT"))]
   pub bevel_top: Option<crate::schemas::a::BevelTop>,
   /// Bottom Bevel
-  #[sdk(child(qname = "a:CT_Bevel/a:bevelB"))]
+  #[sdk(child(qname = "a:bevelB"))]
   pub bevel_bottom: Option<crate::schemas::a::BevelBottom>,
   /// Extrusion Color
-  #[sdk(child(qname = "a:CT_Color/a:extrusionClr"))]
+  #[sdk(child(qname = "a:extrusionClr"))]
   pub extrusion_color: Option<std::boxed::Box<crate::schemas::a::ExtrusionColor>>,
   /// Contour Color
-  #[sdk(child(qname = "a:CT_Color/a:contourClr"))]
+  #[sdk(child(qname = "a:contourClr"))]
   pub contour_color: Option<std::boxed::Box<crate::schemas::a::ContourColor>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the ImageProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_Photo/a14:imgProps")]
+#[sdk(office2010, qname = "a14:imgProps")]
 pub struct ImageProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ImageLayer Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureLayer/a14:imgLayer"))]
+  #[sdk(child(office2010, qname = "a14:imgLayer"))]
   pub image_layer: std::boxed::Box<ImageLayer>,
 }
 /// Defines the UseLocalDpi Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_UseLocalDpi/a14:useLocalDpi")]
+#[sdk(office2010, qname = "a14:useLocalDpi")]
 pub struct UseLocalDpi {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// val
@@ -222,22 +219,22 @@ pub struct UseLocalDpi {
 }
 /// Defines the TextMath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_TextMath/a14:m")]
+#[sdk(office2010, qname = "a14:m")]
 pub struct TextMath {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_children: Vec<std::boxed::Box<[u8]>>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst")]
+#[sdk(office2010, qname = "a14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the ContentPartLocks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks")]
+#[sdk(office2010, qname = "a14:cpLocks")]
 pub struct ContentPartLocks {
   /// Disallow Shape Grouping
   #[sdk(attr(qname = ":noGrp"))]
@@ -270,15 +267,12 @@ pub struct ContentPartLocks {
   #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ForegroundMark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectBackgroundRemovalForegroundMark/a14:foregroundMark"
-)]
+#[sdk(office2010, qname = "a14:foregroundMark")]
 pub struct ForegroundMark {
   /// x1
   #[sdk(attr(office2010, qname = ":x1"))]
@@ -299,10 +293,7 @@ pub struct ForegroundMark {
 }
 /// Defines the BackgroundMark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectBackgroundRemovalBackgroundMark/a14:backgroundMark"
-)]
+#[sdk(office2010, qname = "a14:backgroundMark")]
 pub struct BackgroundMark {
   /// x1
   #[sdk(attr(office2010, qname = ":x1"))]
@@ -323,7 +314,7 @@ pub struct BackgroundMark {
 }
 /// Defines the ArtisticBlur Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectBlur/a14:artisticBlur")]
+#[sdk(office2010, qname = "a14:artisticBlur")]
 pub struct ArtisticBlur {
   /// radius
   #[sdk(attr(office2010, qname = ":radius"))]
@@ -332,7 +323,7 @@ pub struct ArtisticBlur {
 }
 /// Defines the ArtisticCement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectCement/a14:artisticCement")]
+#[sdk(office2010, qname = "a14:artisticCement")]
 pub struct ArtisticCement {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -345,10 +336,7 @@ pub struct ArtisticCement {
 }
 /// Defines the ArtisticChalkSketch Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectChalkSketch/a14:artisticChalkSketch"
-)]
+#[sdk(office2010, qname = "a14:artisticChalkSketch")]
 pub struct ArtisticChalkSketch {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -361,10 +349,7 @@ pub struct ArtisticChalkSketch {
 }
 /// Defines the ArtisticCrisscrossEtching Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectCrisscrossEtching/a14:artisticCrisscrossEtching"
-)]
+#[sdk(office2010, qname = "a14:artisticCrisscrossEtching")]
 pub struct ArtisticCrisscrossEtching {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -377,7 +362,7 @@ pub struct ArtisticCrisscrossEtching {
 }
 /// Defines the ArtisticCutout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectCutout/a14:artisticCutout")]
+#[sdk(office2010, qname = "a14:artisticCutout")]
 pub struct ArtisticCutout {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -390,10 +375,7 @@ pub struct ArtisticCutout {
 }
 /// Defines the ArtisticFilmGrain Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectFilmGrain/a14:artisticFilmGrain"
-)]
+#[sdk(office2010, qname = "a14:artisticFilmGrain")]
 pub struct ArtisticFilmGrain {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -406,7 +388,7 @@ pub struct ArtisticFilmGrain {
 }
 /// Defines the ArtisticGlass Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectGlass/a14:artisticGlass")]
+#[sdk(office2010, qname = "a14:artisticGlass")]
 pub struct ArtisticGlass {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -419,10 +401,7 @@ pub struct ArtisticGlass {
 }
 /// Defines the ArtisticGlowDiffused Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectGlowDiffused/a14:artisticGlowDiffused"
-)]
+#[sdk(office2010, qname = "a14:artisticGlowDiffused")]
 pub struct ArtisticGlowDiffused {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -435,10 +414,7 @@ pub struct ArtisticGlowDiffused {
 }
 /// Defines the ArtisticGlowEdges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectGlowEdges/a14:artisticGlowEdges"
-)]
+#[sdk(office2010, qname = "a14:artisticGlowEdges")]
 pub struct ArtisticGlowEdges {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -451,10 +427,7 @@ pub struct ArtisticGlowEdges {
 }
 /// Defines the ArtisticLightScreen Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectLightScreen/a14:artisticLightScreen"
-)]
+#[sdk(office2010, qname = "a14:artisticLightScreen")]
 pub struct ArtisticLightScreen {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -467,10 +440,7 @@ pub struct ArtisticLightScreen {
 }
 /// Defines the ArtisticLineDrawing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectLineDrawing/a14:artisticLineDrawing"
-)]
+#[sdk(office2010, qname = "a14:artisticLineDrawing")]
 pub struct ArtisticLineDrawing {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -483,7 +453,7 @@ pub struct ArtisticLineDrawing {
 }
 /// Defines the ArtisticMarker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectMarker/a14:artisticMarker")]
+#[sdk(office2010, qname = "a14:artisticMarker")]
 pub struct ArtisticMarker {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -496,10 +466,7 @@ pub struct ArtisticMarker {
 }
 /// Defines the ArtisticMosaicBubbles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectMosiaicBubbles/a14:artisticMosiaicBubbles"
-)]
+#[sdk(office2010, qname = "a14:artisticMosiaicBubbles")]
 pub struct ArtisticMosaicBubbles {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -512,10 +479,7 @@ pub struct ArtisticMosaicBubbles {
 }
 /// Defines the ArtisticPaintStrokes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPaintStrokes/a14:artisticPaintStrokes"
-)]
+#[sdk(office2010, qname = "a14:artisticPaintStrokes")]
 pub struct ArtisticPaintStrokes {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -528,10 +492,7 @@ pub struct ArtisticPaintStrokes {
 }
 /// Defines the ArtisticPaintBrush Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPaintBrush/a14:artisticPaintBrush"
-)]
+#[sdk(office2010, qname = "a14:artisticPaintBrush")]
 pub struct ArtisticPaintBrush {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -544,10 +505,7 @@ pub struct ArtisticPaintBrush {
 }
 /// Defines the ArtisticPastelsSmooth Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPastelsSmooth/a14:artisticPastelsSmooth"
-)]
+#[sdk(office2010, qname = "a14:artisticPastelsSmooth")]
 pub struct ArtisticPastelsSmooth {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -560,10 +518,7 @@ pub struct ArtisticPastelsSmooth {
 }
 /// Defines the ArtisticPencilGrayscale Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPencilGrayscale/a14:artisticPencilGrayscale"
-)]
+#[sdk(office2010, qname = "a14:artisticPencilGrayscale")]
 pub struct ArtisticPencilGrayscale {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -576,10 +531,7 @@ pub struct ArtisticPencilGrayscale {
 }
 /// Defines the ArtisticPencilSketch Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPencilSketch/a14:artisticPencilSketch"
-)]
+#[sdk(office2010, qname = "a14:artisticPencilSketch")]
 pub struct ArtisticPencilSketch {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -592,10 +544,7 @@ pub struct ArtisticPencilSketch {
 }
 /// Defines the ArtisticPhotocopy Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPhotocopy/a14:artisticPhotocopy"
-)]
+#[sdk(office2010, qname = "a14:artisticPhotocopy")]
 pub struct ArtisticPhotocopy {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -608,10 +557,7 @@ pub struct ArtisticPhotocopy {
 }
 /// Defines the ArtisticPlasticWrap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectPlasticWrap/a14:artisticPlasticWrap"
-)]
+#[sdk(office2010, qname = "a14:artisticPlasticWrap")]
 pub struct ArtisticPlasticWrap {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -624,10 +570,7 @@ pub struct ArtisticPlasticWrap {
 }
 /// Defines the ArtisticTexturizer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectTexturizer/a14:artisticTexturizer"
-)]
+#[sdk(office2010, qname = "a14:artisticTexturizer")]
 pub struct ArtisticTexturizer {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -640,10 +583,7 @@ pub struct ArtisticTexturizer {
 }
 /// Defines the ArtisticWatercolorSponge Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectWatercolorSponge/a14:artisticWatercolorSponge"
-)]
+#[sdk(office2010, qname = "a14:artisticWatercolorSponge")]
 pub struct ArtisticWatercolorSponge {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
@@ -656,10 +596,7 @@ pub struct ArtisticWatercolorSponge {
 }
 /// Defines the BackgroundRemoval Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectBackgroundRemoval/a14:backgroundRemoval"
-)]
+#[sdk(office2010, qname = "a14:backgroundRemoval")]
 pub struct BackgroundRemoval {
   /// t
   #[sdk(attr(office2010, qname = ":t"))]
@@ -678,24 +615,15 @@ pub struct BackgroundRemoval {
   #[sdk(number_range(range = 0..= 100000))]
   pub marquee_right: crate::simple_type::Int32Value,
   /// Defines the ForegroundMark Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectBackgroundRemovalForegroundMark/a14:foregroundMark"
-  ))]
+  #[sdk(child(office2010, qname = "a14:foregroundMark"))]
   pub foreground_mark: Vec<ForegroundMark>,
   /// Defines the BackgroundMark Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_PictureEffectBackgroundRemovalBackgroundMark/a14:backgroundMark"
-  ))]
+  #[sdk(child(office2010, qname = "a14:backgroundMark"))]
   pub background_mark: Vec<BackgroundMark>,
 }
 /// Defines the BrightnessContrast Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectBrightnessContrast/a14:brightnessContrast"
-)]
+#[sdk(office2010, qname = "a14:brightnessContrast")]
 pub struct BrightnessContrast {
   /// bright
   #[sdk(attr(office2010, qname = ":bright"))]
@@ -708,10 +636,7 @@ pub struct BrightnessContrast {
 }
 /// Defines the ColorTemperature Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectColorTemperature/a14:colorTemperature"
-)]
+#[sdk(office2010, qname = "a14:colorTemperature")]
 pub struct ColorTemperature {
   /// colorTemp
   #[sdk(attr(office2010, qname = ":colorTemp"))]
@@ -720,7 +645,7 @@ pub struct ColorTemperature {
 }
 /// Defines the Saturation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffectSaturation/a14:saturation")]
+#[sdk(office2010, qname = "a14:saturation")]
 pub struct Saturation {
   /// sat
   #[sdk(attr(office2010, qname = ":sat"))]
@@ -729,10 +654,7 @@ pub struct Saturation {
 }
 /// Defines the SharpenSoften Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften"
-)]
+#[sdk(office2010, qname = "a14:sharpenSoften")]
 pub struct SharpenSoften {
   /// amount
   #[sdk(attr(office2010, qname = ":amount"))]
@@ -741,7 +663,7 @@ pub struct SharpenSoften {
 }
 /// Defines the ImageEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureEffect/a14:imgEffect")]
+#[sdk(office2010, qname = "a14:imgEffect")]
 pub struct ImageEffect {
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
@@ -790,18 +712,18 @@ pub struct ImageEffect {
 }
 /// Defines the ImageLayer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a14:CT_PictureLayer/a14:imgLayer")]
+#[sdk(office2010, qname = "a14:imgLayer")]
 pub struct ImageLayer {
   /// embed
   #[sdk(attr(office2010, qname = "r:embed"))]
   pub embed: Option<crate::simple_type::StringValue>,
   /// Defines the ImageEffect Class.
-  #[sdk(child(office2010, qname = "a14:CT_PictureEffect/a14:imgEffect"))]
+  #[sdk(child(office2010, qname = "a14:imgEffect"))]
   pub image_effect: Vec<ImageEffect>,
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/a14:cNvPr")]
+#[sdk(office2010, qname = "a14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -819,54 +741,45 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Hyperlink associated with clicking or selecting the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Hyperlink associated with hovering over the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Future extension
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_NonVisualInkContentPartProperties/a14:cNvContentPartPr"
-)]
+#[sdk(office2010, qname = "a14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
-  #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  #[sdk(child(office2010, qname = "a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the NonVisualContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_GvmlContentPartNonVisual/a14:nvContentPartPr"
-)]
+#[sdk(office2010, qname = "a14:nvContentPartPr")]
 pub struct NonVisualContentPartProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/a14:cNvPr"))]
+  #[sdk(child(office2010, qname = "a14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualInkContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_NonVisualInkContentPartProperties/a14:cNvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "a14:cNvContentPartPr"))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Transform2D/a14:xfrm")]
+#[sdk(office2010, qname = "a14:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -878,10 +791,10 @@ pub struct Transform2D {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -897,7 +810,7 @@ pub enum HiddenFillPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -921,10 +834,10 @@ pub enum HiddenLinePropertiesChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
+  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
+  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<crate::schemas::a::Miter>),

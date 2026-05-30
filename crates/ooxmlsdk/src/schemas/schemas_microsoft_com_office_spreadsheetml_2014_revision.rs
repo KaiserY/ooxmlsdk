@@ -158,7 +158,7 @@ pub enum OartAnchorType {
 }
 /// Defines the RevExHeaders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExHeaders/xr:revHdrs")]
+#[sdk(office2016, qname = "xr:revHdrs")]
 pub struct RevExHeaders {
   /// minRev
   #[sdk(attr(office2016, qname = ":minRev"))]
@@ -173,12 +173,12 @@ pub struct RevExHeaders {
   #[sdk(attr(office2016, qname = ":endpointId"))]
   pub endpoint_id: crate::simple_type::StringValue,
   /// Defines the RevExHeader Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevExHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:hdr"))]
   pub rev_ex_header: Vec<RevExHeader>,
 }
 /// Defines the RevExStream Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExStream/xr:revStream")]
+#[sdk(office2016, qname = "xr:revStream")]
 pub struct RevExStream {
   #[sdk(
         choice(
@@ -202,33 +202,33 @@ pub struct RevExStream {
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_Dxf/xr:dxf")]
+#[sdk(office2016, qname = "xr:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
-  #[sdk(child(qname = "x:CT_Font/x:font"))]
+  #[sdk(child(qname = "x:font"))]
   pub font: Option<crate::schemas::x::Font>,
   /// Number Format
-  #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
+  #[sdk(child(qname = "x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
   /// Fill
-  #[sdk(child(qname = "x:CT_Fill/x:fill"))]
+  #[sdk(child(qname = "x:fill"))]
   pub fill: Option<std::boxed::Box<crate::schemas::x::Fill>>,
   /// Alignment
-  #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
+  #[sdk(child(qname = "x:alignment"))]
   pub alignment: Option<crate::schemas::x::Alignment>,
   /// Border Properties
-  #[sdk(child(qname = "x:CT_Border/x:border"))]
+  #[sdk(child(qname = "x:border"))]
   pub border: Option<std::boxed::Box<crate::schemas::x::Border>>,
   /// Protection Properties
-  #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
+  #[sdk(child(qname = "x:protection"))]
   pub protection: Option<crate::schemas::x::Protection>,
   /// Future Feature Data Storage Area
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the RevisionPtr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevisionPtr/xr:revisionPtr")]
+#[sdk(office2016, qname = "xr:revisionPtr")]
 pub struct RevisionPtr {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// revIDLastSave
@@ -240,7 +240,7 @@ pub struct RevisionPtr {
 }
 /// Defines the StateBasedObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_StateBasedObject/xr:objectState")]
+#[sdk(office2016, qname = "xr:objectState")]
 pub struct StateBasedObject {
   #[sdk(
         choice(
@@ -256,7 +256,7 @@ pub struct StateBasedObject {
 }
 /// Defines the RevExHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExHeader/xr:hdr")]
+#[sdk(office2016, qname = "xr:hdr")]
 pub struct RevExHeader {
   /// id
   #[sdk(attr(office2016, qname = "r:id"))]
@@ -273,7 +273,7 @@ pub struct RevExHeader {
 }
 /// Defines the RevExFuture Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr")]
+#[sdk(office2016, qname = "xr:xrrftr")]
 pub struct RevExFuture {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -300,12 +300,12 @@ pub struct RevExFuture {
   #[sdk(attr(office2016, qname = ":sti"))]
   pub sti: Option<crate::simple_type::BooleanValue>,
   /// Defines the RevExTest Class.
-  #[sdk(empty_child(office2016, qname = "xr:CT_RevExTest/xr:xrrtest"))]
+  #[sdk(empty_child(office2016, qname = "xr:xrrtest"))]
   pub rev_ex_test: Vec<()>,
 }
 /// Defines the RevExUnsupported Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt")]
+#[sdk(office2016, qname = "xr:xrrUspt")]
 pub struct RevExUnsupported {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -331,7 +331,7 @@ pub struct RevExUnsupported {
 }
 /// Defines the RevExTrimmed Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim")]
+#[sdk(office2016, qname = "xr:xrrTrim")]
 pub struct RevExTrimmed {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -357,7 +357,7 @@ pub struct RevExTrimmed {
 }
 /// Defines the RevExRowColumn Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc")]
+#[sdk(office2016, qname = "xr:xrrrc")]
 pub struct RevExRowColumn {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -392,7 +392,7 @@ pub struct RevExRowColumn {
 }
 /// Defines the RevExMove Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExMove/xr:xrrm")]
+#[sdk(office2016, qname = "xr:xrrm")]
 pub struct RevExMove {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -429,7 +429,7 @@ pub struct RevExMove {
 }
 /// Defines the RevExChangeCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc")]
+#[sdk(office2016, qname = "xr:xrrc")]
 pub struct RevExChangeCell {
   /// listUid
   #[sdk(attr(office2016, qname = ":listUid"))]
@@ -470,15 +470,15 @@ pub struct RevExChangeCell {
   #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
+  #[sdk(child(office2016, qname = "xr:c"))]
   pub rev_cell: Vec<RevCell>,
   /// Defines the ChangeCellSubEdit Class.
-  #[sdk(child(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse"))]
+  #[sdk(child(office2016, qname = "xr:ccse"))]
   pub change_cell_sub_edit: Vec<ChangeCellSubEdit>,
 }
 /// Defines the RevExFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf")]
+#[sdk(office2016, qname = "xr:xrrf")]
 pub struct RevExFormatting {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -546,15 +546,15 @@ pub struct RevExFormatting {
   #[sdk(attr(office2016, qname = ":applyProtection"))]
   pub apply_protection: Option<crate::simple_type::BooleanValue>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(office2016, qname = "x:CT_Dxf/xr:dxf"))]
+  #[sdk(child(office2016, qname = "xr:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
+  #[sdk(child(office2016, qname = "xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDefinedName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName")]
+#[sdk(office2016, qname = "xr:xrrDefName")]
 pub struct RevExDefinedName {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -611,19 +611,15 @@ pub struct RevExDefinedName {
   #[sdk(attr(office2016, qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
   /// Defines the FormulaFormula Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "x:ST_Formula/xr:formula"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:formula"))]
   pub formula_formula: Option<FormulaFormula>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
+  #[sdk(child(office2016, qname = "xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDelObj Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo")]
+#[sdk(office2016, qname = "xr:xrrdo")]
 pub struct RevExDelObj {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -647,12 +643,12 @@ pub struct RevExDelObj {
   #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
-  #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
 }
 /// Defines the RevExChgObj Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco")]
+#[sdk(office2016, qname = "xr:xrrco")]
 pub struct RevExChgObj {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -676,7 +672,7 @@ pub struct RevExChgObj {
   #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
-  #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
   #[sdk(
         choice(
@@ -688,7 +684,7 @@ pub struct RevExChgObj {
 }
 /// Defines the RevExSheetOp Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet")]
+#[sdk(office2016, qname = "xr:xrrSheet")]
 pub struct RevExSheetOp {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -726,7 +722,7 @@ pub struct RevExSheetOp {
 }
 /// Defines the RevisionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevisionList/xr:xrrList")]
+#[sdk(office2016, qname = "xr:xrrList")]
 pub struct RevisionList {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -776,7 +772,7 @@ pub struct RevisionList {
 }
 /// Defines the RevListAutoExpandRw Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR")]
+#[sdk(office2016, qname = "xr:xrrListExpR")]
 pub struct RevListAutoExpandRw {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -810,7 +806,7 @@ pub struct RevListAutoExpandRw {
 }
 /// Defines the RevGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevGroup/xr:xrrg")]
+#[sdk(office2016, qname = "xr:xrrg")]
 pub struct RevGroup {
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
@@ -854,7 +850,7 @@ pub struct RevGroup {
 }
 /// Defines the RevCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevCell/xr:c")]
+#[sdk(office2016, qname = "xr:c")]
 pub struct RevCell {
   /// t
   #[sdk(attr(office2016, qname = ":t"))]
@@ -869,18 +865,18 @@ pub struct RevCell {
   #[sdk(attr(office2016, qname = ":rep"))]
   pub rep: Option<crate::simple_type::UInt32Value>,
   /// Defines the FFormula Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "x:ST_Formula/xr:f"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:f"))]
   pub f_formula: Option<FFormula>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "x:ST_Xstring/xr:v"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xr:v"))]
   pub xstring: Option<Xstring>,
   /// Defines the RstType Class.
-  #[sdk(child(office2016, qname = "x:CT_Rst/xr:is"))]
+  #[sdk(child(office2016, qname = "xr:is"))]
   pub rst_type: Option<std::boxed::Box<RstType>>,
 }
 /// Defines the ChangeCellSubEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse")]
+#[sdk(office2016, qname = "xr:ccse")]
 pub struct ChangeCellSubEdit {
   /// r
   #[sdk(attr(office2016, qname = ":r"))]
@@ -895,15 +891,15 @@ pub struct ChangeCellSubEdit {
   #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// Defines the RevCell Class.
-  #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
+  #[sdk(child(office2016, qname = "xr:c"))]
   pub rev_cell: Vec<RevCell>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_ExtensionList/xr:extLst")]
+#[sdk(office2016, qname = "xr:extLst")]
 pub struct ExtensionList {
   /// Extension.
-  #[sdk(child(qname = "x:CT_Extension/x:ext"))]
+  #[sdk(child(qname = "x:ext"))]
   pub extension: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the FormulaFormula Class.
@@ -912,7 +908,7 @@ pub type FormulaFormula = crate::simple_type::StringValue;
 pub type FFormula = crate::simple_type::StringValue;
 /// Defines the StateBasedHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr")]
+#[sdk(office2016, qname = "xr:hdr")]
 pub struct StateBasedHeader {
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
@@ -932,12 +928,12 @@ pub struct StateBasedHeader {
   #[sdk(attr(office2016, qname = ":seftx"))]
   pub seftx: Option<ExtSubFeatureType>,
   /// Defines the RefMap Class.
-  #[sdk(child(office2016, qname = "xr:CT_RefMap/xr:refmap"))]
+  #[sdk(child(office2016, qname = "xr:refmap"))]
   pub ref_map: Option<RefMap>,
 }
 /// Defines the RevisionStateLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevisionStateLink/xr:link")]
+#[sdk(office2016, qname = "xr:link")]
 pub struct RevisionStateLink {
   /// id
   #[sdk(attr(office2016, qname = "r:id"))]
@@ -945,7 +941,7 @@ pub struct RevisionStateLink {
 }
 /// Defines the RevisionState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RevisionState/xr:body")]
+#[sdk(office2016, qname = "xr:body")]
 pub struct RevisionState {
   #[sdk(
         choice(
@@ -960,7 +956,7 @@ pub struct RevisionState {
 }
 /// Defines the RefMap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RefMap/xr:refmap")]
+#[sdk(office2016, qname = "xr:refmap")]
 pub struct RefMap {
   #[sdk(
         choice(
@@ -975,7 +971,7 @@ pub struct RefMap {
 }
 /// Defines the RowColVisualOps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps")]
+#[sdk(office2016, qname = "xr:rowColVisualOps")]
 pub struct RowColVisualOps {
   /// action
   #[sdk(attr(office2016, qname = ":action"))]
@@ -992,7 +988,7 @@ pub struct RowColVisualOps {
 }
 /// Defines the HideUnhideSheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet")]
+#[sdk(office2016, qname = "xr:hideUnhideSheet")]
 pub struct HideUnhideSheet {
   /// hide
   #[sdk(attr(office2016, qname = ":hide"))]
@@ -1000,10 +996,7 @@ pub struct HideUnhideSheet {
 }
 /// Defines the ShowGridlinesHeadings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"
-)]
+#[sdk(office2016, qname = "xr:showGridlinesHeadings")]
 pub struct ShowGridlinesHeadings {
   /// showGridLines
   #[sdk(attr(office2016, qname = ":showGridLines"))]
@@ -1014,7 +1007,7 @@ pub struct ShowGridlinesHeadings {
 }
 /// Defines the FreezePanes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_FreezePanes/xr:freezePanes")]
+#[sdk(office2016, qname = "xr:freezePanes")]
 pub struct FreezePanes {
   /// sheetViewUid
   #[sdk(attr(office2016, qname = ":sheetViewUid"))]
@@ -1024,18 +1017,18 @@ pub struct FreezePanes {
 }
 /// Defines the Outlines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_Outlines/xr:outlines")]
+#[sdk(office2016, qname = "xr:outlines")]
 pub struct Outlines {
   /// isRow
   #[sdk(attr(office2016, qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
   /// Defines the Outline Class.
-  #[sdk(child(office2016, qname = "xr:CT_Outline/xr:outline"))]
+  #[sdk(child(office2016, qname = "xr:outline"))]
   pub outline: Vec<Outline>,
 }
 /// Defines the Outline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_Outline/xr:outline")]
+#[sdk(office2016, qname = "xr:outline")]
 pub struct Outline {
   /// isCollapsed
   #[sdk(attr(office2016, qname = ":isCollapsed"))]
@@ -1048,24 +1041,24 @@ pub struct Outline {
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the RstType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_Rst/xr:is")]
+#[sdk(office2016, qname = "xr:is")]
 pub struct RstType {
   /// Text
-  #[sdk(child(qname = "x:CT_Xstring/x:t"))]
+  #[sdk(child(qname = "x:t"))]
   pub text: Option<crate::schemas::x::Text>,
   /// Rich Text Run.
-  #[sdk(child(qname = "x:CT_RElt/x:r"))]
+  #[sdk(child(qname = "x:r"))]
   pub run: Vec<crate::schemas::x::Run>,
   /// Phonetic Run.
-  #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
+  #[sdk(child(qname = "x:rPh"))]
   pub phonetic_run: Vec<crate::schemas::x::PhoneticRun>,
   /// Phonetic Properties.
-  #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
+  #[sdk(child(qname = "x:phoneticPr"))]
   pub phonetic_properties: Option<crate::schemas::x::PhoneticProperties>,
 }
 /// Defines the RefCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RefCell/xr:ref")]
+#[sdk(office2016, qname = "xr:ref")]
 pub struct RefCell {
   /// n
   #[sdk(attr(office2016, qname = ":n"))]
@@ -1095,7 +1088,7 @@ pub struct RefCell {
 }
 /// Defines the SheetXluid Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_SheetXluid/xr:sheetUid")]
+#[sdk(office2016, qname = "xr:sheetUid")]
 pub struct SheetXluid {
   /// n
   #[sdk(attr(office2016, qname = ":n"))]
@@ -1117,7 +1110,7 @@ pub struct SheetXluid {
 }
 /// Defines the RefOartAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RefOartAnchor/xr:oartAnchor")]
+#[sdk(office2016, qname = "xr:oartAnchor")]
 pub struct RefOartAnchor {
   /// n
   #[sdk(attr(office2016, qname = ":n"))]
@@ -1172,7 +1165,7 @@ pub struct RefOartAnchor {
 }
 /// Defines the RefTest Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "xr:CT_RefTest/xr:test")]
+#[sdk(office2016, qname = "xr:test")]
 pub struct RefTest {
   /// n
   #[sdk(attr(office2016, qname = ":n"))]
@@ -1189,7 +1182,7 @@ pub struct RefTest {
 }
 /// Represents an external link to another workbook..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_DataValidation/xr:dataValidation")]
+#[sdk(office2016, qname = "xr:dataValidation")]
 pub struct DataValidation {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -1231,22 +1224,18 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(
-    office2013,
-    simple_type = "StringValue",
-    qname = "x:ST_Xstring/x12ac:list"
-  ))]
+  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x12ac:list"))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
-  #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
+  #[sdk(child(qname = "x:formula1"))]
   pub formula1: Option<crate::schemas::x::Formula1>,
   /// Defines the Formula2 Class.
-  #[sdk(child(qname = "x:CT_Xstring/x:formula2"))]
+  #[sdk(child(qname = "x:formula2"))]
   pub formula2: Option<crate::schemas::x::Formula2>,
 }
 /// Represents a hyperlink within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_Hyperlink/xr:hyperlink")]
+#[sdk(office2016, qname = "xr:hyperlink")]
 pub struct Hyperlink {
   /// Reference
   #[sdk(attr(qname = ":ref"))]
@@ -1266,7 +1255,7 @@ pub struct Hyperlink {
 }
 /// Represents a sparkline group of 1 or more sparklines..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x14:CT_SparklineGroup/xr:sparklineGroup")]
+#[sdk(office2016, qname = "xr:sparklineGroup")]
 pub struct SparklineGroup {
   /// manualMax
   #[sdk(attr(office2010, qname = ":manualMax"))]
@@ -1320,73 +1309,70 @@ pub struct SparklineGroup {
   #[sdk(attr(office2010, qname = ":rightToLeft"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
   /// Defines the SeriesColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
+  #[sdk(child(office2010, qname = "x14:colorSeries"))]
   pub series_color: Option<crate::schemas::x14::SeriesColor>,
   /// Defines the NegativeColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
+  #[sdk(child(office2010, qname = "x14:colorNegative"))]
   pub negative_color: Option<crate::schemas::x14::NegativeColor>,
   /// Defines the AxisColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
+  #[sdk(child(office2010, qname = "x14:colorAxis"))]
   pub axis_color: Option<crate::schemas::x14::AxisColor>,
   /// Defines the MarkersColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
+  #[sdk(child(office2010, qname = "x14:colorMarkers"))]
   pub markers_color: Option<crate::schemas::x14::MarkersColor>,
   /// Defines the FirstMarkerColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
+  #[sdk(child(office2010, qname = "x14:colorFirst"))]
   pub first_marker_color: Option<crate::schemas::x14::FirstMarkerColor>,
   /// Defines the LastMarkerColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
+  #[sdk(child(office2010, qname = "x14:colorLast"))]
   pub last_marker_color: Option<crate::schemas::x14::LastMarkerColor>,
   /// Defines the HighMarkerColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
+  #[sdk(child(office2010, qname = "x14:colorHigh"))]
   pub high_marker_color: Option<crate::schemas::x14::HighMarkerColor>,
   /// Defines the LowMarkerColor Class.
-  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
+  #[sdk(child(office2010, qname = "x14:colorLow"))]
   pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
-  #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
+  #[sdk(child(office2010, qname = "x14:sparklines"))]
   pub sparklines: std::boxed::Box<crate::schemas::x14::Sparklines>,
 }
 /// Represents one comment within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_Comments/xr:comments")]
+#[sdk(office2016, qname = "xr:comments")]
 pub struct Comments {
   /// Authors
-  #[sdk(child(qname = "x:CT_Authors/x:authors"))]
+  #[sdk(child(qname = "x:authors"))]
   pub authors: std::boxed::Box<crate::schemas::x::Authors>,
   /// List of Comments
-  #[sdk(child(qname = "x:CT_CommentList/x:commentList"))]
+  #[sdk(child(qname = "x:commentList"))]
   pub comment_list: std::boxed::Box<crate::schemas::x::CommentList>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Represents an autofilter..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "x:CT_AutoFilter/xr:autoFilter")]
+#[sdk(office2016, qname = "xr:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
-  #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
+  #[sdk(child(qname = "x:filterColumn"))]
   pub filter_column: Vec<crate::schemas::x::FilterColumn>,
   /// Sort State for Auto Filter.
-  #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
+  #[sdk(child(qname = "x:sortState"))]
   pub sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Represents a PivotTable View..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
-)]
+#[sdk(office2016, qname = "xr:pivotTableDefinition")]
 pub struct PivotTableDefinition {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -1593,55 +1579,55 @@ pub struct PivotTableDefinition {
   #[sdk(attr(qname = ":customListSort"))]
   pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
   /// Defines the Location Class.
-  #[sdk(child(qname = "x:CT_Location/x:location"))]
+  #[sdk(child(qname = "x:location"))]
   pub location: std::boxed::Box<crate::schemas::x::Location>,
   /// Defines the PivotFields Class.
-  #[sdk(child(qname = "x:CT_PivotFields/x:pivotFields"))]
+  #[sdk(child(qname = "x:pivotFields"))]
   pub pivot_fields: Option<crate::schemas::x::PivotFields>,
   /// Defines the RowFields Class.
-  #[sdk(child(qname = "x:CT_RowFields/x:rowFields"))]
+  #[sdk(child(qname = "x:rowFields"))]
   pub row_fields: Option<crate::schemas::x::RowFields>,
   /// Defines the RowItems Class.
-  #[sdk(child(qname = "x:CT_rowItems/x:rowItems"))]
+  #[sdk(child(qname = "x:rowItems"))]
   pub row_items: Option<crate::schemas::x::RowItems>,
   /// Defines the ColumnFields Class.
-  #[sdk(child(qname = "x:CT_ColFields/x:colFields"))]
+  #[sdk(child(qname = "x:colFields"))]
   pub column_fields: Option<crate::schemas::x::ColumnFields>,
   /// Defines the ColumnItems Class.
-  #[sdk(child(qname = "x:CT_colItems/x:colItems"))]
+  #[sdk(child(qname = "x:colItems"))]
   pub column_items: Option<crate::schemas::x::ColumnItems>,
   /// Defines the PageFields Class.
-  #[sdk(child(qname = "x:CT_PageFields/x:pageFields"))]
+  #[sdk(child(qname = "x:pageFields"))]
   pub page_fields: Option<crate::schemas::x::PageFields>,
   /// Defines the DataFields Class.
-  #[sdk(child(qname = "x:CT_DataFields/x:dataFields"))]
+  #[sdk(child(qname = "x:dataFields"))]
   pub data_fields: Option<crate::schemas::x::DataFields>,
   /// Defines the Formats Class.
-  #[sdk(child(qname = "x:CT_Formats/x:formats"))]
+  #[sdk(child(qname = "x:formats"))]
   pub formats: Option<crate::schemas::x::Formats>,
   /// Defines the ConditionalFormats Class.
-  #[sdk(child(qname = "x:CT_ConditionalFormats/x:conditionalFormats"))]
+  #[sdk(child(qname = "x:conditionalFormats"))]
   pub conditional_formats: Option<crate::schemas::x::ConditionalFormats>,
   /// Defines the ChartFormats Class.
-  #[sdk(child(qname = "x:CT_ChartFormats/x:chartFormats"))]
+  #[sdk(child(qname = "x:chartFormats"))]
   pub chart_formats: Option<crate::schemas::x::ChartFormats>,
   /// Defines the PivotHierarchies Class.
-  #[sdk(child(qname = "x:CT_PivotHierarchies/x:pivotHierarchies"))]
+  #[sdk(child(qname = "x:pivotHierarchies"))]
   pub pivot_hierarchies: Option<crate::schemas::x::PivotHierarchies>,
   /// Defines the PivotTableStyle Class.
-  #[sdk(child(qname = "x:CT_PivotTableStyle/x:pivotTableStyleInfo"))]
+  #[sdk(child(qname = "x:pivotTableStyleInfo"))]
   pub pivot_table_style: Option<crate::schemas::x::PivotTableStyle>,
   /// Defines the PivotFilters Class.
-  #[sdk(child(qname = "x:CT_PivotFilters/x:filters"))]
+  #[sdk(child(qname = "x:filters"))]
   pub pivot_filters: Option<crate::schemas::x::PivotFilters>,
   /// Defines the RowHierarchiesUsage Class.
-  #[sdk(child(qname = "x:CT_RowHierarchiesUsage/x:rowHierarchiesUsage"))]
+  #[sdk(child(qname = "x:rowHierarchiesUsage"))]
   pub row_hierarchies_usage: Option<crate::schemas::x::RowHierarchiesUsage>,
   /// Defines the ColumnHierarchiesUsage Class.
-  #[sdk(child(qname = "x:CT_ColHierarchiesUsage/x:colHierarchiesUsage"))]
+  #[sdk(child(qname = "x:colHierarchiesUsage"))]
   pub column_hierarchies_usage: Option<crate::schemas::x::ColumnHierarchiesUsage>,
   /// Defines the PivotTableDefinitionExtensionList Class.
-  #[sdk(child(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst"))]
+  #[sdk(child(qname = "x:extLst"))]
   pub pivot_table_definition_extension_list:
     Option<crate::schemas::x::PivotTableDefinitionExtensionList>,
 }
@@ -1749,7 +1735,7 @@ pub enum RefMapChoice {
   /// Defines the RefOartAnchor Class.
   RefOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
-  #[sdk(empty_child(office2016, qname = "xr:CT_RefFuture/xr:future"))]
+  #[sdk(empty_child(office2016, qname = "xr:future"))]
   RefFuture,
   /// Defines the RefTest Class.
   RefTest(std::boxed::Box<RefTest>),

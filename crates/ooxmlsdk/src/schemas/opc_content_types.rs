@@ -6,7 +6,7 @@
 
 /// Content Types.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "CT_Types/Types")]
+#[sdk(qname = "Types")]
 pub struct Types {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -20,7 +20,7 @@ pub struct Types {
 }
 /// Default content type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "CT_Default/Default")]
+#[sdk(qname = "Default")]
 pub struct Default {
   /// extension
   #[sdk(attr(qname = "Extension"))]
@@ -31,7 +31,7 @@ pub struct Default {
 }
 /// Override content type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "CT_Override/Override")]
+#[sdk(qname = "Override")]
 pub struct Override {
   /// content_type
   #[sdk(attr(qname = "ContentType"))]

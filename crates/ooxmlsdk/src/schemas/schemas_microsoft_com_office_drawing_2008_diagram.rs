@@ -6,17 +6,17 @@
 
 /// Defines the Drawing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_Drawing/dsp:drawing")]
+#[sdk(office2010, qname = "dsp:drawing")]
 pub struct Drawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ShapeTree Class.
-  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:spTree"))]
+  #[sdk(child(office2010, qname = "dsp:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,
 }
 /// Defines the DataModelExtensionBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt")]
+#[sdk(office2010, qname = "dsp:dataModelExt")]
 pub struct DataModelExtensionBlock {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// relId
@@ -29,7 +29,7 @@ pub struct DataModelExtensionBlock {
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr")]
+#[sdk(office2010, qname = "dsp:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -47,51 +47,51 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Hyperlink associated with clicking or selecting the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Hyperlink associated with hovering over the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Future extension
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr")]
+#[sdk(office2010, qname = "dsp:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   /// Text Box
   #[sdk(attr(qname = ":txBox"))]
   pub text_box: Option<crate::simple_type::BooleanValue>,
   /// Shape Locks
-  #[sdk(child(qname = "a:CT_ShapeLocking/a:spLocks"))]
+  #[sdk(child(qname = "a:spLocks"))]
   pub shape_locks: Option<std::boxed::Box<crate::schemas::a::ShapeLocks>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the ShapeNonVisualProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr")]
+#[sdk(office2010, qname = "dsp:nvSpPr")]
 pub struct ShapeNonVisualProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
+  #[sdk(child(office2010, qname = "dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualDrawingShapeProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:cNvSpPr"))]
   pub non_visual_drawing_shape_properties: std::boxed::Box<NonVisualDrawingShapeProperties>,
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_ShapeProperties/dsp:spPr")]
+#[sdk(office2010, qname = "dsp:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
-  #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
+  #[sdk(child(qname = "a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
@@ -112,7 +112,7 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
+  #[sdk(child(qname = "a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
@@ -122,49 +122,49 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
-  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  #[sdk(child(qname = "a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
-  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
+  #[sdk(child(qname = "a:sp3d"))]
   pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
-  #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_ShapeStyle/dsp:style")]
+#[sdk(office2010, qname = "dsp:style")]
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
+  #[sdk(child(qname = "a:lnRef"))]
   pub line_reference: std::boxed::Box<crate::schemas::a::LineReference>,
   /// Fill Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
+  #[sdk(child(qname = "a:fillRef"))]
   pub fill_reference: std::boxed::Box<crate::schemas::a::FillReference>,
   /// Effect Reference.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
+  #[sdk(child(qname = "a:effectRef"))]
   pub effect_reference: std::boxed::Box<crate::schemas::a::EffectReference>,
   /// Font Reference
-  #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
+  #[sdk(child(qname = "a:fontRef"))]
   pub font_reference: std::boxed::Box<crate::schemas::a::FontReference>,
 }
 /// Defines the TextBody Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_TextBody/dsp:txBody")]
+#[sdk(office2010, qname = "dsp:txBody")]
 pub struct TextBody {
   /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
+  #[sdk(child(qname = "a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  #[sdk(child(qname = "a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
+  #[sdk(child(qname = "a:p"))]
   pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Transform2D/dsp:txXfrm")]
+#[sdk(office2010, qname = "dsp:txXfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -176,60 +176,54 @@ pub struct Transform2D {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst")]
+#[sdk(office2010, qname = "dsp:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr"
-)]
+#[sdk(office2010, qname = "dsp:cNvGrpSpPr")]
 pub struct NonVisualGroupDrawingShapeProperties {
   /// Defines the GroupShapeLocks Class.
-  #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
+  #[sdk(child(qname = "a:grpSpLocks"))]
   pub group_shape_locks: Option<std::boxed::Box<crate::schemas::a::GroupShapeLocks>>,
   /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_group_drawing_shape_props_extension_list:
     Option<crate::schemas::a::NonVisualGroupDrawingShapePropsExtensionList>,
 }
 /// Defines the GroupShapeNonVisualProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr")]
+#[sdk(office2010, qname = "dsp:nvGrpSpPr")]
 pub struct GroupShapeNonVisualProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
+  #[sdk(child(office2010, qname = "dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Defines the NonVisualGroupDrawingShapeProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr"
-  ))]
+  #[sdk(child(office2010, qname = "dsp:cNvGrpSpPr"))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
 }
 /// Defines the GroupShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr")]
+#[sdk(office2010, qname = "dsp:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
-  #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
+  #[sdk(child(qname = "a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
   #[sdk(
         choice(
@@ -250,15 +244,15 @@ pub struct GroupShapeProperties {
     )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
-  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  #[sdk(child(qname = "a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the Shape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_Shape/dsp:sp")]
+#[sdk(office2010, qname = "dsp:sp")]
 pub struct Shape {
   /// modelId
   #[sdk(attr(office2010, qname = ":modelId"))]
@@ -270,33 +264,33 @@ pub struct Shape {
   ))]
   pub model_id: crate::simple_type::StringValue,
   /// Defines the ShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:nvSpPr"))]
   pub shape_non_visual_properties: std::boxed::Box<ShapeNonVisualProperties>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_ShapeProperties/dsp:spPr"))]
+  #[sdk(child(office2010, qname = "dsp:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
-  #[sdk(child(office2010, qname = "a:CT_ShapeStyle/dsp:style"))]
+  #[sdk(child(office2010, qname = "dsp:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// Defines the TextBody Class.
-  #[sdk(child(office2010, qname = "a:CT_TextBody/dsp:txBody"))]
+  #[sdk(child(office2010, qname = "dsp:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/dsp:txXfrm"))]
+  #[sdk(child(office2010, qname = "dsp:txXfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp")]
+#[sdk(office2010, qname = "dsp:grpSp")]
 pub struct GroupShape {
   /// Defines the GroupShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -306,18 +300,18 @@ pub struct GroupShape {
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the ShapeTree Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_GroupShape/dsp:spTree")]
+#[sdk(office2010, qname = "dsp:spTree")]
 pub struct ShapeTree {
   /// Defines the GroupShapeNonVisualProperties Class.
-  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(
         choice(
@@ -327,7 +321,7 @@ pub struct ShapeTree {
     )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -350,7 +344,7 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -373,7 +367,7 @@ pub enum GroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -474,7 +474,7 @@ pub enum NumberSpacingValues {
 }
 /// Defines the RunConflictInsertion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns")]
+#[sdk(office2010, qname = "w14:conflictIns")]
 pub struct RunConflictInsertion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -591,7 +591,7 @@ pub struct RunConflictInsertion {
 }
 /// Defines the RunConflictDeletion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel")]
+#[sdk(office2010, qname = "w14:conflictDel")]
 pub struct RunConflictDeletion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -708,7 +708,7 @@ pub struct RunConflictDeletion {
 }
 /// Defines the ConflictInsertion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_TrackChange/w14:conflictIns")]
+#[sdk(office2010, qname = "w14:conflictIns")]
 pub struct ConflictInsertion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -740,7 +740,7 @@ pub struct ConflictInsertion {
 }
 /// Defines the ConflictDeletion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_TrackChange/w14:conflictDel")]
+#[sdk(office2010, qname = "w14:conflictDel")]
 pub struct ConflictDeletion {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -772,10 +772,7 @@ pub struct ConflictDeletion {
 }
 /// Defines the CustomXmlConflictInsertionRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-)]
+#[sdk(office2010, qname = "w14:customXmlConflictInsRangeStart")]
 pub struct CustomXmlConflictInsertionRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -807,10 +804,7 @@ pub struct CustomXmlConflictInsertionRangeStart {
 }
 /// Defines the CustomXmlConflictDeletionRangeStart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-)]
+#[sdk(office2010, qname = "w14:customXmlConflictDelRangeStart")]
 pub struct CustomXmlConflictDeletionRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
@@ -842,7 +836,7 @@ pub struct CustomXmlConflictDeletionRangeStart {
 }
 /// Defines the Tint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint")]
+#[sdk(office2010, qname = "w14:tint")]
 pub struct Tint {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -858,7 +852,7 @@ pub struct Tint {
 }
 /// Defines the Shade Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade")]
+#[sdk(office2010, qname = "w14:shade")]
 pub struct Shade {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -874,7 +868,7 @@ pub struct Shade {
 }
 /// Defines the Alpha Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha")]
+#[sdk(office2010, qname = "w14:alpha")]
 pub struct Alpha {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -890,7 +884,7 @@ pub struct Alpha {
 }
 /// Defines the HueModulation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod")]
+#[sdk(office2010, qname = "w14:hueMod")]
 pub struct HueModulation {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -905,7 +899,7 @@ pub struct HueModulation {
 }
 /// Defines the Saturation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:sat")]
+#[sdk(office2010, qname = "w14:sat")]
 pub struct Saturation {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -913,7 +907,7 @@ pub struct Saturation {
 }
 /// Defines the SaturationOffset Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:satOff")]
+#[sdk(office2010, qname = "w14:satOff")]
 pub struct SaturationOffset {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -921,7 +915,7 @@ pub struct SaturationOffset {
 }
 /// Defines the SaturationModulation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:satMod")]
+#[sdk(office2010, qname = "w14:satMod")]
 pub struct SaturationModulation {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -929,7 +923,7 @@ pub struct SaturationModulation {
 }
 /// Defines the Luminance Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:lum")]
+#[sdk(office2010, qname = "w14:lum")]
 pub struct Luminance {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -937,7 +931,7 @@ pub struct Luminance {
 }
 /// Defines the LuminanceOffset Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:lumOff")]
+#[sdk(office2010, qname = "w14:lumOff")]
 pub struct LuminanceOffset {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -945,7 +939,7 @@ pub struct LuminanceOffset {
 }
 /// Defines the LuminanceModulation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Percentage/w14:lumMod")]
+#[sdk(office2010, qname = "w14:lumMod")]
 pub struct LuminanceModulation {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -953,7 +947,7 @@ pub struct LuminanceModulation {
 }
 /// Defines the RgbColorModelHex Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr")]
+#[sdk(office2010, qname = "w14:srgbClr")]
 pub struct RgbColorModelHex {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -977,7 +971,7 @@ pub struct RgbColorModelHex {
 }
 /// Defines the SchemeColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr")]
+#[sdk(office2010, qname = "w14:schemeClr")]
 pub struct SchemeColor {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1000,7 +994,7 @@ pub struct SchemeColor {
 }
 /// Defines the LinearShadeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin")]
+#[sdk(office2010, qname = "w14:lin")]
 pub struct LinearShadeProperties {
   /// ang
   #[sdk(attr(office2010, qname = "w14:ang"))]
@@ -1019,18 +1013,18 @@ pub struct LinearShadeProperties {
 }
 /// Defines the PathShadeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PathShadeProperties/w14:path")]
+#[sdk(office2010, qname = "w14:path")]
 pub struct PathShadeProperties {
   /// path
   #[sdk(attr(office2010, qname = "w14:path"))]
   pub path: Option<PathShadeTypeValues>,
   /// Defines the FillToRectangle Class.
-  #[sdk(child(office2010, qname = "w14:CT_RelativeRect/w14:fillToRect"))]
+  #[sdk(child(office2010, qname = "w14:fillToRect"))]
   pub fill_to_rectangle: Option<FillToRectangle>,
 }
 /// Defines the SolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
+#[sdk(office2010, qname = "w14:solidFill")]
 pub struct SolidColorFillProperties {
   #[sdk(
         choice(
@@ -1042,10 +1036,10 @@ pub struct SolidColorFillProperties {
 }
 /// Defines the GradientFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill")]
+#[sdk(office2010, qname = "w14:gradFill")]
 pub struct GradientFillProperties {
   /// Defines the GradientStopList Class.
-  #[sdk(child(office2010, qname = "w14:CT_GradientStopList/w14:gsLst"))]
+  #[sdk(child(office2010, qname = "w14:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
   #[sdk(
         choice(
@@ -1057,7 +1051,7 @@ pub struct GradientFillProperties {
 }
 /// Defines the PresetLineDashProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash")]
+#[sdk(office2010, qname = "w14:prstDash")]
 pub struct PresetLineDashProperties {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1065,7 +1059,7 @@ pub struct PresetLineDashProperties {
 }
 /// Defines the LineJoinMiterProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_LineJoinMiterProperties/w14:miter")]
+#[sdk(office2010, qname = "w14:miter")]
 pub struct LineJoinMiterProperties {
   /// lim
   #[sdk(attr(office2010, qname = "w14:lim"))]
@@ -1080,7 +1074,7 @@ pub struct LineJoinMiterProperties {
 }
 /// Defines the Glow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Glow/w14:glow")]
+#[sdk(office2010, qname = "w14:glow")]
 pub struct Glow {
   /// rad
   #[sdk(attr(office2010, qname = "w14:rad"))]
@@ -1103,7 +1097,7 @@ pub struct Glow {
 }
 /// Defines the Shadow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Shadow/w14:shadow")]
+#[sdk(office2010, qname = "w14:shadow")]
 pub struct Shadow {
   /// blurRad
   #[sdk(attr(office2010, qname = "w14:blurRad"))]
@@ -1179,7 +1173,7 @@ pub struct Shadow {
 }
 /// Defines the Reflection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Reflection/w14:reflection")]
+#[sdk(office2010, qname = "w14:reflection")]
 pub struct Reflection {
   /// blurRad
   #[sdk(attr(office2010, qname = "w14:blurRad"))]
@@ -1303,7 +1297,7 @@ pub struct Reflection {
 }
 /// Defines the TextOutlineEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline")]
+#[sdk(office2010, qname = "w14:textOutline")]
 pub struct TextOutlineEffect {
   /// w
   #[sdk(attr(office2010, qname = "w14:w"))]
@@ -1334,7 +1328,7 @@ pub struct TextOutlineEffect {
     )]
   pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
   /// Defines the PresetLineDashProperties Class.
-  #[sdk(child(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
+  #[sdk(child(office2010, qname = "w14:prstDash"))]
   pub preset_line_dash_properties: Option<PresetLineDashProperties>,
   #[sdk(
         choice(
@@ -1347,7 +1341,7 @@ pub struct TextOutlineEffect {
 }
 /// Defines the FillTextEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_FillTextEffect/w14:textFill")]
+#[sdk(office2010, qname = "w14:textFill")]
 pub struct FillTextEffect {
   #[sdk(
         choice(
@@ -1360,18 +1354,18 @@ pub struct FillTextEffect {
 }
 /// Defines the Scene3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Scene3D/w14:scene3d")]
+#[sdk(office2010, qname = "w14:scene3d")]
 pub struct Scene3D {
   /// Defines the Camera Class.
-  #[sdk(child(office2010, qname = "w14:CT_Camera/w14:camera"))]
+  #[sdk(child(office2010, qname = "w14:camera"))]
   pub camera: std::boxed::Box<Camera>,
   /// Defines the LightRig Class.
-  #[sdk(child(office2010, qname = "w14:CT_LightRig/w14:lightRig"))]
+  #[sdk(child(office2010, qname = "w14:lightRig"))]
   pub light_rig: std::boxed::Box<LightRig>,
 }
 /// Defines the Properties3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Props3D/w14:props3d")]
+#[sdk(office2010, qname = "w14:props3d")]
 pub struct Properties3D {
   /// extrusionH
   #[sdk(attr(office2010, qname = "w14:extrusionH"))]
@@ -1400,21 +1394,21 @@ pub struct Properties3D {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub preset_material_type: Option<PresetMaterialTypeValues>,
   /// Defines the BevelTop Class.
-  #[sdk(child(office2010, qname = "w14:CT_Bevel/w14:bevelT"))]
+  #[sdk(child(office2010, qname = "w14:bevelT"))]
   pub bevel_top: Option<BevelTop>,
   /// Defines the BevelBottom Class.
-  #[sdk(child(office2010, qname = "w14:CT_Bevel/w14:bevelB"))]
+  #[sdk(child(office2010, qname = "w14:bevelB"))]
   pub bevel_bottom: Option<BevelBottom>,
   /// Defines the ExtrusionColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_Color/w14:extrusionClr"))]
+  #[sdk(child(office2010, qname = "w14:extrusionClr"))]
   pub extrusion_color: Option<std::boxed::Box<ExtrusionColor>>,
   /// Defines the ContourColor Class.
-  #[sdk(child(office2010, qname = "w14:CT_Color/w14:contourClr"))]
+  #[sdk(child(office2010, qname = "w14:contourClr"))]
   pub contour_color: Option<std::boxed::Box<ContourColor>>,
 }
 /// Defines the Ligatures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Ligatures/w14:ligatures")]
+#[sdk(office2010, qname = "w14:ligatures")]
 pub struct Ligatures {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1422,7 +1416,7 @@ pub struct Ligatures {
 }
 /// Defines the NumberingFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_NumForm/w14:numForm")]
+#[sdk(office2010, qname = "w14:numForm")]
 pub struct NumberingFormat {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1430,7 +1424,7 @@ pub struct NumberingFormat {
 }
 /// Defines the NumberSpacing Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing")]
+#[sdk(office2010, qname = "w14:numSpacing")]
 pub struct NumberSpacing {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1438,15 +1432,15 @@ pub struct NumberSpacing {
 }
 /// Defines the StylisticSets Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets")]
+#[sdk(office2010, qname = "w14:stylisticSets")]
 pub struct StylisticSets {
   /// Defines the StyleSet Class.
-  #[sdk(child(office2010, qname = "w14:CT_StyleSet/w14:styleSet"))]
+  #[sdk(child(office2010, qname = "w14:styleSet"))]
   pub style_set: Vec<StyleSet>,
 }
 /// Defines the ContextualAlternatives Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts")]
+#[sdk(office2010, qname = "w14:cntxtAlts")]
 pub struct ContextualAlternatives {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1454,7 +1448,7 @@ pub struct ContextualAlternatives {
 }
 /// Defines the ConflictMode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_OnOff/w14:conflictMode")]
+#[sdk(office2010, qname = "w14:conflictMode")]
 pub struct ConflictMode {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1462,7 +1456,7 @@ pub struct ConflictMode {
 }
 /// Defines the DiscardImageEditingData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_OnOff/w14:discardImageEditingData")]
+#[sdk(office2010, qname = "w14:discardImageEditingData")]
 pub struct DiscardImageEditingData {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1470,7 +1464,7 @@ pub struct DiscardImageEditingData {
 }
 /// Defines the Checked Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_OnOff/w14:checked")]
+#[sdk(office2010, qname = "w14:checked")]
 pub struct Checked {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1478,7 +1472,7 @@ pub struct Checked {
 }
 /// Defines the ContentPart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_WordContentPart/w14:contentPart")]
+#[sdk(office2010, qname = "w14:contentPart")]
 pub struct ContentPart {
   /// bwMode
   #[sdk(attr(office2010, qname = "w14:bwMode"))]
@@ -1488,22 +1482,19 @@ pub struct ContentPart {
   #[sdk(attr(office2010, qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
   /// Defines the WordNonVisualContentPartShapeProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "w14:nvContentPartPr"))]
   pub word_non_visual_content_part_shape_properties:
     Option<std::boxed::Box<WordNonVisualContentPartShapeProperties>>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/w14:xfrm"))]
+  #[sdk(child(office2010, qname = "w14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/w14:extLst"))]
+  #[sdk(child(office2010, qname = "w14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DocumentId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_LongHexNumber/w14:docId")]
+#[sdk(office2010, qname = "w14:docId")]
 pub struct DocumentId {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// val
@@ -1513,7 +1504,7 @@ pub struct DocumentId {
 }
 /// Defines the CustomXmlConflictInsertionRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd")]
+#[sdk(office2010, qname = "w14:customXmlConflictInsRangeEnd")]
 pub struct CustomXmlConflictInsertionRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -1535,7 +1526,7 @@ pub struct CustomXmlConflictInsertionRangeEnd {
 }
 /// Defines the CustomXmlConflictDeletionRangeEnd Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd")]
+#[sdk(office2010, qname = "w14:customXmlConflictDelRangeEnd")]
 pub struct CustomXmlConflictDeletionRangeEnd {
   /// Annotation Identifier
   #[sdk(attr(qname = "w:id"))]
@@ -1557,7 +1548,7 @@ pub struct CustomXmlConflictDeletionRangeEnd {
 }
 /// Defines the DefaultImageDpi Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi")]
+#[sdk(office2010, qname = "w14:defaultImageDpi")]
 pub struct DefaultImageDpi {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
@@ -1565,21 +1556,21 @@ pub struct DefaultImageDpi {
 }
 /// Defines the SdtContentCheckBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SdtCheckbox/w14:checkbox")]
+#[sdk(office2010, qname = "w14:checkbox")]
 pub struct SdtContentCheckBox {
   /// Defines the Checked Class.
-  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:checked"))]
+  #[sdk(child(office2010, qname = "w14:checked"))]
   pub checked: Option<Checked>,
   /// Defines the CheckedState Class.
-  #[sdk(child(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState"))]
+  #[sdk(child(office2010, qname = "w14:checkedState"))]
   pub checked_state: Option<CheckedState>,
   /// Defines the UncheckedState Class.
-  #[sdk(child(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState"))]
+  #[sdk(child(office2010, qname = "w14:uncheckedState"))]
   pub unchecked_state: Option<UncheckedState>,
 }
 /// Defines the GradientStop Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_GradientStop/w14:gs")]
+#[sdk(office2010, qname = "w14:gs")]
 pub struct GradientStop {
   /// pos
   #[sdk(attr(office2010, qname = "w14:pos"))]
@@ -1602,7 +1593,7 @@ pub struct GradientStop {
 }
 /// Defines the FillToRectangle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_RelativeRect/w14:fillToRect")]
+#[sdk(office2010, qname = "w14:fillToRect")]
 pub struct FillToRectangle {
   /// l
   #[sdk(attr(office2010, qname = "w14:l"))]
@@ -1619,15 +1610,15 @@ pub struct FillToRectangle {
 }
 /// Defines the GradientStopList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_GradientStopList/w14:gsLst")]
+#[sdk(office2010, qname = "w14:gsLst")]
 pub struct GradientStopList {
   /// Defines the GradientStop Class.
-  #[sdk(child(office2010, qname = "w14:CT_GradientStop/w14:gs"))]
+  #[sdk(child(office2010, qname = "w14:gs"))]
   pub gradient_stop: Vec<GradientStop>,
 }
 /// Defines the SphereCoordinates Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SphereCoords/w14:rot")]
+#[sdk(office2010, qname = "w14:rot")]
 pub struct SphereCoordinates {
   /// lat
   #[sdk(attr(office2010, qname = "w14:lat"))]
@@ -1665,7 +1656,7 @@ pub struct SphereCoordinates {
 }
 /// Defines the Camera Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Camera/w14:camera")]
+#[sdk(office2010, qname = "w14:camera")]
 pub struct Camera {
   /// prst
   #[sdk(attr(office2010, qname = "w14:prst"))]
@@ -1674,7 +1665,7 @@ pub struct Camera {
 }
 /// Defines the LightRig Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_LightRig/w14:lightRig")]
+#[sdk(office2010, qname = "w14:lightRig")]
 pub struct LightRig {
   /// rig
   #[sdk(attr(office2010, qname = "w14:rig"))]
@@ -1685,12 +1676,12 @@ pub struct LightRig {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub light_direction_type: LightRigDirectionValues,
   /// Defines the SphereCoordinates Class.
-  #[sdk(child(office2010, qname = "w14:CT_SphereCoords/w14:rot"))]
+  #[sdk(child(office2010, qname = "w14:rot"))]
   pub sphere_coordinates: Option<SphereCoordinates>,
 }
 /// Defines the BevelTop Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Bevel/w14:bevelT")]
+#[sdk(office2010, qname = "w14:bevelT")]
 pub struct BevelTop {
   /// w
   #[sdk(attr(office2010, qname = "w14:w"))]
@@ -1721,7 +1712,7 @@ pub struct BevelTop {
 }
 /// Defines the BevelBottom Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Bevel/w14:bevelB")]
+#[sdk(office2010, qname = "w14:bevelB")]
 pub struct BevelBottom {
   /// w
   #[sdk(attr(office2010, qname = "w14:w"))]
@@ -1752,7 +1743,7 @@ pub struct BevelBottom {
 }
 /// Defines the ExtrusionColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Color/w14:extrusionClr")]
+#[sdk(office2010, qname = "w14:extrusionClr")]
 pub struct ExtrusionColor {
   #[sdk(
         choice(
@@ -1764,7 +1755,7 @@ pub struct ExtrusionColor {
 }
 /// Defines the ContourColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_Color/w14:contourClr")]
+#[sdk(office2010, qname = "w14:contourClr")]
 pub struct ContourColor {
   #[sdk(
         choice(
@@ -1776,7 +1767,7 @@ pub struct ContourColor {
 }
 /// Defines the StyleSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_StyleSet/w14:styleSet")]
+#[sdk(office2010, qname = "w14:styleSet")]
 pub struct StyleSet {
   /// id
   #[sdk(attr(office2010, qname = "w14:id"))]
@@ -1787,7 +1778,7 @@ pub struct StyleSet {
 }
 /// Defines the CheckedState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState")]
+#[sdk(office2010, qname = "w14:checkedState")]
 pub struct CheckedState {
   /// font
   #[sdk(attr(office2010, qname = "w14:font"))]
@@ -1799,7 +1790,7 @@ pub struct CheckedState {
 }
 /// Defines the UncheckedState Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState")]
+#[sdk(office2010, qname = "w14:uncheckedState")]
 pub struct UncheckedState {
   /// font
   #[sdk(attr(office2010, qname = "w14:font"))]
@@ -1811,7 +1802,7 @@ pub struct UncheckedState {
 }
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/w14:cNvPr")]
+#[sdk(office2010, qname = "w14:cNvPr")]
 pub struct NonVisualDrawingProperties {
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
@@ -1829,54 +1820,45 @@ pub struct NonVisualDrawingProperties {
   #[sdk(attr(qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// Hyperlink associated with clicking or selecting the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  #[sdk(child(qname = "a:hlinkClick"))]
   pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Hyperlink associated with hovering over the element.
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  #[sdk(child(qname = "a:hlinkHover"))]
   pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
   /// Future extension
-  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub non_visual_drawing_properties_extension_list:
     Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"
-)]
+#[sdk(office2010, qname = "w14:cNvContentPartPr")]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
-  #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  #[sdk(child(office2010, qname = "a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a14:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the WordNonVisualContentPartShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2010,
-  qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"
-)]
+#[sdk(office2010, qname = "w14:nvContentPartPr")]
 pub struct WordNonVisualContentPartShapeProperties {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/w14:cNvPr"))]
+  #[sdk(child(office2010, qname = "w14:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// Defines the NonVisualInkContentPartProperties Class.
-  #[sdk(child(
-    office2010,
-    qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"
-  ))]
+  #[sdk(child(office2010, qname = "w14:cNvContentPartPr"))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
 }
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_Transform2D/w14:xfrm")]
+#[sdk(office2010, qname = "w14:xfrm")]
 pub struct Transform2D {
   /// Rotation
   #[sdk(attr(qname = ":rot"))]
@@ -1888,18 +1870,18 @@ pub struct Transform2D {
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
-  #[sdk(child(qname = "a:CT_Point2D/a:off"))]
+  #[sdk(child(qname = "a:off"))]
   pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
-  #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/w14:extLst")]
+#[sdk(office2010, qname = "w14:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2009,10 +1991,10 @@ pub enum RunConflictInsertionChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
@@ -2126,10 +2108,10 @@ pub enum RunConflictDeletionChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
+  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
+  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
@@ -2213,7 +2195,7 @@ pub enum ShadowChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextOutlineEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
+  #[sdk(empty_child(office2010, qname = "w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),
@@ -2223,10 +2205,10 @@ pub enum TextOutlineEffectChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextOutlineEffectChoice2 {
   /// Defines the RoundEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:round"))]
+  #[sdk(empty_child(office2010, qname = "w14:round"))]
   RoundEmpty,
   /// Defines the BevelEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:bevel"))]
+  #[sdk(empty_child(office2010, qname = "w14:bevel"))]
   BevelEmpty,
   /// Defines the LineJoinMiterProperties Class.
   LineJoinMiterProperties(std::boxed::Box<LineJoinMiterProperties>),
@@ -2234,7 +2216,7 @@ pub enum TextOutlineEffectChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillTextEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
+  #[sdk(empty_child(office2010, qname = "w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),

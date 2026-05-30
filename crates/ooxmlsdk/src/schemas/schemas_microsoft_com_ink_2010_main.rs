@@ -92,7 +92,7 @@ pub enum KnownSemanticTypeValues {
 }
 /// Defines the ContextNode Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "msink:CT_CtxNode/msink:context")]
+#[sdk(qname = "msink:context")]
 pub struct ContextNode {
   /// id
   #[sdk(attr(qname = ":id"))]
@@ -226,18 +226,18 @@ pub struct ContextNode {
   #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
   pub shape_geometry: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ContextNodeProperty Class.
-  #[sdk(child(qname = "msink:CT_Property/msink:property"))]
+  #[sdk(child(qname = "msink:property"))]
   pub context_node_property: Vec<ContextNodeProperty>,
   /// Defines the SourceLink Class.
-  #[sdk(child(qname = "msink:CT_CtxLink/msink:sourceLink"))]
+  #[sdk(child(qname = "msink:sourceLink"))]
   pub source_link: Vec<SourceLink>,
   /// Defines the DestinationLink Class.
-  #[sdk(child(qname = "msink:CT_CtxLink/msink:destinationLink"))]
+  #[sdk(child(qname = "msink:destinationLink"))]
   pub destination_link: Vec<DestinationLink>,
 }
 /// Defines the ContextNodeProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "msink:CT_Property/msink:property")]
+#[sdk(qname = "msink:property")]
 pub struct ContextNodeProperty {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -249,7 +249,7 @@ pub struct ContextNodeProperty {
 }
 /// Defines the SourceLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "msink:CT_CtxLink/msink:sourceLink")]
+#[sdk(qname = "msink:sourceLink")]
 pub struct SourceLink {
   /// direction
   #[sdk(attr(qname = ":direction"))]
@@ -266,7 +266,7 @@ pub struct SourceLink {
 }
 /// Defines the DestinationLink Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "msink:CT_CtxLink/msink:destinationLink")]
+#[sdk(qname = "msink:destinationLink")]
 pub struct DestinationLink {
   /// direction
   #[sdk(attr(qname = ":direction"))]

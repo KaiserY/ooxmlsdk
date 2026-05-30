@@ -6,24 +6,15 @@
 
 /// Defines the RichValueRefreshIntervals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrvr:CT_RichValueRefreshIntervals/xlrvr:refreshIntervals"
-)]
+#[sdk(office2021, qname = "xlrvr:refreshIntervals")]
 pub struct RichValueRefreshIntervals {
   /// Defines the RichValueRefreshInterval Class.
-  #[sdk(child(
-    office2021,
-    qname = "xlrvr:CT_RichValueRefreshInterval/xlrvr:refreshInterval"
-  ))]
+  #[sdk(child(office2021, qname = "xlrvr:refreshInterval"))]
   pub rich_value_refresh_interval: Vec<RichValueRefreshInterval>,
 }
 /// Defines the RichValueRefreshInterval Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrvr:CT_RichValueRefreshInterval/xlrvr:refreshInterval"
-)]
+#[sdk(office2021, qname = "xlrvr:refreshInterval")]
 pub struct RichValueRefreshInterval {
   /// resourceIdInt
   #[sdk(attr(office2021, qname = ":resourceIdInt"))]

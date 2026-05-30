@@ -6,13 +6,13 @@
 
 /// Defines the WordprocessingCanvas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpc:CT_WordprocessingCanvas/wpc:wpc")]
+#[sdk(office2010, qname = "wpc:wpc")]
 pub struct WordprocessingCanvas {
   /// Defines the BackgroundFormatting Class.
-  #[sdk(child(office2010, qname = "a:CT_BackgroundFormatting/wpc:bg"))]
+  #[sdk(child(office2010, qname = "wpc:bg"))]
   pub background_formatting: Option<std::boxed::Box<BackgroundFormatting>>,
   /// Defines the WholeFormatting Class.
-  #[sdk(child(office2010, qname = "a:CT_WholeE2oFormatting/wpc:whole"))]
+  #[sdk(child(office2010, qname = "wpc:whole"))]
   pub whole_formatting: Option<std::boxed::Box<WholeFormatting>>,
   #[sdk(
         choice(
@@ -25,12 +25,12 @@ pub struct WordprocessingCanvas {
     )]
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpc:extLst"))]
+  #[sdk(child(office2010, qname = "wpc:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the BackgroundFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_BackgroundFormatting/wpc:bg")]
+#[sdk(office2010, qname = "wpc:bg")]
 pub struct BackgroundFormatting {
   #[sdk(
         choice(
@@ -53,10 +53,10 @@ pub struct BackgroundFormatting {
 }
 /// Defines the WholeFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_WholeE2oFormatting/wpc:whole")]
+#[sdk(office2010, qname = "wpc:whole")]
 pub struct WholeFormatting {
   /// Outline
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
+  #[sdk(child(qname = "a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
@@ -68,32 +68,32 @@ pub struct WholeFormatting {
 }
 /// Defines the GraphicFrameType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:CT_GraphicFrame/wpc:graphicFrame")]
+#[sdk(office2010, qname = "wpc:graphicFrame")]
 pub struct GraphicFrameType {
   /// Defines the NonVisualDrawingProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
+  #[sdk(child(office2010, qname = "wpg:cNvPr"))]
   pub non_visual_drawing_properties:
     std::boxed::Box<crate::schemas::wpg::NonVisualDrawingProperties>,
   /// Defines the NonVisualGraphicFrameProperties Class.
-  #[sdk(child(office2010, qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr"))]
+  #[sdk(child(office2010, qname = "wpg:cNvFrPr"))]
   pub non_visual_graphic_frame_properties:
     std::boxed::Box<crate::schemas::wpg::NonVisualGraphicFrameProperties>,
   /// Defines the Transform2D Class.
-  #[sdk(child(office2010, qname = "a:CT_Transform2D/wpg:xfrm"))]
+  #[sdk(child(office2010, qname = "wpg:xfrm"))]
   pub transform2_d: std::boxed::Box<crate::schemas::wpg::Transform2D>,
   /// Graphic Object.
-  #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
+  #[sdk(child(qname = "a:graphic"))]
   pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
   /// Defines the OfficeArtExtensionList Class.
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
+  #[sdk(child(office2010, qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<crate::schemas::wpg::OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/wpc:extLst")]
+#[sdk(office2010, qname = "wpc:extLst")]
 pub struct OfficeArtExtensionList {
   /// Extension.
-  #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
+  #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -118,7 +118,7 @@ pub enum BackgroundFormattingChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

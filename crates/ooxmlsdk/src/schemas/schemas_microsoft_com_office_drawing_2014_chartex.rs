@@ -254,7 +254,7 @@ pub enum PageOrientation {
 }
 /// Defines the ChartSpace Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ChartSpace/cx:chartSpace")]
+#[sdk(office2016, qname = "cx:chartSpace")]
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -269,33 +269,33 @@ pub struct ChartSpace {
   #[sdk(attr(office2016, qname = ":fallbackImg"))]
   pub fallback_img: Option<crate::simple_type::StringValue>,
   /// Defines the ChartData Class.
-  #[sdk(child(office2016, qname = "cx:CT_ChartData/cx:chartData"))]
+  #[sdk(child(office2016, qname = "cx:chartData"))]
   pub chart_data: Option<std::boxed::Box<ChartData>>,
   /// Defines the Chart Class.
-  #[sdk(child(office2016, qname = "cx:CT_Chart/cx:chart"))]
+  #[sdk(child(office2016, qname = "cx:chart"))]
   pub chart: std::boxed::Box<Chart>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the ColorMappingType Class.
-  #[sdk(child(office2016, qname = "a:CT_ColorMapping/cx:clrMapOvr"))]
+  #[sdk(child(office2016, qname = "cx:clrMapOvr"))]
   pub color_mapping_type: Option<std::boxed::Box<ColorMappingType>>,
   /// Defines the FormatOverrides Class.
-  #[sdk(child(office2016, qname = "cx:CT_FormatOverrides/cx:fmtOvrs"))]
+  #[sdk(child(office2016, qname = "cx:fmtOvrs"))]
   pub format_overrides: Option<FormatOverrides>,
   /// Defines the PrintSettings Class.
-  #[sdk(child(office2016, qname = "cx:CT_PrintSettings/cx:printSettings"))]
+  #[sdk(child(office2016, qname = "cx:printSettings"))]
   pub print_settings: Option<std::boxed::Box<PrintSettings>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RelId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_RelId/cx:chart")]
+#[sdk(office2016, qname = "cx:chart")]
 pub struct RelId {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
@@ -308,7 +308,7 @@ pub type Openxmlsdk49becffa3b034d138272D6ccb22579e3XsdunsignedInt = crate::simpl
 pub type BinCountXsdunsignedInt = crate::simple_type::UInt32Value;
 /// Defines the Extension2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Extension/cx:ext")]
+#[sdk(office2016, qname = "cx:ext")]
 pub struct Extension2 {
   /// uri
   #[sdk(attr(office2016, qname = ":uri"))]
@@ -319,7 +319,7 @@ pub struct Extension2 {
 }
 /// Defines the MinColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:minColor")]
+#[sdk(office2016, qname = "cx:minColor")]
 pub struct MinColorSolidColorFillProperties {
   #[sdk(
         choice(
@@ -335,7 +335,7 @@ pub struct MinColorSolidColorFillProperties {
 }
 /// Defines the MidColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:midColor")]
+#[sdk(office2016, qname = "cx:midColor")]
 pub struct MidColorSolidColorFillProperties {
   #[sdk(
         choice(
@@ -351,7 +351,7 @@ pub struct MidColorSolidColorFillProperties {
 }
 /// Defines the MaxColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:maxColor")]
+#[sdk(office2016, qname = "cx:maxColor")]
 pub struct MaxColorSolidColorFillProperties {
   #[sdk(
         choice(
@@ -367,7 +367,7 @@ pub struct MaxColorSolidColorFillProperties {
 }
 /// Defines the ChartStringValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_StringValue/cx:pt")]
+#[sdk(office2016, qname = "cx:pt")]
 pub struct ChartStringValue {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
@@ -377,7 +377,7 @@ pub struct ChartStringValue {
 }
 /// Defines the Formula Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Formula/cx:f")]
+#[sdk(office2016, qname = "cx:f")]
 pub struct Formula {
   /// dir
   #[sdk(attr(office2016, qname = ":dir"))]
@@ -387,7 +387,7 @@ pub struct Formula {
 }
 /// Defines the NfFormula Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Formula/cx:nf")]
+#[sdk(office2016, qname = "cx:nf")]
 pub struct NfFormula {
   /// dir
   #[sdk(attr(office2016, qname = ":dir"))]
@@ -397,7 +397,7 @@ pub struct NfFormula {
 }
 /// Defines the StringLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_StringLevel/cx:lvl")]
+#[sdk(office2016, qname = "cx:lvl")]
 pub struct StringLevel {
   /// ptCount
   #[sdk(attr(office2016, qname = ":ptCount"))]
@@ -406,12 +406,12 @@ pub struct StringLevel {
   #[sdk(attr(office2016, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Defines the ChartStringValue Class.
-  #[sdk(child(office2016, qname = "cx:CT_StringValue/cx:pt"))]
+  #[sdk(child(office2016, qname = "cx:pt"))]
   pub chart_string_value: Vec<ChartStringValue>,
 }
 /// Defines the NumericValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_NumericValue/cx:pt")]
+#[sdk(office2016, qname = "cx:pt")]
 pub struct NumericValue {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
@@ -421,7 +421,7 @@ pub struct NumericValue {
 }
 /// Defines the NumericLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_NumericLevel/cx:lvl")]
+#[sdk(office2016, qname = "cx:lvl")]
 pub struct NumericLevel {
   /// ptCount
   #[sdk(attr(office2016, qname = ":ptCount"))]
@@ -433,12 +433,12 @@ pub struct NumericLevel {
   #[sdk(attr(office2016, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Defines the NumericValue Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumericValue/cx:pt"))]
+  #[sdk(child(office2016, qname = "cx:pt"))]
   pub numeric_value: Vec<NumericValue>,
 }
 /// Defines the NumericDimension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_NumericDimension/cx:numDim")]
+#[sdk(office2016, qname = "cx:numDim")]
 pub struct NumericDimension {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
@@ -458,7 +458,7 @@ pub struct NumericDimension {
 }
 /// Defines the StringDimension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_StringDimension/cx:strDim")]
+#[sdk(office2016, qname = "cx:strDim")]
 pub struct StringDimension {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
@@ -478,15 +478,15 @@ pub struct StringDimension {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ExtensionList/cx:extLst")]
+#[sdk(office2016, qname = "cx:extLst")]
 pub struct ExtensionList {
   /// Defines the Extension2 Class.
-  #[sdk(child(office2016, qname = "cx:CT_Extension/cx:ext"))]
+  #[sdk(child(office2016, qname = "cx:ext"))]
   pub extension2: Vec<Extension2>,
 }
 /// Defines the ExternalData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ExternalData/cx:externalData")]
+#[sdk(office2016, qname = "cx:externalData")]
 pub struct ExternalData {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// RelId of the relationship for the external data
@@ -498,7 +498,7 @@ pub struct ExternalData {
 }
 /// Defines the Data Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Data/cx:data")]
+#[sdk(office2016, qname = "cx:data")]
 pub struct Data {
   /// id
   #[sdk(attr(office2016, qname = ":id"))]
@@ -511,7 +511,7 @@ pub struct Data {
     )]
   pub data_choice: Vec<DataChoice>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the VXsdstring Class.
@@ -534,7 +534,7 @@ pub type FirstHeaderXsdstring = crate::simple_type::StringValue;
 pub type FirstFooterXsdstring = crate::simple_type::StringValue;
 /// Defines the TextData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_TextData/cx:txData")]
+#[sdk(office2016, qname = "cx:txData")]
 pub struct TextData {
   #[sdk(
         choice(
@@ -550,35 +550,35 @@ pub struct TextData {
 }
 /// Defines the RichTextBody Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_TextBody/cx:rich")]
+#[sdk(office2016, qname = "cx:rich")]
 pub struct RichTextBody {
   /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
+  #[sdk(child(qname = "a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  #[sdk(child(qname = "a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
+  #[sdk(child(qname = "a:p"))]
   pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the TxPrTextBody Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_TextBody/cx:txPr")]
+#[sdk(office2016, qname = "cx:txPr")]
 pub struct TxPrTextBody {
   /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
+  #[sdk(child(qname = "a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
+  #[sdk(child(qname = "a:lstStyle"))]
   pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
+  #[sdk(child(qname = "a:p"))]
   pub paragraph: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the Text Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Text/cx:tx")]
+#[sdk(office2016, qname = "cx:tx")]
 pub struct Text {
   #[sdk(
         choice(
@@ -590,14 +590,14 @@ pub struct Text {
 }
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_ShapeProperties/cx:spPr")]
+#[sdk(office2016, qname = "cx:spPr")]
 pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
-  #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
+  #[sdk(child(qname = "a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(
         choice(
@@ -618,7 +618,7 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
+  #[sdk(child(qname = "a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(
         choice(
@@ -628,18 +628,18 @@ pub struct ShapeProperties {
     )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
-  #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
+  #[sdk(child(qname = "a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
-  #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
+  #[sdk(child(qname = "a:sp3d"))]
   pub shape3_d_type: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
-  #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub shape_properties_extension_list: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the Offset Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Offset/cx:offset")]
+#[sdk(office2016, qname = "cx:offset")]
 pub struct Offset {
   /// top
   #[sdk(attr(office2016, qname = ":top"))]
@@ -650,24 +650,24 @@ pub struct Offset {
 }
 /// Defines the AxisUnitsLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_AxisUnitsLabel/cx:unitsLabel")]
+#[sdk(office2016, qname = "cx:unitsLabel")]
 pub struct AxisUnitsLabel {
   /// Defines the Text Class.
-  #[sdk(child(office2016, qname = "cx:CT_Text/cx:tx"))]
+  #[sdk(child(office2016, qname = "cx:tx"))]
   pub text: Option<std::boxed::Box<Text>>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the CategoryAxisScaling Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_CategoryAxisScaling/cx:catScaling")]
+#[sdk(office2016, qname = "cx:catScaling")]
 pub struct CategoryAxisScaling {
   /// gapWidth
   #[sdk(attr(office2016, qname = ":gapWidth"))]
@@ -683,7 +683,7 @@ pub struct CategoryAxisScaling {
 }
 /// Defines the ValueAxisScaling Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueAxisScaling/cx:valScaling")]
+#[sdk(office2016, qname = "cx:valScaling")]
 pub struct ValueAxisScaling {
   /// max
   #[sdk(attr(office2016, qname = ":max"))]
@@ -720,93 +720,93 @@ pub struct ValueAxisScaling {
 }
 /// Defines the AxisTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_AxisTitle/cx:title")]
+#[sdk(office2016, qname = "cx:title")]
 pub struct AxisTitle {
   /// Defines the Text Class.
-  #[sdk(child(office2016, qname = "cx:CT_Text/cx:tx"))]
+  #[sdk(child(office2016, qname = "cx:tx"))]
   pub text: Option<std::boxed::Box<Text>>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the Offset Class.
-  #[sdk(child(office2016, qname = "cx:CT_Offset/cx:offset"))]
+  #[sdk(child(office2016, qname = "cx:offset"))]
   pub offset: Option<Offset>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the AxisUnits Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_AxisUnits/cx:units")]
+#[sdk(office2016, qname = "cx:units")]
 pub struct AxisUnits {
   /// unit
   #[sdk(attr(office2016, qname = ":unit"))]
   pub unit: Option<AxisUnit>,
   /// Defines the AxisUnitsLabel Class.
-  #[sdk(child(office2016, qname = "cx:CT_AxisUnitsLabel/cx:unitsLabel"))]
+  #[sdk(child(office2016, qname = "cx:unitsLabel"))]
   pub axis_units_label: Option<std::boxed::Box<AxisUnitsLabel>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the MajorGridlinesGridlines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Gridlines/cx:majorGridlines")]
+#[sdk(office2016, qname = "cx:majorGridlines")]
 pub struct MajorGridlinesGridlines {
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the MinorGridlinesGridlines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Gridlines/cx:minorGridlines")]
+#[sdk(office2016, qname = "cx:minorGridlines")]
 pub struct MinorGridlinesGridlines {
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the MajorTickMarksTickMarks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_TickMarks/cx:majorTickMarks")]
+#[sdk(office2016, qname = "cx:majorTickMarks")]
 pub struct MajorTickMarksTickMarks {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: Option<TickMarksType>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the MinorTickMarksTickMarks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_TickMarks/cx:minorTickMarks")]
+#[sdk(office2016, qname = "cx:minorTickMarks")]
 pub struct MinorTickMarksTickMarks {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: Option<TickMarksType>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TickLabels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_TickLabels/cx:tickLabels")]
+#[sdk(office2016, qname = "cx:tickLabels")]
 pub struct TickLabels {
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the NumberFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_NumberFormat/cx:numFmt")]
+#[sdk(office2016, qname = "cx:numFmt")]
 pub struct NumberFormat {
   /// formatCode
   #[sdk(attr(office2016, qname = ":formatCode"))]
@@ -819,7 +819,7 @@ pub struct NumberFormat {
 pub type Xsddouble = crate::simple_type::DoubleValue;
 /// Defines the Address Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Address/cx:address")]
+#[sdk(office2016, qname = "cx:address")]
 pub struct Address {
   /// address1
   #[sdk(attr(office2016, qname = ":address1"))]
@@ -845,7 +845,7 @@ pub struct Address {
 }
 /// Defines the GeoLocation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoLocation/cx:geoLocation")]
+#[sdk(office2016, qname = "cx:geoLocation")]
 pub struct GeoLocation {
   /// latitude
   #[sdk(attr(office2016, qname = ":latitude"))]
@@ -860,12 +860,12 @@ pub struct GeoLocation {
   #[sdk(attr(office2016, qname = ":entityType"))]
   pub entity_type: EntityTypeEnum,
   /// Defines the Address Class.
-  #[sdk(child(office2016, qname = "cx:CT_Address/cx:address"))]
+  #[sdk(child(office2016, qname = "cx:address"))]
   pub address: Option<Address>,
 }
 /// Defines the GeoLocationQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoLocationQuery/cx:geoLocationQuery")]
+#[sdk(office2016, qname = "cx:geoLocationQuery")]
 pub struct GeoLocationQuery {
   /// countryRegion
   #[sdk(attr(office2016, qname = ":countryRegion"))]
@@ -885,29 +885,26 @@ pub struct GeoLocationQuery {
 }
 /// Defines the GeoLocations Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoLocations/cx:geoLocations")]
+#[sdk(office2016, qname = "cx:geoLocations")]
 pub struct GeoLocations {
   /// Defines the GeoLocation Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoLocation/cx:geoLocation"))]
+  #[sdk(child(office2016, qname = "cx:geoLocation"))]
   pub geo_location: Option<std::boxed::Box<GeoLocation>>,
 }
 /// Defines the GeoLocationQueryResult Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoLocationQueryResult/cx:geoLocationQueryResult"
-)]
+#[sdk(office2016, qname = "cx:geoLocationQueryResult")]
 pub struct GeoLocationQueryResult {
   /// Defines the GeoLocationQuery Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoLocationQuery/cx:geoLocationQuery"))]
+  #[sdk(child(office2016, qname = "cx:geoLocationQuery"))]
   pub geo_location_query: Option<GeoLocationQuery>,
   /// Defines the GeoLocations Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoLocations/cx:geoLocations"))]
+  #[sdk(child(office2016, qname = "cx:geoLocations"))]
   pub geo_locations: Option<std::boxed::Box<GeoLocations>>,
 }
 /// Defines the GeoPolygon Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoPolygon/cx:geoPolygon")]
+#[sdk(office2016, qname = "cx:geoPolygon")]
 pub struct GeoPolygon {
   /// polygonId
   #[sdk(attr(office2016, qname = ":polygonId"))]
@@ -921,27 +918,23 @@ pub struct GeoPolygon {
 }
 /// Defines the GeoPolygons Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoPolygons/cx:geoPolygons")]
+#[sdk(office2016, qname = "cx:geoPolygons")]
 pub struct GeoPolygons {
   /// Defines the GeoPolygon Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoPolygon/cx:geoPolygon"))]
+  #[sdk(child(office2016, qname = "cx:geoPolygon"))]
   pub geo_polygon: Vec<GeoPolygon>,
 }
 /// Defines the Copyrights Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Copyrights/cx:copyrights")]
+#[sdk(office2016, qname = "cx:copyrights")]
 pub struct Copyrights {
   /// Defines the CopyrightXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:copyright"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:copyright"))]
   pub copyright_xsdstring: Vec<CopyrightXsdstring>,
 }
 /// Defines the GeoDataEntityQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoDataEntityQuery/cx:geoDataEntityQuery")]
+#[sdk(office2016, qname = "cx:geoDataEntityQuery")]
 pub struct GeoDataEntityQuery {
   /// entityType
   #[sdk(attr(office2016, qname = ":entityType"))]
@@ -952,7 +945,7 @@ pub struct GeoDataEntityQuery {
 }
 /// Defines the GeoData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoData/cx:geoData")]
+#[sdk(office2016, qname = "cx:geoData")]
 pub struct GeoData {
   /// entityName
   #[sdk(attr(office2016, qname = ":entityName"))]
@@ -973,29 +966,26 @@ pub struct GeoData {
   #[sdk(attr(office2016, qname = ":south"))]
   pub south: crate::simple_type::DoubleValue,
   /// Defines the GeoPolygons Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoPolygons/cx:geoPolygons"))]
+  #[sdk(child(office2016, qname = "cx:geoPolygons"))]
   pub geo_polygons: Option<GeoPolygons>,
   /// Defines the Copyrights Class.
-  #[sdk(child(office2016, qname = "cx:CT_Copyrights/cx:copyrights"))]
+  #[sdk(child(office2016, qname = "cx:copyrights"))]
   pub copyrights: Option<Copyrights>,
 }
 /// Defines the GeoDataEntityQueryResult Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoDataEntityQueryResult/cx:geoDataEntityQueryResult"
-)]
+#[sdk(office2016, qname = "cx:geoDataEntityQueryResult")]
 pub struct GeoDataEntityQueryResult {
   /// Defines the GeoDataEntityQuery Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoDataEntityQuery/cx:geoDataEntityQuery"))]
+  #[sdk(child(office2016, qname = "cx:geoDataEntityQuery"))]
   pub geo_data_entity_query: Option<GeoDataEntityQuery>,
   /// Defines the GeoData Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoData/cx:geoData"))]
+  #[sdk(child(office2016, qname = "cx:geoData"))]
   pub geo_data: Option<std::boxed::Box<GeoData>>,
 }
 /// Defines the GeoDataPointQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoDataPointQuery/cx:geoDataPointQuery")]
+#[sdk(office2016, qname = "cx:geoDataPointQuery")]
 pub struct GeoDataPointQuery {
   /// entityType
   #[sdk(attr(office2016, qname = ":entityType"))]
@@ -1009,10 +999,7 @@ pub struct GeoDataPointQuery {
 }
 /// Defines the GeoDataPointToEntityQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoDataPointToEntityQuery/cx:geoDataPointToEntityQuery"
-)]
+#[sdk(office2016, qname = "cx:geoDataPointToEntityQuery")]
 pub struct GeoDataPointToEntityQuery {
   /// entityType
   #[sdk(attr(office2016, qname = ":entityType"))]
@@ -1023,34 +1010,28 @@ pub struct GeoDataPointToEntityQuery {
 }
 /// Defines the GeoDataPointToEntityQueryResult Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoDataPointToEntityQueryResult/cx:geoDataPointToEntityQueryResult"
-)]
+#[sdk(office2016, qname = "cx:geoDataPointToEntityQueryResult")]
 pub struct GeoDataPointToEntityQueryResult {
   /// Defines the GeoDataPointQuery Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoDataPointQuery/cx:geoDataPointQuery"))]
+  #[sdk(child(office2016, qname = "cx:geoDataPointQuery"))]
   pub geo_data_point_query: Option<GeoDataPointQuery>,
   /// Defines the GeoDataPointToEntityQuery Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoDataPointToEntityQuery/cx:geoDataPointToEntityQuery"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoDataPointToEntityQuery"))]
   pub geo_data_point_to_entity_query: Option<GeoDataPointToEntityQuery>,
 }
 /// Defines the EntityType Class.
 pub type EntityType = EntityTypeEnum;
 /// Defines the GeoChildTypes Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoChildTypes/cx:geoChildTypes")]
+#[sdk(office2016, qname = "cx:geoChildTypes")]
 pub struct GeoChildTypes {
   /// Defines the EntityType Class.
-  #[sdk(text_child(office2016, qname = "cx:ST_EntityType/cx:entityType"))]
+  #[sdk(text_child(office2016, qname = "cx:entityType"))]
   pub entity_type: Vec<EntityType>,
 }
 /// Defines the GeoHierarchyEntity Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoHierarchyEntity/cx:geoHierarchyEntity")]
+#[sdk(office2016, qname = "cx:geoHierarchyEntity")]
 pub struct GeoHierarchyEntity {
   /// entityName
   #[sdk(attr(office2016, qname = ":entityName"))]
@@ -1064,49 +1045,37 @@ pub struct GeoHierarchyEntity {
 }
 /// Defines the GeoChildEntitiesQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoChildEntitiesQuery/cx:geoChildEntitiesQuery"
-)]
+#[sdk(office2016, qname = "cx:geoChildEntitiesQuery")]
 pub struct GeoChildEntitiesQuery {
   /// entityId
   #[sdk(attr(office2016, qname = ":entityId"))]
   pub entity_id: crate::simple_type::StringValue,
   /// Defines the GeoChildTypes Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoChildTypes/cx:geoChildTypes"))]
+  #[sdk(child(office2016, qname = "cx:geoChildTypes"))]
   pub geo_child_types: Option<GeoChildTypes>,
 }
 /// Defines the GeoChildEntities Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoChildEntities/cx:geoChildEntities")]
+#[sdk(office2016, qname = "cx:geoChildEntities")]
 pub struct GeoChildEntities {
   /// Defines the GeoHierarchyEntity Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoHierarchyEntity/cx:geoHierarchyEntity"))]
+  #[sdk(child(office2016, qname = "cx:geoHierarchyEntity"))]
   pub geo_hierarchy_entity: Vec<GeoHierarchyEntity>,
 }
 /// Defines the GeoChildEntitiesQueryResult Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoChildEntitiesQueryResult/cx:geoChildEntitiesQueryResult"
-)]
+#[sdk(office2016, qname = "cx:geoChildEntitiesQueryResult")]
 pub struct GeoChildEntitiesQueryResult {
   /// Defines the GeoChildEntitiesQuery Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoChildEntitiesQuery/cx:geoChildEntitiesQuery"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoChildEntitiesQuery"))]
   pub geo_child_entities_query: Option<std::boxed::Box<GeoChildEntitiesQuery>>,
   /// Defines the GeoChildEntities Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoChildEntities/cx:geoChildEntities"))]
+  #[sdk(child(office2016, qname = "cx:geoChildEntities"))]
   pub geo_child_entities: Option<GeoChildEntities>,
 }
 /// Defines the GeoParentEntitiesQuery Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoParentEntitiesQuery/cx:geoParentEntitiesQuery"
-)]
+#[sdk(office2016, qname = "cx:geoParentEntitiesQuery")]
 pub struct GeoParentEntitiesQuery {
   /// entityId
   #[sdk(attr(office2016, qname = ":entityId"))]
@@ -1114,7 +1083,7 @@ pub struct GeoParentEntitiesQuery {
 }
 /// Defines the GeoEntity Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoEntity/cx:geoEntity")]
+#[sdk(office2016, qname = "cx:geoEntity")]
 pub struct GeoEntity {
   /// entityName
   #[sdk(attr(office2016, qname = ":entityName"))]
@@ -1125,7 +1094,7 @@ pub struct GeoEntity {
 }
 /// Defines the GeoParentEntity Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoParentEntity/cx:geoParentEntity")]
+#[sdk(office2016, qname = "cx:geoParentEntity")]
 pub struct GeoParentEntity {
   /// entityId
   #[sdk(attr(office2016, qname = ":entityId"))]
@@ -1133,134 +1102,83 @@ pub struct GeoParentEntity {
 }
 /// Defines the GeoParentEntitiesQueryResult Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoParentEntitiesQueryResult/cx:geoParentEntitiesQueryResult"
-)]
+#[sdk(office2016, qname = "cx:geoParentEntitiesQueryResult")]
 pub struct GeoParentEntitiesQueryResult {
   /// Defines the GeoParentEntitiesQuery Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoParentEntitiesQuery/cx:geoParentEntitiesQuery"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoParentEntitiesQuery"))]
   pub geo_parent_entities_query: std::boxed::Box<GeoParentEntitiesQuery>,
   /// Defines the GeoEntity Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoEntity/cx:geoEntity"))]
+  #[sdk(child(office2016, qname = "cx:geoEntity"))]
   pub geo_entity: Option<GeoEntity>,
   /// Defines the GeoParentEntity Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoParentEntity/cx:geoParentEntity"))]
+  #[sdk(child(office2016, qname = "cx:geoParentEntity"))]
   pub geo_parent_entity: Option<GeoParentEntity>,
 }
 /// Defines the GeoLocationQueryResults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoLocationQueryResults/cx:geoLocationQueryResults"
-)]
+#[sdk(office2016, qname = "cx:geoLocationQueryResults")]
 pub struct GeoLocationQueryResults {
   /// Defines the GeoLocationQueryResult Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoLocationQueryResult/cx:geoLocationQueryResult"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoLocationQueryResult"))]
   pub geo_location_query_result: Vec<GeoLocationQueryResult>,
 }
 /// Defines the GeoDataEntityQueryResults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoDataEntityQueryResults/cx:geoDataEntityQueryResults"
-)]
+#[sdk(office2016, qname = "cx:geoDataEntityQueryResults")]
 pub struct GeoDataEntityQueryResults {
   /// Defines the GeoDataEntityQueryResult Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoDataEntityQueryResult/cx:geoDataEntityQueryResult"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoDataEntityQueryResult"))]
   pub geo_data_entity_query_result: Vec<GeoDataEntityQueryResult>,
 }
 /// Defines the GeoDataPointToEntityQueryResults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoDataPointToEntityQueryResults/cx:geoDataPointToEntityQueryResults"
-)]
+#[sdk(office2016, qname = "cx:geoDataPointToEntityQueryResults")]
 pub struct GeoDataPointToEntityQueryResults {
   /// Defines the GeoDataPointToEntityQueryResult Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoDataPointToEntityQueryResult/cx:geoDataPointToEntityQueryResult"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoDataPointToEntityQueryResult"))]
   pub geo_data_point_to_entity_query_result: Vec<GeoDataPointToEntityQueryResult>,
 }
 /// Defines the GeoChildEntitiesQueryResults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoChildEntitiesQueryResults/cx:geoChildEntitiesQueryResults"
-)]
+#[sdk(office2016, qname = "cx:geoChildEntitiesQueryResults")]
 pub struct GeoChildEntitiesQueryResults {
   /// Defines the GeoChildEntitiesQueryResult Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoChildEntitiesQueryResult/cx:geoChildEntitiesQueryResult"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoChildEntitiesQueryResult"))]
   pub geo_child_entities_query_result: Vec<GeoChildEntitiesQueryResult>,
 }
 /// Defines the GeoParentEntitiesQueryResults Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "cx:CT_GeoParentEntitiesQueryResults/cx:geoParentEntitiesQueryResults"
-)]
+#[sdk(office2016, qname = "cx:geoParentEntitiesQueryResults")]
 pub struct GeoParentEntitiesQueryResults {
   /// Defines the GeoParentEntitiesQueryResult Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoParentEntitiesQueryResult/cx:geoParentEntitiesQueryResult"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoParentEntitiesQueryResult"))]
   pub geo_parent_entities_query_result: Vec<GeoParentEntitiesQueryResult>,
 }
 /// Defines the Xsdbase64Binary Class.
 pub type Xsdbase64Binary = crate::simple_type::Base64BinaryValue;
 /// Defines the Clear Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Clear/cx:clear")]
+#[sdk(office2016, qname = "cx:clear")]
 pub struct Clear {
   /// Defines the GeoLocationQueryResults Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoLocationQueryResults/cx:geoLocationQueryResults"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoLocationQueryResults"))]
   pub geo_location_query_results: Option<GeoLocationQueryResults>,
   /// Defines the GeoDataEntityQueryResults Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoDataEntityQueryResults/cx:geoDataEntityQueryResults"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoDataEntityQueryResults"))]
   pub geo_data_entity_query_results: Option<GeoDataEntityQueryResults>,
   /// Defines the GeoDataPointToEntityQueryResults Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoDataPointToEntityQueryResults/cx:geoDataPointToEntityQueryResults"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoDataPointToEntityQueryResults"))]
   pub geo_data_point_to_entity_query_results: Option<GeoDataPointToEntityQueryResults>,
   /// Defines the GeoChildEntitiesQueryResults Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoChildEntitiesQueryResults/cx:geoChildEntitiesQueryResults"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoChildEntitiesQueryResults"))]
   pub geo_child_entities_query_results: Option<GeoChildEntitiesQueryResults>,
   /// Defines the GeoParentEntitiesQueryResults Class.
-  #[sdk(child(
-    office2016,
-    qname = "cx:CT_GeoParentEntitiesQueryResults/cx:geoParentEntitiesQueryResults"
-  ))]
+  #[sdk(child(office2016, qname = "cx:geoParentEntitiesQueryResults"))]
   pub geo_parent_entities_query_results: Option<GeoParentEntitiesQueryResults>,
 }
 /// Defines the GeoCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_GeoCache/cx:geoCache")]
+#[sdk(office2016, qname = "cx:geoCache")]
 pub struct GeoCache {
   /// provider
   #[sdk(attr(office2016, qname = ":provider"))]
@@ -1275,7 +1193,7 @@ pub struct GeoCache {
 }
 /// Defines the ParentLabelLayout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ParentLabelLayout/cx:parentLabelLayout")]
+#[sdk(office2016, qname = "cx:parentLabelLayout")]
 pub struct ParentLabelLayout {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
@@ -1283,7 +1201,7 @@ pub struct ParentLabelLayout {
 }
 /// Defines the RegionLabelLayout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_RegionLabelLayout/cx:regionLabelLayout")]
+#[sdk(office2016, qname = "cx:regionLabelLayout")]
 pub struct RegionLabelLayout {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
@@ -1291,7 +1209,7 @@ pub struct RegionLabelLayout {
 }
 /// Defines the SeriesElementVisibilities Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_SeriesElementVisibilities/cx:visibility")]
+#[sdk(office2016, qname = "cx:visibility")]
 pub struct SeriesElementVisibilities {
   /// connectorLines
   #[sdk(attr(office2016, qname = ":connectorLines"))]
@@ -1311,7 +1229,7 @@ pub struct SeriesElementVisibilities {
 }
 /// Defines the Binning Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Binning/cx:binning")]
+#[sdk(office2016, qname = "cx:binning")]
 pub struct Binning {
   /// intervalClosed
   #[sdk(attr(office2016, qname = ":intervalClosed"))]
@@ -1336,7 +1254,7 @@ pub struct Binning {
 }
 /// Defines the Geography Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Geography/cx:geography")]
+#[sdk(office2016, qname = "cx:geography")]
 pub struct Geography {
   /// projectionType
   #[sdk(attr(office2016, qname = ":projectionType"))]
@@ -1355,12 +1273,12 @@ pub struct Geography {
   #[sdk(attr(office2016, qname = ":attribution"))]
   pub attribution: crate::simple_type::StringValue,
   /// Defines the GeoCache Class.
-  #[sdk(child(office2016, qname = "cx:CT_GeoCache/cx:geoCache"))]
+  #[sdk(child(office2016, qname = "cx:geoCache"))]
   pub geo_cache: Option<GeoCache>,
 }
 /// Defines the Statistics Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Statistics/cx:statistics")]
+#[sdk(office2016, qname = "cx:statistics")]
 pub struct Statistics {
   /// quartileMethod
   #[sdk(attr(office2016, qname = ":quartileMethod"))]
@@ -1368,15 +1286,15 @@ pub struct Statistics {
 }
 /// Defines the Subtotals Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Subtotals/cx:subtotals")]
+#[sdk(office2016, qname = "cx:subtotals")]
 pub struct Subtotals {
   /// Index of subtotal data point.
-  #[sdk(child(office2016, qname = "c:CT_UnsignedInt/cx:idx"))]
+  #[sdk(child(office2016, qname = "cx:idx"))]
   pub unsigned_integer_type: Vec<UnsignedIntegerType>,
 }
 /// Defines the NumberColorPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_NumberColorPosition/cx:number")]
+#[sdk(office2016, qname = "cx:number")]
 pub struct NumberColorPosition {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
@@ -1384,7 +1302,7 @@ pub struct NumberColorPosition {
 }
 /// Defines the PercentageColorPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PercentageColorPosition/cx:percent")]
+#[sdk(office2016, qname = "cx:percent")]
 pub struct PercentageColorPosition {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
@@ -1392,7 +1310,7 @@ pub struct PercentageColorPosition {
 }
 /// Defines the MinValueColorEndPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColorEndPosition/cx:min")]
+#[sdk(office2016, qname = "cx:min")]
 pub struct MinValueColorEndPosition {
   #[sdk(
         choice(
@@ -1405,7 +1323,7 @@ pub struct MinValueColorEndPosition {
 }
 /// Defines the MaxValueColorEndPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColorEndPosition/cx:max")]
+#[sdk(office2016, qname = "cx:max")]
 pub struct MaxValueColorEndPosition {
   #[sdk(
         choice(
@@ -1418,7 +1336,7 @@ pub struct MaxValueColorEndPosition {
 }
 /// Defines the ValueColorMiddlePosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColorMiddlePosition/cx:mid")]
+#[sdk(office2016, qname = "cx:mid")]
 pub struct ValueColorMiddlePosition {
   #[sdk(
         choice(
@@ -1430,7 +1348,7 @@ pub struct ValueColorMiddlePosition {
 }
 /// Defines the DataLabelVisibilities Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataLabelVisibilities/cx:visibility")]
+#[sdk(office2016, qname = "cx:visibility")]
 pub struct DataLabelVisibilities {
   /// seriesName
   #[sdk(attr(office2016, qname = ":seriesName"))]
@@ -1444,7 +1362,7 @@ pub struct DataLabelVisibilities {
 }
 /// Defines the DataLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataLabel/cx:dataLabel")]
+#[sdk(office2016, qname = "cx:dataLabel")]
 pub struct DataLabel {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
@@ -1453,31 +1371,27 @@ pub struct DataLabel {
   #[sdk(attr(office2016, qname = ":pos"))]
   pub pos: Option<DataLabelPos>,
   /// Defines the NumberFormat Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumberFormat/cx:numFmt"))]
+  #[sdk(child(office2016, qname = "cx:numFmt"))]
   pub number_format: Option<NumberFormat>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the DataLabelVisibilities Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataLabelVisibilities/cx:visibility"))]
+  #[sdk(child(office2016, qname = "cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:separator"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:separator"))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DataLabelHidden Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataLabelHidden/cx:dataLabelHidden")]
+#[sdk(office2016, qname = "cx:dataLabelHidden")]
 pub struct DataLabelHidden {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
@@ -1485,92 +1399,88 @@ pub struct DataLabelHidden {
 }
 /// Defines the ValueColors Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColors/cx:valueColors")]
+#[sdk(office2016, qname = "cx:valueColors")]
 pub struct ValueColors {
   /// Defines the MinColorSolidColorFillProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_SolidColorFillProperties/cx:minColor"))]
+  #[sdk(child(office2016, qname = "cx:minColor"))]
   pub min_color_solid_color_fill_properties:
     Option<std::boxed::Box<MinColorSolidColorFillProperties>>,
   /// Defines the MidColorSolidColorFillProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_SolidColorFillProperties/cx:midColor"))]
+  #[sdk(child(office2016, qname = "cx:midColor"))]
   pub mid_color_solid_color_fill_properties:
     Option<std::boxed::Box<MidColorSolidColorFillProperties>>,
   /// Defines the MaxColorSolidColorFillProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_SolidColorFillProperties/cx:maxColor"))]
+  #[sdk(child(office2016, qname = "cx:maxColor"))]
   pub max_color_solid_color_fill_properties:
     Option<std::boxed::Box<MaxColorSolidColorFillProperties>>,
 }
 /// Defines the ValueColorPositions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColorPositions/cx:valueColorPositions")]
+#[sdk(office2016, qname = "cx:valueColorPositions")]
 pub struct ValueColorPositions {
   /// count
   #[sdk(attr(office2016, qname = ":count"))]
   #[sdk(number_range(range = 2..= 3))]
   pub count: Option<crate::simple_type::Int32Value>,
   /// Defines the MinValueColorEndPosition Class.
-  #[sdk(child(office2016, qname = "cx:CT_ValueColorEndPosition/cx:min"))]
+  #[sdk(child(office2016, qname = "cx:min"))]
   pub min_value_color_end_position: Option<std::boxed::Box<MinValueColorEndPosition>>,
   /// Defines the ValueColorMiddlePosition Class.
-  #[sdk(child(office2016, qname = "cx:CT_ValueColorMiddlePosition/cx:mid"))]
+  #[sdk(child(office2016, qname = "cx:mid"))]
   pub value_color_middle_position: Option<std::boxed::Box<ValueColorMiddlePosition>>,
   /// Defines the MaxValueColorEndPosition Class.
-  #[sdk(child(office2016, qname = "cx:CT_ValueColorEndPosition/cx:max"))]
+  #[sdk(child(office2016, qname = "cx:max"))]
   pub max_value_color_end_position: Option<std::boxed::Box<MaxValueColorEndPosition>>,
 }
 /// Defines the DataPoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataPoint/cx:dataPt")]
+#[sdk(office2016, qname = "cx:dataPt")]
 pub struct DataPoint {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
   pub idx: crate::simple_type::UInt32Value,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DataLabels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataLabels/cx:dataLabels")]
+#[sdk(office2016, qname = "cx:dataLabels")]
 pub struct DataLabels {
   /// pos
   #[sdk(attr(office2016, qname = ":pos"))]
   pub pos: Option<DataLabelPos>,
   /// Defines the NumberFormat Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumberFormat/cx:numFmt"))]
+  #[sdk(child(office2016, qname = "cx:numFmt"))]
   pub number_format: Option<NumberFormat>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the DataLabelVisibilities Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataLabelVisibilities/cx:visibility"))]
+  #[sdk(child(office2016, qname = "cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:separator"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:separator"))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the DataLabel Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataLabel/cx:dataLabel"))]
+  #[sdk(child(office2016, qname = "cx:dataLabel"))]
   pub data_label: Vec<DataLabel>,
   /// Defines the DataLabelHidden Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataLabelHidden/cx:dataLabelHidden"))]
+  #[sdk(child(office2016, qname = "cx:dataLabelHidden"))]
   pub data_label_hidden: Vec<DataLabelHidden>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DataId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_DataId/cx:dataId")]
+#[sdk(office2016, qname = "cx:dataId")]
 pub struct DataId {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
@@ -1578,16 +1488,16 @@ pub struct DataId {
 }
 /// Defines the SeriesLayoutProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_SeriesLayoutProperties/cx:layoutPr")]
+#[sdk(office2016, qname = "cx:layoutPr")]
 pub struct SeriesLayoutProperties {
   /// Defines the ParentLabelLayout Class.
-  #[sdk(child(office2016, qname = "cx:CT_ParentLabelLayout/cx:parentLabelLayout"))]
+  #[sdk(child(office2016, qname = "cx:parentLabelLayout"))]
   pub parent_label_layout: Option<ParentLabelLayout>,
   /// Defines the RegionLabelLayout Class.
-  #[sdk(child(office2016, qname = "cx:CT_RegionLabelLayout/cx:regionLabelLayout"))]
+  #[sdk(child(office2016, qname = "cx:regionLabelLayout"))]
   pub region_label_layout: Option<RegionLabelLayout>,
   /// Defines the SeriesElementVisibilities Class.
-  #[sdk(child(office2016, qname = "cx:CT_SeriesElementVisibilities/cx:visibility"))]
+  #[sdk(child(office2016, qname = "cx:visibility"))]
   pub series_element_visibilities: Option<SeriesElementVisibilities>,
   #[sdk(
         choice(
@@ -1597,34 +1507,34 @@ pub struct SeriesLayoutProperties {
     )]
   pub series_layout_properties_choice: Option<SeriesLayoutPropertiesChoice>,
   /// Defines the Geography Class.
-  #[sdk(child(office2016, qname = "cx:CT_Geography/cx:geography"))]
+  #[sdk(child(office2016, qname = "cx:geography"))]
   pub geography: Option<std::boxed::Box<Geography>>,
   /// Defines the Statistics Class.
-  #[sdk(child(office2016, qname = "cx:CT_Statistics/cx:statistics"))]
+  #[sdk(child(office2016, qname = "cx:statistics"))]
   pub statistics: Option<Statistics>,
   /// Defines the Subtotals Class.
-  #[sdk(child(office2016, qname = "cx:CT_Subtotals/cx:subtotals"))]
+  #[sdk(child(office2016, qname = "cx:subtotals"))]
   pub subtotals: Option<Subtotals>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the AxisId Class.
 pub type AxisId = crate::simple_type::UInt32Value;
 /// Defines the PlotSurface Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PlotSurface/cx:plotSurface")]
+#[sdk(office2016, qname = "cx:plotSurface")]
 pub struct PlotSurface {
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Series Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Series/cx:series")]
+#[sdk(office2016, qname = "cx:series")]
 pub struct Series {
   /// layoutId
   #[sdk(attr(office2016, qname = ":layoutId"))]
@@ -1642,57 +1552,53 @@ pub struct Series {
   #[sdk(attr(office2016, qname = ":formatIdx"))]
   pub format_idx: Option<crate::simple_type::UInt32Value>,
   /// Defines the Text Class.
-  #[sdk(child(office2016, qname = "cx:CT_Text/cx:tx"))]
+  #[sdk(child(office2016, qname = "cx:tx"))]
   pub text: Option<std::boxed::Box<Text>>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ValueColors Class.
-  #[sdk(child(office2016, qname = "cx:CT_ValueColors/cx:valueColors"))]
+  #[sdk(child(office2016, qname = "cx:valueColors"))]
   pub value_colors: Option<std::boxed::Box<ValueColors>>,
   /// Defines the ValueColorPositions Class.
-  #[sdk(child(office2016, qname = "cx:CT_ValueColorPositions/cx:valueColorPositions"))]
+  #[sdk(child(office2016, qname = "cx:valueColorPositions"))]
   pub value_color_positions: Option<std::boxed::Box<ValueColorPositions>>,
   /// Defines the DataPoint Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataPoint/cx:dataPt"))]
+  #[sdk(child(office2016, qname = "cx:dataPt"))]
   pub data_point: Vec<DataPoint>,
   /// Defines the DataLabels Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataLabels/cx:dataLabels"))]
+  #[sdk(child(office2016, qname = "cx:dataLabels"))]
   pub data_labels: Option<std::boxed::Box<DataLabels>>,
   /// Defines the DataId Class.
-  #[sdk(child(office2016, qname = "cx:CT_DataId/cx:dataId"))]
+  #[sdk(child(office2016, qname = "cx:dataId"))]
   pub data_id: Option<DataId>,
   /// Defines the SeriesLayoutProperties Class.
-  #[sdk(child(office2016, qname = "cx:CT_SeriesLayoutProperties/cx:layoutPr"))]
+  #[sdk(child(office2016, qname = "cx:layoutPr"))]
   pub series_layout_properties: Option<std::boxed::Box<SeriesLayoutProperties>>,
   /// Defines the AxisId Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "UInt32Value",
-    qname = "cx:ST_AxisId/cx:axisId"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "UInt32Value", qname = "cx:axisId"))]
   pub axis_id: Vec<AxisId>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PlotAreaRegion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PlotAreaRegion/cx:plotAreaRegion")]
+#[sdk(office2016, qname = "cx:plotAreaRegion")]
 pub struct PlotAreaRegion {
   /// Defines the PlotSurface Class.
-  #[sdk(child(office2016, qname = "cx:CT_PlotSurface/cx:plotSurface"))]
+  #[sdk(child(office2016, qname = "cx:plotSurface"))]
   pub plot_surface: Option<std::boxed::Box<PlotSurface>>,
   /// Defines the Series Class.
-  #[sdk(child(office2016, qname = "cx:CT_Series/cx:series"))]
+  #[sdk(child(office2016, qname = "cx:series"))]
   pub series: Vec<Series>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Axis Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Axis/cx:axis")]
+#[sdk(office2016, qname = "cx:axis")]
 pub struct Axis {
   /// id
   #[sdk(attr(office2016, qname = ":id"))]
@@ -1708,42 +1614,42 @@ pub struct Axis {
     )]
   pub axis_choice: Option<AxisChoice>,
   /// Defines the AxisTitle Class.
-  #[sdk(child(office2016, qname = "cx:CT_AxisTitle/cx:title"))]
+  #[sdk(child(office2016, qname = "cx:title"))]
   pub axis_title: Option<std::boxed::Box<AxisTitle>>,
   /// Defines the AxisUnits Class.
-  #[sdk(child(office2016, qname = "cx:CT_AxisUnits/cx:units"))]
+  #[sdk(child(office2016, qname = "cx:units"))]
   pub axis_units: Option<std::boxed::Box<AxisUnits>>,
   /// Defines the MajorGridlinesGridlines Class.
-  #[sdk(child(office2016, qname = "cx:CT_Gridlines/cx:majorGridlines"))]
+  #[sdk(child(office2016, qname = "cx:majorGridlines"))]
   pub major_gridlines_gridlines: Option<std::boxed::Box<MajorGridlinesGridlines>>,
   /// Defines the MinorGridlinesGridlines Class.
-  #[sdk(child(office2016, qname = "cx:CT_Gridlines/cx:minorGridlines"))]
+  #[sdk(child(office2016, qname = "cx:minorGridlines"))]
   pub minor_gridlines_gridlines: Option<std::boxed::Box<MinorGridlinesGridlines>>,
   /// Defines the MajorTickMarksTickMarks Class.
-  #[sdk(child(office2016, qname = "cx:CT_TickMarks/cx:majorTickMarks"))]
+  #[sdk(child(office2016, qname = "cx:majorTickMarks"))]
   pub major_tick_marks_tick_marks: Option<std::boxed::Box<MajorTickMarksTickMarks>>,
   /// Defines the MinorTickMarksTickMarks Class.
-  #[sdk(child(office2016, qname = "cx:CT_TickMarks/cx:minorTickMarks"))]
+  #[sdk(child(office2016, qname = "cx:minorTickMarks"))]
   pub minor_tick_marks_tick_marks: Option<std::boxed::Box<MinorTickMarksTickMarks>>,
   /// Defines the TickLabels Class.
-  #[sdk(child(office2016, qname = "cx:CT_TickLabels/cx:tickLabels"))]
+  #[sdk(child(office2016, qname = "cx:tickLabels"))]
   pub tick_labels: Option<std::boxed::Box<TickLabels>>,
   /// Defines the NumberFormat Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumberFormat/cx:numFmt"))]
+  #[sdk(child(office2016, qname = "cx:numFmt"))]
   pub number_format: Option<NumberFormat>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ChartTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ChartTitle/cx:title")]
+#[sdk(office2016, qname = "cx:title")]
 pub struct ChartTitle {
   /// pos
   #[sdk(attr(office2016, qname = ":pos"))]
@@ -1755,41 +1661,41 @@ pub struct ChartTitle {
   #[sdk(attr(office2016, qname = ":overlay"))]
   pub overlay: Option<crate::simple_type::BooleanValue>,
   /// Defines the Text Class.
-  #[sdk(child(office2016, qname = "cx:CT_Text/cx:tx"))]
+  #[sdk(child(office2016, qname = "cx:tx"))]
   pub text: Option<std::boxed::Box<Text>>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the Offset Class.
-  #[sdk(child(office2016, qname = "cx:CT_Offset/cx:offset"))]
+  #[sdk(child(office2016, qname = "cx:offset"))]
   pub offset: Option<Offset>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PlotArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PlotArea/cx:plotArea")]
+#[sdk(office2016, qname = "cx:plotArea")]
 pub struct PlotArea {
   /// Defines the PlotAreaRegion Class.
-  #[sdk(child(office2016, qname = "cx:CT_PlotAreaRegion/cx:plotAreaRegion"))]
+  #[sdk(child(office2016, qname = "cx:plotAreaRegion"))]
   pub plot_area_region: std::boxed::Box<PlotAreaRegion>,
   /// Defines the Axis Class.
-  #[sdk(child(office2016, qname = "cx:CT_Axis/cx:axis"))]
+  #[sdk(child(office2016, qname = "cx:axis"))]
   pub axis: Vec<Axis>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Legend Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Legend/cx:legend")]
+#[sdk(office2016, qname = "cx:legend")]
 pub struct Legend {
   /// pos
   #[sdk(attr(office2016, qname = ":pos"))]
@@ -1801,35 +1707,35 @@ pub struct Legend {
   #[sdk(attr(office2016, qname = ":overlay"))]
   pub overlay: Option<crate::simple_type::BooleanValue>,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the TxPrTextBody Class.
-  #[sdk(child(office2016, qname = "a:CT_TextBody/cx:txPr"))]
+  #[sdk(child(office2016, qname = "cx:txPr"))]
   pub tx_pr_text_body: Option<std::boxed::Box<TxPrTextBody>>,
   /// Defines the Offset Class.
-  #[sdk(child(office2016, qname = "cx:CT_Offset/cx:offset"))]
+  #[sdk(child(office2016, qname = "cx:offset"))]
   pub offset: Option<Offset>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FormatOverride Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_FormatOverride/cx:fmtOvr")]
+#[sdk(office2016, qname = "cx:fmtOvr")]
 pub struct FormatOverride {
   /// idx
   #[sdk(attr(office2016, qname = ":idx"))]
   pub idx: crate::simple_type::UInt32Value,
   /// Defines the ShapeProperties Class.
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
+  #[sdk(child(office2016, qname = "cx:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the HeaderFooter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_HeaderFooter/cx:headerFooter")]
+#[sdk(office2016, qname = "cx:headerFooter")]
 pub struct HeaderFooter {
   /// alignWithMargins
   #[sdk(attr(office2016, qname = ":alignWithMargins"))]
@@ -1841,51 +1747,27 @@ pub struct HeaderFooter {
   #[sdk(attr(office2016, qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Defines the OddHeaderXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:oddHeader"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:oddHeader"))]
   pub odd_header_xsdstring: Option<OddHeaderXsdstring>,
   /// Defines the OddFooterXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:oddFooter"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:oddFooter"))]
   pub odd_footer_xsdstring: Option<OddFooterXsdstring>,
   /// Defines the EvenHeaderXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:evenHeader"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:evenHeader"))]
   pub even_header_xsdstring: Option<EvenHeaderXsdstring>,
   /// Defines the EvenFooterXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:evenFooter"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:evenFooter"))]
   pub even_footer_xsdstring: Option<EvenFooterXsdstring>,
   /// Defines the FirstHeaderXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:firstHeader"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:firstHeader"))]
   pub first_header_xsdstring: Option<FirstHeaderXsdstring>,
   /// Defines the FirstFooterXsdstring Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "StringValue",
-    qname = "xsd:string/cx:firstFooter"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:firstFooter"))]
   pub first_footer_xsdstring: Option<FirstFooterXsdstring>,
 }
 /// Defines the PageMargins Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PageMargins/cx:pageMargins")]
+#[sdk(office2016, qname = "cx:pageMargins")]
 pub struct PageMargins {
   /// l
   #[sdk(attr(office2016, qname = ":l"))]
@@ -1908,7 +1790,7 @@ pub struct PageMargins {
 }
 /// Defines the PageSetup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PageSetup/cx:pageSetup")]
+#[sdk(office2016, qname = "cx:pageSetup")]
 pub struct PageSetup {
   /// paperSize
   #[sdk(attr(office2016, qname = ":paperSize"))]
@@ -1940,39 +1822,39 @@ pub struct PageSetup {
 }
 /// Defines the ChartData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ChartData/cx:chartData")]
+#[sdk(office2016, qname = "cx:chartData")]
 pub struct ChartData {
   /// Defines the ExternalData Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExternalData/cx:externalData"))]
+  #[sdk(child(office2016, qname = "cx:externalData"))]
   pub external_data: Option<ExternalData>,
   /// Defines the Data Class.
-  #[sdk(child(office2016, qname = "cx:CT_Data/cx:data"))]
+  #[sdk(child(office2016, qname = "cx:data"))]
   pub data: Vec<Data>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Chart Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Chart/cx:chart")]
+#[sdk(office2016, qname = "cx:chart")]
 pub struct Chart {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the ChartTitle Class.
-  #[sdk(child(office2016, qname = "cx:CT_ChartTitle/cx:title"))]
+  #[sdk(child(office2016, qname = "cx:title"))]
   pub chart_title: Option<std::boxed::Box<ChartTitle>>,
   /// Defines the PlotArea Class.
-  #[sdk(child(office2016, qname = "cx:CT_PlotArea/cx:plotArea"))]
+  #[sdk(child(office2016, qname = "cx:plotArea"))]
   pub plot_area: std::boxed::Box<PlotArea>,
   /// Defines the Legend Class.
-  #[sdk(child(office2016, qname = "cx:CT_Legend/cx:legend"))]
+  #[sdk(child(office2016, qname = "cx:legend"))]
   pub legend: Option<std::boxed::Box<Legend>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
+  #[sdk(child(office2016, qname = "cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ColorMappingType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a:CT_ColorMapping/cx:clrMapOvr")]
+#[sdk(office2016, qname = "cx:clrMapOvr")]
 pub struct ColorMappingType {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
@@ -2023,34 +1905,34 @@ pub struct ColorMappingType {
   #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink: crate::schemas::a::ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the FormatOverrides Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_FormatOverrides/cx:fmtOvrs")]
+#[sdk(office2016, qname = "cx:fmtOvrs")]
 pub struct FormatOverrides {
   /// Defines the FormatOverride Class.
-  #[sdk(child(office2016, qname = "cx:CT_FormatOverride/cx:fmtOvr"))]
+  #[sdk(child(office2016, qname = "cx:fmtOvr"))]
   pub format_override: Vec<FormatOverride>,
 }
 /// Defines the PrintSettings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_PrintSettings/cx:printSettings")]
+#[sdk(office2016, qname = "cx:printSettings")]
 pub struct PrintSettings {
   /// Defines the HeaderFooter Class.
-  #[sdk(child(office2016, qname = "cx:CT_HeaderFooter/cx:headerFooter"))]
+  #[sdk(child(office2016, qname = "cx:headerFooter"))]
   pub header_footer: Option<HeaderFooter>,
   /// Defines the PageMargins Class.
-  #[sdk(child(office2016, qname = "cx:CT_PageMargins/cx:pageMargins"))]
+  #[sdk(child(office2016, qname = "cx:pageMargins"))]
   pub page_margins: Option<PageMargins>,
   /// Defines the PageSetup Class.
-  #[sdk(child(office2016, qname = "cx:CT_PageSetup/cx:pageSetup"))]
+  #[sdk(child(office2016, qname = "cx:pageSetup"))]
   pub page_setup: Option<PageSetup>,
 }
 /// Index of subtotal data point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c:CT_UnsignedInt/cx:idx")]
+#[sdk(office2016, qname = "cx:idx")]
 pub struct UnsignedIntegerType {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
@@ -2104,13 +1986,13 @@ pub enum MaxColorSolidColorFillPropertiesChoice {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct NumericDimensionChoiceSequence {
   /// Defines the Formula Class.
-  #[sdk(child(office2016, qname = "cx:CT_Formula/cx:f"))]
+  #[sdk(child(office2016, qname = "cx:f"))]
   pub formula: std::boxed::Box<Formula>,
   /// Defines the NfFormula Class.
-  #[sdk(child(office2016, qname = "cx:CT_Formula/cx:nf"))]
+  #[sdk(child(office2016, qname = "cx:nf"))]
   pub nf_formula: Option<NfFormula>,
   /// Defines the NumericLevel Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumericLevel/cx:lvl"))]
+  #[sdk(child(office2016, qname = "cx:lvl"))]
   pub numeric_level: Vec<NumericLevel>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2124,13 +2006,13 @@ pub enum NumericDimensionChoice {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct StringDimensionChoiceSequence {
   /// Defines the Formula Class.
-  #[sdk(child(office2016, qname = "cx:CT_Formula/cx:f"))]
+  #[sdk(child(office2016, qname = "cx:f"))]
   pub formula: std::boxed::Box<Formula>,
   /// Defines the NfFormula Class.
-  #[sdk(child(office2016, qname = "cx:CT_Formula/cx:nf"))]
+  #[sdk(child(office2016, qname = "cx:nf"))]
   pub nf_formula: Option<NfFormula>,
   /// Defines the StringLevel Class.
-  #[sdk(child(office2016, qname = "cx:CT_StringLevel/cx:lvl"))]
+  #[sdk(child(office2016, qname = "cx:lvl"))]
   pub string_level: Vec<StringLevel>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2154,14 +2036,14 @@ pub enum TextDataChoice {
   #[sdk(sequence)]
   Sequence {
     /// Defines the Formula Class.
-    #[sdk(child(office2016, qname = "cx:CT_Formula/cx:f"))]
+    #[sdk(child(office2016, qname = "cx:f"))]
     formula: std::boxed::Box<Formula>,
     /// Defines the VXsdstring Class.
-    #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xsd:string/cx:v"))]
+    #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:v"))]
     v_xsdstring: Option<VXsdstring>,
   },
   /// Defines the VXsdstring Class.
-  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xsd:string/cx:v"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "cx:v"))]
   VXsdstring(VXsdstring),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2191,7 +2073,7 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
+  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2204,11 +2086,7 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GeoCacheChoice {
   /// Defines the Xsdbase64Binary Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "Base64BinaryValue",
-    qname = "xsd:base64Binary/cx:binary"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "Base64BinaryValue", qname = "cx:binary"))]
   Xsdbase64Binary(Xsdbase64Binary),
   /// Defines the Clear Class.
   Clear(std::boxed::Box<Clear>),
@@ -2216,24 +2094,16 @@ pub enum GeoCacheChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BinningChoice {
   /// Defines the Xsddouble Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "DoubleValue",
-    qname = "xsd:double/cx:binSize"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "DoubleValue", qname = "cx:binSize"))]
   Xsddouble(Xsddouble),
   /// Defines the BinCountXsdunsignedInt Class.
-  #[sdk(text_child(
-    office2016,
-    simple_type = "UInt32Value",
-    qname = "xsd:unsignedInt/cx:binCount"
-  ))]
+  #[sdk(text_child(office2016, simple_type = "UInt32Value", qname = "cx:binCount"))]
   BinCountXsdunsignedInt(BinCountXsdunsignedInt),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MinValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
-  #[sdk(empty_child(office2016, qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue"))]
+  #[sdk(empty_child(office2016, qname = "cx:extremeValue"))]
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
   NumberColorPosition(std::boxed::Box<NumberColorPosition>),
@@ -2243,7 +2113,7 @@ pub enum MinValueColorEndPositionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MaxValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
-  #[sdk(empty_child(office2016, qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue"))]
+  #[sdk(empty_child(office2016, qname = "cx:extremeValue"))]
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
   NumberColorPosition(std::boxed::Box<NumberColorPosition>),
@@ -2260,7 +2130,7 @@ pub enum ValueColorMiddlePositionChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SeriesLayoutPropertiesChoice {
   /// Defines the Aggregation Class.
-  #[sdk(empty_child(office2016, qname = "cx:CT_Aggregation/cx:aggregation"))]
+  #[sdk(empty_child(office2016, qname = "cx:aggregation"))]
   Aggregation,
   /// Defines the Binning Class.
   Binning(std::boxed::Box<Binning>),

@@ -6,15 +6,15 @@
 
 /// Locked Canvas Container.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GvmlGroupShape/lc:lockedCanvas")]
+#[sdk(qname = "lc:lockedCanvas")]
 pub struct LockedCanvas {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Non-Visual Properties for a Group Shape
-  #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
+  #[sdk(child(qname = "a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties:
     std::boxed::Box<crate::schemas::a::NonVisualGroupShapeProperties>,
   /// Visual Group Shape Properties
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
+  #[sdk(child(qname = "a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>,
   #[sdk(
         choice(
@@ -29,7 +29,7 @@ pub struct LockedCanvas {
     )]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
-  #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
+  #[sdk(child(qname = "a:extLst"))]
   pub gvml_group_shape_extension_list: Option<crate::schemas::a::GvmlGroupShapeExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

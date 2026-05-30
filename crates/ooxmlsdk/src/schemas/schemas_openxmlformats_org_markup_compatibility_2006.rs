@@ -9,7 +9,12 @@
 #[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
 pub struct AlternateContent {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  #[sdk(choice(qname = "mc:CT_Choice/mc:Choice", qname = "mc:CT_Fallback/mc:Fallback"))]
+  #[sdk(
+        choice(
+            child(variant = Choice, qname = "mc:Choice"),
+            child(variant = Fallback, qname = "mc:Fallback")
+        )
+    )]
   pub alternate_content_choice: Vec<AlternateContentChoice>,
 }
 /// Defines the Choice Class.

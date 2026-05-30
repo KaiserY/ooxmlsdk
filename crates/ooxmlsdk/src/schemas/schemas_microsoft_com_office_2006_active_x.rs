@@ -48,7 +48,12 @@ pub struct ActiveXObjectProperty {
   /// value
   #[sdk(attr(qname = "ax:value"))]
   pub value: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(qname = "ax:CT_Font/ax:font", qname = "ax:CT_Picture/ax:picture"))]
+  #[sdk(
+        choice(
+            child(variant = SharedComFont, qname = "ax:font"),
+            child(variant = SharedComPicture, qname = "ax:picture")
+        )
+    )]
   pub active_x_object_property_choice: Option<ActiveXObjectPropertyChoice>,
 }
 /// Defines the SharedComFont Class.

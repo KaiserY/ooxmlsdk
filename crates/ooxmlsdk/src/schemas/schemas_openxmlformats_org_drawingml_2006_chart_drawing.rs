@@ -15,14 +15,16 @@ pub struct RelativeAnchorSize {
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:to"))]
   pub to_anchor: std::boxed::Box<ToAnchor>,
-  #[sdk(choice(
-    qname = "cdr:CT_Shape/cdr:sp",
-    qname = "cdr:CT_GroupShape/cdr:grpSp",
-    qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
-    qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "cdr:sp"),
+            child(variant = GroupShape, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
+            child(variant = Picture, qname = "cdr:pic"),
+            child(variant = ContentPart, qname = "cdr14:contentPart")
+        )
+    )]
   pub relative_anchor_size_choice: Option<RelativeAnchorSizeChoice>,
 }
 /// Absolute Anchor Shape Size.
@@ -35,14 +37,16 @@ pub struct AbsoluteAnchorSize {
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/cdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[sdk(choice(
-    qname = "cdr:CT_Shape/cdr:sp",
-    qname = "cdr:CT_GroupShape/cdr:grpSp",
-    qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
-    qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "cdr:sp"),
+            child(variant = GroupShape, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
+            child(variant = Picture, qname = "cdr:pic"),
+            child(variant = ContentPart, qname = "cdr14:contentPart")
+        )
+    )]
   pub absolute_anchor_size_choice: Option<AbsoluteAnchorSizeChoice>,
 }
 /// Shape Definition.
@@ -84,14 +88,16 @@ pub struct GroupShape {
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/cdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "cdr:CT_Shape/cdr:sp",
-    qname = "cdr:CT_GroupShape/cdr:grpSp",
-    qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
-    qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "cdr:sp"),
+            child(variant = GroupShape, qname = "cdr:grpSp"),
+            child(variant = GraphicFrame, qname = "cdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "cdr:cxnSp"),
+            child(variant = Picture, qname = "cdr:pic"),
+            child(variant = ContentPart, qname = "cdr14:contentPart")
+        )
+    )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
@@ -224,27 +230,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -357,10 +369,12 @@ pub struct BlipFill {
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
-  #[sdk(choice(
-    qname = "a:CT_TileInfoProperties/a:tile",
-    qname = "a:CT_StretchInfoProperties/a:stretch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tile, qname = "a:tile"),
+            child(variant = Stretch, qname = "a:stretch")
+        )
+    )]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
@@ -480,19 +494,23 @@ pub struct GroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]

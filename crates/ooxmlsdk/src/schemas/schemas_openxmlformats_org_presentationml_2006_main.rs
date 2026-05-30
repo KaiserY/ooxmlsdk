@@ -872,10 +872,12 @@ pub struct ColorMap {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMappingOverride/p:clrMapOvr")]
 pub struct ColorMapOverride {
-  #[sdk(choice(
-    qname = "a:CT_EmptyElement/a:masterClrMapping",
-    qname = "a:CT_ColorMapping/a:overrideClrMapping"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = MasterColorMapping, qname = "a:masterClrMapping"),
+            child(variant = OverrideColorMapping, qname = "a:overrideClrMapping")
+        )
+    )]
   pub color_map_override_choice: Option<ColorMapOverrideChoice>,
 }
 /// Background Properties.
@@ -885,18 +887,22 @@ pub struct BackgroundProperties {
   /// Shade to Title
   #[sdk(attr(qname = ":shadeToTitle"))]
   pub shade_to_title: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub background_properties_choice1: Option<BackgroundPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub background_properties_choice2: Option<BackgroundPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -909,14 +915,16 @@ pub struct BackgroundStyleReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub background_style_reference_choice: Option<BackgroundStyleReferenceChoice>,
 }
 /// Data for the Windows platform..
@@ -978,10 +986,12 @@ pub struct OleObject {
   /// progId
   #[sdk(attr(qname = ":progId"))]
   pub prog_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "p:CT_OleObjectEmbed/p:embed",
-    qname = "p:CT_OleObjectLink/p:link"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = OleObjectEmbed, qname = "p:embed"),
+            child(variant = OleObjectLink, qname = "p:link")
+        )
+    )]
   pub ole_object_choice: Option<OleObjectChoice>,
   /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
@@ -1425,13 +1435,15 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:sldTgt",
-    qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
-    qname = "p:CT_TLShapeTargetElement/p:spTgt",
-    qname = "p:CT_TLSubShapeId/p:inkTgt",
-    qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = SlideTarget, qname = "p:sldTgt"),
+            child(variant = SoundTarget, qname = "p:sndTgt"),
+            child(variant = ShapeTarget, qname = "p:spTgt"),
+            child(variant = InkTarget, qname = "p:inkTgt"),
+            child(variant = BookmarkTarget, qname = "p14:bmkTgt")
+        )
+    )]
   pub target_element_choice: Option<TargetElementChoice>,
 }
 /// Time Node.
@@ -1466,11 +1478,13 @@ pub struct Condition {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
-    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
-    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TargetElement, qname = "p:tgtEl"),
+            child(variant = TimeNode, qname = "p:tn"),
+            child(variant = RuntimeNodeTrigger, qname = "p:rtn")
+        )
+    )]
   pub condition_choice: Option<ConditionChoice>,
 }
 /// Defines the EndSync Class.
@@ -1488,11 +1502,13 @@ pub struct EndSync {
   #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
   #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
   pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
-    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
-    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TargetElement, qname = "p:tgtEl"),
+            child(variant = TimeNode, qname = "p:tn"),
+            child(variant = RuntimeNodeTrigger, qname = "p:rtn")
+        )
+    )]
   pub end_sync_choice: Option<EndSyncChoice>,
 }
 /// Parallel Time Node.
@@ -1968,28 +1984,32 @@ pub struct StringVariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:clrVal")]
 pub struct ColorValue {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_value_choice: Option<ColorValueChoice>,
 }
 /// Pen Color for Slide Show.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:penClr")]
 pub struct PenColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub pen_color_choice: Option<PenColorChoice>,
 }
 /// Time Animate Value.
@@ -2102,26 +2122,30 @@ pub struct Progress {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimVariant/p:to")]
 pub struct ToVariantValue {
-  #[sdk(choice(
-    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
-    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
-    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
-    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
-    qname = "a:CT_Color/p:clrVal"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BooleanVariantValue, qname = "p:boolVal"),
+            child(variant = IntegerVariantValue, qname = "p:intVal"),
+            child(variant = FloatVariantValue, qname = "p:fltVal"),
+            child(variant = StringVariantValue, qname = "p:strVal"),
+            child(variant = ColorValue, qname = "p:clrVal")
+        )
+    )]
   pub to_variant_value_choice: Option<ToVariantValueChoice>,
 }
 /// Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLAnimVariant/p:val")]
 pub struct VariantValue {
-  #[sdk(choice(
-    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
-    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
-    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
-    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
-    qname = "a:CT_Color/p:clrVal"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BooleanVariantValue, qname = "p:boolVal"),
+            child(variant = IntegerVariantValue, qname = "p:intVal"),
+            child(variant = FloatVariantValue, qname = "p:fltVal"),
+            child(variant = StringVariantValue, qname = "p:strVal"),
+            child(variant = ColorValue, qname = "p:clrVal")
+        )
+    )]
   pub variant_value_choice: Option<VariantValueChoice>,
 }
 /// Common Media Node Properties.
@@ -2179,10 +2203,12 @@ pub struct TemplateList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub")]
 pub struct BuildSubElement {
-  #[sdk(choice(
-    qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm",
-    qname = "a:CT_AnimationChartBuildProperties/a:bldChart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BuildDiagram, qname = "a:bldDgm"),
+            child(variant = BuildChart, qname = "a:bldChart")
+        )
+    )]
   pub build_sub_element_choice: Option<BuildSubElementChoice>,
 }
 /// Build Paragraph.
@@ -2289,22 +2315,26 @@ pub struct BuildGraphics {
   /// Expand UI
   #[sdk(attr(qname = ":uiExpand"))]
   pub ui_expand: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:bldAsOne",
-    qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BuildAsOne, qname = "p:bldAsOne"),
+            child(variant = BuildSubElement, qname = "p:bldSub")
+        )
+    )]
   pub build_graphics_choice: Option<BuildGraphicsChoice>,
 }
 /// Build List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_BuildList/p:bldLst")]
 pub struct BuildList {
-  #[sdk(choice(
-    qname = "p:CT_TLBuildParagraph/p:bldP",
-    qname = "p:CT_TLBuildDiagram/p:bldDgm",
-    qname = "p:CT_TLOleBuildChart/p:bldOleChart",
-    qname = "p:CT_TLGraphicalObjectBuild/p:bldGraphic"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BuildParagraph, qname = "p:bldP"),
+            child(variant = BuildDiagram, qname = "p:bldDgm"),
+            child(variant = BuildOleChart, qname = "p:bldOleChart"),
+            child(variant = BuildGraphics, qname = "p:bldGraphic")
+        )
+    )]
   pub build_list_choice: Vec<BuildListChoice>,
 }
 /// Defines the ExtensionListWithModification Class.
@@ -2322,38 +2352,44 @@ pub struct ExtensionListWithModification {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLByAnimateColorTransform/p:by")]
 pub struct ByColor {
-  #[sdk(choice(
-    qname = "p:CT_TLByRgbColorTransform/p:rgb",
-    qname = "p:CT_TLByHslColorTransform/p:hsl"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColor, qname = "p:rgb"),
+            child(variant = HslColor, qname = "p:hsl")
+        )
+    )]
   pub by_color_choice: Option<ByColorChoice>,
 }
 /// From.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub from_color_choice: Option<FromColorChoice>,
 }
 /// To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub to_color_choice: Option<ToColorChoice>,
 }
 /// Presentation Slide.
@@ -2671,13 +2707,15 @@ pub struct ApplicationNonVisualDrawingProperties {
   /// Placeholder Shape
   #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
   pub placeholder_shape: Option<std::boxed::Box<PlaceholderShape>>,
-  #[sdk(choice(
-    qname = "a:CT_AudioCD/a:audioCd",
-    qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
-    qname = "a:CT_AudioFile/a:audioFile",
-    qname = "a:CT_VideoFile/a:videoFile",
-    qname = "a:CT_QuickTimeFile/a:quickTimeFile"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AudioFromCd, qname = "a:audioCd"),
+            child(variant = WaveAudioFile, qname = "a:wavAudioFile"),
+            child(variant = AudioFromFile, qname = "a:audioFile"),
+            child(variant = VideoFromFile, qname = "a:videoFile"),
+            child(variant = QuickTimeFromFile, qname = "a:quickTimeFile")
+        )
+    )]
   pub application_non_visual_drawing_properties_choice:
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.
@@ -2714,27 +2752,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -2856,10 +2900,12 @@ pub struct BlipFill {
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
-  #[sdk(choice(
-    qname = "a:CT_TileInfoProperties/a:tile",
-    qname = "a:CT_StretchInfoProperties/a:stretch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tile, qname = "a:tile"),
+            child(variant = Stretch, qname = "a:stretch")
+        )
+    )]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
@@ -3474,12 +3520,14 @@ pub struct SlideExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
-    qname = "p14:CT_ShowEventRecordList/p14:showEvtLst",
-    qname = "p188:CT_CommentRelationship/p188:commentRel",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = LaserTraceList, qname = "p14:laserTraceLst"),
+            child(variant = ShowEventRecordList, qname = "p14:showEvtLst"),
+            child(variant = CommentRelationship, qname = "p188:commentRel"),
+            any
+        )
+    )]
   pub slide_extension_choice: Option<SlideExtensionChoice>,
 }
 /// Defines the CommonSlideDataExtension Class.
@@ -3490,7 +3538,7 @@ pub struct CommonSlideDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p14:CT_RandomId/p14:creationId", any))]
+  #[sdk(choice(child(variant = CreationId, qname = "p14:creationId"), any))]
   pub common_slide_data_extension_choice: Option<CommonSlideDataExtensionChoice>,
 }
 /// Defines the ShowPropertiesExtension Class.
@@ -3501,12 +3549,14 @@ pub struct ShowPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p14:CT_BrowseMode/p14:browseMode",
-    qname = "a:CT_Color/p14:laserClr",
-    qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BrowseMode, qname = "p14:browseMode"),
+            child(variant = LaserColor, qname = "p14:laserClr"),
+            child(variant = ShowMediaControls, qname = "p14:showMediaCtrls"),
+            any
+        )
+    )]
   pub show_properties_extension_choice: Option<ShowPropertiesExtensionChoice>,
 }
 /// Defines the Picture Class.
@@ -3573,49 +3623,51 @@ pub struct Transition {
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub advance_after_time: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "p:CT_OrientationTransition/p:blinds",
-    qname = "p:CT_OrientationTransition/p:checker",
-    qname = "p:CT_Empty/p:circle",
-    qname = "p:CT_Empty/p:dissolve",
-    qname = "p:CT_OrientationTransition/p:comb",
-    qname = "p:CT_EightDirectionTransition/p:cover",
-    qname = "p:CT_OptionalBlackTransition/p:cut",
-    qname = "p:CT_Empty/p:diamond",
-    qname = "p:CT_OptionalBlackTransition/p:fade",
-    qname = "p:CT_Empty/p:newsflash",
-    qname = "p:CT_Empty/p:plus",
-    qname = "p:CT_EightDirectionTransition/p:pull",
-    qname = "p:CT_SideDirectionTransition/p:push",
-    qname = "p:CT_Empty/p:random",
-    qname = "p:CT_OrientationTransition/p:randomBar",
-    qname = "p:CT_SplitTransition/p:split",
-    qname = "p:CT_CornerDirectionTransition/p:strips",
-    qname = "p:CT_Empty/p:wedge",
-    qname = "p:CT_WheelTransition/p:wheel",
-    qname = "p:CT_SideDirectionTransition/p:wipe",
-    qname = "p:CT_InOutTransition/p:zoom",
-    qname = "p:CT_Empty/p14:flash",
-    qname = "p:CT_SideDirectionTransition/p14:vortex",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:switch",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:flip",
-    qname = "p14:CT_RippleTransition/p14:ripple",
-    qname = "p14:CT_GlitterTransition/p14:glitter",
-    qname = "p:CT_Empty/p14:honeycomb",
-    qname = "p14:CT_PrismTransition/p14:prism",
-    qname = "p:CT_OrientationTransition/p14:doors",
-    qname = "p:CT_OrientationTransition/p14:window",
-    qname = "p14:CT_ShredTransition/p14:shred",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:ferris",
-    qname = "p14:CT_FlyThroughTransition/p14:flythrough",
-    qname = "p:CT_InOutTransition/p14:warp",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:gallery",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor",
-    qname = "p:CT_SideDirectionTransition/p14:pan",
-    qname = "p14:CT_RevealTransition/p14:reveal",
-    qname = "p:CT_WheelTransition/p14:wheelReverse",
-    qname = "p15:CT_PresetTransition/p15:prstTrans"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BlindsTransition, qname = "p:blinds"),
+            child(variant = CheckerTransition, qname = "p:checker"),
+            empty_child(variant = CircleTransition, qname = "p:circle"),
+            empty_child(variant = DissolveTransition, qname = "p:dissolve"),
+            child(variant = CombTransition, qname = "p:comb"),
+            child(variant = CoverTransition, qname = "p:cover"),
+            child(variant = CutTransition, qname = "p:cut"),
+            empty_child(variant = DiamondTransition, qname = "p:diamond"),
+            child(variant = FadeTransition, qname = "p:fade"),
+            empty_child(variant = NewsflashTransition, qname = "p:newsflash"),
+            empty_child(variant = PlusTransition, qname = "p:plus"),
+            child(variant = PullTransition, qname = "p:pull"),
+            child(variant = PushTransition, qname = "p:push"),
+            empty_child(variant = RandomTransition, qname = "p:random"),
+            child(variant = RandomBarTransition, qname = "p:randomBar"),
+            child(variant = SplitTransition, qname = "p:split"),
+            child(variant = StripsTransition, qname = "p:strips"),
+            empty_child(variant = WedgeTransition, qname = "p:wedge"),
+            child(variant = WheelTransition, qname = "p:wheel"),
+            child(variant = WipeTransition, qname = "p:wipe"),
+            child(variant = ZoomTransition, qname = "p:zoom"),
+            empty_child(variant = FlashTransition, qname = "p14:flash"),
+            child(variant = VortexTransition, qname = "p14:vortex"),
+            child(variant = SwitchTransition, qname = "p14:switch"),
+            child(variant = FlipTransition, qname = "p14:flip"),
+            child(variant = RippleTransition, qname = "p14:ripple"),
+            child(variant = GlitterTransition, qname = "p14:glitter"),
+            empty_child(variant = HoneycombTransition, qname = "p14:honeycomb"),
+            child(variant = PrismTransition, qname = "p14:prism"),
+            child(variant = DoorsTransition, qname = "p14:doors"),
+            child(variant = WindowTransition, qname = "p14:window"),
+            child(variant = ShredTransition, qname = "p14:shred"),
+            child(variant = FerrisTransition, qname = "p14:ferris"),
+            child(variant = FlythroughTransition, qname = "p14:flythrough"),
+            child(variant = WarpTransition, qname = "p14:warp"),
+            child(variant = GalleryTransition, qname = "p14:gallery"),
+            child(variant = ConveyorTransition, qname = "p14:conveyor"),
+            child(variant = PanTransition, qname = "p14:pan"),
+            child(variant = RevealTransition, qname = "p14:reveal"),
+            child(variant = WheelReverseTransition, qname = "p14:wheelReverse"),
+            child(variant = PresetTransition, qname = "p15:prstTrans")
+        )
+    )]
   pub transition_choice: Option<TransitionChoice>,
   /// Defines the SoundAction Class.
   #[sdk(child(qname = "p:CT_TransitionSoundAction/p:sndAc"))]
@@ -3654,10 +3706,12 @@ pub struct Background {
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
-  #[sdk(choice(
-    qname = "p:CT_BackgroundProperties/p:bgPr",
-    qname = "a:CT_StyleMatrixReference/p:bgRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackgroundProperties, qname = "p:bgPr"),
+            child(variant = BackgroundStyleReference, qname = "p:bgRef")
+        )
+    )]
   pub background_choice: Option<BackgroundChoice>,
 }
 /// Shape Tree.
@@ -3670,15 +3724,17 @@ pub struct ShapeTree {
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "p:CT_Shape/p:sp",
-    qname = "p:CT_GroupShape/p:grpSp",
-    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
-    qname = "p:CT_Connector/p:cxnSp",
-    qname = "p:CT_Picture/p:pic",
-    qname = "p:CT_ContentPart/p:contentPart",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "p:sp"),
+            child(variant = GroupShape, qname = "p:grpSp"),
+            child(variant = GraphicFrame, qname = "p:graphicFrame"),
+            child(variant = ConnectionShape, qname = "p:cxnSp"),
+            child(variant = Picture, qname = "p:pic"),
+            child(variant = ContentPart, qname = "p:contentPart"),
+            any
+        )
+    )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -3694,14 +3750,16 @@ pub struct GroupShape {
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "p:CT_Shape/p:sp",
-    qname = "p:CT_GroupShape/p:grpSp",
-    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
-    qname = "p:CT_Connector/p:cxnSp",
-    qname = "p:CT_Picture/p:pic",
-    qname = "p:CT_ContentPart/p:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "p:sp"),
+            child(variant = GroupShape, qname = "p:grpSp"),
+            child(variant = GraphicFrame, qname = "p:graphicFrame"),
+            child(variant = ConnectionShape, qname = "p:cxnSp"),
+            child(variant = Picture, qname = "p:pic"),
+            child(variant = ContentPart, qname = "p:contentPart")
+        )
+    )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -3722,7 +3780,7 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ControlList/p:controls")]
 pub struct ControlList {
-  #[sdk(choice(qname = "p:CT_Control/p:control", any))]
+  #[sdk(choice(child(variant = Control, qname = "p:control"), any))]
   pub xml_children: Vec<ControlListChoice>,
 }
 /// Defines the CommonSlideDataExtensionList Class.
@@ -3760,19 +3818,23 @@ pub struct GroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -3857,13 +3919,15 @@ pub struct ShapeTarget {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "a:ST_DrawingElementId"))]
   #[sdk(number_type(source = 3u32, union = 0u64, type_name = "a:ST_DrawingElementId"))]
   pub shape_id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:bg",
-    qname = "p:CT_TLSubShapeId/p:subSp",
-    qname = "p:CT_TLOleChartTargetElement/p:oleChartEl",
-    qname = "p:CT_TLTextTargetElement/p:txEl",
-    qname = "a:CT_AnimationElementChoice/p:graphicEl"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BackgroundAnimation, qname = "p:bg"),
+            child(variant = SubShape, qname = "p:subSp"),
+            child(variant = OleChartElement, qname = "p:oleChartEl"),
+            child(variant = TextElement, qname = "p:txEl"),
+            child(variant = GraphicElement, qname = "p:graphicEl")
+        )
+    )]
   pub shape_target_choice: Option<ShapeTargetChoice>,
 }
 /// Ink Target.
@@ -3892,7 +3956,7 @@ pub struct CommentAuthorExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo", any))]
+  #[sdk(choice(child(variant = PresenceInfo, qname = "p15:presenceInfo"), any))]
   pub comment_author_extension_choice: Option<CommentAuthorExtensionChoice>,
 }
 /// Defines the CommentExtension Class.
@@ -3903,7 +3967,7 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo", any))]
+  #[sdk(choice(child(variant = ThreadingInfo, qname = "p15:threadingInfo"), any))]
   pub comment_extension_choice: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
@@ -3914,7 +3978,7 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
+  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
   pub slide_layout_extension_choice: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
@@ -3925,7 +3989,7 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
+  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
   pub slide_master_extension_choice: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
@@ -3936,7 +4000,7 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
+  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
   pub handout_master_extension_choice: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
@@ -3947,7 +4011,7 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
+  #[sdk(choice(child(variant = SlideGuideList, qname = "p15:sldGuideLst"), any))]
   pub notes_master_extension_choice: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
@@ -3993,11 +4057,13 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p14:CT_Media/p14:media",
-    qname = "p14:CT_RandomId/p14:modId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Media, qname = "p14:media"),
+            child(variant = ModificationId, qname = "p14:modId"),
+            any
+        )
+    )]
   pub application_non_visual_drawing_properties_extension_choice:
     Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
 }
@@ -4012,52 +4078,58 @@ pub struct Iterate {
   /// Backwards
   #[sdk(attr(qname = ":backwards"))]
   pub backwards: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "p:CT_TLIterateIntervalTime/p:tmAbs",
-    qname = "p:CT_TLIterateIntervalPercentage/p:tmPct"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TimeAbsolute, qname = "p:tmAbs"),
+            child(variant = TimePercentage, qname = "p:tmPct")
+        )
+    )]
   pub iterate_choice: Option<IterateChoice>,
 }
 /// Defines the ChildTimeNodeList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:childTnLst")]
 pub struct ChildTimeNodeList {
-  #[sdk(choice(
-    qname = "p:CT_TLTimeNodeParallel/p:par",
-    qname = "p:CT_TLTimeNodeSequence/p:seq",
-    qname = "p:CT_TLTimeNodeExclusive/p:excl",
-    qname = "p:CT_TLAnimateBehavior/p:anim",
-    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
-    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
-    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
-    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
-    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
-    qname = "p:CT_TLCommandBehavior/p:cmd",
-    qname = "p:CT_TLSetBehavior/p:set",
-    qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ParallelTimeNode, qname = "p:par"),
+            child(variant = SequenceTimeNode, qname = "p:seq"),
+            child(variant = ExclusiveTimeNode, qname = "p:excl"),
+            child(variant = Animate, qname = "p:anim"),
+            child(variant = AnimateColor, qname = "p:animClr"),
+            child(variant = AnimateEffect, qname = "p:animEffect"),
+            child(variant = AnimateMotion, qname = "p:animMotion"),
+            child(variant = AnimateRotation, qname = "p:animRot"),
+            child(variant = AnimateScale, qname = "p:animScale"),
+            child(variant = Command, qname = "p:cmd"),
+            child(variant = SetBehavior, qname = "p:set"),
+            child(variant = Audio, qname = "p:audio"),
+            child(variant = Video, qname = "p:video")
+        )
+    )]
   pub child_time_node_list_choice: Vec<ChildTimeNodeListChoice>,
 }
 /// Defines the SubTimeNodeList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:subTnLst")]
 pub struct SubTimeNodeList {
-  #[sdk(choice(
-    qname = "p:CT_TLTimeNodeParallel/p:par",
-    qname = "p:CT_TLTimeNodeSequence/p:seq",
-    qname = "p:CT_TLTimeNodeExclusive/p:excl",
-    qname = "p:CT_TLAnimateBehavior/p:anim",
-    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
-    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
-    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
-    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
-    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
-    qname = "p:CT_TLCommandBehavior/p:cmd",
-    qname = "p:CT_TLSetBehavior/p:set",
-    qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ParallelTimeNode, qname = "p:par"),
+            child(variant = SequenceTimeNode, qname = "p:seq"),
+            child(variant = ExclusiveTimeNode, qname = "p:excl"),
+            child(variant = Animate, qname = "p:anim"),
+            child(variant = AnimateColor, qname = "p:animClr"),
+            child(variant = AnimateEffect, qname = "p:animEffect"),
+            child(variant = AnimateMotion, qname = "p:animMotion"),
+            child(variant = AnimateRotation, qname = "p:animRot"),
+            child(variant = AnimateScale, qname = "p:animScale"),
+            child(variant = Command, qname = "p:cmd"),
+            child(variant = SetBehavior, qname = "p:set"),
+            child(variant = Audio, qname = "p:audio"),
+            child(variant = Video, qname = "p:video")
+        )
+    )]
   pub sub_time_node_list_choice: Vec<SubTimeNodeListChoice>,
 }
 /// Defines the TimeAnimateValueList Class.
@@ -4298,13 +4370,15 @@ pub struct PresentationExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p14:CT_SectionProperties/p14:sectionPr",
-    qname = "p14:CT_SectionList/p14:sectionLst",
-    qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst",
-    qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SectionProperties, qname = "p14:sectionPr"),
+            child(variant = SectionList, qname = "p14:sectionLst"),
+            child(variant = SlideGuideList, qname = "p15:sldGuideLst"),
+            child(variant = NotesGuideList, qname = "p15:notesGuideLst"),
+            any
+        )
+    )]
   pub presentation_extension_choice: Option<PresentationExtensionChoice>,
 }
 /// HTML Publishing Properties.
@@ -4321,11 +4395,13 @@ pub struct HtmlPublishProperties {
   /// Publish Path
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:sldAll",
-    qname = "p:CT_IndexRange/p:sldRg",
-    qname = "p:CT_CustomShowId/p:custShow"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = SlideAll, qname = "p:sldAll"),
+            child(variant = SlideRange, qname = "p:sldRg"),
+            child(variant = CustomShowReference, qname = "p:custShow")
+        )
+    )]
   pub html_publish_properties_choice: Option<HtmlPublishPropertiesChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -4409,17 +4485,21 @@ pub struct ShowProperties {
   /// Use Timings in Slide Show
   #[sdk(attr(qname = ":useTimings"))]
   pub use_timings: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:present",
-    qname = "p:CT_ShowInfoBrowse/p:browse",
-    qname = "p:CT_ShowInfoKiosk/p:kiosk"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = PresenterSlideMode, qname = "p:present"),
+            child(variant = BrowseSlideMode, qname = "p:browse"),
+            child(variant = KioskSlideMode, qname = "p:kiosk")
+        )
+    )]
   pub show_properties_choice1: Option<ShowPropertiesChoice>,
-  #[sdk(choice(
-    qname = "p:CT_Empty/p:sldAll",
-    qname = "p:CT_IndexRange/p:sldRg",
-    qname = "p:CT_CustomShowId/p:custShow"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = SlideAll, qname = "p:sldAll"),
+            child(variant = SlideRange, qname = "p:sldRg"),
+            child(variant = CustomShowReference, qname = "p:custShow")
+        )
+    )]
   pub show_properties_choice2: Option<ShowPropertiesChoice2>,
   /// Pen Color for Slide Show.
   #[sdk(child(qname = "a:CT_Color/p:penClr"))]
@@ -4432,14 +4512,16 @@ pub struct ShowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMRU/p:clrMru")]
 pub struct ColorMostRecentlyUsed {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_most_recently_used_choice: Vec<ColorMostRecentlyUsedChoice>,
 }
 /// Defines the PresentationPropertiesExtensionList Class.
@@ -4458,13 +4540,18 @@ pub struct PresentationPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
-    qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi",
-    qname = "a14:CT_TextMath/a14:m",
-    qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DiscardImageEditData, qname = "p14:discardImageEditData"),
+            child(variant = DefaultImageDpi, qname = "p14:defaultImageDpi"),
+            child(variant = TextMath, qname = "a14:m"),
+            child(
+                variant = ChartTrackingReferenceBased,
+                qname = "p15:chartTrackingRefBased"
+            ),
+            any
+        )
+    )]
   pub presentation_properties_extension_choice: Option<PresentationPropertiesExtensionChoice>,
 }
 /// Defines the HeaderFooter Class.
@@ -4562,17 +4649,24 @@ pub struct OleChartElement {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTextTargetElement/p:txEl")]
 pub struct TextElement {
-  #[sdk(choice(qname = "p:CT_IndexRange/p:charRg", qname = "p:CT_IndexRange/p:pRg"))]
+  #[sdk(
+        choice(
+            child(variant = CharRange, qname = "p:charRg"),
+            child(variant = ParagraphIndexRange, qname = "p:pRg")
+        )
+    )]
   pub text_element_choice: Option<TextElementChoice>,
 }
 /// Graphic Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AnimationElementChoice/p:graphicEl")]
 pub struct GraphicElement {
-  #[sdk(choice(
-    qname = "a:CT_AnimationDgmElement/a:dgm",
-    qname = "a:CT_AnimationChartElement/a:chart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Diagram, qname = "a:dgm"),
+            child(variant = Chart, qname = "a:chart")
+        )
+    )]
   pub graphic_element_choice: Option<GraphicElementChoice>,
 }
 /// Defines the BlindsTransition Class.
@@ -4708,10 +4802,12 @@ pub struct ZoomTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TransitionSoundAction/p:sndAc")]
 pub struct SoundAction {
-  #[sdk(choice(
-    qname = "p:CT_TransitionStartSoundAction/p:stSnd",
-    qname = "p:CT_Empty/p:endSnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = StartSoundAction, qname = "p:stSnd"),
+            empty_child(variant = EndSoundAction, qname = "p:endSnd")
+        )
+    )]
   pub sound_action_choice: Option<SoundActionChoice>,
 }
 /// Defines the PlaceholderExtension Class.

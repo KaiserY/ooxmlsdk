@@ -124,16 +124,18 @@ pub struct TaskHistoryEvent {
   /// Defines the TaskAnchor Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskAnchor/p228:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice(
-    qname = "p228:CT_TaskAssignUnassignUser/p228:asgn",
-    qname = "p:CT_Empty/p228:add",
-    qname = "p228:CT_TaskTitleEventInfo/p228:title",
-    qname = "p228:CT_TaskScheduleEventInfo/p228:date",
-    qname = "p228:CT_TaskProgressEventInfo/p228:pcntCmplt",
-    qname = "p:CT_Empty/p228:unasgnAll",
-    qname = "p228:CT_TaskUndo/p228:undo",
-    qname = "p228:CT_TaskUnknownRecord/p228:unknown"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AsgnTaskAssignUnassignUser, qname = "p228:asgn"),
+            empty_child(variant = AddEmpty, qname = "p228:add"),
+            child(variant = TaskTitleEventInfo, qname = "p228:title"),
+            child(variant = TaskScheduleEventInfo, qname = "p228:date"),
+            child(variant = TaskProgressEventInfo, qname = "p228:pcntCmplt"),
+            empty_child(variant = UnasgnAllEmpty, qname = "p228:unasgnAll"),
+            child(variant = TaskUndo, qname = "p228:undo"),
+            empty_child(variant = TaskUnknownRecord, qname = "p228:unknown")
+        )
+    )]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p228:extLst"))]

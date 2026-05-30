@@ -372,15 +372,17 @@ pub struct Ink {
   #[sdk(attr(qname = ":documentID"))]
   #[sdk(string_format(kind = "uri"))]
   pub document_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "inkml:CT_Annotation/inkml:annotation",
-    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
-    qname = "inkml:CT_Definitions/inkml:definitions",
-    qname = "inkml:CT_Context/inkml:context",
-    qname = "inkml:CT_Trace/inkml:trace",
-    qname = "inkml:CT_TraceGroup/inkml:traceGroup",
-    qname = "inkml:CT_TraceView/inkml:traceView"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Annotation, qname = "inkml:annotation"),
+            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
+            child(variant = Definitions, qname = "inkml:definitions"),
+            child(variant = Context, qname = "inkml:context"),
+            child(variant = Trace, qname = "inkml:trace"),
+            child(variant = TraceGroup, qname = "inkml:traceGroup"),
+            child(variant = TraceView, qname = "inkml:traceView")
+        )
+    )]
   pub ink_choice: Vec<InkChoice>,
 }
 /// Defines the Bind Class.
@@ -443,10 +445,12 @@ pub struct Mapping {
   /// Defines the Bind Class.
   #[sdk(child(qname = "inkml:CT_Bind/inkml:bind"))]
   pub bind: Vec<Bind>,
-  #[sdk(choice(
-    qname = "inkml:CT_Table/inkml:table",
-    qname = "inkml:CT_Matrix/inkml:matrix"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Table, qname = "inkml:table"),
+            child(variant = Matrix, qname = "inkml:matrix")
+        )
+    )]
   pub mapping_choice: Option<MappingChoice>,
   /// Defines the Mapping Class.
   #[sdk(child(qname = "inkml:CT_Mapping/inkml:mapping"))]
@@ -1194,12 +1198,14 @@ pub struct TraceGroup {
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "inkml:CT_Annotation/inkml:annotation",
-    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
-    qname = "inkml:CT_Trace/inkml:trace",
-    qname = "inkml:CT_TraceGroup/inkml:traceGroup"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Annotation, qname = "inkml:annotation"),
+            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
+            child(variant = Trace, qname = "inkml:trace"),
+            child(variant = TraceGroup, qname = "inkml:traceGroup")
+        )
+    )]
   pub trace_group_choice: Vec<TraceGroupChoice>,
 }
 /// Defines the TraceView Class.
@@ -1223,11 +1229,13 @@ pub struct TraceView {
   /// to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "inkml:CT_Annotation/inkml:annotation",
-    qname = "inkml:CT_AnnotationXML/inkml:annotationXML",
-    qname = "inkml:CT_TraceView/inkml:traceView"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Annotation, qname = "inkml:annotation"),
+            child(variant = AnnotationXml, qname = "inkml:annotationXML"),
+            child(variant = TraceView, qname = "inkml:traceView")
+        )
+    )]
   pub trace_view_choice: Vec<TraceViewChoice>,
 }
 /// Defines the Context Class.
@@ -1288,19 +1296,21 @@ pub struct Context {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Definitions/inkml:definitions")]
 pub struct Definitions {
-  #[sdk(choice(
-    qname = "inkml:CT_Brush/inkml:brush",
-    qname = "inkml:CT_Canvas/inkml:canvas",
-    qname = "inkml:CT_CanvasTransform/inkml:canvasTransform",
-    qname = "inkml:CT_Context/inkml:context",
-    qname = "inkml:CT_InkSource/inkml:inkSource",
-    qname = "inkml:CT_Mapping/inkml:mapping",
-    qname = "inkml:CT_Timestamp/inkml:timestamp",
-    qname = "inkml:CT_Trace/inkml:trace",
-    qname = "inkml:CT_TraceFormat/inkml:traceFormat",
-    qname = "inkml:CT_TraceGroup/inkml:traceGroup",
-    qname = "inkml:CT_TraceView/inkml:traceView"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Brush, qname = "inkml:brush"),
+            child(variant = Canvas, qname = "inkml:canvas"),
+            child(variant = CanvasTransform, qname = "inkml:canvasTransform"),
+            child(variant = Context, qname = "inkml:context"),
+            child(variant = InkSource, qname = "inkml:inkSource"),
+            child(variant = Mapping, qname = "inkml:mapping"),
+            child(variant = Timestamp, qname = "inkml:timestamp"),
+            child(variant = Trace, qname = "inkml:trace"),
+            child(variant = TraceFormat, qname = "inkml:traceFormat"),
+            child(variant = TraceGroup, qname = "inkml:traceGroup"),
+            child(variant = TraceView, qname = "inkml:traceView")
+        )
+    )]
   pub definitions_choice: Vec<DefinitionsChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -1152,14 +1152,16 @@ pub struct FillColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub fill_color_list_choice: Vec<FillColorListChoice>,
 }
 /// Line Color List.
@@ -1174,14 +1176,16 @@ pub struct LineColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub line_color_list_choice: Vec<LineColorListChoice>,
 }
 /// Effect Color List.
@@ -1196,14 +1200,16 @@ pub struct EffectColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub effect_color_list_choice: Vec<EffectColorListChoice>,
 }
 /// Text Line Color List.
@@ -1218,14 +1224,16 @@ pub struct TextLineColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub text_line_color_list_choice: Vec<TextLineColorListChoice>,
 }
 /// Text Fill Color List.
@@ -1240,14 +1248,16 @@ pub struct TextFillColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub text_fill_color_list_choice: Vec<TextFillColorListChoice>,
 }
 /// Text Effect Color List.
@@ -1262,14 +1272,16 @@ pub struct TextEffectColorList {
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub text_effect_color_list_choice: Vec<TextEffectColorListChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -2052,17 +2064,19 @@ pub struct ForEach {
   /// Step
   #[sdk(attr(list, qname = ":step"))]
   pub step: Option<Vec<crate::simple_type::Int32Value>>,
-  #[sdk(choice(
-    qname = "dgm:CT_Algorithm/dgm:alg",
-    qname = "dgm:CT_Shape/dgm:shape",
-    qname = "dgm:CT_PresentationOf/dgm:presOf",
-    qname = "dgm:CT_Constraints/dgm:constrLst",
-    qname = "dgm:CT_Rules/dgm:ruleLst",
-    qname = "dgm:CT_ForEach/dgm:forEach",
-    qname = "dgm:CT_LayoutNode/dgm:layoutNode",
-    qname = "dgm:CT_Choose/dgm:choose",
-    qname = "a:CT_OfficeArtExtensionList/dgm:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Algorithm, qname = "dgm:alg"),
+            child(variant = Shape, qname = "dgm:shape"),
+            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Constraints, qname = "dgm:constrLst"),
+            child(variant = RuleList, qname = "dgm:ruleLst"),
+            child(variant = ForEach, qname = "dgm:forEach"),
+            child(variant = LayoutNode, qname = "dgm:layoutNode"),
+            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ExtensionList, qname = "dgm:extLst")
+        )
+    )]
   pub for_each_choice: Vec<ForEachChoice>,
 }
 /// Layout Node.
@@ -2082,18 +2096,20 @@ pub struct LayoutNode {
   /// Move With
   #[sdk(attr(qname = ":moveWith"))]
   pub move_with: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "dgm:CT_Algorithm/dgm:alg",
-    qname = "dgm:CT_Shape/dgm:shape",
-    qname = "dgm:CT_PresentationOf/dgm:presOf",
-    qname = "dgm:CT_Constraints/dgm:constrLst",
-    qname = "dgm:CT_Rules/dgm:ruleLst",
-    qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst",
-    qname = "dgm:CT_ForEach/dgm:forEach",
-    qname = "dgm:CT_LayoutNode/dgm:layoutNode",
-    qname = "dgm:CT_Choose/dgm:choose",
-    qname = "a:CT_OfficeArtExtensionList/dgm:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Algorithm, qname = "dgm:alg"),
+            child(variant = Shape, qname = "dgm:shape"),
+            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Constraints, qname = "dgm:constrLst"),
+            child(variant = RuleList, qname = "dgm:ruleLst"),
+            child(variant = VariableList, qname = "dgm:varLst"),
+            child(variant = ForEach, qname = "dgm:forEach"),
+            child(variant = LayoutNode, qname = "dgm:layoutNode"),
+            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ExtensionList, qname = "dgm:extLst")
+        )
+    )]
   pub layout_node_choice: Vec<LayoutNodeChoice>,
 }
 /// Choose Element.
@@ -2180,17 +2196,19 @@ pub struct DiagramChooseIf {
   #[sdk(string_set(source = 6u32, union = 0u64, values = &["none", "lvl", "ctr"]))]
   #[sdk(string_set(source = 7u32, union = 0u64, values = &["exact", "rel"]))]
   pub val: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "dgm:CT_Algorithm/dgm:alg",
-    qname = "dgm:CT_Shape/dgm:shape",
-    qname = "dgm:CT_PresentationOf/dgm:presOf",
-    qname = "dgm:CT_Constraints/dgm:constrLst",
-    qname = "dgm:CT_Rules/dgm:ruleLst",
-    qname = "dgm:CT_ForEach/dgm:forEach",
-    qname = "dgm:CT_LayoutNode/dgm:layoutNode",
-    qname = "dgm:CT_Choose/dgm:choose",
-    qname = "a:CT_OfficeArtExtensionList/dgm:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Algorithm, qname = "dgm:alg"),
+            child(variant = Shape, qname = "dgm:shape"),
+            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Constraints, qname = "dgm:constrLst"),
+            child(variant = RuleList, qname = "dgm:ruleLst"),
+            child(variant = ForEach, qname = "dgm:forEach"),
+            child(variant = LayoutNode, qname = "dgm:layoutNode"),
+            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ExtensionList, qname = "dgm:extLst")
+        )
+    )]
   pub diagram_choose_if_choice: Vec<DiagramChooseIfChoice>,
 }
 /// Else.
@@ -2200,17 +2218,19 @@ pub struct DiagramChooseElse {
   /// Name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "dgm:CT_Algorithm/dgm:alg",
-    qname = "dgm:CT_Shape/dgm:shape",
-    qname = "dgm:CT_PresentationOf/dgm:presOf",
-    qname = "dgm:CT_Constraints/dgm:constrLst",
-    qname = "dgm:CT_Rules/dgm:ruleLst",
-    qname = "dgm:CT_ForEach/dgm:forEach",
-    qname = "dgm:CT_LayoutNode/dgm:layoutNode",
-    qname = "dgm:CT_Choose/dgm:choose",
-    qname = "a:CT_OfficeArtExtensionList/dgm:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Algorithm, qname = "dgm:alg"),
+            child(variant = Shape, qname = "dgm:shape"),
+            child(variant = PresentationOf, qname = "dgm:presOf"),
+            child(variant = Constraints, qname = "dgm:constrLst"),
+            child(variant = RuleList, qname = "dgm:ruleLst"),
+            child(variant = ForEach, qname = "dgm:forEach"),
+            child(variant = LayoutNode, qname = "dgm:layoutNode"),
+            child(variant = Choose, qname = "dgm:choose"),
+            child(variant = ExtensionList, qname = "dgm:extLst")
+        )
+    )]
   pub diagram_choose_else_choice: Vec<DiagramChooseElseChoice>,
 }
 /// Data Model.
@@ -2441,7 +2461,12 @@ pub struct Shape3D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_TextProps/dgm:txPr")]
 pub struct TextProperties {
-  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
+  #[sdk(
+        choice(
+            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = FlatText, qname = "a:flatTx")
+        )
+    )]
   pub text_properties_choice: Option<TextPropertiesChoice>,
 }
 /// Title.
@@ -2501,7 +2526,7 @@ pub struct StyleLabel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PtList/dgm:ptLst")]
 pub struct PointList {
-  #[sdk(choice(qname = "dgm:CT_Pt/dgm:pt", any))]
+  #[sdk(choice(child(variant = Point, qname = "dgm:pt"), any))]
   pub xml_children: Vec<PointListChoice>,
 }
 /// Connection List.
@@ -2516,19 +2541,23 @@ pub struct ConnectionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFormatting/dgm:bg")]
 pub struct Background {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub background_choice1: Option<BackgroundChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub background_choice2: Option<BackgroundChoice2>,
 }
 /// Whole E2O Formatting.
@@ -2538,10 +2567,12 @@ pub struct Whole {
   /// Outline
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub whole_choice: Option<WholeChoice>,
 }
 /// Defines the DataModelExtensionList Class.
@@ -2664,27 +2695,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -2726,11 +2763,13 @@ pub struct DiagramDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst",
-    qname = "a:CT_TextListStyle/dgm1612:lstStyle",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NumberDiagramInfoList, qname = "dgm1611:autoBuNodeInfoLst"),
+            child(variant = TextListStyleType, qname = "dgm1612:lstStyle"),
+            any
+        )
+    )]
   pub diagram_definition_extension_choice: Option<DiagramDefinitionExtensionChoice>,
 }
 /// Defines the SampleData Class.

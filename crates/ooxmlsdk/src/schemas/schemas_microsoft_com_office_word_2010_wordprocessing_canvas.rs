@@ -14,13 +14,15 @@ pub struct WordprocessingCanvas {
   /// Defines the WholeFormatting Class.
   #[sdk(child(office2010, qname = "a:CT_WholeE2oFormatting/wpc:whole"))]
   pub whole_formatting: Option<std::boxed::Box<WholeFormatting>>,
-  #[sdk(choice(
-    qname = "wps:CT_WordprocessingShape/wps:wsp",
-    qname = "pic:CT_Picture/pic:pic",
-    qname = "w14:CT_WordContentPart/w14:contentPart",
-    qname = "wpg:CT_WordprocessingGroup/wpg:wgp",
-    qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = WordprocessingShape, qname = "wps:wsp"),
+            child(variant = Picture, qname = "pic:pic"),
+            child(variant = ContentPart, qname = "w14:contentPart"),
+            child(variant = WordprocessingGroup, qname = "wpg:wgp"),
+            child(variant = GraphicFrameType, qname = "wpc:graphicFrame")
+        )
+    )]
   pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpc:extLst"))]
@@ -30,19 +32,23 @@ pub struct WordprocessingCanvas {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_BackgroundFormatting/wpc:bg")]
 pub struct BackgroundFormatting {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub background_formatting_choice1: Option<BackgroundFormattingChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub background_formatting_choice2: Option<BackgroundFormattingChoice2>,
 }
 /// Defines the WholeFormatting Class.
@@ -52,10 +58,12 @@ pub struct WholeFormatting {
   /// Outline
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub whole_formatting_choice: Option<WholeFormattingChoice>,
 }
 /// Defines the GraphicFrameType Class.

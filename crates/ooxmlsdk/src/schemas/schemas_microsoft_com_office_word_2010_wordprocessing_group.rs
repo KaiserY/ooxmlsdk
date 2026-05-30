@@ -21,13 +21,15 @@ pub struct WordprocessingGroup {
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "wps:CT_WordprocessingShape/wps:wsp",
-    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
-    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
-    qname = "pic:CT_Picture/pic:pic",
-    qname = "w14:CT_WordContentPart/w14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = WordprocessingShape, qname = "wps:wsp"),
+            child(variant = GroupShape, qname = "wpg:grpSp"),
+            child(variant = GraphicFrame, qname = "wpg:graphicFrame"),
+            child(variant = Picture, qname = "pic:pic"),
+            child(variant = ContentPart, qname = "w14:contentPart")
+        )
+    )]
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
@@ -50,13 +52,15 @@ pub struct GroupShape {
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "wps:CT_WordprocessingShape/wps:wsp",
-    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
-    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
-    qname = "pic:CT_Picture/pic:pic",
-    qname = "w14:CT_WordContentPart/w14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = WordprocessingShape, qname = "wps:wsp"),
+            child(variant = GroupShape, qname = "wpg:grpSp"),
+            child(variant = GraphicFrame, qname = "wpg:graphicFrame"),
+            child(variant = Picture, qname = "pic:pic"),
+            child(variant = ContentPart, qname = "w14:contentPart")
+        )
+    )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
@@ -157,19 +161,23 @@ pub struct GroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]

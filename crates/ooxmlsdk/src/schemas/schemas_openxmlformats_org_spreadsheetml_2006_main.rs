@@ -2164,20 +2164,22 @@ pub struct Headers {
 pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  #[sdk(choice(
-    qname = "x:CT_RevisionRowColumn/x:rrc",
-    qname = "x:CT_RevisionMove/x:rm",
-    qname = "x:CT_RevisionCustomView/x:rcv",
-    qname = "x:CT_RevisionSheetRename/x:rsnm",
-    qname = "x:CT_RevisionInsertSheet/x:ris",
-    qname = "x:CT_RevisionCellChange/x:rcc",
-    qname = "x:CT_RevisionFormatting/x:rfmt",
-    qname = "x:CT_RevisionAutoFormatting/x:raf",
-    qname = "x:CT_RevisionDefinedName/x:rdn",
-    qname = "x:CT_RevisionComment/x:rcmt",
-    qname = "x:CT_RevisionQueryTableField/x:rqt",
-    qname = "x:CT_RevisionConflict/x:rcft"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RevisionRowColumn, qname = "x:rrc"),
+            child(variant = RevisionMove, qname = "x:rm"),
+            child(variant = RevisionCustomView, qname = "x:rcv"),
+            child(variant = RevisionSheetName, qname = "x:rsnm"),
+            child(variant = RevisionInsertSheet, qname = "x:ris"),
+            child(variant = RevisionCellChange, qname = "x:rcc"),
+            child(variant = RevisionFormat, qname = "x:rfmt"),
+            child(variant = RevisionAutoFormat, qname = "x:raf"),
+            child(variant = RevisionDefinedName, qname = "x:rdn"),
+            child(variant = RevisionComment, qname = "x:rcmt"),
+            child(variant = RevisionQueryTable, qname = "x:rqt"),
+            child(variant = RevisionConflict, qname = "x:rcft")
+        )
+    )]
   pub revisions_choice: Vec<RevisionsChoice>,
 }
 /// User List.
@@ -2507,11 +2509,13 @@ pub struct ExternalLink {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(choice(
-    qname = "x:CT_ExternalBook/x:externalBook",
-    qname = "x:CT_DdeLink/x:ddeLink",
-    qname = "x:CT_OleLink/x:oleLink"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ExternalBook, qname = "x:externalBook"),
+            child(variant = DdeLink, qname = "x:ddeLink"),
+            child(variant = OleLink, qname = "x:oleLink")
+        )
+    )]
   pub external_link_choice: Option<ExternalLinkChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -2698,17 +2702,19 @@ pub struct FilterColumn {
   /// Show Filter Button
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "x:CT_Filters/x:filters",
-    qname = "x:CT_Top10/x:top10",
-    qname = "x14:CT_CustomFilters/x14:customFilters",
-    qname = "x:CT_CustomFilters/x:customFilters",
-    qname = "x:CT_DynamicFilter/x:dynamicFilter",
-    qname = "x:CT_ColorFilter/x:colorFilter",
-    qname = "x14:CT_IconFilter/x14:iconFilter",
-    qname = "x:CT_IconFilter/x:iconFilter",
-    qname = "x:CT_ExtensionList/x:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Filters, qname = "x:filters"),
+            child(variant = Top10, qname = "x:top10"),
+            child(variant = X14CustomFilters, qname = "x14:customFilters"),
+            child(variant = XCustomFilters, qname = "x:customFilters"),
+            child(variant = DynamicFilter, qname = "x:dynamicFilter"),
+            child(variant = ColorFilter, qname = "x:colorFilter"),
+            child(variant = X14IconFilter, qname = "x14:iconFilter"),
+            child(variant = XIconFilter, qname = "x:iconFilter"),
+            child(variant = ExtensionList, qname = "x:extLst")
+        )
+    )]
   pub filter_column_choice: Option<FilterColumnChoice>,
 }
 /// Sort State for Auto Filter.
@@ -2727,10 +2733,12 @@ pub struct SortState {
   /// Sort Range
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_SortCondition/x14:sortCondition",
-    qname = "x:CT_SortCondition/x:sortCondition"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14SortCondition, qname = "x14:sortCondition"),
+            child(variant = XSortCondition, qname = "x:sortCondition")
+        )
+    )]
   pub sort_state_choice: Vec<SortStateChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -3136,11 +3144,13 @@ pub struct Tables {
   /// Count of Tables
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_TableMissing/x:m",
-    qname = "x:CT_XStringElement/x:s",
-    qname = "x:CT_Index/x:x"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = MissingTable, qname = "x:m"),
+            child(variant = CharacterValue, qname = "x:s"),
+            child(variant = FieldItem, qname = "x:x")
+        )
+    )]
   pub tables_choice: Vec<TablesChoice>,
 }
 /// Parameter Properties.
@@ -3612,15 +3622,17 @@ pub struct MemberPropertiesMap {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_Record/x:r")]
 pub struct PivotCacheRecord {
-  #[sdk(choice(
-    qname = "x:CT_Missing/x:m",
-    qname = "x:CT_Number/x:n",
-    qname = "x:CT_Boolean/x:b",
-    qname = "x:CT_Error/x:e",
-    qname = "x:CT_String/x:s",
-    qname = "x:CT_DateTime/x:d",
-    qname = "x:CT_Index/x:x"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MissingItem, qname = "x:m"),
+            child(variant = NumberItem, qname = "x:n"),
+            child(variant = BooleanItem, qname = "x:b"),
+            child(variant = ErrorItem, qname = "x:e"),
+            child(variant = StringItem, qname = "x:s"),
+            child(variant = DateTimeItem, qname = "x:d"),
+            child(variant = FieldItem, qname = "x:x")
+        )
+    )]
   pub pivot_cache_record_choice: Vec<PivotCacheRecordChoice>,
 }
 /// OLAP KPI.
@@ -3752,12 +3764,14 @@ pub struct Entries {
   /// Tuple Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_Missing/x:m",
-    qname = "x:CT_Number/x:n",
-    qname = "x:CT_Error/x:e",
-    qname = "x:CT_String/x:s"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MissingItem, qname = "x:m"),
+            child(variant = NumberItem, qname = "x:n"),
+            child(variant = ErrorItem, qname = "x:e"),
+            child(variant = StringItem, qname = "x:s")
+        )
+    )]
   pub entries_choice: Vec<EntriesChoice>,
 }
 /// Sets.
@@ -4576,14 +4590,16 @@ pub struct GroupItems {
   /// Items Created Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_Missing/x:m",
-    qname = "x:CT_Number/x:n",
-    qname = "x:CT_Boolean/x:b",
-    qname = "x:CT_Error/x:e",
-    qname = "x:CT_String/x:s",
-    qname = "x:CT_DateTime/x:d"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MissingItem, qname = "x:m"),
+            child(variant = NumberItem, qname = "x:n"),
+            child(variant = BooleanItem, qname = "x:b"),
+            child(variant = ErrorItem, qname = "x:e"),
+            child(variant = StringItem, qname = "x:s"),
+            child(variant = DateTimeItem, qname = "x:d")
+        )
+    )]
   pub group_items_choice: Vec<GroupItemsChoice>,
 }
 /// Page Field.
@@ -4998,23 +5014,25 @@ pub struct FontScheme {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_RPrElt/x:rPr")]
 pub struct RunProperties {
-  #[sdk(choice(
-    qname = "x:CT_BooleanProperty/x:b",
-    qname = "x:CT_BooleanProperty/x:i",
-    qname = "x:CT_BooleanProperty/x:strike",
-    qname = "x:CT_BooleanProperty/x:condense",
-    qname = "x:CT_BooleanProperty/x:extend",
-    qname = "x:CT_BooleanProperty/x:outline",
-    qname = "x:CT_BooleanProperty/x:shadow",
-    qname = "x:CT_UnderlineProperty/x:u",
-    qname = "x:CT_VerticalAlignFontProperty/x:vertAlign",
-    qname = "x:CT_FontSize/x:sz",
-    qname = "x:CT_Color/x:color",
-    qname = "x:CT_FontName/x:rFont",
-    qname = "x:CT_IntProperty/x:family",
-    qname = "x:CT_IntProperty/x:charset",
-    qname = "x:CT_FontScheme/x:scheme"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Bold, qname = "x:b"),
+            child(variant = Italic, qname = "x:i"),
+            child(variant = Strike, qname = "x:strike"),
+            child(variant = Condense, qname = "x:condense"),
+            child(variant = Extend, qname = "x:extend"),
+            child(variant = Outline, qname = "x:outline"),
+            child(variant = Shadow, qname = "x:shadow"),
+            child(variant = Underline, qname = "x:u"),
+            child(variant = VerticalTextAlignment, qname = "x:vertAlign"),
+            child(variant = FontSize, qname = "x:sz"),
+            child(variant = Color, qname = "x:color"),
+            child(variant = RunFont, qname = "x:rFont"),
+            child(variant = FontFamily, qname = "x:family"),
+            child(variant = RunPropertyCharSet, qname = "x:charset"),
+            child(variant = FontScheme, qname = "x:scheme")
+        )
+    )]
   pub run_properties_choice: Vec<RunPropertiesChoice>,
 }
 /// Rich Text Run.
@@ -5121,11 +5139,13 @@ pub struct RevisionRowColumn {
   /// Edge Deleted
   #[sdk(attr(qname = ":edge"))]
   pub edge: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "x:CT_UndoInfo/x:undo",
-    qname = "x:CT_RevisionCellChange/x:rcc",
-    qname = "x:CT_RevisionFormatting/x:rfmt"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Undo, qname = "x:undo"),
+            child(variant = RevisionCellChange, qname = "x:rcc"),
+            child(variant = RevisionFormat, qname = "x:rfmt")
+        )
+    )]
   pub revision_row_column_choice: Vec<RevisionRowColumnChoice>,
 }
 /// Revision Cell Move.
@@ -5153,11 +5173,13 @@ pub struct RevisionMove {
   /// Source Sheet Id
   #[sdk(attr(qname = ":sourceSheetId"))]
   pub source_sheet_id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_UndoInfo/x:undo",
-    qname = "x:CT_RevisionCellChange/x:rcc",
-    qname = "x:CT_RevisionFormatting/x:rfmt"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Undo, qname = "x:undo"),
+            child(variant = RevisionCellChange, qname = "x:rcc"),
+            child(variant = RevisionFormat, qname = "x:rfmt")
+        )
+    )]
   pub revision_move_choice: Vec<RevisionMoveChoice>,
 }
 /// Revision Custom View.
@@ -7087,12 +7109,14 @@ pub struct Mdx {
   /// Cube Function Tag
   #[sdk(attr(qname = ":f"))]
   pub cube_function: MdxFunctionValues,
-  #[sdk(choice(
-    qname = "x:CT_MdxTuple/x:t",
-    qname = "x:CT_MdxSet/x:ms",
-    qname = "x:CT_MdxMemeberProp/x:p",
-    qname = "x:CT_MdxKPI/x:k"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MdxTuple, qname = "x:t"),
+            child(variant = MdxSet, qname = "x:ms"),
+            child(variant = MdxMemberProp, qname = "x:p"),
+            child(variant = MdxKpi, qname = "x:k")
+        )
+    )]
   pub mdx_choice: Option<MdxChoice>,
 }
 /// Tuple MDX Metadata.
@@ -7355,33 +7379,37 @@ pub struct Protection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_Font/x:font")]
 pub struct Font {
-  #[sdk(choice(
-    qname = "x:CT_BooleanProperty/x:b",
-    qname = "x:CT_BooleanProperty/x:i",
-    qname = "x:CT_BooleanProperty/x:strike",
-    qname = "x:CT_BooleanProperty/x:condense",
-    qname = "x:CT_BooleanProperty/x:extend",
-    qname = "x:CT_BooleanProperty/x:outline",
-    qname = "x:CT_BooleanProperty/x:shadow",
-    qname = "x:CT_UnderlineProperty/x:u",
-    qname = "x:CT_VerticalAlignFontProperty/x:vertAlign",
-    qname = "x:CT_FontSize/x:sz",
-    qname = "x:CT_Color/x:color",
-    qname = "x:CT_FontNameNonEmpty/x:name",
-    qname = "x:CT_FontFamilyNum/x:family",
-    qname = "x:CT_ByteProperty/x:charset",
-    qname = "x:CT_FontScheme/x:scheme"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Bold, qname = "x:b"),
+            child(variant = Italic, qname = "x:i"),
+            child(variant = Strike, qname = "x:strike"),
+            child(variant = Condense, qname = "x:condense"),
+            child(variant = Extend, qname = "x:extend"),
+            child(variant = Outline, qname = "x:outline"),
+            child(variant = Shadow, qname = "x:shadow"),
+            child(variant = Underline, qname = "x:u"),
+            child(variant = VerticalTextAlignment, qname = "x:vertAlign"),
+            child(variant = FontSize, qname = "x:sz"),
+            child(variant = Color, qname = "x:color"),
+            child(variant = FontName, qname = "x:name"),
+            child(variant = FontFamilyNumbering, qname = "x:family"),
+            child(variant = FontCharSet, qname = "x:charset"),
+            child(variant = FontScheme, qname = "x:scheme")
+        )
+    )]
   pub font_choice: Vec<FontChoice>,
 }
 /// Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_Fill/x:fill")]
 pub struct Fill {
-  #[sdk(choice(
-    qname = "x:CT_PatternFill/x:patternFill",
-    qname = "x:CT_GradientFill/x:gradientFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PatternFill, qname = "x:patternFill"),
+            child(variant = GradientFill, qname = "x:gradientFill")
+        )
+    )]
   pub fill_choice: Option<FillChoice>,
 }
 /// Border Properties.
@@ -7705,7 +7733,12 @@ pub struct Value {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
-  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", qname = "x14:CT_OleItem/x14:oleItem"))]
+  #[sdk(
+        choice(
+            child(variant = XOleItem, qname = "x:oleItem"),
+            child(variant = X14OleItem, qname = "x14:oleItem")
+        )
+    )]
   pub ole_items_choice: Vec<OleItemsChoice>,
 }
 /// External Workbook.
@@ -8234,7 +8267,7 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x:ST_Guid/x14:id", any))]
+  #[sdk(choice(text_child(variant = Id, qname = "x14:id"), any))]
   pub conditional_formatting_rule_extension_choice:
     Option<ConditionalFormattingRuleExtensionChoice>,
 }
@@ -8247,7 +8280,7 @@ pub struct PivotHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy", any))]
+  #[sdk(choice(child(variant = PivotHierarchy, qname = "x14:pivotHierarchy"), any))]
   pub pivot_hierarchy_extension_choice: Option<PivotHierarchyExtensionChoice>,
 }
 /// Defines the PivotFieldExtension Class.
@@ -8259,7 +8292,7 @@ pub struct PivotFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x14:CT_PivotField/x14:pivotField", any))]
+  #[sdk(choice(child(variant = PivotField, qname = "x14:pivotField"), any))]
   pub pivot_field_extension_choice: Option<PivotFieldExtensionChoice>,
 }
 /// Defines the CacheSourceExtension Class.
@@ -8271,7 +8304,9 @@ pub struct CacheSourceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection", any))]
+  #[sdk(
+        choice(child(variant = SourceConnection, qname = "x14:sourceConnection"), any)
+    )]
   pub cache_source_extension_choice: Option<CacheSourceExtensionChoice>,
 }
 /// OLE Link Item.
@@ -8900,7 +8935,7 @@ pub struct OleObjects {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:CT_Controls/x:controls")]
 pub struct Controls {
-  #[sdk(choice(qname = "x:CT_Control/x:control", any))]
+  #[sdk(choice(child(variant = Control, qname = "x:control"), any))]
   pub xml_children: Vec<ControlsChoice>,
 }
 /// Macro Sheet Dimensions.
@@ -9203,11 +9238,13 @@ pub struct Filters {
   /// Calendar Type
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
-  #[sdk(choice(
-    qname = "x14:CT_Filter/x14:filter",
-    qname = "x:CT_Filter/x:filter",
-    qname = "x:CT_DateGroupItem/x:dateGroupItem"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14Filter, qname = "x14:filter"),
+            child(variant = XFilter, qname = "x:filter"),
+            child(variant = DateGroupItem, qname = "x:dateGroupItem")
+        )
+    )]
   pub filters_choice: Vec<FiltersChoice>,
 }
 /// Top 10.
@@ -9289,12 +9326,20 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables",
-    qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache",
-    qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(
+                variant = SlicerCachePivotTables,
+                qname = "x15:slicerCachePivotTables"
+            ),
+            child(variant = TableSlicerCache, qname = "x15:tableSlicerCache"),
+            child(
+                variant = SlicerCacheHideItemsWithNoData,
+                qname = "x15:slicerCacheHideItemsWithNoData"
+            ),
+            any
+        )
+    )]
   pub slicer_cache_definition_extension_choice: Option<SlicerCacheDefinitionExtensionChoice>,
 }
 /// Defines the PivotFilterExtension Class.
@@ -9306,11 +9351,13 @@ pub struct PivotFilterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x15:CT_PivotFilter/x15:pivotFilter",
-    qname = "x15:CT_MovingPeriodState/x15:movingPeriodState",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PivotFilter, qname = "x15:pivotFilter"),
+            child(variant = MovingPeriodState, qname = "x15:movingPeriodState"),
+            any
+        )
+    )]
   pub pivot_filter_extension_choice: Option<PivotFilterExtensionChoice>,
 }
 /// Defines the QueryTableExtension Class.
@@ -9322,7 +9369,7 @@ pub struct QueryTableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable", any))]
+  #[sdk(choice(child(variant = QueryTable, qname = "x15:queryTable"), any))]
   pub query_table_extension_choice: Option<QueryTableExtensionChoice>,
 }
 /// Defines the DatabaseProperties Class.
@@ -9506,11 +9553,13 @@ pub struct ConnectionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_Connection/x14:connection",
-    qname = "x15:CT_Connection/x15:connection",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14Connection, qname = "x14:connection"),
+            child(variant = X15Connection, qname = "x15:connection"),
+            any
+        )
+    )]
   pub connection_extension_choice: Option<ConnectionExtensionChoice>,
 }
 /// Defines the TextFields Class.
@@ -9570,14 +9619,16 @@ pub struct SharedItems {
   /// Long Text
   #[sdk(attr(qname = ":longText"))]
   pub long_text: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "x:CT_Missing/x:m",
-    qname = "x:CT_Number/x:n",
-    qname = "x:CT_Boolean/x:b",
-    qname = "x:CT_Error/x:e",
-    qname = "x:CT_String/x:s",
-    qname = "x:CT_DateTime/x:d"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MissingItem, qname = "x:m"),
+            child(variant = NumberItem, qname = "x:n"),
+            child(variant = BooleanItem, qname = "x:b"),
+            child(variant = ErrorItem, qname = "x:e"),
+            child(variant = StringItem, qname = "x:s"),
+            child(variant = DateTimeItem, qname = "x:d")
+        )
+    )]
   pub shared_items_choice: Vec<SharedItemsChoice>,
 }
 /// Defines the FieldGroup Class.
@@ -9590,10 +9641,12 @@ pub struct FieldGroup {
   /// Field Base
   #[sdk(attr(qname = ":base"))]
   pub base: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_RangePr/x:rangePr",
-    qname = "x:CT_DiscretePr/x:discretePr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RangeProperties, qname = "x:rangePr"),
+            child(variant = DiscreteProperties, qname = "x:discretePr")
+        )
+    )]
   pub field_group_choice: Option<FieldGroupChoice>,
   /// OLAP Group Items.
   #[sdk(child(qname = "x:CT_GroupItems/x:groupItems"))]
@@ -9617,11 +9670,13 @@ pub struct CacheFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_CacheField/x14:cacheField",
-    qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CacheField, qname = "x14:cacheField"),
+            child(variant = CachedUniqueNames, qname = "x15:cachedUniqueNames"),
+            any
+        )
+    )]
   pub cache_field_extension_choice: Option<CacheFieldExtensionChoice>,
 }
 /// Defines the FieldsUsage Class.
@@ -9664,11 +9719,13 @@ pub struct CacheHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy",
-    qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14CacheHierarchy, qname = "x14:cacheHierarchy"),
+            child(variant = X15CacheHierarchy, qname = "x15:cacheHierarchy"),
+            any
+        )
+    )]
   pub cache_hierarchy_extension_choice: Option<CacheHierarchyExtensionChoice>,
 }
 /// Defines the CalculatedMemberExtensionList Class.
@@ -9689,11 +9746,13 @@ pub struct CalculatedMemberExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_CalculatedMember/x14:calculatedMember",
-    qname = "x15:CT_CalculatedMember/x15:calculatedMember",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14CalculatedMember, qname = "x14:calculatedMember"),
+            child(variant = X15CalculatedMember, qname = "x15:calculatedMember"),
+            any
+        )
+    )]
   pub calculated_member_extension_choice: Option<CalculatedMemberExtensionChoice>,
 }
 /// Defines the DataFieldExtensionList Class.
@@ -9714,11 +9773,13 @@ pub struct DataFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_DataField/x14:dataField",
-    qname = "x15:CT_DataField/x15:dataField",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14DataField, qname = "x14:dataField"),
+            child(variant = X15DataField, qname = "x15:dataField"),
+            any
+        )
+    )]
   pub data_field_extension_choice: Option<DataFieldExtensionChoice>,
 }
 /// Defines the PivotFilterExtensionList Class.
@@ -9897,17 +9958,22 @@ pub struct WorksheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings",
-    qname = "x14:CT_DataValidations/x14:dataValidations",
-    qname = "x14:CT_SparklineGroups/x14:sparklineGroups",
-    qname = "x14:CT_SlicerRefs/x14:slicerList",
-    qname = "x14:CT_ProtectedRanges/x14:protectedRanges",
-    qname = "x14:CT_IgnoredErrors/x14:ignoredErrors",
-    qname = "x15:CT_WebExtensions/x15:webExtensions",
-    qname = "x15:CT_TimelineRefs/x15:timelineRefs",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(
+                variant = ConditionalFormattings,
+                qname = "x14:conditionalFormattings"
+            ),
+            child(variant = DataValidations, qname = "x14:dataValidations"),
+            child(variant = SparklineGroups, qname = "x14:sparklineGroups"),
+            child(variant = SlicerList, qname = "x14:slicerList"),
+            child(variant = ProtectedRanges, qname = "x14:protectedRanges"),
+            child(variant = IgnoredErrors, qname = "x14:ignoredErrors"),
+            child(variant = WebExtensions, qname = "x15:webExtensions"),
+            child(variant = TimelineReferences, qname = "x15:timelineRefs"),
+            any
+        )
+    )]
   pub worksheet_extension_choice: Option<WorksheetExtensionChoice>,
 }
 /// Defines the NumberingFormats Class.
@@ -10048,13 +10114,15 @@ pub struct StylesheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x:CT_Dxfs/x14:dxfs",
-    qname = "x14:CT_SlicerStyles/x14:slicerStyles",
-    qname = "x:CT_Dxfs/x15:dxfs",
-    qname = "x15:CT_TimelineStyles/x15:timelineStyles",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = X14DifferentialFormats, qname = "x14:dxfs"),
+            child(variant = SlicerStyles, qname = "x14:slicerStyles"),
+            child(variant = X15DifferentialFormats, qname = "x15:dxfs"),
+            child(variant = TimelineStyles, qname = "x15:timelineStyles"),
+            any
+        )
+    )]
   pub stylesheet_extension_choice: Option<StylesheetExtensionChoice>,
 }
 /// Defines the Location Class.
@@ -10275,13 +10343,15 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition",
-    qname = "x15:CT_PivotTableData/x15:pivotTableData",
-    qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings",
-    qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PivotTableDefinition, qname = "x14:pivotTableDefinition"),
+            child(variant = PivotTableData, qname = "x15:pivotTableData"),
+            child(variant = PivotTableUiSettings, qname = "x15:pivotTableUISettings"),
+            child(variant = PivotVersionInfo, qname = "xxpvi:pivotVersionInfo"),
+            any
+        )
+    )]
   pub pivot_table_definition_extension_choice: Option<PivotTableDefinitionExtensionChoice>,
 }
 /// Defines the CacheSource Class.
@@ -10294,11 +10364,13 @@ pub struct CacheSource {
   /// connectionId
   #[sdk(attr(qname = ":connectionId"))]
   pub connection_id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "x:CT_WorksheetSource/x:worksheetSource",
-    qname = "x:CT_Consolidation/x:consolidation",
-    qname = "x:CT_CacheSourceExtensionList/x:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = WorksheetSource, qname = "x:worksheetSource"),
+            child(variant = Consolidation, qname = "x:consolidation"),
+            child(variant = CacheSourceExtensionList, qname = "x:extLst")
+        )
+    )]
   pub cache_source_choice: Option<CacheSourceChoice>,
 }
 /// Defines the CacheFields Class.
@@ -10427,18 +10499,29 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition",
-    qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled",
-    qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition",
-    qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion",
-    qname = "xsd:boolean/xxpim:implicitMeasureSupport",
-    qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
-    qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
-    qname = "xsd:boolean/xlpar:autoRefresh",
-    qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PivotCacheDefinition, qname = "x14:pivotCacheDefinition"),
+            child(variant = PivotCacheDecoupled, qname = "x15:pivotCacheDecoupled"),
+            child(
+                variant = TimelinePivotCacheDefinition,
+                qname = "x15:timelinePivotCacheDefinition"
+            ),
+            child(variant = PivotCacheIdVersion, qname = "x15:pivotCacheIdVersion"),
+            text_child(
+                variant = XxpimXsdboolean,
+                qname = "xxpim:implicitMeasureSupport"
+            ),
+            child(variant = PivotCacheRichInfo, qname = "xprd:richInfo"),
+            child(variant = CacheVersionInfo, qname = "xxpvi:cacheVersionInfo"),
+            text_child(variant = XlparXsdboolean, qname = "xlpar:autoRefresh"),
+            child(
+                variant = PivotCacheDynamicArray,
+                qname = "xlpda:pivotCacheDynamicArray"
+            ),
+            any
+        )
+    )]
   pub pivot_cache_definition_extension_choice: Option<PivotCacheDefinitionExtensionChoice>,
 }
 /// Sheet names of supporting book.
@@ -10514,11 +10597,13 @@ pub struct TableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_Table/x14:table",
-    qname = "xlmsforms:CT_MsForm/xlmsforms:msForm",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Table, qname = "x14:table"),
+            child(variant = MsForm, qname = "xlmsforms:msForm"),
+            any
+        )
+    )]
   pub table_extension_choice: Option<TableExtensionChoice>,
 }
 /// Defines the FileVersion Class.
@@ -10867,23 +10952,31 @@ pub struct WorkbookExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "x14:CT_DefinedNames/x14:definedNames",
-    qname = "x:CT_PivotCaches/x14:pivotCaches",
-    qname = "x14:CT_SlicerCaches/x14:slicerCaches",
-    qname = "x14:CT_SlicerCaches/x15:slicerCaches",
-    qname = "x14:CT_WorkbookPr/x14:workbookPr",
-    qname = "x:CT_PivotCaches/x15:pivotCaches",
-    qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences",
-    qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches",
-    qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs",
-    qname = "x15:CT_WorkbookPr/x15:workbookPr",
-    qname = "x15:CT_DataModel/x15:dataModel",
-    qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
-    qname = "xlwcv:CT_Version/xlwcv:version",
-    qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DefinedNames, qname = "x14:definedNames"),
+            child(variant = X14PivotCaches, qname = "x14:pivotCaches"),
+            child(variant = X14SlicerCaches, qname = "x14:slicerCaches"),
+            child(variant = X15SlicerCaches, qname = "x15:slicerCaches"),
+            child(variant = X14WorkbookProperties, qname = "x14:workbookPr"),
+            child(variant = X15PivotCaches, qname = "x15:pivotCaches"),
+            child(variant = PivotTableReferences, qname = "x15:pivotTableReferences"),
+            child(
+                variant = TimelineCachePivotCaches,
+                qname = "x15:timelineCachePivotCaches"
+            ),
+            child(variant = TimelineCacheReferences, qname = "x15:timelineCacheRefs"),
+            child(variant = X15WorkbookProperties, qname = "x15:workbookPr"),
+            child(variant = DataModel, qname = "x15:dataModel"),
+            child(variant = ExternalCodeService, qname = "xlecs:externalCodeService"),
+            child(variant = Version, qname = "xlwcv:version"),
+            child(
+                variant = ExternalCodeServiceImageAsInput,
+                qname = "xlecs2:externalCodeServiceImageAsInput"
+            ),
+            any
+        )
+    )]
   pub workbook_extension_choice: Option<WorkbookExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -954,10 +954,12 @@ pub struct SplitButtonRegular {
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_VisibleButton/mso14:button",
-    qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso14:button"),
+            child(variant = VisibleToggleButton, qname = "mso14:toggleButton")
+        )
+    )]
   pub split_button_regular_choice: Option<SplitButtonRegularChoice>,
   /// Defines the MenuRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuRegular/mso14:menu"))]
@@ -1097,17 +1099,19 @@ pub struct MenuRegular {
   #[sdk(attr(office2010, qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_MenuSeparator/mso14:menuSeparator",
-    qname = "mso14:CT_SplitButtonRegular/mso14:splitButton",
-    qname = "mso14:CT_MenuRegular/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso14:menuSeparator"),
+            child(variant = SplitButtonRegular, qname = "mso14:splitButton"),
+            child(variant = MenuRegular, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu")
+        )
+    )]
   pub menu_regular_choice: Vec<MenuRegularChoice>,
 }
 /// Defines the DynamicMenuRegular Class.
@@ -1327,10 +1331,12 @@ pub struct SplitButtonWithTitle {
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_VisibleButton/mso14:button",
-    qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso14:button"),
+            child(variant = VisibleToggleButton, qname = "mso14:toggleButton")
+        )
+    )]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
   /// Defines the MenuWithTitle Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuWithTitle/mso14:menu"))]
@@ -1470,17 +1476,19 @@ pub struct MenuWithTitle {
   #[sdk(attr(office2010, qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_MenuSeparator/mso14:menuSeparator",
-    qname = "mso14:CT_SplitButtonWithTitle/mso14:splitButton",
-    qname = "mso14:CT_MenuWithTitle/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso14:menuSeparator"),
+            child(variant = SplitButtonWithTitle, qname = "mso14:splitButton"),
+            child(variant = MenuWithTitle, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu")
+        )
+    )]
   pub menu_with_title_choice: Vec<MenuWithTitleChoice>,
 }
 /// Defines the MenuSeparatorNoTitle Class.
@@ -2902,17 +2910,19 @@ pub struct Menu {
   #[sdk(attr(office2010, qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_MenuSeparator/mso14:menuSeparator",
-    qname = "mso14:CT_SplitButtonRegular/mso14:splitButton",
-    qname = "mso14:CT_MenuRegular/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso14:menuSeparator"),
+            child(variant = SplitButtonRegular, qname = "mso14:splitButton"),
+            child(variant = MenuRegular, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu")
+        )
+    )]
   pub menu_choice: Vec<MenuChoice>,
 }
 /// Defines the DynamicMenu Class.
@@ -3146,10 +3156,12 @@ pub struct SplitButton {
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_VisibleButton/mso14:button",
-    qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso14:button"),
+            child(variant = VisibleToggleButton, qname = "mso14:toggleButton")
+        )
+    )]
   pub split_button_choice: Option<SplitButtonChoice>,
   /// Defines the MenuRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_MenuRegular/mso14:menu"))]
@@ -3207,22 +3219,24 @@ pub struct Box {
   /// boxStyle
   #[sdk(attr(office2010, qname = ":boxStyle"))]
   pub box_style: Option<BoxStyleValues>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlClone/mso14:control",
-    qname = "mso14:CT_LabelControl/mso14:labelControl",
-    qname = "mso14:CT_Button/mso14:button",
-    qname = "mso14:CT_ToggleButton/mso14:toggleButton",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_EditBox/mso14:editBox",
-    qname = "mso14:CT_ComboBox/mso14:comboBox",
-    qname = "mso14:CT_DropDownRegular/mso14:dropDown",
-    qname = "mso14:CT_Gallery/mso14:gallery",
-    qname = "mso14:CT_Menu/mso14:menu",
-    qname = "mso14:CT_DynamicMenu/mso14:dynamicMenu",
-    qname = "mso14:CT_SplitButton/mso14:splitButton",
-    qname = "mso14:CT_Box/mso14:box",
-    qname = "mso14:CT_ButtonGroup/mso14:buttonGroup"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlClone, qname = "mso14:control"),
+            child(variant = LabelControl, qname = "mso14:labelControl"),
+            child(variant = Button, qname = "mso14:button"),
+            child(variant = ToggleButton, qname = "mso14:toggleButton"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = EditBox, qname = "mso14:editBox"),
+            child(variant = ComboBox, qname = "mso14:comboBox"),
+            child(variant = DropDownRegular, qname = "mso14:dropDown"),
+            child(variant = Gallery, qname = "mso14:gallery"),
+            child(variant = Menu, qname = "mso14:menu"),
+            child(variant = DynamicMenu, qname = "mso14:dynamicMenu"),
+            child(variant = SplitButton, qname = "mso14:splitButton"),
+            child(variant = Box, qname = "mso14:box"),
+            child(variant = ButtonGroup, qname = "mso14:buttonGroup")
+        )
+    )]
   pub box_choice: Vec<BoxChoice>,
 }
 /// Defines the ButtonGroup Class.
@@ -3274,16 +3288,18 @@ pub struct ButtonGroup {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_MenuRegular/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu",
-    qname = "mso14:CT_SplitButtonRegular/mso14:splitButton",
-    qname = "mso14:CT_Separator/mso14:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = MenuRegular, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu"),
+            child(variant = SplitButtonRegular, qname = "mso14:splitButton"),
+            child(variant = Separator, qname = "mso14:separator")
+        )
+    )]
   pub button_group_choice: Vec<ButtonGroupChoice>,
 }
 /// Defines the BackstageMenuButton Class.
@@ -4307,19 +4323,21 @@ pub struct GroupBox {
   #[sdk(attr(office2010, qname = ":getLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroupButton/mso14:button",
-    qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageEditBox/mso14:editBox",
-    qname = "mso14:CT_BackstageDropDown/mso14:dropDown",
-    qname = "mso14:CT_RadioGroup/mso14:radioGroup",
-    qname = "mso14:CT_BackstageComboBox/mso14:comboBox",
-    qname = "mso14:CT_Hyperlink/mso14:hyperlink",
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl",
-    qname = "mso14:CT_GroupBox/mso14:groupBox",
-    qname = "mso14:CT_LayoutContainer/mso14:layoutContainer",
-    qname = "mso14:CT_ImageControl/mso14:imageControl"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageGroupButton, qname = "mso14:button"),
+            child(variant = BackstageCheckBox, qname = "mso14:checkBox"),
+            child(variant = BackstageEditBox, qname = "mso14:editBox"),
+            child(variant = BackstageDropDown, qname = "mso14:dropDown"),
+            child(variant = RadioGroup, qname = "mso14:radioGroup"),
+            child(variant = BackstageComboBox, qname = "mso14:comboBox"),
+            child(variant = Hyperlink, qname = "mso14:hyperlink"),
+            child(variant = BackstageLabelControl, qname = "mso14:labelControl"),
+            child(variant = GroupBox, qname = "mso14:groupBox"),
+            child(variant = LayoutContainer, qname = "mso14:layoutContainer"),
+            child(variant = ImageControl, qname = "mso14:imageControl")
+        )
+    )]
   pub group_box_choice: Vec<GroupBoxChoice>,
 }
 /// Defines the LayoutContainer Class.
@@ -4351,19 +4369,21 @@ pub struct LayoutContainer {
   /// layoutChildren
   #[sdk(attr(office2010, qname = ":layoutChildren"))]
   pub layout_children: Option<LayoutChildrenValues>,
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroupButton/mso14:button",
-    qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageEditBox/mso14:editBox",
-    qname = "mso14:CT_BackstageDropDown/mso14:dropDown",
-    qname = "mso14:CT_RadioGroup/mso14:radioGroup",
-    qname = "mso14:CT_BackstageComboBox/mso14:comboBox",
-    qname = "mso14:CT_Hyperlink/mso14:hyperlink",
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl",
-    qname = "mso14:CT_GroupBox/mso14:groupBox",
-    qname = "mso14:CT_LayoutContainer/mso14:layoutContainer",
-    qname = "mso14:CT_ImageControl/mso14:imageControl"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageGroupButton, qname = "mso14:button"),
+            child(variant = BackstageCheckBox, qname = "mso14:checkBox"),
+            child(variant = BackstageEditBox, qname = "mso14:editBox"),
+            child(variant = BackstageDropDown, qname = "mso14:dropDown"),
+            child(variant = RadioGroup, qname = "mso14:radioGroup"),
+            child(variant = BackstageComboBox, qname = "mso14:comboBox"),
+            child(variant = Hyperlink, qname = "mso14:hyperlink"),
+            child(variant = BackstageLabelControl, qname = "mso14:labelControl"),
+            child(variant = GroupBox, qname = "mso14:groupBox"),
+            child(variant = LayoutContainer, qname = "mso14:layoutContainer"),
+            child(variant = ImageControl, qname = "mso14:imageControl")
+        )
+    )]
   pub layout_container_choice: Vec<LayoutContainerChoice>,
 }
 /// Defines the ImageControl Class.
@@ -4508,7 +4528,7 @@ pub struct BackstageGroup {
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(qname = "mso14:CT_PrimaryItem/mso14:primaryItem"))]
+  #[sdk(choice(child(variant = PrimaryItem, qname = "mso14:primaryItem")))]
   pub backstage_group_choice: Option<BackstageGroupChoice>,
   /// Defines the TopItemsGroupControls Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupControls/mso14:topItems"))]
@@ -4617,17 +4637,19 @@ pub struct MenuRoot {
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_MenuSeparator/mso14:menuSeparator",
-    qname = "mso14:CT_SplitButtonRegular/mso14:splitButton",
-    qname = "mso14:CT_MenuRegular/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso14:menuSeparator"),
+            child(variant = SplitButtonRegular, qname = "mso14:splitButton"),
+            child(variant = MenuRegular, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu")
+        )
+    )]
   pub menu_root_choice: Vec<MenuRootChoice>,
 }
 /// Defines the CustomUI Class.
@@ -5119,23 +5141,25 @@ pub struct Group {
   /// centerVertically
   #[sdk(attr(office2010, qname = ":centerVertically"))]
   pub center_vertically: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlClone/mso14:control",
-    qname = "mso14:CT_LabelControl/mso14:labelControl",
-    qname = "mso14:CT_Button/mso14:button",
-    qname = "mso14:CT_ToggleButton/mso14:toggleButton",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_EditBox/mso14:editBox",
-    qname = "mso14:CT_ComboBox/mso14:comboBox",
-    qname = "mso14:CT_DropDownRegular/mso14:dropDown",
-    qname = "mso14:CT_Gallery/mso14:gallery",
-    qname = "mso14:CT_Menu/mso14:menu",
-    qname = "mso14:CT_DynamicMenu/mso14:dynamicMenu",
-    qname = "mso14:CT_SplitButton/mso14:splitButton",
-    qname = "mso14:CT_Box/mso14:box",
-    qname = "mso14:CT_ButtonGroup/mso14:buttonGroup",
-    qname = "mso14:CT_Separator/mso14:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlClone, qname = "mso14:control"),
+            child(variant = LabelControl, qname = "mso14:labelControl"),
+            child(variant = Button, qname = "mso14:button"),
+            child(variant = ToggleButton, qname = "mso14:toggleButton"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = EditBox, qname = "mso14:editBox"),
+            child(variant = ComboBox, qname = "mso14:comboBox"),
+            child(variant = DropDownRegular, qname = "mso14:dropDown"),
+            child(variant = Gallery, qname = "mso14:gallery"),
+            child(variant = Menu, qname = "mso14:menu"),
+            child(variant = DynamicMenu, qname = "mso14:dynamicMenu"),
+            child(variant = SplitButton, qname = "mso14:splitButton"),
+            child(variant = Box, qname = "mso14:box"),
+            child(variant = ButtonGroup, qname = "mso14:buttonGroup"),
+            child(variant = Separator, qname = "mso14:separator")
+        )
+    )]
   pub group_choice: Vec<GroupChoice>,
   /// Defines the DialogBoxLauncher Class.
   #[sdk(child(office2010, qname = "mso14:CT_DialogLauncher/mso14:dialogBoxLauncher"))]
@@ -5279,22 +5303,26 @@ pub struct ControlCloneQat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_QatItems/mso14:sharedControls")]
 pub struct SharedControlsQatItems {
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneQat/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_Separator/mso14:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneQat, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = Separator, qname = "mso14:separator")
+        )
+    )]
   pub shared_controls_qat_items_choice: Vec<SharedControlsQatItemsChoice>,
 }
 /// Defines the DocumentControlsQatItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_QatItems/mso14:documentControls")]
 pub struct DocumentControlsQatItems {
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneQat/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_Separator/mso14:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneQat, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = Separator, qname = "mso14:separator")
+        )
+    )]
   pub document_controls_qat_items_choice: Vec<DocumentControlsQatItemsChoice>,
 }
 /// Defines the Tab Class.
@@ -5453,17 +5481,19 @@ pub struct ContextMenu {
   #[sdk(string_format(kind = "token"))]
   #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneRegular/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_CheckBox/mso14:checkBox",
-    qname = "mso14:CT_GalleryRegular/mso14:gallery",
-    qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
-    qname = "mso14:CT_SplitButtonRegular/mso14:splitButton",
-    qname = "mso14:CT_MenuRegular/mso14:menu",
-    qname = "mso14:CT_DynamicMenuRegular/mso14:dynamicMenu",
-    qname = "mso14:CT_MenuSeparatorNoTitle/mso14:menuSeparator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlCloneRegular, qname = "mso14:control"),
+            child(variant = ButtonRegular, qname = "mso14:button"),
+            child(variant = CheckBox, qname = "mso14:checkBox"),
+            child(variant = GalleryRegular, qname = "mso14:gallery"),
+            child(variant = ToggleButtonRegular, qname = "mso14:toggleButton"),
+            child(variant = SplitButtonRegular, qname = "mso14:splitButton"),
+            child(variant = MenuRegular, qname = "mso14:menu"),
+            child(variant = DynamicMenuRegular, qname = "mso14:dynamicMenu"),
+            child(variant = MenuSeparatorNoTitle, qname = "mso14:menuSeparator")
+        )
+    )]
   pub context_menu_choice: Vec<ContextMenuChoice>,
 }
 /// Defines the ItemBackstageItem Class.
@@ -5711,60 +5741,68 @@ pub struct BackstageMenuGroup {
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageMenuButton/mso14:button",
-    qname = "mso14:CT_BackstageMenuCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageSubMenu/mso14:menu",
-    qname = "mso14:CT_BackstageMenuToggleButton/mso14:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageMenuButton, qname = "mso14:button"),
+            child(variant = BackstageMenuCheckBox, qname = "mso14:checkBox"),
+            child(variant = BackstageSubMenu, qname = "mso14:menu"),
+            child(variant = BackstageMenuToggleButton, qname = "mso14:toggleButton")
+        )
+    )]
   pub backstage_menu_group_choice: Vec<BackstageMenuGroupChoice>,
 }
 /// Defines the PrimaryItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_PrimaryItem/mso14:primaryItem")]
 pub struct PrimaryItem {
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageRegularButton/mso14:button",
-    qname = "mso14:CT_BackstagePrimaryMenu/mso14:menu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageRegularButton, qname = "mso14:button"),
+            child(variant = BackstagePrimaryMenu, qname = "mso14:menu")
+        )
+    )]
   pub primary_item_choice: Option<PrimaryItemChoice>,
 }
 /// Defines the TopItemsGroupControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_GroupControls/mso14:topItems")]
 pub struct TopItemsGroupControls {
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroupButton/mso14:button",
-    qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageEditBox/mso14:editBox",
-    qname = "mso14:CT_BackstageDropDown/mso14:dropDown",
-    qname = "mso14:CT_RadioGroup/mso14:radioGroup",
-    qname = "mso14:CT_BackstageComboBox/mso14:comboBox",
-    qname = "mso14:CT_Hyperlink/mso14:hyperlink",
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl",
-    qname = "mso14:CT_GroupBox/mso14:groupBox",
-    qname = "mso14:CT_LayoutContainer/mso14:layoutContainer",
-    qname = "mso14:CT_ImageControl/mso14:imageControl"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageGroupButton, qname = "mso14:button"),
+            child(variant = BackstageCheckBox, qname = "mso14:checkBox"),
+            child(variant = BackstageEditBox, qname = "mso14:editBox"),
+            child(variant = BackstageDropDown, qname = "mso14:dropDown"),
+            child(variant = RadioGroup, qname = "mso14:radioGroup"),
+            child(variant = BackstageComboBox, qname = "mso14:comboBox"),
+            child(variant = Hyperlink, qname = "mso14:hyperlink"),
+            child(variant = BackstageLabelControl, qname = "mso14:labelControl"),
+            child(variant = GroupBox, qname = "mso14:groupBox"),
+            child(variant = LayoutContainer, qname = "mso14:layoutContainer"),
+            child(variant = ImageControl, qname = "mso14:imageControl")
+        )
+    )]
   pub top_items_group_controls_choice: Vec<TopItemsGroupControlsChoice>,
 }
 /// Defines the BottomItemsGroupControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_GroupControls/mso14:bottomItems")]
 pub struct BottomItemsGroupControls {
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroupButton/mso14:button",
-    qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageEditBox/mso14:editBox",
-    qname = "mso14:CT_BackstageDropDown/mso14:dropDown",
-    qname = "mso14:CT_RadioGroup/mso14:radioGroup",
-    qname = "mso14:CT_BackstageComboBox/mso14:comboBox",
-    qname = "mso14:CT_Hyperlink/mso14:hyperlink",
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl",
-    qname = "mso14:CT_GroupBox/mso14:groupBox",
-    qname = "mso14:CT_LayoutContainer/mso14:layoutContainer",
-    qname = "mso14:CT_ImageControl/mso14:imageControl"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageGroupButton, qname = "mso14:button"),
+            child(variant = BackstageCheckBox, qname = "mso14:checkBox"),
+            child(variant = BackstageEditBox, qname = "mso14:editBox"),
+            child(variant = BackstageDropDown, qname = "mso14:dropDown"),
+            child(variant = RadioGroup, qname = "mso14:radioGroup"),
+            child(variant = BackstageComboBox, qname = "mso14:comboBox"),
+            child(variant = Hyperlink, qname = "mso14:hyperlink"),
+            child(variant = BackstageLabelControl, qname = "mso14:labelControl"),
+            child(variant = GroupBox, qname = "mso14:groupBox"),
+            child(variant = LayoutContainer, qname = "mso14:layoutContainer"),
+            child(variant = ImageControl, qname = "mso14:imageControl")
+        )
+    )]
   pub bottom_items_group_controls_choice: Vec<BottomItemsGroupControlsChoice>,
 }
 /// Defines the TaskGroupCategory Class.
@@ -6182,21 +6220,25 @@ pub struct TaskFormGroup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_BackstageGroups/mso14:firstColumn")]
 pub struct BackstageGroups {
-  #[sdk(choice(
-    qname = "mso14:CT_TaskFormGroup/mso14:taskFormGroup",
-    qname = "mso14:CT_BackstageGroup/mso14:group",
-    qname = "mso14:CT_TaskGroup/mso14:taskGroup"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TaskFormGroup, qname = "mso14:taskFormGroup"),
+            child(variant = BackstageGroup, qname = "mso14:group"),
+            child(variant = TaskGroup, qname = "mso14:taskGroup")
+        )
+    )]
   pub backstage_groups_choice: Option<BackstageGroupsChoice>,
 }
 /// Defines the SimpleGroups Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_SimpleGroups/mso14:secondColumn")]
 pub struct SimpleGroups {
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroup/mso14:group",
-    qname = "mso14:CT_TaskGroup/mso14:taskGroup"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageGroup, qname = "mso14:group"),
+            child(variant = TaskGroup, qname = "mso14:taskGroup")
+        )
+    )]
   pub simple_groups_choice: Vec<SimpleGroupsChoice>,
 }
 /// Defines the BackstageTab Class.
@@ -6456,10 +6498,12 @@ pub struct Backstage {
   #[sdk(attr(office2010, qname = ":onHide"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_hide: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageTab/mso14:tab",
-    qname = "mso14:CT_BackstageFastCommandButton/mso14:button"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackstageTab, qname = "mso14:tab"),
+            child(variant = BackstageFastCommandButton, qname = "mso14:button")
+        )
+    )]
   pub backstage_choice: Vec<BackstageChoice>,
 }
 /// Defines the ContextMenus Class.

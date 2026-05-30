@@ -88,7 +88,12 @@ pub struct Lattice {
   /// time-ref-anchor-point
   #[sdk(attr(qname = "emma:time-ref-anchor-point"))]
   pub time_reference_anchor_point: Option<AnchorPointValues>,
-  #[sdk(choice(qname = "emma:CT_Arc/emma:arc", qname = "emma:CT_Node/emma:node"))]
+  #[sdk(
+        choice(
+            child(variant = Arc, qname = "emma:arc"),
+            child(variant = Node, qname = "emma:node")
+        )
+    )]
   pub lattice_choice: Vec<LatticeChoice>,
 }
 /// Defines the Literal Class.
@@ -180,13 +185,15 @@ pub struct Interpretation {
   /// uninterpreted
   #[sdk(attr(qname = "emma:uninterpreted"))]
   pub uninterpreted: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "emma:CT_DerivedFrom/emma:derived-from",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Lattice/emma:lattice",
-    qname = "emma:CT_Literal/emma:literal",
-    qname = "msink:CT_CtxNode/msink:context"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DerivedFrom, qname = "emma:derived-from"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Lattice, qname = "emma:lattice"),
+            text_child(variant = Literal, qname = "emma:literal"),
+            child(variant = ContextNode, qname = "msink:context")
+        )
+    )]
   pub interpretation_choice: Vec<InterpretationChoice>,
 }
 /// Defines the OneOf Class.
@@ -273,14 +280,16 @@ pub struct OneOf {
   /// dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "emma:CT_DerivedFrom/emma:derived-from",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Group/emma:group",
-    qname = "emma:CT_Sequence/emma:sequence"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DerivedFrom, qname = "emma:derived-from"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = Group, qname = "emma:group"),
+            child(variant = Sequence, qname = "emma:sequence")
+        )
+    )]
   pub one_of_choice: Vec<OneOfChoice>,
 }
 /// Defines the Group Class.
@@ -364,15 +373,17 @@ pub struct Group {
   /// dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "emma:CT_DerivedFrom/emma:derived-from",
-    qname = "emma:CT_GroupInfo/emma:group-info",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Group/emma:group",
-    qname = "emma:CT_Sequence/emma:sequence"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DerivedFrom, qname = "emma:derived-from"),
+            child(variant = GroupInfo, qname = "emma:group-info"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = Group, qname = "emma:group"),
+            child(variant = Sequence, qname = "emma:sequence")
+        )
+    )]
   pub group_choice: Vec<GroupChoice>,
 }
 /// Defines the Sequence Class.
@@ -456,14 +467,16 @@ pub struct Sequence {
   /// dialog-turn
   #[sdk(attr(qname = "emma:dialog-turn"))]
   pub dialog_turn: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "emma:CT_DerivedFrom/emma:derived-from",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Group/emma:group",
-    qname = "emma:CT_Sequence/emma:sequence"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DerivedFrom, qname = "emma:derived-from"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = Group, qname = "emma:group"),
+            child(variant = Sequence, qname = "emma:sequence")
+        )
+    )]
   pub sequence_choice: Vec<SequenceChoice>,
 }
 /// Defines the GroupInfo Class.
@@ -481,12 +494,14 @@ pub struct GroupInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "emma:CT_Derivation/emma:derivation")]
 pub struct Derivation {
-  #[sdk(choice(
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Sequence/emma:sequence",
-    qname = "emma:CT_Group/emma:group"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = Sequence, qname = "emma:sequence"),
+            child(variant = Group, qname = "emma:group")
+        )
+    )]
   pub derivation_choice: Vec<DerivationChoice>,
 }
 /// Defines the Grammar Class.
@@ -653,17 +668,19 @@ pub struct Emma {
   /// version
   #[sdk(attr(qname = ":version"))]
   pub version: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "emma:CT_Derivation/emma:derivation",
-    qname = "emma:CT_Grammar/emma:grammar",
-    qname = "emma:CT_Model/emma:model",
-    qname = "emma:CT_EndPointInfo/emma:endpoint-info",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Group/emma:group",
-    qname = "emma:CT_Sequence/emma:sequence"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Derivation, qname = "emma:derivation"),
+            child(variant = Grammar, qname = "emma:grammar"),
+            child(variant = Model, qname = "emma:model"),
+            child(variant = EndPointInfo, qname = "emma:endpoint-info"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = Group, qname = "emma:group"),
+            child(variant = Sequence, qname = "emma:sequence")
+        )
+    )]
   pub emma_choice: Vec<EmmaChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

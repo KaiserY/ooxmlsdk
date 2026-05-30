@@ -169,14 +169,16 @@ pub struct GroupCommand {
   /// Defines the DrawingMonikerList Class.
   #[sdk(any_child(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
   pub drawing_moniker_list: DrawingMonikerList,
-  #[sdk(choice(
-    qname = "oac:CT_ShapeMoniker/oac:spMk",
-    qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk",
-    qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk",
-    qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk",
-    qname = "oac:CT_PictureMoniker/oac:picMk",
-    qname = "oac:CT_InkMoniker/oac:inkMk"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ShapeMoniker, qname = "oac:spMk"),
+            child(variant = GroupShapeMoniker, qname = "oac:grpSpMk"),
+            child(variant = GraphicFrameMoniker, qname = "oac:graphicFrameMk"),
+            child(variant = ConnectorMoniker, qname = "oac:cxnSpMk"),
+            child(variant = PictureMoniker, qname = "oac:picMk"),
+            child(variant = InkMoniker, qname = "oac:inkMk")
+        )
+    )]
   pub group_command_choice: Vec<GroupCommandChoice>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2016, qname = "a:CT_GroupShapeProperties/oac:grpSpPr"))]
@@ -355,28 +357,36 @@ pub struct TextParagraphPropertiesType {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<crate::schemas::a::SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub text_paragraph_properties_type_choice1: Option<TextParagraphPropertiesTypeChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub text_paragraph_properties_type_choice2: Option<TextParagraphPropertiesTypeChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub text_paragraph_properties_type_choice3: Option<TextParagraphPropertiesTypeChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub text_paragraph_properties_type_choice4: Option<TextParagraphPropertiesTypeChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -459,16 +469,23 @@ pub struct TextBodyProperties {
   /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<std::boxed::Box<crate::schemas::a::PresetTextWarp>>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoAutofit/a:noAutofit",
-    qname = "a:CT_TextNormalAutofit/a:normAutofit",
-    qname = "a:CT_TextShapeAutofit/a:spAutoFit"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoAutoFit, qname = "a:noAutofit"),
+            child(variant = NormalAutoFit, qname = "a:normAutofit"),
+            empty_child(variant = ShapeAutoFit, qname = "a:spAutoFit")
+        )
+    )]
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
-  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
+  #[sdk(
+        choice(
+            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = FlatText, qname = "a:flatTx")
+        )
+    )]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -531,27 +548,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -602,14 +625,16 @@ pub struct LnRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub ln_ref_style_matrix_reference_choice: Option<LnRefStyleMatrixReferenceChoice>,
 }
 /// Defines the FillRefStyleMatrixReference Class.
@@ -619,14 +644,16 @@ pub struct FillRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub fill_ref_style_matrix_reference_choice: Option<FillRefStyleMatrixReferenceChoice>,
 }
 /// Defines the EffectRefStyleMatrixReference Class.
@@ -636,14 +663,16 @@ pub struct EffectRefStyleMatrixReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub effect_ref_style_matrix_reference_choice: Option<EffectRefStyleMatrixReferenceChoice>,
 }
 /// Defines the FontReference Class.
@@ -654,14 +683,16 @@ pub struct FontReference {
   #[sdk(attr(qname = ":idx"))]
   #[sdk(string_format(kind = "token"))]
   pub index: crate::schemas::a::FontCollectionIndexValues,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub font_reference_choice: Option<FontReferenceChoice>,
 }
 /// Defines the ModifyShapeStyleProps Class.
@@ -701,10 +732,12 @@ pub struct BlipFillProperties {
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
-  #[sdk(choice(
-    qname = "a:CT_TileInfoProperties/a:tile",
-    qname = "a:CT_StretchInfoProperties/a:stretch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tile, qname = "a:tile"),
+            child(variant = Stretch, qname = "a:stretch")
+        )
+    )]
   pub blip_fill_properties_choice: Option<BlipFillPropertiesChoice>,
 }
 /// Defines the FillRectRelativeRectProps Class.
@@ -798,19 +831,23 @@ pub struct GroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -1130,23 +1167,29 @@ pub struct LinePropertiesType {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<crate::schemas::a::PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub line_properties_type_choice1: Option<LinePropertiesTypeChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub line_properties_type_choice2: Option<LinePropertiesTypeChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub line_properties_type_choice3: Option<LinePropertiesTypeChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]

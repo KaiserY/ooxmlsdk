@@ -162,14 +162,16 @@ pub struct ColorStyle {
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_style_choice: Vec<ColorStyleChoice>,
   /// Defines the ColorStyleVariation Class.
   #[sdk(child(office2013, qname = "cs:CT_ColorStyleVariation/cs:variation"))]
@@ -288,36 +290,38 @@ pub struct ChartStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "cs:CT_ColorStyleVariation/cs:variation")]
 pub struct ColorStyleVariation {
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub color_style_variation_choice: Vec<ColorStyleVariationChoice>,
 }
 /// Defines the OfficeArtExtensionList Class.
@@ -338,36 +342,38 @@ pub struct StyleColor {
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub val: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub style_color_choice: Vec<StyleColorChoice>,
 }
 /// Defines the LineReference Class.
@@ -380,14 +386,16 @@ pub struct LineReference {
   /// mods
   #[sdk(attr(office2013, list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub line_reference_choice: Option<LineReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -403,14 +411,16 @@ pub struct FillReference {
   /// mods
   #[sdk(attr(office2013, list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub fill_reference_choice: Option<FillReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -426,14 +436,16 @@ pub struct EffectReference {
   /// mods
   #[sdk(attr(office2013, list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub effect_reference_choice: Option<EffectReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -452,14 +464,16 @@ pub struct FontReference {
   /// mods
   #[sdk(attr(office2013, list, qname = ":mods"))]
   pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub font_reference_choice: Option<FontReferenceChoice>,
   /// Defines the StyleColor Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
@@ -476,27 +490,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -578,32 +598,40 @@ pub struct TextCharacterPropertiesType {
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub text_character_properties_type_choice1: Option<TextCharacterPropertiesTypeChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub highlight: Option<std::boxed::Box<crate::schemas::a::Highlight>>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
-    qname = "a:CT_LineProperties/a:uLn"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
+            child(variant = Underline, qname = "a:uLn")
+        )
+    )]
   pub text_character_properties_type_choice3: Option<TextCharacterPropertiesTypeChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
-    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
+            child(variant = UnderlineFill, qname = "a:uFill")
+        )
+    )]
   pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -701,16 +729,23 @@ pub struct TextBodyProperties {
   /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<std::boxed::Box<crate::schemas::a::PresetTextWarp>>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoAutofit/a:noAutofit",
-    qname = "a:CT_TextNormalAutofit/a:normAutofit",
-    qname = "a:CT_TextShapeAutofit/a:spAutoFit"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoAutoFit, qname = "a:noAutofit"),
+            child(variant = NormalAutoFit, qname = "a:normAutofit"),
+            empty_child(variant = ShapeAutoFit, qname = "a:spAutoFit")
+        )
+    )]
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
-  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
+  #[sdk(
+        choice(
+            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = FlatText, qname = "a:flatTx")
+        )
+    )]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]

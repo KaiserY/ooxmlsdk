@@ -5057,29 +5057,33 @@ pub struct EmbeddedObject {
   #[sdk(attr(office2010, qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice(
-    qname = "v:CT_Group/v:group",
-    qname = "v:CT_Image/v:image",
-    qname = "v:CT_Line/v:line",
-    qname = "v:CT_Oval/v:oval",
-    qname = "v:CT_PolyLine/v:polyline",
-    qname = "v:CT_Rect/v:rect",
-    qname = "v:CT_RoundRect/v:roundrect",
-    qname = "v:CT_Shape/v:shape",
-    qname = "v:CT_Shapetype/v:shapetype",
-    qname = "v:CT_Arc/v:arc",
-    qname = "v:CT_Curve/v:curve",
-    qname = "o:CT_OLEObject/o:OLEObject"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Group, qname = "v:group"),
+            child(variant = ImageFile, qname = "v:image"),
+            child(variant = Line, qname = "v:line"),
+            child(variant = Oval, qname = "v:oval"),
+            child(variant = PolyLine, qname = "v:polyline"),
+            child(variant = Rectangle, qname = "v:rect"),
+            child(variant = RoundRectangle, qname = "v:roundrect"),
+            child(variant = Shape, qname = "v:shape"),
+            child(variant = Shapetype, qname = "v:shapetype"),
+            child(variant = Arc, qname = "v:arc"),
+            child(variant = Curve, qname = "v:curve"),
+            child(variant = OleObject, qname = "o:OLEObject")
+        )
+    )]
   pub embedded_object_choice1: Vec<EmbeddedObjectChoice>,
   /// DrawingML Object.
   #[sdk(child(qname = "w:CT_Drawing/w:drawing"))]
   pub drawing: Option<std::boxed::Box<Drawing>>,
-  #[sdk(choice(
-    qname = "w:CT_Control/w:control",
-    qname = "w:CT_ObjectEmbed/w:objectEmbed",
-    qname = "w:CT_ObjectLink/w:objectLink"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Control, qname = "w:control"),
+            child(variant = ObjectEmbed, qname = "w:objectEmbed"),
+            child(variant = ObjectLink, qname = "w:objectLink")
+        )
+    )]
   pub embedded_object_choice2: Option<EmbeddedObjectChoice2>,
 }
 /// VML Object.
@@ -5091,20 +5095,22 @@ pub struct Picture {
   #[sdk(attr(office2010, qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice(
-    qname = "v:CT_Group/v:group",
-    qname = "v:CT_Image/v:image",
-    qname = "v:CT_Line/v:line",
-    qname = "v:CT_Oval/v:oval",
-    qname = "v:CT_PolyLine/v:polyline",
-    qname = "v:CT_Rect/v:rect",
-    qname = "v:CT_RoundRect/v:roundrect",
-    qname = "v:CT_Shape/v:shape",
-    qname = "v:CT_Shapetype/v:shapetype",
-    qname = "v:CT_Arc/v:arc",
-    qname = "v:CT_Curve/v:curve",
-    qname = "o:CT_OLEObject/o:OLEObject"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Group, qname = "v:group"),
+            child(variant = ImageFile, qname = "v:image"),
+            child(variant = Line, qname = "v:line"),
+            child(variant = Oval, qname = "v:oval"),
+            child(variant = PolyLine, qname = "v:polyline"),
+            child(variant = Rectangle, qname = "v:rect"),
+            child(variant = RoundRectangle, qname = "v:roundrect"),
+            child(variant = Shape, qname = "v:shape"),
+            child(variant = Shapetype, qname = "v:shapetype"),
+            child(variant = Arc, qname = "v:arc"),
+            child(variant = Curve, qname = "v:curve"),
+            child(variant = OleObject, qname = "o:OLEObject")
+        )
+    )]
   pub picture_choice: Vec<PictureChoice>,
   /// Defines the MovieReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:movie"))]
@@ -5126,11 +5132,13 @@ pub struct FieldChar {
   /// Field Result Invalidated
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
-  #[sdk(choice(
-    qname = "w:CT_Base64BinaryText/w:fldData",
-    qname = "w:CT_FFData/w:ffData",
-    qname = "w:CT_TrackChangeNumbering/w:numberingChange"
-  ))]
+  #[sdk(
+        choice(
+            text_child(variant = FieldData, qname = "w:fldData"),
+            child(variant = FormFieldData, qname = "w:ffData"),
+            child(variant = NumberingChange, qname = "w:numberingChange")
+        )
+    )]
   pub field_char_choice: Option<FieldCharChoice>,
 }
 /// Phonetic Guide.
@@ -5176,7 +5184,12 @@ pub struct EndnoteReference {
 #[sdk(qname = "w:CT_Drawing/w:drawing")]
 pub struct Drawing {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(choice(qname = "wp:CT_Anchor/wp:anchor", qname = "wp:CT_Inline/wp:inline"))]
+  #[sdk(
+        choice(
+            child(variant = Anchor, qname = "wp:anchor"),
+            child(variant = Inline, qname = "wp:inline")
+        )
+    )]
   pub drawing_choice: Option<DrawingChoice>,
 }
 /// Absolute Position Tab Character.
@@ -6274,46 +6287,48 @@ pub struct RunPropertiesChange {
 pub struct RunProperties {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
-  #[sdk(choice(
-    qname = "w:CT_String253/w:rStyle",
-    qname = "w:CT_Fonts/w:rFonts",
-    qname = "w:CT_OnOff/w:b",
-    qname = "w:CT_OnOff/w:bCs",
-    qname = "w:CT_OnOff/w:i",
-    qname = "w:CT_OnOff/w:iCs",
-    qname = "w:CT_OnOff/w:caps",
-    qname = "w:CT_OnOff/w:smallCaps",
-    qname = "w:CT_OnOff/w:strike",
-    qname = "w:CT_OnOff/w:dstrike",
-    qname = "w:CT_OnOff/w:outline",
-    qname = "w:CT_OnOff/w:shadow",
-    qname = "w:CT_OnOff/w:emboss",
-    qname = "w:CT_OnOff/w:imprint",
-    qname = "w:CT_OnOff/w:noProof",
-    qname = "w:CT_OnOff/w:snapToGrid",
-    qname = "w:CT_OnOff/w:vanish",
-    qname = "w:CT_OnOff/w:webHidden",
-    qname = "w:CT_Color/w:color",
-    qname = "w:CT_ShortTwipsMeasure/w:spacing",
-    qname = "w:CT_TextScale/w:w",
-    qname = "w:CT_HpsKern/w:kern",
-    qname = "w:CT_SignedHpsMeasure/w:position",
-    qname = "w:CT_HpsMeasure/w:sz",
-    qname = "w:CT_HpsMeasure/w:szCs",
-    qname = "w:CT_Highlight/w:highlight",
-    qname = "w:CT_Underline/w:u",
-    qname = "w:CT_TextEffect/w:effect",
-    qname = "w:CT_Border/w:bdr",
-    qname = "w:CT_Shd/w:shd",
-    qname = "w:CT_FitText/w:fitText",
-    qname = "w:CT_VerticalAlignRun/w:vertAlign",
-    qname = "w:CT_OnOff/w:rtl",
-    qname = "w:CT_OnOff/w:cs",
-    qname = "w:CT_Em/w:em",
-    qname = "w:CT_Language/w:lang",
-    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
-    qname = "w:CT_OnOff/w:specVanish"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunStyle, qname = "w:rStyle"),
+            child(variant = RunFonts, qname = "w:rFonts"),
+            child(variant = Bold, qname = "w:b"),
+            child(variant = BoldComplexScript, qname = "w:bCs"),
+            child(variant = Italic, qname = "w:i"),
+            child(variant = ItalicComplexScript, qname = "w:iCs"),
+            child(variant = Caps, qname = "w:caps"),
+            child(variant = SmallCaps, qname = "w:smallCaps"),
+            child(variant = Strike, qname = "w:strike"),
+            child(variant = DoubleStrike, qname = "w:dstrike"),
+            child(variant = Outline, qname = "w:outline"),
+            child(variant = Shadow, qname = "w:shadow"),
+            child(variant = Emboss, qname = "w:emboss"),
+            child(variant = Imprint, qname = "w:imprint"),
+            child(variant = NoProof, qname = "w:noProof"),
+            child(variant = SnapToGrid, qname = "w:snapToGrid"),
+            child(variant = Vanish, qname = "w:vanish"),
+            child(variant = WebHidden, qname = "w:webHidden"),
+            child(variant = Color, qname = "w:color"),
+            child(variant = Spacing, qname = "w:spacing"),
+            child(variant = CharacterScale, qname = "w:w"),
+            child(variant = Kern, qname = "w:kern"),
+            child(variant = Position, qname = "w:position"),
+            child(variant = FontSize, qname = "w:sz"),
+            child(variant = FontSizeComplexScript, qname = "w:szCs"),
+            child(variant = Highlight, qname = "w:highlight"),
+            child(variant = Underline, qname = "w:u"),
+            child(variant = TextEffect, qname = "w:effect"),
+            child(variant = Border, qname = "w:bdr"),
+            child(variant = Shading, qname = "w:shd"),
+            child(variant = FitText, qname = "w:fitText"),
+            child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
+            child(variant = ComplexScript, qname = "w:cs"),
+            child(variant = Emphasis, qname = "w:em"),
+            child(variant = Languages, qname = "w:lang"),
+            child(variant = EastAsianLayout, qname = "w:eastAsianLayout"),
+            child(variant = SpecVanish, qname = "w:specVanish")
+        )
+    )]
   pub run_properties_choice: Vec<RunPropertiesChoice>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
@@ -6386,7 +6401,12 @@ pub struct InsertedMathControl {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "w:CT_RPr/w:rPr", qname = "w:CT_MathCtrlDel/w:del"))]
+  #[sdk(
+        choice(
+            child(variant = RunProperties, qname = "w:rPr"),
+            child(variant = DeletedMathControl, qname = "w:del")
+        )
+    )]
   pub inserted_math_control_choice: Option<InsertedMathControlChoice>,
 }
 /// Defines the DeletedMathControl Class.
@@ -6455,11 +6475,13 @@ pub struct MoveFromMathControl {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_RPr/w:rPr",
-    qname = "w:CT_MathCtrlIns/w:ins",
-    qname = "w:CT_MathCtrlDel/w:del"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunProperties, qname = "w:rPr"),
+            child(variant = InsertedMathControl, qname = "w:ins"),
+            child(variant = DeletedMathControl, qname = "w:del")
+        )
+    )]
   pub move_from_math_control_choice: Option<MoveFromMathControlChoice>,
 }
 /// Defines the MoveToMathControl Class.
@@ -6493,11 +6515,13 @@ pub struct MoveToMathControl {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_RPr/w:rPr",
-    qname = "w:CT_MathCtrlIns/w:ins",
-    qname = "w:CT_MathCtrlDel/w:del"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunProperties, qname = "w:rPr"),
+            child(variant = InsertedMathControl, qname = "w:ins"),
+            child(variant = DeletedMathControl, qname = "w:del")
+        )
+    )]
   pub move_to_math_control_choice: Option<MoveToMathControlChoice>,
 }
 /// Defines the CustomXmlRuby Class.
@@ -6508,65 +6532,91 @@ pub struct CustomXmlRuby {
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub custom_xml_ruby_choice: Vec<CustomXmlRubyChoice>,
 }
 /// Defines the SimpleFieldRuby Class.
@@ -6588,65 +6638,91 @@ pub struct SimpleFieldRuby {
     qname = "w:CT_Base64BinaryText/w:fldData"
   ))]
   pub field_data: Option<FieldData>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub simple_field_ruby_choice: Vec<SimpleFieldRubyChoice>,
 }
 /// Defines the HyperlinkRuby Class.
@@ -6675,65 +6751,91 @@ pub struct HyperlinkRuby {
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub hyperlink_ruby_choice: Vec<HyperlinkRubyChoice>,
 }
 /// Phonetic Guide Text Run.
@@ -6756,41 +6858,49 @@ pub struct Run {
   /// Run Properties
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_Br/w:br",
-    qname = "w:CT_Text/w:t",
-    qname = "w:CT_Text/w:delText",
-    qname = "w:CT_Text/w:instrText",
-    qname = "w:CT_Text/w:delInstrText",
-    qname = "w:CT_Empty/w:noBreakHyphen",
-    qname = "w:CT_Empty/w:softHyphen",
-    qname = "w:CT_Empty/w:dayShort",
-    qname = "w:CT_Empty/w:monthShort",
-    qname = "w:CT_Empty/w:yearShort",
-    qname = "w:CT_Empty/w:dayLong",
-    qname = "w:CT_Empty/w:monthLong",
-    qname = "w:CT_Empty/w:yearLong",
-    qname = "w:CT_Empty/w:annotationRef",
-    qname = "w:CT_Empty/w:footnoteRef",
-    qname = "w:CT_Empty/w:endnoteRef",
-    qname = "w:CT_Empty/w:separator",
-    qname = "w:CT_Empty/w:continuationSeparator",
-    qname = "w:CT_Sym/w:sym",
-    qname = "w:CT_Empty/w:pgNum",
-    qname = "w:CT_Empty/w:cr",
-    qname = "w:CT_Empty/w:tab",
-    qname = "w:CT_Object/w:object",
-    qname = "w:CT_Picture/w:pict",
-    qname = "w:CT_FldChar/w:fldChar",
-    qname = "w:CT_Ruby/w:ruby",
-    qname = "w:CT_FtnEdnRef/w:footnoteReference",
-    qname = "w:CT_FtnEdnRef/w:endnoteReference",
-    qname = "w:CT_Markup/w:commentReference",
-    qname = "w:CT_Drawing/w:drawing",
-    qname = "w:CT_PTab/w:ptab",
-    qname = "w:CT_Empty/w:lastRenderedPageBreak",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Break, qname = "w:br"),
+            child(variant = Text, qname = "w:t"),
+            child(variant = DeletedText, qname = "w:delText"),
+            child(variant = FieldCode, qname = "w:instrText"),
+            child(variant = DeletedFieldCode, qname = "w:delInstrText"),
+            empty_child(variant = NoBreakHyphen, qname = "w:noBreakHyphen"),
+            empty_child(variant = SoftHyphen, qname = "w:softHyphen"),
+            empty_child(variant = DayShort, qname = "w:dayShort"),
+            empty_child(variant = MonthShort, qname = "w:monthShort"),
+            empty_child(variant = YearShort, qname = "w:yearShort"),
+            empty_child(variant = DayLong, qname = "w:dayLong"),
+            empty_child(variant = MonthLong, qname = "w:monthLong"),
+            empty_child(variant = YearLong, qname = "w:yearLong"),
+            empty_child(variant = AnnotationReferenceMark, qname = "w:annotationRef"),
+            empty_child(variant = FootnoteReferenceMark, qname = "w:footnoteRef"),
+            empty_child(variant = EndnoteReferenceMark, qname = "w:endnoteRef"),
+            empty_child(variant = SeparatorMark, qname = "w:separator"),
+            empty_child(
+                variant = ContinuationSeparatorMark,
+                qname = "w:continuationSeparator"
+            ),
+            child(variant = SymbolChar, qname = "w:sym"),
+            empty_child(variant = PageNumber, qname = "w:pgNum"),
+            empty_child(variant = CarriageReturn, qname = "w:cr"),
+            empty_child(variant = TabChar, qname = "w:tab"),
+            child(variant = EmbeddedObject, qname = "w:object"),
+            child(variant = Picture, qname = "w:pict"),
+            child(variant = FieldChar, qname = "w:fldChar"),
+            child(variant = Ruby, qname = "w:ruby"),
+            child(variant = FootnoteReference, qname = "w:footnoteReference"),
+            child(variant = EndnoteReference, qname = "w:endnoteReference"),
+            child(variant = CommentReference, qname = "w:commentReference"),
+            child(variant = Drawing, qname = "w:drawing"),
+            child(variant = PositionalTab, qname = "w:ptab"),
+            empty_child(
+                variant = LastRenderedPageBreak,
+                qname = "w:lastRenderedPageBreak"
+            ),
+            any
+        )
+    )]
   pub run_choice: Vec<RunChoice>,
 }
 /// Defines the SdtRunRuby Class.
@@ -6806,28 +6916,54 @@ pub struct SdtRunRuby {
   /// Defines the SdtContentRunRuby Class.
   #[sdk(child(qname = "w:CT_SdtContentRunRuby/w:sdtContent"))]
   pub sdt_content_run_ruby: Option<SdtContentRunRuby>,
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub sdt_run_ruby_choice: Vec<SdtRunRubyChoice>,
 }
 /// Defines the ProofError Class.
@@ -6905,64 +7041,90 @@ pub struct InsertedRun {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub inserted_run_choice: Vec<InsertedRunChoice>,
 }
 /// Deleted Run Content.
@@ -6996,64 +7158,90 @@ pub struct DeletedRun {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub deleted_run_choice: Vec<DeletedRunChoice>,
 }
 /// Move Source Run Content.
@@ -7087,64 +7275,90 @@ pub struct MoveFromRun {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub move_from_run_choice: Vec<MoveFromRunChoice>,
 }
 /// Move Destination Run Content.
@@ -7178,64 +7392,90 @@ pub struct MoveToRun {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub move_to_run_choice: Vec<MoveToRunChoice>,
 }
 /// Defines the ContentPart Class.
@@ -7259,28 +7499,54 @@ pub struct SdtRun {
   /// Inline-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentRun/w:sdtContent"))]
   pub sdt_content_run: Option<SdtContentRun>,
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub sdt_run_choice: Vec<SdtRunChoice>,
 }
 /// Defines the CustomXmlBlock Class.
@@ -7291,42 +7557,68 @@ pub struct CustomXmlBlock {
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub custom_xml_block_choice: Vec<CustomXmlBlockChoice>,
 }
 /// Defines the SdtBlock Class.
@@ -7342,28 +7634,54 @@ pub struct SdtBlock {
   /// Block-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentBlock/w:sdtContent"))]
   pub sdt_content_block: Option<SdtContentBlock>,
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub sdt_block_choice: Vec<SdtBlockChoice>,
 }
 /// Defines the Paragraph Class.
@@ -7405,97 +7723,149 @@ pub struct Paragraph {
   /// Paragraph Properties
   #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc"),
+            any
+        )
+    )]
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
 /// Defines the Table Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub table_choice1: Vec<TableChoice>,
   /// Table Properties.
   #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
@@ -7503,41 +7873,67 @@ pub struct Table {
   /// Table Grid.
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
   pub table_grid: std::boxed::Box<TableGrid>,
-  #[sdk(choice(
-    qname = "w:CT_Row/w:tr",
-    qname = "w:CT_CustomXmlRow/w:customXml",
-    qname = "w:CT_SdtRow/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableRow, qname = "w:tr"),
+            child(variant = CustomXmlRow, qname = "w:customXml"),
+            child(variant = SdtRow, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub table_choice2: Vec<TableChoice2>,
 }
 /// Table Row.
@@ -7575,41 +7971,67 @@ pub struct TableRow {
   /// Table Row Properties
   #[sdk(child(qname = "w:CT_TrPr/w:trPr"))]
   pub table_row_properties: Option<std::boxed::Box<TableRowProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_Tc/w:tc",
-    qname = "w:CT_CustomXmlCell/w:customXml",
-    qname = "w:CT_SdtCell/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableCell, qname = "w:tc"),
+            child(variant = CustomXmlCell, qname = "w:customXml"),
+            child(variant = SdtCell, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub table_row_choice: Vec<TableRowChoice>,
 }
 /// Row-Level Custom XML Element.
@@ -7619,41 +8041,67 @@ pub struct CustomXmlRow {
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_Row/w:tr",
-    qname = "w:CT_CustomXmlRow/w:customXml",
-    qname = "w:CT_SdtRow/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableRow, qname = "w:tr"),
+            child(variant = CustomXmlRow, qname = "w:customXml"),
+            child(variant = SdtRow, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub custom_xml_row_choice: Vec<CustomXmlRowChoice>,
 }
 /// Row-Level Structured Document Tag.
@@ -7669,28 +8117,54 @@ pub struct SdtRow {
   /// Row-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentRow/w:sdtContent"))]
   pub sdt_content_row: Option<SdtContentRow>,
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub sdt_row_choice: Vec<SdtRowChoice>,
 }
 /// Table Cell.
@@ -7700,43 +8174,69 @@ pub struct TableCell {
   /// Table Cell Properties
   #[sdk(child(qname = "w:CT_TcPr/w:tcPr"))]
   pub table_cell_properties: Option<std::boxed::Box<TableCellProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub table_cell_choice: Vec<TableCellChoice>,
 }
 /// Cell-Level Custom XML Element.
@@ -7746,41 +8246,67 @@ pub struct CustomXmlCell {
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_Tc/w:tc",
-    qname = "w:CT_CustomXmlCell/w:customXml",
-    qname = "w:CT_SdtCell/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableCell, qname = "w:tc"),
+            child(variant = CustomXmlCell, qname = "w:customXml"),
+            child(variant = SdtCell, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub custom_xml_cell_choice: Vec<CustomXmlCellChoice>,
 }
 /// Cell-Level Structured Document Tag.
@@ -7796,28 +8322,54 @@ pub struct SdtCell {
   /// Cell-Level Structured Document Tag Content
   #[sdk(child(qname = "w:CT_SdtContentCell/w:sdtContent"))]
   pub sdt_content_cell: Option<SdtContentCell>,
-  #[sdk(choice(
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            )
+        )
+    )]
   pub sdt_cell_choice: Vec<SdtCellChoice>,
 }
 /// Defines the CustomXmlRun Class.
@@ -7827,68 +8379,94 @@ pub struct CustomXmlRun {
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:CT_CustomXmlPr/w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub custom_xml_run_choice: Vec<CustomXmlRunChoice>,
 }
 /// Defines the SimpleField Class.
@@ -7910,68 +8488,94 @@ pub struct SimpleField {
     qname = "w:CT_Base64BinaryText/w:fldData"
   ))]
   pub field_data: Option<FieldData>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub simple_field_choice: Vec<SimpleFieldChoice>,
 }
 /// Defines the Hyperlink Class.
@@ -8000,68 +8604,94 @@ pub struct Hyperlink {
   /// Hyperlink Target
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub hyperlink_choice: Vec<HyperlinkChoice>,
 }
 /// Defines the BidirectionalOverride Class.
@@ -8071,68 +8701,94 @@ pub struct BidirectionalOverride {
   /// val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub bidirectional_override_choice: Vec<BidirectionalOverrideChoice>,
 }
 /// Defines the BidirectionalEmbedding Class.
@@ -8142,68 +8798,94 @@ pub struct BidirectionalEmbedding {
   /// val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub bidirectional_embedding_choice: Vec<BidirectionalEmbeddingChoice>,
 }
 /// Anchor for Subdocument Location.
@@ -9212,43 +9894,69 @@ pub struct Recipients {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub text_box_content_choice: Vec<TextBoxContentChoice>,
 }
 /// Comments Collection.
@@ -9291,43 +9999,69 @@ pub struct Header {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub header_choice: Vec<HeaderChoice>,
 }
 /// Footer.
@@ -9337,43 +10071,69 @@ pub struct Footer {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub footer_choice: Vec<FooterChoice>,
 }
 /// Document Settings.
@@ -9745,7 +10505,7 @@ pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
-  #[sdk(choice(qname = "w:CT_Font/w:font", any))]
+  #[sdk(choice(child(variant = Font, qname = "w:font"), any))]
   pub xml_children: Vec<FontsChoice>,
 }
 /// Numbering Definitions.
@@ -9891,31 +10651,35 @@ pub struct PreviousTableCellProperties {
   /// Defines the HideMark Class.
   #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
-  #[sdk(choice(
-    qname = "w:CT_TrackChange/w:cellIns",
-    qname = "w:CT_TrackChange/w:cellDel",
-    qname = "w:CT_CellMergeTrackChange/w:cellMerge"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CellInsertion, qname = "w:cellIns"),
+            child(variant = CellDeletion, qname = "w:cellDel"),
+            child(variant = CellMerge, qname = "w:cellMerge")
+        )
+    )]
   pub previous_table_cell_properties_choice: Option<PreviousTableCellPropertiesChoice>,
 }
 /// Previous Table Row Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBase/w:trPr")]
 pub struct PreviousTableRowProperties {
-  #[sdk(choice(
-    qname = "w:CT_Cnf/w:cnfStyle",
-    qname = "w:CT_NonZeroDecimalNumber/w:divId",
-    qname = "w:CT_DecimalNumber/w:gridBefore",
-    qname = "w:CT_DecimalNumber/w:gridAfter",
-    qname = "w:CT_TblWidth/w:wBefore",
-    qname = "w:CT_TblWidth/w:wAfter",
-    qname = "w:CT_Height/w:trHeight",
-    qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOff/w:cantSplit",
-    qname = "w:CT_OnOff/w:tblHeader",
-    qname = "w:CT_TblWidth/w:tblCellSpacing",
-    qname = "w:CT_TblJc/w:jc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ConditionalFormatStyle, qname = "w:cnfStyle"),
+            child(variant = DivId, qname = "w:divId"),
+            child(variant = GridBefore, qname = "w:gridBefore"),
+            child(variant = GridAfter, qname = "w:gridAfter"),
+            child(variant = WidthBeforeTableRow, qname = "w:wBefore"),
+            child(variant = WidthAfterTableRow, qname = "w:wAfter"),
+            child(variant = TableRowHeight, qname = "w:trHeight"),
+            child(variant = Hidden, qname = "w:hidden"),
+            child(variant = CantSplit, qname = "w:cantSplit"),
+            child(variant = TableHeader, qname = "w:tblHeader"),
+            child(variant = TableCellSpacing, qname = "w:tblCellSpacing"),
+            child(variant = TableJustification, qname = "w:jc")
+        )
+    )]
   pub previous_table_row_properties_choice: Vec<PreviousTableRowPropertiesChoice>,
 }
 /// Previous Table Properties.
@@ -10158,46 +10922,48 @@ pub struct ParagraphPropertiesExtended {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrOriginal/w:rPr")]
 pub struct PreviousRunProperties {
-  #[sdk(choice(
-    qname = "w:CT_String253/w:rStyle",
-    qname = "w:CT_Fonts/w:rFonts",
-    qname = "w:CT_OnOff/w:b",
-    qname = "w:CT_OnOff/w:bCs",
-    qname = "w:CT_OnOff/w:i",
-    qname = "w:CT_OnOff/w:iCs",
-    qname = "w:CT_OnOff/w:caps",
-    qname = "w:CT_OnOff/w:smallCaps",
-    qname = "w:CT_OnOff/w:strike",
-    qname = "w:CT_OnOff/w:dstrike",
-    qname = "w:CT_OnOff/w:outline",
-    qname = "w:CT_OnOff/w:shadow",
-    qname = "w:CT_OnOff/w:emboss",
-    qname = "w:CT_OnOff/w:imprint",
-    qname = "w:CT_OnOff/w:noProof",
-    qname = "w:CT_OnOff/w:snapToGrid",
-    qname = "w:CT_OnOff/w:vanish",
-    qname = "w:CT_OnOff/w:webHidden",
-    qname = "w:CT_Color/w:color",
-    qname = "w:CT_ShortTwipsMeasure/w:spacing",
-    qname = "w:CT_TextScale/w:w",
-    qname = "w:CT_HpsKern/w:kern",
-    qname = "w:CT_SignedHpsMeasure/w:position",
-    qname = "w:CT_HpsMeasure/w:sz",
-    qname = "w:CT_HpsMeasure/w:szCs",
-    qname = "w:CT_Highlight/w:highlight",
-    qname = "w:CT_Underline/w:u",
-    qname = "w:CT_TextEffect/w:effect",
-    qname = "w:CT_Border/w:bdr",
-    qname = "w:CT_Shd/w:shd",
-    qname = "w:CT_FitText/w:fitText",
-    qname = "w:CT_VerticalAlignRun/w:vertAlign",
-    qname = "w:CT_OnOff/w:rtl",
-    qname = "w:CT_OnOff/w:cs",
-    qname = "w:CT_Em/w:em",
-    qname = "w:CT_Language/w:lang",
-    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
-    qname = "w:CT_OnOff/w:specVanish"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunStyle, qname = "w:rStyle"),
+            child(variant = RunFonts, qname = "w:rFonts"),
+            child(variant = Bold, qname = "w:b"),
+            child(variant = BoldComplexScript, qname = "w:bCs"),
+            child(variant = Italic, qname = "w:i"),
+            child(variant = ItalicComplexScript, qname = "w:iCs"),
+            child(variant = Caps, qname = "w:caps"),
+            child(variant = SmallCaps, qname = "w:smallCaps"),
+            child(variant = Strike, qname = "w:strike"),
+            child(variant = DoubleStrike, qname = "w:dstrike"),
+            child(variant = Outline, qname = "w:outline"),
+            child(variant = Shadow, qname = "w:shadow"),
+            child(variant = Emboss, qname = "w:emboss"),
+            child(variant = Imprint, qname = "w:imprint"),
+            child(variant = NoProof, qname = "w:noProof"),
+            child(variant = SnapToGrid, qname = "w:snapToGrid"),
+            child(variant = Vanish, qname = "w:vanish"),
+            child(variant = WebHidden, qname = "w:webHidden"),
+            child(variant = Color, qname = "w:color"),
+            child(variant = Spacing, qname = "w:spacing"),
+            child(variant = CharacterScale, qname = "w:w"),
+            child(variant = Kern, qname = "w:kern"),
+            child(variant = Position, qname = "w:position"),
+            child(variant = FontSize, qname = "w:sz"),
+            child(variant = FontSizeComplexScript, qname = "w:szCs"),
+            child(variant = Highlight, qname = "w:highlight"),
+            child(variant = Underline, qname = "w:u"),
+            child(variant = TextEffect, qname = "w:effect"),
+            child(variant = Border, qname = "w:bdr"),
+            child(variant = Shading, qname = "w:shd"),
+            child(variant = FitText, qname = "w:fitText"),
+            child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
+            child(variant = ComplexScript, qname = "w:cs"),
+            child(variant = Emphasis, qname = "w:em"),
+            child(variant = Languages, qname = "w:lang"),
+            child(variant = EastAsianLayout, qname = "w:eastAsianLayout"),
+            child(variant = SpecVanish, qname = "w:specVanish")
+        )
+    )]
   pub run_properties_choice: Vec<PreviousRunPropertiesChoice>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
@@ -10252,52 +11018,56 @@ pub struct PreviousParagraphMarkRunProperties {
   /// Move Destination Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
-  #[sdk(choice(
-    qname = "w:CT_TrackChange/w14:conflictIns",
-    qname = "w:CT_TrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = ConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub previous_paragraph_mark_run_properties_choice1:
     Option<PreviousParagraphMarkRunPropertiesChoice>,
-  #[sdk(choice(
-    qname = "w:CT_String253/w:rStyle",
-    qname = "w:CT_Fonts/w:rFonts",
-    qname = "w:CT_OnOff/w:b",
-    qname = "w:CT_OnOff/w:bCs",
-    qname = "w:CT_OnOff/w:i",
-    qname = "w:CT_OnOff/w:iCs",
-    qname = "w:CT_OnOff/w:caps",
-    qname = "w:CT_OnOff/w:smallCaps",
-    qname = "w:CT_OnOff/w:strike",
-    qname = "w:CT_OnOff/w:dstrike",
-    qname = "w:CT_OnOff/w:outline",
-    qname = "w:CT_OnOff/w:shadow",
-    qname = "w:CT_OnOff/w:emboss",
-    qname = "w:CT_OnOff/w:imprint",
-    qname = "w:CT_OnOff/w:noProof",
-    qname = "w:CT_OnOff/w:snapToGrid",
-    qname = "w:CT_OnOff/w:vanish",
-    qname = "w:CT_OnOff/w:webHidden",
-    qname = "w:CT_Color/w:color",
-    qname = "w:CT_ShortTwipsMeasure/w:spacing",
-    qname = "w:CT_TextScale/w:w",
-    qname = "w:CT_HpsKern/w:kern",
-    qname = "w:CT_SignedHpsMeasure/w:position",
-    qname = "w:CT_HpsMeasure/w:sz",
-    qname = "w:CT_HpsMeasure/w:szCs",
-    qname = "w:CT_Highlight/w:highlight",
-    qname = "w:CT_Underline/w:u",
-    qname = "w:CT_TextEffect/w:effect",
-    qname = "w:CT_Border/w:bdr",
-    qname = "w:CT_Shd/w:shd",
-    qname = "w:CT_FitText/w:fitText",
-    qname = "w:CT_VerticalAlignRun/w:vertAlign",
-    qname = "w:CT_OnOff/w:rtl",
-    qname = "w:CT_OnOff/w:cs",
-    qname = "w:CT_Em/w:em",
-    qname = "w:CT_Language/w:lang",
-    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
-    qname = "w:CT_OnOff/w:specVanish"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunStyle, qname = "w:rStyle"),
+            child(variant = RunFonts, qname = "w:rFonts"),
+            child(variant = Bold, qname = "w:b"),
+            child(variant = BoldComplexScript, qname = "w:bCs"),
+            child(variant = Italic, qname = "w:i"),
+            child(variant = ItalicComplexScript, qname = "w:iCs"),
+            child(variant = Caps, qname = "w:caps"),
+            child(variant = SmallCaps, qname = "w:smallCaps"),
+            child(variant = Strike, qname = "w:strike"),
+            child(variant = DoubleStrike, qname = "w:dstrike"),
+            child(variant = Outline, qname = "w:outline"),
+            child(variant = Shadow, qname = "w:shadow"),
+            child(variant = Emboss, qname = "w:emboss"),
+            child(variant = Imprint, qname = "w:imprint"),
+            child(variant = NoProof, qname = "w:noProof"),
+            child(variant = SnapToGrid, qname = "w:snapToGrid"),
+            child(variant = Vanish, qname = "w:vanish"),
+            child(variant = WebHidden, qname = "w:webHidden"),
+            child(variant = Color, qname = "w:color"),
+            child(variant = Spacing, qname = "w:spacing"),
+            child(variant = CharacterScale, qname = "w:w"),
+            child(variant = Kern, qname = "w:kern"),
+            child(variant = Position, qname = "w:position"),
+            child(variant = FontSize, qname = "w:sz"),
+            child(variant = FontSizeComplexScript, qname = "w:szCs"),
+            child(variant = Highlight, qname = "w:highlight"),
+            child(variant = Underline, qname = "w:u"),
+            child(variant = TextEffect, qname = "w:effect"),
+            child(variant = Border, qname = "w:bdr"),
+            child(variant = Shading, qname = "w:shd"),
+            child(variant = FitText, qname = "w:fitText"),
+            child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
+            child(variant = ComplexScript, qname = "w:cs"),
+            child(variant = Emphasis, qname = "w:em"),
+            child(variant = Languages, qname = "w:lang"),
+            child(variant = EastAsianLayout, qname = "w:eastAsianLayout"),
+            child(variant = SpecVanish, qname = "w:specVanish")
+        )
+    )]
   pub previous_paragraph_mark_run_properties_choice2:
     Vec<PreviousParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
@@ -10442,51 +11212,55 @@ pub struct ParagraphMarkRunProperties {
   /// Move Destination Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
-  #[sdk(choice(
-    qname = "w:CT_TrackChange/w14:conflictIns",
-    qname = "w:CT_TrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = ConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub paragraph_mark_run_properties_choice1: Option<ParagraphMarkRunPropertiesChoice>,
-  #[sdk(choice(
-    qname = "w:CT_String253/w:rStyle",
-    qname = "w:CT_Fonts/w:rFonts",
-    qname = "w:CT_OnOff/w:b",
-    qname = "w:CT_OnOff/w:bCs",
-    qname = "w:CT_OnOff/w:i",
-    qname = "w:CT_OnOff/w:iCs",
-    qname = "w:CT_OnOff/w:caps",
-    qname = "w:CT_OnOff/w:smallCaps",
-    qname = "w:CT_OnOff/w:strike",
-    qname = "w:CT_OnOff/w:dstrike",
-    qname = "w:CT_OnOff/w:outline",
-    qname = "w:CT_OnOff/w:shadow",
-    qname = "w:CT_OnOff/w:emboss",
-    qname = "w:CT_OnOff/w:imprint",
-    qname = "w:CT_OnOff/w:noProof",
-    qname = "w:CT_OnOff/w:snapToGrid",
-    qname = "w:CT_OnOff/w:vanish",
-    qname = "w:CT_OnOff/w:webHidden",
-    qname = "w:CT_Color/w:color",
-    qname = "w:CT_ShortTwipsMeasure/w:spacing",
-    qname = "w:CT_TextScale/w:w",
-    qname = "w:CT_HpsKern/w:kern",
-    qname = "w:CT_SignedHpsMeasure/w:position",
-    qname = "w:CT_HpsMeasure/w:sz",
-    qname = "w:CT_HpsMeasure/w:szCs",
-    qname = "w:CT_Highlight/w:highlight",
-    qname = "w:CT_Underline/w:u",
-    qname = "w:CT_TextEffect/w:effect",
-    qname = "w:CT_Border/w:bdr",
-    qname = "w:CT_Shd/w:shd",
-    qname = "w:CT_FitText/w:fitText",
-    qname = "w:CT_VerticalAlignRun/w:vertAlign",
-    qname = "w:CT_OnOff/w:rtl",
-    qname = "w:CT_OnOff/w:cs",
-    qname = "w:CT_Em/w:em",
-    qname = "w:CT_Language/w:lang",
-    qname = "w:CT_EastAsianLayout/w:eastAsianLayout",
-    qname = "w:CT_OnOff/w:specVanish"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunStyle, qname = "w:rStyle"),
+            child(variant = RunFonts, qname = "w:rFonts"),
+            child(variant = Bold, qname = "w:b"),
+            child(variant = BoldComplexScript, qname = "w:bCs"),
+            child(variant = Italic, qname = "w:i"),
+            child(variant = ItalicComplexScript, qname = "w:iCs"),
+            child(variant = Caps, qname = "w:caps"),
+            child(variant = SmallCaps, qname = "w:smallCaps"),
+            child(variant = Strike, qname = "w:strike"),
+            child(variant = DoubleStrike, qname = "w:dstrike"),
+            child(variant = Outline, qname = "w:outline"),
+            child(variant = Shadow, qname = "w:shadow"),
+            child(variant = Emboss, qname = "w:emboss"),
+            child(variant = Imprint, qname = "w:imprint"),
+            child(variant = NoProof, qname = "w:noProof"),
+            child(variant = SnapToGrid, qname = "w:snapToGrid"),
+            child(variant = Vanish, qname = "w:vanish"),
+            child(variant = WebHidden, qname = "w:webHidden"),
+            child(variant = Color, qname = "w:color"),
+            child(variant = Spacing, qname = "w:spacing"),
+            child(variant = CharacterScale, qname = "w:w"),
+            child(variant = Kern, qname = "w:kern"),
+            child(variant = Position, qname = "w:position"),
+            child(variant = FontSize, qname = "w:sz"),
+            child(variant = FontSizeComplexScript, qname = "w:szCs"),
+            child(variant = Highlight, qname = "w:highlight"),
+            child(variant = Underline, qname = "w:u"),
+            child(variant = TextEffect, qname = "w:effect"),
+            child(variant = Border, qname = "w:bdr"),
+            child(variant = Shading, qname = "w:shd"),
+            child(variant = FitText, qname = "w:fitText"),
+            child(variant = VerticalTextAlignment, qname = "w:vertAlign"),
+            child(variant = RightToLeftText, qname = "w:rtl"),
+            child(variant = ComplexScript, qname = "w:cs"),
+            child(variant = Emphasis, qname = "w:em"),
+            child(variant = Languages, qname = "w:lang"),
+            child(variant = EastAsianLayout, qname = "w:eastAsianLayout"),
+            child(variant = SpecVanish, qname = "w:specVanish")
+        )
+    )]
   pub paragraph_mark_run_properties_choice2: Vec<ParagraphMarkRunPropertiesChoice2>,
   /// Defines the Glow Class.
   #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
@@ -10553,10 +11327,12 @@ pub struct SectionProperties {
   #[sdk(attr(qname = "w:rsidSect"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice(
-    qname = "w:CT_HdrFtrRef/w:headerReference",
-    qname = "w:CT_HdrFtrRef/w:footerReference"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = HeaderReference, qname = "w:headerReference"),
+            child(variant = FooterReference, qname = "w:footerReference")
+        )
+    )]
   pub section_properties_choice: Vec<SectionPropertiesChoice>,
   /// Defines the FootnoteProperties Class.
   #[sdk(child(qname = "w:CT_FtnProps/w:footnotePr"))]
@@ -10628,18 +11404,20 @@ pub type FieldData = crate::simple_type::Base64BinaryValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFData/w:ffData")]
 pub struct FormFieldData {
-  #[sdk(choice(
-    qname = "w:CT_FFName/w:name",
-    qname = "w:CT_OnOff/w:enabled",
-    qname = "w:CT_OnOff/w:calcOnExit",
-    qname = "w:CT_MacroName/w:entryMacro",
-    qname = "w:CT_MacroName/w:exitMacro",
-    qname = "w:CT_FFHelpText/w:helpText",
-    qname = "w:CT_FFStatusText/w:statusText",
-    qname = "w:CT_FFCheckBox/w:checkBox",
-    qname = "w:CT_FFDDList/w:ddList",
-    qname = "w:CT_FFTextInput/w:textInput"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FormFieldName, qname = "w:name"),
+            child(variant = Enabled, qname = "w:enabled"),
+            child(variant = CalculateOnExit, qname = "w:calcOnExit"),
+            child(variant = EntryMacro, qname = "w:entryMacro"),
+            child(variant = ExitMacro, qname = "w:exitMacro"),
+            child(variant = HelpText, qname = "w:helpText"),
+            child(variant = StatusText, qname = "w:statusText"),
+            child(variant = CheckBox, qname = "w:checkBox"),
+            child(variant = DropDownListFormField, qname = "w:ddList"),
+            child(variant = TextInput, qname = "w:textInput")
+        )
+    )]
   pub form_field_data_choice: Vec<FormFieldDataChoice>,
 }
 /// Form Field Name.
@@ -10698,7 +11476,12 @@ pub struct StatusText {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFCheckBox/w:checkBox")]
 pub struct CheckBox {
-  #[sdk(choice(qname = "w:CT_HpsMeasure/w:size", qname = "w:CT_OnOff/w:sizeAuto"))]
+  #[sdk(
+        choice(
+            child(variant = FormFieldSize, qname = "w:size"),
+            child(variant = AutomaticallySizeFormField, qname = "w:sizeAuto")
+        )
+    )]
   pub check_box_choice: Option<CheckBoxChoice>,
   /// Default Checkbox Form Field State.
   #[sdk(child(qname = "w:CT_OnOff/w:default"))]
@@ -10955,130 +11738,182 @@ pub struct RubyProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub ruby_content_choice: Vec<RubyContentChoice>,
 }
 /// Phonetic Guide Base Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub ruby_base_choice: Vec<RubyBaseChoice>,
 }
 /// Custom XML Data Date Storage Format.
@@ -11112,38 +11947,43 @@ pub struct ListItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
-  #[sdk(choice(
-    qname = "w:CT_RPr/w:rPr",
-    qname = "w:CT_String/w:alias",
-    qname = "w:CT_Lock/w:lock",
-    qname = "w:CT_Placeholder/w:placeholder",
-    qname = "w:CT_OnOff/w:showingPlcHdr",
-    qname = "w:CT_DataBinding/w:dataBinding",
-    qname = "w:CT_DataBinding/w15:dataBinding",
-    qname = "w:CT_OnOff/w:temporary",
-    qname = "w:CT_DecimalNumber/w:id",
-    qname = "w:CT_String/w:tag",
-    qname = "w:CT_Color/w15:color",
-    qname = "w15:CT_SdtAppearance/w15:appearance",
-    qname = "w:CT_OnOff/w15:webExtensionLinked",
-    qname = "w:CT_OnOff/w15:webExtensionCreated",
-    qname = "w:CT_Empty/w:equation",
-    qname = "w:CT_SdtComboBox/w:comboBox",
-    qname = "w:CT_SdtDate/w:date",
-    qname = "w:CT_SdtDocPart/w:docPartObj",
-    qname = "w:CT_SdtDocPart/w:docPartList",
-    qname = "w:CT_SdtDropDownList/w:dropDownList",
-    qname = "w:CT_Empty/w:picture",
-    qname = "w:CT_Empty/w:richText",
-    qname = "w:CT_SdtText/w:text",
-    qname = "w:CT_Empty/w:citation",
-    qname = "w:CT_Empty/w:group",
-    qname = "w:CT_Empty/w:bibliography",
-    qname = "w:CT_Empty/w14:entityPicker",
-    qname = "w14:CT_SdtCheckbox/w14:checkbox",
-    qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection",
-    qname = "w:CT_Empty/w15:repeatingSectionItem"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RunProperties, qname = "w:rPr"),
+            child(variant = SdtAlias, qname = "w:alias"),
+            child(variant = Lock, qname = "w:lock"),
+            child(variant = SdtPlaceholder, qname = "w:placeholder"),
+            child(variant = ShowingPlaceholder, qname = "w:showingPlcHdr"),
+            child(variant = WDataBinding, qname = "w:dataBinding"),
+            child(variant = W15DataBinding, qname = "w15:dataBinding"),
+            child(variant = TemporarySdt, qname = "w:temporary"),
+            child(variant = SdtId, qname = "w:id"),
+            child(variant = Tag, qname = "w:tag"),
+            child(variant = Color, qname = "w15:color"),
+            child(variant = Appearance, qname = "w15:appearance"),
+            child(variant = WebExtensionLinked, qname = "w15:webExtensionLinked"),
+            child(variant = WebExtensionCreated, qname = "w15:webExtensionCreated"),
+            empty_child(variant = SdtContentEquation, qname = "w:equation"),
+            child(variant = SdtContentComboBox, qname = "w:comboBox"),
+            child(variant = SdtContentDate, qname = "w:date"),
+            child(variant = SdtContentDocPartObject, qname = "w:docPartObj"),
+            child(variant = SdtContentDocPartList, qname = "w:docPartList"),
+            child(variant = SdtContentDropDownList, qname = "w:dropDownList"),
+            empty_child(variant = SdtContentPicture, qname = "w:picture"),
+            empty_child(variant = SdtContentRichText, qname = "w:richText"),
+            child(variant = SdtContentText, qname = "w:text"),
+            empty_child(variant = SdtContentCitation, qname = "w:citation"),
+            empty_child(variant = SdtContentGroup, qname = "w:group"),
+            empty_child(variant = SdtContentBibliography, qname = "w:bibliography"),
+            empty_child(variant = EntityPickerEmpty, qname = "w14:entityPicker"),
+            child(variant = SdtContentCheckBox, qname = "w14:checkbox"),
+            child(variant = SdtRepeatedSection, qname = "w15:repeatingSection"),
+            empty_child(
+                variant = SdtRepeatedSectionItem,
+                qname = "w15:repeatingSectionItem"
+            )
+        )
+    )]
   pub sdt_properties_choice: Vec<SdtPropertiesChoice>,
 }
 /// Structured Document Tag End Character Properties.
@@ -11158,257 +11998,387 @@ pub struct SdtEndCharProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub sdt_content_block_choice: Vec<SdtContentBlockChoice>,
 }
 /// Inline-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
-  #[sdk(choice(
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_CustomXmlRun/w:customXml",
-    qname = "w:CT_SimpleField/w:fldSimple",
-    qname = "w:CT_Hyperlink/w:hyperlink",
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir",
-    qname = "w:CT_Rel/w:subDoc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MRun, qname = "m:r"),
+            child(variant = CustomXmlRun, qname = "w:customXml"),
+            child(variant = SimpleField, qname = "w:fldSimple"),
+            child(variant = Hyperlink, qname = "w:hyperlink"),
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir"),
+            child(variant = SubDocumentReference, qname = "w:subDoc")
+        )
+    )]
   pub sdt_content_run_choice: Vec<SdtContentRunChoice>,
 }
 /// Defines the SdtContentRunRuby Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
-  #[sdk(choice(
-    qname = "w:CT_CustomXmlRuby/w:customXml",
-    qname = "w:CT_SimpleFieldRuby/w:fldSimple",
-    qname = "w:CT_HyperlinkRuby/w:hyperlink",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_SdtRunRuby/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomXmlRuby, qname = "w:customXml"),
+            child(variant = SimpleFieldRuby, qname = "w:fldSimple"),
+            child(variant = HyperlinkRuby, qname = "w:hyperlink"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = SdtRunRuby, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r")
+        )
+    )]
   pub sdt_content_run_ruby_choice: Vec<SdtContentRunRubyChoice>,
 }
 /// Cell-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
-  #[sdk(choice(
-    qname = "w:CT_Tc/w:tc",
-    qname = "w:CT_CustomXmlCell/w:customXml",
-    qname = "w:CT_SdtCell/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableCell, qname = "w:tc"),
+            child(variant = CustomXmlCell, qname = "w:customXml"),
+            child(variant = SdtCell, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub sdt_content_cell_choice: Vec<SdtContentCellChoice>,
 }
 /// Row-Level Structured Document Tag Content.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
-  #[sdk(choice(
-    qname = "w:CT_Row/w:tr",
-    qname = "w:CT_CustomXmlRow/w:customXml",
-    qname = "w:CT_SdtRow/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableRow, qname = "w:tr"),
+            child(variant = CustomXmlRow, qname = "w:customXml"),
+            child(variant = SdtRow, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub sdt_content_row_choice: Vec<SdtContentRowChoice>,
 }
 /// Custom XML Element Properties.
@@ -11557,11 +12527,13 @@ pub struct TableCellProperties {
   /// Defines the HideMark Class.
   #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
-  #[sdk(choice(
-    qname = "w:CT_TrackChange/w:cellIns",
-    qname = "w:CT_TrackChange/w:cellDel",
-    qname = "w:CT_CellMergeTrackChange/w:cellMerge"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CellInsertion, qname = "w:cellIns"),
+            child(variant = CellDeletion, qname = "w:cellDel"),
+            child(variant = CellMerge, qname = "w:cellMerge")
+        )
+    )]
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   /// Revision Information for Table Cell Properties.
   #[sdk(child(qname = "w:CT_TcPrChange/w:tcPrChange"))]
@@ -12299,7 +13271,12 @@ pub struct Frameset {
   /// Frameset Layout
   #[sdk(child(qname = "w:CT_FrameLayout/w:frameLayout"))]
   pub frame_layout: Option<FrameLayout>,
-  #[sdk(choice(qname = "w:CT_Frameset/w:frameset", qname = "w:CT_Frame/w:frame"))]
+  #[sdk(
+        choice(
+            child(variant = Frameset, qname = "w:frameset"),
+            child(variant = Frame, qname = "w:frame")
+        )
+    )]
   pub frameset_choice: Vec<FramesetChoice>,
 }
 /// Single Frame Properties.
@@ -12664,10 +13641,12 @@ pub struct NumberingPictureBullet {
   /// numPicBulletId
   #[sdk(attr(qname = "w:numPicBulletId"))]
   pub numbering_picture_bullet_id: crate::simple_type::Int32Value,
-  #[sdk(choice(
-    qname = "w:CT_PictureBulletBase/w:pict",
-    qname = "w:CT_Drawing/w:drawing"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PictureBulletBase, qname = "w:pict"),
+            child(variant = Drawing, qname = "w:drawing")
+        )
+    )]
   pub numbering_picture_bullet_choice: Option<NumberingPictureBulletChoice>,
 }
 /// Abstract Numbering Definition.
@@ -12844,13 +13823,15 @@ pub struct TableStyleConditionalFormattingTableProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBaseStyleable/w:trPr")]
 pub struct TableStyleConditionalFormattingTableRowProperties {
-  #[sdk(choice(
-    qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOff/w:cantSplit",
-    qname = "w:CT_OnOff/w:tblHeader",
-    qname = "w:CT_TblWidth/w:tblCellSpacing",
-    qname = "w:CT_TblJc/w:jc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Hidden, qname = "w:hidden"),
+            child(variant = CantSplit, qname = "w:cantSplit"),
+            child(variant = TableHeader, qname = "w:tblHeader"),
+            child(variant = TableCellSpacing, qname = "w:tblCellSpacing"),
+            child(variant = TableJustification, qname = "w:jc")
+        )
+    )]
   pub table_style_conditional_formatting_table_row_properties_choice:
     Vec<TableStyleConditionalFormattingTableRowPropertiesChoice>,
 }
@@ -13438,20 +14419,22 @@ pub struct Comment {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd")
+        )
+    )]
   pub comment_choice: Vec<CommentChoice>,
 }
 /// Footnote Content.
@@ -13465,43 +14448,69 @@ pub struct Footnote {
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(range = -2147483648..= 32767))]
   pub id: crate::simple_type::IntegerValue,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub footnote_choice: Vec<FootnoteChoice>,
 }
 /// Endnote Content.
@@ -13515,43 +14524,69 @@ pub struct Endnote {
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(range = -2147483648..= 32767))]
   pub id: crate::simple_type::IntegerValue,
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub endnote_choice: Vec<EndnoteChoice>,
 }
 /// Entry Insertion Behavior.
@@ -13747,43 +14782,69 @@ pub struct DocPartProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub doc_part_body_choice: Vec<DocPartBodyChoice>,
   /// Section Properties.
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
@@ -13793,44 +14854,70 @@ pub struct DocPartBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:body")]
 pub struct Body {
-  #[sdk(choice(
-    qname = "w:CT_AltChunk/w:altChunk",
-    qname = "w:CT_CustomXmlBlock/w:customXml",
-    qname = "w:CT_SdtBlock/w:sdt",
-    qname = "w:CT_P/w:p",
-    qname = "w:CT_Tbl/w:tbl",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AltChunk, qname = "w:altChunk"),
+            child(variant = CustomXmlBlock, qname = "w:customXml"),
+            child(variant = SdtBlock, qname = "w:sdt"),
+            child(variant = Paragraph, qname = "w:p"),
+            child(variant = Table, qname = "w:tbl"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            any
+        )
+    )]
   pub body_choice: Vec<BodyChoice>,
   /// Section Properties.
   #[sdk(child(qname = "w:CT_SectPr/w:sectPr"))]
@@ -13932,20 +15019,22 @@ pub struct TablePropertyExceptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPr/w:trPr")]
 pub struct TableRowProperties {
-  #[sdk(choice(
-    qname = "w:CT_Cnf/w:cnfStyle",
-    qname = "w:CT_NonZeroDecimalNumber/w:divId",
-    qname = "w:CT_DecimalNumber/w:gridBefore",
-    qname = "w:CT_DecimalNumber/w:gridAfter",
-    qname = "w:CT_TblWidth/w:wBefore",
-    qname = "w:CT_TblWidth/w:wAfter",
-    qname = "w:CT_Height/w:trHeight",
-    qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOff/w:cantSplit",
-    qname = "w:CT_OnOff/w:tblHeader",
-    qname = "w:CT_TblWidth/w:tblCellSpacing",
-    qname = "w:CT_TblJc/w:jc"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ConditionalFormatStyle, qname = "w:cnfStyle"),
+            child(variant = DivId, qname = "w:divId"),
+            child(variant = GridBefore, qname = "w:gridBefore"),
+            child(variant = GridAfter, qname = "w:gridAfter"),
+            child(variant = WidthBeforeTableRow, qname = "w:wBefore"),
+            child(variant = WidthAfterTableRow, qname = "w:wAfter"),
+            child(variant = TableRowHeight, qname = "w:trHeight"),
+            child(variant = Hidden, qname = "w:hidden"),
+            child(variant = CantSplit, qname = "w:cantSplit"),
+            child(variant = TableHeader, qname = "w:tblHeader"),
+            child(variant = TableCellSpacing, qname = "w:tblCellSpacing"),
+            child(variant = TableJustification, qname = "w:jc")
+        )
+    )]
   pub table_row_properties_choice1: Vec<TableRowPropertiesChoice>,
   /// Inserted Paragraph.
   #[sdk(child(qname = "w:CT_TrackChange/w:ins"))]
@@ -13956,10 +15045,12 @@ pub struct TableRowProperties {
   /// Revision Information for Table Row Properties.
   #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
   pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
-  #[sdk(choice(
-    qname = "w:CT_TrackChange/w14:conflictIns",
-    qname = "w:CT_TrackChange/w14:conflictDel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = ConflictDeletion, qname = "w14:conflictDel")
+        )
+    )]
   pub table_row_properties_choice2: Option<TableRowPropertiesChoice2>,
 }
 /// Revision Information for Table Row Properties.
@@ -14749,20 +15840,24 @@ pub struct SaveThroughXslt {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults")]
 pub struct HeaderShapeDefaults {
-  #[sdk(choice(
-    qname = "o:CT_ShapeDefaults/o:shapedefaults",
-    qname = "o:CT_ShapeLayout/o:shapelayout"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ShapeDefaults, qname = "o:shapedefaults"),
+            child(variant = ShapeLayout, qname = "o:shapelayout")
+        )
+    )]
   pub header_shape_defaults_choice: Vec<HeaderShapeDefaultsChoice>,
 }
 /// Default Properties for VML Objects in Main Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:shapeDefaults")]
 pub struct ShapeDefaults {
-  #[sdk(choice(
-    qname = "o:CT_ShapeDefaults/o:shapedefaults",
-    qname = "o:CT_ShapeLayout/o:shapelayout"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ShapeDefaults, qname = "o:shapedefaults"),
+            child(variant = ShapeLayout, qname = "o:shapelayout")
+        )
+    )]
   pub shape_defaults_choice: Vec<ShapeDefaultsChoice>,
 }
 /// Document-Wide Footnote Properties.
@@ -15113,17 +16208,19 @@ pub struct TargetScreenSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PictureBulletBase/w:pict")]
 pub struct PictureBulletBase {
-  #[sdk(choice(
-    qname = "v:CT_Group/v:group",
-    qname = "v:CT_Image/v:image",
-    qname = "v:CT_Line/v:line",
-    qname = "v:CT_Oval/v:oval",
-    qname = "v:CT_PolyLine/v:polyline",
-    qname = "v:CT_Rect/v:rect",
-    qname = "v:CT_RoundRect/v:roundrect",
-    qname = "v:CT_Shape/v:shape",
-    qname = "v:CT_Shapetype/v:shapetype"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Group, qname = "v:group"),
+            child(variant = ImageFile, qname = "v:image"),
+            child(variant = Line, qname = "v:line"),
+            child(variant = Oval, qname = "v:oval"),
+            child(variant = PolyLine, qname = "v:polyline"),
+            child(variant = Rectangle, qname = "v:rect"),
+            child(variant = RoundRectangle, qname = "v:roundrect"),
+            child(variant = Shape, qname = "v:shape"),
+            child(variant = Shapetype, qname = "v:shapetype")
+        )
+    )]
   pub picture_bullet_base_choice: Vec<PictureBulletBaseChoice>,
 }
 /// Defines the Panose1Number Class.

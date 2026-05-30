@@ -386,26 +386,32 @@ pub struct ChartShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub chart_shape_properties_choice1: Option<ChartShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub chart_shape_properties_choice2: Option<ChartShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub chart_shape_properties_choice3: Option<ChartShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -794,11 +800,13 @@ pub struct Layout {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Tx/c:tx")]
 pub struct ChartText {
-  #[sdk(choice(
-    qname = "c:CT_StrRef/c:strRef",
-    qname = "a:CT_TextBody/c:rich",
-    qname = "c:CT_StrData/c:strLit"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = StringReference, qname = "c:strRef"),
+            child(variant = RichText, qname = "c:rich"),
+            child(variant = StringLiteral, qname = "c:strLit")
+        )
+    )]
   pub chart_text_choice: Option<ChartTextChoice>,
 }
 /// Leader Lines.
@@ -917,7 +925,12 @@ pub struct FormatId {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerTx/c:tx")]
 pub struct SeriesText {
-  #[sdk(choice(qname = "c:CT_StrRef/c:strRef", qname = "c:ST_Xstring/c:v"))]
+  #[sdk(
+        choice(
+            child(variant = StringReference, qname = "c:strRef"),
+            text_child(variant = NumericValue, qname = "c:v")
+        )
+    )]
   pub series_text_choice: Option<SeriesTextChoice>,
 }
 /// Grouping.
@@ -982,22 +995,27 @@ pub struct DataLabels {
   /// Data Label.
   #[sdk(child(qname = "c:CT_DLbl/c:dLbl"))]
   pub data_label: Vec<DataLabel>,
-  #[sdk(choice(
-    qname = "c:CT_Boolean/c:delete",
-    qname = "c:CT_NumFmt/c:numFmt",
-    qname = "a:CT_ChartShapeProperties/c:spPr",
-    qname = "a:CT_TextBody/c:txPr",
-    qname = "c:CT_DLblPos/c:dLblPos",
-    qname = "c:CT_Boolean/c:showLegendKey",
-    qname = "c:CT_Boolean/c:showVal",
-    qname = "c:CT_Boolean/c:showCatName",
-    qname = "c:CT_Boolean/c:showSerName",
-    qname = "c:CT_Boolean/c:showPercent",
-    qname = "c:CT_Boolean/c:showBubbleSize",
-    qname = "xsd:string/c:separator",
-    qname = "c:CT_Boolean/c:showLeaderLines",
-    qname = "c:CT_ChartLines/c:leaderLines"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Delete, qname = "c:delete"),
+            sequence(
+                variant = Sequence,
+                child(qname = "c:numFmt"),
+                child(qname = "c:spPr"),
+                child(qname = "c:txPr"),
+                child(qname = "c:dLblPos"),
+                child(qname = "c:showLegendKey"),
+                child(qname = "c:showVal"),
+                child(qname = "c:showCatName"),
+                child(qname = "c:showSerName"),
+                child(qname = "c:showPercent"),
+                child(qname = "c:showBubbleSize"),
+                text_child(qname = "c:separator"),
+                child(qname = "c:showLeaderLines"),
+                child(qname = "c:leaderLines")
+            )
+        )
+    )]
   pub data_labels_choice: Option<DataLabelsChoice>,
   /// Defines the DLblsExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblsExtensionList/c:extLst"))]
@@ -1396,7 +1414,13 @@ pub struct ChartSpace {
   /// Defines the RoundedCorners Class.
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
-  #[sdk(choice(qname = "c14:CT_Style/c14:style", qname = "c:CT_Style/c:style", any))]
+  #[sdk(
+        choice(
+            child(variant = C14Style, qname = "c14:style"),
+            child(variant = CStyle, qname = "c:style"),
+            any
+        )
+    )]
   pub chart_space_choice: Option<ChartSpaceChoice>,
   /// Defines the ColorMapOverride Class.
   #[sdk(child(qname = "a:CT_ColorMapping/c:clrMapOvr"))]
@@ -1435,10 +1459,12 @@ pub struct ChartSpace {
 pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  #[sdk(choice(
-    qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor",
-    qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RelativeAnchorSize, qname = "cdr:relSizeAnchor"),
+            child(variant = AbsoluteAnchorSize, qname = "cdr:absSizeAnchor")
+        )
+    )]
   pub user_shapes_choice: Vec<UserShapesChoice>,
 }
 /// Reference to Chart Part.
@@ -1883,35 +1909,60 @@ pub struct ErrorBarValueType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:plus")]
 pub struct Plus {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
+  #[sdk(
+        choice(
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit")
+        )
+    )]
   pub plus_choice: Option<PlusChoice>,
 }
 /// Minus.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:minus")]
 pub struct Minus {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
+  #[sdk(
+        choice(
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit")
+        )
+    )]
   pub minus_choice: Option<MinusChoice>,
 }
 /// Defines the Values Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:val")]
 pub struct Values {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
+  #[sdk(
+        choice(
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit")
+        )
+    )]
   pub values_choice: Option<ValuesChoice>,
 }
 /// Defines the YValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:yVal")]
 pub struct YValues {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
+  #[sdk(
+        choice(
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit")
+        )
+    )]
   pub y_values_choice: Option<YValuesChoice>,
 }
 /// Defines the BubbleSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:bubbleSize")]
 pub struct BubbleSize {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
+  #[sdk(
+        choice(
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit")
+        )
+    )]
   pub bubble_size_choice: Option<BubbleSizeChoice>,
 }
 /// Gap Width.
@@ -2086,7 +2137,12 @@ pub struct LegendEntry {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  #[sdk(choice(qname = "c:CT_Boolean/c:delete", qname = "a:CT_TextBody/c:txPr"))]
+  #[sdk(
+        choice(
+            child(variant = Delete, qname = "c:delete"),
+            sequence(variant = Sequence, child(qname = "c:txPr"))
+        )
+    )]
   pub legend_entry_choice: Option<LegendEntryChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
@@ -2190,27 +2246,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -2229,22 +2291,27 @@ pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  #[sdk(choice(
-    qname = "c:CT_Boolean/c:delete",
-    qname = "c:CT_Layout/c:layout",
-    qname = "c:CT_Tx/c:tx",
-    qname = "c:CT_NumFmt/c:numFmt",
-    qname = "a:CT_ChartShapeProperties/c:spPr",
-    qname = "a:CT_TextBody/c:txPr",
-    qname = "c:CT_DLblPos/c:dLblPos",
-    qname = "c:CT_Boolean/c:showLegendKey",
-    qname = "c:CT_Boolean/c:showVal",
-    qname = "c:CT_Boolean/c:showCatName",
-    qname = "c:CT_Boolean/c:showSerName",
-    qname = "c:CT_Boolean/c:showPercent",
-    qname = "c:CT_Boolean/c:showBubbleSize",
-    qname = "xsd:string/c:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Delete, qname = "c:delete"),
+            sequence(
+                variant = Sequence,
+                child(qname = "c:layout"),
+                child(qname = "c:tx"),
+                child(qname = "c:numFmt"),
+                child(qname = "c:spPr"),
+                child(qname = "c:txPr"),
+                child(qname = "c:dLblPos"),
+                child(qname = "c:showLegendKey"),
+                child(qname = "c:showVal"),
+                child(qname = "c:showCatName"),
+                child(qname = "c:showSerName"),
+                child(qname = "c:showPercent"),
+                child(qname = "c:showBubbleSize"),
+                text_child(qname = "c:separator")
+            )
+        )
+    )]
   pub data_label_choice: Option<DataLabelChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
@@ -2733,7 +2800,12 @@ pub struct ValueAxis {
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
-  #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
+  #[sdk(
+        choice(
+            child(variant = Crosses, qname = "c:crosses"),
+            child(variant = CrossesAt, qname = "c:crossesAt")
+        )
+    )]
   pub value_axis_choice: Option<ValueAxisChoice>,
   /// Defines the CrossBetween Class.
   #[sdk(child(qname = "c:CT_CrossBetween/c:crossBetween"))]
@@ -2797,7 +2869,12 @@ pub struct CategoryAxis {
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
-  #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
+  #[sdk(
+        choice(
+            child(variant = Crosses, qname = "c:crosses"),
+            child(variant = CrossesAt, qname = "c:crossesAt")
+        )
+    )]
   pub category_axis_choice: Option<CategoryAxisChoice>,
   /// Defines the AutoLabeled Class.
   #[sdk(child(qname = "c:CT_Boolean/c:auto"))]
@@ -2867,7 +2944,12 @@ pub struct DateAxis {
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
-  #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
+  #[sdk(
+        choice(
+            child(variant = Crosses, qname = "c:crosses"),
+            child(variant = CrossesAt, qname = "c:crossesAt")
+        )
+    )]
   pub date_axis_choice: Option<DateAxisChoice>,
   /// Defines the AutoLabeled Class.
   #[sdk(child(qname = "c:CT_Boolean/c:auto"))]
@@ -2940,7 +3022,12 @@ pub struct SeriesAxis {
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
   pub crossing_axis: std::boxed::Box<CrossingAxis>,
-  #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
+  #[sdk(
+        choice(
+            child(variant = Crosses, qname = "c:crosses"),
+            child(variant = CrossesAt, qname = "c:crossesAt")
+        )
+    )]
   pub series_axis_choice: Option<SeriesAxisChoice>,
   /// Defines the TickLabelSkip Class.
   #[sdk(child(qname = "c:CT_Skip/c:tickLblSkip"))]
@@ -3025,7 +3112,15 @@ pub struct StockChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
+  #[sdk(
+        choice(
+            child(
+                variant = FilteredLineSeriesExtension,
+                qname = "c15:filteredLineSeries"
+            ),
+            any
+        )
+    )]
   pub stock_chart_extension_choice: Option<StockChartExtensionChoice>,
 }
 /// Defines the PieChartExtension Class.
@@ -3037,7 +3132,9 @@ pub struct PieChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
+  #[sdk(
+        choice(child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"), any)
+    )]
   pub pie_chart_extension_choice: Option<PieChartExtensionChoice>,
 }
 /// Defines the Pie3DChartExtension Class.
@@ -3049,7 +3146,9 @@ pub struct Pie3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
+  #[sdk(
+        choice(child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"), any)
+    )]
   pub pie3_d_chart_extension_choice: Option<Pie3DChartExtensionChoice>,
 }
 /// Defines the NumRefExtension Class.
@@ -3061,12 +3160,14 @@ pub struct NumRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FullRef/c15:fullRef",
-    qname = "c15:CT_LevelRef/c15:levelRef",
-    qname = "c15:CT_FormulaRef/c15:formulaRef",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FullReference, qname = "c15:fullRef"),
+            child(variant = LevelReference, qname = "c15:levelRef"),
+            child(variant = FormulaReference, qname = "c15:formulaRef"),
+            any
+        )
+    )]
   pub num_ref_extension_choice: Option<NumRefExtensionChoice>,
 }
 /// Defines the StrDataExtension Class.
@@ -3078,7 +3179,9 @@ pub struct StrDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c:CT_Boolean/c15:autoCat", any))]
+  #[sdk(
+        choice(child(variant = AutoGeneneratedCategories, qname = "c15:autoCat"), any)
+    )]
   pub str_data_extension_choice: Option<StrDataExtensionChoice>,
 }
 /// Defines the StrRefExtension Class.
@@ -3090,12 +3193,14 @@ pub struct StrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FullRef/c15:fullRef",
-    qname = "c15:CT_LevelRef/c15:levelRef",
-    qname = "c15:CT_FormulaRef/c15:formulaRef",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FullReference, qname = "c15:fullRef"),
+            child(variant = LevelReference, qname = "c15:levelRef"),
+            child(variant = FormulaReference, qname = "c15:formulaRef"),
+            any
+        )
+    )]
   pub str_ref_extension_choice: Option<StrRefExtensionChoice>,
 }
 /// Defines the MultiLvlStrRefExtension Class.
@@ -3107,12 +3212,14 @@ pub struct MultiLvlStrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FullRef/c15:fullRef",
-    qname = "c15:CT_LevelRef/c15:levelRef",
-    qname = "c15:CT_FormulaRef/c15:formulaRef",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FullReference, qname = "c15:fullRef"),
+            child(variant = LevelReference, qname = "c15:levelRef"),
+            child(variant = FormulaReference, qname = "c15:formulaRef"),
+            any
+        )
+    )]
   pub multi_lvl_str_ref_extension_choice: Option<MultiLvlStrRefExtensionChoice>,
 }
 /// Defines the DLblsExtension Class.
@@ -3124,16 +3231,18 @@ pub struct DLblsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c:CT_Tx/c15:tx",
-    qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
-    qname = "c:CT_Boolean/c15:showDataLabelsRange",
-    qname = "a:CT_ShapeProperties/c15:spPr",
-    qname = "c:CT_Layout/c15:layout",
-    qname = "c:CT_Boolean/c15:showLeaderLines",
-    qname = "c:CT_ChartLines/c15:leaderLines",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ChartText, qname = "c15:tx"),
+            child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
+            child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
+            child(variant = ShapeProperties, qname = "c15:spPr"),
+            child(variant = Layout, qname = "c15:layout"),
+            child(variant = ShowLeaderLines, qname = "c15:showLeaderLines"),
+            child(variant = LeaderLines, qname = "c15:leaderLines"),
+            any
+        )
+    )]
   pub d_lbls_extension_choice: Vec<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
@@ -3145,7 +3254,15 @@ pub struct LineChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
+  #[sdk(
+        choice(
+            child(
+                variant = FilteredLineSeriesExtension,
+                qname = "c15:filteredLineSeries"
+            ),
+            any
+        )
+    )]
   pub line_chart_extension_choice: Option<LineChartExtensionChoice>,
 }
 /// Defines the Line3DChartExtension Class.
@@ -3157,7 +3274,15 @@ pub struct Line3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
+  #[sdk(
+        choice(
+            child(
+                variant = FilteredLineSeriesExtension,
+                qname = "c15:filteredLineSeries"
+            ),
+            any
+        )
+    )]
   pub line3_d_chart_extension_choice: Option<Line3DChartExtensionChoice>,
 }
 /// Defines the ScatterChartExtension Class.
@@ -3169,7 +3294,12 @@ pub struct ScatterChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredScatterSeries, qname = "c15:filteredScatterSeries"),
+            any
+        )
+    )]
   pub scatter_chart_extension_choice: Option<ScatterChartExtensionChoice>,
 }
 /// Defines the RadarChartExtension Class.
@@ -3181,7 +3311,12 @@ pub struct RadarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredRadarSeries, qname = "c15:filteredRadarSeries"),
+            any
+        )
+    )]
   pub radar_chart_extension_choice: Option<RadarChartExtensionChoice>,
 }
 /// Defines the BarChartExtension Class.
@@ -3193,7 +3328,9 @@ pub struct BarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
+  #[sdk(
+        choice(child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"), any)
+    )]
   pub bar_chart_extension_choice: Option<BarChartExtensionChoice>,
 }
 /// Defines the Bar3DChartExtension Class.
@@ -3205,7 +3342,9 @@ pub struct Bar3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
+  #[sdk(
+        choice(child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"), any)
+    )]
   pub bar3_d_chart_extension_choice: Option<Bar3DChartExtensionChoice>,
 }
 /// Defines the AreaChartExtension Class.
@@ -3217,7 +3356,12 @@ pub struct AreaChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
+            any
+        )
+    )]
   pub area_chart_extension_choice: Option<AreaChartExtensionChoice>,
 }
 /// Defines the Area3DChartExtension Class.
@@ -3229,7 +3373,12 @@ pub struct Area3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
+            any
+        )
+    )]
   pub area3_d_chart_extension_choice: Option<Area3DChartExtensionChoice>,
 }
 /// Defines the BubbleChartExtension Class.
@@ -3241,7 +3390,12 @@ pub struct BubbleChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredBubbleSeries, qname = "c15:filteredBubbleSeries"),
+            any
+        )
+    )]
   pub bubble_chart_extension_choice: Option<BubbleChartExtensionChoice>,
 }
 /// Defines the SurfaceChartExtension Class.
@@ -3253,7 +3407,12 @@ pub struct SurfaceChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
+            any
+        )
+    )]
   pub surface_chart_extension_choice: Option<SurfaceChartExtensionChoice>,
 }
 /// Defines the Surface3DChartExtension Class.
@@ -3265,7 +3424,12 @@ pub struct Surface3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
+            any
+        )
+    )]
   pub surface3_d_chart_extension_choice: Option<Surface3DChartExtensionChoice>,
 }
 /// Defines the CatAxExtension Class.
@@ -3277,7 +3441,7 @@ pub struct CatAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
+  #[sdk(choice(child(variant = NumberingFormat, qname = "c15:numFmt"), any))]
   pub cat_ax_extension_choice: Option<CatAxExtensionChoice>,
 }
 /// Defines the DateAxExtension Class.
@@ -3289,7 +3453,7 @@ pub struct DateAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
+  #[sdk(choice(child(variant = NumberingFormat, qname = "c15:numFmt"), any))]
   pub date_ax_extension_choice: Option<DateAxExtensionChoice>,
 }
 /// Defines the SerAxExtension Class.
@@ -3301,7 +3465,7 @@ pub struct SerAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
+  #[sdk(choice(child(variant = NumberingFormat, qname = "c15:numFmt"), any))]
   pub ser_ax_extension_choice: Option<SerAxExtensionChoice>,
 }
 /// Defines the ValAxExtension Class.
@@ -3313,7 +3477,7 @@ pub struct ValAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
+  #[sdk(choice(child(variant = NumberingFormat, qname = "c15:numFmt"), any))]
   pub val_ax_extension_choice: Option<ValAxExtensionChoice>,
 }
 /// Defines the UpDownBars Class.
@@ -3816,10 +3980,12 @@ pub struct CrossBetween {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DispUnits/c:dispUnits")]
 pub struct DisplayUnits {
-  #[sdk(choice(
-    qname = "c:CT_Double/c:custUnit",
-    qname = "c:CT_BuiltInUnit/c:builtInUnit"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomDisplayUnit, qname = "c:custUnit"),
+            child(variant = BuiltInUnit, qname = "c:builtInUnit")
+        )
+    )]
   pub display_units_choice: Option<DisplayUnitsChoice>,
   /// Display Units Label.
   #[sdk(child(qname = "c:CT_DispUnitsLbl/c:dispUnitsLbl"))]
@@ -3855,15 +4021,17 @@ pub struct DLblExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
-    qname = "c:CT_Boolean/c15:xForSave",
-    qname = "c:CT_Boolean/c15:showDataLabelsRange",
-    qname = "a:CT_ShapeProperties/c15:spPr",
-    qname = "c:CT_Layout/c15:layout",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
+            child(variant = ExceptionForSave, qname = "c15:xForSave"),
+            child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
+            child(variant = ShapeProperties, qname = "c15:spPr"),
+            child(variant = Layout, qname = "c15:layout"),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub d_lbl_extension_choice: Vec<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
@@ -3972,26 +4140,30 @@ pub struct ErrorBars {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/c:cat")]
 pub struct CategoryAxisData {
-  #[sdk(choice(
-    qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef",
-    qname = "c:CT_NumRef/c:numRef",
-    qname = "c:CT_NumData/c:numLit",
-    qname = "c:CT_StrRef/c:strRef",
-    qname = "c:CT_StrData/c:strLit"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MultiLevelStringReference, qname = "c:multiLvlStrRef"),
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit"),
+            child(variant = StringReference, qname = "c:strRef"),
+            child(variant = StringLiteral, qname = "c:strLit")
+        )
+    )]
   pub category_axis_data_choice: Option<CategoryAxisDataChoice>,
 }
 /// Defines the XValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/c:xVal")]
 pub struct XValues {
-  #[sdk(choice(
-    qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef",
-    qname = "c:CT_NumRef/c:numRef",
-    qname = "c:CT_NumData/c:numLit",
-    qname = "c:CT_StrRef/c:strRef",
-    qname = "c:CT_StrData/c:strLit"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = MultiLevelStringReference, qname = "c:multiLvlStrRef"),
+            child(variant = NumberReference, qname = "c:numRef"),
+            child(variant = NumberLiteral, qname = "c:numLit"),
+            child(variant = StringReference, qname = "c:strRef"),
+            child(variant = StringLiteral, qname = "c:strLit")
+        )
+    )]
   pub x_values_choice: Option<XValuesChoice>,
 }
 /// Defines the LineSerExtensionList Class.
@@ -4012,16 +4184,27 @@ pub struct LineSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub line_ser_extension_choice: Option<LineSerExtensionChoice>,
 }
 /// Defines the ScatterSerExtensionList Class.
@@ -4042,16 +4225,27 @@ pub struct ScatterSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub scatter_ser_extension_choice: Option<ScatterSerExtensionChoice>,
 }
 /// Defines the RadarSerExtensionList Class.
@@ -4072,16 +4266,27 @@ pub struct RadarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub radar_ser_extension_choice: Option<RadarSerExtensionChoice>,
 }
 /// Defines the BarSerExtensionList Class.
@@ -4102,17 +4307,28 @@ pub struct BarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub bar_ser_extension_choice: Option<BarSerExtensionChoice>,
 }
 /// Defines the AreaSerExtensionList Class.
@@ -4133,16 +4349,27 @@ pub struct AreaSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub area_ser_extension_choice: Option<AreaSerExtensionChoice>,
 }
 /// Defines the PieSerExtensionList Class.
@@ -4163,16 +4390,27 @@ pub struct PieSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub pie_ser_extension_choice: Option<PieSerExtensionChoice>,
 }
 /// Defines the BubbleSerExtensionList Class.
@@ -4193,16 +4431,27 @@ pub struct BubbleSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub bubble_ser_extension_choice: Option<BubbleSerExtensionChoice>,
 }
 /// Defines the SurfaceSerExtensionList Class.
@@ -4223,15 +4472,26 @@ pub struct SurfaceSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            any
+        )
+    )]
   pub surface_ser_extension_choice: Option<SurfaceSerExtensionChoice>,
 }
 /// Defines the DataDisplayOptions16 Class.
@@ -4336,31 +4596,35 @@ pub struct PlotArea {
   /// Layout
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
   pub layout: Option<std::boxed::Box<Layout>>,
-  #[sdk(choice(
-    qname = "c:CT_AreaChart/c:areaChart",
-    qname = "c:CT_Area3DChart/c:area3DChart",
-    qname = "c:CT_LineChart/c:lineChart",
-    qname = "c:CT_Line3DChart/c:line3DChart",
-    qname = "c:CT_StockChart/c:stockChart",
-    qname = "c:CT_RadarChart/c:radarChart",
-    qname = "c:CT_ScatterChart/c:scatterChart",
-    qname = "c:CT_PieChart/c:pieChart",
-    qname = "c:CT_Pie3DChart/c:pie3DChart",
-    qname = "c:CT_DoughnutChart/c:doughnutChart",
-    qname = "c:CT_BarChart/c:barChart",
-    qname = "c:CT_Bar3DChart/c:bar3DChart",
-    qname = "c:CT_OfPieChart/c:ofPieChart",
-    qname = "c:CT_SurfaceChart/c:surfaceChart",
-    qname = "c:CT_Surface3DChart/c:surface3DChart",
-    qname = "c:CT_BubbleChart/c:bubbleChart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AreaChart, qname = "c:areaChart"),
+            child(variant = Area3DChart, qname = "c:area3DChart"),
+            child(variant = LineChart, qname = "c:lineChart"),
+            child(variant = Line3DChart, qname = "c:line3DChart"),
+            child(variant = StockChart, qname = "c:stockChart"),
+            child(variant = RadarChart, qname = "c:radarChart"),
+            child(variant = ScatterChart, qname = "c:scatterChart"),
+            child(variant = PieChart, qname = "c:pieChart"),
+            child(variant = Pie3DChart, qname = "c:pie3DChart"),
+            child(variant = DoughnutChart, qname = "c:doughnutChart"),
+            child(variant = BarChart, qname = "c:barChart"),
+            child(variant = Bar3DChart, qname = "c:bar3DChart"),
+            child(variant = OfPieChart, qname = "c:ofPieChart"),
+            child(variant = SurfaceChart, qname = "c:surfaceChart"),
+            child(variant = Surface3DChart, qname = "c:surface3DChart"),
+            child(variant = BubbleChart, qname = "c:bubbleChart")
+        )
+    )]
   pub plot_area_choice1: Vec<PlotAreaChoice>,
-  #[sdk(choice(
-    qname = "c:CT_ValAx/c:valAx",
-    qname = "c:CT_CatAx/c:catAx",
-    qname = "c:CT_DateAx/c:dateAx",
-    qname = "c:CT_SerAx/c:serAx"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ValueAxis, qname = "c:valAx"),
+            child(variant = CategoryAxis, qname = "c:catAx"),
+            child(variant = DateAxis, qname = "c:dateAx"),
+            child(variant = SeriesAxis, qname = "c:serAx")
+        )
+    )]
   pub plot_area_choice2: Vec<PlotAreaChoice2>,
   /// Data Table.
   #[sdk(child(qname = "c:CT_DTable/c:dTable"))]
@@ -4613,12 +4877,14 @@ pub struct ChartSpaceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "c14:CT_PivotOptions/c14:pivotOptions",
-    qname = "c14:CT_SketchOptions/c14:sketchOptions",
-    qname = "c:CT_PivotSource/c15:pivotSource",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PivotOptions, qname = "c14:pivotOptions"),
+            child(variant = SketchOptions, qname = "c14:sketchOptions"),
+            child(variant = PivotSource, qname = "c15:pivotSource"),
+            any
+        )
+    )]
   pub chart_space_extension_choice: Option<ChartSpaceExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

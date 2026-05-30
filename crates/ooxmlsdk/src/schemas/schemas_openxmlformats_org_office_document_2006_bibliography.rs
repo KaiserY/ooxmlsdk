@@ -310,44 +310,50 @@ pub struct Writer {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Author")]
 pub struct Author {
-  #[sdk(choice(
-    qname = "b:CT_NameListType/b:NameList",
-    qname = "b:ST_String255/b:Corporate"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NameList, qname = "b:NameList"),
+            text_child(variant = Corporate, qname = "b:Corporate")
+        )
+    )]
   pub author_choice: Option<AuthorChoice>,
 }
 /// Performer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Performer")]
 pub struct Performer {
-  #[sdk(choice(
-    qname = "b:CT_NameListType/b:NameList",
-    qname = "b:ST_String255/b:Corporate"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NameList, qname = "b:NameList"),
+            text_child(variant = Corporate, qname = "b:Corporate")
+        )
+    )]
   pub performer_choice: Option<PerformerChoice>,
 }
 /// Contributors List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_AuthorType/b:Author")]
 pub struct AuthorList {
-  #[sdk(choice(
-    qname = "b:CT_NameType/b:Artist",
-    qname = "b:CT_NameOrCorporateType/b:Author",
-    qname = "b:CT_NameType/b:BookAuthor",
-    qname = "b:CT_NameType/b:Compiler",
-    qname = "b:CT_NameType/b:Composer",
-    qname = "b:CT_NameType/b:Conductor",
-    qname = "b:CT_NameType/b:Counsel",
-    qname = "b:CT_NameType/b:Director",
-    qname = "b:CT_NameType/b:Editor",
-    qname = "b:CT_NameType/b:Interviewee",
-    qname = "b:CT_NameType/b:Interviewer",
-    qname = "b:CT_NameType/b:Inventor",
-    qname = "b:CT_NameOrCorporateType/b:Performer",
-    qname = "b:CT_NameType/b:ProducerName",
-    qname = "b:CT_NameType/b:Translator",
-    qname = "b:CT_NameType/b:Writer"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Artist, qname = "b:Artist"),
+            child(variant = Author, qname = "b:Author"),
+            child(variant = BookAuthor, qname = "b:BookAuthor"),
+            child(variant = Compiler, qname = "b:Compiler"),
+            child(variant = Composer, qname = "b:Composer"),
+            child(variant = Conductor, qname = "b:Conductor"),
+            child(variant = Counsel, qname = "b:Counsel"),
+            child(variant = Director, qname = "b:Director"),
+            child(variant = Editor, qname = "b:Editor"),
+            child(variant = Interviewee, qname = "b:Interviewee"),
+            child(variant = Interviewer, qname = "b:Interviewer"),
+            child(variant = Inventor, qname = "b:Inventor"),
+            child(variant = Performer, qname = "b:Performer"),
+            child(variant = ProducerName, qname = "b:ProducerName"),
+            child(variant = Translator, qname = "b:Translator"),
+            child(variant = Writer, qname = "b:Writer")
+        )
+    )]
   pub author_list_choice: Vec<AuthorListChoice>,
 }
 /// Source Type.
@@ -356,60 +362,65 @@ pub type SourceType = DataSourceValues;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_SourceType/b:Source")]
 pub struct Source {
-  #[sdk(choice(
-    qname = "b:ST_String255/b:AbbreviatedCaseNumber",
-    qname = "b:ST_String255/b:AlbumTitle",
-    qname = "b:CT_AuthorType/b:Author",
-    qname = "b:ST_String255/b:BookTitle",
-    qname = "b:ST_String255/b:Broadcaster",
-    qname = "b:ST_String255/b:BroadcastTitle",
-    qname = "b:ST_String255/b:CaseNumber",
-    qname = "b:ST_String255/b:ChapterNumber",
-    qname = "b:ST_String255/b:City",
-    qname = "b:ST_String255/b:Comments",
-    qname = "b:ST_String255/b:ConferenceName",
-    qname = "b:ST_String255/b:CountryRegion",
-    qname = "b:ST_String255/b:Court",
-    qname = "b:ST_String255/b:Day",
-    qname = "b:ST_String255/b:DayAccessed",
-    qname = "b:ST_String255/b:Department",
-    qname = "b:ST_String255/b:Distributor",
-    qname = "b:ST_String255/b:Edition",
-    qname = "b:ST_String255/b:Guid",
-    qname = "b:ST_String255/b:Institution",
-    qname = "b:ST_String255/b:InternetSiteTitle",
-    qname = "b:ST_String255/b:Issue",
-    qname = "b:ST_String255/b:JournalName",
-    qname = "b:ST_String255/b:LCID",
-    qname = "b:ST_String255/b:Medium",
-    qname = "b:ST_String255/b:Month",
-    qname = "b:ST_String255/b:MonthAccessed",
-    qname = "b:ST_String255/b:NumberVolumes",
-    qname = "b:ST_String255/b:Pages",
-    qname = "b:ST_String255/b:PatentNumber",
-    qname = "b:ST_String255/b:PeriodicalTitle",
-    qname = "b:ST_String255/b:ProductionCompany",
-    qname = "b:ST_String255/b:PublicationTitle",
-    qname = "b:ST_String255/b:Publisher",
-    qname = "b:ST_String255/b:RecordingNumber",
-    qname = "b:ST_String255/b:RefOrder",
-    qname = "b:ST_String255/b:Reporter",
-    qname = "b:ST_SourceType/b:SourceType",
-    qname = "b:ST_String255/b:ShortTitle",
-    qname = "b:ST_String255/b:StandardNumber",
-    qname = "b:ST_String255/b:StateProvince",
-    qname = "b:ST_String255/b:Station",
-    qname = "b:ST_String255/b:Tag",
-    qname = "b:ST_String255/b:Theater",
-    qname = "b:ST_String255/b:ThesisType",
-    qname = "b:ST_String255/b:Title",
-    qname = "b:ST_String255/b:Type",
-    qname = "b:ST_String255/b:URL",
-    qname = "b:ST_String255/b:Version",
-    qname = "b:ST_String255/b:Volume",
-    qname = "b:ST_String255/b:Year",
-    qname = "b:ST_String255/b:YearAccessed"
-  ))]
+  #[sdk(
+        choice(
+            text_child(
+                variant = AbbreviatedCaseNumber,
+                qname = "b:AbbreviatedCaseNumber"
+            ),
+            text_child(variant = AlbumTitle, qname = "b:AlbumTitle"),
+            child(variant = AuthorList, qname = "b:Author"),
+            text_child(variant = BookTitle, qname = "b:BookTitle"),
+            text_child(variant = Broadcaster, qname = "b:Broadcaster"),
+            text_child(variant = BroadcastTitle, qname = "b:BroadcastTitle"),
+            text_child(variant = CaseNumber, qname = "b:CaseNumber"),
+            text_child(variant = ChapterNumber, qname = "b:ChapterNumber"),
+            text_child(variant = City, qname = "b:City"),
+            text_child(variant = Comments, qname = "b:Comments"),
+            text_child(variant = ConferenceName, qname = "b:ConferenceName"),
+            text_child(variant = CountryRegion, qname = "b:CountryRegion"),
+            text_child(variant = Court, qname = "b:Court"),
+            text_child(variant = Day, qname = "b:Day"),
+            text_child(variant = DayAccessed, qname = "b:DayAccessed"),
+            text_child(variant = Department, qname = "b:Department"),
+            text_child(variant = Distributor, qname = "b:Distributor"),
+            text_child(variant = Edition, qname = "b:Edition"),
+            text_child(variant = GuidString, qname = "b:Guid"),
+            text_child(variant = Institution, qname = "b:Institution"),
+            text_child(variant = InternetSiteTitle, qname = "b:InternetSiteTitle"),
+            text_child(variant = Issue, qname = "b:Issue"),
+            text_child(variant = JournalName, qname = "b:JournalName"),
+            text_child(variant = LcId, qname = "b:LCID"),
+            text_child(variant = Medium, qname = "b:Medium"),
+            text_child(variant = Month, qname = "b:Month"),
+            text_child(variant = MonthAccessed, qname = "b:MonthAccessed"),
+            text_child(variant = NumberVolumes, qname = "b:NumberVolumes"),
+            text_child(variant = Pages, qname = "b:Pages"),
+            text_child(variant = PatentNumber, qname = "b:PatentNumber"),
+            text_child(variant = PeriodicalTitle, qname = "b:PeriodicalTitle"),
+            text_child(variant = ProductionCompany, qname = "b:ProductionCompany"),
+            text_child(variant = PublicationTitle, qname = "b:PublicationTitle"),
+            text_child(variant = Publisher, qname = "b:Publisher"),
+            text_child(variant = RecordingNumber, qname = "b:RecordingNumber"),
+            text_child(variant = ReferenceOrder, qname = "b:RefOrder"),
+            text_child(variant = Reporter, qname = "b:Reporter"),
+            text_child(variant = SourceType, qname = "b:SourceType"),
+            text_child(variant = ShortTitle, qname = "b:ShortTitle"),
+            text_child(variant = StandardNumber, qname = "b:StandardNumber"),
+            text_child(variant = StateProvince, qname = "b:StateProvince"),
+            text_child(variant = Station, qname = "b:Station"),
+            text_child(variant = Tag, qname = "b:Tag"),
+            text_child(variant = Theater, qname = "b:Theater"),
+            text_child(variant = ThesisType, qname = "b:ThesisType"),
+            text_child(variant = Title, qname = "b:Title"),
+            text_child(variant = PatentType, qname = "b:Type"),
+            text_child(variant = UrlString, qname = "b:URL"),
+            text_child(variant = Version, qname = "b:Version"),
+            text_child(variant = Volume, qname = "b:Volume"),
+            text_child(variant = Year, qname = "b:Year"),
+            text_child(variant = YearAccessed, qname = "b:YearAccessed")
+        )
+    )]
   pub source_choice: Vec<SourceChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

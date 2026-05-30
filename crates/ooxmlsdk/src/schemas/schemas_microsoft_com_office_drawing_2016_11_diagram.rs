@@ -36,12 +36,14 @@ pub struct DiagramAutoBullet {
   /// leadZeros
   #[sdk(attr(office2019, qname = ":leadZeros"))]
   pub lead_zeros: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub diagram_auto_bullet_choice: Option<DiagramAutoBulletChoice>,
 }
 /// Defines the NumberDiagramInfo Class.

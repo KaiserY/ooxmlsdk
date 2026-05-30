@@ -1190,6 +1190,55 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let value: LitStr = nested.value()?.parse()?;
               choice_qnames.push(value.value());
               Ok(())
+            } else if nested.path.is_ident("child")
+              || nested.path.is_ident("empty_child")
+              || nested.path.is_ident("text_child")
+              || nested.path.is_ident("any_child")
+            {
+              nested.parse_nested_meta(|choice_child| {
+                if choice_child.path.is_ident("qname") {
+                  let value: LitStr = choice_child.value()?.parse()?;
+                  choice_qnames.push(value.value());
+                  Ok(())
+                } else if choice_child.path.is_ident("variant") {
+                  let _value: Ident = choice_child.value()?.parse()?;
+                  Ok(())
+                } else if is_sdk_version_marker_path(&choice_child.path) {
+                  Ok(())
+                } else {
+                  Err(choice_child.error("unsupported sdk choice child attribute"))
+                }
+              })
+            } else if nested.path.is_ident("sequence") {
+              nested.parse_nested_meta(|sequence| {
+                if sequence.path.is_ident("variant") {
+                  let _value: Ident = sequence.value()?.parse()?;
+                  Ok(())
+                } else if sequence.path.is_ident("child")
+                  || sequence.path.is_ident("empty_child")
+                  || sequence.path.is_ident("text_child")
+                  || sequence.path.is_ident("any_child")
+                {
+                  sequence.parse_nested_meta(|sequence_child| {
+                    if sequence_child.path.is_ident("qname") {
+                      let value: LitStr = sequence_child.value()?.parse()?;
+                      choice_qnames.push(value.value());
+                      Ok(())
+                    } else if sequence_child.path.is_ident("field") {
+                      let _value: Ident = sequence_child.value()?.parse()?;
+                      Ok(())
+                    } else if is_sdk_version_marker_path(&sequence_child.path) {
+                      Ok(())
+                    } else {
+                      Err(sequence_child.error("unsupported sdk choice sequence child attribute"))
+                    }
+                  })
+                } else if is_sdk_version_marker_path(&sequence.path) {
+                  Ok(())
+                } else {
+                  Err(sequence.error("unsupported sdk choice sequence attribute"))
+                }
+              })
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {

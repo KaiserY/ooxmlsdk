@@ -65,12 +65,14 @@ pub struct OfficeArtExtensionList {
   qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps"
 )]
 pub struct LiveFeedBackgroundProperties {
-  #[sdk(choice(
-    qname = "alf:CT_BackgroundNormalProperties/alf:Normal",
-    qname = "alf:CT_BackgroundRemovedProperties/alf:Removed",
-    qname = "alf:CT_BackgroundBlurProperties/alf:Blur",
-    qname = "alf:CT_BackgroundCustomProperties/alf:Custom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = BackgroundNormalProperties, qname = "alf:Normal"),
+            child(variant = BackgroundRemovedProperties, qname = "alf:Removed"),
+            child(variant = BackgroundBlurProperties, qname = "alf:Blur"),
+            child(variant = BackgroundCustomProperties, qname = "alf:Custom")
+        )
+    )]
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]

@@ -200,18 +200,20 @@ pub struct Comment {
   /// title
   #[sdk(attr(office2021, qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "pc:CT_SlideMonikerList/pc:sldMkLst",
-    qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst",
-    qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst",
-    qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst",
-    qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst",
-    qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst",
-    qname = "oac:CT_TableCellMonikerList/oac:tcMkLst",
-    qname = "oac:CT_TableRowMonikerList/oac:trMkLst",
-    qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst",
-    qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SlideMonikerList, qname = "pc:sldMkLst"),
+            any_child(variant = SlideLayoutMonikerList, qname = "pc:sldLayoutMkLst"),
+            any_child(variant = MainMasterMonikerList, qname = "pc:sldMasterMkLst"),
+            any_child(variant = DeMkLstDrawingElementMonikerList, qname = "oac:deMkLst"),
+            any_child(variant = TextBodyMonikerList, qname = "oac:txBodyMkLst"),
+            any_child(variant = TextCharRangeMonikerList, qname = "oac:txMkLst"),
+            any_child(variant = TableCellMonikerList, qname = "oac:tcMkLst"),
+            any_child(variant = TableRowMonikerList, qname = "oac:trMkLst"),
+            any_child(variant = TableColumnMonikerList, qname = "oac:gridColMkLst"),
+            empty_child(variant = CommentUnknownAnchor, qname = "p188:unknownAnchor")
+        )
+    )]
   pub comment_choice: Vec<CommentChoice>,
   /// Defines the Point2DType Class.
   #[sdk(child(office2021, qname = "a:CT_Point2D/p188:pos"))]

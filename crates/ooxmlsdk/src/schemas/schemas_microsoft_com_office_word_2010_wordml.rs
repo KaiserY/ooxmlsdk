@@ -503,64 +503,90 @@ pub struct RunConflictInsertion {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub run_conflict_insertion_choice: Vec<RunConflictInsertionChoice>,
 }
 /// Defines the RunConflictDeletion Class.
@@ -594,64 +620,90 @@ pub struct RunConflictDeletion {
     max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "w:CT_SdtRun/w:sdt",
-    qname = "w:CT_ProofErr/w:proofErr",
-    qname = "w:CT_PermStart/w:permStart",
-    qname = "w:CT_Perm/w:permEnd",
-    qname = "w:CT_Bookmark/w:bookmarkStart",
-    qname = "w:CT_MarkupRange/w:bookmarkEnd",
-    qname = "w:CT_MarkupRange/w:commentRangeStart",
-    qname = "w:CT_MarkupRange/w:commentRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveFromRangeStart",
-    qname = "w:CT_MarkupRange/w:moveFromRangeEnd",
-    qname = "w:CT_MoveBookmark/w:moveToRangeStart",
-    qname = "w:CT_MarkupRange/w:moveToRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlInsRangeStart",
-    qname = "w:CT_Markup/w:customXmlInsRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlDelRangeStart",
-    qname = "w:CT_Markup/w:customXmlDelRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
-    qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w:CT_RunTrackChange/w:ins",
-    qname = "w:CT_RunTrackChange/w:del",
-    qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo",
-    qname = "w:CT_ContentPart/w:contentPart",
-    qname = "w:CT_RunTrackChange/w14:conflictIns",
-    qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "m:CT_Acc/m:acc",
-    qname = "m:CT_Bar/m:bar",
-    qname = "m:CT_Box/m:box",
-    qname = "m:CT_BorderBox/m:borderBox",
-    qname = "m:CT_D/m:d",
-    qname = "m:CT_EqArr/m:eqArr",
-    qname = "m:CT_F/m:f",
-    qname = "m:CT_Func/m:func",
-    qname = "m:CT_GroupChr/m:groupChr",
-    qname = "m:CT_LimLow/m:limLow",
-    qname = "m:CT_LimUpp/m:limUpp",
-    qname = "m:CT_M/m:m",
-    qname = "m:CT_Nary/m:nary",
-    qname = "m:CT_Phant/m:phant",
-    qname = "m:CT_Rad/m:rad",
-    qname = "m:CT_SPre/m:sPre",
-    qname = "m:CT_SSub/m:sSub",
-    qname = "m:CT_SSubSup/m:sSubSup",
-    qname = "m:CT_SSup/m:sSup",
-    qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r",
-    qname = "w:CT_BdoContentRun/w:bdo",
-    qname = "w:CT_DirContentRun/w:dir"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SdtRun, qname = "w:sdt"),
+            child(variant = ProofError, qname = "w:proofErr"),
+            child(variant = PermStart, qname = "w:permStart"),
+            child(variant = PermEnd, qname = "w:permEnd"),
+            child(variant = BookmarkStart, qname = "w:bookmarkStart"),
+            child(variant = BookmarkEnd, qname = "w:bookmarkEnd"),
+            child(variant = CommentRangeStart, qname = "w:commentRangeStart"),
+            child(variant = CommentRangeEnd, qname = "w:commentRangeEnd"),
+            child(variant = MoveFromRangeStart, qname = "w:moveFromRangeStart"),
+            child(variant = MoveFromRangeEnd, qname = "w:moveFromRangeEnd"),
+            child(variant = MoveToRangeStart, qname = "w:moveToRangeStart"),
+            child(variant = MoveToRangeEnd, qname = "w:moveToRangeEnd"),
+            child(variant = CustomXmlInsRangeStart, qname = "w:customXmlInsRangeStart"),
+            child(variant = CustomXmlInsRangeEnd, qname = "w:customXmlInsRangeEnd"),
+            child(variant = CustomXmlDelRangeStart, qname = "w:customXmlDelRangeStart"),
+            child(variant = CustomXmlDelRangeEnd, qname = "w:customXmlDelRangeEnd"),
+            child(
+                variant = CustomXmlMoveFromRangeStart,
+                qname = "w:customXmlMoveFromRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveFromRangeEnd,
+                qname = "w:customXmlMoveFromRangeEnd"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeStart,
+                qname = "w:customXmlMoveToRangeStart"
+            ),
+            child(
+                variant = CustomXmlMoveToRangeEnd,
+                qname = "w:customXmlMoveToRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(variant = InsertedRun, qname = "w:ins"),
+            child(variant = DeletedRun, qname = "w:del"),
+            child(variant = MoveFromRun, qname = "w:moveFrom"),
+            child(variant = MoveToRun, qname = "w:moveTo"),
+            child(variant = ContentPart, qname = "w:contentPart"),
+            child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Accent, qname = "m:acc"),
+            child(variant = Bar, qname = "m:bar"),
+            child(variant = Box, qname = "m:box"),
+            child(variant = BorderBox, qname = "m:borderBox"),
+            child(variant = Delimiter, qname = "m:d"),
+            child(variant = EquationArray, qname = "m:eqArr"),
+            child(variant = Fraction, qname = "m:f"),
+            child(variant = MathFunction, qname = "m:func"),
+            child(variant = GroupChar, qname = "m:groupChr"),
+            child(variant = LimitLower, qname = "m:limLow"),
+            child(variant = LimitUpper, qname = "m:limUpp"),
+            child(variant = Matrix, qname = "m:m"),
+            child(variant = Nary, qname = "m:nary"),
+            child(variant = Phantom, qname = "m:phant"),
+            child(variant = Radical, qname = "m:rad"),
+            child(variant = PreSubSuper, qname = "m:sPre"),
+            child(variant = Subscript, qname = "m:sSub"),
+            child(variant = SubSuperscript, qname = "m:sSubSup"),
+            child(variant = Superscript, qname = "m:sSup"),
+            child(variant = MRun, qname = "m:r"),
+            child(variant = WRun, qname = "w:r"),
+            child(variant = BidirectionalOverride, qname = "w:bdo"),
+            child(variant = BidirectionalEmbedding, qname = "w:dir")
+        )
+    )]
   pub run_conflict_deletion_choice: Vec<RunConflictDeletionChoice>,
 }
 /// Defines the ConflictInsertion Class.
@@ -907,18 +959,20 @@ pub struct RgbColorModelHex {
   #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
-  #[sdk(choice(
-    qname = "w14:CT_PositiveFixedPercentage/w14:tint",
-    qname = "w14:CT_PositiveFixedPercentage/w14:shade",
-    qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
-    qname = "w14:CT_PositivePercentage/w14:hueMod",
-    qname = "w14:CT_Percentage/w14:sat",
-    qname = "w14:CT_Percentage/w14:satOff",
-    qname = "w14:CT_Percentage/w14:satMod",
-    qname = "w14:CT_Percentage/w14:lum",
-    qname = "w14:CT_Percentage/w14:lumOff",
-    qname = "w14:CT_Percentage/w14:lumMod"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "w14:tint"),
+            child(variant = Shade, qname = "w14:shade"),
+            child(variant = Alpha, qname = "w14:alpha"),
+            child(variant = HueModulation, qname = "w14:hueMod"),
+            child(variant = Saturation, qname = "w14:sat"),
+            child(variant = SaturationOffset, qname = "w14:satOff"),
+            child(variant = SaturationModulation, qname = "w14:satMod"),
+            child(variant = Luminance, qname = "w14:lum"),
+            child(variant = LuminanceOffset, qname = "w14:lumOff"),
+            child(variant = LuminanceModulation, qname = "w14:lumMod")
+        )
+    )]
   pub rgb_color_model_hex_choice: Vec<RgbColorModelHexChoice>,
 }
 /// Defines the SchemeColor Class.
@@ -928,18 +982,20 @@ pub struct SchemeColor {
   /// val
   #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: SchemeColorValues,
-  #[sdk(choice(
-    qname = "w14:CT_PositiveFixedPercentage/w14:tint",
-    qname = "w14:CT_PositiveFixedPercentage/w14:shade",
-    qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
-    qname = "w14:CT_PositivePercentage/w14:hueMod",
-    qname = "w14:CT_Percentage/w14:sat",
-    qname = "w14:CT_Percentage/w14:satOff",
-    qname = "w14:CT_Percentage/w14:satMod",
-    qname = "w14:CT_Percentage/w14:lum",
-    qname = "w14:CT_Percentage/w14:lumOff",
-    qname = "w14:CT_Percentage/w14:lumMod"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "w14:tint"),
+            child(variant = Shade, qname = "w14:shade"),
+            child(variant = Alpha, qname = "w14:alpha"),
+            child(variant = HueModulation, qname = "w14:hueMod"),
+            child(variant = Saturation, qname = "w14:sat"),
+            child(variant = SaturationOffset, qname = "w14:satOff"),
+            child(variant = SaturationModulation, qname = "w14:satMod"),
+            child(variant = Luminance, qname = "w14:lum"),
+            child(variant = LuminanceOffset, qname = "w14:lumOff"),
+            child(variant = LuminanceModulation, qname = "w14:lumMod")
+        )
+    )]
   pub scheme_color_choice: Vec<SchemeColorChoice>,
 }
 /// Defines the LinearShadeProperties Class.
@@ -976,10 +1032,12 @@ pub struct PathShadeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
 pub struct SolidColorFillProperties {
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub solid_color_fill_properties_choice: Option<SolidColorFillPropertiesChoice>,
 }
 /// Defines the GradientFillProperties Class.
@@ -989,10 +1047,12 @@ pub struct GradientFillProperties {
   /// Defines the GradientStopList Class.
   #[sdk(child(office2010, qname = "w14:CT_GradientStopList/w14:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
-  #[sdk(choice(
-    qname = "w14:CT_LinearShadeProperties/w14:lin",
-    qname = "w14:CT_PathShadeProperties/w14:path"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = LinearShadeProperties, qname = "w14:lin"),
+            child(variant = PathShadeProperties, qname = "w14:path")
+        )
+    )]
   pub gradient_fill_properties_choice: Option<GradientFillPropertiesChoice>,
 }
 /// Defines the PresetLineDashProperties Class.
@@ -1033,10 +1093,12 @@ pub struct Glow {
     max_inclusive = true,
   ))]
   pub glow_radius: Option<crate::simple_type::Int64Value>,
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub glow_choice: Option<GlowChoice>,
 }
 /// Defines the Shadow Class.
@@ -1107,10 +1169,12 @@ pub struct Shadow {
   /// algn
   #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<RectangleAlignmentValues>,
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub shadow_choice: Option<ShadowChoice>,
 }
 /// Defines the Reflection Class.
@@ -1261,31 +1325,37 @@ pub struct TextOutlineEffect {
   /// algn
   #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "w:CT_Empty/w14:noFill",
-    qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
-    qname = "w14:CT_GradientFillProperties/w14:gradFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoFillEmpty, qname = "w14:noFill"),
+            child(variant = SolidColorFillProperties, qname = "w14:solidFill"),
+            child(variant = GradientFillProperties, qname = "w14:gradFill")
+        )
+    )]
   pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
   /// Defines the PresetLineDashProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
   pub preset_line_dash_properties: Option<PresetLineDashProperties>,
-  #[sdk(choice(
-    qname = "w:CT_Empty/w14:round",
-    qname = "w:CT_Empty/w14:bevel",
-    qname = "w14:CT_LineJoinMiterProperties/w14:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = RoundEmpty, qname = "w14:round"),
+            empty_child(variant = BevelEmpty, qname = "w14:bevel"),
+            child(variant = LineJoinMiterProperties, qname = "w14:miter")
+        )
+    )]
   pub text_outline_effect_choice3: Option<TextOutlineEffectChoice2>,
 }
 /// Defines the FillTextEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "w14:CT_FillTextEffect/w14:textFill")]
 pub struct FillTextEffect {
-  #[sdk(choice(
-    qname = "w:CT_Empty/w14:noFill",
-    qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
-    qname = "w14:CT_GradientFillProperties/w14:gradFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoFillEmpty, qname = "w14:noFill"),
+            child(variant = SolidColorFillProperties, qname = "w14:solidFill"),
+            child(variant = GradientFillProperties, qname = "w14:gradFill")
+        )
+    )]
   pub fill_text_effect_choice: Option<FillTextEffectChoice>,
 }
 /// Defines the Scene3D Class.
@@ -1522,10 +1592,12 @@ pub struct GradientStop {
     max_inclusive = true,
   ))]
   pub stop_position: crate::simple_type::Int32Value,
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub gradient_stop_choice: Option<GradientStopChoice>,
 }
 /// Defines the FillToRectangle Class.
@@ -1682,20 +1754,24 @@ pub struct BevelBottom {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "w14:CT_Color/w14:extrusionClr")]
 pub struct ExtrusionColor {
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub extrusion_color_choice: Option<ExtrusionColorChoice>,
 }
 /// Defines the ContourColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "w14:CT_Color/w14:contourClr")]
 pub struct ContourColor {
-  #[sdk(choice(
-    qname = "w14:CT_SRgbColor/w14:srgbClr",
-    qname = "w14:CT_SchemeColor/w14:schemeClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelHex, qname = "w14:srgbClr"),
+            child(variant = SchemeColor, qname = "w14:schemeClr")
+        )
+    )]
   pub contour_color_choice: Option<ContourColorChoice>,
 }
 /// Defines the StyleSet Class.

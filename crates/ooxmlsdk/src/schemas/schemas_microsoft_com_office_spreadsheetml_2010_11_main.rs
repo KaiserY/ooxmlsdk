@@ -721,10 +721,12 @@ pub struct OleDbPrpoperties {
   /// connection
   #[sdk(attr(office2013, qname = ":connection"))]
   pub connection: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "x15:CT_DbTables/x15:dbTables",
-    qname = "x15:CT_DbCommand/x15:dbCommand"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DbTables, qname = "x15:dbTables"),
+            child(variant = DbCommand, qname = "x15:dbCommand")
+        )
+    )]
   pub ole_db_prpoperties_choice: Option<OleDbPrpopertiesChoice>,
 }
 /// Defines the DataFeedProperties Class.

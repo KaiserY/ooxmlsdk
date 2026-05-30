@@ -15,27 +15,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -95,22 +101,27 @@ pub struct DLbl {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<crate::schemas::c::Index>,
-  #[sdk(choice(
-    qname = "c:CT_Boolean/c:delete",
-    qname = "c:CT_Layout/c:layout",
-    qname = "c:CT_Tx/c:tx",
-    qname = "c:CT_NumFmt/c:numFmt",
-    qname = "a:CT_ChartShapeProperties/c:spPr",
-    qname = "a:CT_TextBody/c:txPr",
-    qname = "c:CT_DLblPos/c:dLblPos",
-    qname = "c:CT_Boolean/c:showLegendKey",
-    qname = "c:CT_Boolean/c:showVal",
-    qname = "c:CT_Boolean/c:showCatName",
-    qname = "c:CT_Boolean/c:showSerName",
-    qname = "c:CT_Boolean/c:showPercent",
-    qname = "c:CT_Boolean/c:showBubbleSize",
-    qname = "xsd:string/c:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Delete, qname = "c:delete"),
+            sequence(
+                variant = Sequence,
+                child(qname = "c:layout"),
+                child(qname = "c:tx"),
+                child(qname = "c:numFmt"),
+                child(qname = "c:spPr"),
+                child(qname = "c:txPr"),
+                child(qname = "c:dLblPos"),
+                child(qname = "c:showLegendKey"),
+                child(qname = "c:showVal"),
+                child(qname = "c:showCatName"),
+                child(qname = "c:showSerName"),
+                child(qname = "c:showPercent"),
+                child(qname = "c:showBubbleSize"),
+                text_child(qname = "c:separator")
+            )
+        )
+    )]
   pub d_lbl_choice: Option<DLblChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]

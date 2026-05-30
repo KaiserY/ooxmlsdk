@@ -323,14 +323,16 @@ pub struct BrowseMode {
 #[sdk(office2010, qname = "a:CT_Color/p14:laserClr")]
 pub struct LaserColor {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub laser_color_choice: Option<LaserColorChoice>,
 }
 /// Defines the DefaultImageDpi Class.
@@ -393,15 +395,17 @@ pub struct ModificationId {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_ShowEventRecordList/p14:showEvtLst")]
 pub struct ShowEventRecordList {
-  #[sdk(choice(
-    qname = "p14:CT_TriggerEventRecord/p14:triggerEvt",
-    qname = "p14:CT_MediaPlaybackEventRecord/p14:playEvt",
-    qname = "p14:CT_MediaPlaybackEventRecord/p14:stopEvt",
-    qname = "p14:CT_MediaPlaybackEventRecord/p14:pauseEvt",
-    qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt",
-    qname = "p14:CT_MediaSeekEventRecord/p14:seekEvt",
-    qname = "p14:CT_NullEventRecord/p14:nullEvt"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TriggerEventRecord, qname = "p14:triggerEvt"),
+            child(variant = PlayEventRecord, qname = "p14:playEvt"),
+            child(variant = StopEventRecord, qname = "p14:stopEvt"),
+            child(variant = PauseEventRecord, qname = "p14:pauseEvt"),
+            child(variant = ResumeEventRecord, qname = "p14:resumeEvt"),
+            child(variant = SeekEventRecord, qname = "p14:seekEvt"),
+            child(variant = NullEventRecord, qname = "p14:nullEvt")
+        )
+    )]
   pub show_event_record_list_choice: Vec<ShowEventRecordListChoice>,
 }
 /// Defines the NonVisualDrawingProperties Class.
@@ -464,13 +468,15 @@ pub struct ApplicationNonVisualDrawingProperties {
   /// Placeholder Shape
   #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
   pub placeholder_shape: Option<std::boxed::Box<crate::schemas::p::PlaceholderShape>>,
-  #[sdk(choice(
-    qname = "a:CT_AudioCD/a:audioCd",
-    qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
-    qname = "a:CT_AudioFile/a:audioFile",
-    qname = "a:CT_VideoFile/a:videoFile",
-    qname = "a:CT_QuickTimeFile/a:quickTimeFile"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AudioFromCd, qname = "a:audioCd"),
+            child(variant = WaveAudioFile, qname = "a:wavAudioFile"),
+            child(variant = AudioFromFile, qname = "a:audioFile"),
+            child(variant = VideoFromFile, qname = "a:videoFile"),
+            child(variant = QuickTimeFromFile, qname = "a:quickTimeFile")
+        )
+    )]
   pub application_non_visual_drawing_properties_choice:
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.

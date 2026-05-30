@@ -193,15 +193,17 @@ pub struct FeaturePropertyBag {
   /// att
   #[sdk(attr(microsoft365, qname = ":att"))]
   pub att: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "xfpb:CT_ArrayFeatureProperty/xfpb:a",
-    qname = "xfpb:CT_BagFeatureProperty/xfpb:bagId",
-    qname = "xfpb:CT_IntFeatureProperty/xfpb:i",
-    qname = "xfpb:CT_StringFeatureProperty/xfpb:s",
-    qname = "xfpb:CT_BoolFeatureProperty/xfpb:b",
-    qname = "xfpb:CT_DecimalFeatureProperty/xfpb:d",
-    qname = "xfpb:CT_RelFeatureProperty/xfpb:rel"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ArrayFeatureProperty, qname = "xfpb:a"),
+            child(variant = BagFeatureProperty, qname = "xfpb:bagId"),
+            child(variant = IntFeatureProperty, qname = "xfpb:i"),
+            child(variant = StringFeatureProperty, qname = "xfpb:s"),
+            child(variant = BoolFeatureProperty, qname = "xfpb:b"),
+            child(variant = DecimalFeatureProperty, qname = "xfpb:d"),
+            child(variant = RelFeatureProperty, qname = "xfpb:rel")
+        )
+    )]
   pub feature_property_bag_choice: Vec<FeaturePropertyBagChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -219,14 +221,16 @@ pub struct ArrayFeatureProperty {
   /// Name of the key for the key value pair.
   #[sdk(attr(microsoft365, qname = ":k"))]
   pub k: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "xsd:unsignedInt/xfpb:bagId",
-    qname = "xsd:integer/xfpb:i",
-    qname = "xsd:string/xfpb:s",
-    qname = "xsd:boolean/xfpb:b",
-    qname = "xsd:double/xfpb:d",
-    qname = "xsd:string/xfpb:rel"
-  ))]
+  #[sdk(
+        choice(
+            text_child(variant = XsdunsignedInt, qname = "xfpb:bagId"),
+            text_child(variant = Xsdinteger, qname = "xfpb:i"),
+            text_child(variant = SXsdstring, qname = "xfpb:s"),
+            text_child(variant = Xsdboolean, qname = "xfpb:b"),
+            text_child(variant = Xsddouble, qname = "xfpb:d"),
+            text_child(variant = RelXsdstring, qname = "xfpb:rel")
+        )
+    )]
   pub array_feature_property_choice: Vec<ArrayFeaturePropertyChoice>,
 }
 /// Defines the BagFeatureProperty Class.

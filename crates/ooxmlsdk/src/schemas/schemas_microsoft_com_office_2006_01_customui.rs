@@ -873,10 +873,12 @@ pub struct UnsizedSplitButton {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_VisibleButton/mso:button",
-    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso:button"),
+            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+        )
+    )]
   pub unsized_split_button_choice: Option<UnsizedSplitButtonChoice>,
   /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
@@ -1016,17 +1018,19 @@ pub struct UnsizedMenu {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
-    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
-    qname = "mso:CT_MenuRegular/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+        )
+    )]
   pub unsized_menu_choice: Vec<UnsizedMenuChoice>,
 }
 /// Defines the UnsizedDynamicMenu Class.
@@ -1246,10 +1250,12 @@ pub struct SplitButtonWithTitle {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_VisibleButton/mso:button",
-    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso:button"),
+            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+        )
+    )]
   pub split_button_with_title_choice: Option<SplitButtonWithTitleChoice>,
   /// Defines the MenuWithTitle Class.
   #[sdk(child(qname = "mso:CT_MenuWithTitle/mso:menu"))]
@@ -1389,17 +1395,19 @@ pub struct MenuWithTitle {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
-    qname = "mso:CT_SplitButtonWithTitle/mso:splitButton",
-    qname = "mso:CT_MenuWithTitle/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
+            child(variant = SplitButtonWithTitle, qname = "mso:splitButton"),
+            child(variant = MenuWithTitle, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+        )
+    )]
   pub menu_with_title_choice: Vec<MenuWithTitleChoice>,
 }
 /// Defines the ControlClone Class.
@@ -2772,17 +2780,19 @@ pub struct Menu {
   #[sdk(attr(qname = ":getShowImage"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
-    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
-    qname = "mso:CT_MenuRegular/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+        )
+    )]
   pub menu_choice: Vec<MenuChoice>,
 }
 /// Defines the DynamicMenu Class.
@@ -3016,10 +3026,12 @@ pub struct SplitButton {
   #[sdk(attr(qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_VisibleButton/mso:button",
-    qname = "mso:CT_VisibleToggleButton/mso:toggleButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = VisibleButton, qname = "mso:button"),
+            child(variant = VisibleToggleButton, qname = "mso:toggleButton")
+        )
+    )]
   pub split_button_choice: Option<SplitButtonChoice>,
   /// Defines the UnsizedMenu Class.
   #[sdk(child(qname = "mso:CT_MenuRegular/mso:menu"))]
@@ -3073,22 +3085,24 @@ pub struct Box {
   /// boxStyle
   #[sdk(attr(qname = ":boxStyle"))]
   pub box_style: Option<BoxStyleValues>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlClone/mso:control",
-    qname = "mso:CT_LabelControl/mso:labelControl",
-    qname = "mso:CT_Button/mso:button",
-    qname = "mso:CT_ToggleButton/mso:toggleButton",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_EditBox/mso:editBox",
-    qname = "mso:CT_ComboBox/mso:comboBox",
-    qname = "mso:CT_DropDownRegular/mso:dropDown",
-    qname = "mso:CT_Gallery/mso:gallery",
-    qname = "mso:CT_Menu/mso:menu",
-    qname = "mso:CT_DynamicMenu/mso:dynamicMenu",
-    qname = "mso:CT_SplitButton/mso:splitButton",
-    qname = "mso:CT_Box/mso:box",
-    qname = "mso:CT_ButtonGroup/mso:buttonGroup"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlClone, qname = "mso:control"),
+            child(variant = TextLabel, qname = "mso:labelControl"),
+            child(variant = Button, qname = "mso:button"),
+            child(variant = ToggleButton, qname = "mso:toggleButton"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = EditBox, qname = "mso:editBox"),
+            child(variant = ComboBox, qname = "mso:comboBox"),
+            child(variant = DropDown, qname = "mso:dropDown"),
+            child(variant = Gallery, qname = "mso:gallery"),
+            child(variant = Menu, qname = "mso:menu"),
+            child(variant = DynamicMenu, qname = "mso:dynamicMenu"),
+            child(variant = SplitButton, qname = "mso:splitButton"),
+            child(variant = Box, qname = "mso:box"),
+            child(variant = ButtonGroup, qname = "mso:buttonGroup")
+        )
+    )]
   pub box_choice: Vec<BoxChoice>,
 }
 /// Defines the ButtonGroup Class.
@@ -3136,15 +3150,17 @@ pub struct ButtonGroup {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   #[sdk(string_format(kind = "qname"))]
   pub insert_before_q: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_MenuRegular/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu",
-    qname = "mso:CT_SplitButtonRegular/mso:splitButton"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedMenu, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu"),
+            child(variant = UnsizedSplitButton, qname = "mso:splitButton")
+        )
+    )]
   pub button_group_choice: Vec<ButtonGroupChoice>,
 }
 /// Defines the MenuRoot Class.
@@ -3162,17 +3178,19 @@ pub struct MenuRoot {
   /// itemSize
   #[sdk(attr(qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
-    qname = "mso:CT_SplitButtonRegular/mso:splitButton",
-    qname = "mso:CT_MenuRegular/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
+            child(variant = UnsizedSplitButton, qname = "mso:splitButton"),
+            child(variant = UnsizedMenu, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+        )
+    )]
   pub menu_root_choice: Vec<MenuRootChoice>,
 }
 /// Defines the CustomUI Class.
@@ -3648,23 +3666,25 @@ pub struct Group {
   #[sdk(attr(qname = ":getKeytip"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "mso:CT_ControlClone/mso:control",
-    qname = "mso:CT_LabelControl/mso:labelControl",
-    qname = "mso:CT_Button/mso:button",
-    qname = "mso:CT_ToggleButton/mso:toggleButton",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_EditBox/mso:editBox",
-    qname = "mso:CT_ComboBox/mso:comboBox",
-    qname = "mso:CT_DropDownRegular/mso:dropDown",
-    qname = "mso:CT_Gallery/mso:gallery",
-    qname = "mso:CT_Menu/mso:menu",
-    qname = "mso:CT_DynamicMenu/mso:dynamicMenu",
-    qname = "mso:CT_SplitButton/mso:splitButton",
-    qname = "mso:CT_Box/mso:box",
-    qname = "mso:CT_ButtonGroup/mso:buttonGroup",
-    qname = "mso:CT_Separator/mso:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ControlClone, qname = "mso:control"),
+            child(variant = TextLabel, qname = "mso:labelControl"),
+            child(variant = Button, qname = "mso:button"),
+            child(variant = ToggleButton, qname = "mso:toggleButton"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = EditBox, qname = "mso:editBox"),
+            child(variant = ComboBox, qname = "mso:comboBox"),
+            child(variant = DropDown, qname = "mso:dropDown"),
+            child(variant = Gallery, qname = "mso:gallery"),
+            child(variant = Menu, qname = "mso:menu"),
+            child(variant = DynamicMenu, qname = "mso:dynamicMenu"),
+            child(variant = SplitButton, qname = "mso:splitButton"),
+            child(variant = Box, qname = "mso:box"),
+            child(variant = ButtonGroup, qname = "mso:buttonGroup"),
+            child(variant = VerticalSeparator, qname = "mso:separator")
+        )
+    )]
   pub group_choice: Vec<GroupChoice>,
   /// Defines the DialogBoxLauncher Class.
   #[sdk(child(qname = "mso:CT_DialogLauncher/mso:dialogBoxLauncher"))]
@@ -3808,22 +3828,26 @@ pub struct QuickAccessToolbarControlClone {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:sharedControls")]
 pub struct SharedQatControls {
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneQat/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_Separator/mso:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = QuickAccessToolbarControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = VerticalSeparator, qname = "mso:separator")
+        )
+    )]
   pub shared_qat_controls_choice: Vec<SharedQatControlsChoice>,
 }
 /// Defines the DocumentSpecificQuickAccessToolbarControls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_QatItems/mso:documentControls")]
 pub struct DocumentSpecificQuickAccessToolbarControls {
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneQat/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_Separator/mso:separator"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = QuickAccessToolbarControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = VerticalSeparator, qname = "mso:separator")
+        )
+    )]
   pub document_specific_quick_access_toolbar_controls_choice:
     Vec<DocumentSpecificQuickAccessToolbarControlsChoice>,
 }
@@ -3950,17 +3974,19 @@ pub struct RepurposedCommand {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_OfficeMenu/mso:officeMenu")]
 pub struct OfficeMenu {
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneRegular/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_CheckBox/mso:checkBox",
-    qname = "mso:CT_GalleryRegular/mso:gallery",
-    qname = "mso:CT_ToggleButtonRegular/mso:toggleButton",
-    qname = "mso:CT_MenuSeparator/mso:menuSeparator",
-    qname = "mso:CT_SplitButtonWithTitle/mso:splitButton",
-    qname = "mso:CT_MenuWithTitle/mso:menu",
-    qname = "mso:CT_DynamicMenuRegular/mso:dynamicMenu"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = UnsizedControlClone, qname = "mso:control"),
+            child(variant = UnsizedButton, qname = "mso:button"),
+            child(variant = CheckBox, qname = "mso:checkBox"),
+            child(variant = UnsizedGallery, qname = "mso:gallery"),
+            child(variant = UnsizedToggleButton, qname = "mso:toggleButton"),
+            child(variant = MenuSeparator, qname = "mso:menuSeparator"),
+            child(variant = SplitButtonWithTitle, qname = "mso:splitButton"),
+            child(variant = MenuWithTitle, qname = "mso:menu"),
+            child(variant = UnsizedDynamicMenu, qname = "mso:dynamicMenu")
+        )
+    )]
   pub office_menu_choice: Vec<OfficeMenuChoice>,
 }
 /// Defines the QuickAccessToolbar Class.

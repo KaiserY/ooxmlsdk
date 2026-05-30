@@ -68,13 +68,15 @@ pub enum RichFormatPropertyType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichFilterColumn/xlrd2:filterColumn")]
 pub struct RichFilterColumn {
-  #[sdk(choice(
-    qname = "xlrd2:CT_RichFilters/xlrd2:filters",
-    qname = "xlrd2:CT_RichTop10/xlrd2:top10",
-    qname = "xlrd2:CT_CustomRichFilters/xlrd2:customFilters",
-    qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter",
-    qname = "x:CT_ExtensionList/xlrd2:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RichFilters, qname = "xlrd2:filters"),
+            child(variant = RichTop10, qname = "xlrd2:top10"),
+            child(variant = CustomRichFilters, qname = "xlrd2:customFilters"),
+            child(variant = DynamicRichFilter, qname = "xlrd2:dynamicFilter"),
+            child(variant = ExtensionList, qname = "xlrd2:extLst")
+        )
+    )]
   pub rich_filter_column_choice: Option<RichFilterColumnChoice>,
 }
 /// Defines the RichSortCondition Class.
@@ -242,10 +244,12 @@ pub struct CustomRichFilters {
   /// and
   #[sdk(attr(office2019, qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter",
-    qname = "x:CT_ExtensionList/xlrd2:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomRichFilter, qname = "xlrd2:customFilter"),
+            child(variant = ExtensionList, qname = "xlrd2:extLst")
+        )
+    )]
   pub custom_rich_filters_choice: Vec<CustomRichFiltersChoice>,
 }
 /// Defines the DynamicRichFilter Class.

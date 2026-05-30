@@ -144,25 +144,27 @@ pub struct Snapshot {
   #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(kind = "token"))]
   pub compression_state: Option<crate::schemas::a::BlipCompressionValues>,
-  #[sdk(choice(
-    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
-    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
-    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
-    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
-    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
-    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
-    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
-    qname = "a:CT_BiLevelEffect/a:biLevel",
-    qname = "a:CT_BlurEffect/a:blur",
-    qname = "a:CT_ColorChangeEffect/a:clrChange",
-    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
-    qname = "a:CT_DuotoneEffect/a:duotone",
-    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
-    qname = "a:CT_GrayscaleEffect/a:grayscl",
-    qname = "a:CT_HSLEffect/a:hsl",
-    qname = "a:CT_LuminanceEffect/a:lum",
-    qname = "a:CT_TintEffect/a:tint"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
+            empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
+            empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
+            child(variant = AlphaInverse, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
+            child(variant = AlphaReplace, qname = "a:alphaRepl"),
+            child(variant = BiLevel, qname = "a:biLevel"),
+            child(variant = Blur, qname = "a:blur"),
+            child(variant = ColorChange, qname = "a:clrChange"),
+            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = Duotone, qname = "a:duotone"),
+            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            empty_child(variant = Grayscale, qname = "a:grayscl"),
+            child(variant = Hsl, qname = "a:hsl"),
+            child(variant = LuminanceEffect, qname = "a:lum"),
+            child(variant = TintEffect, qname = "a:tint")
+        )
+    )]
   pub snapshot_choice: Vec<SnapshotChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]

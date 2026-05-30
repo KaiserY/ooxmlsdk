@@ -28,15 +28,17 @@ pub struct TwoCellAnchor {
   /// Ending Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
-  #[sdk(choice(
-    qname = "xdr:CT_Shape/xdr:sp",
-    qname = "xdr:CT_GroupShape/xdr:grpSp",
-    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
-    qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic",
-    qname = "xdr14:CT_ContentPart/xdr:contentPart",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "xdr:sp"),
+            child(variant = GroupShape, qname = "xdr:grpSp"),
+            child(variant = GraphicFrame, qname = "xdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "xdr:cxnSp"),
+            child(variant = Picture, qname = "xdr:pic"),
+            child(variant = ContentPart, qname = "xdr:contentPart"),
+            any
+        )
+    )]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -52,14 +54,16 @@ pub struct OneCellAnchor {
   /// Defines the Extent Class.
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[sdk(choice(
-    qname = "xdr:CT_Shape/xdr:sp",
-    qname = "xdr:CT_GroupShape/xdr:grpSp",
-    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
-    qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic",
-    qname = "xdr14:CT_ContentPart/xdr:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "xdr:sp"),
+            child(variant = GroupShape, qname = "xdr:grpSp"),
+            child(variant = GraphicFrame, qname = "xdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "xdr:cxnSp"),
+            child(variant = Picture, qname = "xdr:pic"),
+            child(variant = ContentPart, qname = "xdr:contentPart")
+        )
+    )]
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -75,14 +79,16 @@ pub struct AbsoluteAnchor {
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
   pub extent: std::boxed::Box<Extent>,
-  #[sdk(choice(
-    qname = "xdr:CT_Shape/xdr:sp",
-    qname = "xdr:CT_GroupShape/xdr:grpSp",
-    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
-    qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic",
-    qname = "xdr14:CT_ContentPart/xdr:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "xdr:sp"),
+            child(variant = GroupShape, qname = "xdr:grpSp"),
+            child(variant = GraphicFrame, qname = "xdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "xdr:cxnSp"),
+            child(variant = Picture, qname = "xdr:pic"),
+            child(variant = ContentPart, qname = "xdr:contentPart")
+        )
+    )]
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -127,14 +133,16 @@ pub struct GroupShape {
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "xdr:CT_Shape/xdr:sp",
-    qname = "xdr:CT_GroupShape/xdr:grpSp",
-    qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
-    qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic",
-    qname = "xdr14:CT_ContentPart/xdr14:contentPart"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Shape, qname = "xdr:sp"),
+            child(variant = GroupShape, qname = "xdr:grpSp"),
+            child(variant = GraphicFrame, qname = "xdr:graphicFrame"),
+            child(variant = ConnectionShape, qname = "xdr:cxnSp"),
+            child(variant = Picture, qname = "xdr:pic"),
+            child(variant = ContentPart, qname = "xdr14:contentPart")
+        )
+    )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
@@ -238,12 +246,14 @@ pub struct ContentPart {
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  #[sdk(choice(
-    qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
-    qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",
-    qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TwoCellAnchor, qname = "xdr:twoCellAnchor"),
+            child(variant = OneCellAnchor, qname = "xdr:oneCellAnchor"),
+            child(variant = AbsoluteAnchor, qname = "xdr:absoluteAnchor"),
+            any
+        )
+    )]
   pub worksheet_drawing_choice: Vec<WorksheetDrawingChoice>,
 }
 /// Non-Visual Properties for a Shape.
@@ -268,27 +278,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -367,10 +383,12 @@ pub struct BlipFill {
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
-  #[sdk(choice(
-    qname = "a:CT_TileInfoProperties/a:tile",
-    qname = "a:CT_StretchInfoProperties/a:stretch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tile, qname = "a:tile"),
+            child(variant = Stretch, qname = "a:stretch")
+        )
+    )]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Properties for a Graphic Frame.
@@ -606,19 +624,23 @@ pub struct GroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]

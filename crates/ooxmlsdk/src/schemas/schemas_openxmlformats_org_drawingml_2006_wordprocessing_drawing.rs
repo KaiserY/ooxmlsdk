@@ -263,13 +263,15 @@ pub struct Anchor {
   /// Object Extents Including Effects.
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
-  #[sdk(choice(
-    qname = "wp:CT_WrapNone/wp:wrapNone",
-    qname = "wp:CT_WrapSquare/wp:wrapSquare",
-    qname = "wp:CT_WrapTight/wp:wrapTight",
-    qname = "wp:CT_WrapThrough/wp:wrapThrough",
-    qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = WrapNone, qname = "wp:wrapNone"),
+            child(variant = WrapSquare, qname = "wp:wrapSquare"),
+            child(variant = WrapTight, qname = "wp:wrapTight"),
+            child(variant = WrapThrough, qname = "wp:wrapThrough"),
+            child(variant = WrapTopBottom, qname = "wp:wrapTopAndBottom")
+        )
+    )]
   pub anchor_choice: Option<AnchorChoice>,
   /// Drawing Object Non-Visual Properties.
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
@@ -370,11 +372,16 @@ pub struct HorizontalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(kind = "token"))]
   pub relative_from: HorizontalRelativePositionValues,
-  #[sdk(choice(
-    qname = "wp:ST_AlignH/wp:align",
-    qname = "wp:ST_PositionOffset/wp:posOffset",
-    qname = "a:ST_Percentage/wp14:pctPosHOffset"
-  ))]
+  #[sdk(
+        choice(
+            text_child(variant = HorizontalAlignment, qname = "wp:align"),
+            text_child(variant = PositionOffset, qname = "wp:posOffset"),
+            text_child(
+                variant = PercentagePositionHeightOffset,
+                qname = "wp14:pctPosHOffset"
+            )
+        )
+    )]
   pub horizontal_position_choice: Option<HorizontalPositionChoice>,
 }
 /// Vertical Positioning.
@@ -385,11 +392,16 @@ pub struct VerticalPosition {
   #[sdk(attr(qname = ":relativeFrom"))]
   #[sdk(string_format(kind = "token"))]
   pub relative_from: VerticalRelativePositionValues,
-  #[sdk(choice(
-    qname = "wp:ST_AlignV/wp:align",
-    qname = "wp:ST_PositionOffset/wp:posOffset",
-    qname = "a:ST_Percentage/wp14:pctPosVOffset"
-  ))]
+  #[sdk(
+        choice(
+            text_child(variant = VerticalAlignment, qname = "wp:align"),
+            text_child(variant = PositionOffset, qname = "wp:posOffset"),
+            text_child(
+                variant = PercentagePositionVerticalOffset,
+                qname = "wp14:pctPosVOffset"
+            )
+        )
+    )]
   pub vertical_position_choice: Option<VerticalPositionChoice>,
 }
 /// Inline Drawing Object Extents.

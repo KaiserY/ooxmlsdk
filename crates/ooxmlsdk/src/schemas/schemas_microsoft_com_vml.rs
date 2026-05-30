@@ -480,7 +480,7 @@ pub struct TextBox {
   /// Text Box Single-Click Selection Toggle
   #[sdk(attr(qname = "o:singleclick"))]
   pub single_click: Option<crate::simple_type::TrueFalseValue>,
-  #[sdk(choice(qname = "w:CT_TxbxContent/w:txbxContent", any))]
+  #[sdk(choice(child(variant = TextBoxContent, qname = "w:txbxContent"), any))]
   pub text_box_choice: Option<TextBoxChoice>,
 }
 /// Defines the TextPath Class.
@@ -748,33 +748,35 @@ pub struct Shape {
   /// Storage for Alternate Math Content
   #[sdk(attr(qname = ":equationxml"))]
   pub equation_xml: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata",
-    qname = "o:CT_Ink/o:ink",
-    qname = "pvml:CT_Empty/pvml:iscomment"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata"),
+            child(variant = Ink, qname = "o:ink"),
+            empty_child(variant = InkAnnotationFlag, qname = "pvml:iscomment")
+        )
+    )]
   pub shape_choice: Vec<ShapeChoice>,
 }
 /// Shape Template.
@@ -945,31 +947,33 @@ pub struct Shapetype {
   /// Master Element Toggle
   #[sdk(attr(qname = "o:master"))]
   pub master: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub shapetype_choice: Vec<ShapetypeChoice>,
   /// Complex.
   #[sdk(child(qname = "o:CT_Complex/o:complex"))]
@@ -1082,25 +1086,27 @@ pub struct Group {
   /// Table Row Height Limits
   #[sdk(attr(qname = "o:tablelimits"))]
   pub table_limits: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Group/v:group",
-    qname = "v:CT_Shape/v:shape",
-    qname = "v:CT_Shapetype/v:shapetype",
-    qname = "v:CT_Arc/v:arc",
-    qname = "v:CT_Curve/v:curve",
-    qname = "v:CT_Image/v:image",
-    qname = "v:CT_Line/v:line",
-    qname = "v:CT_Oval/v:oval",
-    qname = "v:CT_PolyLine/v:polyline",
-    qname = "v:CT_Rect/v:rect",
-    qname = "v:CT_RoundRect/v:roundrect",
-    qname = "o:CT_Diagram/o:diagram",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "xvml:CT_ClientData/xvml:ClientData"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Group, qname = "v:group"),
+            child(variant = Shape, qname = "v:shape"),
+            child(variant = Shapetype, qname = "v:shapetype"),
+            child(variant = Arc, qname = "v:arc"),
+            child(variant = Curve, qname = "v:curve"),
+            child(variant = ImageFile, qname = "v:image"),
+            child(variant = Line, qname = "v:line"),
+            child(variant = Oval, qname = "v:oval"),
+            child(variant = PolyLine, qname = "v:polyline"),
+            child(variant = Rectangle, qname = "v:rect"),
+            child(variant = RoundRectangle, qname = "v:roundrect"),
+            child(variant = Diagram, qname = "o:diagram"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = ClientData, qname = "xvml:ClientData")
+        )
+    )]
   pub group_choice: Vec<GroupChoice>,
 }
 /// Document Background.
@@ -1300,31 +1306,33 @@ pub struct Arc {
   /// Ending Angle
   #[sdk(attr(qname = ":endangle"))]
   pub end_angle: Option<crate::simple_type::DecimalValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub arc_choice: Vec<ArcChoice>,
 }
 /// Bezier Curve.
@@ -1500,31 +1508,33 @@ pub struct Curve {
   /// Curve Ending Point
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub curve_choice: Vec<CurveChoice>,
 }
 /// Image File.
@@ -1715,31 +1725,33 @@ pub struct ImageFile {
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub image_file_choice: Vec<ImageFileChoice>,
 }
 /// Line.
@@ -1910,31 +1922,33 @@ pub struct Line {
   /// Line End Point
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub line_choice: Vec<LineChoice>,
 }
 /// Oval.
@@ -2099,31 +2113,33 @@ pub struct Oval {
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub oval_choice: Vec<OvalChoice>,
 }
 /// Multiple Path Line.
@@ -2290,32 +2306,34 @@ pub struct PolyLine {
   /// Points for Compound Line
   #[sdk(attr(qname = ":points"))]
   pub points: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata",
-    qname = "o:CT_Ink/o:ink"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata"),
+            child(variant = Ink, qname = "o:ink")
+        )
+    )]
   pub poly_line_choice: Vec<PolyLineChoice>,
 }
 /// Rectangle.
@@ -2480,31 +2498,33 @@ pub struct Rectangle {
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub rectangle_choice: Vec<RectangleChoice>,
 }
 /// Rounded Rectangle.
@@ -2668,31 +2688,33 @@ pub struct RoundRectangle {
   /// Rounded Corner Arc Size
   #[sdk(attr(qname = ":arcsize"))]
   pub arc_size: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Rel/pvml:textdata"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Path, qname = "v:path"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = SignatureLine, qname = "o:signatureline"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            child(variant = TextData, qname = "pvml:textdata")
+        )
+    )]
   pub round_rectangle_choice: Vec<RoundRectangleChoice>,
 }
 /// Shape Handle.

@@ -19,7 +19,12 @@ pub struct PlaceholderTypeExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type")]
 pub struct PlaceholderTypeAcb {
-  #[sdk(choice(qname = "p:CT_Empty/p232:cameo", qname = "p:CT_Empty/p232:unknown"))]
+  #[sdk(
+        choice(
+            empty_child(variant = CameoEmpty, qname = "p232:cameo"),
+            empty_child(variant = UnknownEmpty, qname = "p232:unknown")
+        )
+    )]
   pub placeholder_type_acb_choice: Option<PlaceholderTypeAcbChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

@@ -14,10 +14,12 @@ pub struct LineSketchStyleProperties {
   /// sd
   #[sdk(attr(office2021, qname = ":sd"))]
   pub sd: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,
   /// Defines the LineSketchTypeProperties Class.
   #[sdk(child(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
@@ -37,12 +39,20 @@ pub struct LineSketchStyleProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type")]
 pub struct LineSketchTypeProperties {
-  #[sdk(choice(
-    qname = "ask:CT_Empty/ask:lineSketchNone",
-    qname = "ask:CT_Empty/ask:lineSketchCurved",
-    qname = "ask:CT_Empty/ask:lineSketchFreehand",
-    qname = "ask:CT_Empty/ask:lineSketchScribble"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = LineSketchNoneEmpty, qname = "ask:lineSketchNone"),
+            empty_child(variant = LineSketchCurvedEmpty, qname = "ask:lineSketchCurved"),
+            empty_child(
+                variant = LineSketchFreehandEmpty,
+                qname = "ask:lineSketchFreehand"
+            ),
+            empty_child(
+                variant = LineSketchScribbleEmpty,
+                qname = "ask:lineSketchScribble"
+            )
+        )
+    )]
   pub line_sketch_type_properties_choice: Option<LineSketchTypePropertiesChoice>,
 }
 /// Defines the LineSketchSeed Class.

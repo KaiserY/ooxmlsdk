@@ -81,19 +81,21 @@ pub struct TaskHistoryEvent {
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice(
-    qname = "t:CT_TaskUser/t:Assign",
-    qname = "t:CT_TaskUser/t:Unassign",
-    qname = "t:CT_TaskCreateEventInfo/t:Create",
-    qname = "t:CT_TaskTitleEventInfo/t:SetTitle",
-    qname = "t:CT_TaskScheduleEventInfo/t:Schedule",
-    qname = "t:CT_TaskProgressEventInfo/t:Progress",
-    qname = "t:CT_TaskPriorityEventInfo/t:Priority",
-    qname = "t:CT_TaskDeleteEventInfo/t:Delete",
-    qname = "t:CT_TaskUndeleteEventInfo/t:Undelete",
-    qname = "t:CT_TaskUnassignAll/t:UnassignAll",
-    qname = "t:CT_TaskUndo/t:Undo"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AssignTaskUser, qname = "t:Assign"),
+            child(variant = UnassignTaskUser, qname = "t:Unassign"),
+            empty_child(variant = TaskCreateEventInfo, qname = "t:Create"),
+            child(variant = TaskTitleEventInfo, qname = "t:SetTitle"),
+            child(variant = TaskScheduleEventInfo, qname = "t:Schedule"),
+            child(variant = TaskProgressEventInfo, qname = "t:Progress"),
+            child(variant = TaskPriorityEventInfo, qname = "t:Priority"),
+            empty_child(variant = TaskDeleteEventInfo, qname = "t:Delete"),
+            empty_child(variant = TaskUndeleteEventInfo, qname = "t:Undelete"),
+            empty_child(variant = TaskUnassignAll, qname = "t:UnassignAll"),
+            child(variant = TaskUndo, qname = "t:Undo")
+        )
+    )]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]

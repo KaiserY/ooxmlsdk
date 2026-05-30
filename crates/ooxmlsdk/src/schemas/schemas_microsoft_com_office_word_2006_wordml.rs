@@ -135,13 +135,15 @@ pub struct KeyMapEntry {
   /// mask
   #[sdk(attr(qname = "wne:mask"))]
   pub mask: Option<crate::simple_type::OnOffValue>,
-  #[sdk(choice(
-    qname = "wne:CT_Fci/wne:fci",
-    qname = "wne:CT_MacroWll/wne:macro",
-    qname = "wne:CT_AcdKeymap/wne:acd",
-    qname = "wne:CT_MacroWll/wne:wll",
-    qname = "wne:CT_LongHexNumber/wne:wch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FixedCommandKeyboardCustomization, qname = "wne:fci"),
+            child(variant = MacroKeyboardCustomization, qname = "wne:macro"),
+            child(variant = AllocatedCommandKeyboardCustomization, qname = "wne:acd"),
+            child(variant = WllMacroKeyboardCustomization, qname = "wne:wll"),
+            child(variant = CharacterInsertion, qname = "wne:wch")
+        )
+    )]
   pub key_map_entry_choice: Option<KeyMapEntryChoice>,
 }
 /// Defines the AllocatedCommand Class.

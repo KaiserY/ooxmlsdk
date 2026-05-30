@@ -144,18 +144,20 @@ pub struct TaskHistoryEvent {
   /// Defines the TaskAnchor Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAnchor/p216:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice(
-    qname = "p216:CT_TaskAssignUnassignUser/p216:asgn",
-    qname = "p216:CT_TaskAssignUnassignUser/p216:unAsgn",
-    qname = "p:CT_Empty/p216:add",
-    qname = "p216:CT_TaskTitleEventInfo/p216:title",
-    qname = "p216:CT_TaskScheduleEventInfo/p216:date",
-    qname = "p216:CT_TaskProgressEventInfo/p216:pcntCmplt",
-    qname = "p216:CT_TaskPriorityRecord/p216:pri",
-    qname = "p:CT_Empty/p216:unasgnAll",
-    qname = "p216:CT_TaskUndo/p216:undo",
-    qname = "p216:CT_TaskUnknownRecord/p216:unknown"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AsgnTaskAssignUnassignUser, qname = "p216:asgn"),
+            child(variant = UnAsgnTaskAssignUnassignUser, qname = "p216:unAsgn"),
+            empty_child(variant = AddEmpty, qname = "p216:add"),
+            child(variant = TaskTitleEventInfo, qname = "p216:title"),
+            child(variant = TaskScheduleEventInfo, qname = "p216:date"),
+            child(variant = TaskProgressEventInfo, qname = "p216:pcntCmplt"),
+            child(variant = TaskPriorityRecord, qname = "p216:pri"),
+            empty_child(variant = UnasgnAllEmpty, qname = "p216:unasgnAll"),
+            child(variant = TaskUndo, qname = "p216:undo"),
+            empty_child(variant = TaskUnknownRecord, qname = "p216:unknown")
+        )
+    )]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p216:extLst"))]

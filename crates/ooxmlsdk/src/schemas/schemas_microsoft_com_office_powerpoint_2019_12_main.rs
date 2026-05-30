@@ -144,18 +144,20 @@ pub struct TaskHistoryEvent {
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskAnchor/p1912:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  #[sdk(choice(
-    qname = "p1912:CT_TaskAssignUnassignUser/p1912:asgn",
-    qname = "p1912:CT_TaskAssignUnassignUser/p1912:unAsgn",
-    qname = "p:CT_Empty/p1912:add",
-    qname = "p1912:CT_TaskTitleEventInfo/p1912:title",
-    qname = "p1912:CT_TaskScheduleEventInfo/p1912:date",
-    qname = "p1912:CT_TaskProgressEventInfo/p1912:pcntCmplt",
-    qname = "p1912:CT_TaskPriorityRecord/p1912:pri",
-    qname = "p:CT_Empty/p1912:unasgnAll",
-    qname = "p1912:CT_TaskUndo/p1912:undo",
-    qname = "p1912:CT_TaskUnknownRecord/p1912:unknown"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AsgnTaskAssignUnassignUser, qname = "p1912:asgn"),
+            child(variant = UnAsgnTaskAssignUnassignUser, qname = "p1912:unAsgn"),
+            empty_child(variant = AddEmpty, qname = "p1912:add"),
+            child(variant = TaskTitleEventInfo, qname = "p1912:title"),
+            child(variant = TaskScheduleEventInfo, qname = "p1912:date"),
+            child(variant = TaskProgressEventInfo, qname = "p1912:pcntCmplt"),
+            child(variant = TaskPriorityRecord, qname = "p1912:pri"),
+            empty_child(variant = UnasgnAllEmpty, qname = "p1912:unasgnAll"),
+            child(variant = TaskUndo, qname = "p1912:undo"),
+            empty_child(variant = TaskUnknownRecord, qname = "p1912:unknown")
+        )
+    )]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "p:CT_ExtensionList/p1912:extLst"))]

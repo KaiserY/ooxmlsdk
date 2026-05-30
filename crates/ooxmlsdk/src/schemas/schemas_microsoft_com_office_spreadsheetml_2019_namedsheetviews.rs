@@ -147,17 +147,19 @@ pub struct FilterColumn {
   /// Show Filter Button
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "x:CT_Filters/x:filters",
-    qname = "x:CT_Top10/x:top10",
-    qname = "x14:CT_CustomFilters/x14:customFilters",
-    qname = "x:CT_CustomFilters/x:customFilters",
-    qname = "x:CT_DynamicFilter/x:dynamicFilter",
-    qname = "x:CT_ColorFilter/x:colorFilter",
-    qname = "x14:CT_IconFilter/x14:iconFilter",
-    qname = "x:CT_IconFilter/x:iconFilter",
-    qname = "x:CT_ExtensionList/x:extLst"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Filters, qname = "x:filters"),
+            child(variant = Top10, qname = "x:top10"),
+            child(variant = X14CustomFilters, qname = "x14:customFilters"),
+            child(variant = XCustomFilters, qname = "x:customFilters"),
+            child(variant = DynamicFilter, qname = "x:dynamicFilter"),
+            child(variant = ColorFilter, qname = "x:colorFilter"),
+            child(variant = X14IconFilter, qname = "x14:iconFilter"),
+            child(variant = XIconFilter, qname = "x:iconFilter"),
+            child(variant = ExtensionList, qname = "x:extLst")
+        )
+    )]
   pub filter_column_choice: Option<FilterColumnChoice>,
 }
 /// Defines the SortRule Class.
@@ -175,10 +177,12 @@ pub struct SortRule {
   /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
-  #[sdk(choice(
-    qname = "x14:CT_SortCondition/xnsv:sortCondition",
-    qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SortCondition, qname = "xnsv:sortCondition"),
+            child(variant = RichSortCondition, qname = "xnsv:richSortCondition")
+        )
+    )]
   pub sort_rule_choice: Option<SortRuleChoice>,
 }
 /// Defines the SortCondition Class.

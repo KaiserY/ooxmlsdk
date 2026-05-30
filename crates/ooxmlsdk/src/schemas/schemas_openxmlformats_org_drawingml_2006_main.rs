@@ -2228,36 +2228,38 @@ pub struct RgbColorModelPercentage {
   /// Blue
   #[sdk(attr(qname = ":b"))]
   pub blue_portion: crate::simple_type::DrawingmlPercentageValue,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub rgb_color_model_percentage_choice: Vec<RgbColorModelPercentageChoice>,
 }
 /// RGB Color Model - Hex Variant.
@@ -2281,36 +2283,38 @@ pub struct RgbColorModelHex {
     max_inclusive = true,
   ))]
   pub legacy_spreadsheet_color_index: Option<crate::simple_type::Int32Value>,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub rgb_color_model_hex_choice: Vec<RgbColorModelHexChoice>,
 }
 /// Hue, Saturation, Luminance Color Model.
@@ -2327,36 +2331,38 @@ pub struct HslColor {
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
   pub lum_value: crate::simple_type::DrawingmlPercentageValue,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub hsl_color_choice: Vec<HslColorChoice>,
 }
 /// System Color.
@@ -2371,36 +2377,38 @@ pub struct SystemColor {
   #[sdk(attr(qname = ":lastClr"))]
   #[sdk(string_length(min = 3u32, max = 3u32))]
   pub last_color: Option<crate::simple_type::HexBinaryValue>,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub system_color_choice: Vec<SystemColorChoice>,
 }
 /// Scheme Color.
@@ -2411,36 +2419,38 @@ pub struct SchemeColor {
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(kind = "token"))]
   pub val: SchemeColorValues,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub scheme_color_choice: Vec<SchemeColorChoice>,
 }
 /// Preset Color.
@@ -2451,36 +2461,38 @@ pub struct PresetColor {
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(kind = "token"))]
   pub val: PresetColorValues,
-  #[sdk(choice(
-    qname = "a:CT_PositiveFixedPercentage/a:tint",
-    qname = "a:CT_PositiveFixedPercentage/a:shade",
-    qname = "a:CT_ComplementTransform/a:comp",
-    qname = "a:CT_InverseTransform/a:inv",
-    qname = "a:CT_GrayscaleTransform/a:gray",
-    qname = "a:CT_PositiveFixedPercentage/a:alpha",
-    qname = "a:CT_FixedPercentage/a:alphaOff",
-    qname = "a:CT_PositivePercentage/a:alphaMod",
-    qname = "a:CT_PositiveFixedAngle/a:hue",
-    qname = "a:CT_Angle/a:hueOff",
-    qname = "a:CT_PositivePercentage/a:hueMod",
-    qname = "a:CT_Percentage/a:sat",
-    qname = "a:CT_Percentage/a:satOff",
-    qname = "a:CT_Percentage/a:satMod",
-    qname = "a:CT_Percentage/a:lum",
-    qname = "a:CT_Percentage/a:lumOff",
-    qname = "a:CT_Percentage/a:lumMod",
-    qname = "a:CT_Percentage/a:red",
-    qname = "a:CT_Percentage/a:redOff",
-    qname = "a:CT_Percentage/a:redMod",
-    qname = "a:CT_Percentage/a:green",
-    qname = "a:CT_Percentage/a:greenOff",
-    qname = "a:CT_Percentage/a:greenMod",
-    qname = "a:CT_Percentage/a:blue",
-    qname = "a:CT_Percentage/a:blueOff",
-    qname = "a:CT_Percentage/a:blueMod",
-    qname = "a:CT_GammaTransform/a:gamma",
-    qname = "a:CT_InverseGammaTransform/a:invGamma"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tint, qname = "a:tint"),
+            child(variant = Shade, qname = "a:shade"),
+            empty_child(variant = Complement, qname = "a:comp"),
+            empty_child(variant = Inverse, qname = "a:inv"),
+            empty_child(variant = Gray, qname = "a:gray"),
+            child(variant = Alpha, qname = "a:alpha"),
+            child(variant = AlphaOffset, qname = "a:alphaOff"),
+            child(variant = AlphaModulation, qname = "a:alphaMod"),
+            child(variant = Hue, qname = "a:hue"),
+            child(variant = HueOffset, qname = "a:hueOff"),
+            child(variant = HueModulation, qname = "a:hueMod"),
+            child(variant = Saturation, qname = "a:sat"),
+            child(variant = SaturationOffset, qname = "a:satOff"),
+            child(variant = SaturationModulation, qname = "a:satMod"),
+            child(variant = Luminance, qname = "a:lum"),
+            child(variant = LuminanceOffset, qname = "a:lumOff"),
+            child(variant = LuminanceModulation, qname = "a:lumMod"),
+            child(variant = Red, qname = "a:red"),
+            child(variant = RedOffset, qname = "a:redOff"),
+            child(variant = RedModulation, qname = "a:redMod"),
+            child(variant = Green, qname = "a:green"),
+            child(variant = GreenOffset, qname = "a:greenOff"),
+            child(variant = GreenModulation, qname = "a:greenMod"),
+            child(variant = Blue, qname = "a:blue"),
+            child(variant = BlueOffset, qname = "a:blueOff"),
+            child(variant = BlueModulation, qname = "a:blueMod"),
+            empty_child(variant = Gamma, qname = "a:gamma"),
+            empty_child(variant = InverseGamma, qname = "a:invGamma")
+        )
+    )]
   pub preset_color_choice: Vec<PresetColorChoice>,
 }
 /// Apply 3D shape properties.
@@ -2598,14 +2610,16 @@ pub struct NoFill {
 #[sdk(qname = "a:CT_SolidColorFillProperties/a:solidFill")]
 pub struct SolidFill {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub solid_fill_choice: Option<SolidFillChoice>,
 }
 /// Defines the GradientFill Class.
@@ -2622,10 +2636,12 @@ pub struct GradientFill {
   /// Gradient Stop List
   #[sdk(child(qname = "a:CT_GradientStopList/a:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
-  #[sdk(choice(
-    qname = "a:CT_LinearShadeProperties/a:lin",
-    qname = "a:CT_PathShadeProperties/a:path"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = LinearGradientFill, qname = "a:lin"),
+            child(variant = PathGradientFill, qname = "a:path")
+        )
+    )]
   pub gradient_fill_choice: Option<GradientFillChoice>,
   /// Tile Rectangle.
   #[sdk(child(qname = "a:CT_RelativeRect/a:tileRect"))]
@@ -2647,10 +2663,12 @@ pub struct BlipFill {
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
   pub source_rectangle: Option<SourceRectangle>,
-  #[sdk(choice(
-    qname = "a:CT_TileInfoProperties/a:tile",
-    qname = "a:CT_StretchInfoProperties/a:stretch"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Tile, qname = "a:tile"),
+            child(variant = Stretch, qname = "a:stretch")
+        )
+    )]
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Pattern Fill.
@@ -2680,38 +2698,40 @@ pub struct EffectContainer {
   #[sdk(attr(qname = ":name"))]
   #[sdk(string_format(kind = "token"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_EffectContainer/a:cont",
-    qname = "a:CT_EffectReference/a:effect",
-    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
-    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
-    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
-    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
-    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
-    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
-    qname = "a:CT_AlphaOutsetEffect/a:alphaOutset",
-    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
-    qname = "a:CT_BiLevelEffect/a:biLevel",
-    qname = "a:CT_BlendEffect/a:blend",
-    qname = "a:CT_BlurEffect/a:blur",
-    qname = "a:CT_ColorChangeEffect/a:clrChange",
-    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
-    qname = "a:CT_DuotoneEffect/a:duotone",
-    qname = "a:CT_FillEffect/a:fill",
-    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
-    qname = "a:CT_GlowEffect/a:glow",
-    qname = "a:CT_GrayscaleEffect/a:grayscl",
-    qname = "a:CT_HSLEffect/a:hsl",
-    qname = "a:CT_InnerShadowEffect/a:innerShdw",
-    qname = "a:CT_LuminanceEffect/a:lum",
-    qname = "a:CT_OuterShadowEffect/a:outerShdw",
-    qname = "a:CT_PresetShadowEffect/a:prstShdw",
-    qname = "a:CT_ReflectionEffect/a:reflection",
-    qname = "a:CT_RelativeOffsetEffect/a:relOff",
-    qname = "a:CT_SoftEdgesEffect/a:softEdge",
-    qname = "a:CT_TintEffect/a:tint",
-    qname = "a:CT_TransformEffect/a:xfrm"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectContainer, qname = "a:cont"),
+            child(variant = Effect, qname = "a:effect"),
+            child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
+            empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
+            empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
+            child(variant = AlphaInverse, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
+            child(variant = AlphaOutset, qname = "a:alphaOutset"),
+            child(variant = AlphaReplace, qname = "a:alphaRepl"),
+            child(variant = BiLevel, qname = "a:biLevel"),
+            child(variant = Blend, qname = "a:blend"),
+            child(variant = Blur, qname = "a:blur"),
+            child(variant = ColorChange, qname = "a:clrChange"),
+            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = Duotone, qname = "a:duotone"),
+            child(variant = Fill, qname = "a:fill"),
+            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            child(variant = Glow, qname = "a:glow"),
+            empty_child(variant = Grayscale, qname = "a:grayscl"),
+            child(variant = Hsl, qname = "a:hsl"),
+            child(variant = InnerShadow, qname = "a:innerShdw"),
+            child(variant = LuminanceEffect, qname = "a:lum"),
+            child(variant = OuterShadow, qname = "a:outerShdw"),
+            child(variant = PresetShadow, qname = "a:prstShdw"),
+            child(variant = Reflection, qname = "a:reflection"),
+            child(variant = RelativeOffset, qname = "a:relOff"),
+            child(variant = SoftEdge, qname = "a:softEdge"),
+            child(variant = TintEffect, qname = "a:tint"),
+            child(variant = TransformEffect, qname = "a:xfrm")
+        )
+    )]
   pub effect_container_choice: Vec<EffectContainerChoice>,
 }
 /// Effect Container.
@@ -2726,38 +2746,40 @@ pub struct EffectDag {
   #[sdk(attr(qname = ":name"))]
   #[sdk(string_format(kind = "token"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_EffectContainer/a:cont",
-    qname = "a:CT_EffectReference/a:effect",
-    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
-    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
-    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
-    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
-    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
-    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
-    qname = "a:CT_AlphaOutsetEffect/a:alphaOutset",
-    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
-    qname = "a:CT_BiLevelEffect/a:biLevel",
-    qname = "a:CT_BlendEffect/a:blend",
-    qname = "a:CT_BlurEffect/a:blur",
-    qname = "a:CT_ColorChangeEffect/a:clrChange",
-    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
-    qname = "a:CT_DuotoneEffect/a:duotone",
-    qname = "a:CT_FillEffect/a:fill",
-    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
-    qname = "a:CT_GlowEffect/a:glow",
-    qname = "a:CT_GrayscaleEffect/a:grayscl",
-    qname = "a:CT_HSLEffect/a:hsl",
-    qname = "a:CT_InnerShadowEffect/a:innerShdw",
-    qname = "a:CT_LuminanceEffect/a:lum",
-    qname = "a:CT_OuterShadowEffect/a:outerShdw",
-    qname = "a:CT_PresetShadowEffect/a:prstShdw",
-    qname = "a:CT_ReflectionEffect/a:reflection",
-    qname = "a:CT_RelativeOffsetEffect/a:relOff",
-    qname = "a:CT_SoftEdgesEffect/a:softEdge",
-    qname = "a:CT_TintEffect/a:tint",
-    qname = "a:CT_TransformEffect/a:xfrm"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectContainer, qname = "a:cont"),
+            child(variant = Effect, qname = "a:effect"),
+            child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
+            empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
+            empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
+            child(variant = AlphaInverse, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
+            child(variant = AlphaOutset, qname = "a:alphaOutset"),
+            child(variant = AlphaReplace, qname = "a:alphaRepl"),
+            child(variant = BiLevel, qname = "a:biLevel"),
+            child(variant = Blend, qname = "a:blend"),
+            child(variant = Blur, qname = "a:blur"),
+            child(variant = ColorChange, qname = "a:clrChange"),
+            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = Duotone, qname = "a:duotone"),
+            child(variant = Fill, qname = "a:fill"),
+            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            child(variant = Glow, qname = "a:glow"),
+            empty_child(variant = Grayscale, qname = "a:grayscl"),
+            child(variant = Hsl, qname = "a:hsl"),
+            child(variant = InnerShadow, qname = "a:innerShdw"),
+            child(variant = LuminanceEffect, qname = "a:lum"),
+            child(variant = OuterShadow, qname = "a:outerShdw"),
+            child(variant = PresetShadow, qname = "a:prstShdw"),
+            child(variant = Reflection, qname = "a:reflection"),
+            child(variant = RelativeOffset, qname = "a:relOff"),
+            child(variant = SoftEdge, qname = "a:softEdge"),
+            child(variant = TintEffect, qname = "a:tint"),
+            child(variant = TransformEffect, qname = "a:xfrm")
+        )
+    )]
   pub effect_dag_choice: Vec<EffectDagChoice>,
 }
 /// Effect.
@@ -2782,14 +2804,16 @@ pub struct AlphaBiLevel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaInverseEffect/a:alphaInv")]
 pub struct AlphaInverse {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub alpha_inverse_choice: Option<AlphaInverseChoice>,
 }
 /// Alpha Modulate Effect.
@@ -2878,42 +2902,48 @@ pub struct ColorChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorReplaceEffect/a:clrRepl")]
 pub struct ColorReplacement {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_replacement_choice: Option<ColorReplacementChoice>,
 }
 /// Duotone Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DuotoneEffect/a:duotone")]
 pub struct Duotone {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub duotone_choice: Vec<DuotoneChoice>,
 }
 /// Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillEffect/a:fill")]
 pub struct Fill {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub fill_choice: Option<FillChoice>,
 }
 /// Fill Overlay Effect.
@@ -2924,14 +2954,16 @@ pub struct FillOverlay {
   #[sdk(attr(qname = ":blend"))]
   #[sdk(string_format(kind = "token"))]
   pub blend: BlendModeValues,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub fill_overlay_choice: Option<FillOverlayChoice>,
 }
 /// Glow Effect.
@@ -2942,14 +2974,16 @@ pub struct Glow {
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
   pub radius: Option<crate::simple_type::PositiveCoordinateValue>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub glow_choice: Option<GlowChoice>,
 }
 /// Hue Saturation Luminance Effect.
@@ -2985,14 +3019,16 @@ pub struct InnerShadow {
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub inner_shadow_choice: Option<InnerShadowChoice>,
 }
 /// Luminance.
@@ -3059,14 +3095,16 @@ pub struct OuterShadow {
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub outer_shadow_choice: Option<OuterShadowChoice>,
 }
 /// Preset Shadow.
@@ -3085,14 +3123,16 @@ pub struct PresetShadow {
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub preset_shadow_choice: Option<PresetShadowChoice>,
 }
 /// Reflection Effect.
@@ -3350,14 +3390,16 @@ pub struct CustomDash {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillProperties/a:fill")]
 pub struct FillProperties {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub fill_properties_choice: Option<FillPropertiesChoice>,
 }
 /// Fill Reference.
@@ -3368,14 +3410,16 @@ pub struct FillReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub fill_reference_choice: Option<FillReferenceChoice>,
 }
 /// Effect Reference.
@@ -3386,14 +3430,16 @@ pub struct EffectReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub effect_reference_choice: Option<EffectReferenceChoice>,
 }
 /// Defines the LineReference Class.
@@ -3404,24 +3450,28 @@ pub struct LineReference {
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub line_reference_choice: Option<LineReferenceChoice>,
 }
 /// Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectProperties/a:effect")]
 pub struct EffectPropertiesType {
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub effect_properties_type_choice: Option<EffectPropertiesTypeChoice>,
 }
 /// Font.
@@ -3493,14 +3543,16 @@ pub struct FontReference {
   #[sdk(attr(qname = ":idx"))]
   #[sdk(string_format(kind = "token"))]
   pub index: FontCollectionIndexValues,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub font_reference_choice: Option<FontReferenceChoice>,
 }
 /// Normal AutoFit.
@@ -3520,112 +3572,128 @@ pub struct NormalAutoFit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:buClr")]
 pub struct BulletColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub bullet_color_choice: Option<BulletColorChoice>,
 }
 /// Extrusion Color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:extrusionClr")]
 pub struct ExtrusionColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub extrusion_color_choice: Option<ExtrusionColorChoice>,
 }
 /// Contour Color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:contourClr")]
 pub struct ContourColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub contour_color_choice: Option<ContourColorChoice>,
 }
 /// Change Color From.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrFrom")]
 pub struct ColorFrom {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_from_choice: Option<ColorFromChoice>,
 }
 /// Change Color To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrTo")]
 pub struct ColorTo {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub color_to_choice: Option<ColorToChoice>,
 }
 /// Foreground color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:fgClr")]
 pub struct ForegroundColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub foreground_color_choice: Option<ForegroundColorChoice>,
 }
 /// Background color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:bgClr")]
 pub struct BackgroundColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub background_color_choice: Option<BackgroundColorChoice>,
 }
 /// Defines the Highlight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:highlight")]
 pub struct Highlight {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub highlight_choice: Option<HighlightChoice>,
 }
 /// Bullet Size Percentage.
@@ -3785,23 +3853,29 @@ pub struct Underline {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub underline_choice1: Option<UnderlineChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub underline_choice2: Option<UnderlineChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub underline_choice3: Option<UnderlineChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -3834,23 +3908,29 @@ pub struct Outline {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub outline_choice1: Option<OutlineChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub outline_choice2: Option<OutlineChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub outline_choice3: Option<OutlineChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -3882,23 +3962,29 @@ pub struct LeftBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub left_border_line_properties_choice1: Option<LeftBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub left_border_line_properties_choice2: Option<LeftBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub left_border_line_properties_choice3: Option<LeftBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -3930,23 +4016,29 @@ pub struct RightBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub right_border_line_properties_choice1: Option<RightBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub right_border_line_properties_choice2: Option<RightBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub right_border_line_properties_choice3: Option<RightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -3978,23 +4070,29 @@ pub struct TopBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub top_border_line_properties_choice1: Option<TopBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub top_border_line_properties_choice2: Option<TopBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub top_border_line_properties_choice3: Option<TopBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -4026,23 +4124,29 @@ pub struct BottomBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub bottom_border_line_properties_choice1: Option<BottomBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub bottom_border_line_properties_choice2: Option<BottomBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub bottom_border_line_properties_choice3: Option<BottomBorderLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -4074,25 +4178,31 @@ pub struct TopLeftToBottomRightBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub top_left_to_bottom_right_border_line_properties_choice1:
     Option<TopLeftToBottomRightBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub top_left_to_bottom_right_border_line_properties_choice2:
     Option<TopLeftToBottomRightBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub top_left_to_bottom_right_border_line_properties_choice3:
     Option<TopLeftToBottomRightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
@@ -4125,25 +4235,31 @@ pub struct BottomLeftToTopRightBorderLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub bottom_left_to_top_right_border_line_properties_choice1:
     Option<BottomLeftToTopRightBorderLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub bottom_left_to_top_right_border_line_properties_choice2:
     Option<BottomLeftToTopRightBorderLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub bottom_left_to_top_right_border_line_properties_choice3:
     Option<BottomLeftToTopRightBorderLinePropertiesChoice3>,
   /// default head line end style is none.
@@ -4160,14 +4276,16 @@ pub struct BottomLeftToTopRightBorderLineProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill")]
 pub struct UnderlineFill {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub underline_fill_choice: Option<UnderlineFillChoice>,
 }
 /// Text Run.
@@ -4236,25 +4354,27 @@ pub struct Blip {
   #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(kind = "token"))]
   pub compression_state: Option<BlipCompressionValues>,
-  #[sdk(choice(
-    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
-    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
-    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
-    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
-    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
-    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
-    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
-    qname = "a:CT_BiLevelEffect/a:biLevel",
-    qname = "a:CT_BlurEffect/a:blur",
-    qname = "a:CT_ColorChangeEffect/a:clrChange",
-    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
-    qname = "a:CT_DuotoneEffect/a:duotone",
-    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
-    qname = "a:CT_GrayscaleEffect/a:grayscl",
-    qname = "a:CT_HSLEffect/a:hsl",
-    qname = "a:CT_LuminanceEffect/a:lum",
-    qname = "a:CT_TintEffect/a:tint"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AlphaBiLevel, qname = "a:alphaBiLevel"),
+            empty_child(variant = AlphaCeiling, qname = "a:alphaCeiling"),
+            empty_child(variant = AlphaFloor, qname = "a:alphaFloor"),
+            child(variant = AlphaInverse, qname = "a:alphaInv"),
+            child(variant = AlphaModulationEffect, qname = "a:alphaMod"),
+            child(variant = AlphaModulationFixed, qname = "a:alphaModFix"),
+            child(variant = AlphaReplace, qname = "a:alphaRepl"),
+            child(variant = BiLevel, qname = "a:biLevel"),
+            child(variant = Blur, qname = "a:blur"),
+            child(variant = ColorChange, qname = "a:clrChange"),
+            child(variant = ColorReplacement, qname = "a:clrRepl"),
+            child(variant = Duotone, qname = "a:duotone"),
+            child(variant = FillOverlay, qname = "a:fillOverlay"),
+            empty_child(variant = Grayscale, qname = "a:grayscl"),
+            child(variant = Hsl, qname = "a:hsl"),
+            child(variant = LuminanceEffect, qname = "a:lum"),
+            child(variant = TintEffect, qname = "a:tint")
+        )
+    )]
   pub blip_choice: Vec<BlipChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
@@ -4378,14 +4498,16 @@ pub struct CustomColor {
   /// Name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub custom_color_choice: Option<CustomColorChoice>,
 }
 /// Font.
@@ -4420,10 +4542,12 @@ pub struct Scene3DType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectStyleItem/a:effectStyle")]
 pub struct EffectStyle {
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub effect_style_choice: Option<EffectStyleChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -4436,14 +4560,16 @@ pub struct EffectStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FillStyleList/a:fillStyleLst")]
 pub struct FillStyleList {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub fill_style_list_choice: Vec<FillStyleListChoice>,
 }
 /// Line Style List.
@@ -4466,14 +4592,16 @@ pub struct EffectStyleList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFillStyleList/a:bgFillStyleLst")]
 pub struct BackgroundFillStyleList {
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub background_fill_style_list_choice: Vec<BackgroundFillStyleListChoice>,
 }
 /// Defines the ColorScheme Class.
@@ -4564,156 +4692,180 @@ pub struct FormatScheme {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk1")]
 pub struct Dark1Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub dark1_color_choice: Option<Dark1ColorChoice>,
 }
 /// Light 1.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt1")]
 pub struct Light1Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub light1_color_choice: Option<Light1ColorChoice>,
 }
 /// Dark 2.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk2")]
 pub struct Dark2Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub dark2_color_choice: Option<Dark2ColorChoice>,
 }
 /// Light 2.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt2")]
 pub struct Light2Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub light2_color_choice: Option<Light2ColorChoice>,
 }
 /// Accent 1.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent1")]
 pub struct Accent1Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent1_color_choice: Option<Accent1ColorChoice>,
 }
 /// Accent 2.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent2")]
 pub struct Accent2Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent2_color_choice: Option<Accent2ColorChoice>,
 }
 /// Accent 3.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent3")]
 pub struct Accent3Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent3_color_choice: Option<Accent3ColorChoice>,
 }
 /// Accent 4.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent4")]
 pub struct Accent4Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent4_color_choice: Option<Accent4ColorChoice>,
 }
 /// Accent 5.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent5")]
 pub struct Accent5Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent5_color_choice: Option<Accent5ColorChoice>,
 }
 /// Accent 6.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent6")]
 pub struct Accent6Color {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub accent6_color_choice: Option<Accent6ColorChoice>,
 }
 /// Hyperlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:hlink")]
 pub struct Hyperlink {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub hyperlink_choice: Option<HyperlinkChoice>,
 }
 /// Followed Hyperlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:folHlink")]
 pub struct FollowedHyperlinkColor {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub followed_hyperlink_color_choice: Option<FollowedHyperlinkColorChoice>,
 }
 /// Horizontal Ratio.
@@ -4927,358 +5079,423 @@ pub struct GraphicData {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a:CT_GraphicalObject/a:graphic",
-    qname = "a:CT_Blip/a:blip",
-    qname = "a:CT_OfficeStyleSheet/a:theme",
-    qname = "a:CT_BaseStylesOverride/a:themeOverride",
-    qname = "a:CT_EmptyElement/a:themeManager",
-    qname = "a:CT_Table/a:tbl",
-    qname = "a:CT_TableStyleList/a:tblStyleLst",
-    qname = "aoe:CT_OEmbedShared/aoe:oembedShared",
-    qname = "woe:CT_OEmbed/woe:oembed",
-    qname = "aif:CT_ImageFormula/aif:imageFormula",
-    qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps",
-    qname = "asl:CT_ScriptLink/asl:scriptLink",
-    qname = "aclsh:CT_ClassificationOutcome/aclsh:classification",
-    qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps",
-    qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl",
-    qname = "asvg:CT_SVGBlip/asvg:svgBlip",
-    qname = "adec:CT_Decorative/adec:decorative",
-    qname = "a16:CT_CreationId/a16:creationId",
-    qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef",
-    qname = "a16:CT_ConnectableReferences/a16:cxnDERefs",
-    qname = "a16:CT_Identifier/a16:rowId",
-    qname = "a16:CT_Identifier/a16:colId",
-    qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr",
-    qname = "wp15:CT_WebVideoPr/wp15:webVideoPr",
-    qname = "thm15:CT_ThemeFamily/thm15:themeFamily",
-    qname = "a15:CT_BackgroundPr/a15:backgroundPr",
-    qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps",
-    qname = "a15:CT_ObjectPr/a15:objectPr",
-    qname = "a15:CT_SignatureLine/a15:signatureLine",
-    qname = "a14:CT_CameraTool/a14:cameraTool",
-    qname = "a14:CT_CompatExt/a14:compatExt",
-    qname = "a14:CT_IsGvmlCanvas/a14:isCanvas",
-    qname = "a14:CT_GvmlContentPart/a14:contentPart",
-    qname = "a14:CT_ShadowObscured/a14:shadowObscured",
-    qname = "a:CT_FillProperties/a14:hiddenFill",
-    qname = "a:CT_LineProperties/a14:hiddenLine",
-    qname = "a:CT_EffectProperties/a14:hiddenEffects",
-    qname = "a:CT_Scene3D/a14:hiddenScene3d",
-    qname = "a:CT_Shape3D/a14:hiddenSp3d",
-    qname = "a14:CT_Photo/a14:imgProps",
-    qname = "a14:CT_UseLocalDpi/a14:useLocalDpi",
-    qname = "a14:CT_TextMath/a14:m",
-    qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr",
-    qname = "dgm14:CT_Boolean/dgm14:recolorImg",
-    qname = "dsp:CT_Drawing/dsp:drawing",
-    qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt",
-    qname = "dgm:CT_ColorTransform/dgm:colorsDef",
-    qname = "dgm:CT_ColorTransformHeader/dgm:colorsDefHdr",
-    qname = "dgm:CT_ColorTransformHeaderLst/dgm:colorsDefHdrLst",
-    qname = "dgm:CT_DataModelRoot/dgm:dataModel",
-    qname = "dgm:CT_DiagramDefinition/dgm:layoutDef",
-    qname = "dgm:CT_DiagramDefinitionHeader/dgm:layoutDefHdr",
-    qname = "dgm:CT_DiagramDefinitionHeaderLst/dgm:layoutDefHdrLst",
-    qname = "dgm:CT_RelIds/dgm:relIds",
-    qname = "dgm:CT_StyleDefinition/dgm:styleDef",
-    qname = "dgm:CT_StyleDefinitionHeader/dgm:styleDefHdr",
-    qname = "dgm:CT_StyleDefinitionHeaderLst/dgm:styleDefHdrLst",
-    qname = "a:CT_ShapeProperties/dgm1612:spPr",
-    qname = "a:CT_TextListStyle/dgm1612:lstStyle",
-    qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst",
-    qname = "c:CT_ChartSpace/c:chartSpace",
-    qname = "cdr:CT_Drawing/c:userShapes",
-    qname = "c:CT_RelId/c:chart",
-    qname = "c16r3:CT_DataDisplayOptions16/c16r3:dataDisplayOptions16",
-    qname = "a:CT_ShapeProperties/c16:spPr",
-    qname = "c:CT_UnsignedInt/c16:explosion",
-    qname = "c:CT_Boolean/c16:invertIfNegative",
-    qname = "c:CT_Boolean/c16:bubble3D",
-    qname = "c:CT_Marker/c16:marker",
-    qname = "c:CT_DLbl/c16:dLbl",
-    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-    qname = "c16:CT_PivotOptions16/c16:pivotOptions16",
-    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
-    qname = "c:CT_PivotSource/c15:pivotSource",
-    qname = "c:CT_NumFmt/c15:numFmt",
-    qname = "a:CT_ShapeProperties/c15:spPr",
-    qname = "c:CT_Layout/c15:layout",
-    qname = "c15:CT_FullRef/c15:fullRef",
-    qname = "c15:CT_LevelRef/c15:levelRef",
-    qname = "c15:CT_FormulaRef/c15:formulaRef",
-    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-    qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries",
-    qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries",
-    qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries",
-    qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries",
-    qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries",
-    qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries",
-    qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries",
-    qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries",
-    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-    qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
-    qname = "c:CT_Boolean/c15:xForSave",
-    qname = "c:CT_Boolean/c15:showDataLabelsRange",
-    qname = "c:CT_Tx/c15:tx",
-    qname = "c:CT_Boolean/c15:showLeaderLines",
-    qname = "c:CT_ChartLines/c15:leaderLines",
-    qname = "c:CT_Boolean/c15:autoCat",
-    qname = "c14:CT_PivotOptions/c14:pivotOptions",
-    qname = "c14:CT_SketchOptions/c14:sketchOptions",
-    qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
-    qname = "c14:CT_Style/c14:style",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart",
-    qname = "comp:CT_Compat/comp:legacyDrawing",
-    qname = "a:CT_GvmlGroupShape/lc:lockedCanvas",
-    qname = "wp:CT_Inline/wp:inline",
-    qname = "wp:CT_Anchor/wp:anchor",
-    qname = "a:ST_Percentage/wp14:pctPosHOffset",
-    qname = "a:ST_Percentage/wp14:pctPosVOffset",
-    qname = "wp14:CT_SizeRelH/wp14:sizeRelH",
-    qname = "wp14:CT_SizeRelV/wp14:sizeRelV",
-    qname = "pic:CT_Picture/pic:pic",
-    qname = "a:CT_ShapeStyle/pic14:style",
-    qname = "a:CT_OfficeArtExtensionList/pic14:extLst",
-    qname = "xdr:CT_Drawing/xdr:wsDr",
-    qname = "xdr14:CT_ContentPart/xdr:contentPart",
-    qname = "xdr14:CT_ContentPart/xdr14:contentPart",
-    qname = "pc:CT_CommentAuthorMonikerList/pc:cmAuthorMkLst",
-    qname = "pc:CT_CommentMonikerList/pc:cmMkLst",
-    qname = "pc:CT_StringTagMonikerList/pc:tagMkLst",
-    qname = "pc:CT_CustomShowMonikerList/pc:custShowMkLst",
-    qname = "pc:CT_DocumentMonikerList/pc:docMkLst",
-    qname = "pc:CT_SectionMonikerList/pc:sectionMkLst",
-    qname = "pc:CT_SlideBaseMonikerList/pc:sldBaseMkLst",
-    qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst",
-    qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst",
-    qname = "pc:CT_SlideMonikerList/pc:sldMkLst",
-    qname = "pc:CT_SlidePosMonikerList/pc:sldPosMkLst",
-    qname = "pc:CT_NotesMonikerList/pc:notesMkLst",
-    qname = "pc:CT_NotesTextMonikerList/pc:notesTxtMkLst",
-    qname = "pc:CT_NotesMasterMonikerList/pc:notesMasterMkLst",
-    qname = "pc:CT_HandoutMonikerList/pc:handoutMkLst",
-    qname = "pc:CT_AnimationEffectMonikerList/pc:animEffectMkLst",
-    qname = "pc:CT_AnimationEffectMonikerList/pc:animEffectParentMkLst",
-    qname = "pc:CT_OsfTaskPaneAppMonikerList/pc:tkAppMkLst",
-    qname = "pc:CT_SummaryZoomMonikerList/pc:tocMkLst",
-    qname = "pc:CT_SectionLinkObjMonikerList/pc:sectionLnkObjMkLst",
-    qname = "pc:CT_DesignerTagMonikerList/pc:designTagMkLst",
-    qname = "pc:CT_CustomXmlPartMonikerList/pc:cXmlMkLst",
-    qname = "p:CT_CommentAuthorList/p:cmAuthorLst",
-    qname = "p:CT_CommentList/p:cmLst",
-    qname = "p:CT_OleObject/p:oleObj",
-    qname = "p:CT_Presentation/p:presentation",
-    qname = "p:CT_PresentationProperties/p:presentationPr",
-    qname = "p:CT_Slide/p:sld",
-    qname = "p:CT_SlideLayout/p:sldLayout",
-    qname = "p:CT_SlideMaster/p:sldMaster",
-    qname = "p:CT_HandoutMaster/p:handoutMaster",
-    qname = "p:CT_NotesMaster/p:notesMaster",
-    qname = "p:CT_NotesSlide/p:notes",
-    qname = "p:CT_SlideSyncProperties/p:sldSyncPr",
-    qname = "p:CT_TagList/p:tagLst",
-    qname = "p:CT_ViewProperties/p:viewPr",
-    qname = "p:CT_ContentPart/p:contentPart",
-    qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt",
-    qname = "p188:CT_AuthorList/p188:authorLst",
-    qname = "p188:CT_CommentList/p188:cmLst",
-    qname = "p188:CT_CommentRelationship/p188:commentRel",
-    qname = "p223:CT_Reactions/p223:reactions",
-    qname = "p228:CT_TaskDetails/p228:taskDetails",
-    qname = "p1912:CT_TaskHistoryDetails/p1912:taskHistoryDetails",
-    qname = "oac:CT_TextBodyPackage/oac:txBodyPkg",
-    qname = "oac:CT_GroupCommand/oac:grpCmd",
-    qname = "oac:CT_ImgData/oac:imgData",
-    qname = "oac:CT_ImgData/oac:origImgData",
-    qname = "oac:CT_ImgLink/oac:imgLink",
-    qname = "oac:CT_DrawingMonikerList/oac:dgMkLst",
-    qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst",
-    qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst",
-    qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst",
-    qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst",
-    qname = "oac:CT_ShapeMonikerList/oac:spMkLst",
-    qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst",
-    qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst",
-    qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst",
-    qname = "oac:CT_PictureMonikerList/oac:picMkLst",
-    qname = "oac:CT_InkMonikerList/oac:inkMkLst",
-    qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst",
-    qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst",
-    qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst",
-    qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst",
-    qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst",
-    qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst",
-    qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst",
-    qname = "oac:CT_TableMonikerList/oac:tblMkLst",
-    qname = "oac:CT_TableCellMonikerList/oac:tcMkLst",
-    qname = "oac:CT_TableRowMonikerList/oac:trMkLst",
-    qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst",
-    qname = "inkml:CT_Ink/inkml:ink",
-    qname = "emma:CT_OneOf/emma:one-of",
-    qname = "emma:CT_Group/emma:group",
-    qname = "emma:CT_Sequence/emma:sequence",
-    qname = "emma:CT_EndPoint/emma:endpoint",
-    qname = "emma:CT_EndPointInfo/emma:endpoint-info",
-    qname = "emma:CT_Info/emma:info",
-    qname = "emma:CT_Grammar/emma:grammar",
-    qname = "emma:CT_DerivedFrom/emma:derived-from",
-    qname = "emma:CT_Node/emma:node",
-    qname = "emma:CT_Arc/emma:arc",
-    qname = "emma:CT_Lattice/emma:lattice",
-    qname = "emma:CT_Literal/emma:literal",
-    qname = "emma:CT_Interpretation/emma:interpretation",
-    qname = "emma:CT_GroupInfo/emma:group-info",
-    qname = "emma:CT_Derivation/emma:derivation",
-    qname = "emma:CT_Model/emma:model",
-    qname = "emma:CT_Emma/emma:emma",
-    qname = "msink:CT_CtxNode/msink:context",
-    qname = "p15:CT_PresetTransition/p15:prstTrans",
-    qname = "p15:CT_PresenceInfo/p15:presenceInfo",
-    qname = "p15:CT_CommentThreading/p15:threadingInfo",
-    qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst",
-    qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst",
-    qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased",
-    qname = "p14:CT_ContentPartNonVisual/p14:nvContentPartPr",
-    qname = "a:CT_Transform2D/p14:xfrm",
-    qname = "p:CT_ExtensionListModify/p14:extLst",
-    qname = "p14:CT_Media/p14:media",
-    qname = "p:CT_SideDirectionTransition/p14:vortex",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:switch",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:flip",
-    qname = "p14:CT_RippleTransition/p14:ripple",
-    qname = "p:CT_Empty/p14:honeycomb",
-    qname = "p14:CT_PrismTransition/p14:prism",
-    qname = "p:CT_OrientationTransition/p14:doors",
-    qname = "p:CT_OrientationTransition/p14:window",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:ferris",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:gallery",
-    qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor",
-    qname = "p:CT_SideDirectionTransition/p14:pan",
-    qname = "p14:CT_GlitterTransition/p14:glitter",
-    qname = "p:CT_InOutTransition/p14:warp",
-    qname = "p14:CT_FlyThroughTransition/p14:flythrough",
-    qname = "p:CT_Empty/p14:flash",
-    qname = "p14:CT_ShredTransition/p14:shred",
-    qname = "p14:CT_RevealTransition/p14:reveal",
-    qname = "p:CT_WheelTransition/p14:wheelReverse",
-    qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt",
-    qname = "p14:CT_SectionProperties/p14:sectionPr",
-    qname = "p14:CT_SectionList/p14:sectionLst",
-    qname = "p14:CT_BrowseMode/p14:browseMode",
-    qname = "a:CT_Color/p14:laserClr",
-    qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi",
-    qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
-    qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls",
-    qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
-    qname = "p14:CT_RandomId/p14:creationId",
-    qname = "p14:CT_RandomId/p14:modId",
-    qname = "p14:CT_ShowEventRecordList/p14:showEvtLst",
-    qname = "w:CT_Recipients/w:recipients",
-    qname = "w:CT_TxbxContent/w:txbxContent",
-    qname = "w:CT_Comments/w:comments",
-    qname = "w:CT_Footnotes/w:footnotes",
-    qname = "w:CT_Endnotes/w:endnotes",
-    qname = "w:CT_HdrFtr/w:hdr",
-    qname = "w:CT_HdrFtr/w:ftr",
-    qname = "w:CT_Settings/w:settings",
-    qname = "w:CT_WebSettings/w:webSettings",
-    qname = "w:CT_FontsList/w:fonts",
-    qname = "w:CT_Numbering/w:numbering",
-    qname = "w:CT_Styles/w:styles",
-    qname = "w:CT_Document/w:document",
-    qname = "w:CT_GlossaryDocument/w:glossaryDocument",
-    qname = "w:CT_Color/w15:color",
-    qname = "w:CT_DataBinding/w15:dataBinding",
-    qname = "w15:CT_SdtAppearance/w15:appearance",
-    qname = "w15:CT_CommentsEx/w15:commentsEx",
-    qname = "w15:CT_People/w15:people",
-    qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection",
-    qname = "w:CT_Empty/w15:repeatingSectionItem",
-    qname = "w:CT_OnOff/w15:chartTrackingRefBased",
-    qname = "w:CT_OnOff/w15:collapsed",
-    qname = "w15:CT_Guid/w15:docId",
-    qname = "w:CT_DecimalNumber/w15:footnoteColumns",
-    qname = "w:CT_OnOff/w15:webExtensionLinked",
-    qname = "w:CT_OnOff/w15:webExtensionCreated",
-    qname = "w14:CT_WordContentPart/w14:contentPart",
-    qname = "w14:CT_LongHexNumber/w14:docId",
-    qname = "w14:CT_OnOff/w14:conflictMode",
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-    qname = "w14:CT_OnOff/w14:discardImageEditingData",
-    qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi",
-    qname = "w:CT_Empty/w14:entityPicker",
-    qname = "w14:CT_SdtCheckbox/w14:checkbox",
-    qname = "sl:CT_SchemaLibrary/sl:schemaLibrary",
-    qname = "m:CT_MathPr/m:mathPr",
-    qname = "m:CT_OMathPara/m:oMathPara",
-    qname = "m:CT_OMath/m:oMath",
-    qname = "v:CT_Shape/v:shape",
-    qname = "v:CT_Shapetype/v:shapetype",
-    qname = "v:CT_Group/v:group",
-    qname = "v:CT_Background/v:background",
-    qname = "v:CT_Fill/v:fill",
-    qname = "v:CT_Formulas/v:formulas",
-    qname = "v:CT_Handles/v:handles",
-    qname = "v:CT_ImageData/v:imagedata",
-    qname = "v:CT_Path/v:path",
-    qname = "v:CT_Textbox/v:textbox",
-    qname = "v:CT_Shadow/v:shadow",
-    qname = "v:CT_Stroke/v:stroke",
-    qname = "v:CT_TextPath/v:textpath",
-    qname = "v:CT_Arc/v:arc",
-    qname = "v:CT_Curve/v:curve",
-    qname = "v:CT_Image/v:image",
-    qname = "v:CT_Line/v:line",
-    qname = "v:CT_Oval/v:oval",
-    qname = "v:CT_PolyLine/v:polyline",
-    qname = "v:CT_Rect/v:rect",
-    qname = "v:CT_RoundRect/v:roundrect",
-    qname = "o:CT_ShapeDefaults/o:shapedefaults",
-    qname = "o:CT_ShapeLayout/o:shapelayout",
-    qname = "o:CT_SignatureLine/o:signatureline",
-    qname = "o:CT_Ink/o:ink",
-    qname = "o:CT_Diagram/o:diagram",
-    qname = "o:CT_Skew/o:skew",
-    qname = "o:CT_Extrusion/o:extrusion",
-    qname = "o:CT_Callout/o:callout",
-    qname = "o:CT_Lock/o:lock",
-    qname = "o:CT_OLEObject/o:OLEObject",
-    qname = "o:CT_Complex/o:complex",
-    qname = "o:CT_StrokeChild/o:left",
-    qname = "o:CT_StrokeChild/o:top",
-    qname = "o:CT_StrokeChild/o:right",
-    qname = "o:CT_StrokeChild/o:bottom",
-    qname = "o:CT_StrokeChild/o:column",
-    qname = "o:CT_ClipPath/o:clippath",
-    qname = "o:CT_Fill/o:fill",
-    qname = "w10:CT_Border/w10:bordertop",
-    qname = "w10:CT_Border/w10:borderleft",
-    qname = "w10:CT_Border/w10:borderright",
-    qname = "w10:CT_Border/w10:borderbottom",
-    qname = "w10:CT_Wrap/w10:wrap",
-    qname = "w10:CT_AnchorLock/w10:anchorlock",
-    qname = "xvml:CT_ClientData/xvml:ClientData",
-    qname = "pvml:CT_Empty/pvml:iscomment",
-    qname = "pvml:CT_Rel/pvml:textdata",
-    qname = "wpc:CT_WordprocessingCanvas/wpc:wpc",
-    qname = "wpg:CT_WordprocessingGroup/wpg:wgp",
-    qname = "wps:CT_WordprocessingShape/wps:wsp",
-    qname = "sle:CT_Slicer/sle:slicer",
-    qname = "cs:CT_ColorStyle/cs:colorStyle",
-    qname = "cs:CT_ChartStyle/cs:chartStyle",
-    qname = "we:CT_OsfWebExtension/we:webextension",
-    qname = "we:CT_WebExtensionPartRef/we:webextensionref",
-    qname = "tsle:CT_Timeline/tsle:timeslicer",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Graphic, qname = "a:graphic"),
+            child(variant = Blip, qname = "a:blip"),
+            child(variant = Theme, qname = "a:theme"),
+            child(variant = ThemeOverride, qname = "a:themeOverride"),
+            empty_child(variant = ThemeManager, qname = "a:themeManager"),
+            child(variant = Table, qname = "a:tbl"),
+            child(variant = TableStyleList, qname = "a:tblStyleLst"),
+            child(variant = OEmbedShared, qname = "aoe:oembedShared"),
+            child(variant = OEmbed, qname = "woe:oembed"),
+            child(variant = ImageFormula, qname = "aif:imageFormula"),
+            child(variant = LiveFeedProperties, qname = "alf:liveFeedProps"),
+            child(variant = ScriptLink, qname = "asl:scriptLink"),
+            child(variant = ClassificationOutcome, qname = "aclsh:classification"),
+            child(
+                variant = LineSketchStyleProperties,
+                qname = "ask:lineSketchStyleProps"
+            ),
+            child(variant = PictureAttributionSourceUrl, qname = "a1611:picAttrSrcUrl"),
+            child(variant = SvgBlip, qname = "asvg:svgBlip"),
+            child(variant = Decorative, qname = "adec:decorative"),
+            child(variant = A16CreationId, qname = "a16:creationId"),
+            child(variant = PredecessorDrawingElementReference, qname = "a16:predDERef"),
+            child(variant = ConnectableReferences, qname = "a16:cxnDERefs"),
+            child(variant = RowIdIdentifier, qname = "a16:rowId"),
+            child(variant = ColIdIdentifier, qname = "a16:colId"),
+            child(variant = HyperlinkColor, qname = "ahyp:hlinkClr"),
+            child(variant = WebVideoProperty, qname = "wp15:webVideoPr"),
+            child(variant = ThemeFamily, qname = "thm15:themeFamily"),
+            child(variant = BackgroundProperties, qname = "a15:backgroundPr"),
+            child(variant = NonVisualGroupProperties, qname = "a15:nonVisualGroupProps"),
+            child(variant = ObjectProperties, qname = "a15:objectPr"),
+            child(variant = A15SignatureLine, qname = "a15:signatureLine"),
+            child(variant = CameraTool, qname = "a14:cameraTool"),
+            child(variant = CompatExtension, qname = "a14:compatExt"),
+            child(variant = IsCanvas, qname = "a14:isCanvas"),
+            child(variant = GvmlContentPart, qname = "a14:contentPart"),
+            child(variant = ShadowObscured, qname = "a14:shadowObscured"),
+            child(variant = HiddenFillProperties, qname = "a14:hiddenFill"),
+            child(variant = HiddenLineProperties, qname = "a14:hiddenLine"),
+            child(variant = HiddenEffectsProperties, qname = "a14:hiddenEffects"),
+            child(variant = HiddenScene3D, qname = "a14:hiddenScene3d"),
+            child(variant = HiddenShape3D, qname = "a14:hiddenSp3d"),
+            child(variant = ImageProperties, qname = "a14:imgProps"),
+            child(variant = UseLocalDpi, qname = "a14:useLocalDpi"),
+            child(variant = TextMath, qname = "a14:m"),
+            child(variant = NonVisualDrawingProperties, qname = "dgm14:cNvPr"),
+            child(variant = RecolorImages, qname = "dgm14:recolorImg"),
+            child(variant = Drawing, qname = "dsp:drawing"),
+            child(variant = DataModelExtensionBlock, qname = "dsp:dataModelExt"),
+            child(variant = ColorsDefinition, qname = "dgm:colorsDef"),
+            child(variant = ColorsDefinitionHeader, qname = "dgm:colorsDefHdr"),
+            child(variant = ColorsDefinitionHeaderList, qname = "dgm:colorsDefHdrLst"),
+            child(variant = DataModelRoot, qname = "dgm:dataModel"),
+            child(variant = LayoutDefinition, qname = "dgm:layoutDef"),
+            child(variant = LayoutDefinitionHeader, qname = "dgm:layoutDefHdr"),
+            child(variant = LayoutDefinitionHeaderList, qname = "dgm:layoutDefHdrLst"),
+            child(variant = RelationshipIds, qname = "dgm:relIds"),
+            child(variant = StyleDefinition, qname = "dgm:styleDef"),
+            child(variant = StyleDefinitionHeader, qname = "dgm:styleDefHdr"),
+            child(variant = StyleDefinitionHeaderList, qname = "dgm:styleDefHdrLst"),
+            child(variant = Dgm1612ShapeProperties, qname = "dgm1612:spPr"),
+            child(variant = TextListStyleType, qname = "dgm1612:lstStyle"),
+            child(variant = NumberDiagramInfoList, qname = "dgm1611:autoBuNodeInfoLst"),
+            child(variant = ChartSpace, qname = "c:chartSpace"),
+            child(variant = UserShapes, qname = "c:userShapes"),
+            child(variant = ChartReference, qname = "c:chart"),
+            child(variant = DataDisplayOptions16, qname = "c16r3:dataDisplayOptions16"),
+            child(variant = C16ShapeProperties, qname = "c16:spPr"),
+            child(variant = UnsignedIntegerType, qname = "c16:explosion"),
+            child(variant = InvertIfNegativeBoolean, qname = "c16:invertIfNegative"),
+            child(variant = Bubble3DBoolean, qname = "c16:bubble3D"),
+            child(variant = Marker, qname = "c16:marker"),
+            child(variant = DLbl, qname = "c16:dLbl"),
+            child(
+                variant = C16CategoryFilterExceptions,
+                qname = "c16:categoryFilterExceptions"
+            ),
+            child(variant = PivotOptions16, qname = "c16:pivotOptions16"),
+            child(
+                variant = ChartDataPointUniqueIdMap,
+                qname = "c16:datapointuniqueidmap"
+            ),
+            child(variant = UniqueIdChartUniqueId, qname = "c16:uniqueId"),
+            child(variant = PivotSource, qname = "c15:pivotSource"),
+            child(variant = NumberingFormat, qname = "c15:numFmt"),
+            child(variant = C15ShapeProperties, qname = "c15:spPr"),
+            child(variant = Layout, qname = "c15:layout"),
+            child(variant = FullReference, qname = "c15:fullRef"),
+            child(variant = LevelReference, qname = "c15:levelRef"),
+            child(variant = FormulaReference, qname = "c15:formulaRef"),
+            child(variant = FilteredSeriesTitle, qname = "c15:filteredSeriesTitle"),
+            child(variant = FilteredCategoryTitle, qname = "c15:filteredCategoryTitle"),
+            child(variant = FilteredAreaSeries, qname = "c15:filteredAreaSeries"),
+            child(variant = FilteredBarSeries, qname = "c15:filteredBarSeries"),
+            child(variant = FilteredBubbleSeries, qname = "c15:filteredBubbleSeries"),
+            child(
+                variant = FilteredLineSeriesExtension,
+                qname = "c15:filteredLineSeries"
+            ),
+            child(variant = FilteredPieSeries, qname = "c15:filteredPieSeries"),
+            child(variant = FilteredRadarSeries, qname = "c15:filteredRadarSeries"),
+            child(variant = FilteredScatterSeries, qname = "c15:filteredScatterSeries"),
+            child(variant = FilteredSurfaceSeries, qname = "c15:filteredSurfaceSeries"),
+            child(variant = DataLabelsRange, qname = "c15:datalabelsRange"),
+            child(
+                variant = C15CategoryFilterExceptions,
+                qname = "c15:categoryFilterExceptions"
+            ),
+            child(variant = DataLabelFieldTable, qname = "c15:dlblFieldTable"),
+            child(variant = ExceptionForSave, qname = "c15:xForSave"),
+            child(variant = ShowDataLabelsRange, qname = "c15:showDataLabelsRange"),
+            child(variant = ChartText, qname = "c15:tx"),
+            child(variant = ShowLeaderLines, qname = "c15:showLeaderLines"),
+            child(variant = LeaderLines, qname = "c15:leaderLines"),
+            child(variant = AutoGeneneratedCategories, qname = "c15:autoCat"),
+            child(variant = PivotOptions, qname = "c14:pivotOptions"),
+            child(variant = SketchOptions, qname = "c14:sketchOptions"),
+            child(variant = InvertSolidFillFormat, qname = "c14:invertSolidFillFmt"),
+            child(variant = Style, qname = "c14:style"),
+            child(variant = Cdr14ContentPart, qname = "cdr14:contentPart"),
+            child(variant = LegacyDrawing, qname = "comp:legacyDrawing"),
+            child(variant = LockedCanvas, qname = "lc:lockedCanvas"),
+            child(variant = Inline, qname = "wp:inline"),
+            child(variant = Anchor, qname = "wp:anchor"),
+            text_child(
+                variant = PercentagePositionHeightOffset,
+                qname = "wp14:pctPosHOffset"
+            ),
+            text_child(
+                variant = PercentagePositionVerticalOffset,
+                qname = "wp14:pctPosVOffset"
+            ),
+            child(variant = RelativeWidth, qname = "wp14:sizeRelH"),
+            child(variant = RelativeHeight, qname = "wp14:sizeRelV"),
+            child(variant = Picture, qname = "pic:pic"),
+            child(variant = ShapeStyle, qname = "pic14:style"),
+            child(variant = OfficeArtExtensionList, qname = "pic14:extLst"),
+            child(variant = WorksheetDrawing, qname = "xdr:wsDr"),
+            child(variant = XdrContentPart, qname = "xdr:contentPart"),
+            child(variant = Xdr14ContentPart, qname = "xdr14:contentPart"),
+            any_child(variant = CommentAuthorMonikerList, qname = "pc:cmAuthorMkLst"),
+            any_child(variant = CommentMonikerList, qname = "pc:cmMkLst"),
+            any_child(variant = StringTagMonikerList, qname = "pc:tagMkLst"),
+            any_child(variant = CustomShowMonikerList, qname = "pc:custShowMkLst"),
+            any_child(variant = DocumentMonikerList, qname = "pc:docMkLst"),
+            any_child(variant = SectionMonikerList, qname = "pc:sectionMkLst"),
+            any_child(variant = SlideBaseMonikerList, qname = "pc:sldBaseMkLst"),
+            any_child(variant = SlideLayoutMonikerList, qname = "pc:sldLayoutMkLst"),
+            any_child(variant = MainMasterMonikerList, qname = "pc:sldMasterMkLst"),
+            child(variant = SlideMonikerList, qname = "pc:sldMkLst"),
+            any_child(variant = SlidePosMonikerList, qname = "pc:sldPosMkLst"),
+            any_child(variant = NotesMonikerList, qname = "pc:notesMkLst"),
+            any_child(variant = NotesTextMonikerList, qname = "pc:notesTxtMkLst"),
+            any_child(variant = NotesMasterMonikerList, qname = "pc:notesMasterMkLst"),
+            any_child(variant = HandoutMonikerList, qname = "pc:handoutMkLst"),
+            any_child(
+                variant = AnimEffectMkLstAnimationEffectMonikerList,
+                qname = "pc:animEffectMkLst"
+            ),
+            any_child(
+                variant = AnimEffectParentMkLstAnimationEffectMonikerList,
+                qname = "pc:animEffectParentMkLst"
+            ),
+            any_child(variant = OsfTaskPaneAppMonikerList, qname = "pc:tkAppMkLst"),
+            any_child(variant = SummaryZoomMonikerList, qname = "pc:tocMkLst"),
+            any_child(
+                variant = SectionLinkObjMonikerList,
+                qname = "pc:sectionLnkObjMkLst"
+            ),
+            any_child(variant = DesignerTagMonikerList, qname = "pc:designTagMkLst"),
+            any_child(variant = CustomXmlPartMonikerList, qname = "pc:cXmlMkLst"),
+            child(variant = CommentAuthorList, qname = "p:cmAuthorLst"),
+            child(variant = PCommentList, qname = "p:cmLst"),
+            child(variant = POleObject, qname = "p:oleObj"),
+            child(variant = Presentation, qname = "p:presentation"),
+            child(variant = PresentationProperties, qname = "p:presentationPr"),
+            child(variant = Slide, qname = "p:sld"),
+            child(variant = SlideLayout, qname = "p:sldLayout"),
+            child(variant = SlideMaster, qname = "p:sldMaster"),
+            child(variant = HandoutMaster, qname = "p:handoutMaster"),
+            child(variant = NotesMaster, qname = "p:notesMaster"),
+            child(variant = NotesSlide, qname = "p:notes"),
+            child(variant = SlideSyncProperties, qname = "p:sldSyncPr"),
+            child(variant = TagList, qname = "p:tagLst"),
+            child(variant = ViewProperties, qname = "p:viewPr"),
+            child(variant = PContentPart, qname = "p:contentPart"),
+            child(variant = PlaceholderTypeExtension, qname = "p232:phTypeExt"),
+            child(variant = AuthorList, qname = "p188:authorLst"),
+            child(variant = P188CommentList, qname = "p188:cmLst"),
+            child(variant = CommentRelationship, qname = "p188:commentRel"),
+            child(variant = Reactions, qname = "p223:reactions"),
+            child(variant = TaskDetails, qname = "p228:taskDetails"),
+            child(variant = TaskHistoryDetails, qname = "p1912:taskHistoryDetails"),
+            empty_child(variant = TextBodyPackage, qname = "oac:txBodyPkg"),
+            child(variant = GroupCommand, qname = "oac:grpCmd"),
+            text_child(variant = ImgDataImgData, qname = "oac:imgData"),
+            text_child(variant = OrigImgDataImgData, qname = "oac:origImgData"),
+            child(variant = ImgLink, qname = "oac:imgLink"),
+            any_child(variant = DrawingMonikerList, qname = "oac:dgMkLst"),
+            any_child(variant = DocumentContextMonikerList, qname = "oac:dcMkLst"),
+            any_child(
+                variant = GraphicParentMonikerList,
+                qname = "oac:graphicParentMkLst"
+            ),
+            any_child(variant = DeMkLstDrawingElementMonikerList, qname = "oac:deMkLst"),
+            any_child(
+                variant = DeMasterMkLstDrawingElementMonikerList,
+                qname = "oac:deMasterMkLst"
+            ),
+            any_child(variant = ShapeMonikerList, qname = "oac:spMkLst"),
+            any_child(variant = GroupShapeMonikerList, qname = "oac:grpSpMkLst"),
+            any_child(
+                variant = GraphicFrameMonikerList,
+                qname = "oac:graphicFrameMkLst"
+            ),
+            any_child(variant = ConnectorMonikerList, qname = "oac:cxnSpMkLst"),
+            any_child(variant = PictureMonikerList, qname = "oac:picMkLst"),
+            any_child(variant = InkMonikerList, qname = "oac:inkMkLst"),
+            any_child(variant = TextBodyMonikerList, qname = "oac:txBodyMkLst"),
+            any_child(variant = TextCharRangeMonikerList, qname = "oac:txMkLst"),
+            any_child(variant = HyperlinkMonikerList, qname = "oac:hlinkMkLst"),
+            any_child(variant = Model3DMonikerList, qname = "oac:model3DMkLst"),
+            any_child(variant = ViewSelectionStgList, qname = "oac:viewSelLst"),
+            any_child(variant = EditorSelectionStgList, qname = "oac:editorSelLst"),
+            any_child(variant = DrawingSelectionStgList, qname = "oac:drSelLst"),
+            any_child(variant = TableMonikerList, qname = "oac:tblMkLst"),
+            any_child(variant = TableCellMonikerList, qname = "oac:tcMkLst"),
+            any_child(variant = TableRowMonikerList, qname = "oac:trMkLst"),
+            any_child(variant = TableColumnMonikerList, qname = "oac:gridColMkLst"),
+            child(variant = InkmlInk, qname = "inkml:ink"),
+            child(variant = OneOf, qname = "emma:one-of"),
+            child(variant = EmmaGroup, qname = "emma:group"),
+            child(variant = Sequence, qname = "emma:sequence"),
+            child(variant = EndPoint, qname = "emma:endpoint"),
+            child(variant = EndPointInfo, qname = "emma:endpoint-info"),
+            child(variant = Info, qname = "emma:info"),
+            child(variant = Grammar, qname = "emma:grammar"),
+            child(variant = DerivedFrom, qname = "emma:derived-from"),
+            child(variant = Node, qname = "emma:node"),
+            child(variant = EmmaArc, qname = "emma:arc"),
+            child(variant = Lattice, qname = "emma:lattice"),
+            text_child(variant = Literal, qname = "emma:literal"),
+            child(variant = Interpretation, qname = "emma:interpretation"),
+            child(variant = GroupInfo, qname = "emma:group-info"),
+            child(variant = Derivation, qname = "emma:derivation"),
+            child(variant = Model, qname = "emma:model"),
+            child(variant = Emma, qname = "emma:emma"),
+            child(variant = ContextNode, qname = "msink:context"),
+            child(variant = PresetTransition, qname = "p15:prstTrans"),
+            child(variant = PresenceInfo, qname = "p15:presenceInfo"),
+            child(variant = ThreadingInfo, qname = "p15:threadingInfo"),
+            child(variant = SlideGuideList, qname = "p15:sldGuideLst"),
+            child(variant = NotesGuideList, qname = "p15:notesGuideLst"),
+            child(
+                variant = ChartTrackingReferenceBased,
+                qname = "p15:chartTrackingRefBased"
+            ),
+            child(
+                variant = NonVisualContentPartProperties,
+                qname = "p14:nvContentPartPr"
+            ),
+            child(variant = Transform2D, qname = "p14:xfrm"),
+            child(variant = ExtensionListModify, qname = "p14:extLst"),
+            child(variant = Media, qname = "p14:media"),
+            child(variant = VortexTransition, qname = "p14:vortex"),
+            child(variant = SwitchTransition, qname = "p14:switch"),
+            child(variant = FlipTransition, qname = "p14:flip"),
+            child(variant = RippleTransition, qname = "p14:ripple"),
+            empty_child(variant = HoneycombTransition, qname = "p14:honeycomb"),
+            child(variant = PrismTransition, qname = "p14:prism"),
+            child(variant = DoorsTransition, qname = "p14:doors"),
+            child(variant = WindowTransition, qname = "p14:window"),
+            child(variant = FerrisTransition, qname = "p14:ferris"),
+            child(variant = GalleryTransition, qname = "p14:gallery"),
+            child(variant = ConveyorTransition, qname = "p14:conveyor"),
+            child(variant = PanTransition, qname = "p14:pan"),
+            child(variant = GlitterTransition, qname = "p14:glitter"),
+            child(variant = WarpTransition, qname = "p14:warp"),
+            child(variant = FlythroughTransition, qname = "p14:flythrough"),
+            empty_child(variant = FlashTransition, qname = "p14:flash"),
+            child(variant = ShredTransition, qname = "p14:shred"),
+            child(variant = RevealTransition, qname = "p14:reveal"),
+            child(variant = WheelReverseTransition, qname = "p14:wheelReverse"),
+            child(variant = BookmarkTarget, qname = "p14:bmkTgt"),
+            child(variant = SectionProperties, qname = "p14:sectionPr"),
+            child(variant = SectionList, qname = "p14:sectionLst"),
+            child(variant = BrowseMode, qname = "p14:browseMode"),
+            child(variant = LaserColor, qname = "p14:laserClr"),
+            child(variant = P14DefaultImageDpi, qname = "p14:defaultImageDpi"),
+            child(variant = DiscardImageEditData, qname = "p14:discardImageEditData"),
+            child(variant = ShowMediaControls, qname = "p14:showMediaCtrls"),
+            child(variant = LaserTraceList, qname = "p14:laserTraceLst"),
+            child(variant = P14CreationId, qname = "p14:creationId"),
+            child(variant = ModificationId, qname = "p14:modId"),
+            child(variant = ShowEventRecordList, qname = "p14:showEvtLst"),
+            child(variant = Recipients, qname = "w:recipients"),
+            child(variant = TextBoxContent, qname = "w:txbxContent"),
+            child(variant = Comments, qname = "w:comments"),
+            child(variant = Footnotes, qname = "w:footnotes"),
+            child(variant = Endnotes, qname = "w:endnotes"),
+            child(variant = Header, qname = "w:hdr"),
+            child(variant = Footer, qname = "w:ftr"),
+            child(variant = Settings, qname = "w:settings"),
+            child(variant = WebSettings, qname = "w:webSettings"),
+            child(variant = Fonts, qname = "w:fonts"),
+            child(variant = Numbering, qname = "w:numbering"),
+            child(variant = Styles, qname = "w:styles"),
+            child(variant = Document, qname = "w:document"),
+            child(variant = GlossaryDocument, qname = "w:glossaryDocument"),
+            child(variant = Color, qname = "w15:color"),
+            child(variant = DataBinding, qname = "w15:dataBinding"),
+            child(variant = Appearance, qname = "w15:appearance"),
+            child(variant = CommentsEx, qname = "w15:commentsEx"),
+            child(variant = People, qname = "w15:people"),
+            child(variant = SdtRepeatedSection, qname = "w15:repeatingSection"),
+            empty_child(
+                variant = SdtRepeatedSectionItem,
+                qname = "w15:repeatingSectionItem"
+            ),
+            child(variant = ChartTrackingRefBased, qname = "w15:chartTrackingRefBased"),
+            child(variant = DefaultCollapsed, qname = "w15:collapsed"),
+            child(variant = PersistentDocumentId, qname = "w15:docId"),
+            child(variant = FootnoteColumns, qname = "w15:footnoteColumns"),
+            child(variant = WebExtensionLinked, qname = "w15:webExtensionLinked"),
+            child(variant = WebExtensionCreated, qname = "w15:webExtensionCreated"),
+            child(variant = W14ContentPart, qname = "w14:contentPart"),
+            child(variant = DocumentId, qname = "w14:docId"),
+            child(variant = ConflictMode, qname = "w14:conflictMode"),
+            child(
+                variant = CustomXmlConflictInsertionRangeStart,
+                qname = "w14:customXmlConflictInsRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictInsertionRangeEnd,
+                qname = "w14:customXmlConflictInsRangeEnd"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeStart,
+                qname = "w14:customXmlConflictDelRangeStart"
+            ),
+            child(
+                variant = CustomXmlConflictDeletionRangeEnd,
+                qname = "w14:customXmlConflictDelRangeEnd"
+            ),
+            child(
+                variant = DiscardImageEditingData,
+                qname = "w14:discardImageEditingData"
+            ),
+            child(variant = W14DefaultImageDpi, qname = "w14:defaultImageDpi"),
+            empty_child(variant = EntityPickerEmpty, qname = "w14:entityPicker"),
+            child(variant = SdtContentCheckBox, qname = "w14:checkbox"),
+            child(variant = SchemaLibrary, qname = "sl:schemaLibrary"),
+            child(variant = MathProperties, qname = "m:mathPr"),
+            child(variant = Paragraph, qname = "m:oMathPara"),
+            child(variant = OfficeMath, qname = "m:oMath"),
+            child(variant = Shape, qname = "v:shape"),
+            child(variant = Shapetype, qname = "v:shapetype"),
+            child(variant = VGroup, qname = "v:group"),
+            child(variant = Background, qname = "v:background"),
+            child(variant = Fill, qname = "v:fill"),
+            child(variant = Formulas, qname = "v:formulas"),
+            child(variant = ShapeHandles, qname = "v:handles"),
+            child(variant = ImageData, qname = "v:imagedata"),
+            child(variant = Path, qname = "v:path"),
+            child(variant = TextBox, qname = "v:textbox"),
+            child(variant = Shadow, qname = "v:shadow"),
+            child(variant = Stroke, qname = "v:stroke"),
+            child(variant = TextPath, qname = "v:textpath"),
+            child(variant = VArc, qname = "v:arc"),
+            child(variant = Curve, qname = "v:curve"),
+            child(variant = ImageFile, qname = "v:image"),
+            child(variant = Line, qname = "v:line"),
+            child(variant = Oval, qname = "v:oval"),
+            child(variant = PolyLine, qname = "v:polyline"),
+            child(variant = Rectangle, qname = "v:rect"),
+            child(variant = RoundRectangle, qname = "v:roundrect"),
+            child(variant = ShapeDefaults, qname = "o:shapedefaults"),
+            child(variant = ShapeLayout, qname = "o:shapelayout"),
+            child(variant = OSignatureLine, qname = "o:signatureline"),
+            child(variant = OInk, qname = "o:ink"),
+            child(variant = Diagram, qname = "o:diagram"),
+            child(variant = Skew, qname = "o:skew"),
+            child(variant = Extrusion, qname = "o:extrusion"),
+            child(variant = Callout, qname = "o:callout"),
+            child(variant = Lock, qname = "o:lock"),
+            child(variant = OOleObject, qname = "o:OLEObject"),
+            child(variant = Complex, qname = "o:complex"),
+            child(variant = LeftStroke, qname = "o:left"),
+            child(variant = TopStroke, qname = "o:top"),
+            child(variant = RightStroke, qname = "o:right"),
+            child(variant = BottomStroke, qname = "o:bottom"),
+            child(variant = ColumnStroke, qname = "o:column"),
+            child(variant = ClipPath, qname = "o:clippath"),
+            child(variant = FillExtendedProperties, qname = "o:fill"),
+            child(variant = TopBorder, qname = "w10:bordertop"),
+            child(variant = LeftBorder, qname = "w10:borderleft"),
+            child(variant = RightBorder, qname = "w10:borderright"),
+            child(variant = BottomBorder, qname = "w10:borderbottom"),
+            child(variant = TextWrap, qname = "w10:wrap"),
+            empty_child(variant = AnchorLock, qname = "w10:anchorlock"),
+            child(variant = ClientData, qname = "xvml:ClientData"),
+            empty_child(variant = InkAnnotationFlag, qname = "pvml:iscomment"),
+            child(variant = TextData, qname = "pvml:textdata"),
+            child(variant = WordprocessingCanvas, qname = "wpc:wpc"),
+            child(variant = WordprocessingGroup, qname = "wpg:wgp"),
+            child(variant = WordprocessingShape, qname = "wps:wsp"),
+            child(variant = Slicer, qname = "sle:slicer"),
+            child(variant = ColorStyle, qname = "cs:colorStyle"),
+            child(variant = ChartStyle, qname = "cs:chartStyle"),
+            child(variant = WebExtension, qname = "we:webextension"),
+            child(variant = WebExtensionReference, qname = "we:webextensionref"),
+            child(variant = TimeSlicer, qname = "tsle:timeslicer"),
+            any
+        )
+    )]
   pub graphic_data_choice: Vec<GraphicDataChoice>,
 }
 /// Diagram to Animate.
@@ -5447,27 +5664,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -5486,10 +5709,12 @@ pub struct TextShape {
   /// Shape Text Body
   #[sdk(child(qname = "a:CT_TextBody/a:txBody"))]
   pub text_body: std::boxed::Box<TextBody>,
-  #[sdk(choice(
-    qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect",
-    qname = "a:CT_Transform2D/a:xfrm"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UseShapeRectangle, qname = "a:useSpRect"),
+            child(variant = Transform2D, qname = "a:xfrm")
+        )
+    )]
   pub text_shape_choice: Option<TextShapeChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -5849,14 +6074,16 @@ pub struct GradientStop {
   #[sdk(attr(qname = ":pos"))]
   #[sdk(number_range(range = 0..= 100000))]
   pub position: crate::simple_type::PositiveFixedPercentageValue,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub gradient_stop_choice: Option<GradientStopChoice>,
 }
 /// Gradient Stop List.
@@ -6157,14 +6384,16 @@ pub struct Path {
   /// 3D Extrusion Allowed
   #[sdk(attr(qname = ":extrusionOk"))]
   pub extrusion_ok: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_Path2DClose/a:close",
-    qname = "a:CT_Path2DMoveTo/a:moveTo",
-    qname = "a:CT_Path2DLineTo/a:lnTo",
-    qname = "a:CT_Path2DArcTo/a:arcTo",
-    qname = "a:CT_Path2DQuadBezierTo/a:quadBezTo",
-    qname = "a:CT_Path2DCubicBezierTo/a:cubicBezTo"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = CloseShapePath, qname = "a:close"),
+            child(variant = MoveTo, qname = "a:moveTo"),
+            child(variant = LineTo, qname = "a:lnTo"),
+            child(variant = ArcTo, qname = "a:arcTo"),
+            child(variant = QuadraticBezierCurveTo, qname = "a:quadBezTo"),
+            child(variant = CubicBezierCurveTo, qname = "a:cubicBezTo")
+        )
+    )]
   pub path_choice: Vec<PathChoice>,
 }
 /// List of Shape Adjust Values.
@@ -6187,10 +6416,12 @@ pub struct ShapeGuideList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjustHandleList/a:ahLst")]
 pub struct AdjustHandleList {
-  #[sdk(choice(
-    qname = "a:CT_XYAdjustHandle/a:ahXY",
-    qname = "a:CT_PolarAdjustHandle/a:ahPolar"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = AdjustHandleXy, qname = "a:ahXY"),
+            child(variant = AdjustHandlePolar, qname = "a:ahPolar")
+        )
+    )]
   pub adjust_handle_list_choice: Vec<AdjustHandleListChoice>,
 }
 /// List of Shape Connection Sites.
@@ -6374,16 +6605,23 @@ pub struct BodyProperties {
   /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<std::boxed::Box<PresetTextWarp>>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoAutofit/a:noAutofit",
-    qname = "a:CT_TextNormalAutofit/a:normAutofit",
-    qname = "a:CT_TextShapeAutofit/a:spAutoFit"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoAutoFit, qname = "a:noAutofit"),
+            child(variant = NormalAutoFit, qname = "a:normAutofit"),
+            empty_child(variant = ShapeAutoFit, qname = "a:spAutoFit")
+        )
+    )]
   pub body_properties_choice1: Option<BodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<Scene3DType>>,
-  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
+  #[sdk(
+        choice(
+            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = FlatText, qname = "a:flatTx")
+        )
+    )]
   pub body_properties_choice2: Option<BodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -6700,14 +6938,16 @@ pub struct TableCellProperties {
   /// Cell 3-D
   #[sdk(child(qname = "a:CT_Cell3D/a:cell3D"))]
   pub cell3_d_properties: Option<std::boxed::Box<Cell3DProperties>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub table_cell_properties_choice: Option<TableCellPropertiesChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -6895,24 +7135,30 @@ pub struct TableProperties {
   /// Banded Columns
   #[sdk(attr(qname = ":bandCol"))]
   pub band_column: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub table_properties_choice1: Option<TablePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub table_properties_choice2: Option<TablePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TableStyle/a:tableStyle",
-    qname = "a:ST_Guid/a:tableStyleId"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TableStyle, qname = "a:tableStyle"),
+            text_child(variant = TableStyleId, qname = "a:tableStyleId")
+        )
+    )]
   pub table_properties_choice3: Option<TablePropertiesChoice3>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -6945,80 +7191,96 @@ pub struct TableRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:left")]
 pub struct LeftBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub left_border_choice: Option<LeftBorderChoice>,
 }
 /// Right Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:right")]
 pub struct RightBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub right_border_choice: Option<RightBorderChoice>,
 }
 /// Top Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:top")]
 pub struct TopBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub top_border_choice: Option<TopBorderChoice>,
 }
 /// Bottom Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:bottom")]
 pub struct BottomBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub bottom_border_choice: Option<BottomBorderChoice>,
 }
 /// Inside Horizontal Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:insideH")]
 pub struct InsideHorizontalBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub inside_horizontal_border_choice: Option<InsideHorizontalBorderChoice>,
 }
 /// Inside Vertical Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:insideV")]
 pub struct InsideVerticalBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub inside_vertical_border_choice: Option<InsideVerticalBorderChoice>,
 }
 /// Top Left to Bottom Right Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:tl2br")]
 pub struct TopLeftToBottomRightBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub top_left_to_bottom_right_border_choice: Option<TopLeftToBottomRightBorderChoice>,
 }
 /// Top Right to Bottom Left Border.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ThemeableLineStyle/a:tr2bl")]
 pub struct TopRightToBottomLeftBorder {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Outline, qname = "a:ln"),
+            child(variant = LineReference, qname = "a:lnRef")
+        )
+    )]
   pub top_right_to_bottom_left_border_choice: Option<TopRightToBottomLeftBorderChoice>,
 }
 /// Table Cell Borders.
@@ -7065,19 +7327,23 @@ pub struct TableCellTextStyle {
   #[sdk(attr(qname = ":i"))]
   #[sdk(string_format(kind = "token"))]
   pub italic: Option<BooleanStyleValues>,
-  #[sdk(choice(
-    qname = "a:CT_FontCollection/a:font",
-    qname = "a:CT_FontReference/a:fontRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Fonts, qname = "a:font"),
+            child(variant = FontReference, qname = "a:fontRef")
+        )
+    )]
   pub table_cell_text_style_choice1: Option<TableCellTextStyleChoice>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub table_cell_text_style_choice2: Option<TableCellTextStyleChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -7090,10 +7356,12 @@ pub struct TableCellStyle {
   /// Table Cell Borders
   #[sdk(child(qname = "a:CT_TableCellBorderStyle/a:tcBdr"))]
   pub table_cell_borders: Option<std::boxed::Box<TableCellBorders>>,
-  #[sdk(choice(
-    qname = "a:CT_FillProperties/a:fill",
-    qname = "a:CT_StyleMatrixReference/a:fillRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FillProperties, qname = "a:fill"),
+            child(variant = FillReference, qname = "a:fillRef")
+        )
+    )]
   pub table_cell_style_choice: Option<TableCellStyleChoice>,
   /// Cell 3-D.
   #[sdk(child(qname = "a:CT_Cell3D/a:cell3D"))]
@@ -7103,15 +7371,19 @@ pub struct TableCellStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableBackgroundStyle/a:tblBg")]
 pub struct TableBackground {
-  #[sdk(choice(
-    qname = "a:CT_FillProperties/a:fill",
-    qname = "a:CT_StyleMatrixReference/a:fillRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = FillProperties, qname = "a:fill"),
+            child(variant = FillReference, qname = "a:fillRef")
+        )
+    )]
   pub table_background_choice1: Option<TableBackgroundChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectProperties/a:effect",
-    qname = "a:CT_StyleMatrixReference/a:effectRef"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectPropertiesType, qname = "a:effect"),
+            child(variant = EffectReference, qname = "a:effectRef")
+        )
+    )]
   pub table_background_choice2: Option<TableBackgroundChoice2>,
 }
 /// Whole Table.
@@ -7309,28 +7581,36 @@ pub struct ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub paragraph_properties_choice1: Option<ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub paragraph_properties_choice2: Option<ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub paragraph_properties_choice3: Option<ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub paragraph_properties_choice4: Option<ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7394,28 +7674,36 @@ pub struct DefaultParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub default_paragraph_properties_choice1: Option<DefaultParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub default_paragraph_properties_choice2: Option<DefaultParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub default_paragraph_properties_choice3: Option<DefaultParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub default_paragraph_properties_choice4: Option<DefaultParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7479,28 +7767,36 @@ pub struct Level1ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level1_paragraph_properties_choice1: Option<Level1ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level1_paragraph_properties_choice2: Option<Level1ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level1_paragraph_properties_choice3: Option<Level1ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level1_paragraph_properties_choice4: Option<Level1ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7564,28 +7860,36 @@ pub struct Level2ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level2_paragraph_properties_choice1: Option<Level2ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level2_paragraph_properties_choice2: Option<Level2ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level2_paragraph_properties_choice3: Option<Level2ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level2_paragraph_properties_choice4: Option<Level2ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7649,28 +7953,36 @@ pub struct Level3ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level3_paragraph_properties_choice1: Option<Level3ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level3_paragraph_properties_choice2: Option<Level3ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level3_paragraph_properties_choice3: Option<Level3ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level3_paragraph_properties_choice4: Option<Level3ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7734,28 +8046,36 @@ pub struct Level4ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level4_paragraph_properties_choice1: Option<Level4ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level4_paragraph_properties_choice2: Option<Level4ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level4_paragraph_properties_choice3: Option<Level4ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level4_paragraph_properties_choice4: Option<Level4ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7819,28 +8139,36 @@ pub struct Level5ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level5_paragraph_properties_choice1: Option<Level5ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level5_paragraph_properties_choice2: Option<Level5ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level5_paragraph_properties_choice3: Option<Level5ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level5_paragraph_properties_choice4: Option<Level5ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7904,28 +8232,36 @@ pub struct Level6ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level6_paragraph_properties_choice1: Option<Level6ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level6_paragraph_properties_choice2: Option<Level6ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level6_paragraph_properties_choice3: Option<Level6ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level6_paragraph_properties_choice4: Option<Level6ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -7989,28 +8325,36 @@ pub struct Level7ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level7_paragraph_properties_choice1: Option<Level7ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level7_paragraph_properties_choice2: Option<Level7ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level7_paragraph_properties_choice3: Option<Level7ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level7_paragraph_properties_choice4: Option<Level7ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -8074,28 +8418,36 @@ pub struct Level8ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level8_paragraph_properties_choice1: Option<Level8ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level8_paragraph_properties_choice2: Option<Level8ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level8_paragraph_properties_choice3: Option<Level8ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level8_paragraph_properties_choice4: Option<Level8ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -8159,28 +8511,36 @@ pub struct Level9ParagraphProperties {
   /// Space After
   #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
   pub space_after: Option<std::boxed::Box<SpaceAfter>>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletColorText, qname = "a:buClrTx"),
+            child(variant = BulletColor, qname = "a:buClr")
+        )
+    )]
   pub level9_paragraph_properties_choice1: Option<Level9ParagraphPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletSizeText, qname = "a:buSzTx"),
+            child(variant = BulletSizePercentage, qname = "a:buSzPct"),
+            child(variant = BulletSizePoints, qname = "a:buSzPts")
+        )
+    )]
   pub level9_paragraph_properties_choice2: Option<Level9ParagraphPropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = BulletFontText, qname = "a:buFontTx"),
+            child(variant = BulletFont, qname = "a:buFont")
+        )
+    )]
   pub level9_paragraph_properties_choice3: Option<Level9ParagraphPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoBullet, qname = "a:buNone"),
+            child(variant = AutoNumberedBullet, qname = "a:buAutoNum"),
+            child(variant = CharacterBullet, qname = "a:buChar"),
+            child(variant = PictureBullet, qname = "a:buBlip")
+        )
+    )]
   pub level9_paragraph_properties_choice4: Option<Level9ParagraphPropertiesChoice4>,
   /// Tab List.
   #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
@@ -8262,32 +8622,40 @@ pub struct EndParagraphRunProperties {
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub end_paragraph_run_properties_choice1: Option<EndParagraphRunPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub end_paragraph_run_properties_choice2: Option<EndParagraphRunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub highlight: Option<std::boxed::Box<Highlight>>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
-    qname = "a:CT_LineProperties/a:uLn"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
+            child(variant = Underline, qname = "a:uLn")
+        )
+    )]
   pub end_paragraph_run_properties_choice3: Option<EndParagraphRunPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
-    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
+            child(variant = UnderlineFill, qname = "a:uFill")
+        )
+    )]
   pub end_paragraph_run_properties_choice4: Option<EndParagraphRunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -8384,32 +8752,40 @@ pub struct RunProperties {
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub run_properties_choice1: Option<RunPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub run_properties_choice2: Option<RunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub highlight: Option<std::boxed::Box<Highlight>>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
-    qname = "a:CT_LineProperties/a:uLn"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
+            child(variant = Underline, qname = "a:uLn")
+        )
+    )]
   pub run_properties_choice3: Option<RunPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
-    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
+            child(variant = UnderlineFill, qname = "a:uFill")
+        )
+    )]
   pub run_properties_choice4: Option<RunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -8506,32 +8882,40 @@ pub struct DefaultRunProperties {
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub default_run_properties_choice1: Option<DefaultRunPropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub default_run_properties_choice2: Option<DefaultRunPropertiesChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub highlight: Option<std::boxed::Box<Highlight>>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
-    qname = "a:CT_LineProperties/a:uLn"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFollowsText, qname = "a:uLnTx"),
+            child(variant = Underline, qname = "a:uLn")
+        )
+    )]
   pub default_run_properties_choice3: Option<DefaultRunPropertiesChoice3>,
-  #[sdk(choice(
-    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
-    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = UnderlineFillText, qname = "a:uFillTx"),
+            child(variant = UnderlineFill, qname = "a:uFill")
+        )
+    )]
   pub default_run_properties_choice4: Option<DefaultRunPropertiesChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
@@ -8566,12 +8950,14 @@ pub struct Paragraph {
   /// Text Paragraph Properties
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
-  #[sdk(choice(
-    qname = "a:CT_RegularTextRun/a:r",
-    qname = "a:CT_TextLineBreak/a:br",
-    qname = "a:CT_TextField/a:fld",
-    qname = "a14:CT_TextMath/a14:m"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = Run, qname = "a:r"),
+            child(variant = Break, qname = "a:br"),
+            child(variant = Field, qname = "a:fld"),
+            child(variant = TextMath, qname = "a14:m")
+        )
+    )]
   pub paragraph_choice: Vec<ParagraphChoice>,
   /// End Paragraph Run Properties.
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:endParaRPr"))]
@@ -8611,30 +8997,36 @@ pub struct SpacingPoints {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:lnSpc")]
 pub struct LineSpacing {
-  #[sdk(choice(
-    qname = "a:CT_TextSpacingPercent/a:spcPct",
-    qname = "a:CT_TextSpacingPoint/a:spcPts"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SpacingPercent, qname = "a:spcPct"),
+            child(variant = SpacingPoints, qname = "a:spcPts")
+        )
+    )]
   pub line_spacing_choice: Option<LineSpacingChoice>,
 }
 /// Space Before.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:spcBef")]
 pub struct SpaceBefore {
-  #[sdk(choice(
-    qname = "a:CT_TextSpacingPercent/a:spcPct",
-    qname = "a:CT_TextSpacingPoint/a:spcPts"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SpacingPercent, qname = "a:spcPct"),
+            child(variant = SpacingPoints, qname = "a:spcPts")
+        )
+    )]
   pub space_before_choice: Option<SpaceBeforeChoice>,
 }
 /// Space After.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextSpacing/a:spcAft")]
 pub struct SpaceAfter {
-  #[sdk(choice(
-    qname = "a:CT_TextSpacingPercent/a:spcPct",
-    qname = "a:CT_TextSpacingPoint/a:spcPts"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = SpacingPercent, qname = "a:spcPct"),
+            child(variant = SpacingPoints, qname = "a:spcPts")
+        )
+    )]
   pub space_after_choice: Option<SpaceAfterChoice>,
 }
 /// Tab List.
@@ -8655,15 +9047,17 @@ pub struct ShapePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a:CT_FillProperties/a14:hiddenFill",
-    qname = "a:CT_LineProperties/a14:hiddenLine",
-    qname = "a:CT_EffectProperties/a14:hiddenEffects",
-    qname = "a:CT_Scene3D/a14:hiddenScene3d",
-    qname = "a:CT_Shape3D/a14:hiddenSp3d",
-    qname = "a14:CT_ShadowObscured/a14:shadowObscured",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = HiddenFillProperties, qname = "a14:hiddenFill"),
+            child(variant = HiddenLineProperties, qname = "a14:hiddenLine"),
+            child(variant = HiddenEffectsProperties, qname = "a14:hiddenEffects"),
+            child(variant = HiddenScene3D, qname = "a14:hiddenScene3d"),
+            child(variant = HiddenShape3D, qname = "a14:hiddenSp3d"),
+            child(variant = ShadowObscured, qname = "a14:shadowObscured"),
+            any
+        )
+    )]
   pub shape_properties_extension_choice: Option<ShapePropertiesExtensionChoice>,
 }
 /// Defines the GvmlGroupShapeExtension Class.
@@ -8674,7 +9068,7 @@ pub struct GvmlGroupShapeExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas", any))]
+  #[sdk(choice(child(variant = IsCanvas, qname = "a14:isCanvas"), any))]
   pub gvml_group_shape_extension_choice: Option<GvmlGroupShapeExtensionChoice>,
 }
 /// Defines the ShapePropertiesExtensionList Class.
@@ -8709,19 +9103,23 @@ pub struct VisualGroupShapeProperties {
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
   pub transform_group: Option<std::boxed::Box<TransformGroup>>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub visual_group_shape_properties_choice1: Option<VisualGroupShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub visual_group_shape_properties_choice2: Option<VisualGroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -8814,15 +9212,17 @@ pub struct GroupShape {
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<VisualGroupShapeProperties>,
-  #[sdk(choice(
-    qname = "a:CT_GvmlTextShape/a:txSp",
-    qname = "a:CT_GvmlShape/a:sp",
-    qname = "a:CT_GvmlConnector/a:cxnSp",
-    qname = "a:CT_GvmlPicture/a:pic",
-    qname = "a14:CT_GvmlContentPart/a14:contentPart",
-    qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TextShape, qname = "a:txSp"),
+            child(variant = Shape, qname = "a:sp"),
+            child(variant = ConnectionShape, qname = "a:cxnSp"),
+            child(variant = Picture, qname = "a:pic"),
+            child(variant = GvmlContentPart, qname = "a14:contentPart"),
+            child(variant = GraphicFrame, qname = "a:graphicFrame"),
+            child(variant = GroupShape, qname = "a:grpSp")
+        )
+    )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
@@ -8845,7 +9245,12 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps", any))]
+  #[sdk(
+        choice(
+            child(variant = NonVisualGroupProperties, qname = "a15:nonVisualGroupProps"),
+            any
+        )
+    )]
   pub non_visual_group_drawing_shape_props_extension_choice:
     Option<NonVisualGroupDrawingShapePropsExtensionChoice>,
 }
@@ -8857,7 +9262,7 @@ pub struct OfficeStyleSheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "thm15:CT_ThemeFamily/thm15:themeFamily", any))]
+  #[sdk(choice(child(variant = ThemeFamily, qname = "thm15:themeFamily"), any))]
   pub office_style_sheet_extension_choice: Option<OfficeStyleSheetExtensionChoice>,
 }
 /// Defines the ConnectorLockingExtension Class.
@@ -8868,7 +9273,7 @@ pub struct ConnectorLockingExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "a:CT_GraphicalObject/a:graphic", any))]
+  #[sdk(choice(child(variant = Graphic, qname = "a:graphic"), any))]
   pub connector_locking_extension_choice: Option<ConnectorLockingExtensionChoice>,
 }
 /// Defines the GroupShapeLocks Class.
@@ -9091,11 +9496,13 @@ pub struct DataModelExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt",
-    qname = "dgm14:CT_Boolean/dgm14:recolorImg",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = DataModelExtensionBlock, qname = "dsp:dataModelExt"),
+            child(variant = RecolorImages, qname = "dgm14:recolorImg"),
+            any
+        )
+    )]
   pub data_model_extension_choice: Option<DataModelExtensionChoice>,
 }
 /// Defines the PtExtension Class.
@@ -9106,7 +9513,9 @@ pub struct PtExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr", any))]
+  #[sdk(
+        choice(child(variant = NonVisualDrawingProperties, qname = "dgm14:cNvPr"), any)
+    )]
   pub pt_extension_choice: Option<PtExtensionChoice>,
 }
 /// Defines the HyperlinkExtension Class.
@@ -9117,7 +9526,7 @@ pub struct HyperlinkExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr", any))]
+  #[sdk(choice(child(variant = HyperlinkColor, qname = "ahyp:hlinkClr"), any))]
   pub hyperlink_extension_choice: Option<HyperlinkExtensionChoice>,
 }
 /// Future extensions..
@@ -9137,10 +9546,15 @@ pub struct LinePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(
+                variant = LineSketchStyleProperties,
+                qname = "ask:lineSketchStyleProps"
+            ),
+            any
+        )
+    )]
   pub line_properties_extension_choice: Option<LinePropertiesExtensionChoice>,
 }
 /// default head line end style is none.
@@ -9194,16 +9608,18 @@ pub struct NonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a14:CT_CompatExt/a14:compatExt",
-    qname = "a15:CT_BackgroundPr/a15:backgroundPr",
-    qname = "a16:CT_CreationId/a16:creationId",
-    qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef",
-    qname = "adec:CT_Decorative/adec:decorative",
-    qname = "aclsh:CT_ClassificationOutcome/aclsh:classification",
-    qname = "asl:CT_ScriptLink/asl:scriptLink",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CompatExtension, qname = "a14:compatExt"),
+            child(variant = BackgroundProperties, qname = "a15:backgroundPr"),
+            child(variant = CreationId, qname = "a16:creationId"),
+            child(variant = PredecessorDrawingElementReference, qname = "a16:predDERef"),
+            child(variant = Decorative, qname = "adec:decorative"),
+            child(variant = ClassificationOutcome, qname = "aclsh:classification"),
+            child(variant = ScriptLink, qname = "asl:scriptLink"),
+            any
+        )
+    )]
   pub non_visual_drawing_properties_extension_choice:
     Option<NonVisualDrawingPropertiesExtensionChoice>,
 }
@@ -9265,14 +9681,16 @@ pub struct NonVisualPicturePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a14:CT_CameraTool/a14:cameraTool",
-    qname = "a15:CT_SignatureLine/a15:signatureLine",
-    qname = "a15:CT_ObjectPr/a15:objectPr",
-    qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps",
-    qname = "aif:CT_ImageFormula/aif:imageFormula",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CameraTool, qname = "a14:cameraTool"),
+            child(variant = SignatureLine, qname = "a15:signatureLine"),
+            child(variant = ObjectProperties, qname = "a15:objectPr"),
+            child(variant = LiveFeedProperties, qname = "alf:liveFeedProps"),
+            child(variant = ImageFormula, qname = "aif:imageFormula"),
+            any
+        )
+    )]
   pub non_visual_picture_properties_extension_choice:
     Option<NonVisualPicturePropertiesExtensionChoice>,
 }
@@ -9293,16 +9711,18 @@ pub struct BlipExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a14:CT_Photo/a14:imgProps",
-    qname = "a14:CT_UseLocalDpi/a14:useLocalDpi",
-    qname = "wp15:CT_WebVideoPr/wp15:webVideoPr",
-    qname = "asvg:CT_SVGBlip/asvg:svgBlip",
-    qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl",
-    qname = "woe:CT_OEmbed/woe:oembed",
-    qname = "aoe:CT_OEmbedShared/aoe:oembedShared",
-    any
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ImageProperties, qname = "a14:imgProps"),
+            child(variant = UseLocalDpi, qname = "a14:useLocalDpi"),
+            child(variant = WebVideoProperty, qname = "wp15:webVideoPr"),
+            child(variant = SvgBlip, qname = "asvg:svgBlip"),
+            child(variant = PictureAttributionSourceUrl, qname = "a1611:picAttrSrcUrl"),
+            child(variant = OEmbed, qname = "woe:oembed"),
+            child(variant = OEmbedShared, qname = "aoe:oembedShared"),
+            any
+        )
+    )]
   pub blip_extension_choice: Option<BlipExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

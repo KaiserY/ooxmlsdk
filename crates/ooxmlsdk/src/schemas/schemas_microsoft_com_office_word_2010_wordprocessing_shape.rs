@@ -14,10 +14,12 @@ pub struct WordprocessingShape {
   /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wps:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
-  #[sdk(choice(
-    qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr",
-    qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NonVisualDrawingShapeProperties, qname = "wps:cNvSpPr"),
+            child(variant = NonVisualConnectorProperties, qname = "wps:cNvCnPr")
+        )
+    )]
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeProperties/wps:spPr"))]
@@ -28,10 +30,12 @@ pub struct WordprocessingShape {
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wps:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
-  #[sdk(choice(
-    qname = "wps:CT_TextboxInfo/wps:txbx",
-    qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TextBoxInfo2, qname = "wps:txbx"),
+            child(variant = LinkedTextBox, qname = "wps:linkedTxbx")
+        )
+    )]
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
   #[sdk(child(office2010, qname = "a:CT_TextBodyProperties/wps:bodyPr"))]
@@ -117,27 +121,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -266,16 +276,23 @@ pub struct TextBodyProperties {
   /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
   pub preset_text_warp: Option<std::boxed::Box<crate::schemas::a::PresetTextWarp>>,
-  #[sdk(choice(
-    qname = "a:CT_TextNoAutofit/a:noAutofit",
-    qname = "a:CT_TextNormalAutofit/a:normAutofit",
-    qname = "a:CT_TextShapeAutofit/a:spAutoFit"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = NoAutoFit, qname = "a:noAutofit"),
+            child(variant = NormalAutoFit, qname = "a:normAutofit"),
+            empty_child(variant = ShapeAutoFit, qname = "a:spAutoFit")
+        )
+    )]
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub scene3_d_type: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
-  #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
+  #[sdk(
+        choice(
+            child(variant = Shape3DType, qname = "a:sp3d"),
+            child(variant = FlatText, qname = "a:flatTx")
+        )
+    )]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]

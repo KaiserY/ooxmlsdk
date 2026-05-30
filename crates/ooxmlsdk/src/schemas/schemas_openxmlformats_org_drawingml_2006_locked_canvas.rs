@@ -16,15 +16,17 @@ pub struct LockedCanvas {
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
   pub visual_group_shape_properties: std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>,
-  #[sdk(choice(
-    qname = "a:CT_GvmlTextShape/a:txSp",
-    qname = "a:CT_GvmlShape/a:sp",
-    qname = "a:CT_GvmlConnector/a:cxnSp",
-    qname = "a:CT_GvmlPicture/a:pic",
-    qname = "a14:CT_GvmlContentPart/a14:contentPart",
-    qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = TextShape, qname = "a:txSp"),
+            child(variant = Shape, qname = "a:sp"),
+            child(variant = ConnectionShape, qname = "a:cxnSp"),
+            child(variant = Picture, qname = "a:pic"),
+            child(variant = GvmlContentPart, qname = "a14:contentPart"),
+            child(variant = GraphicFrame, qname = "a:graphicFrame"),
+            child(variant = GroupShape, qname = "a:grpSp")
+        )
+    )]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]

@@ -321,42 +321,48 @@ pub struct Extension2 {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:minColor")]
 pub struct MinColorSolidColorFillProperties {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub min_color_solid_color_fill_properties_choice: Option<MinColorSolidColorFillPropertiesChoice>,
 }
 /// Defines the MidColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:midColor")]
 pub struct MidColorSolidColorFillProperties {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub mid_color_solid_color_fill_properties_choice: Option<MidColorSolidColorFillPropertiesChoice>,
 }
 /// Defines the MaxColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_SolidColorFillProperties/cx:maxColor")]
 pub struct MaxColorSolidColorFillProperties {
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),
+            child(variant = RgbColorModelHex, qname = "a:srgbClr"),
+            child(variant = HslColor, qname = "a:hslClr"),
+            child(variant = SystemColor, qname = "a:sysClr"),
+            child(variant = SchemeColor, qname = "a:schemeClr"),
+            child(variant = PresetColor, qname = "a:prstClr")
+        )
+    )]
   pub max_color_solid_color_fill_properties_choice: Option<MaxColorSolidColorFillPropertiesChoice>,
 }
 /// Defines the ChartStringValue Class.
@@ -437,11 +443,17 @@ pub struct NumericDimension {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: NumericDimensionType,
-  #[sdk(choice(
-    qname = "cx:CT_Formula/cx:f",
-    qname = "cx:CT_Formula/cx:nf",
-    qname = "cx:CT_NumericLevel/cx:lvl"
-  ))]
+  #[sdk(
+        choice(
+            sequence(
+                variant = Sequence,
+                child(qname = "cx:f"),
+                child(qname = "cx:nf"),
+                child(qname = "cx:lvl")
+            ),
+            child(variant = NumericLevel, qname = "cx:lvl")
+        )
+    )]
   pub numeric_dimension_choice: Option<NumericDimensionChoice>,
 }
 /// Defines the StringDimension Class.
@@ -451,11 +463,17 @@ pub struct StringDimension {
   /// type
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: StringDimensionType,
-  #[sdk(choice(
-    qname = "cx:CT_Formula/cx:f",
-    qname = "cx:CT_Formula/cx:nf",
-    qname = "cx:CT_StringLevel/cx:lvl"
-  ))]
+  #[sdk(
+        choice(
+            sequence(
+                variant = Sequence,
+                child(qname = "cx:f"),
+                child(qname = "cx:nf"),
+                child(qname = "cx:lvl")
+            ),
+            child(variant = StringLevel, qname = "cx:lvl")
+        )
+    )]
   pub string_dimension_choice: Option<StringDimensionChoice>,
 }
 /// Defines the ExtensionList Class.
@@ -485,10 +503,12 @@ pub struct Data {
   /// id
   #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "cx:CT_NumericDimension/cx:numDim",
-    qname = "cx:CT_StringDimension/cx:strDim"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NumericDimension, qname = "cx:numDim"),
+            child(variant = StringDimension, qname = "cx:strDim")
+        )
+    )]
   pub data_choice: Vec<DataChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
@@ -516,7 +536,16 @@ pub type FirstFooterXsdstring = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_TextData/cx:txData")]
 pub struct TextData {
-  #[sdk(choice(qname = "cx:CT_Formula/cx:f", qname = "xsd:string/cx:v"))]
+  #[sdk(
+        choice(
+            sequence(
+                variant = Sequence,
+                child(field = formula, qname = "cx:f"),
+                text_child(field = v_xsdstring, qname = "cx:v")
+            ),
+            text_child(variant = VXsdstring, qname = "cx:v")
+        )
+    )]
   pub text_data_choice: Option<TextDataChoice>,
 }
 /// Defines the RichTextBody Class.
@@ -551,7 +580,12 @@ pub struct TxPrTextBody {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_Text/cx:tx")]
 pub struct Text {
-  #[sdk(choice(qname = "cx:CT_TextData/cx:txData", qname = "a:CT_TextBody/cx:rich"))]
+  #[sdk(
+        choice(
+            child(variant = TextData, qname = "cx:txData"),
+            child(variant = RichTextBody, qname = "cx:rich")
+        )
+    )]
   pub text_choice: Option<TextChoice>,
 }
 /// Defines the ShapeProperties Class.
@@ -565,27 +599,33 @@ pub struct ShapeProperties {
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
-  #[sdk(choice(
-    qname = "a:CT_CustomGeometry2D/a:custGeom",
-    qname = "a:CT_PresetGeometry2D/a:prstGeom"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CustomGeometry, qname = "a:custGeom"),
+            child(variant = PresetGeometry, qname = "a:prstGeom")
+        )
+    )]
   pub shape_properties_choice1: Option<ShapePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
@@ -1225,7 +1265,12 @@ pub struct GeoCache {
   /// provider
   #[sdk(attr(office2016, qname = ":provider"))]
   pub provider: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "xsd:base64Binary/cx:binary", qname = "cx:CT_Clear/cx:clear"))]
+  #[sdk(
+        choice(
+            text_child(variant = Xsdbase64Binary, qname = "cx:binary"),
+            child(variant = Clear, qname = "cx:clear")
+        )
+    )]
   pub geo_cache_choice: Vec<GeoCacheChoice>,
 }
 /// Defines the ParentLabelLayout Class.
@@ -1281,7 +1326,12 @@ pub struct Binning {
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:double"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub overflow: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(qname = "xsd:double/cx:binSize", qname = "xsd:unsignedInt/cx:binCount"))]
+  #[sdk(
+        choice(
+            text_child(variant = Xsddouble, qname = "cx:binSize"),
+            text_child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
+        )
+    )]
   pub binning_choice: Option<BinningChoice>,
 }
 /// Defines the Geography Class.
@@ -1344,32 +1394,38 @@ pub struct PercentageColorPosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ValueColorEndPosition/cx:min")]
 pub struct MinValueColorEndPosition {
-  #[sdk(choice(
-    qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue",
-    qname = "cx:CT_NumberColorPosition/cx:number",
-    qname = "cx:CT_PercentageColorPosition/cx:percent"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = ExtremeValueColorPosition, qname = "cx:extremeValue"),
+            child(variant = NumberColorPosition, qname = "cx:number"),
+            child(variant = PercentageColorPosition, qname = "cx:percent")
+        )
+    )]
   pub min_value_color_end_position_choice: Option<MinValueColorEndPositionChoice>,
 }
 /// Defines the MaxValueColorEndPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ValueColorEndPosition/cx:max")]
 pub struct MaxValueColorEndPosition {
-  #[sdk(choice(
-    qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue",
-    qname = "cx:CT_NumberColorPosition/cx:number",
-    qname = "cx:CT_PercentageColorPosition/cx:percent"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = ExtremeValueColorPosition, qname = "cx:extremeValue"),
+            child(variant = NumberColorPosition, qname = "cx:number"),
+            child(variant = PercentageColorPosition, qname = "cx:percent")
+        )
+    )]
   pub max_value_color_end_position_choice: Option<MaxValueColorEndPositionChoice>,
 }
 /// Defines the ValueColorMiddlePosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_ValueColorMiddlePosition/cx:mid")]
 pub struct ValueColorMiddlePosition {
-  #[sdk(choice(
-    qname = "cx:CT_NumberColorPosition/cx:number",
-    qname = "cx:CT_PercentageColorPosition/cx:percent"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NumberColorPosition, qname = "cx:number"),
+            child(variant = PercentageColorPosition, qname = "cx:percent")
+        )
+    )]
   pub value_color_middle_position_choice: Option<ValueColorMiddlePositionChoice>,
 }
 /// Defines the DataLabelVisibilities Class.
@@ -1533,10 +1589,12 @@ pub struct SeriesLayoutProperties {
   /// Defines the SeriesElementVisibilities Class.
   #[sdk(child(office2016, qname = "cx:CT_SeriesElementVisibilities/cx:visibility"))]
   pub series_element_visibilities: Option<SeriesElementVisibilities>,
-  #[sdk(choice(
-    qname = "cx:CT_Aggregation/cx:aggregation",
-    qname = "cx:CT_Binning/cx:binning"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Aggregation, qname = "cx:aggregation"),
+            child(variant = Binning, qname = "cx:binning")
+        )
+    )]
   pub series_layout_properties_choice: Option<SeriesLayoutPropertiesChoice>,
   /// Defines the Geography Class.
   #[sdk(child(office2016, qname = "cx:CT_Geography/cx:geography"))]
@@ -1642,10 +1700,12 @@ pub struct Axis {
   /// hidden
   #[sdk(attr(office2016, qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "cx:CT_CategoryAxisScaling/cx:catScaling",
-    qname = "cx:CT_ValueAxisScaling/cx:valScaling"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = CategoryAxisScaling, qname = "cx:catScaling"),
+            child(variant = ValueAxisScaling, qname = "cx:valScaling")
+        )
+    )]
   pub axis_choice: Option<AxisChoice>,
   /// Defines the AxisTitle Class.
   #[sdk(child(office2016, qname = "cx:CT_AxisTitle/cx:title"))]

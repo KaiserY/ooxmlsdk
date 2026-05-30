@@ -2714,6 +2714,26 @@ fn inline_sequence_helper_type_decl<'a>(
     .filter(|type_decl| helper_struct_is_inline_sequence_candidate(type_decl))
 }
 
+fn sequence_payload_helper_type_decl<'a>(
+  variant: &VariantDecl,
+  module: &'a SchemaModuleDecl,
+) -> Option<&'a TypeDecl> {
+  if !matches!(
+    variant.wire,
+    crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
+  ) {
+    return None;
+  }
+
+  if variant.payload.module_path.is_some() {
+    return None;
+  }
+
+  module.types.iter().find(|type_decl| {
+    type_decl.rust_name == variant.payload.rust_type && type_decl.kind == TypeKind::HelperStruct
+  })
+}
+
 fn choice_variant_rendered_names(
   variant: &VariantDecl,
   _module: &SchemaModuleDecl,
@@ -3624,49 +3644,144 @@ fn choice_type_accepts_any(module: &SchemaModuleDecl, rust_type: &str) -> bool {
   type_accepts_any_recursive(module, rust_type, &mut HashSet::new())
 }
 
-fn choice_type_specific_start_qname_groups(
+fn choice_metadata_qname(qname: &str) -> String {
+  schema_qname_element_name(qname).to_string()
+}
+
+fn choice_sequence_child_metadata_tokens(
+  field: &FieldDecl,
+  include_field_name: bool,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> Result<Option<TokenStream>> {
+  let field_name = include_field_name.then(|| {
+    let ident: Result<Ident> = parse_str(&field.rust_name).map_err(Into::into);
+    ident
+  });
+  let field_name = field_name.transpose()?;
+  let field_attr = field_name
+    .as_ref()
+    .map(|field_name| quote! { field = #field_name, });
+
+  Ok(match &field.wire {
+    FieldWireDecl::Child { qname } => {
+      let qname = choice_metadata_qname(qname);
+      if empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph).is_some() {
+        Some(quote! { empty_child(#field_attr qname = #qname) })
+      } else if is_any_children_alias_type_ref(module, &field.type_ref, type_graph) {
+        Some(quote! { any_child(#field_attr qname = #qname) })
+      } else {
+        Some(quote! { child(#field_attr qname = #qname) })
+      }
+    }
+    FieldWireDecl::TextChild { qname } => {
+      let qname = choice_metadata_qname(qname);
+      Some(quote! { text_child(#field_attr qname = #qname) })
+    }
+    _ => None,
+  })
+}
+
+fn choice_variant_metadata_tokens(
+  variant: &VariantDecl,
+  type_decl: &TypeDecl,
+  module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> Result<Vec<TokenStream>> {
+  let rendered_variant_name_map = anonymous_variant_render_name_map(type_decl, module);
+  let rendered_variant_name = rendered_variant_name_map
+    .get(&variant.rust_name)
+    .map(String::as_str)
+    .unwrap_or(&variant.rust_name);
+  let variant_ident: Ident =
+    parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
+
+  match &variant.wire {
+    VariantWireDecl::Any => Ok(vec![quote! { any }]),
+    VariantWireDecl::Text => Ok(vec![quote! { text }]),
+    VariantWireDecl::TextChild { qnames } => Ok(
+      qnames
+        .iter()
+        .map(|qname| {
+          let qname = choice_metadata_qname(qname);
+          quote! { text_child(variant = #variant_ident, qname = #qname) }
+        })
+        .collect(),
+    ),
+    VariantWireDecl::Child { qnames } => {
+      let is_any_children_alias =
+        is_any_children_alias_type_ref(module, &variant.payload, type_graph);
+      let is_empty_leaf_marker =
+        is_empty_leaf_marker_ref_with_graph(module, &variant.payload, type_graph);
+      let item_name = if is_empty_leaf_marker {
+        quote! { empty_child }
+      } else if is_any_children_alias {
+        quote! { any_child }
+      } else {
+        quote! { child }
+      };
+      Ok(
+        qnames
+          .iter()
+          .map(|qname| {
+            let qname = choice_metadata_qname(qname);
+            quote! { #item_name(variant = #variant_ident, qname = #qname) }
+          })
+          .collect(),
+      )
+    }
+    VariantWireDecl::Sequence { .. } => {
+      let mut children = Vec::new();
+      if let Some(helper_type_decl) = sequence_payload_helper_type_decl(variant, module) {
+        let helper_fields: Vec<&FieldDecl> = helper_type_decl
+          .members
+          .iter()
+          .filter_map(|member| match member {
+            MemberDecl::Field(field) => Some(field),
+            _ => None,
+          })
+          .collect();
+        let include_field_names = helper_fields.len() > 1
+          && helper_struct_is_inline_sequence_clippy_safe(helper_type_decl, module, type_graph);
+        for field in helper_fields {
+          if let Some(child) =
+            choice_sequence_child_metadata_tokens(field, include_field_names, module, type_graph)?
+          {
+            children.push(child);
+          }
+        }
+      }
+
+      Ok(vec![quote! {
+        sequence(variant = #variant_ident #(, #children)*)
+      }])
+    }
+  }
+}
+
+fn choice_field_metadata_tokens(
   module: &SchemaModuleDecl,
   rust_type: &str,
-  version_cfg: VersionCfgContext,
-) -> (Vec<String>, Vec<String>) {
+  type_graph: &TypeContainmentGraph,
+) -> Result<Vec<TokenStream>> {
   let Some(type_decl) = module
     .types
     .iter()
     .find(|type_decl| type_decl.rust_name == rust_type && type_decl.kind == TypeKind::ChoiceEnum)
   else {
-    return (Vec::new(), Vec::new());
+    return Ok(Vec::new());
   };
 
-  let mut unconditional_qnames = Vec::new();
-  let feature_gated_qnames = Vec::new();
+  let mut tokens = Vec::new();
   for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
-    let _ = version_cfg;
-    let target_qnames = &mut unconditional_qnames;
-
-    match &variant.wire {
-      VariantWireDecl::Child {
-        qnames: variant_qnames,
-      }
-      | VariantWireDecl::Sequence {
-        qnames: variant_qnames,
-      }
-      | VariantWireDecl::TextChild {
-        qnames: variant_qnames,
-      } => {
-        for qname in variant_qnames {
-          if !target_qnames.contains(qname) {
-            target_qnames.push(qname.clone());
-          }
-        }
-      }
-      VariantWireDecl::Any | VariantWireDecl::Text => {}
-    }
+    tokens.extend(choice_variant_metadata_tokens(
+      variant, type_decl, module, type_graph,
+    )?);
   }
-
-  (unconditional_qnames, feature_gated_qnames)
+  Ok(tokens)
 }
 
 fn gen_direct_child_fields_from_decl(
@@ -3963,32 +4078,27 @@ fn gen_choice_fields_from_decl(
     let attrs = module_version_cfg_attrs(&field.version, field_cfg);
     let choice_accepts_text = choice_type_accepts_text(module, &field.type_ref.rust_type);
     let choice_accepts_any = choice_type_accepts_any(module, &field.type_ref.rust_type);
-    let (choice_qnames, gated_choice_qnames) =
-      choice_type_specific_start_qname_groups(module, &field.type_ref.rust_type, field_cfg);
-    let choice_qname_attrs = choice_qnames
-      .into_iter()
-      .map(|qname| quote! { qname = #qname })
-      .collect::<Vec<_>>();
-    let gated_choice_qname_attrs = gated_choice_qnames
-      .into_iter()
-      .map(|qname| quote! { qname = #qname })
-      .collect::<Vec<_>>();
-    let mut sdk_choice_attrs = Vec::new();
-    if choice_qname_attrs.is_empty() && !choice_accepts_text && !choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
-    } else if choice_accepts_text && choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text, any))] });
-    } else if choice_accepts_text {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text))] });
-    } else if choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* any))] });
-    } else {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs),*))] });
+    let mut choice_items =
+      choice_field_metadata_tokens(module, &field.type_ref.rust_type, type_graph)?;
+    if choice_accepts_text
+      && !choice_items
+        .iter()
+        .any(|tokens| tokens.to_string() == "text")
+    {
+      choice_items.push(quote! { text });
     }
-    if !gated_choice_qname_attrs.is_empty() {
-      sdk_choice_attrs.push(quote! {
-        #[sdk(choice(#(#gated_choice_qname_attrs),*))]
-      });
+    if choice_accepts_any
+      && !choice_items
+        .iter()
+        .any(|tokens| tokens.to_string() == "any")
+    {
+      choice_items.push(quote! { any });
+    }
+    let mut sdk_choice_attrs = Vec::new();
+    if choice_items.is_empty() {
+      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
+    } else {
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_items),*))] });
     };
 
     match field.cardinality {
@@ -5409,7 +5519,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (choice (qname ="));
+    assert!(generated.contains("# [sdk (choice (child (variant = TFirst , qname = \"t:first\")"));
   }
 
   #[test]
@@ -5490,8 +5600,9 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (choice (qname ="));
-    assert!(generated.contains("t14:CT_OfficeOnly/t14:officeOnly"));
+    assert!(generated.contains("# [sdk (choice ("));
+    assert!(generated.contains("qname = \"t:always\""));
+    assert!(generated.contains("qname = \"t14:officeOnly\""));
     assert!(!generated.contains("cfg_attr"));
   }
 

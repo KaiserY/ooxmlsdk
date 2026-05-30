@@ -69,14 +69,16 @@ pub struct ShadowObscured {
 #[sdk(office2010, qname = "a:CT_FillProperties/a14:hiddenFill")]
 pub struct HiddenFillProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = BlipFill, qname = "a:blipFill"),
+            child(variant = PatternFill, qname = "a:pattFill"),
+            empty_child(variant = GroupFill, qname = "a:grpFill")
+        )
+    )]
   pub hidden_fill_properties_choice: Option<HiddenFillPropertiesChoice>,
 }
 /// Defines the HiddenLineProperties Class.
@@ -100,23 +102,29 @@ pub struct HiddenLineProperties {
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
   pub alignment: Option<crate::schemas::a::PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = NoFill, qname = "a:noFill"),
+            child(variant = SolidFill, qname = "a:solidFill"),
+            child(variant = GradientFill, qname = "a:gradFill"),
+            child(variant = PatternFill, qname = "a:pattFill")
+        )
+    )]
   pub hidden_line_properties_choice1: Option<HiddenLinePropertiesChoice>,
-  #[sdk(choice(
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = PresetDash, qname = "a:prstDash"),
+            child(variant = CustomDash, qname = "a:custDash")
+        )
+    )]
   pub hidden_line_properties_choice2: Option<HiddenLinePropertiesChoice2>,
-  #[sdk(choice(
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter"
-  ))]
+  #[sdk(
+        choice(
+            empty_child(variant = Round, qname = "a:round"),
+            empty_child(variant = LineJoinBevel, qname = "a:bevel"),
+            child(variant = Miter, qname = "a:miter")
+        )
+    )]
   pub hidden_line_properties_choice3: Option<HiddenLinePropertiesChoice3>,
   /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
@@ -133,10 +141,12 @@ pub struct HiddenLineProperties {
 #[sdk(office2010, qname = "a:CT_EffectProperties/a14:hiddenEffects")]
 pub struct HiddenEffectsProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
-  #[sdk(choice(
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = EffectList, qname = "a:effectLst"),
+            child(variant = EffectDag, qname = "a:effectDag")
+        )
+    )]
   pub hidden_effects_properties_choice: Option<HiddenEffectsPropertiesChoice>,
 }
 /// Defines the HiddenScene3D Class.
@@ -736,35 +746,46 @@ pub struct ImageEffect {
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a14:CT_PictureEffectBlur/a14:artisticBlur",
-    qname = "a14:CT_PictureEffectCement/a14:artisticCement",
-    qname = "a14:CT_PictureEffectChalkSketch/a14:artisticChalkSketch",
-    qname = "a14:CT_PictureEffectCrisscrossEtching/a14:artisticCrisscrossEtching",
-    qname = "a14:CT_PictureEffectCutout/a14:artisticCutout",
-    qname = "a14:CT_PictureEffectFilmGrain/a14:artisticFilmGrain",
-    qname = "a14:CT_PictureEffectGlass/a14:artisticGlass",
-    qname = "a14:CT_PictureEffectGlowDiffused/a14:artisticGlowDiffused",
-    qname = "a14:CT_PictureEffectGlowEdges/a14:artisticGlowEdges",
-    qname = "a14:CT_PictureEffectLightScreen/a14:artisticLightScreen",
-    qname = "a14:CT_PictureEffectLineDrawing/a14:artisticLineDrawing",
-    qname = "a14:CT_PictureEffectMarker/a14:artisticMarker",
-    qname = "a14:CT_PictureEffectMosiaicBubbles/a14:artisticMosiaicBubbles",
-    qname = "a14:CT_PictureEffectPaintStrokes/a14:artisticPaintStrokes",
-    qname = "a14:CT_PictureEffectPaintBrush/a14:artisticPaintBrush",
-    qname = "a14:CT_PictureEffectPastelsSmooth/a14:artisticPastelsSmooth",
-    qname = "a14:CT_PictureEffectPencilGrayscale/a14:artisticPencilGrayscale",
-    qname = "a14:CT_PictureEffectPencilSketch/a14:artisticPencilSketch",
-    qname = "a14:CT_PictureEffectPhotocopy/a14:artisticPhotocopy",
-    qname = "a14:CT_PictureEffectPlasticWrap/a14:artisticPlasticWrap",
-    qname = "a14:CT_PictureEffectTexturizer/a14:artisticTexturizer",
-    qname = "a14:CT_PictureEffectWatercolorSponge/a14:artisticWatercolorSponge",
-    qname = "a14:CT_PictureEffectBackgroundRemoval/a14:backgroundRemoval",
-    qname = "a14:CT_PictureEffectBrightnessContrast/a14:brightnessContrast",
-    qname = "a14:CT_PictureEffectColorTemperature/a14:colorTemperature",
-    qname = "a14:CT_PictureEffectSaturation/a14:saturation",
-    qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften"
-  ))]
+  #[sdk(
+        choice(
+            child(variant = ArtisticBlur, qname = "a14:artisticBlur"),
+            child(variant = ArtisticCement, qname = "a14:artisticCement"),
+            child(variant = ArtisticChalkSketch, qname = "a14:artisticChalkSketch"),
+            child(
+                variant = ArtisticCrisscrossEtching,
+                qname = "a14:artisticCrisscrossEtching"
+            ),
+            child(variant = ArtisticCutout, qname = "a14:artisticCutout"),
+            child(variant = ArtisticFilmGrain, qname = "a14:artisticFilmGrain"),
+            child(variant = ArtisticGlass, qname = "a14:artisticGlass"),
+            child(variant = ArtisticGlowDiffused, qname = "a14:artisticGlowDiffused"),
+            child(variant = ArtisticGlowEdges, qname = "a14:artisticGlowEdges"),
+            child(variant = ArtisticLightScreen, qname = "a14:artisticLightScreen"),
+            child(variant = ArtisticLineDrawing, qname = "a14:artisticLineDrawing"),
+            child(variant = ArtisticMarker, qname = "a14:artisticMarker"),
+            child(variant = ArtisticMosaicBubbles, qname = "a14:artisticMosiaicBubbles"),
+            child(variant = ArtisticPaintStrokes, qname = "a14:artisticPaintStrokes"),
+            child(variant = ArtisticPaintBrush, qname = "a14:artisticPaintBrush"),
+            child(variant = ArtisticPastelsSmooth, qname = "a14:artisticPastelsSmooth"),
+            child(
+                variant = ArtisticPencilGrayscale,
+                qname = "a14:artisticPencilGrayscale"
+            ),
+            child(variant = ArtisticPencilSketch, qname = "a14:artisticPencilSketch"),
+            child(variant = ArtisticPhotocopy, qname = "a14:artisticPhotocopy"),
+            child(variant = ArtisticPlasticWrap, qname = "a14:artisticPlasticWrap"),
+            child(variant = ArtisticTexturizer, qname = "a14:artisticTexturizer"),
+            child(
+                variant = ArtisticWatercolorSponge,
+                qname = "a14:artisticWatercolorSponge"
+            ),
+            child(variant = BackgroundRemoval, qname = "a14:backgroundRemoval"),
+            child(variant = BrightnessContrast, qname = "a14:brightnessContrast"),
+            child(variant = ColorTemperature, qname = "a14:colorTemperature"),
+            child(variant = Saturation, qname = "a14:saturation"),
+            child(variant = SharpenSoften, qname = "a14:sharpenSoften")
+        )
+    )]
   pub image_effect_choice: Option<ImageEffectChoice>,
 }
 /// Defines the ImageLayer Class.

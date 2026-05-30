@@ -9,8 +9,8 @@ enum DeserializeMode {
 impl DeserializeMode {
   fn deserialize_inner_ident(self) -> Ident {
     match self {
-      Self::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
-      Self::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+      Self::Borrowed => Ident::new("read_borrowed_inner", Span::call_site()),
+      Self::Io => Ident::new("read_io_inner", Span::call_site()),
     }
   }
 
@@ -506,8 +506,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut mce_any_arms = Vec::new();
   let mut has_any_variant = false;
   let mut helper_items = Vec::new();
-  let deserialize_borrowed_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Borrowed);
-  let deserialize_io_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Borrowed);
+  let read_io_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Io);
 
   for variant in variants {
     let variant_ident = &variant.ident;
@@ -549,14 +549,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
@@ -721,14 +721,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
@@ -778,14 +778,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
-            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if <#inner_ty as crate::sdk::SdkChoice>::matches_start_qname(event_name) {
-            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
             return Ok(#constructor);
           }
         });
@@ -892,14 +892,14 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
@@ -993,7 +993,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => {
-            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
+            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, empty_tag)?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
           }
@@ -1001,7 +1001,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => {
-            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
+            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_io_inner(xml_reader, e, empty_tag)?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
           }
@@ -1365,7 +1365,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             )? {
               for child_xml in children {
                 let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
-                let mut child = <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
+                let mut child = <Self as crate::sdk::SdkChoice>::read_borrowed_inner(
                   &mut child_reader,
                   None,
                 )?;
@@ -1554,7 +1554,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     #( #helper_items )*
 
     impl #impl_generics crate::sdk::SdkChoice for #ident #type_generics #where_clause {
-      fn #deserialize_borrowed_inner_ident<'de>(
+      fn #read_borrowed_inner_ident<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
@@ -1576,7 +1576,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         #read_tokens_borrowed
       }
 
-      fn #deserialize_io_inner_ident<R: std::io::BufRead>(
+      fn #read_io_inner_ident<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
@@ -1670,20 +1670,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
 
     impl #impl_generics #ident #type_generics #where_clause {
-      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-      ) -> Result<Self, crate::common::SdkError> {
-        <Self as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, xml_event)
-      }
-
-      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
-      ) -> Result<Self, crate::common::SdkError> {
-        <Self as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, xml_event)
-      }
-
       pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,

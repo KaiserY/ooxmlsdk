@@ -9,8 +9,8 @@ enum DeserializeMode {
 impl DeserializeMode {
   fn deserialize_inner_ident(self) -> Ident {
     match self {
-      Self::Borrowed => Ident::new("deserialize_borrowed_inner", Span::call_site()),
-      Self::Io => Ident::new("deserialize_io_inner", Span::call_site()),
+      Self::Borrowed => Ident::new("read_borrowed_inner", Span::call_site()),
+      Self::Io => Ident::new("read_io_inner", Span::call_site()),
     }
   }
 
@@ -325,14 +325,14 @@ fn build_flat_choice_dispatch_match_tokens(
   proc_macro2::TokenStream,
 ) {
   let targets = qname_match_targets(qnames);
-  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
-  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let read_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   if repeated {
     (
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -345,7 +345,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -358,7 +358,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -371,7 +371,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -387,7 +387,7 @@ fn build_flat_choice_dispatch_match_tokens(
     (
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -400,7 +400,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -413,7 +413,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -426,7 +426,7 @@ fn build_flat_choice_dispatch_match_tokens(
       },
       quote! {
         #( #targets )|* => {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -518,20 +518,20 @@ fn expand_tuple_wrapper(
       const ELEMENT_NAME: crate::sdk::ElementName =
         crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
 
-      fn read_borrowed<'de>(
+      fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         start: quick_xml::events::BytesStart<'de>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, start, empty).map(Self)
+        <#inner_ty as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, start, empty).map(Self)
       }
 
-      fn read_io<R: std::io::BufRead>(
+      fn read_io_inner<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         start: quick_xml::events::BytesStart<'static>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, start, empty).map(Self)
+        <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, start, empty).map(Self)
       }
 
       fn write_inner<W: std::io::Write>(
@@ -600,7 +600,7 @@ fn expand_tuple_wrapper(
           #tag_qname_lit,
           #local_name_lit,
         )?;
-        <Self as crate::sdk::SdkType>::read_borrowed(&mut xml_reader, start, empty)
+        <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
       }
     }
 
@@ -613,7 +613,7 @@ fn expand_tuple_wrapper(
           #tag_qname_lit,
           #local_name_lit,
         )?;
-        <Self as crate::sdk::SdkType>::read_borrowed(&mut xml_reader, start, empty)
+        <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
       }
 
       pub fn from_reader<R: std::io::BufRead>(
@@ -626,7 +626,7 @@ fn expand_tuple_wrapper(
           #tag_qname_lit,
           #local_name_lit,
         )?;
-        <Self as crate::sdk::SdkType>::read_io(&mut xml_reader, start, empty)
+        <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
       }
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
@@ -1656,8 +1656,8 @@ fn expand_sequence_helper_struct(
         let self_write_call =
           write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &qname);
         let deserialize_borrowed_call =
-          quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed };
-        let deserialize_io_call = quote! { <#child_ty as crate::sdk::SdkType>::read_io };
+          quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner };
+        let deserialize_io_call = quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner };
 
         if contains_vec_type(&field.ty) {
           child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -1973,7 +1973,7 @@ fn expand_sequence_helper_struct(
     }
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed<'de>(
+      fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         start: quick_xml::events::BytesStart<'de>,
         empty: bool,
@@ -2015,7 +2015,7 @@ fn expand_sequence_helper_struct(
         })
       }
 
-      fn read_io<R: std::io::BufRead>(
+      fn read_io_inner<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         start: quick_xml::events::BytesStart<'static>,
         empty: bool,
@@ -2085,8 +2085,8 @@ fn expand_helper_struct(
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
-  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let read_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
@@ -2235,10 +2235,10 @@ fn expand_helper_struct(
       quote! { #tag_qname_lit | #local_name_lit }
     };
     let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &deserialize_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed }
+      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
+        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io }
+        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
         if as_result {
@@ -2299,10 +2299,10 @@ fn expand_helper_struct(
       }
     };
     let build_match = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &deserialize_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed }
+      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
+        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io }
+        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
         if as_result {
@@ -2381,82 +2381,82 @@ fn expand_helper_struct(
       direct_child_dispatch_tokens_borrowed.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_dispatch_tokens_io.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_io.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
@@ -2495,82 +2495,82 @@ fn expand_helper_struct(
       direct_child_dispatch_tokens_borrowed.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_dispatch_tokens_io.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_io.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
     }
   }
@@ -2732,7 +2732,7 @@ fn expand_helper_struct(
       }
     } else if field.repeated {
       choice_unique_parse_tokens_borrowed.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -2743,7 +2743,7 @@ fn expand_helper_struct(
           }
       });
       choice_unique_parse_tokens_io.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -2754,7 +2754,7 @@ fn expand_helper_struct(
           }
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -2765,7 +2765,7 @@ fn expand_helper_struct(
           };
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               #xml_child_slot_assign
@@ -2777,7 +2777,7 @@ fn expand_helper_struct(
       });
     } else {
       choice_unique_parse_tokens_borrowed.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -2788,7 +2788,7 @@ fn expand_helper_struct(
           }
       });
       choice_unique_parse_tokens_io.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -2799,7 +2799,7 @@ fn expand_helper_struct(
           }
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -2810,7 +2810,7 @@ fn expand_helper_struct(
           };
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -3119,7 +3119,7 @@ fn expand_helper_struct(
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed<'de>(
+      fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         start: quick_xml::events::BytesStart<'de>,
         empty: bool,
@@ -3170,7 +3170,7 @@ fn expand_helper_struct(
         })
       }
 
-      fn read_io<R: std::io::BufRead>(
+      fn read_io_inner<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         start: quick_xml::events::BytesStart<'static>,
         empty: bool,
@@ -3286,8 +3286,8 @@ fn expand_named_struct(
     };
     LitByteStr::new(attr.as_bytes(), Span::call_site())
   });
-  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
-  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let read_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
 
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
@@ -3903,10 +3903,10 @@ fn expand_named_struct(
     let self_write_call =
       write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &field.qname);
     let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &deserialize_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed }
+      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
+        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io }
+        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
         if as_result {
@@ -3969,10 +3969,10 @@ fn expand_named_struct(
       }
     };
     let build_match = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &deserialize_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed }
+      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
+        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io }
+        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
         if as_result {
@@ -4052,42 +4052,42 @@ fn expand_named_struct(
       direct_child_dispatch_tokens_borrowed.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_dispatch_tokens_io.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_io.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
@@ -4124,42 +4124,42 @@ fn expand_named_struct(
       direct_child_dispatch_tokens_borrowed.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_dispatch_tokens_io.push(build_dispatch(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_io.push(build_dispatch(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_match_tokens_borrowed.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_match_tokens_io.push(build_match(
         &xml_reader_ident,
         false,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
       direct_child_visit_match_tokens_borrowed.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_borrowed_inner_ident,
+        &read_borrowed_inner_ident,
       ));
       direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
-        &deserialize_io_inner_ident,
+        &read_io_inner_ident,
       ));
     }
   }
@@ -4700,7 +4700,7 @@ fn expand_named_struct(
       }
     } else if field.repeated {
       choice_unique_parse_tokens_borrowed.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -4710,7 +4710,7 @@ fn expand_named_struct(
           }
       });
       choice_unique_parse_tokens_io.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               continue;
@@ -4720,7 +4720,7 @@ fn expand_named_struct(
           }
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -4730,7 +4730,7 @@ fn expand_named_struct(
           };
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident.push(parsed_choice);
               Ok(true)
@@ -4741,7 +4741,7 @@ fn expand_named_struct(
       });
     } else {
       choice_unique_parse_tokens_borrowed.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -4752,7 +4752,7 @@ fn expand_named_struct(
           }
       });
       choice_unique_parse_tokens_io.push(quote! {
-          match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -4763,7 +4763,7 @@ fn expand_named_struct(
           }
       });
       choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_borrowed_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -4774,7 +4774,7 @@ fn expand_named_struct(
           };
       });
       choice_unique_visit_parse_tokens_io.push(quote! {
-          return match <#choice_ty as crate::sdk::SdkChoice>::#deserialize_io_inner_ident(xml_reader, Some((e, next_empty))) {
+          return match <#choice_ty as crate::sdk::SdkChoice>::#read_io_inner_ident(xml_reader, Some((e, next_empty))) {
             Ok(parsed_choice) => {
               #field_ident = Some(parsed_choice);
               #xml_child_slot_assign
@@ -6046,7 +6046,7 @@ fn expand_named_struct(
         #tag_qname_lit,
         #local_name_lit,
       )?;
-      let mut value = <Self as crate::sdk::SdkType>::read_borrowed(&mut xml_reader, start, empty)?;
+      let mut value = <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)?;
       #xml_header_assign_tokens
       Ok(value)
     }
@@ -6058,7 +6058,7 @@ fn expand_named_struct(
         #tag_qname_lit,
         #local_name_lit,
       )?;
-      <Self as crate::sdk::SdkType>::read_borrowed(&mut xml_reader, start, empty)
+      <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
     }
   };
   let root_read_io_tokens = if has_xml_header_field {
@@ -6069,7 +6069,7 @@ fn expand_named_struct(
         #tag_qname_lit,
         #local_name_lit,
       )?;
-      let mut value = <Self as crate::sdk::SdkType>::read_io(&mut xml_reader, start, empty)?;
+      let mut value = <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)?;
       #xml_header_assign_tokens
       Ok(value)
     }
@@ -6081,7 +6081,7 @@ fn expand_named_struct(
         #tag_qname_lit,
         #local_name_lit,
       )?;
-      <Self as crate::sdk::SdkType>::read_io(&mut xml_reader, start, empty)
+      <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
     }
   };
   let has_body = !child_fields.is_empty()
@@ -6186,20 +6186,68 @@ fn expand_named_struct(
       const ELEMENT_NAME: crate::sdk::ElementName =
         crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
 
-      fn read_borrowed<'de>(
+      fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         e: quick_xml::events::BytesStart<'de>,
         empty_tag: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::#deserialize_borrowed_inner_ident(xml_reader, e, empty_tag)
+        #xml_header_decl_tokens
+        let __end_qname = e.name();
+        let __end_name = __end_qname.as_ref();
+        #( #attr_decl_tokens )*
+        #namespace_attr_parse_tokens
+        #( #child_decl_tokens )*
+        #( #choice_decl_tokens )*
+        #( #any_decl_tokens )*
+        #xml_other_children_decl_tokens
+        #text_decl_tokens
+
+        #borrowed_children_loop_tokens
+
+        Ok(Self {
+          #( #attr_init_tokens, )*
+          #( #child_init_tokens, )*
+          #( #choice_init_tokens, )*
+          #( #any_init_tokens, )*
+          #text_finish_tokens
+          #( #attr_finish_tokens, )*
+          #special_namespace_init_tokens
+          #xml_header_init_tokens
+          #xml_other_attrs_init_tokens
+          #xml_other_children_init_tokens
+        })
       }
 
-      fn read_io<R: std::io::BufRead>(
+      fn read_io_inner<R: std::io::BufRead>(
         xml_reader: &mut crate::common::IoReader<R>,
         e: quick_xml::events::BytesStart<'static>,
         empty_tag: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        Self::#deserialize_io_inner_ident(xml_reader, e, empty_tag)
+        #xml_header_decl_tokens
+        let __end_qname = e.name();
+        let __end_name = __end_qname.as_ref();
+        #( #attr_decl_tokens )*
+        #namespace_attr_parse_tokens
+        #( #child_decl_tokens )*
+        #( #choice_decl_tokens )*
+        #( #any_decl_tokens )*
+        #xml_other_children_decl_tokens
+        #text_decl_tokens
+
+        #io_children_loop_tokens
+
+        Ok(Self {
+          #( #attr_init_tokens, )*
+          #( #child_init_tokens, )*
+          #( #choice_init_tokens, )*
+          #( #any_init_tokens, )*
+          #text_finish_tokens
+          #( #attr_finish_tokens, )*
+          #special_namespace_init_tokens
+          #xml_header_init_tokens
+          #xml_other_attrs_init_tokens
+          #xml_other_children_init_tokens
+        })
       }
 
       fn write_inner<W: std::io::Write>(
@@ -6255,70 +6303,6 @@ fn expand_named_struct(
     #public_root_from_str_tokens
 
     impl #impl_generics #ident #type_generics #where_clause {
-      pub(crate) fn #deserialize_borrowed_inner_ident<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        e: quick_xml::events::BytesStart<'de>,
-        empty_tag: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        #xml_header_decl_tokens
-        let __end_qname = e.name();
-        let __end_name = __end_qname.as_ref();
-        #( #attr_decl_tokens )*
-        #namespace_attr_parse_tokens
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        #( #any_decl_tokens )*
-        #xml_other_children_decl_tokens
-        #text_decl_tokens
-
-        #borrowed_children_loop_tokens
-
-        Ok(Self {
-          #( #attr_init_tokens, )*
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-          #( #any_init_tokens, )*
-          #text_finish_tokens
-          #( #attr_finish_tokens, )*
-          #special_namespace_init_tokens
-          #xml_header_init_tokens
-          #xml_other_attrs_init_tokens
-          #xml_other_children_init_tokens
-        })
-      }
-
-      pub(crate) fn #deserialize_io_inner_ident<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        e: quick_xml::events::BytesStart<'static>,
-        empty_tag: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        #xml_header_decl_tokens
-        let __end_qname = e.name();
-        let __end_name = __end_qname.as_ref();
-        #( #attr_decl_tokens )*
-        #namespace_attr_parse_tokens
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        #( #any_decl_tokens )*
-        #xml_other_children_decl_tokens
-        #text_decl_tokens
-
-        #io_children_loop_tokens
-
-        Ok(Self {
-          #( #attr_init_tokens, )*
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-          #( #any_init_tokens, )*
-          #text_finish_tokens
-          #( #attr_finish_tokens, )*
-          #special_namespace_init_tokens
-          #xml_header_init_tokens
-          #xml_other_attrs_init_tokens
-          #xml_other_children_init_tokens
-        })
-      }
-
       #public_root_methods_tokens
     }
 

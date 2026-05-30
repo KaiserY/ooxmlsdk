@@ -503,7 +503,7 @@ impl ElementName {
 pub trait SdkType: Sized {
   const ELEMENT_NAME: ElementName = ElementName::EMPTY;
 
-  fn read_borrowed<'de>(
+  fn read_borrowed_inner<'de>(
     _xml_reader: &mut crate::common::SliceReader<'de>,
     _start: quick_xml::events::BytesStart<'de>,
     _empty: bool,
@@ -513,7 +513,7 @@ pub trait SdkType: Sized {
     ))
   }
 
-  fn read_io<R: std::io::BufRead>(
+  fn read_io_inner<R: std::io::BufRead>(
     _xml_reader: &mut crate::common::IoReader<R>,
     _start: quick_xml::events::BytesStart<'static>,
     _empty: bool,
@@ -540,12 +540,12 @@ pub trait SdkType: Sized {
 }
 
 pub trait SdkChoice: Sized {
-  fn deserialize_borrowed_inner<'de>(
+  fn read_borrowed_inner<'de>(
     xml_reader: &mut crate::common::SliceReader<'de>,
     xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
   ) -> Result<Self, crate::common::SdkError>;
 
-  fn deserialize_io_inner<R: std::io::BufRead>(
+  fn read_io_inner<R: std::io::BufRead>(
     xml_reader: &mut crate::common::IoReader<R>,
     xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
   ) -> Result<Self, crate::common::SdkError>;

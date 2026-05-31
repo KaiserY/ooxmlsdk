@@ -540,8 +540,16 @@ pub struct TextData {
         choice(
             sequence(
                 variant = Sequence,
-                child(field = formula, qname = "cx:f"),
-                text_child(field = v_xsdstring, qname = "cx:v")
+                child(
+                    field = formula,
+                    ty = "std :: boxed :: Box < Formula >",
+                    qname = "cx:f"
+                ),
+                text_child(
+                    field = v_xsdstring,
+                    ty = "Option < VXsdstring >",
+                    qname = "cx:v"
+                )
             ),
             text_child(variant = VXsdstring, qname = "cx:v")
         )

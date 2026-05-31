@@ -60,6 +60,7 @@ pub struct SchemaTypeExtension {
 pub struct SchemaTypeAttributeExtension {
   pub q_name: String,
   pub property_name: String,
+  pub optional: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_type: String,
 }
@@ -241,6 +242,9 @@ pub fn apply_schema_extensions(
 
         if !attr_extension.override_type.is_empty() {
           attr.r#type = attr_extension.override_type.clone();
+        }
+        if let Some(optional) = attr_extension.optional {
+          attr.required = !optional;
         }
       }
 
@@ -646,6 +650,43 @@ mod tests {
       schemas[0].types[0].attributes[0].r#type,
       "Int32ZeroOnOverflowValue"
     );
+  }
+
+  #[test]
+  fn applies_attribute_optional_extension_by_property_name() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "ConditionalFormatStyle".to_string(),
+        attributes: vec![SchemaTypeAttribute {
+          q_name: "w:val".to_string(),
+          property_name: "Val".to_string(),
+          required: true,
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "ConditionalFormatStyle".to_string(),
+          attributes: vec![SchemaTypeAttributeExtension {
+            property_name: "Val".to_string(),
+            optional: Some(true),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert!(!schemas[0].types[0].attributes[0].required);
   }
 
   #[test]

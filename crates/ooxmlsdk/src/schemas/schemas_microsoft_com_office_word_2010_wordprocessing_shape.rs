@@ -23,7 +23,7 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "wps:spPr"))]
-  pub shape_properties: std::boxed::Box<ShapeProperties>,
+  pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ShapeStyle Class.
   #[sdk(child(qname = "wps:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
@@ -39,7 +39,7 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
   #[sdk(child(qname = "wps:bodyPr"))]
-  pub text_body_properties: std::boxed::Box<TextBodyProperties>,
+  pub text_body_properties: Option<std::boxed::Box<TextBodyProperties>>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

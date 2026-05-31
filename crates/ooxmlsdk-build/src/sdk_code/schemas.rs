@@ -2320,6 +2320,14 @@ fn helper_struct_is_inline_sequence_clippy_safe(
   })
 }
 
+fn single_field_sequence_variant_can_inline(field: &FieldDecl) -> bool {
+  matches!(field.cardinality, Cardinality::One | Cardinality::Optional)
+    && matches!(
+      field.wire,
+      FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. }
+    )
+}
+
 fn inline_single_field_sequence_variant_tokens(
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
@@ -2327,7 +2335,7 @@ fn inline_single_field_sequence_variant_tokens(
   variant_attrs: &[Attribute],
   field: &FieldDecl,
 ) -> Result<Option<TokenStream>> {
-  if !matches!(field.cardinality, Cardinality::One | Cardinality::Optional) {
+  if !single_field_sequence_variant_can_inline(field) {
     return Ok(None);
   }
 
@@ -2371,6 +2379,71 @@ fn inline_single_field_sequence_variant_tokens(
     }
     _ => Ok(None),
   }
+}
+
+enum SequenceVariantShape<'a> {
+  SingleField {
+    variant_ident: Ident,
+    field: &'a FieldDecl,
+  },
+  InlineSequence {
+    variant_ident: Ident,
+    helper_type_decl: &'a TypeDecl,
+    helper_fields: Vec<&'a FieldDecl>,
+  },
+  BoxedSequence {
+    variant_ident: Ident,
+    helper_fields: Vec<&'a FieldDecl>,
+  },
+}
+
+fn sequence_variant_shape<'a>(
+  variant: &VariantDecl,
+  rendered_variant_name: &str,
+  module: &'a SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
+) -> Result<SequenceVariantShape<'a>> {
+  let variant_ident: Ident =
+    parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
+  let Some(helper_type_decl) = sequence_payload_helper_type_decl(variant, module) else {
+    return Ok(SequenceVariantShape::BoxedSequence {
+      variant_ident,
+      helper_fields: Vec::new(),
+    });
+  };
+  let helper_fields: Vec<&FieldDecl> = helper_type_decl
+    .members
+    .iter()
+    .filter_map(|member| match member {
+      MemberDecl::Field(field) => Some(field),
+      _ => None,
+    })
+    .collect();
+
+  if helper_struct_is_inline_sequence_candidate(helper_type_decl) {
+    if helper_fields.len() == 1 && single_field_sequence_variant_can_inline(helper_fields[0]) {
+      return Ok(SequenceVariantShape::SingleField {
+        variant_ident: single_field_sequence_variant_ident(
+          rendered_variant_name,
+          helper_fields[0],
+        )?,
+        field: helper_fields[0],
+      });
+    }
+
+    if helper_struct_is_inline_sequence_clippy_safe(helper_type_decl, module, type_graph) {
+      return Ok(SequenceVariantShape::InlineSequence {
+        variant_ident,
+        helper_type_decl,
+        helper_fields,
+      });
+    }
+  }
+
+  Ok(SequenceVariantShape::BoxedSequence {
+    variant_ident,
+    helper_fields,
+  })
 }
 
 struct ChoiceVariantRenderContext<'a> {
@@ -2488,70 +2561,61 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
-      if let Some(helper_type_decl) =
-        inline_sequence_helper_type_decl(variant, render_context.module)
-      {
-        let helper_fields: Vec<&FieldDecl> = helper_type_decl
-          .members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Field(field) => Some(field),
-            _ => None,
-          })
-          .collect();
-        if helper_fields.len() == 1
-          && let Some(single_field_tokens) = inline_single_field_sequence_variant_tokens(
+      match sequence_variant_shape(
+        variant,
+        rendered_variant_name,
+        render_context.module,
+        render_context.type_graph,
+      )? {
+        SequenceVariantShape::SingleField {
+          variant_ident,
+          field,
+        } => {
+          let single_field_tokens = inline_single_field_sequence_variant_tokens(
             render_context.module,
             render_context.type_graph,
-            &single_field_sequence_variant_ident(rendered_variant_name, helper_fields[0])?,
+            &variant_ident,
             &variant_attrs,
-            helper_fields[0],
+            field,
           )?
-        {
-          return Ok(vec![quote! {
+          .expect("single-field sequence shape must render");
+          Ok(vec![quote! {
             #prefix_attrs
             #single_field_tokens
-          }]);
+          }])
         }
-        if !helper_struct_is_inline_sequence_clippy_safe(
+        SequenceVariantShape::InlineSequence {
+          variant_ident,
           helper_type_decl,
-          render_context.module,
-          render_context.type_graph,
-        ) {
+          helper_fields,
+        } => {
+          let inline_fields = gen_inline_sequence_variant_fields_from_decl(
+            &helper_fields,
+            &helper_type_decl.rust_name,
+            render_context.module,
+            render_context.type_graph,
+            VersionCfgContext::new(true),
+          )?;
+          Ok(vec![quote! {
+            #prefix_attrs
+            #( #variant_attrs )*
+            #variant_doc_attrs
+            #[sdk(sequence)]
+            #variant_ident {
+              #( #inline_fields )*
+            },
+          }])
+        }
+        SequenceVariantShape::BoxedSequence { variant_ident, .. } => {
           let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-          return Ok(vec![quote! {
+          Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
             #variant_doc_attrs
             #[sdk(sequence)]
             #variant_ident(std::boxed::Box<#payload_type>),
-          }]);
+          }])
         }
-        let inline_fields = gen_inline_sequence_variant_fields_from_decl(
-          &helper_fields,
-          &helper_type_decl.rust_name,
-          render_context.module,
-          render_context.type_graph,
-          VersionCfgContext::new(true),
-        )?;
-        Ok(vec![quote! {
-          #prefix_attrs
-          #( #variant_attrs )*
-          #variant_doc_attrs
-          #[sdk(sequence)]
-          #variant_ident {
-            #( #inline_fields )*
-          },
-        }])
-      } else {
-        let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-        Ok(vec![quote! {
-          #prefix_attrs
-          #( #variant_attrs )*
-          #variant_doc_attrs
-          #[sdk(sequence)]
-          #variant_ident(std::boxed::Box<#payload_type>),
-        }])
       }
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { qnames } => {
@@ -2690,28 +2754,6 @@ fn single_field_sequence_variant_ident(
   Ok(parse_str(&escape_upper_camel_case(
     rendered_variant_name.to_string(),
   ))?)
-}
-
-fn inline_sequence_helper_type_decl<'a>(
-  variant: &VariantDecl,
-  module: &'a SchemaModuleDecl,
-) -> Option<&'a TypeDecl> {
-  if !matches!(
-    variant.wire,
-    crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
-  ) {
-    return None;
-  }
-
-  if variant.payload.module_path.is_some() {
-    return None;
-  }
-
-  module
-    .types
-    .iter()
-    .find(|type_decl| type_decl.rust_name == variant.payload.rust_type)
-    .filter(|type_decl| helper_struct_is_inline_sequence_candidate(type_decl))
 }
 
 fn sequence_payload_helper_type_decl<'a>(
@@ -3654,10 +3696,12 @@ fn choice_metadata_qname(qname: &str) -> String {
 
 fn choice_sequence_child_metadata_tokens(
   field: &FieldDecl,
+  variant_ident: Option<&Ident>,
   include_field_name: bool,
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
 ) -> Result<Option<TokenStream>> {
+  let variant_attr = variant_ident.map(|variant_ident| quote! { variant = #variant_ident, });
   let field_name = include_field_name.then(|| {
     let ident: Result<Ident> = parse_str(&field.rust_name).map_err(Into::into);
     ident
@@ -3666,21 +3710,41 @@ fn choice_sequence_child_metadata_tokens(
   let field_attr = field_name
     .as_ref()
     .map(|field_name| quote! { field = #field_name, });
+  let ty_attr = if include_field_name {
+    let field_ty = type_from_decl_ref(&field.type_ref, type_graph)?;
+    let field_ty = match field.cardinality {
+      Cardinality::Optional => quote! { Option<#field_ty> },
+      Cardinality::Many => quote! { Vec<#field_ty> },
+      Cardinality::One => {
+        if matches!(field.wire, FieldWireDecl::Child { .. })
+          && !is_value_like_type_ref(module, &field.type_ref, type_graph)
+        {
+          quote! { std::boxed::Box<#field_ty> }
+        } else {
+          quote! { #field_ty }
+        }
+      }
+    };
+    let field_ty = field_ty.to_string();
+    Some(quote! { ty = #field_ty, })
+  } else {
+    None
+  };
 
   Ok(match &field.wire {
     FieldWireDecl::Child { qname } => {
       let qname = choice_metadata_qname(qname);
       if empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph).is_some() {
-        Some(quote! { empty_child(#field_attr qname = #qname) })
+        Some(quote! { empty_child(#variant_attr #field_attr #ty_attr qname = #qname) })
       } else if is_any_children_alias_type_ref(module, &field.type_ref, type_graph) {
-        Some(quote! { any_child(#field_attr qname = #qname) })
+        Some(quote! { any_child(#variant_attr #field_attr #ty_attr qname = #qname) })
       } else {
-        Some(quote! { child(#field_attr qname = #qname) })
+        Some(quote! { child(#variant_attr #field_attr #ty_attr qname = #qname) })
       }
     }
     FieldWireDecl::TextChild { qname } => {
       let qname = choice_metadata_qname(qname);
-      Some(quote! { text_child(#field_attr qname = #qname) })
+      Some(quote! { text_child(#variant_attr #field_attr #ty_attr qname = #qname) })
     }
     _ => None,
   })
@@ -3735,30 +3799,57 @@ fn choice_variant_metadata_tokens(
       )
     }
     VariantWireDecl::Sequence { .. } => {
-      let mut children = Vec::new();
-      if let Some(helper_type_decl) = sequence_payload_helper_type_decl(variant, module) {
-        let helper_fields: Vec<&FieldDecl> = helper_type_decl
-          .members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Field(field) => Some(field),
-            _ => None,
-          })
-          .collect();
-        let include_field_names = helper_fields.len() > 1
-          && helper_struct_is_inline_sequence_clippy_safe(helper_type_decl, module, type_graph);
-        for field in helper_fields {
-          if let Some(child) =
-            choice_sequence_child_metadata_tokens(field, include_field_names, module, type_graph)?
-          {
-            children.push(child);
+      match sequence_variant_shape(variant, rendered_variant_name, module, type_graph)? {
+        SequenceVariantShape::SingleField {
+          variant_ident,
+          field,
+        } => Ok(
+          choice_sequence_child_metadata_tokens(
+            field,
+            Some(&variant_ident),
+            false,
+            module,
+            type_graph,
+          )?
+          .into_iter()
+          .collect(),
+        ),
+        SequenceVariantShape::InlineSequence {
+          variant_ident,
+          helper_fields,
+          ..
+        } => {
+          let mut children = Vec::new();
+          for field in helper_fields {
+            if let Some(child) =
+              choice_sequence_child_metadata_tokens(field, None, true, module, type_graph)?
+            {
+              children.push(child);
+            }
           }
+
+          Ok(vec![quote! {
+            sequence(variant = #variant_ident #(, #children)*)
+          }])
+        }
+        SequenceVariantShape::BoxedSequence {
+          variant_ident,
+          helper_fields,
+        } => {
+          let mut children = Vec::new();
+          for field in helper_fields {
+            if let Some(child) =
+              choice_sequence_child_metadata_tokens(field, None, false, module, type_graph)?
+            {
+              children.push(child);
+            }
+          }
+
+          Ok(vec![quote! {
+            sequence(variant = #variant_ident #(, #children)*)
+          }])
         }
       }
-
-      Ok(vec![quote! {
-        sequence(variant = #variant_ident #(, #children)*)
-      }])
     }
   }
 }

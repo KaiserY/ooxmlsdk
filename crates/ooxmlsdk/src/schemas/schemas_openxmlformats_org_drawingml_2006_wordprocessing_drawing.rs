@@ -250,7 +250,7 @@ pub struct Anchor {
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "wp:simplePos"))]
-  pub simple_position: std::boxed::Box<SimplePosition>,
+  pub simple_position: Option<SimplePosition>,
   /// Horizontal Positioning
   #[sdk(child(qname = "wp:positionH"))]
   pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
@@ -275,7 +275,7 @@ pub struct Anchor {
   pub anchor_choice: Option<AnchorChoice>,
   /// Drawing Object Non-Visual Properties.
   #[sdk(child(qname = "wp:docPr"))]
-  pub doc_properties: std::boxed::Box<DocProperties>,
+  pub doc_properties: Option<std::boxed::Box<DocProperties>>,
   /// Defines the NonVisualGraphicFrameDrawingProperties Class.
   #[sdk(child(qname = "wp:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:

@@ -176,6 +176,7 @@ struct SdkChoiceField {
   accepts_text: Option<bool>,
   accepts_any: Option<bool>,
   specific_qnames: Vec<String>,
+  items: Vec<SdkTypeChoiceItem>,
 }
 
 #[derive(Clone)]
@@ -345,7 +346,50 @@ struct ParsedSdkTypeFieldAttrs {
   choice_accepts_text: Option<bool>,
   choice_accepts_any: Option<bool>,
   choice_qnames: Vec<String>,
+  choice_items: Vec<SdkTypeChoiceItem>,
   validators: Vec<SdkFieldValidator>,
+}
+
+#[derive(Clone)]
+enum SdkTypeChoiceItem {
+  Child {
+    variant: Ident,
+    qname: String,
+  },
+  EmptyChild {
+    variant: Ident,
+    qname: String,
+  },
+  TextChild {
+    variant: Ident,
+    qname: String,
+  },
+  AnyChild {
+    variant: Ident,
+    qname: String,
+  },
+  Sequence {
+    variant: Ident,
+    children: Vec<SdkTypeChoiceSequenceChild>,
+  },
+  Any,
+  Text,
+}
+
+#[derive(Clone)]
+struct SdkTypeChoiceSequenceChild {
+  kind: SdkTypeChoiceSequenceChildKind,
+  field: Option<Ident>,
+  ty: Option<Type>,
+  qname: String,
+}
+
+#[derive(Clone)]
+enum SdkTypeChoiceSequenceChildKind {
+  Child,
+  EmptyChild,
+  TextChild,
+  AnyChild,
 }
 
 struct StringSetValues {
@@ -1046,6 +1090,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   let mut choice_accepts_text = None;
   let mut choice_accepts_any = None;
   let mut choice_qnames = Vec::new();
+  let mut choice_items = Vec::new();
   let mut validators = Vec::new();
 
   for attr in attrs {
@@ -1182,9 +1227,11 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("text") {
               accepts_text = true;
+              choice_items.push(SdkTypeChoiceItem::Text);
               Ok(())
             } else if nested.path.is_ident("any") {
               accepts_any = true;
+              choice_items.push(SdkTypeChoiceItem::Any);
               Ok(())
             } else if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
@@ -1195,50 +1242,99 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               || nested.path.is_ident("text_child")
               || nested.path.is_ident("any_child")
             {
+              let mut variant = None;
+              let mut qname = None;
               nested.parse_nested_meta(|choice_child| {
                 if choice_child.path.is_ident("qname") {
                   let value: LitStr = choice_child.value()?.parse()?;
-                  choice_qnames.push(value.value());
+                  qname = Some(value.value());
                   Ok(())
                 } else if choice_child.path.is_ident("variant") {
-                  let _value: Ident = choice_child.value()?.parse()?;
+                  variant = Some(choice_child.value()?.parse()?);
                   Ok(())
                 } else if is_sdk_version_marker_path(&choice_child.path) {
                   Ok(())
                 } else {
                   Err(choice_child.error("unsupported sdk choice child attribute"))
                 }
-              })
+              })?;
+              let qname = qname.unwrap_or_default();
+              choice_qnames.push(qname.clone());
+              let variant = variant.ok_or_else(|| {
+                syn::Error::new_spanned(&nested.path, "sdk choice child requires variant")
+              })?;
+              if nested.path.is_ident("child") {
+                choice_items.push(SdkTypeChoiceItem::Child { variant, qname });
+              } else if nested.path.is_ident("empty_child") {
+                choice_items.push(SdkTypeChoiceItem::EmptyChild { variant, qname });
+              } else if nested.path.is_ident("text_child") {
+                choice_items.push(SdkTypeChoiceItem::TextChild { variant, qname });
+              } else {
+                choice_items.push(SdkTypeChoiceItem::AnyChild { variant, qname });
+              }
+              Ok(())
             } else if nested.path.is_ident("sequence") {
+              let mut variant = None;
+              let mut children = Vec::new();
               nested.parse_nested_meta(|sequence| {
                 if sequence.path.is_ident("variant") {
-                  let _value: Ident = sequence.value()?.parse()?;
+                  variant = Some(sequence.value()?.parse()?);
                   Ok(())
                 } else if sequence.path.is_ident("child")
                   || sequence.path.is_ident("empty_child")
                   || sequence.path.is_ident("text_child")
                   || sequence.path.is_ident("any_child")
                 {
+                  let kind = if sequence.path.is_ident("child") {
+                    SdkTypeChoiceSequenceChildKind::Child
+                  } else if sequence.path.is_ident("empty_child") {
+                    SdkTypeChoiceSequenceChildKind::EmptyChild
+                  } else if sequence.path.is_ident("text_child") {
+                    SdkTypeChoiceSequenceChildKind::TextChild
+                  } else {
+                    SdkTypeChoiceSequenceChildKind::AnyChild
+                  };
+                  let mut field = None;
+                  let mut ty = None;
+                  let mut qname = None;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
                       let value: LitStr = sequence_child.value()?.parse()?;
-                      choice_qnames.push(value.value());
+                      qname = Some(value.value());
                       Ok(())
                     } else if sequence_child.path.is_ident("field") {
-                      let _value: Ident = sequence_child.value()?.parse()?;
+                      field = Some(sequence_child.value()?.parse()?);
+                      Ok(())
+                    } else if sequence_child.path.is_ident("ty") {
+                      let value: LitStr = sequence_child.value()?.parse()?;
+                      ty = Some(parse_str(&value.value())?);
                       Ok(())
                     } else if is_sdk_version_marker_path(&sequence_child.path) {
                       Ok(())
                     } else {
                       Err(sequence_child.error("unsupported sdk choice sequence child attribute"))
                     }
-                  })
+                  })?;
+                  let qname = qname.unwrap_or_default();
+                  choice_qnames.push(qname.clone());
+                  children.push(SdkTypeChoiceSequenceChild {
+                    kind,
+                    field,
+                    ty,
+                    qname,
+                  });
+                  Ok(())
                 } else if is_sdk_version_marker_path(&sequence.path) {
                   Ok(())
                 } else {
                   Err(sequence.error("unsupported sdk choice sequence attribute"))
                 }
-              })
+              })?;
+              let variant = variant.ok_or_else(|| {
+                syn::Error::new_spanned(&nested.path, "sdk choice sequence requires variant")
+              })?;
+              choice_items.push(SdkTypeChoiceItem::Sequence { variant, children });
+              Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
@@ -1550,6 +1646,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
     choice_accepts_text,
     choice_accepts_any,
     choice_qnames,
+    choice_items,
     validators,
   })
 }

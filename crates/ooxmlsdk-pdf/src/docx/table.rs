@@ -91,7 +91,11 @@ impl TableConditionalStyleMask {
   }
 
   pub(super) fn from_cnf_style(style: &w::ConditionalFormatStyle) -> Self {
-    let mut mask = Self::from_cnf_value(style.val.as_str());
+    let mut mask = style
+      .val
+      .as_deref()
+      .map(Self::from_cnf_value)
+      .unwrap_or_default();
     mask.first_row |= style.first_row.is_some_and(|value| value.as_bool());
     mask.last_row |= style.last_row.is_some_and(|value| value.as_bool());
     mask.first_column |= style.first_column.is_some_and(|value| value.as_bool());

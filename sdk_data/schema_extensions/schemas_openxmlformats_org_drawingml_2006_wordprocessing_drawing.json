@@ -10,11 +10,19 @@
       "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
+          "PropertyName": "SimplePosition",
+          "Optional": true
+        },
+        {
           "PropertyName": "HorizontalPosition",
           "Optional": true
         },
         {
           "PropertyName": "VerticalPosition",
+          "Optional": true
+        },
+        {
+          "Name": "a:CT_NonVisualDrawingProps/wp:docPr",
           "Optional": true
         }
       ],

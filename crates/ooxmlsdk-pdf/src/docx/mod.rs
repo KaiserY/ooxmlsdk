@@ -1524,8 +1524,9 @@ fn table_model(
   Table {
     column_widths_pt: table
       .table_grid
-      .grid_column
-      .iter()
+      .as_deref()
+      .into_iter()
+      .flat_map(|grid| &grid.grid_column)
       .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
       .collect(),
     preferred_width_pt: properties
@@ -4747,8 +4748,8 @@ fn inline_image_impl(
       let image_data = image_data_with_effects(resource, &properties);
       let hyperlink_url = anchor
         .doc_properties
-        .hyperlink_on_click
         .as_deref()
+        .and_then(|properties| properties.hyperlink_on_click.as_deref())
         .and_then(|hyperlink| hyperlink.id.as_deref())
         .and_then(|relationship_id| hyperlinks.target(relationship_id))
         .or_else(|| {
@@ -4771,7 +4772,10 @@ fn inline_image_impl(
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
-        alt_text: anchor.doc_properties.description.clone(),
+        alt_text: anchor
+          .doc_properties
+          .as_ref()
+          .and_then(|properties| properties.description.clone()),
         hyperlink_url,
         placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
@@ -4811,7 +4815,8 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     .simple_pos
     .as_ref()
     .is_some_and(|value| value.as_bool())
-    .then_some(anchor.simple_position.as_ref());
+    .then_some(anchor.simple_position.as_ref())
+    .flatten();
   let horizontal_relative_to = simple_position
     .map(|_| HorizontalImageReference::Page)
     .or_else(|| horizontal_position.map(horizontal_image_reference))
@@ -5324,8 +5329,8 @@ fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) 
   matches!(
     shape
       .text_body_properties
-      .text_body_properties_choice1
-      .as_ref(),
+      .as_deref()
+      .and_then(|properties| properties.text_body_properties_choice1.as_ref()),
     Some(wps::TextBodyPropertiesChoice::ShapeAutoFit)
   )
 }
@@ -5336,7 +5341,10 @@ fn drawingml_textbox_is_vertical(xml: &str) -> bool {
 
 fn wordprocessing_shape_textbox_is_vertical(shape: &wps::WordprocessingShape) -> bool {
   matches!(
-    shape.text_body_properties.vertical,
+    shape
+      .text_body_properties
+      .as_ref()
+      .and_then(|properties| properties.vertical),
     Some(a::TextVerticalValues::Vertical)
   )
 }
@@ -5353,8 +5361,8 @@ fn drawingml_textbox_has_fontwork_warp(xml: &str) -> bool {
 fn wordprocessing_shape_textbox_has_fontwork_warp(shape: &wps::WordprocessingShape) -> bool {
   shape
     .text_body_properties
-    .preset_text_warp
-    .as_ref()
+    .as_deref()
+    .and_then(|properties| properties.preset_text_warp.as_ref())
     .is_some_and(|warp| {
       !matches!(
         warp.preset,
@@ -5558,7 +5566,9 @@ fn text_box_frame_from_wordprocessing_shape(
   let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
     content, base_style, styles, images, hyperlinks,
   ));
-  apply_wordprocessing_shape_textbox_body_properties(&shape.text_body_properties, &mut frame);
+  if let Some(properties) = shape.text_body_properties.as_deref() {
+    apply_wordprocessing_shape_textbox_body_properties(properties, &mut frame);
+  }
   if let Some(rotation_deg) = wordprocessing_shape_textbox_text_rotation(shape) {
     rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
   }
@@ -5580,7 +5590,11 @@ fn drawingml_textbox_text_rotation(xml: &str) -> Option<f32> {
 }
 
 fn wordprocessing_shape_textbox_text_rotation(shape: &wps::WordprocessingShape) -> Option<f32> {
-  match shape.text_body_properties.vertical {
+  match shape
+    .text_body_properties
+    .as_ref()
+    .and_then(|properties| properties.vertical)
+  {
     Some(a::TextVerticalValues::Vertical)
     | Some(a::TextVerticalValues::WordArtVertical)
     | Some(a::TextVerticalValues::EastAsianVetical) => Some(-90.0),
@@ -6080,6 +6094,11 @@ fn wordprocessing_shape_textbox_frame(
   context: DrawingTextBoxImportContext<'_>,
 ) -> Option<InlineShape> {
   let content = wordprocessing_shape_textbox_content(shape)?;
+  let shape_properties = shape
+    .shape_properties
+    .as_deref()
+    .cloned()
+    .unwrap_or_default();
   let text_box = text_box_frame_from_wordprocessing_shape(
     shape,
     content,
@@ -6091,7 +6110,7 @@ fn wordprocessing_shape_textbox_frame(
   let auto_fit = wordprocessing_shape_textbox_uses_auto_fit(shape);
   let expands_auto_fit = auto_fit && wordprocessing_shape_textbox_is_vertical(shape);
   let frame_stroke = wordprocessing_shape_textbox_frame_stroke(shape, auto_fit, placement);
-  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  let properties = DrawingMlShapeProperties::Wordprocessing(shape_properties);
   let geometry = properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
@@ -6501,7 +6520,12 @@ fn wordprocessing_shape_shape(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Option<InlineShape> {
-  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  let shape_properties = shape
+    .shape_properties
+    .as_deref()
+    .cloned()
+    .unwrap_or_default();
+  let properties = DrawingMlShapeProperties::Wordprocessing(shape_properties.clone());
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
@@ -6513,7 +6537,7 @@ fn wordprocessing_shape_shape(
       })
     })
   };
-  let fill_image = wordprocessing_shape_image_fill(&shape.shape_properties, context.images);
+  let fill_image = wordprocessing_shape_image_fill(&shape_properties, context.images);
   let stroke = if wordprocessing_shape_has_no_line(shape) {
     None
   } else {
@@ -7539,8 +7563,8 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
         .is_some_and(|hidden| hidden.as_bool())
         || anchor
           .doc_properties
-          .hidden
           .as_ref()
+          .and_then(|properties| properties.hidden.as_ref())
           .is_some_and(|hidden| hidden.as_bool())
     }
     None => false,
@@ -7988,7 +8012,13 @@ fn drawingml_picture_frame(
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
 ) -> Option<InlineShape> {
-  let properties = DrawingMlShapeProperties::Picture((*picture.shape_properties).clone());
+  let properties = DrawingMlShapeProperties::Picture(
+    picture
+      .shape_properties
+      .as_deref()
+      .cloned()
+      .unwrap_or_default(),
+  );
   let geometry = properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
@@ -8082,7 +8112,13 @@ fn drawingml_picture_image(
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &properties);
-  let shape_properties = DrawingMlShapeProperties::Picture((*picture.shape_properties).clone());
+  let shape_properties = DrawingMlShapeProperties::Picture(
+    picture
+      .shape_properties
+      .as_deref()
+      .cloned()
+      .unwrap_or_default(),
+  );
   let geometry = shape_properties
     .geometry_kind()
     .unwrap_or(InlineShapeGeometry::Rectangle);
@@ -8350,6 +8386,7 @@ fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) 
 fn drawingml_picture_alt_text(picture: &pic::Picture) -> Option<String> {
   let properties = &picture
     .non_visual_picture_properties
+    .as_deref()?
     .non_visual_drawing_properties;
   properties
     .description
@@ -8383,7 +8420,13 @@ fn wordprocessing_shape_fill_color(
   shape: &wps::WordprocessingShape,
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
-  let properties = DrawingMlShapeProperties::Wordprocessing((*shape.shape_properties).clone());
+  let properties = DrawingMlShapeProperties::Wordprocessing(
+    shape
+      .shape_properties
+      .as_deref()
+      .cloned()
+      .unwrap_or_default(),
+  );
   drawingml_shape_properties_fill_color(&properties, theme_colors)
 }
 
@@ -8530,12 +8573,14 @@ fn wordprocessing_shape_stroke(
   shape: &wps::WordprocessingShape,
   theme_colors: &ThemeColors,
 ) -> Option<BorderStyle> {
-  let line = shape.shape_properties.outline.as_ref()?;
+  let line = shape.shape_properties.as_ref()?.outline.as_ref()?;
   let color = match line.outline_choice1.as_ref()? {
     a::OutlineChoice::NoFill(_) => return None,
-    a::OutlineChoice::SolidFill(fill) => resolve_drawingml_solid_fill(fill, theme_colors)?.color,
+    a::OutlineChoice::SolidFill(fill) => {
+      resolve_drawingml_solid_fill(fill.as_ref(), theme_colors)?.color
+    }
     a::OutlineChoice::GradientFill(fill) => {
-      drawingml_first_gradient_fill_color(fill, theme_colors)?
+      drawingml_first_gradient_fill_color(fill.as_ref(), theme_colors)?
     }
     a::OutlineChoice::PatternFill(_) => return None,
   };
@@ -8590,8 +8635,8 @@ fn drawingml_shape_has_no_line(xml: &str) -> bool {
 fn wordprocessing_shape_has_no_line(shape: &wps::WordprocessingShape) -> bool {
   shape
     .shape_properties
-    .outline
-    .as_ref()
+    .as_deref()
+    .and_then(|properties| properties.outline.as_ref())
     .and_then(|line| line.outline_choice1.as_ref())
     .is_some_and(|choice| matches!(choice, a::OutlineChoice::NoFill(_)))
 }
@@ -10187,9 +10232,13 @@ fn drawing_picture_image_properties(
     relationship_id: picture.blip_fill.blip.as_ref()?.embed.clone(),
     hyperlink_relationship_id: picture
       .non_visual_picture_properties
-      .non_visual_drawing_properties
-      .hyperlink_on_click
-      .as_ref()
+      .as_deref()
+      .and_then(|properties| {
+        properties
+          .non_visual_drawing_properties
+          .hyperlink_on_click
+          .as_ref()
+      })
       .and_then(|hyperlink| hyperlink.id.clone()),
     ..DrawingImageProperties::default()
   };
@@ -10214,7 +10263,11 @@ fn drawing_picture_image_properties(
     properties.crop = crop;
   }
 
-  if let Some(transform) = picture.shape_properties.transform2_d.as_ref() {
+  if let Some(transform) = picture
+    .shape_properties
+    .as_ref()
+    .and_then(|properties| properties.transform2_d.as_ref())
+  {
     apply_image_transform(&mut properties, transform);
   }
 
@@ -13425,12 +13478,12 @@ mod tests {
       ..Default::default()
     };
     let row_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
-      val: "100000000000".into(),
+      val: Some("100000000000".into()),
       first_row: Some(true.into()),
       ..Default::default()
     });
     let cell_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
-      val: "000100000000".into(),
+      val: Some("000100000000".into()),
       last_column: Some(true.into()),
       ..Default::default()
     });

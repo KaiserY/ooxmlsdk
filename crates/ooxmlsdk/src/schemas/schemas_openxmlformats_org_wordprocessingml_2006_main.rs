@@ -2575,7 +2575,7 @@ pub struct MoveFromRangeStart {
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
-  pub date: crate::simple_type::DateTimeValue,
+  pub date: Option<crate::simple_type::DateTimeValue>,
   /// name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(max = 40u32))]
@@ -2616,7 +2616,7 @@ pub struct MoveToRangeStart {
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
-  pub date: crate::simple_type::DateTimeValue,
+  pub date: Option<crate::simple_type::DateTimeValue>,
   /// name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(max = 40u32))]
@@ -7869,7 +7869,7 @@ pub struct Table {
   pub table_properties: std::boxed::Box<TableProperties>,
   /// Table Grid.
   #[sdk(child(qname = "w:tblGrid"))]
-  pub table_grid: std::boxed::Box<TableGrid>,
+  pub table_grid: Option<std::boxed::Box<TableGrid>>,
   #[sdk(
         choice(
             child(variant = TableRow, qname = "w:tr"),
@@ -8962,7 +8962,7 @@ pub struct ConditionalFormatStyle {
   #[sdk(attr(qname = "w:val"))]
   #[sdk(pattern(regex = "[01]*"))]
   #[sdk(string_length(min = 12u32, max = 12u32))]
-  pub val: crate::simple_type::StringValue,
+  pub val: Option<crate::simple_type::StringValue>,
   /// firstRow
   #[sdk(attr(qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
@@ -15294,7 +15294,7 @@ pub struct DataBinding {
   pub x_path: crate::simple_type::StringValue,
   /// Custom XML Data Storage ID
   #[sdk(attr(qname = "w:storeItemID"))]
-  pub store_item_id: crate::simple_type::StringValue,
+  pub store_item_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SdtContentComboBox Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

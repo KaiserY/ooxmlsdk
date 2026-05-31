@@ -2140,7 +2140,7 @@ pub struct LegendEntry {
   #[sdk(
         choice(
             child(variant = Delete, qname = "c:delete"),
-            sequence(variant = Sequence, child(qname = "c:txPr"))
+            child(variant = TextProperties, qname = "c:txPr")
         )
     )]
   pub legend_entry_choice: Option<LegendEntryChoice>,

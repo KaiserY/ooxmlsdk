@@ -11,13 +11,13 @@ pub struct Picture {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:nvPicPr"))]
-  pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
+  pub non_visual_picture_properties: Option<std::boxed::Box<NonVisualPictureProperties>>,
   /// Picture Fill
   #[sdk(child(qname = "pic:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
   /// Shape Properties
   #[sdk(child(qname = "pic:spPr"))]
-  pub shape_properties: std::boxed::Box<ShapeProperties>,
+  pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ShapeStyle Class.
   #[sdk(child(qname = "pic14:style"))]
   pub shape_style: Option<std::boxed::Box<crate::schemas::pic14::ShapeStyle>>,

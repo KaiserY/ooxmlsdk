@@ -43,6 +43,24 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "ConditionalFormatStyle",
+      "Attributes": [
+        {
+          "PropertyName": "Val",
+          "Optional": true
+        }
+      ]
+    },
+    {
+      "ClassName": "DataBinding",
+      "Attributes": [
+        {
+          "PropertyName": "StoreItemId",
+          "Optional": true
+        }
+      ]
+    },
+    {
       "ClassName": "Document",
       "HaveXmlOtherAttrs": true
     },
@@ -67,6 +85,15 @@
       "ClassName": "Fonts",
       "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "MoveBookmarkType",
+      "Attributes": [
+        {
+          "PropertyName": "Date",
+          "Optional": true
+        }
+      ]
     },
     {
       "ClassName": "Footnotes",
@@ -208,6 +235,15 @@
     {
       "ClassName": "TableRow",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "Table",
+      "Children": [
+        {
+          "Name": "w:CT_TblGrid/w:tblGrid",
+          "Optional": true
+        }
+      ]
     }
   ],
   "ChoiceEnums": [

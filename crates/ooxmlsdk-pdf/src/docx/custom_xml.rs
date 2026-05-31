@@ -30,7 +30,10 @@ impl CustomXmlBindings {
 
   pub(super) fn value_for_sdt(&self, properties: &w::SdtProperties) -> Option<String> {
     if let Some(binding) = sdt_data_binding(properties)
-      && let Some(value) = self.value(&binding.store_item_id, &binding.x_path)
+      && let Some(value) = self.value(
+        binding.store_item_id.as_deref().unwrap_or(""),
+        &binding.x_path,
+      )
     {
       return Some(value);
     }

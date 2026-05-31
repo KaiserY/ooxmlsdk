@@ -3,6 +3,19 @@
     {
       "ClassName": "TextBoxInfo2",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "WordprocessingShape",
+      "Children": [
+        {
+          "Name": "a:CT_ShapeProperties/wps:spPr",
+          "Optional": true
+        },
+        {
+          "Name": "a:CT_TextBodyProperties/wps:bodyPr",
+          "Optional": true
+        }
+      ]
     }
   ]
 }

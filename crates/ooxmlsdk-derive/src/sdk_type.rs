@@ -1943,15 +1943,8 @@ fn expand_helper_struct(
   }
 
   let mut child_decl_tokens = Vec::new();
-  let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_parse_tokens_borrowed = Vec::new();
   let mut child_parse_tokens_io = Vec::new();
   let mut child_visit_parse_tokens_borrowed = Vec::new();
@@ -1960,7 +1953,6 @@ fn expand_helper_struct(
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-  let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
     let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
@@ -1990,7 +1982,6 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let target = if tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
@@ -2000,89 +1991,19 @@ fn expand_helper_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
+    let build_match = |reader_ident: &Ident, deserialize_ident: &Ident| {
       let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
         quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
         quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
-        if as_result {
-          quote! {
-              #case_index => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                __ooxmlsdk_seen_child = true;
-                return Ok(true);
-              },
-          }
-        } else {
-          quote! {
-              #case_index => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                __ooxmlsdk_seen_child = true;
-                continue;
-              },
-          }
-        }
-      } else {
-        if as_result {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              __ooxmlsdk_seen_child = true;
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              __ooxmlsdk_seen_child = true;
-              continue;
-            },
-          }
-        }
-      }
-    };
-    let build_match = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
-      } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
-      };
-      if field.repeated {
-        if as_result {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              __ooxmlsdk_seen_child = true;
-              #xml_child_slot_assign
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              __ooxmlsdk_seen_child = true;
-              #xml_child_slot_assign
-              continue;
-            },
-          }
-        }
-      } else if as_result {
         quote! {
           #target => {
             let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-            #field_ident = Some(#parsed_child_expr);
-            __ooxmlsdk_seen_child = true;
-            return Ok(true);
+            #field_ident.push(#parsed_child_expr);
+            #xml_child_slot_assign
+            continue;
           },
         }
       } else {
@@ -2090,13 +2011,12 @@ fn expand_helper_struct(
           #target => {
             let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
             #field_ident = Some(#parsed_child_expr);
-            __ooxmlsdk_seen_child = true;
+            #xml_child_slot_assign
             continue;
           },
         }
       }
     };
-    direct_child_case_arms.push(quote! { #target => #case_index, });
 
     if field.repeated {
       child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -2112,46 +2032,9 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
         }
       });
-      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_dispatch_tokens_io.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
+      direct_child_match_tokens_borrowed
+        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
+      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -2186,46 +2069,9 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_dispatch_tokens_io.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
+      direct_child_match_tokens_borrowed
+        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
+      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     }
   }
 
@@ -3238,15 +3084,8 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_dispatch_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_visit_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_decl_tokens = Vec::new();
   let mut child_parse_tokens_borrowed = Vec::new();
   let mut child_parse_tokens_io = Vec::new();
@@ -3256,7 +3095,6 @@ fn expand_named_struct(
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
   let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-  let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
     let xml_child_slot = xml_child_slot_by_field
@@ -3290,7 +3128,6 @@ fn expand_named_struct(
     } else {
       quote! { parsed_child }
     };
-    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let target = if use_local_name_child_dispatch || tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
@@ -3303,85 +3140,19 @@ fn expand_named_struct(
     let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &field.qname);
     let self_write_call =
       write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &field.qname);
-    let build_dispatch = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
+    let build_match = |reader_ident: &Ident, deserialize_ident: &Ident| {
       let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
         quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
       } else {
         quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
       if field.repeated {
-        if as_result {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              continue;
-            },
-          }
-        }
-      } else {
-        if as_result {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              continue;
-            },
-          }
-        }
-      }
-    };
-    let build_match = |reader_ident: &Ident, as_result: bool, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
-      } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
-      };
-      if field.repeated {
-        if as_result {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              #xml_child_slot_assign
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident.push(#parsed_child_expr);
-              #xml_child_slot_assign
-              continue;
-            },
-          }
-        }
-      } else if as_result {
         quote! {
           #target => {
             let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-            #field_ident = Some(#parsed_child_expr);
+            #field_ident.push(#parsed_child_expr);
             #xml_child_slot_assign
-            return Ok(true);
+            continue;
           },
         }
       } else {
@@ -3409,47 +3180,9 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
         }
       });
-      direct_child_case_arms.push(quote! { #target => #case_index, });
-      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_dispatch_tokens_io.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
+      direct_child_match_tokens_borrowed
+        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
+      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     } else {
       child_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -3481,47 +3214,9 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      direct_child_case_arms.push(quote! { #target => #case_index, });
-      direct_child_dispatch_tokens_borrowed.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_dispatch_tokens_io.push(build_dispatch(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
+      direct_child_match_tokens_borrowed
+        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
+      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     }
   }
 
@@ -3546,62 +3241,22 @@ fn expand_named_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
-    let build_dispatch = |reader_ident: &Ident, as_result: bool, mode: DeserializeMode| {
+    let build_match = |reader_ident: &Ident, mode: DeserializeMode| {
       let skip_tokens = build_empty_child_skip_tokens(ident, &field.qname, mode, reader_ident);
       let assign_tokens = if field.repeated {
         quote! { #field_ident.push(()); }
       } else {
         quote! { #field_ident = Some(()); }
       };
-      if as_result {
-        quote! {
-          #case_index => {
-            #skip_tokens
-            #assign_tokens
-            #xml_child_slot_assign
-            return Ok(true);
-          },
-        }
-      } else {
-        quote! {
-          #case_index => {
-            #skip_tokens
-            #assign_tokens
-            #xml_child_slot_assign
-            continue;
-          },
-        }
+      quote! {
+        #target => {
+          #skip_tokens
+          #assign_tokens
+          #xml_child_slot_assign
+          continue;
+        },
       }
     };
-    let build_match = |reader_ident: &Ident, as_result: bool, mode: DeserializeMode| {
-      let skip_tokens = build_empty_child_skip_tokens(ident, &field.qname, mode, reader_ident);
-      let assign_tokens = if field.repeated {
-        quote! { #field_ident.push(()); }
-      } else {
-        quote! { #field_ident = Some(()); }
-      };
-      if as_result {
-        quote! {
-          #target => {
-            #skip_tokens
-            #assign_tokens
-            #xml_child_slot_assign
-            return Ok(true);
-          },
-        }
-      } else {
-        quote! {
-          #target => {
-            #skip_tokens
-            #assign_tokens
-            #xml_child_slot_assign
-            continue;
-          },
-        }
-      }
-    };
-    direct_child_case_arms.push(quote! { #target => #case_index, });
 
     if field.repeated {
       child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
@@ -3625,42 +3280,9 @@ fn expand_named_struct(
       field.repeated,
       field.optional,
     ));
-    direct_child_dispatch_tokens_borrowed.push(build_dispatch(
-      &xml_reader_ident,
-      false,
-      DeserializeMode::Borrowed,
-    ));
-    direct_child_dispatch_tokens_io.push(build_dispatch(
-      &xml_reader_ident,
-      false,
-      DeserializeMode::Io,
-    ));
-    direct_child_visit_dispatch_tokens_borrowed.push(build_dispatch(
-      &visitor_reader_ident,
-      true,
-      DeserializeMode::Borrowed,
-    ));
-    direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-      &visitor_reader_ident,
-      true,
-      DeserializeMode::Io,
-    ));
-    direct_child_match_tokens_borrowed.push(build_match(
-      &xml_reader_ident,
-      false,
-      DeserializeMode::Borrowed,
-    ));
-    direct_child_match_tokens_io.push(build_match(&xml_reader_ident, false, DeserializeMode::Io));
-    direct_child_visit_match_tokens_borrowed.push(build_match(
-      &visitor_reader_ident,
-      true,
-      DeserializeMode::Borrowed,
-    ));
-    direct_child_visit_match_tokens_io.push(build_match(
-      &visitor_reader_ident,
-      true,
-      DeserializeMode::Io,
-    ));
+    direct_child_match_tokens_borrowed
+      .push(build_match(&xml_reader_ident, DeserializeMode::Borrowed));
+    direct_child_match_tokens_io.push(build_match(&xml_reader_ident, DeserializeMode::Io));
   }
 
   for field in &text_child_fields {
@@ -5418,14 +5040,7 @@ fn expand_named_struct(
       }
     }
   };
-  let choice_fallback_tokens_borrowed = if flat_choice_has_wildcard {
-    quote! {}
-  } else {
-    quote! {
-      _ => {}
-    }
-  };
-  let choice_fallback_tokens_io = if flat_choice_has_wildcard {
+  let choice_fallback_tokens = if flat_choice_has_wildcard {
     quote! {}
   } else {
     quote! {
@@ -5477,7 +5092,7 @@ fn expand_named_struct(
         match event_name {
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
-          #choice_fallback_tokens_borrowed
+          #choice_fallback_tokens
         }
       }
     } else if !has_any_dispatch {
@@ -5554,7 +5169,7 @@ fn expand_named_struct(
         match event_name {
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
-          #choice_fallback_tokens_io
+          #choice_fallback_tokens
         }
       }
     } else if !has_any_dispatch {
@@ -5942,51 +5557,14 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let choice_accepts_text_tokens = if choice_fields.is_empty() {
-    quote! { false }
-  } else {
-    let all_known = choice_fields
-      .iter()
-      .all(|field| field.accepts_text.is_some());
-    if all_known {
-      let any_accepts_text = choice_fields
+  let choice_accepts_text = choice_fields.iter().any(|field| {
+    field.accepts_text.unwrap_or_else(|| {
+      field
+        .items
         .iter()
-        .any(|field| field.accepts_text.expect("checked above"));
-      quote! { #any_accepts_text }
-    } else {
-      let choice_accepts_text_checks: Vec<_> = choice_fields
-        .iter()
-        .map(|field| {
-          if let Some(accepts_text) = field.accepts_text {
-            quote! { #accepts_text }
-          } else {
-            let accepts_text = field
-              .items
-              .iter()
-              .any(|item| matches!(item, SdkTypeChoiceItem::Text { .. }));
-            quote! { #accepts_text }
-          }
-        })
-        .collect();
-      quote! {
-        false #( || #choice_accepts_text_checks )*
-      }
-    }
-  };
-  let choice_accepts_text_known = if choice_fields.is_empty() {
-    Some(false)
-  } else if choice_fields
-    .iter()
-    .all(|field| field.accepts_text.is_some())
-  {
-    Some(
-      choice_fields
-        .iter()
-        .any(|field| field.accepts_text.expect("checked above")),
-    )
-  } else {
-    None
-  };
+        .any(|item| matches!(item, SdkTypeChoiceItem::Text { .. }))
+    })
+  });
   let borrowed_decl_event_tokens = if has_xml_header_field {
     quote! {
       quick_xml::events::Event::Decl(e) => {
@@ -6110,20 +5688,10 @@ fn expand_named_struct(
       }
     }
   };
-  let borrowed_children_loop_tokens = if text_field.is_some() {
-    borrowed_children_text_loop_tokens.clone()
-  } else if choice_accepts_text_known == Some(false) {
-    borrowed_children_tag_loop_tokens.clone()
-  } else if choice_accepts_text_known == Some(true) {
+  let borrowed_children_loop_tokens = if text_field.is_some() || choice_accepts_text {
     borrowed_children_text_loop_tokens.clone()
   } else {
-    quote! {
-      if #choice_accepts_text_tokens {
-        #borrowed_children_text_loop_tokens
-      } else {
-        #borrowed_children_tag_loop_tokens
-      }
-    }
+    borrowed_children_tag_loop_tokens.clone()
   };
   let io_children_text_loop_tokens = quote! {
     if !empty_tag {
@@ -6181,20 +5749,10 @@ fn expand_named_struct(
       }
     }
   };
-  let io_children_loop_tokens = if text_field.is_some() {
-    io_children_text_loop_tokens.clone()
-  } else if choice_accepts_text_known == Some(false) {
-    io_children_tag_loop_tokens.clone()
-  } else if choice_accepts_text_known == Some(true) {
+  let io_children_loop_tokens = if text_field.is_some() || choice_accepts_text {
     io_children_text_loop_tokens.clone()
   } else {
-    quote! {
-      if #choice_accepts_text_tokens {
-        #io_children_text_loop_tokens
-      } else {
-        #io_children_tag_loop_tokens
-      }
-    }
+    io_children_tag_loop_tokens.clone()
   };
 
   let fixed_namespace_write_tokens = if has_xmlns_fields {

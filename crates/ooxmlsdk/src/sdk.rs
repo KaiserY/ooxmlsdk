@@ -651,15 +651,14 @@ impl MceContext {
     })
   }
 
-  pub(crate) fn should_remove_ignorable_attribute(&self, qname: &str) -> bool {
-    let Some((prefix, _)) = qname.split_once(':') else {
+  pub(crate) fn should_remove_ignorable_attribute_bytes(&self, qname: &[u8]) -> bool {
+    let Some(prefix_len) = qname.iter().position(|byte| *byte == b':') else {
       return false;
     };
-    let Some(namespace) = self.namespace_for_prefix_bytes(prefix.as_bytes()) else {
+    let Some(namespace) = self.namespace_for_prefix_bytes(&qname[..prefix_len]) else {
       return false;
     };
-    self.is_ignorable_namespace_bytes(namespace)
-      && !self.is_preserved_attribute_qname_bytes(qname.as_bytes())
+    self.is_ignorable_namespace_bytes(namespace) && !self.is_preserved_attribute_qname_bytes(qname)
   }
 
   fn is_preserved_attribute_qname_bytes(&self, qname: &[u8]) -> bool {

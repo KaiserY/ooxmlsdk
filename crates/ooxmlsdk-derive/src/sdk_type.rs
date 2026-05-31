@@ -1098,7 +1098,7 @@ fn mce_context_scope_tokens(
       quote! {
         self
           .#ident
-          .retain(|attr| !context.should_remove_ignorable_attribute(attr.name()));
+          .retain(|attr| !context.should_remove_ignorable_attribute_bytes(attr.name_bytes()));
       }
     } else {
       quote! {}
@@ -1354,6 +1354,60 @@ struct TextChildParseArmOptions {
   as_result: bool,
   use_local_name_dispatch: bool,
   list: bool,
+}
+
+fn field_decl_init_tokens(
+  owner_ident: &Ident,
+  field_ident: &Ident,
+  repeated: bool,
+  optional: bool,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+  if repeated {
+    (
+      quote! { let mut #field_ident = Vec::new(); },
+      quote! { #field_ident },
+    )
+  } else if optional {
+    (
+      quote! { let mut #field_ident = None; },
+      quote! { #field_ident },
+    )
+  } else {
+    (
+      quote! { let mut #field_ident = None; },
+      quote! {
+        #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+          stringify!(#owner_ident),
+          stringify!(#field_ident),
+        ))?
+      },
+    )
+  }
+}
+
+fn push_mode_pair<F>(
+  borrowed_tokens: &mut Vec<proc_macro2::TokenStream>,
+  io_tokens: &mut Vec<proc_macro2::TokenStream>,
+  mut build: F,
+) where
+  F: FnMut(DeserializeMode) -> proc_macro2::TokenStream,
+{
+  borrowed_tokens.push(build(DeserializeMode::Borrowed));
+  io_tokens.push(build(DeserializeMode::Io));
+}
+
+fn sdk_type_read_inner_call_tokens(
+  child_ty: &Type,
+  mode: DeserializeMode,
+) -> proc_macro2::TokenStream {
+  match mode {
+    DeserializeMode::Borrowed => {
+      quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
+    }
+    DeserializeMode::Io => {
+      quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
+    }
+  }
 }
 
 fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::TokenStream {
@@ -1864,8 +1918,6 @@ fn expand_helper_struct(
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  let read_borrowed_inner_ident = DeserializeMode::Borrowed.deserialize_inner_ident();
-  let read_io_inner_ident = DeserializeMode::Io.deserialize_inner_ident();
 
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
@@ -1952,7 +2004,6 @@ fn expand_helper_struct(
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
-  let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
     let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
@@ -1991,16 +2042,12 @@ fn expand_helper_struct(
       );
       quote! { #tag_qname_lit | #local_name_lit }
     };
-    let build_match = |reader_ident: &Ident, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
-      } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
-      };
+    let build_match = |mode: DeserializeMode| {
+      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
       if field.repeated {
         quote! {
           #target => {
-            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
             #field_ident.push(#parsed_child_expr);
             #xml_child_slot_assign
             continue;
@@ -2009,7 +2056,7 @@ fn expand_helper_struct(
       } else {
         quote! {
           #target => {
-            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
             #field_ident = Some(#parsed_child_expr);
             #xml_child_slot_assign
             continue;
@@ -2017,10 +2064,12 @@ fn expand_helper_struct(
         }
       }
     };
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
 
     if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
       let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &field.qname);
       child_write_tokens.push(quote! {
         for child in &self.#field_ident {
@@ -2032,21 +2081,7 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
         }
       });
-      direct_child_match_tokens_borrowed
-        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
-      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
       if field.optional {
         let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &field.qname);
         child_write_tokens.push(quote! {
@@ -2069,10 +2104,12 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      direct_child_match_tokens_borrowed
-        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
-      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     }
+    push_mode_pair(
+      &mut direct_child_match_tokens_borrowed,
+      &mut direct_child_match_tokens_io,
+      build_match,
+    );
   }
 
   let mut choice_decl_tokens = Vec::new();
@@ -2092,9 +2129,11 @@ fn expand_helper_struct(
     } else {
       quote! { &self.#field_ident }
     };
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    choice_decl_tokens.push(decl_tokens);
+    choice_init_tokens.push(init_tokens);
     if field.repeated {
-      choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(build_choice_write_tokens(
         &choice_ty,
         &field.items,
@@ -2108,17 +2147,6 @@ fn expand_helper_struct(
         }
       });
     } else {
-      choice_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        choice_init_tokens.push(quote! { #field_ident });
-      } else {
-        choice_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
       if field.optional {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -2149,22 +2177,10 @@ fn expand_helper_struct(
 
   for field in &text_child_fields {
     let field_ident = &field.ident;
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
     child_write_tokens.push(build_text_child_write_tokens(
       field_ident,
       &field.qname,
@@ -2210,64 +2226,46 @@ fn expand_helper_struct(
 
   for field in &any_child_fields {
     let field_ident = &field.ident;
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
     child_write_tokens.push(build_any_child_write_tokens(
       field_ident,
       &field.qname,
       field.repeated,
       field.optional,
     ));
-    child_parse_tokens_borrowed.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      false,
-      DeserializeMode::Borrowed,
-      quote! { __ooxmlsdk_seen_child = true; },
-    ));
-    child_parse_tokens_io.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      false,
-      DeserializeMode::Io,
-      quote! { __ooxmlsdk_seen_child = true; },
-    ));
-    child_visit_parse_tokens_borrowed.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      true,
-      DeserializeMode::Borrowed,
-      quote! { __ooxmlsdk_seen_child = true; },
-    ));
-    child_visit_parse_tokens_io.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      true,
-      DeserializeMode::Io,
-      quote! { __ooxmlsdk_seen_child = true; },
-    ));
+    push_mode_pair(
+      &mut child_parse_tokens_borrowed,
+      &mut child_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &field.qname,
+          field.repeated,
+          false,
+          mode,
+          quote! { __ooxmlsdk_seen_child = true; },
+        )
+      },
+    );
+    push_mode_pair(
+      &mut child_visit_parse_tokens_borrowed,
+      &mut child_visit_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &field.qname,
+          field.repeated,
+          true,
+          mode,
+          quote! { __ooxmlsdk_seen_child = true; },
+        )
+      },
+    );
   }
 
   let main_dispatch_tokens_borrowed = quote! {
@@ -2525,9 +2523,6 @@ fn expand_named_struct(
     };
     LitByteStr::new(attr.as_bytes(), Span::call_site())
   });
-  let read_borrowed_inner_ident = DeserializeMode::Borrowed.deserialize_inner_ident();
-  let read_io_inner_ident = DeserializeMode::Io.deserialize_inner_ident();
-
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
@@ -3140,16 +3135,12 @@ fn expand_named_struct(
     let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &field.qname);
     let self_write_call =
       write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &field.qname);
-    let build_match = |reader_ident: &Ident, deserialize_ident: &Ident| {
-      let deserialize_call = if deserialize_ident == &read_borrowed_inner_ident {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
-      } else {
-        quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
-      };
+    let build_match = |mode: DeserializeMode| {
+      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
       if field.repeated {
         quote! {
           #target => {
-            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
             #field_ident.push(#parsed_child_expr);
             #xml_child_slot_assign
             continue;
@@ -3158,7 +3149,7 @@ fn expand_named_struct(
       } else {
         quote! {
           #target => {
-            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
             #field_ident = Some(#parsed_child_expr);
             #xml_child_slot_assign
             continue;
@@ -3166,10 +3157,12 @@ fn expand_named_struct(
         }
       }
     };
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
 
     if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
       child_write_tokens.push(quote! {
         for child in &self.#field_ident {
           #child_write_call
@@ -3180,21 +3173,7 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
         }
       });
-      direct_child_match_tokens_borrowed
-        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
-      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
       if field.optional {
         child_write_tokens.push(quote! {
           if let Some(child) = &self.#field_ident {
@@ -3214,10 +3193,12 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      direct_child_match_tokens_borrowed
-        .push(build_match(&xml_reader_ident, &read_borrowed_inner_ident));
-      direct_child_match_tokens_io.push(build_match(&xml_reader_ident, &read_io_inner_ident));
     }
+    push_mode_pair(
+      &mut direct_child_match_tokens_borrowed,
+      &mut direct_child_match_tokens_io,
+      build_match,
+    );
   }
 
   for field in &empty_child_fields {
@@ -3258,31 +3239,21 @@ fn expand_named_struct(
       }
     };
 
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
     child_write_tokens.push(build_empty_child_write_tokens(
       field_ident,
       &field.qname,
       field.repeated,
       field.optional,
     ));
-    direct_child_match_tokens_borrowed
-      .push(build_match(&xml_reader_ident, DeserializeMode::Borrowed));
-    direct_child_match_tokens_io.push(build_match(&xml_reader_ident, DeserializeMode::Io));
+    push_mode_pair(
+      &mut direct_child_match_tokens_borrowed,
+      &mut direct_child_match_tokens_io,
+      |mode| build_match(&xml_reader_ident, mode),
+    );
   }
 
   for field in &text_child_fields {
@@ -3292,22 +3263,10 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
     child_write_tokens.push(build_text_child_write_tokens(
       field_ident,
       &field.qname,
@@ -3358,64 +3317,46 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-    if field.repeated {
-      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      child_init_tokens.push(quote! { #field_ident });
-    } else {
-      child_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        child_init_tokens.push(quote! { #field_ident });
-      } else {
-        child_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    child_decl_tokens.push(decl_tokens);
+    child_init_tokens.push(init_tokens);
     child_write_tokens.push(build_any_child_write_tokens(
       field_ident,
       &field.qname,
       field.repeated,
       field.optional,
     ));
-    child_parse_tokens_borrowed.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      false,
-      DeserializeMode::Borrowed,
-      xml_child_slot_assign.clone(),
-    ));
-    child_parse_tokens_io.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      false,
-      DeserializeMode::Io,
-      xml_child_slot_assign.clone(),
-    ));
-    child_visit_parse_tokens_borrowed.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      true,
-      DeserializeMode::Borrowed,
-      xml_child_slot_assign.clone(),
-    ));
-    child_visit_parse_tokens_io.push(build_any_child_parse_arm(
-      ident,
-      field_ident,
-      &field.qname,
-      field.repeated,
-      true,
-      DeserializeMode::Io,
-      xml_child_slot_assign,
-    ));
+    push_mode_pair(
+      &mut child_parse_tokens_borrowed,
+      &mut child_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &field.qname,
+          field.repeated,
+          false,
+          mode,
+          xml_child_slot_assign.clone(),
+        )
+      },
+    );
+    push_mode_pair(
+      &mut child_visit_parse_tokens_borrowed,
+      &mut child_visit_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &field.qname,
+          field.repeated,
+          true,
+          mode,
+          xml_child_slot_assign.clone(),
+        )
+      },
+    );
   }
 
   let mut choice_decl_tokens = Vec::new();
@@ -4767,9 +4708,11 @@ fn expand_named_struct(
         }
       }
     }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    choice_decl_tokens.push(decl_tokens);
+    choice_init_tokens.push(init_tokens);
     if field.repeated {
-      choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      choice_init_tokens.push(quote! { #field_ident });
       choice_write_tokens.push(build_choice_write_tokens(
         &choice_ty,
         &field.items,
@@ -4784,17 +4727,6 @@ fn expand_named_struct(
       });
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     } else {
-      choice_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        choice_init_tokens.push(quote! { #field_ident });
-      } else {
-        choice_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
       if field.optional {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -4853,87 +4785,38 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-
-    if field.repeated {
-      any_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-      any_init_tokens.push(quote! { #field_ident });
-      any_parse_tokens_borrowed.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        true,
-        DeserializeMode::Borrowed,
-        false,
-        xml_child_slot_assign.clone(),
-      ));
-      any_parse_tokens_io.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        true,
-        DeserializeMode::Io,
-        false,
-        xml_child_slot_assign.clone(),
-      ));
-      any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        true,
-        DeserializeMode::Borrowed,
-        true,
-        xml_child_slot_assign.clone(),
-      ));
-      any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        true,
-        DeserializeMode::Io,
-        true,
-        xml_child_slot_assign.clone(),
-      ));
-    } else {
-      any_decl_tokens.push(quote! { let mut #field_ident = None; });
-      if field.optional {
-        any_init_tokens.push(quote! { #field_ident });
-      } else {
-        any_init_tokens.push(quote! {
-          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-            stringify!(#ident),
-            stringify!(#field_ident),
-          ))?
-        });
-      }
-      any_parse_tokens_borrowed.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        false,
-        DeserializeMode::Borrowed,
-        false,
-        xml_child_slot_assign.clone(),
-      ));
-      any_parse_tokens_io.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        false,
-        DeserializeMode::Io,
-        false,
-        xml_child_slot_assign.clone(),
-      ));
-      any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        false,
-        DeserializeMode::Borrowed,
-        true,
-        xml_child_slot_assign.clone(),
-      ));
-      any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
-        field_ident,
-        &field.ty,
-        false,
-        DeserializeMode::Io,
-        true,
-        xml_child_slot_assign.clone(),
-      ));
-    }
+    let (decl_tokens, init_tokens) =
+      field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
+    any_decl_tokens.push(decl_tokens);
+    any_init_tokens.push(init_tokens);
+    push_mode_pair(
+      &mut any_parse_tokens_borrowed,
+      &mut any_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_tokens(
+          field_ident,
+          &field.ty,
+          field.repeated,
+          mode,
+          false,
+          xml_child_slot_assign.clone(),
+        )
+      },
+    );
+    push_mode_pair(
+      &mut any_visit_parse_tokens_borrowed,
+      &mut any_visit_parse_tokens_io,
+      |mode| {
+        build_any_child_parse_tokens(
+          field_ident,
+          &field.ty,
+          field.repeated,
+          mode,
+          true,
+          xml_child_slot_assign.clone(),
+        )
+      },
+    );
   }
   let pure_any_parse_tokens_borrowed = if let Some(field) = any_fields.first() {
     let field_ident = &field.ident;

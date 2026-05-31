@@ -900,7 +900,7 @@ pub(crate) fn mce_choice_replacement_child_bytes(
           match reader.read_event()? {
             Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
               let choice_namespaces = namespaces_with(&namespaces, &e)?;
-              let requires = attr_value(&e, b"Requires")?;
+              let requires = attr_value(&reader, &e, b"Requires")?;
               let children = read_mce_container_children_bytes(&mut reader, MC_CHOICE_NAMES)?;
               if choice_requires_supported(
                 requires.as_deref(),
@@ -912,7 +912,7 @@ pub(crate) fn mce_choice_replacement_child_bytes(
             }
             Event::Empty(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
               let choice_namespaces = namespaces_with(&namespaces, &e)?;
-              let requires = attr_value(&e, b"Requires")?;
+              let requires = attr_value(&reader, &e, b"Requires")?;
               if choice_requires_supported(
                 requires.as_deref(),
                 &choice_namespaces,
@@ -966,15 +966,19 @@ fn mce_unknown_element_replacement_bytes(
   let qname = start.name();
   let qname = qname.as_ref();
   let namespaces = namespaces_from_context_with(context, &start)?;
-  let ignorable_namespace = qname_prefix(qname).and_then(|prefix| {
-    namespaces.iter().rev().find_map(|namespace| {
-      (namespace.prefix_bytes() == prefix)
-        .then_some(namespace.uri_bytes())
-        .filter(|ns| context.is_ignorable_namespace_bytes(ns))
-    })
+  let is_ignorable = qname_prefix(qname).is_some_and(|prefix| {
+    namespaces
+      .iter()
+      .rev()
+      .find_map(|namespace| {
+        (namespace.prefix_bytes() == prefix)
+          .then_some(namespace.uri_bytes())
+          .filter(|ns| context.is_ignorable_namespace_bytes(ns))
+      })
+      .is_some()
   });
 
-  if ignorable_namespace.is_some() && context.is_process_content_qname_bytes(qname) {
+  if is_ignorable && context.is_process_content_qname_bytes(qname) {
     if empty_tag {
       return Ok(Some(Vec::new()));
     }
@@ -982,7 +986,7 @@ fn mce_unknown_element_replacement_bytes(
     return read_mce_container_children_bytes(reader, &[end_name.as_slice()]).map(Some);
   }
 
-  if ignorable_namespace.is_some() {
+  if is_ignorable {
     if !empty_tag {
       skip_element(reader)?;
     }
@@ -1082,13 +1086,22 @@ fn skip_element(reader: &mut Reader<&[u8]>) -> Result<(), SdkError> {
 
 #[cfg(feature = "mce")]
 fn attr_value(
+  reader: &Reader<&[u8]>,
   start: &quick_xml::events::BytesStart<'_>,
   name: &[u8],
 ) -> Result<Option<Box<[u8]>>, SdkError> {
   for attr in start.attributes() {
     let attr = attr?;
     if attr.key.as_ref() == name {
-      return Ok(Some(attr.value.as_ref().into()));
+      return if let Some(value) = attr_raw_value(&attr) {
+        Ok(Some(value.into()))
+      } else {
+        Ok(Some(
+          decode_attr_value(&attr, reader.decoder())?
+            .into_bytes()
+            .into_boxed_slice(),
+        ))
+      };
     }
   }
   Ok(None)

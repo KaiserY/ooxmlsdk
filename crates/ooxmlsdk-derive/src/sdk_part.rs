@@ -162,16 +162,16 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         if explicit_relationship_type_may_have_alias(value) =>
       {
         Some(quote! {
-          crate::common::relationship_type_matches_alias(
+          crate::common::relationship_type_matches_alias_bytes(
             relationship_type,
-            #relationship_type_pattern,
+            #relationship_type_pattern.as_bytes(),
           )
         })
       }
       PartRelationshipTypeSource::TypeConst => Some(quote! {
-        crate::common::relationship_type_matches_alias(
+        crate::common::relationship_type_matches_alias_bytes(
           relationship_type,
-          #relationship_type_pattern,
+          #relationship_type_pattern.as_bytes(),
         )
       }),
       _ => None,
@@ -341,16 +341,16 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         if explicit_relationship_type_may_have_alias(value) =>
       {
         Some(quote! {
-          crate::common::relationship_type_matches_alias(
+          crate::common::relationship_type_matches_alias_bytes(
             relationship_type,
-            #relationship_type_pattern,
+            #relationship_type_pattern.as_bytes(),
           )
         })
       }
       PartRelationshipTypeSource::TypeConst => Some(quote! {
-        crate::common::relationship_type_matches_alias(
+        crate::common::relationship_type_matches_alias_bytes(
           relationship_type,
-          #relationship_type_pattern,
+          #relationship_type_pattern.as_bytes(),
         )
       }),
       _ => None,
@@ -501,7 +501,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
       let alias_dispatch_chain =
         build_conditional_chain(&alias_match_branches, extended_fallback_tokens);
       quote! {
-        let relationship_type = relationship.r#type.as_str();
+        let relationship_type = relationship.r#type.as_bytes();
         #alias_dispatch_chain
       }
     };
@@ -1904,11 +1904,11 @@ fn part_handle_child_methods_tokens(
   let accessors = child_infos.iter().map(|child| {
     let method_ident = &child.field_ident;
     let part_ty = &child.part_ty;
-    let relationship_type = &child.relationship_type;
+    let relationship_type = proc_macro2::Literal::byte_string(child.relationship_type.as_bytes());
     let map_relationship = quote! {
       |relationship: &crate::common::RelationshipInfo| {
-        if crate::common::relationship_type_matches(
-          relationship.relationship_type(),
+        if crate::common::relationship_type_matches_bytes(
+          relationship.relationship_type_bytes(),
           #relationship_type,
         ) {
           relationship

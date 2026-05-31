@@ -7,6 +7,7 @@ use std::{
   path::Path,
 };
 
+use ooxmlsdk::namespaces::XmlKnownRelationshipNamespace;
 use ooxmlsdk::parts::{
   PartRef, presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
@@ -1498,25 +1499,9 @@ fn normalize_ignorable_prefix_list(value: &str, namespaces: &BTreeMap<String, St
 }
 
 fn normalize_relationship_type_uri(value: &str) -> String {
-  const PURL_PREFIX: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
-  const OPENXML_PREFIX: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
-
-  if let Some(suffix) = value.strip_prefix(PURL_PREFIX) {
-    return match suffix {
-      "customProperties" => format!("{OPENXML_PREFIX}custom-properties"),
-      "extendedProperties" => format!("{OPENXML_PREFIX}extended-properties"),
-      other => format!("{OPENXML_PREFIX}{other}"),
-    };
-  }
-
-  match value {
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument" => {
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-        .to_string()
-    }
-    _ => value.to_string(),
-  }
+  XmlKnownRelationshipNamespace::from_uri(value)
+    .map(|namespace| namespace.uri().to_string())
+    .unwrap_or_else(|| value.to_string())
 }
 
 fn normalize_namespace_uri(value: &str) -> String {

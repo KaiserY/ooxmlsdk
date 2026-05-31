@@ -1396,6 +1396,77 @@ fn push_mode_pair<F>(
   io_tokens.push(build(DeserializeMode::Io));
 }
 
+fn flat_choice_arm_tokens(
+  targets: &[proc_macro2::TokenStream],
+  body: proc_macro2::TokenStream,
+  visit: bool,
+) -> proc_macro2::TokenStream {
+  let terminal = if visit {
+    quote! { return Ok(true); }
+  } else {
+    quote! { continue; }
+  };
+  quote! {
+    #( #targets )|* => {
+      #body
+      #terminal
+    }
+  }
+}
+
+fn push_flat_choice_mode_arms(
+  borrowed_tokens: &mut Vec<proc_macro2::TokenStream>,
+  io_tokens: &mut Vec<proc_macro2::TokenStream>,
+  borrowed_visit_tokens: &mut Vec<proc_macro2::TokenStream>,
+  io_visit_tokens: &mut Vec<proc_macro2::TokenStream>,
+  targets: &[proc_macro2::TokenStream],
+  borrowed_body: proc_macro2::TokenStream,
+  io_body: proc_macro2::TokenStream,
+) {
+  borrowed_tokens.push(flat_choice_arm_tokens(
+    targets,
+    borrowed_body.clone(),
+    false,
+  ));
+  io_tokens.push(flat_choice_arm_tokens(targets, io_body.clone(), false));
+  borrowed_visit_tokens.push(flat_choice_arm_tokens(targets, borrowed_body, true));
+  io_visit_tokens.push(flat_choice_arm_tokens(targets, io_body, true));
+}
+
+fn flat_choice_wildcard_arm_tokens(
+  body: proc_macro2::TokenStream,
+  visit: bool,
+) -> proc_macro2::TokenStream {
+  let terminal = if visit {
+    quote! { return Ok(true); }
+  } else {
+    quote! { continue; }
+  };
+  quote! {
+    _ => {
+      #body
+      #terminal
+    }
+  }
+}
+
+fn push_flat_choice_wildcard_arms(
+  borrowed_tokens: &mut Vec<proc_macro2::TokenStream>,
+  io_tokens: &mut Vec<proc_macro2::TokenStream>,
+  borrowed_visit_tokens: &mut Vec<proc_macro2::TokenStream>,
+  io_visit_tokens: &mut Vec<proc_macro2::TokenStream>,
+  borrowed_body: proc_macro2::TokenStream,
+  io_body: proc_macro2::TokenStream,
+) {
+  borrowed_tokens.push(flat_choice_wildcard_arm_tokens(
+    borrowed_body.clone(),
+    false,
+  ));
+  io_tokens.push(flat_choice_wildcard_arm_tokens(io_body.clone(), false));
+  borrowed_visit_tokens.push(flat_choice_wildcard_arm_tokens(borrowed_body, true));
+  io_visit_tokens.push(flat_choice_wildcard_arm_tokens(io_body, true));
+}
+
 fn sdk_type_read_inner_call_tokens(
   child_ty: &Type,
   mode: DeserializeMode,
@@ -1828,6 +1899,50 @@ fn build_any_child_parse_tokens(
       #assign
       #xml_child_slot_assign
       #tail
+    }
+  }
+}
+
+fn build_choice_any_child_parse_tokens(
+  owner_ident: &Ident,
+  qname: &str,
+  mode: DeserializeMode,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let tag_qname_lit = LitByteStr::new(
+    format!("{tag_prefix}:{local_name}").as_bytes(),
+    Span::call_site(),
+  );
+  let read_raw_element_xml = mode.read_raw_element_xml_fn();
+  let read_raw_empty_xml = mode.read_raw_empty_xml_fn();
+  quote! {
+    let mut parsed_child = Vec::new();
+    if !next_empty {
+      loop {
+        match xml_reader.next()? {
+          quick_xml::events::Event::Start(e) => {
+            let xml = #read_raw_element_xml(xml_reader, e)?;
+            parsed_child.push(xml);
+          }
+          quick_xml::events::Event::Empty(e) => {
+            let xml = #read_raw_empty_xml(e)?;
+            parsed_child.push(xml);
+          }
+          quick_xml::events::Event::End(end) => {
+            if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
+          }
+          _ => {}
+        }
+      }
     }
   }
 }
@@ -3544,98 +3659,34 @@ fn expand_named_struct(
         match item {
           SdkTypeChoiceItem::Child { variant, qname, .. } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            flat_choice_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
+            let assign_tokens = if field.repeated {
+              quote! { #field_ident.push(parsed_choice); }
+            } else {
+              quote! { #field_ident = Some(parsed_choice); }
+            };
+            let borrowed_body = quote! {
                 let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
                   <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
                 ));
-                #field_ident.push(parsed_choice);
+                #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            if !field.repeated {
-              flat_choice_match_tokens_borrowed.pop();
-              flat_choice_match_tokens_borrowed.push(quote! {
-                #( #targets )|* => {
-                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                    <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
-                  ));
-                  #field_ident = Some(parsed_choice);
-                  #xml_child_slot_assign
-                  continue;
-                }
-              });
-            }
-            flat_choice_match_tokens_io.push(quote! {
-              #( #targets )|* => {
+            };
+            let io_body = quote! {
                 let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
                   <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
                 ));
-                #field_ident.push(parsed_choice);
+                #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            if !field.repeated {
-              flat_choice_match_tokens_io.pop();
-              flat_choice_match_tokens_io.push(quote! {
-                #( #targets )|* => {
-                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                    <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
-                  ));
-                  #field_ident = Some(parsed_choice);
-                  #xml_child_slot_assign
-                  continue;
-                }
-              });
-            }
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
-                ));
-                #field_ident.push(parsed_choice);
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            if !field.repeated {
-              flat_choice_visit_match_tokens_borrowed.pop();
-              flat_choice_visit_match_tokens_borrowed.push(quote! {
-                #( #targets )|* => {
-                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                    <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
-                  ));
-                  #field_ident = Some(parsed_choice);
-                  #xml_child_slot_assign
-                  return Ok(true);
-                }
-              });
-            }
-            flat_choice_visit_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
-                ));
-                #field_ident.push(parsed_choice);
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            if !field.repeated {
-              flat_choice_visit_match_tokens_io.pop();
-              flat_choice_visit_match_tokens_io.push(quote! {
-                #( #targets )|* => {
-                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                    <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
-                  ));
-                  #field_ident = Some(parsed_choice);
-                  #xml_child_slot_assign
-                  return Ok(true);
-                }
-              });
-            }
+            };
+            push_flat_choice_mode_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              &targets,
+              borrowed_body,
+              io_body,
+            );
           }
           SdkTypeChoiceItem::EmptyChild { variant, qname } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
@@ -3652,38 +3703,25 @@ fn expand_named_struct(
             } else {
               quote! { #field_ident = Some(#choice_ty::#variant); }
             };
-            flat_choice_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
+            let borrowed_body = quote! {
                 #skip_tokens_borrowed
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_match_tokens_io.push(quote! {
-              #( #targets )|* => {
+            };
+            let io_body = quote! {
                 #skip_tokens_io
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
-                #skip_tokens_borrowed
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            flat_choice_visit_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                #skip_tokens_io
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
+            };
+            push_flat_choice_mode_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              &targets,
+              borrowed_body,
+              io_body,
+            );
           }
           SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
@@ -3700,143 +3738,51 @@ fn expand_named_struct(
             } else {
               quote! { #field_ident = Some(#choice_ty::#variant(parsed_child)); }
             };
-            flat_choice_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
+            let body = quote! {
                 #parsed_tokens
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                #parsed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
-                #parsed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            flat_choice_visit_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                #parsed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
+            };
+            push_flat_choice_mode_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              &targets,
+              body.clone(),
+              body,
+            );
           }
           SdkTypeChoiceItem::AnyChild { variant, qname } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let QNameInfo {
-              tag_prefix,
-              local_name,
-            } = parse_qname_info(qname);
-            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-            let tag_qname_lit = LitByteStr::new(
-              format!("{tag_prefix}:{local_name}").as_bytes(),
-              Span::call_site(),
-            );
-            let parsed_borrowed_tokens = quote! {
-              let mut parsed_child = Vec::new();
-              if !next_empty {
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_raw_element_xml_borrowed(xml_reader, e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_raw_empty_xml_borrowed(e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-              }
-            };
-            let parsed_io_tokens = quote! {
-              let mut parsed_child = Vec::new();
-              if !next_empty {
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_raw_element_xml_io(xml_reader, e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_raw_empty_xml_io(e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-              }
-            };
+            let parsed_borrowed_tokens =
+              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Borrowed);
+            let parsed_io_tokens =
+              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Io);
             let assign_tokens = if field.repeated {
               quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
             } else {
               quote! { #field_ident = Some(#choice_ty::#variant(parsed_child.into())); }
             };
-            flat_choice_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
+            let borrowed_body = quote! {
                 #parsed_borrowed_tokens
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_match_tokens_io.push(quote! {
-              #( #targets )|* => {
+            };
+            let io_body = quote! {
                 #parsed_io_tokens
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
-                #parsed_borrowed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            flat_choice_visit_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                #parsed_io_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
+            };
+            push_flat_choice_mode_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              &targets,
+              borrowed_body,
+              io_body,
+            );
           }
           SdkTypeChoiceItem::Sequence { variant, children } => {
             let occupied_qnames = field
@@ -4039,72 +3985,46 @@ fn expand_named_struct(
                 #( #final_fields )*
                 let parsed_choice = #choice_ty::#variant { #( #variant_fields ),* };
               };
-              flat_choice_match_tokens_borrowed.push(quote! {
-                #( #targets )|* => {
+              let borrowed_body = quote! {
                   #borrowed_sequence_tokens
                   #assign_named_tokens
                   #xml_child_slot_assign
-                  continue;
-                }
-              });
-              flat_choice_match_tokens_io.push(quote! {
-                #( #targets )|* => {
+              };
+              let io_body = quote! {
                   #io_sequence_tokens
                   #assign_named_tokens
                   #xml_child_slot_assign
-                  continue;
-                }
-              });
-              flat_choice_visit_match_tokens_borrowed.push(quote! {
-                #( #targets )|* => {
-                  #borrowed_sequence_tokens
-                  #assign_named_tokens
-                  #xml_child_slot_assign
-                  return Ok(true);
-                }
-              });
-              flat_choice_visit_match_tokens_io.push(quote! {
-                #( #targets )|* => {
-                  #io_sequence_tokens
-                  #assign_named_tokens
-                  #xml_child_slot_assign
-                  return Ok(true);
-                }
-              });
+              };
+              push_flat_choice_mode_arms(
+                &mut flat_choice_match_tokens_borrowed,
+                &mut flat_choice_match_tokens_io,
+                &mut flat_choice_visit_match_tokens_borrowed,
+                &mut flat_choice_visit_match_tokens_io,
+                &targets,
+                borrowed_body,
+                io_body,
+              );
               continue;
             }
-            flat_choice_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
+            let borrowed_body = quote! {
                 let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_match_tokens_io.push(quote! {
-              #( #targets )|* => {
+            };
+            let io_body = quote! {
                 let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              #( #targets )|* => {
-                let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            flat_choice_visit_match_tokens_io.push(quote! {
-              #( #targets )|* => {
-                let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
+            };
+            push_flat_choice_mode_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              &targets,
+              borrowed_body,
+              io_body,
+            );
           }
           SdkTypeChoiceItem::Any { variant } => {
             flat_choice_has_wildcard = true;
@@ -4113,8 +4033,7 @@ fn expand_named_struct(
             } else {
               quote! { #field_ident = Some(#choice_ty::#variant(xml)); }
             };
-            flat_choice_match_tokens_borrowed.push(quote! {
-              _ => {
+            let borrowed_body = quote! {
                 let xml = if next_empty {
                   crate::common::read_raw_empty_xml_borrowed_bytes(e)?
                 } else {
@@ -4122,11 +4041,8 @@ fn expand_named_struct(
                 };
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_match_tokens_io.push(quote! {
-              _ => {
+            };
+            let io_body = quote! {
                 let xml = if next_empty {
                   crate::common::read_raw_empty_xml_io_bytes(e)?
                 } else {
@@ -4134,33 +4050,15 @@ fn expand_named_struct(
                 };
                 #assign_tokens
                 #xml_child_slot_assign
-                continue;
-              }
-            });
-            flat_choice_visit_match_tokens_borrowed.push(quote! {
-              _ => {
-                let xml = if next_empty {
-                  crate::common::read_raw_empty_xml_borrowed_bytes(e)?
-                } else {
-                  crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
-                };
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
-            flat_choice_visit_match_tokens_io.push(quote! {
-              _ => {
-                let xml = if next_empty {
-                  crate::common::read_raw_empty_xml_io_bytes(e)?
-                } else {
-                  crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
-                };
-                #assign_tokens
-                #xml_child_slot_assign
-                return Ok(true);
-              }
-            });
+            };
+            push_flat_choice_wildcard_arms(
+              &mut flat_choice_match_tokens_borrowed,
+              &mut flat_choice_match_tokens_io,
+              &mut flat_choice_visit_match_tokens_borrowed,
+              &mut flat_choice_visit_match_tokens_io,
+              borrowed_body,
+              io_body,
+            );
           }
           SdkTypeChoiceItem::Text { .. } => {}
         }
@@ -4271,41 +4169,24 @@ fn expand_named_struct(
         match item {
           SdkTypeChoiceItem::Child { variant, qname, .. } => {
             let targets = grouped_choice_match_target_keys(std::slice::from_ref(qname));
+            let assign_tokens = if field.repeated {
+              quote! { #field_ident.push(parsed_choice); }
+            } else {
+              quote! { #field_ident = Some(parsed_choice); }
+            };
             let borrowed_parse = quote! {
               let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
                 <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
               ));
-              #field_ident.push(parsed_choice);
+              #assign_tokens
               #xml_child_slot_assign
-            };
-            let borrowed_parse = if field.repeated {
-              borrowed_parse
-            } else {
-              quote! {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
-                ));
-                #field_ident = Some(parsed_choice);
-                #xml_child_slot_assign
-              }
             };
             let io_parse = quote! {
               let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
                 <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
               ));
-              #field_ident.push(parsed_choice);
+              #assign_tokens
               #xml_child_slot_assign
-            };
-            let io_parse = if field.repeated {
-              io_parse
-            } else {
-              quote! {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
-                ));
-                #field_ident = Some(parsed_choice);
-                #xml_child_slot_assign
-              }
             };
             push_grouped_choice_attempts(
               targets,
@@ -4378,71 +4259,10 @@ fn expand_named_struct(
           }
           SdkTypeChoiceItem::AnyChild { variant, qname } => {
             let targets = grouped_choice_match_target_keys(std::slice::from_ref(qname));
-            let QNameInfo {
-              tag_prefix,
-              local_name,
-            } = parse_qname_info(qname);
-            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-            let tag_qname_lit = LitByteStr::new(
-              format!("{tag_prefix}:{local_name}").as_bytes(),
-              Span::call_site(),
-            );
-            let parsed_borrowed_tokens = quote! {
-              let mut parsed_child = Vec::new();
-              if !next_empty {
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_raw_element_xml_borrowed(xml_reader, e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_raw_empty_xml_borrowed(e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-              }
-            };
-            let parsed_io_tokens = quote! {
-              let mut parsed_child = Vec::new();
-              if !next_empty {
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Start(e) => {
-                      let xml = crate::common::read_raw_element_xml_io(xml_reader, e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::Empty(e) => {
-                      let xml = crate::common::read_raw_empty_xml_io(e)?;
-                      parsed_child.push(xml);
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-              }
-            };
+            let parsed_borrowed_tokens =
+              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Borrowed);
+            let parsed_io_tokens =
+              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Io);
             let assign_tokens = if field.repeated {
               quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
             } else {

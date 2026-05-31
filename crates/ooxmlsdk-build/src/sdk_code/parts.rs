@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{Ident, ItemMod, ItemStruct, Stmt, Type, parse_str, parse2};
 
 use crate::Result;
@@ -8,6 +8,7 @@ use crate::sdk_code::part_codegen_ir::{
   PartChildCardinality, PartFieldDecl, PartFieldKind, PartModuleDecl,
 };
 use crate::sdk_code::versioning::features_cfg_attrs;
+use crate::sdk_data::sdk_data_model::NamespaceAlias as SdkDataNamespaceAlias;
 
 pub fn gen_part_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let relationship_type_str = part.relationship_type.as_str();
@@ -257,11 +258,15 @@ fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
   }
 }
 
-pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
+pub fn gen_parts_mod(
+  parts: &[&PartModuleDecl],
+  _namespace_aliases: &[SdkDataNamespaceAlias],
+) -> Result<TokenStream> {
   let mut mod_list: Vec<ItemMod> = vec![];
   let mut part_ref_variants: Vec<TokenStream> = vec![];
   let mut part_ref_from_part_id_groups: BTreeMap<String, Vec<TokenStream>> = BTreeMap::new();
   let mut root_element_variants: Vec<TokenStream> = vec![];
+  let relationship_type_variants = relationship_type_variant_map(parts)?;
 
   for part in parts {
     let mod_ident: Ident = parse_str(&part.module_name)?;
@@ -299,7 +304,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       #( #part_attrs )*
       #struct_ident(#part_ty),
     });
-    let relationship_type = part.relationship_type.as_str();
+    let relationship_type_pattern =
+      relationship_type_known_match_pattern(&part.relationship_type, &relationship_type_variants)?;
     let exact_match_condition = part_exact_match_condition_tokens(part, quote! { part });
     let make_part_ref = quote! {
       return Some(<#part_ty>::make_part_ref(
@@ -311,14 +317,14 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     let part_ref_arm = if let Some(exact_match_condition) = exact_match_condition {
       quote! {
         #( #part_attrs )*
-        #relationship_type if #exact_match_condition => {
+        #relationship_type_pattern if #exact_match_condition => {
           #make_part_ref
         }
       }
     } else {
       quote! {
         #( #part_attrs )*
-        #relationship_type => {
+        #relationship_type_pattern => {
           #make_part_ref
         }
       }
@@ -399,7 +405,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         relationship_id: Option<&str>,
       ) -> Option<Self> {
         let part = storage.part(part_id)?;
-        let Some(relationship_type) = part.relationship_type() else {
+        let Some(relationship_type) = part.relationship_known_type() else {
           let part = if let Some(relationship_id) = relationship_id {
             <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
               storage,
@@ -414,7 +420,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           };
           return Some(PartRef::ExtendedPart(part));
         };
-        match crate::common::canonical_relationship_type(relationship_type).as_ref() {
+        match relationship_type {
           #( #part_ref_from_part_id_match_arms )*
           _ => {}
         }
@@ -514,9 +520,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             let Some(part) = storage.part(part_id) else {
               return Ok(None);
             };
-            if part.relationship_type()
-              == Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk")
-            {
+            if part.relationship_known_type()
+              == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAFChunk) {
               return Ok(None);
             }
             #[cfg(not(feature = "mce"))]
@@ -659,10 +664,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     ) -> bool
     {
       open_settings.ignore_calculation_chain_part_relationship
-        && crate::common::relationship_type_matches(
-          relationship.relationship_type(),
-          crate::parts::calculation_chain_part::RELATIONSHIP_TYPE,
-        )
+        && relationship.relationship_known_type()
+          == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCalcChain)
     }
 
     pub fn save_package<P, W>(
@@ -729,6 +732,71 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       Ok(())
     }
   })
+}
+
+fn relationship_type_known_match_pattern(
+  relationship_type: &str,
+  relationship_type_variants: &HashMap<String, Ident>,
+) -> Result<TokenStream> {
+  let Some(variant_ident) = relationship_type_variants.get(relationship_type) else {
+    return Err(format!("unknown relationship type variant for {relationship_type}").into());
+  };
+  Ok(quote! {
+    crate::namespaces::XmlKnownRelationshipNamespace::#variant_ident
+  })
+}
+
+fn relationship_type_variant_map(parts: &[&PartModuleDecl]) -> Result<HashMap<String, Ident>> {
+  let mut known_uris = HashSet::new();
+  let mut used_variants = HashSet::new();
+  let mut variants = HashMap::new();
+
+  for relationship_type in super::EXTRA_RELATIONSHIP_TYPES {
+    known_uris.insert((*relationship_type).to_string());
+    variants.insert(
+      (*relationship_type).to_string(),
+      parse_str(&super::relationship_type_variant_name(
+        relationship_type,
+        &mut used_variants,
+      ))?,
+    );
+  }
+
+  for part in parts {
+    let relationship_type = part.relationship_type.as_str();
+    if relationship_type.is_empty() || !known_uris.insert(relationship_type.to_string()) {
+      continue;
+    }
+    variants.insert(
+      relationship_type.to_string(),
+      parse_str(&super::relationship_type_variant_name(
+        relationship_type,
+        &mut used_variants,
+      ))?,
+    );
+  }
+
+  Ok(variants)
+}
+
+pub(crate) fn relationship_type_aliases(
+  relationship_type: &str,
+  namespace_aliases: &[SdkDataNamespaceAlias],
+) -> Vec<String> {
+  let Some((canonical_base, canonical_suffix)) = relationship_type.rsplit_once('/') else {
+    return Vec::new();
+  };
+
+  let mut aliases = HashSet::new();
+  for alias in namespace_aliases {
+    if alias.canonical_uri == relationship_type {
+      aliases.insert(alias.uri.clone());
+    }
+    if alias.canonical_uri == canonical_base {
+      aliases.insert(format!("{}/{canonical_suffix}", alias.uri));
+    }
+  }
+  aliases.into_iter().collect()
 }
 
 fn part_module_attrs(part: &PartModuleDecl) -> Vec<syn::Attribute> {
@@ -933,7 +1001,7 @@ mod tests {
       ..Default::default()
     };
 
-    let rendered = gen_parts_mod(&[&part]).unwrap().to_string();
+    let rendered = gen_parts_mod(&[&part], &[]).unwrap().to_string();
     assert!(rendered.contains("pub enum PartRef"));
     assert!(rendered.contains("pub mod extended_part"));
     assert!(
@@ -1010,7 +1078,7 @@ mod tests {
       ..Default::default()
     };
 
-    let rendered = gen_parts_mod(&[&package, &part]).unwrap().to_string();
+    let rendered = gen_parts_mod(&[&package, &part], &[]).unwrap().to_string();
     assert!(rendered.contains("pub mod wordprocessing_document"));
     assert!(!rendered.contains("WordprocessingDocument (& 'a"));
     assert!(rendered.contains("MainDocumentPart (crate :: parts"));

@@ -252,11 +252,15 @@ fn relationship_target_as_part<T: SdkPart>(
 #[cfg(feature = "parts")]
 #[inline]
 fn is_data_part_reference_relationship(relationship: &crate::common::RelationshipInfo) -> bool {
+  use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
+
   matches!(
-    relationship.relationship_type(),
-    crate::common::RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
-      | crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
-      | crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+    relationship.relationship_known_type(),
+    Some(
+      RelationshipType::RelationshipAudio
+        | RelationshipType::RelationshipMedia
+        | RelationshipType::RelationshipVideo
+    )
   )
 }
 
@@ -2244,24 +2248,22 @@ pub trait SdkPart: Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
+    let relationship_type = crate::common::XmlRelationshipNamespaceUri::from_uri(relationship_type);
     crate::sdk::SdkPackage::storage(package)
       .relationships(self.part_id())
       .into_iter()
       .flat_map(|relationships| relationships.iter())
       .filter_map(move |relationship| {
-        crate::common::relationship_type_matches(
-          relationship.relationship_type(),
-          relationship_type,
-        )
-        .then(|| relationship.target_part_id())
-        .flatten()
-        .map(|part_id| {
-          RelatedPart::new(
-            relationship.id(),
-            relationship.relationship_type(),
-            T::from_relationship_id(relationship.id(), part_id),
-          )
-        })
+        (relationship.relationship_namespace_uri() == &relationship_type)
+          .then(|| relationship.target_part_id())
+          .flatten()
+          .map(|part_id| {
+            RelatedPart::new(
+              relationship.id(),
+              relationship.relationship_type(),
+              T::from_relationship_id(relationship.id(), part_id),
+            )
+          })
       })
   }
 
@@ -2418,12 +2420,16 @@ pub trait SdkPart: Clone + Sized + 'static {
     package: &mut P,
     relationship: crate::common::Relationship,
   ) -> Result<String, crate::common::SdkError> {
+    use crate::common::ReferenceRelationshipKind;
+
     if !relationship.is_reference_relationship()
       || !matches!(
-        relationship.relationship_type(),
-        crate::common::RelationshipSet::AUDIO_REFERENCE_RELATIONSHIP_TYPE
-          | crate::common::RelationshipSet::MEDIA_REFERENCE_RELATIONSHIP_TYPE
-          | crate::common::RelationshipSet::VIDEO_REFERENCE_RELATIONSHIP_TYPE
+        relationship.reference_kind(),
+        Some(
+          ReferenceRelationshipKind::Audio
+            | ReferenceRelationshipKind::Media
+            | ReferenceRelationshipKind::Video
+        )
       )
     {
       return Err(crate::common::SdkError::CommonError(format!(

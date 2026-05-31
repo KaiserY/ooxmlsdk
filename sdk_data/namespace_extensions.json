@@ -109,6 +109,36 @@
       "Source": "test-data xmlns scan"
     },
     {
+      "Prefix": "prm",
+      "Uri": "http://schemas.openxmlformats.org/package/2006/relationships/metadata",
+      "Version": "Office2007",
+      "Source": "relationship type canonical base"
+    },
+    {
+      "Prefix": "orcp",
+      "Uri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+      "Version": "Office2007",
+      "Source": "relationship type canonical URI"
+    },
+    {
+      "Prefix": "orep",
+      "Uri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+      "Version": "Office2007",
+      "Source": "relationship type canonical URI"
+    },
+    {
+      "Prefix": "orswe",
+      "Uri": "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
+      "Version": "Office2007",
+      "Source": "relationship type canonical URI"
+    },
+    {
+      "Prefix": "or",
+      "Uri": "http://schemas.microsoft.com/office/2007/relationships",
+      "Version": "Office2007",
+      "Source": "relationship type canonical base"
+    },
+    {
       "Prefix": "outs",
       "Uri": "http://schemas.microsoft.com/office/2009/outspace/metadata",
       "Version": "Office2010",
@@ -219,6 +249,31 @@
       "Uri": "http://purl.oclc.org/ooxml/officeDocument/relationships",
       "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
       "Source": "Strict OOXML"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata",
+      "CanonicalUri": "http://schemas.openxmlformats.org/package/2006/relationships/metadata",
+      "Source": "Strict OOXML relationship type alias"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/relationships/customProperties",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
+      "Source": "Strict OOXML relationship type alias"
+    },
+    {
+      "Uri": "http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperties",
+      "CanonicalUri": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+      "Source": "Strict OOXML relationship type alias"
+    },
+    {
+      "Uri": "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects",
+      "CanonicalUri": "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
+      "Source": "relationship type alias"
+    },
+    {
+      "Uri": "http://schemas.microsoft.com/office/2006/relationships",
+      "CanonicalUri": "http://schemas.microsoft.com/office/2007/relationships",
+      "Source": "relationship type alias"
     },
     {
       "Uri": "http://purl.oclc.org/ooxml/presentationml/main",

@@ -73,6 +73,7 @@ fn package_relationship_dispatch_tokens(
   let mut alias_branches = Vec::new();
   for (field_index, child) in child_infos.iter().enumerate() {
     let relationship_type = child.relationship_type.as_str();
+    let relationship_type_bytes = proc_macro2::Literal::byte_string(relationship_type.as_bytes());
     let (_, load_tokens) = package_child_init_tokens(child, field_index);
     exact_groups
       .entry(relationship_type)
@@ -81,9 +82,9 @@ fn package_relationship_dispatch_tokens(
     if explicit_relationship_type_may_have_alias(relationship_type) {
       alias_branches.push((
         quote! {
-          crate::common::relationship_type_matches_alias(
+          crate::common::relationship_type_matches_alias_bytes(
             relationship_type,
-            #relationship_type,
+            #relationship_type_bytes,
           )
         },
         load_tokens,
@@ -92,6 +93,7 @@ fn package_relationship_dispatch_tokens(
   }
 
   let exact_arms = exact_groups.iter().map(|(relationship_type, loads)| {
+    let relationship_type = proc_macro2::Literal::byte_string(relationship_type.as_bytes());
     quote! {
       #relationship_type => {
         #( #loads )*
@@ -357,7 +359,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let mut modeled_relationships = Vec::new();
     for relationship in storage.package_relationships().iter() {
       let mut represented_relationship = false;
-      let relationship_type = relationship.relationship_type();
+      let relationship_type = relationship.relationship_type_bytes();
       #relationship_dispatch
       if relationship.is_reference_relationship() {
         let item_index = modeled_relationships.len();

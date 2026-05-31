@@ -457,9 +457,19 @@ fn build_conditional_chain(
 }
 
 fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
-  value.starts_with("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
-    || value == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
-    || value == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
+  relationship_type_has_known_namespace(value, "r")
+    || relationship_type_has_known_namespace(value, "prm")
+    || relationship_type_has_known_namespace(value, "orswe")
+}
+
+fn relationship_type_has_known_namespace(value: &str, prefix: &str) -> bool {
+  let Some(namespace) = namespaces::uri_by_prefix(prefix) else {
+    return false;
+  };
+  value == namespace
+    || value
+      .strip_prefix(namespace)
+      .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn is_relationship_model_field(ident: &Ident) -> bool {

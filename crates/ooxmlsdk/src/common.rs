@@ -172,6 +172,64 @@ impl AsRef<str> for XmlNamespaceUri {
   }
 }
 
+#[cfg(feature = "parts")]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum XmlRelationshipNamespaceUri {
+  Known(crate::namespaces::XmlKnownRelationshipNamespace),
+  Custom(Box<[u8]>),
+}
+
+#[cfg(feature = "parts")]
+impl XmlRelationshipNamespaceUri {
+  #[inline]
+  pub fn new(uri: impl AsRef<[u8]>) -> Self {
+    Self::from_uri_bytes(uri.as_ref())
+  }
+
+  #[inline]
+  pub fn from_uri(uri: &str) -> Self {
+    Self::from_uri_bytes(uri.as_bytes())
+  }
+
+  #[inline]
+  pub fn from_uri_bytes(uri: &[u8]) -> Self {
+    if let Some(namespace) = crate::namespaces::XmlKnownRelationshipNamespace::from_uri_bytes(uri) {
+      Self::Known(namespace)
+    } else {
+      Self::Custom(uri.into())
+    }
+  }
+
+  #[inline]
+  pub fn as_str(&self) -> &str {
+    std::str::from_utf8(self.uri_bytes()).unwrap_or("")
+  }
+
+  #[inline]
+  pub fn uri_bytes(&self) -> &[u8] {
+    match self {
+      Self::Known(namespace) => namespace.uri_bytes(),
+      Self::Custom(uri) => uri.as_ref(),
+    }
+  }
+
+  #[inline]
+  pub fn known(&self) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
+    match self {
+      Self::Known(namespace) => Some(*namespace),
+      Self::Custom(_) => None,
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+impl AsRef<str> for XmlRelationshipNamespaceUri {
+  #[inline]
+  fn as_ref(&self) -> &str {
+    self.as_str()
+  }
+}
+
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct XmlNamespace {
   pub prefix: XmlPrefix,
@@ -375,45 +433,43 @@ where
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
-  actual == canonical || canonical_relationship_type(actual).as_ref() == canonical
+pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
+  if actual == canonical {
+    return true;
+  }
+  let Some(canonical) = relationship_type_known_bytes(canonical) else {
+    return false;
+  };
+  relationship_type_matches_known_bytes(actual, canonical)
 }
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
-  actual != canonical && canonical_relationship_type(actual).as_ref() == canonical
+pub(crate) fn relationship_type_matches_alias_bytes(actual: &[u8], canonical: &[u8]) -> bool {
+  if actual == canonical {
+    return false;
+  }
+  let Some(canonical) = relationship_type_known_bytes(canonical) else {
+    return false;
+  };
+  relationship_type_known_bytes(actual).is_some_and(|actual| actual == canonical)
 }
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn canonical_relationship_type(value: &str) -> std::borrow::Cow<'_, str> {
-  if value == "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail" {
-    return std::borrow::Cow::Borrowed(
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-    );
-  }
+pub(crate) fn relationship_type_known_bytes(
+  value: &[u8],
+) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
+  crate::namespaces::XmlKnownRelationshipNamespace::from_uri_bytes(value)
+}
 
-  if value == "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects" {
-    return std::borrow::Cow::Borrowed(
-      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
-    );
-  }
-
-  if let Some(suffix) =
-    value.strip_prefix("http://purl.oclc.org/ooxml/officeDocument/relationships/")
-  {
-    let alias_suffix = match suffix {
-      "customProperties" => "custom-properties",
-      "extendedProperties" => "extended-properties",
-      other => other,
-    };
-    return std::borrow::Cow::Owned(format!(
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/{alias_suffix}"
-    ));
-  }
-
-  std::borrow::Cow::Borrowed(value)
+#[inline]
+#[cfg(feature = "parts")]
+pub(crate) fn relationship_type_matches_known_bytes(
+  actual: &[u8],
+  canonical: crate::namespaces::XmlKnownRelationshipNamespace,
+) -> bool {
+  actual == canonical.uri_bytes() || relationship_type_known_bytes(actual) == Some(canonical)
 }
 
 #[inline]
@@ -427,14 +483,15 @@ pub(crate) fn part_descriptor_matches(
   descriptor_path_prefix: &str,
   descriptor_target_name: &str,
 ) -> bool {
-  if !relationship_type_matches(actual_relationship_type, descriptor_relationship_type) {
+  let actual_relationship_type = actual_relationship_type.as_bytes();
+  if !relationship_type_matches_bytes(
+    actual_relationship_type,
+    descriptor_relationship_type.as_bytes(),
+  ) {
     return false;
   }
   if descriptor_content_type.is_empty()
-    && relationship_type_matches(
-      actual_relationship_type,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-    )
+    && is_office_document_relationship_type(actual_relationship_type)
   {
     return package_main_part_path_matches(
       actual_path,
@@ -446,10 +503,15 @@ pub(crate) fn part_descriptor_matches(
     return true;
   }
 
-  relationship_type_matches(
-    actual_relationship_type,
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-  ) && package_main_part_path_matches(actual_path, descriptor_path_prefix, descriptor_target_name)
+  is_office_document_relationship_type(actual_relationship_type)
+    && package_main_part_path_matches(actual_path, descriptor_path_prefix, descriptor_target_name)
+}
+
+#[inline]
+#[cfg(feature = "parts")]
+fn is_office_document_relationship_type(value: &[u8]) -> bool {
+  relationship_type_known_bytes(value)
+    == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument)
 }
 
 #[inline]
@@ -601,42 +663,27 @@ mod tests {
   #[cfg(feature = "parts")]
   #[test]
   fn variable_content_main_part_descriptors_match_by_target_path() {
+    let office_document_relationship_type = format!(
+      "{}/officeDocument",
+      crate::namespaces::XmlKnownNamespace::R.uri()
+    );
     assert!(part_descriptor_matches(
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      &office_document_relationship_type,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
       "xl/workbook.xml",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      &office_document_relationship_type,
       "",
       "xl",
       "workbook",
     ));
     assert!(!part_descriptor_matches(
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      &office_document_relationship_type,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
       "xl/workbook.xml",
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      &office_document_relationship_type,
       "",
       "word",
       "document",
-    ));
-  }
-
-  #[cfg(feature = "parts")]
-  #[test]
-  fn relationship_type_aliases_canonicalize_to_transitional_types() {
-    assert_eq!(
-      canonical_relationship_type("http://purl.oclc.org/ooxml/officeDocument/relationships/theme"),
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
-    );
-    assert_eq!(
-      canonical_relationship_type(
-        "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail"
-      ),
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
-    );
-    assert!(relationship_type_matches(
-      "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects",
-      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
     ));
   }
 }

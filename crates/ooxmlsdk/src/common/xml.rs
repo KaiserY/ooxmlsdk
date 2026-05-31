@@ -900,7 +900,7 @@ pub(crate) fn mce_choice_replacement_child_bytes(
           match reader.read_event()? {
             Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
               let choice_namespaces = namespaces_with(&namespaces, &e)?;
-              let requires = attr_value(&reader, &e, b"Requires")?;
+              let requires = attr_value(&e, b"Requires")?;
               let children = read_mce_container_children_bytes(&mut reader, MC_CHOICE_NAMES)?;
               if choice_requires_supported(
                 requires.as_deref(),
@@ -912,7 +912,7 @@ pub(crate) fn mce_choice_replacement_child_bytes(
             }
             Event::Empty(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
               let choice_namespaces = namespaces_with(&namespaces, &e)?;
-              let requires = attr_value(&reader, &e, b"Requires")?;
+              let requires = attr_value(&e, b"Requires")?;
               if choice_requires_supported(
                 requires.as_deref(),
                 &choice_namespaces,
@@ -967,10 +967,10 @@ fn mce_unknown_element_replacement_bytes(
   let qname = qname.as_ref();
   let namespaces = namespaces_from_context_with(context, &start)?;
   let ignorable_namespace = qname_prefix(qname).and_then(|prefix| {
-    namespaces.iter().rev().find_map(|(candidate, ns)| {
-      (candidate.as_bytes() == prefix)
-        .then_some(ns.as_str())
-        .filter(|ns| context.is_ignorable_namespace(ns))
+    namespaces.iter().rev().find_map(|namespace| {
+      (namespace.prefix_bytes() == prefix)
+        .then_some(namespace.uri_bytes())
+        .filter(|ns| context.is_ignorable_namespace_bytes(ns))
     })
   });
 
@@ -1082,14 +1082,13 @@ fn skip_element(reader: &mut Reader<&[u8]>) -> Result<(), SdkError> {
 
 #[cfg(feature = "mce")]
 fn attr_value(
-  reader: &Reader<&[u8]>,
   start: &quick_xml::events::BytesStart<'_>,
   name: &[u8],
-) -> Result<Option<String>, SdkError> {
+) -> Result<Option<Box<[u8]>>, SdkError> {
   for attr in start.attributes() {
     let attr = attr?;
     if attr.key.as_ref() == name {
-      return Ok(Some(decode_attr_value(&attr, reader.decoder())?));
+      return Ok(Some(attr.value.as_ref().into()));
     }
   }
   Ok(None)
@@ -1097,22 +1096,26 @@ fn attr_value(
 
 #[cfg(feature = "mce")]
 fn choice_requires_supported(
-  requires: Option<&str>,
-  namespaces: &[crate::sdk::MceNamespace],
+  requires: Option<&[u8]>,
+  namespaces: &[crate::common::XmlNamespace],
   target: crate::sdk::FileFormatVersion,
 ) -> Result<bool, SdkError> {
   let Some(requires) = requires else {
     return Ok(false);
   };
-  for prefix in requires.split_whitespace() {
-    let Some((_, ns)) = namespaces
+  for prefix in requires
+    .split(u8::is_ascii_whitespace)
+    .filter(|part| !part.is_empty())
+  {
+    let Some(ns) = namespaces
       .iter()
       .rev()
-      .find(|(candidate, _)| candidate.as_bytes() == prefix.as_bytes())
+      .find(|candidate| candidate.prefix_bytes() == prefix)
+      .map(|namespace| namespace.uri_bytes())
     else {
       return Ok(false);
     };
-    if !namespace_supported(ns.as_str(), target) {
+    if !namespace_supported(ns, target) {
       return Ok(false);
     }
   }
@@ -1121,9 +1124,9 @@ fn choice_requires_supported(
 
 #[cfg(feature = "mce")]
 fn namespaces_with(
-  namespaces: &[crate::sdk::MceNamespace],
+  namespaces: &[crate::common::XmlNamespace],
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
+) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
   let mut merged = namespaces.to_vec();
   merged.extend(namespace_decls(start)?);
   Ok(merged)
@@ -1133,7 +1136,7 @@ fn namespaces_with(
 fn namespaces_from_context_with(
   context: &crate::sdk::MceContext,
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
+) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
   let mut namespaces = context.namespaces().to_vec();
   namespaces.extend(namespace_decls(start)?);
   Ok(namespaces)
@@ -1142,15 +1145,15 @@ fn namespaces_from_context_with(
 #[cfg(feature = "mce")]
 fn namespace_decls(
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
+) -> Result<Vec<crate::common::XmlNamespace>, SdkError> {
   let mut namespaces = Vec::new();
   for attr in start.attributes() {
     let attr = attr?;
     let key = attr.key.as_ref();
     if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-      namespaces.push((
-        crate::common::XmlPrefix::new(prefix),
-        crate::common::XmlNamespaceUri::new(attr.value.as_ref()),
+      namespaces.push(crate::common::XmlNamespace::new(
+        prefix,
+        attr.value.as_ref(),
       ));
     }
   }
@@ -1158,7 +1161,7 @@ fn namespace_decls(
 }
 
 #[cfg(feature = "mce")]
-fn namespace_supported(ns: &str, target: crate::sdk::FileFormatVersion) -> bool {
+fn namespace_supported(ns: &[u8], target: crate::sdk::FileFormatVersion) -> bool {
   crate::sdk::namespace_supported(ns, target)
 }
 

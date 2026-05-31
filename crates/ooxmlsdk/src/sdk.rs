@@ -553,15 +553,12 @@ impl<T: SdkMce + ?Sized> SdkMce for Box<T> {
 }
 
 #[cfg(feature = "mce")]
-pub(crate) type MceNamespace = (crate::common::XmlPrefix, crate::common::XmlNamespaceUri);
-
-#[cfg(feature = "mce")]
 #[derive(Clone, Debug, Default)]
 pub struct MceContext {
-  namespaces: Vec<MceNamespace>,
-  ignorable_namespaces: Vec<Box<str>>,
-  process_content: Vec<Box<str>>,
-  preserve_attributes: Vec<Box<str>>,
+  namespaces: Vec<crate::common::XmlNamespace>,
+  ignorable_namespaces: Vec<Box<[u8]>>,
+  process_content: Vec<Box<[u8]>>,
+  preserve_attributes: Vec<Box<[u8]>>,
 }
 
 #[cfg(feature = "mce")]
@@ -588,42 +585,40 @@ impl MceContext {
       preserve_attributes: self.preserve_attributes.len(),
     };
 
-    self.namespaces.extend(
-      namespaces
-        .iter()
-        .map(|decl| (decl.prefix.clone(), decl.uri.clone())),
-    );
+    self.namespaces.extend_from_slice(namespaces);
 
-    if let Some(value) = mce_attr(attrs, "Ignorable") {
-      for prefix in value.split_whitespace() {
-        if let Some(ns) = self.namespace_for_prefix(prefix) {
+    if let Some(value) = mce_attr(attrs, b"Ignorable") {
+      for prefix in split_ascii_whitespace(value) {
+        if let Some(ns) = self.namespace_for_prefix_bytes(prefix) {
           self.ignorable_namespaces.push(ns.into());
         }
       }
     }
 
-    if let Some(value) = mce_attr(attrs, "ProcessContent") {
+    if let Some(value) = mce_attr(attrs, b"ProcessContent") {
       self
         .process_content
-        .extend(value.split_whitespace().map(Into::into));
+        .extend(split_ascii_whitespace(value).map(Into::into));
     }
 
-    if let Some(value) = mce_attr(attrs, "PreserveAttributes") {
+    if let Some(value) = mce_attr(attrs, b"PreserveAttributes") {
       self
         .preserve_attributes
-        .extend(value.split_whitespace().map(Into::into));
+        .extend(split_ascii_whitespace(value).map(Into::into));
     }
 
-    if let Some(value) = mce_attr(attrs, "MustUnderstand") {
-      for prefix in value.split_whitespace() {
-        let Some(ns) = self.namespace_for_prefix(prefix) else {
+    if let Some(value) = mce_attr(attrs, b"MustUnderstand") {
+      for prefix in split_ascii_whitespace(value) {
+        let Some(ns) = self.namespace_for_prefix_bytes(prefix) else {
+          let prefix = String::from_utf8_lossy(prefix);
           return Err(crate::common::SdkError::CommonError(format!(
             "MCE MustUnderstand prefix `{prefix}` is not declared"
           )));
         };
         if !namespace_supported(ns, settings.target_file_format_version) {
+          let namespace = String::from_utf8_lossy(ns);
           return Err(crate::common::SdkError::CommonError(format!(
-            "MCE MustUnderstand namespace `{ns}` is not supported by target file format {:?}",
+            "MCE MustUnderstand namespace `{namespace}` is not supported by target file format {:?}",
             settings.target_file_format_version
           )));
         }
@@ -647,86 +642,97 @@ impl MceContext {
   pub(crate) fn is_process_content_qname_bytes(&self, qname: &[u8]) -> bool {
     self.process_content.iter().any(|candidate| {
       let candidate = candidate.as_ref();
-      candidate.as_bytes() == b"*"
-        || candidate.as_bytes() == qname
+      candidate == b"*"
+        || candidate == qname
         || candidate
-          .strip_suffix(":*")
+          .strip_suffix(b":*")
           .zip(qname.iter().position(|byte| *byte == b':'))
-          .is_some_and(|(prefix, qname_prefix_len)| prefix.as_bytes() == &qname[..qname_prefix_len])
+          .is_some_and(|(prefix, qname_prefix_len)| prefix == &qname[..qname_prefix_len])
     })
-  }
-
-  pub(crate) fn is_ignorable_namespace(&self, namespace: &str) -> bool {
-    self
-      .ignorable_namespaces
-      .iter()
-      .any(|candidate| candidate.as_ref() == namespace)
   }
 
   pub(crate) fn should_remove_ignorable_attribute(&self, qname: &str) -> bool {
     let Some((prefix, _)) = qname.split_once(':') else {
       return false;
     };
-    let Some(namespace) = self.namespace_for_prefix(prefix) else {
+    let Some(namespace) = self.namespace_for_prefix_bytes(prefix.as_bytes()) else {
       return false;
     };
-    self.is_ignorable_namespace(namespace) && !self.is_preserved_attribute_qname(qname)
+    self.is_ignorable_namespace_bytes(namespace)
+      && !self.is_preserved_attribute_qname_bytes(qname.as_bytes())
   }
 
-  fn is_preserved_attribute_qname(&self, qname: &str) -> bool {
+  fn is_preserved_attribute_qname_bytes(&self, qname: &[u8]) -> bool {
     self.preserve_attributes.iter().any(|candidate| {
       let candidate = candidate.as_ref();
-      candidate == "*"
+      candidate == b"*"
         || candidate == qname
         || candidate
-          .strip_suffix(":*")
-          .zip(qname.split_once(':'))
-          .is_some_and(|(prefix, (qname_prefix, _))| prefix == qname_prefix)
+          .strip_suffix(b":*")
+          .zip(qname.iter().position(|byte| *byte == b':'))
+          .is_some_and(|(prefix, qname_prefix_len)| prefix == &qname[..qname_prefix_len])
     })
   }
 
-  pub(crate) fn namespace_for_prefix(&self, prefix: &str) -> Option<&str> {
-    self.namespaces.iter().rev().find_map(|(candidate, uri)| {
-      (candidate.as_bytes() == prefix.as_bytes())
-        .then(|| std::str::from_utf8(uri.uri_bytes()).ok())
-        .flatten()
-    })
+  pub(crate) fn namespace_for_prefix_bytes(&self, prefix: &[u8]) -> Option<&[u8]> {
+    self
+      .namespaces
+      .iter()
+      .rev()
+      .find_map(|candidate| (candidate.prefix_bytes() == prefix).then(|| candidate.uri_bytes()))
   }
 
-  pub(crate) fn namespaces(&self) -> &[MceNamespace] {
+  pub(crate) fn is_ignorable_namespace_bytes(&self, namespace: &[u8]) -> bool {
+    self
+      .ignorable_namespaces
+      .iter()
+      .any(|candidate| candidate.as_ref() == namespace)
+  }
+
+  pub(crate) fn namespaces(&self) -> &[crate::common::XmlNamespace] {
     self.namespaces.as_slice()
   }
 }
 
 #[cfg(feature = "mce")]
-pub(crate) fn namespace_supported(ns: &str, target: FileFormatVersion) -> bool {
+pub(crate) fn namespace_supported(ns: &[u8], target: FileFormatVersion) -> bool {
   namespace_minimum_version(ns)
     .is_some_and(|version| file_format_rank(version) <= file_format_rank(target))
 }
 
 #[cfg(feature = "mce")]
-fn namespace_minimum_version(ns: &str) -> Option<FileFormatVersion> {
-  if ns.contains("openxmlformats.org") || ns.contains("/2006/") || ns.contains(":office:") {
+fn namespace_minimum_version(ns: &[u8]) -> Option<FileFormatVersion> {
+  if bytes_contains(ns, b"openxmlformats.org")
+    || bytes_contains(ns, b"/2006/")
+    || bytes_contains(ns, b":office:")
+  {
     Some(FileFormatVersion::Office2007)
-  } else if ns.contains("/2010/") || ns.contains("14") {
+  } else if bytes_contains(ns, b"/2010/") || bytes_contains(ns, b"14") {
     Some(FileFormatVersion::Office2010)
-  } else if ns.contains("/2012/") || ns.contains("15") {
+  } else if bytes_contains(ns, b"/2012/") || bytes_contains(ns, b"15") {
     Some(FileFormatVersion::Office2013)
-  } else if ns.contains("/2016/") || ns.contains("16") {
+  } else if bytes_contains(ns, b"/2016/") || bytes_contains(ns, b"16") {
     Some(FileFormatVersion::Office2016)
-  } else if ns.contains("/2019/") {
+  } else if bytes_contains(ns, b"/2019/") {
     Some(FileFormatVersion::Office2019)
-  } else if ns.contains("/2021/") {
+  } else if bytes_contains(ns, b"/2021/") {
     Some(FileFormatVersion::Office2021)
-  } else if ns.contains("/2022/")
-    || ns.contains("/2023/")
-    || ns.contains("/2024/")
-    || ns.contains("/2025/")
+  } else if bytes_contains(ns, b"/2022/")
+    || bytes_contains(ns, b"/2023/")
+    || bytes_contains(ns, b"/2024/")
+    || bytes_contains(ns, b"/2025/")
   {
     Some(FileFormatVersion::Microsoft365)
   } else {
     None
   }
+}
+
+#[cfg(feature = "mce")]
+fn bytes_contains(haystack: &[u8], needle: &[u8]) -> bool {
+  haystack
+    .windows(needle.len())
+    .any(|window| window == needle)
 }
 
 #[cfg(feature = "mce")]
@@ -743,12 +749,19 @@ fn file_format_rank(version: FileFormatVersion) -> u8 {
 }
 
 #[cfg(feature = "mce")]
-fn mce_attr<'a>(attrs: &'a [crate::common::XmlOtherAttr], local_name: &str) -> Option<&'a str> {
-  let prefixed_name = format!("mc:{local_name}");
+fn mce_attr<'a>(attrs: &'a [crate::common::XmlOtherAttr], local_name: &[u8]) -> Option<&'a [u8]> {
   attrs.iter().find_map(|attr| {
-    let name = attr.name();
-    (name == prefixed_name || name == local_name).then_some(attr.raw_value())
+    let name = attr.name_bytes();
+    (name.strip_prefix(b"mc:") == Some(local_name) || name == local_name)
+      .then_some(attr.raw_value_bytes())
   })
+}
+
+#[cfg(feature = "mce")]
+fn split_ascii_whitespace(value: &[u8]) -> impl Iterator<Item = &[u8]> {
+  value
+    .split(u8::is_ascii_whitespace)
+    .filter(|part| !part.is_empty())
 }
 
 #[cfg(feature = "parts")]

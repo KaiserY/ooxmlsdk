@@ -1112,14 +1112,12 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               Err(nested.error("unsupported sdk child attribute"))
             }
           })?;
-          kind = Some(SdkTypeFieldKind::Child {
-            qname: qname.unwrap_or_default(),
-          });
+          let qname =
+            qname.ok_or_else(|| syn::Error::new_spanned(&meta.path, "sdk child requires qname"))?;
+          kind = Some(SdkTypeFieldKind::Child { qname });
         }
         Meta::Path(path) if path.is_ident("child") => {
-          kind = Some(SdkTypeFieldKind::Child {
-            qname: String::new(),
-          });
+          return Err(syn::Error::new_spanned(path, "sdk child requires qname"));
         }
         Meta::List(meta) if meta.path.is_ident("empty_child") => {
           let mut qname = None;
@@ -1779,19 +1777,6 @@ fn qname_write_prefix(prefix: &str) -> &str {
   } else {
     prefix
   }
-}
-
-fn element_name_tokens_from_qname(qname: &str) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let tag_prefix_lit = LitByteStr::new(
-    qname_write_prefix(&tag_prefix).as_bytes(),
-    Span::call_site(),
-  );
-  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  quote! { crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit) }
 }
 
 fn write_start_tag_open_tokens(qname: &str) -> proc_macro2::TokenStream {

@@ -485,24 +485,7 @@ pub trait SdkEnum: Sized {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ElementName {
-  pub prefix: &'static [u8],
-  pub local: &'static [u8],
-}
-
-impl ElementName {
-  pub const EMPTY: Self = Self::new(b"", b"");
-
-  #[inline]
-  pub const fn new(prefix: &'static [u8], local: &'static [u8]) -> Self {
-    Self { prefix, local }
-  }
-}
-
 pub trait SdkType: Sized {
-  const ELEMENT_NAME: ElementName = ElementName::EMPTY;
-
   fn read_borrowed_inner<'de>(
     _xml_reader: &mut crate::common::SliceReader<'de>,
     _start: quick_xml::events::BytesStart<'de>,
@@ -527,11 +510,6 @@ pub trait SdkType: Sized {
     Err(std::io::Error::other(
       "SdkType does not support XML writing",
     ))
-  }
-
-  #[inline]
-  fn matches_type_start_qname(_name: &[u8]) -> bool {
-    false
   }
 }
 

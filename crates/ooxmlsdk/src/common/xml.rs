@@ -1281,41 +1281,6 @@ pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
   }
 }
 
-#[inline(always)]
-pub(crate) fn write_start_tag_open_bytes<W: std::io::Write>(
-  writer: &mut W,
-  tag_prefix: &[u8],
-  local_name: &[u8],
-) -> std::io::Result<()> {
-  writer.write_all(b"<")?;
-  write_qualified_name_bytes(writer, tag_prefix, local_name)
-}
-
-#[inline(always)]
-pub(crate) fn write_end_tag_bytes<W: std::io::Write>(
-  writer: &mut W,
-  tag_prefix: &[u8],
-  local_name: &[u8],
-) -> std::io::Result<()> {
-  writer.write_all(b"</")?;
-  write_qualified_name_bytes(writer, tag_prefix, local_name)?;
-  writer.write_all(b">")
-}
-
-#[inline(always)]
-fn write_qualified_name_bytes<W: std::io::Write>(
-  writer: &mut W,
-  tag_prefix: &[u8],
-  local_name: &[u8],
-) -> std::io::Result<()> {
-  if !tag_prefix.is_empty() {
-    writer.write_all(tag_prefix)?;
-    writer.write_all(b":")?;
-  }
-
-  writer.write_all(local_name)
-}
-
 #[inline]
 pub(crate) fn write_escaped_str<W: std::io::Write>(
   writer: &mut W,

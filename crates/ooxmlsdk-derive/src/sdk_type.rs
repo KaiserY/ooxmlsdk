@@ -700,17 +700,11 @@ fn expand_tuple_wrapper(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_prefix_lit = LitByteStr::new(
-    qname_write_prefix(&tag_prefix).as_bytes(),
-    Span::call_site(),
-  );
-  let element_name = element_name_tokens_from_qname(schema_qname);
+  let start_tag_open = write_start_tag_open_tokens(schema_qname);
+  let end_tag = write_end_tag_tokens(schema_qname);
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      const ELEMENT_NAME: crate::sdk::ElementName =
-        crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
-
       fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         start: quick_xml::events::BytesStart<'de>,
@@ -732,11 +726,6 @@ fn expand_tuple_wrapper(
         writer: &mut W,
       ) -> Result<bool, std::io::Error> {
         <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)
-      }
-
-      #[inline]
-      fn matches_type_start_qname(name: &[u8]) -> bool {
-        name == #tag_qname_lit || name == #local_name_lit
       }
     }
 
@@ -822,10 +811,9 @@ fn expand_tuple_wrapper(
       }
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
-        let name = #element_name;
-        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
+        #start_tag_open
         if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
-          crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
+          #end_tag
         } else {
           writer.write_all(b" />")?;
         }
@@ -2139,10 +2127,7 @@ fn expand_helper_struct(
       quote! { parsed_child }
     };
     let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
-    let is_generic_child = field.qname.is_empty();
-    let target = if is_generic_child {
-      quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
-    } else if tag_prefix.is_empty() {
+    let target = if tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
       let tag_qname_lit = LitByteStr::new(
@@ -3047,11 +3032,8 @@ fn expand_named_struct(
     quote! {}
   };
   let raw_tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
-  let tag_prefix_lit = LitByteStr::new(
-    qname_write_prefix(&tag_prefix).as_bytes(),
-    Span::call_site(),
-  );
-  let element_name = element_name_tokens_from_qname(schema_qname);
+  let start_tag_open = write_start_tag_open_tokens(schema_qname);
+  let end_tag = write_end_tag_tokens(schema_qname);
   let default_ns = parse_sdk_default_ns(&input.attrs)?;
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
   let fixed_namespace_uri_lit =
@@ -3676,10 +3658,7 @@ fn expand_named_struct(
       quote! { parsed_child }
     };
     let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
-    let is_generic_child = field.qname.is_empty();
-    let target = if is_generic_child {
-      quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
-    } else if use_local_name_child_dispatch || tag_prefix.is_empty() {
+    let target = if use_local_name_child_dispatch || tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
       let tag_qname_lit = LitByteStr::new(
@@ -3697,45 +3676,7 @@ fn expand_named_struct(
       } else {
         quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
-      if is_generic_child {
-        if field.repeated {
-          if as_result {
-            quote! {
-              #case_index => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                return Ok(true);
-              },
-            }
-          } else {
-            quote! {
-              #case_index => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                continue;
-              },
-            }
-          }
-        } else if as_result {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #case_index => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              continue;
-            },
-          }
-        }
-      } else if field.repeated {
+      if field.repeated {
         if as_result {
           quote! {
             #case_index => {
@@ -3781,47 +3722,7 @@ fn expand_named_struct(
       } else {
         quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
       };
-      if is_generic_child {
-        if field.repeated {
-          if as_result {
-            quote! {
-              #target => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                #xml_child_slot_assign
-                return Ok(true);
-              },
-            }
-          } else {
-            quote! {
-              #target => {
-                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-                #field_ident.push(#parsed_child_expr);
-                #xml_child_slot_assign
-                continue;
-              },
-            }
-          }
-        } else if as_result {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              return Ok(true);
-            },
-          }
-        } else {
-          quote! {
-            #target => {
-              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
-              #field_ident = Some(#parsed_child_expr);
-              #xml_child_slot_assign
-              continue;
-            },
-          }
-        }
-      } else if field.repeated {
+      if field.repeated {
         if as_result {
           quote! {
             #target => {
@@ -7135,10 +7036,9 @@ fn expand_named_struct(
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
         #xml_header_tokens
-        let name = #element_name;
-        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
+        #start_tag_open
         if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
-          crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
+          #end_tag
         } else {
           writer.write_all(b" />")?;
         }
@@ -7173,9 +7073,6 @@ fn expand_named_struct(
     #( #mce_choice_impl_tokens )*
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      const ELEMENT_NAME: crate::sdk::ElementName =
-        crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
-
       fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
         e: quick_xml::events::BytesStart<'de>,
@@ -7246,11 +7143,6 @@ fn expand_named_struct(
         #( #attr_write_tokens )*
         #xml_other_attrs_write_tokens
         #body_write_tokens
-      }
-
-      #[inline]
-      fn matches_type_start_qname(name: &[u8]) -> bool {
-        name == #tag_qname_lit || name == #local_name_lit
       }
     }
     #[cfg(feature = "validators")]

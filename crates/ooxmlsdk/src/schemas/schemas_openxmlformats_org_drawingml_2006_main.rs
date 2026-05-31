@@ -9725,20 +9725,17 @@ pub struct BlipExtension {
     )]
   pub blip_extension_choice: Option<BlipExtensionChoice>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelPercentageChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -9783,26 +9780,21 @@ pub enum RgbColorModelPercentageChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelHexChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -9847,26 +9839,21 @@ pub enum RgbColorModelHexChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HslColorChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -9911,26 +9898,21 @@ pub enum HslColorChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SystemColorChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -9975,26 +9957,21 @@ pub enum SystemColorChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SchemeColorChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -10039,26 +10016,21 @@ pub enum SchemeColorChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PresetColorChoice {
   /// Tint.
   Tint(std::boxed::Box<Tint>),
   /// Shade.
   Shade(std::boxed::Box<Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<Alpha>),
@@ -10103,13 +10075,11 @@ pub enum PresetColorChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SolidFillChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10124,21 +10094,21 @@ pub enum SolidFillChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GradientFillChoice {
   /// Linear Gradient Fill.
   LinearGradientFill(std::boxed::Box<LinearGradientFill>),
   /// Path Gradient.
   PathGradientFill(std::boxed::Box<PathGradientFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipFillChoice {
   /// Tile.
   Tile(std::boxed::Box<Tile>),
   /// Stretch.
   Stretch(std::boxed::Box<Stretch>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectContainerChoice {
   /// Effect Container.
   EffectContainer(std::boxed::Box<EffectContainer>),
@@ -10147,10 +10117,8 @@ pub enum EffectContainerChoice {
   /// Defines the AlphaBiLevel Class.
   AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
   /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:alphaCeiling"))]
   AlphaCeiling,
   /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:alphaFloor"))]
   AlphaFloor,
   /// Alpha Inverse Effect.
   AlphaInverse(std::boxed::Box<AlphaInverse>),
@@ -10181,7 +10149,6 @@ pub enum EffectContainerChoice {
   /// Glow Effect.
   Glow(std::boxed::Box<Glow>),
   /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:grayscl"))]
   Grayscale,
   /// Hue Saturation Luminance Effect.
   Hsl(std::boxed::Box<Hsl>),
@@ -10204,7 +10171,7 @@ pub enum EffectContainerChoice {
   /// Transform Effect.
   TransformEffect(std::boxed::Box<TransformEffect>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectDagChoice {
   /// Effect Container.
   EffectContainer(std::boxed::Box<EffectContainer>),
@@ -10213,10 +10180,8 @@ pub enum EffectDagChoice {
   /// Defines the AlphaBiLevel Class.
   AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
   /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:alphaCeiling"))]
   AlphaCeiling,
   /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:alphaFloor"))]
   AlphaFloor,
   /// Alpha Inverse Effect.
   AlphaInverse(std::boxed::Box<AlphaInverse>),
@@ -10247,7 +10212,6 @@ pub enum EffectDagChoice {
   /// Glow Effect.
   Glow(std::boxed::Box<Glow>),
   /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:grayscl"))]
   Grayscale,
   /// Hue Saturation Luminance Effect.
   Hsl(std::boxed::Box<Hsl>),
@@ -10270,7 +10234,7 @@ pub enum EffectDagChoice {
   /// Transform Effect.
   TransformEffect(std::boxed::Box<TransformEffect>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AlphaInverseChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10285,7 +10249,7 @@ pub enum AlphaInverseChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorReplacementChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10300,7 +10264,7 @@ pub enum ColorReplacementChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DuotoneChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10315,7 +10279,7 @@ pub enum DuotoneChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10328,10 +10292,9 @@ pub enum FillChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillOverlayChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10344,10 +10307,9 @@ pub enum FillOverlayChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GlowChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10362,7 +10324,7 @@ pub enum GlowChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InnerShadowChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10377,7 +10339,7 @@ pub enum InnerShadowChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OuterShadowChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10392,7 +10354,7 @@ pub enum OuterShadowChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PresetShadowChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10407,7 +10369,7 @@ pub enum PresetShadowChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10420,10 +10382,9 @@ pub enum FillPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10438,7 +10399,7 @@ pub enum FillReferenceChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10453,7 +10414,7 @@ pub enum EffectReferenceChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10468,14 +10429,14 @@ pub enum LineReferenceChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectPropertiesTypeChoice {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FontReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10490,7 +10451,7 @@ pub enum FontReferenceChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BulletColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10505,7 +10466,7 @@ pub enum BulletColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExtrusionColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10520,7 +10481,7 @@ pub enum ExtrusionColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ContourColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10535,7 +10496,7 @@ pub enum ContourColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorFromChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10550,7 +10511,7 @@ pub enum ColorFromChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorToChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10565,7 +10526,7 @@ pub enum ColorToChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ForegroundColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10580,7 +10541,7 @@ pub enum ForegroundColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10595,7 +10556,7 @@ pub enum BackgroundColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HighlightChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10610,7 +10571,7 @@ pub enum HighlightChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10621,25 +10582,23 @@ pub enum UnderlineChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10650,25 +10609,23 @@ pub enum OutlineChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OutlineChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10679,25 +10636,23 @@ pub enum LeftBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10708,25 +10663,23 @@ pub enum RightBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10737,25 +10690,23 @@ pub enum TopBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10766,25 +10717,23 @@ pub enum BottomBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10795,25 +10744,23 @@ pub enum TopLeftToBottomRightBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10824,25 +10771,23 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnderlineFillChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10855,18 +10800,15 @@ pub enum UnderlineFillChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipChoice {
   /// Defines the AlphaBiLevel Class.
   AlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
   /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:alphaCeiling"))]
   AlphaCeiling,
   /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:alphaFloor"))]
   AlphaFloor,
   /// Alpha Inverse Effect.
   AlphaInverse(std::boxed::Box<AlphaInverse>),
@@ -10889,7 +10831,6 @@ pub enum BlipChoice {
   /// Fill Overlay Effect.
   FillOverlay(std::boxed::Box<FillOverlay>),
   /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:grayscl"))]
   Grayscale,
   /// Hue Saturation Luminance Effect.
   Hsl(std::boxed::Box<Hsl>),
@@ -10898,7 +10839,7 @@ pub enum BlipChoice {
   /// Defines the TintEffect Class.
   TintEffect(std::boxed::Box<TintEffect>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10913,14 +10854,14 @@ pub enum CustomColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectStyleChoice {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillStyleListChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10933,10 +10874,9 @@ pub enum FillStyleListChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundFillStyleListChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -10949,10 +10889,9 @@ pub enum BackgroundFillStyleListChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Dark1ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10965,7 +10904,7 @@ pub enum Dark1ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Light1ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10978,7 +10917,7 @@ pub enum Light1ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Dark2ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -10991,7 +10930,7 @@ pub enum Dark2ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Light2ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11004,7 +10943,7 @@ pub enum Light2ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent1ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11017,7 +10956,7 @@ pub enum Accent1ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent2ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11030,7 +10969,7 @@ pub enum Accent2ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent3ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11043,7 +10982,7 @@ pub enum Accent3ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent4ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11056,7 +10995,7 @@ pub enum Accent4ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent5ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11069,7 +11008,7 @@ pub enum Accent5ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Accent6ColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11082,7 +11021,7 @@ pub enum Accent6ColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11095,7 +11034,7 @@ pub enum HyperlinkChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FollowedHyperlinkColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11108,7 +11047,7 @@ pub enum FollowedHyperlinkColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GraphicDataChoice {
   /// Graphic Object.
   Graphic(std::boxed::Box<Graphic>),
@@ -11119,7 +11058,6 @@ pub enum GraphicDataChoice {
   /// Theme Override.
   ThemeOverride(std::boxed::Box<ThemeOverride>),
   /// Theme Manager.
-  #[sdk(empty_child(qname = "a:themeManager"))]
   ThemeManager,
   /// Table.
   Table(std::boxed::Box<Table>),
@@ -11135,7 +11073,6 @@ pub enum GraphicDataChoice {
   PictureAttributionSourceUrl(std::boxed::Box<crate::schemas::a1611::PictureAttributionSourceUrl>),
   SvgBlip(std::boxed::Box<crate::schemas::asvg::SvgBlip>),
   Decorative(std::boxed::Box<crate::schemas::adec::Decorative>),
-  #[sdk(child(qname = "a16:creationId"))]
   A16CreationId(std::boxed::Box<crate::schemas::a16::CreationId>),
   PredecessorDrawingElementReference(
     std::boxed::Box<crate::schemas::a16::PredecessorDrawingElementReference>,
@@ -11153,7 +11090,6 @@ pub enum GraphicDataChoice {
   CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
   CompatExtension(std::boxed::Box<crate::schemas::a14::CompatExtension>),
   IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
-  #[sdk(child(qname = "a14:contentPart"))]
   GvmlContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
   ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
   HiddenFillProperties(std::boxed::Box<crate::schemas::a14::HiddenFillProperties>),
@@ -11179,7 +11115,6 @@ pub enum GraphicDataChoice {
   StyleDefinition(std::boxed::Box<crate::schemas::dgm::StyleDefinition>),
   StyleDefinitionHeader(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeader>),
   StyleDefinitionHeaderList(std::boxed::Box<crate::schemas::dgm::StyleDefinitionHeaderList>),
-  #[sdk(child(qname = "dgm1612:spPr"))]
   Dgm1612ShapeProperties(std::boxed::Box<crate::schemas::dgm1612::ShapeProperties>),
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
@@ -11187,21 +11122,18 @@ pub enum GraphicDataChoice {
   UserShapes(std::boxed::Box<crate::schemas::c::UserShapes>),
   ChartReference(std::boxed::Box<crate::schemas::c::ChartReference>),
   DataDisplayOptions16(std::boxed::Box<crate::schemas::c16r3::DataDisplayOptions16>),
-  #[sdk(child(qname = "c16:spPr"))]
   C16ShapeProperties(std::boxed::Box<crate::schemas::c16::ShapeProperties>),
   UnsignedIntegerType(std::boxed::Box<crate::schemas::c16::UnsignedIntegerType>),
   InvertIfNegativeBoolean(std::boxed::Box<crate::schemas::c16::InvertIfNegativeBoolean>),
   Bubble3DBoolean(std::boxed::Box<crate::schemas::c16::Bubble3DBoolean>),
   Marker(std::boxed::Box<crate::schemas::c16::Marker>),
   DLbl(std::boxed::Box<crate::schemas::c16::DLbl>),
-  #[sdk(child(qname = "c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   PivotOptions16(std::boxed::Box<crate::schemas::c16::PivotOptions16>),
   ChartDataPointUniqueIdMap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   UniqueIdChartUniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
   NumberingFormat(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
-  #[sdk(child(qname = "c15:spPr"))]
   C15ShapeProperties(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   FullReference(std::boxed::Box<crate::schemas::c15::FullReference>),
@@ -11218,7 +11150,6 @@ pub enum GraphicDataChoice {
   FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   DataLabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
-  #[sdk(child(qname = "c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   DataLabelFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
   ExceptionForSave(std::boxed::Box<crate::schemas::c15::ExceptionForSave>),
@@ -11230,79 +11161,49 @@ pub enum GraphicDataChoice {
   PivotOptions(std::boxed::Box<crate::schemas::c14::PivotOptions>),
   SketchOptions(std::boxed::Box<crate::schemas::c14::SketchOptions>),
   InvertSolidFillFormat(std::boxed::Box<crate::schemas::c14::InvertSolidFillFormat>),
-  #[sdk(child(qname = "c14:style"))]
   Style(std::boxed::Box<crate::schemas::c14::Style>),
-  #[sdk(child(qname = "cdr14:contentPart"))]
   Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
   LegacyDrawing(std::boxed::Box<crate::schemas::comp::LegacyDrawing>),
   LockedCanvas(std::boxed::Box<crate::schemas::lc::LockedCanvas>),
   Inline(std::boxed::Box<crate::schemas::wp::Inline>),
   Anchor(std::boxed::Box<crate::schemas::wp::Anchor>),
-  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosHOffset"))]
   PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
-  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosVOffset"))]
   PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
   RelativeWidth(std::boxed::Box<crate::schemas::wp14::RelativeWidth>),
   RelativeHeight(std::boxed::Box<crate::schemas::wp14::RelativeHeight>),
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
-  #[sdk(child(qname = "pic14:style"))]
   ShapeStyle(std::boxed::Box<crate::schemas::pic14::ShapeStyle>),
-  #[sdk(child(qname = "pic14:extLst"))]
   OfficeArtExtensionList(std::boxed::Box<crate::schemas::pic14::OfficeArtExtensionList>),
   WorksheetDrawing(std::boxed::Box<crate::schemas::xdr::WorksheetDrawing>),
-  #[sdk(child(qname = "xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<crate::schemas::xdr::ContentPart>),
-  #[sdk(child(qname = "xdr14:contentPart"))]
   Xdr14ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
-  #[sdk(any_child(qname = "pc:cmAuthorMkLst"))]
   CommentAuthorMonikerList(crate::schemas::pc::CommentAuthorMonikerList),
-  #[sdk(any_child(qname = "pc:cmMkLst"))]
   CommentMonikerList(crate::schemas::pc::CommentMonikerList),
-  #[sdk(any_child(qname = "pc:tagMkLst"))]
   StringTagMonikerList(crate::schemas::pc::StringTagMonikerList),
-  #[sdk(any_child(qname = "pc:custShowMkLst"))]
   CustomShowMonikerList(crate::schemas::pc::CustomShowMonikerList),
-  #[sdk(any_child(qname = "pc:docMkLst"))]
   DocumentMonikerList(crate::schemas::pc::DocumentMonikerList),
-  #[sdk(any_child(qname = "pc:sectionMkLst"))]
   SectionMonikerList(crate::schemas::pc::SectionMonikerList),
-  #[sdk(any_child(qname = "pc:sldBaseMkLst"))]
   SlideBaseMonikerList(crate::schemas::pc::SlideBaseMonikerList),
-  #[sdk(any_child(qname = "pc:sldLayoutMkLst"))]
   SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),
-  #[sdk(any_child(qname = "pc:sldMasterMkLst"))]
   MainMasterMonikerList(crate::schemas::pc::MainMasterMonikerList),
   SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
-  #[sdk(any_child(qname = "pc:sldPosMkLst"))]
   SlidePosMonikerList(crate::schemas::pc::SlidePosMonikerList),
-  #[sdk(any_child(qname = "pc:notesMkLst"))]
   NotesMonikerList(crate::schemas::pc::NotesMonikerList),
-  #[sdk(any_child(qname = "pc:notesTxtMkLst"))]
   NotesTextMonikerList(crate::schemas::pc::NotesTextMonikerList),
-  #[sdk(any_child(qname = "pc:notesMasterMkLst"))]
   NotesMasterMonikerList(crate::schemas::pc::NotesMasterMonikerList),
-  #[sdk(any_child(qname = "pc:handoutMkLst"))]
   HandoutMonikerList(crate::schemas::pc::HandoutMonikerList),
-  #[sdk(any_child(qname = "pc:animEffectMkLst"))]
   AnimEffectMkLstAnimationEffectMonikerList(
     crate::schemas::pc::AnimEffectMkLstAnimationEffectMonikerList,
   ),
-  #[sdk(any_child(qname = "pc:animEffectParentMkLst"))]
   AnimEffectParentMkLstAnimationEffectMonikerList(
     crate::schemas::pc::AnimEffectParentMkLstAnimationEffectMonikerList,
   ),
-  #[sdk(any_child(qname = "pc:tkAppMkLst"))]
   OsfTaskPaneAppMonikerList(crate::schemas::pc::OsfTaskPaneAppMonikerList),
-  #[sdk(any_child(qname = "pc:tocMkLst"))]
   SummaryZoomMonikerList(crate::schemas::pc::SummaryZoomMonikerList),
-  #[sdk(any_child(qname = "pc:sectionLnkObjMkLst"))]
   SectionLinkObjMonikerList(crate::schemas::pc::SectionLinkObjMonikerList),
-  #[sdk(any_child(qname = "pc:designTagMkLst"))]
   DesignerTagMonikerList(crate::schemas::pc::DesignerTagMonikerList),
-  #[sdk(any_child(qname = "pc:cXmlMkLst"))]
   CustomXmlPartMonikerList(crate::schemas::pc::CustomXmlPartMonikerList),
   CommentAuthorList(std::boxed::Box<crate::schemas::p::CommentAuthorList>),
-  #[sdk(child(qname = "p:cmLst"))]
   PCommentList(std::boxed::Box<crate::schemas::p::CommentList>),
   POleObject(std::boxed::Box<crate::schemas::p::OleObject>),
   Presentation(std::boxed::Box<crate::schemas::p::Presentation>),
@@ -11316,75 +11217,46 @@ pub enum GraphicDataChoice {
   SlideSyncProperties(std::boxed::Box<crate::schemas::p::SlideSyncProperties>),
   TagList(std::boxed::Box<crate::schemas::p::TagList>),
   ViewProperties(std::boxed::Box<crate::schemas::p::ViewProperties>),
-  #[sdk(child(qname = "p:contentPart"))]
   PContentPart(std::boxed::Box<crate::schemas::p::ContentPart>),
   PlaceholderTypeExtension(std::boxed::Box<crate::schemas::p232::PlaceholderTypeExtension>),
   AuthorList(std::boxed::Box<crate::schemas::p188::AuthorList>),
-  #[sdk(child(qname = "p188:cmLst"))]
   P188CommentList(std::boxed::Box<crate::schemas::p188::CommentList>),
   CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
   Reactions(std::boxed::Box<crate::schemas::p223::Reactions>),
   TaskDetails(std::boxed::Box<crate::schemas::p228::TaskDetails>),
   TaskHistoryDetails(std::boxed::Box<crate::schemas::p1912::TaskHistoryDetails>),
   /// Defines the TextBodyPackage Class.
-  #[sdk(empty_child(qname = "oac:txBodyPkg"))]
   TextBodyPackage,
   GroupCommand(std::boxed::Box<crate::schemas::oac::GroupCommand>),
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:imgData"))]
   ImgDataImgData(crate::schemas::oac::ImgDataImgData),
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "oac:origImgData"))]
   OrigImgDataImgData(crate::schemas::oac::OrigImgDataImgData),
   ImgLink(std::boxed::Box<crate::schemas::oac::ImgLink>),
-  #[sdk(any_child(qname = "oac:dgMkLst"))]
   DrawingMonikerList(crate::schemas::oac::DrawingMonikerList),
-  #[sdk(any_child(qname = "oac:dcMkLst"))]
   DocumentContextMonikerList(crate::schemas::oac::DocumentContextMonikerList),
-  #[sdk(any_child(qname = "oac:graphicParentMkLst"))]
   GraphicParentMonikerList(crate::schemas::oac::GraphicParentMonikerList),
-  #[sdk(any_child(qname = "oac:deMkLst"))]
   DeMkLstDrawingElementMonikerList(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
-  #[sdk(any_child(qname = "oac:deMasterMkLst"))]
   DeMasterMkLstDrawingElementMonikerList(
     crate::schemas::oac::DeMasterMkLstDrawingElementMonikerList,
   ),
-  #[sdk(any_child(qname = "oac:spMkLst"))]
   ShapeMonikerList(crate::schemas::oac::ShapeMonikerList),
-  #[sdk(any_child(qname = "oac:grpSpMkLst"))]
   GroupShapeMonikerList(crate::schemas::oac::GroupShapeMonikerList),
-  #[sdk(any_child(qname = "oac:graphicFrameMkLst"))]
   GraphicFrameMonikerList(crate::schemas::oac::GraphicFrameMonikerList),
-  #[sdk(any_child(qname = "oac:cxnSpMkLst"))]
   ConnectorMonikerList(crate::schemas::oac::ConnectorMonikerList),
-  #[sdk(any_child(qname = "oac:picMkLst"))]
   PictureMonikerList(crate::schemas::oac::PictureMonikerList),
-  #[sdk(any_child(qname = "oac:inkMkLst"))]
   InkMonikerList(crate::schemas::oac::InkMonikerList),
-  #[sdk(any_child(qname = "oac:txBodyMkLst"))]
   TextBodyMonikerList(crate::schemas::oac::TextBodyMonikerList),
-  #[sdk(any_child(qname = "oac:txMkLst"))]
   TextCharRangeMonikerList(crate::schemas::oac::TextCharRangeMonikerList),
-  #[sdk(any_child(qname = "oac:hlinkMkLst"))]
   HyperlinkMonikerList(crate::schemas::oac::HyperlinkMonikerList),
-  #[sdk(any_child(qname = "oac:model3DMkLst"))]
   Model3DMonikerList(crate::schemas::oac::Model3DMonikerList),
-  #[sdk(any_child(qname = "oac:viewSelLst"))]
   ViewSelectionStgList(crate::schemas::oac::ViewSelectionStgList),
-  #[sdk(any_child(qname = "oac:editorSelLst"))]
   EditorSelectionStgList(crate::schemas::oac::EditorSelectionStgList),
-  #[sdk(any_child(qname = "oac:drSelLst"))]
   DrawingSelectionStgList(crate::schemas::oac::DrawingSelectionStgList),
-  #[sdk(any_child(qname = "oac:tblMkLst"))]
   TableMonikerList(crate::schemas::oac::TableMonikerList),
-  #[sdk(any_child(qname = "oac:tcMkLst"))]
   TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
-  #[sdk(any_child(qname = "oac:trMkLst"))]
   TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
-  #[sdk(any_child(qname = "oac:gridColMkLst"))]
   TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
-  #[sdk(child(qname = "inkml:ink"))]
   InkmlInk(std::boxed::Box<crate::schemas::inkml::Ink>),
   OneOf(std::boxed::Box<crate::schemas::emma::OneOf>),
-  #[sdk(child(qname = "emma:group"))]
   EmmaGroup(std::boxed::Box<crate::schemas::emma::Group>),
   Sequence(std::boxed::Box<crate::schemas::emma::Sequence>),
   EndPoint(std::boxed::Box<crate::schemas::emma::EndPoint>),
@@ -11393,10 +11265,8 @@ pub enum GraphicDataChoice {
   Grammar(std::boxed::Box<crate::schemas::emma::Grammar>),
   DerivedFrom(std::boxed::Box<crate::schemas::emma::DerivedFrom>),
   Node(std::boxed::Box<crate::schemas::emma::Node>),
-  #[sdk(child(qname = "emma:arc"))]
   EmmaArc(std::boxed::Box<crate::schemas::emma::Arc>),
   Lattice(std::boxed::Box<crate::schemas::emma::Lattice>),
-  #[sdk(text_child(simple_type = "StringValue", qname = "emma:literal"))]
   Literal(crate::schemas::emma::Literal),
   Interpretation(std::boxed::Box<crate::schemas::emma::Interpretation>),
   GroupInfo(std::boxed::Box<crate::schemas::emma::GroupInfo>),
@@ -11409,13 +11279,11 @@ pub enum GraphicDataChoice {
   ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
-  #[sdk(child(qname = "p15:chartTrackingRefBased"))]
   ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
   NonVisualContentPartProperties(
     std::boxed::Box<crate::schemas::p14::NonVisualContentPartProperties>,
   ),
   Transform2D(std::boxed::Box<crate::schemas::p14::Transform2D>),
-  #[sdk(child(qname = "p14:extLst"))]
   ExtensionListModify(std::boxed::Box<crate::schemas::p14::ExtensionListModify>),
   Media(std::boxed::Box<crate::schemas::p14::Media>),
   VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
@@ -11423,7 +11291,6 @@ pub enum GraphicDataChoice {
   FlipTransition(std::boxed::Box<crate::schemas::p14::FlipTransition>),
   RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
   /// Defines the HoneycombTransition Class.
-  #[sdk(empty_child(qname = "p14:honeycomb"))]
   HoneycombTransition,
   PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
   DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
@@ -11436,7 +11303,6 @@ pub enum GraphicDataChoice {
   WarpTransition(std::boxed::Box<crate::schemas::p14::WarpTransition>),
   FlythroughTransition(std::boxed::Box<crate::schemas::p14::FlythroughTransition>),
   /// Defines the FlashTransition Class.
-  #[sdk(empty_child(qname = "p14:flash"))]
   FlashTransition,
   ShredTransition(std::boxed::Box<crate::schemas::p14::ShredTransition>),
   RevealTransition(std::boxed::Box<crate::schemas::p14::RevealTransition>),
@@ -11446,12 +11312,10 @@ pub enum GraphicDataChoice {
   SectionList(std::boxed::Box<crate::schemas::p14::SectionList>),
   BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
   LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
-  #[sdk(child(qname = "p14:defaultImageDpi"))]
   P14DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
   DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
   ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
   LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
-  #[sdk(child(qname = "p14:creationId"))]
   P14CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
   ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
   ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
@@ -11476,19 +11340,14 @@ pub enum GraphicDataChoice {
   People(std::boxed::Box<crate::schemas::w15::People>),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(qname = "w15:repeatingSectionItem"))]
   SdtRepeatedSectionItem,
-  #[sdk(child(qname = "w15:chartTrackingRefBased"))]
   ChartTrackingRefBased(std::boxed::Box<crate::schemas::w15::ChartTrackingRefBased>),
   DefaultCollapsed(std::boxed::Box<crate::schemas::w15::DefaultCollapsed>),
-  #[sdk(child(qname = "w15:docId"))]
   PersistentDocumentId(std::boxed::Box<crate::schemas::w15::PersistentDocumentId>),
   FootnoteColumns(std::boxed::Box<crate::schemas::w15::FootnoteColumns>),
   WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
   WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
-  #[sdk(child(qname = "w14:contentPart"))]
   W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
-  #[sdk(child(qname = "w14:docId"))]
   DocumentId(std::boxed::Box<crate::schemas::w14::DocumentId>),
   ConflictMode(std::boxed::Box<crate::schemas::w14::ConflictMode>),
   CustomXmlConflictInsertionRangeStart(
@@ -11504,10 +11363,8 @@ pub enum GraphicDataChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
   DiscardImageEditingData(std::boxed::Box<crate::schemas::w14::DiscardImageEditingData>),
-  #[sdk(child(qname = "w14:defaultImageDpi"))]
   W14DefaultImageDpi(std::boxed::Box<crate::schemas::w14::DefaultImageDpi>),
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(qname = "w14:entityPicker"))]
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
   SchemaLibrary(std::boxed::Box<crate::schemas::sl::SchemaLibrary>),
@@ -11516,10 +11373,8 @@ pub enum GraphicDataChoice {
   OfficeMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
   Shape(std::boxed::Box<crate::schemas::v::Shape>),
   Shapetype(std::boxed::Box<crate::schemas::v::Shapetype>),
-  #[sdk(child(qname = "v:group"))]
   VGroup(std::boxed::Box<crate::schemas::v::Group>),
   Background(std::boxed::Box<crate::schemas::v::Background>),
-  #[sdk(child(qname = "v:fill"))]
   Fill(std::boxed::Box<crate::schemas::v::Fill>),
   Formulas(std::boxed::Box<crate::schemas::v::Formulas>),
   ShapeHandles(std::boxed::Box<crate::schemas::v::ShapeHandles>),
@@ -11529,7 +11384,6 @@ pub enum GraphicDataChoice {
   Shadow(std::boxed::Box<crate::schemas::v::Shadow>),
   Stroke(std::boxed::Box<crate::schemas::v::Stroke>),
   TextPath(std::boxed::Box<crate::schemas::v::TextPath>),
-  #[sdk(child(qname = "v:arc"))]
   VArc(std::boxed::Box<crate::schemas::v::Arc>),
   Curve(std::boxed::Box<crate::schemas::v::Curve>),
   ImageFile(std::boxed::Box<crate::schemas::v::ImageFile>),
@@ -11541,7 +11395,6 @@ pub enum GraphicDataChoice {
   ShapeDefaults(std::boxed::Box<crate::schemas::o::ShapeDefaults>),
   ShapeLayout(std::boxed::Box<crate::schemas::o::ShapeLayout>),
   OSignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
-  #[sdk(child(qname = "o:ink"))]
   OInk(std::boxed::Box<crate::schemas::o::Ink>),
   Diagram(std::boxed::Box<crate::schemas::o::Diagram>),
   Skew(std::boxed::Box<crate::schemas::o::Skew>),
@@ -11556,7 +11409,6 @@ pub enum GraphicDataChoice {
   BottomStroke(std::boxed::Box<crate::schemas::o::BottomStroke>),
   ColumnStroke(std::boxed::Box<crate::schemas::o::ColumnStroke>),
   ClipPath(std::boxed::Box<crate::schemas::o::ClipPath>),
-  #[sdk(child(qname = "o:fill"))]
   FillExtendedProperties(std::boxed::Box<crate::schemas::o::FillExtendedProperties>),
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   LeftBorder(std::boxed::Box<crate::schemas::w10::LeftBorder>),
@@ -11564,11 +11416,9 @@ pub enum GraphicDataChoice {
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   /// Ink Annotation Flag.
-  #[sdk(empty_child(qname = "pvml:iscomment"))]
   InkAnnotationFlag,
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
   WordprocessingCanvas(std::boxed::Box<crate::schemas::wpc::WordprocessingCanvas>),
@@ -11580,17 +11430,16 @@ pub enum GraphicDataChoice {
   WebExtension(std::boxed::Box<crate::schemas::we::WebExtension>),
   WebExtensionReference(std::boxed::Box<crate::schemas::we::WebExtensionReference>),
   TimeSlicer(std::boxed::Box<crate::schemas::tsle::TimeSlicer>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -11603,25 +11452,23 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextShapeChoice {
   /// Use Shape Text Rectangle.
-  #[sdk(empty_child(qname = "a:useSpRect"))]
   UseShapeRectangle,
   /// Defines the Transform2D Class.
   Transform2D(std::boxed::Box<Transform2D>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GradientStopChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11636,10 +11483,9 @@ pub enum GradientStopChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PathChoice {
   /// Close Shape Path.
-  #[sdk(empty_child(qname = "a:close"))]
   CloseShapePath,
   /// Move Path To.
   MoveTo(std::boxed::Box<MoveTo>),
@@ -11652,32 +11498,30 @@ pub enum PathChoice {
   /// Draw Cubic Bezier Curve To.
   CubicBezierCurveTo(std::boxed::Box<CubicBezierCurveTo>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AdjustHandleListChoice {
   /// XY Adjust Handle.
   AdjustHandleXy(std::boxed::Box<AdjustHandleXy>),
   /// Polar Adjust Handle.
   AdjustHandlePolar(std::boxed::Box<AdjustHandlePolar>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BodyPropertiesChoice {
   /// No AutoFit.
-  #[sdk(empty_child(qname = "a:noAutofit"))]
   NoAutoFit,
   /// Normal AutoFit.
   NormalAutoFit(std::boxed::Box<NormalAutoFit>),
   /// Shape AutoFit.
-  #[sdk(empty_child(qname = "a:spAutoFit"))]
   ShapeAutoFit,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<Shape3DType>),
   /// No text in 3D scene.
   FlatText(std::boxed::Box<FlatText>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -11690,10 +11534,9 @@ pub enum TableCellPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TablePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -11706,88 +11549,86 @@ pub enum TablePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TablePropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TablePropertiesChoice3 {
   /// Table Style.
   TableStyle(std::boxed::Box<TableStyle>),
   /// Table Style ID.
-  #[sdk(text_child(simple_type = "StringValue", qname = "a:tableStyleId"))]
   TableStyleId(TableStyleId),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LeftBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RightBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InsideHorizontalBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InsideVerticalBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopLeftToBottomRightBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopRightToBottomLeftBorderChoice {
   /// Defines the Outline Class.
   Outline(std::boxed::Box<Outline>),
   /// Defines the LineReference Class.
   LineReference(std::boxed::Box<LineReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellTextStyleChoice {
   /// Font.
   Fonts(std::boxed::Box<Fonts>),
   /// Defines the FontReference Class.
   FontReference(std::boxed::Box<FontReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellTextStyleChoice2 {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<RgbColorModelPercentage>),
@@ -11802,57 +11643,53 @@ pub enum TableCellTextStyleChoice2 {
   /// Preset Color.
   PresetColor(std::boxed::Box<PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellStyleChoice {
   /// Fill.
   FillProperties(std::boxed::Box<FillProperties>),
   /// Fill Reference.
   FillReference(std::boxed::Box<FillReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableBackgroundChoice {
   /// Fill.
   FillProperties(std::boxed::Box<FillProperties>),
   /// Fill Reference.
   FillReference(std::boxed::Box<FillReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableBackgroundChoice2 {
   /// Effect.
   EffectPropertiesType(std::boxed::Box<EffectPropertiesType>),
   /// Effect Reference.
   EffectReference(std::boxed::Box<EffectReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -11861,36 +11698,32 @@ pub enum ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -11899,36 +11732,32 @@ pub enum DefaultParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level1ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -11937,36 +11766,32 @@ pub enum Level1ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level2ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -11975,36 +11800,32 @@ pub enum Level2ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level3ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12013,36 +11834,32 @@ pub enum Level3ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level4ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12051,36 +11868,32 @@ pub enum Level4ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level5ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12089,36 +11902,32 @@ pub enum Level5ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level6ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12127,36 +11936,32 @@ pub enum Level6ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level7ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12165,36 +11970,32 @@ pub enum Level7ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level8ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12203,36 +12004,32 @@ pub enum Level8ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice {
   /// Follow Text.
-  #[sdk(empty_child(qname = "a:buClrTx"))]
   BulletColorText,
   /// Color Specified.
   BulletColor(std::boxed::Box<BulletColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice2 {
   /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:buSzTx"))]
   BulletSizeText,
   /// Bullet Size Percentage.
   BulletSizePercentage(std::boxed::Box<BulletSizePercentage>),
   /// Bullet Size Points.
   BulletSizePoints(std::boxed::Box<BulletSizePoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice3 {
   /// Follow text.
-  #[sdk(empty_child(qname = "a:buFontTx"))]
   BulletFontText,
   /// Specified.
   BulletFont(std::boxed::Box<BulletFont>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Level9ParagraphPropertiesChoice4 {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<AutoNumberedBullet>),
@@ -12241,7 +12038,7 @@ pub enum Level9ParagraphPropertiesChoice4 {
   /// Picture Bullet.
   PictureBullet(std::boxed::Box<PictureBullet>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndParagraphRunPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -12254,33 +12051,30 @@ pub enum EndParagraphRunPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndParagraphRunPropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndParagraphRunPropertiesChoice3 {
   /// Underline Follows Text.
-  #[sdk(empty_child(qname = "a:uLnTx"))]
   UnderlineFollowsText,
   /// Underline Stroke.
   Underline(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndParagraphRunPropertiesChoice4 {
   /// Underline Fill Properties Follow Text.
-  #[sdk(empty_child(qname = "a:uFillTx"))]
   UnderlineFillText,
   /// Underline Fill.
   UnderlineFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -12293,33 +12087,30 @@ pub enum RunPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice3 {
   /// Underline Follows Text.
-  #[sdk(empty_child(qname = "a:uLnTx"))]
   UnderlineFollowsText,
   /// Underline Stroke.
   Underline(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice4 {
   /// Underline Fill Properties Follow Text.
-  #[sdk(empty_child(qname = "a:uFillTx"))]
   UnderlineFillText,
   /// Underline Fill.
   UnderlineFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultRunPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -12332,33 +12123,30 @@ pub enum DefaultRunPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultRunPropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultRunPropertiesChoice3 {
   /// Underline Follows Text.
-  #[sdk(empty_child(qname = "a:uLnTx"))]
   UnderlineFollowsText,
   /// Underline Stroke.
   Underline(std::boxed::Box<Underline>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefaultRunPropertiesChoice4 {
   /// Underline Fill Properties Follow Text.
-  #[sdk(empty_child(qname = "a:uFillTx"))]
   UnderlineFillText,
   /// Underline Fill.
   UnderlineFill(std::boxed::Box<UnderlineFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphChoice {
   /// Text Run.
   Run(std::boxed::Box<Run>),
@@ -12368,28 +12156,28 @@ pub enum ParagraphChoice {
   Field(std::boxed::Box<Field>),
   TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineSpacingChoice {
   /// Spacing Percent.
   SpacingPercent(std::boxed::Box<SpacingPercent>),
   /// Spacing Points.
   SpacingPoints(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SpaceBeforeChoice {
   /// Spacing Percent.
   SpacingPercent(std::boxed::Box<SpacingPercent>),
   /// Spacing Points.
   SpacingPoints(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SpaceAfterChoice {
   /// Spacing Percent.
   SpacingPercent(std::boxed::Box<SpacingPercent>),
   /// Spacing Points.
   SpacingPoints(std::boxed::Box<SpacingPoints>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesExtensionChoice {
   /// Defines the HiddenFillProperties Class.
   HiddenFillProperties(std::boxed::Box<crate::schemas::a14::HiddenFillProperties>),
@@ -12403,17 +12191,15 @@ pub enum ShapePropertiesExtensionChoice {
   HiddenShape3D(std::boxed::Box<crate::schemas::a14::HiddenShape3D>),
   /// Defines the ShadowObscured Class.
   ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GvmlGroupShapeExtensionChoice {
   /// Defines the IsCanvas Class.
   IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VisualGroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<NoFill>),
@@ -12426,17 +12212,16 @@ pub enum VisualGroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VisualGroupShapePropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapeChoice {
   /// Text Shape.
   TextShape(std::boxed::Box<TextShape>),
@@ -12452,58 +12237,51 @@ pub enum GroupShapeChoice {
   /// Group shape.
   GroupShape(std::boxed::Box<GroupShape>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
   /// Defines the NonVisualGroupProperties Class.
   NonVisualGroupProperties(std::boxed::Box<crate::schemas::a15::NonVisualGroupProperties>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OfficeStyleSheetExtensionChoice {
   /// Defines the ThemeFamily Class.
   ThemeFamily(std::boxed::Box<crate::schemas::thm15::ThemeFamily>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConnectorLockingExtensionChoice {
   /// Graphic Object.
   Graphic(std::boxed::Box<Graphic>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataModelExtensionChoice {
   /// Defines the DataModelExtensionBlock Class.
   DataModelExtensionBlock(std::boxed::Box<crate::schemas::dsp::DataModelExtensionBlock>),
   /// Defines the RecolorImages Class.
   RecolorImages(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PtExtensionChoice {
   /// Defines the NonVisualDrawingProperties Class.
   NonVisualDrawingProperties(std::boxed::Box<crate::schemas::dgm14::NonVisualDrawingProperties>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkExtensionChoice {
   /// Defines the HyperlinkColor Class.
   HyperlinkColor(std::boxed::Box<crate::schemas::ahyp::HyperlinkColor>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LinePropertiesExtensionChoice {
   /// Defines the LineSketchStyleProperties Class.
   LineSketchStyleProperties(std::boxed::Box<crate::schemas::ask::LineSketchStyleProperties>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
   /// Defines the CompatExtension Class.
   CompatExtension(std::boxed::Box<crate::schemas::a14::CompatExtension>),
@@ -12521,10 +12299,9 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
   ClassificationOutcome(std::boxed::Box<crate::schemas::aclsh::ClassificationOutcome>),
   /// Defines the ScriptLink Class.
   ScriptLink(std::boxed::Box<crate::schemas::asl::ScriptLink>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
   /// Defines the CameraTool Class.
   CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
@@ -12536,10 +12313,9 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
   LiveFeedProperties(std::boxed::Box<crate::schemas::alf::LiveFeedProperties>),
   /// Defines the ImageFormula Class.
   ImageFormula(std::boxed::Box<crate::schemas::aif::ImageFormula>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipExtensionChoice {
   /// Defines the ImageProperties Class.
   ImageProperties(std::boxed::Box<crate::schemas::a14::ImageProperties>),
@@ -12555,6 +12331,5 @@ pub enum BlipExtensionChoice {
   OEmbed(std::boxed::Box<crate::schemas::woe::OEmbed>),
   /// Defines the OEmbedShared Class.
   OEmbedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }

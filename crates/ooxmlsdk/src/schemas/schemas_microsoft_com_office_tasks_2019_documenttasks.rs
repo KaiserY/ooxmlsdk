@@ -198,14 +198,13 @@ pub struct CommentAnchor {
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::StringValue,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TaskHistoryEventChoice {
   /// Defines the AssignTaskUser Class.
   AssignTaskUser(std::boxed::Box<AssignTaskUser>),
   /// Defines the UnassignTaskUser Class.
   UnassignTaskUser(std::boxed::Box<UnassignTaskUser>),
   /// Defines the TaskCreateEventInfo Class.
-  #[sdk(empty_child(qname = "t:Create"))]
   TaskCreateEventInfo,
   /// Defines the TaskTitleEventInfo Class.
   TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
@@ -216,13 +215,10 @@ pub enum TaskHistoryEventChoice {
   /// Defines the TaskPriorityEventInfo Class.
   TaskPriorityEventInfo(std::boxed::Box<TaskPriorityEventInfo>),
   /// Defines the TaskDeleteEventInfo Class.
-  #[sdk(empty_child(qname = "t:Delete"))]
   TaskDeleteEventInfo,
   /// Defines the TaskUndeleteEventInfo Class.
-  #[sdk(empty_child(qname = "t:Undelete"))]
   TaskUndeleteEventInfo,
   /// Defines the TaskUnassignAll Class.
-  #[sdk(empty_child(qname = "t:UnassignAll"))]
   TaskUnassignAll,
   /// Defines the TaskUndo Class.
   TaskUndo(std::boxed::Box<TaskUndo>),

@@ -1631,7 +1631,7 @@ pub struct PivotTableDefinition {
   pub pivot_table_definition_extension_list:
     Option<crate::schemas::x::PivotTableDefinitionExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevExStreamChoice {
   /// Defines the RevExFuture Class.
   RevExFuture(std::boxed::Box<RevExFuture>),
@@ -1662,7 +1662,7 @@ pub enum RevExStreamChoice {
   /// Defines the RevGroup Class.
   RevGroup(std::boxed::Box<RevGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StateBasedObjectChoice {
   /// Represents an external link to another workbook..
   DataValidation(std::boxed::Box<DataValidation>),
@@ -1677,14 +1677,14 @@ pub enum StateBasedObjectChoice {
   /// Represents a PivotTable View..
   PivotTableDefinition(std::boxed::Box<PivotTableDefinition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevExChgObjChoice {
   /// Defines the RevisionStateLink Class.
   RevisionStateLink(std::boxed::Box<RevisionStateLink>),
   /// Defines the RevisionState Class.
   RevisionState(std::boxed::Box<RevisionState>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevGroupChoice {
   /// Defines the RevExFuture Class.
   RevExFuture(std::boxed::Box<RevExFuture>),
@@ -1713,7 +1713,7 @@ pub enum RevGroupChoice {
   /// Defines the RevListAutoExpandRw Class.
   RevListAutoExpandRw(std::boxed::Box<RevListAutoExpandRw>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevisionStateChoice {
   /// Defines the RowColVisualOps Class.
   RowColVisualOps(std::boxed::Box<RowColVisualOps>),
@@ -1726,7 +1726,7 @@ pub enum RevisionStateChoice {
   /// Defines the Outlines Class.
   Outlines(std::boxed::Box<Outlines>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RefMapChoice {
   /// Defines the RefCell Class.
   RefCell(std::boxed::Box<RefCell>),
@@ -1735,7 +1735,6 @@ pub enum RefMapChoice {
   /// Defines the RefOartAnchor Class.
   RefOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
-  #[sdk(empty_child(qname = "xr:future"))]
   RefFuture,
   /// Defines the RefTest Class.
   RefTest(std::boxed::Box<RefTest>),

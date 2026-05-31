@@ -10,7 +10,6 @@ use syn::{
 };
 
 mod namespaces;
-mod sdk_choice;
 mod sdk_enum;
 mod sdk_package;
 mod sdk_part;
@@ -29,15 +28,6 @@ pub fn sdk_enum(input: TokenStream) -> TokenStream {
 pub fn sdk_type(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match sdk_type::expand_sdk_type(&input) {
-    Ok(tokens) => tokens.into(),
-    Err(err) => err.to_compile_error().into(),
-  }
-}
-
-#[proc_macro_derive(SdkChoice, attributes(sdk))]
-pub fn sdk_choice(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  match sdk_choice::expand_sdk_choice(&input) {
     Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
@@ -168,7 +158,7 @@ struct SdkAnyChildField {
 }
 
 #[derive(Clone)]
-struct SdkChoiceField {
+struct SdkTypeChoiceField {
   ident: Ident,
   ty: Type,
   optional: bool,
@@ -354,6 +344,7 @@ struct ParsedSdkTypeFieldAttrs {
 enum SdkTypeChoiceItem {
   Child {
     variant: Ident,
+    ty: Option<Type>,
     qname: String,
   },
   EmptyChild {
@@ -362,6 +353,8 @@ enum SdkTypeChoiceItem {
   },
   TextChild {
     variant: Ident,
+    ty: Option<Type>,
+    simple_type: Option<String>,
     qname: String,
   },
   AnyChild {
@@ -372,8 +365,12 @@ enum SdkTypeChoiceItem {
     variant: Ident,
     children: Vec<SdkTypeChoiceSequenceChild>,
   },
-  Any,
-  Text,
+  Any {
+    variant: Ident,
+  },
+  Text {
+    variant: Ident,
+  },
 }
 
 #[derive(Clone)]
@@ -381,6 +378,7 @@ struct SdkTypeChoiceSequenceChild {
   kind: SdkTypeChoiceSequenceChildKind,
   field: Option<Ident>,
   ty: Option<Type>,
+  simple_type: Option<String>,
   qname: String,
 }
 
@@ -410,27 +408,6 @@ impl Parse for StringSetValues {
         .collect(),
     })
   }
-}
-
-enum SdkChoiceVariantKind {
-  TypedChild,
-  Child {
-    qnames: Vec<String>,
-  },
-  EmptyChild {
-    qnames: Vec<String>,
-  },
-  AnyChild {
-    qnames: Vec<String>,
-  },
-  Choice,
-  Sequence,
-  TextChild {
-    qnames: Vec<String>,
-    simple_type: Option<String>,
-  },
-  Any,
-  Text,
 }
 
 #[derive(Clone)]
@@ -1227,11 +1204,47 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("text") {
               accepts_text = true;
-              choice_items.push(SdkTypeChoiceItem::Text);
+              if nested.input.is_empty() {
+                choice_items.push(SdkTypeChoiceItem::Text {
+                  variant: Ident::new("Text", Span::call_site()),
+                });
+              } else {
+                let mut variant = None;
+                nested.parse_nested_meta(|text| {
+                  if text.path.is_ident("variant") {
+                    variant = Some(text.value()?.parse()?);
+                    Ok(())
+                  } else {
+                    Err(text.error("unsupported sdk choice text attribute"))
+                  }
+                })?;
+                let variant = variant.ok_or_else(|| {
+                  syn::Error::new_spanned(&nested.path, "sdk choice text requires variant")
+                })?;
+                choice_items.push(SdkTypeChoiceItem::Text { variant });
+              }
               Ok(())
             } else if nested.path.is_ident("any") {
               accepts_any = true;
-              choice_items.push(SdkTypeChoiceItem::Any);
+              if nested.input.is_empty() {
+                choice_items.push(SdkTypeChoiceItem::Any {
+                  variant: Ident::new("XmlAny", Span::call_site()),
+                });
+              } else {
+                let mut variant = None;
+                nested.parse_nested_meta(|any| {
+                  if any.path.is_ident("variant") {
+                    variant = Some(any.value()?.parse()?);
+                    Ok(())
+                  } else {
+                    Err(any.error("unsupported sdk choice any attribute"))
+                  }
+                })?;
+                let variant = variant.ok_or_else(|| {
+                  syn::Error::new_spanned(&nested.path, "sdk choice any requires variant")
+                })?;
+                choice_items.push(SdkTypeChoiceItem::Any { variant });
+              }
               Ok(())
             } else if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
@@ -1243,6 +1256,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               || nested.path.is_ident("any_child")
             {
               let mut variant = None;
+              let mut ty = None;
+              let mut simple_type = None;
               let mut qname = None;
               nested.parse_nested_meta(|choice_child| {
                 if choice_child.path.is_ident("qname") {
@@ -1251,6 +1266,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   Ok(())
                 } else if choice_child.path.is_ident("variant") {
                   variant = Some(choice_child.value()?.parse()?);
+                  Ok(())
+                } else if choice_child.path.is_ident("ty") {
+                  let value: LitStr = choice_child.value()?.parse()?;
+                  ty = Some(parse_str(&value.value())?);
+                  Ok(())
+                } else if choice_child.path.is_ident("simple_type") {
+                  let value: LitStr = choice_child.value()?.parse()?;
+                  simple_type = Some(value.value());
                   Ok(())
                 } else if is_sdk_version_marker_path(&choice_child.path) {
                   Ok(())
@@ -1264,11 +1287,16 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 syn::Error::new_spanned(&nested.path, "sdk choice child requires variant")
               })?;
               if nested.path.is_ident("child") {
-                choice_items.push(SdkTypeChoiceItem::Child { variant, qname });
+                choice_items.push(SdkTypeChoiceItem::Child { variant, ty, qname });
               } else if nested.path.is_ident("empty_child") {
                 choice_items.push(SdkTypeChoiceItem::EmptyChild { variant, qname });
               } else if nested.path.is_ident("text_child") {
-                choice_items.push(SdkTypeChoiceItem::TextChild { variant, qname });
+                choice_items.push(SdkTypeChoiceItem::TextChild {
+                  variant,
+                  ty,
+                  simple_type,
+                  qname,
+                });
               } else {
                 choice_items.push(SdkTypeChoiceItem::AnyChild { variant, qname });
               }
@@ -1279,6 +1307,10 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               nested.parse_nested_meta(|sequence| {
                 if sequence.path.is_ident("variant") {
                   variant = Some(sequence.value()?.parse()?);
+                  Ok(())
+                } else if sequence.path.is_ident("ty") {
+                  let value: LitStr = sequence.value()?.parse()?;
+                  let _: Type = parse_str(&value.value())?;
                   Ok(())
                 } else if sequence.path.is_ident("child")
                   || sequence.path.is_ident("empty_child")
@@ -1296,6 +1328,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   };
                   let mut field = None;
                   let mut ty = None;
+                  let mut simple_type = None;
                   let mut qname = None;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
@@ -1309,6 +1342,10 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                       let value: LitStr = sequence_child.value()?.parse()?;
                       ty = Some(parse_str(&value.value())?);
                       Ok(())
+                    } else if sequence_child.path.is_ident("simple_type") {
+                      let value: LitStr = sequence_child.value()?.parse()?;
+                      simple_type = Some(value.value());
+                      Ok(())
                     } else if is_sdk_version_marker_path(&sequence_child.path) {
                       Ok(())
                     } else {
@@ -1321,6 +1358,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                     kind,
                     field,
                     ty,
+                    simple_type,
                     qname,
                   });
                   Ok(())
@@ -1651,145 +1689,6 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   })
 }
 
-fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkChoiceVariantKind>> {
-  let mut child_qnames = Vec::new();
-  let mut empty_child_qnames = Vec::new();
-  let mut text_child_qnames = Vec::new();
-  let mut text_child_simple_type = None;
-  let mut any_child_qnames = Vec::new();
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    if let Some(meta) = metas.into_iter().next() {
-      match meta {
-        Meta::List(meta) if meta.path.is_ident("child") => {
-          let mut qname = None;
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("qname") {
-              let value: LitStr = nested.value()?.parse()?;
-              qname = Some(value.value());
-              Ok(())
-            } else if is_sdk_version_marker_path(&nested.path) {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk choice child attribute"))
-            }
-          })?;
-          child_qnames.push(qname.unwrap_or_default());
-        }
-        Meta::List(meta) if meta.path.is_ident("empty_child") => {
-          let mut qname = None;
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("qname") {
-              let value: LitStr = nested.value()?.parse()?;
-              qname = Some(value.value());
-              Ok(())
-            } else if is_sdk_version_marker_path(&nested.path) {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk choice empty_child attribute"))
-            }
-          })?;
-          empty_child_qnames.push(qname.unwrap_or_default());
-        }
-        Meta::List(meta) if meta.path.is_ident("text_child") => {
-          let mut qname = None;
-          let mut simple_type = None;
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("qname") {
-              let value: LitStr = nested.value()?.parse()?;
-              qname = Some(value.value());
-              Ok(())
-            } else if nested.path.is_ident("simple_type") {
-              let value: LitStr = nested.value()?.parse()?;
-              simple_type = Some(value.value());
-              Ok(())
-            } else if nested.path.is_ident("list") || is_sdk_version_marker_path(&nested.path) {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk choice text_child attribute"))
-            }
-          })?;
-          if let Some(simple_type) = simple_type {
-            if let Some(existing) = &text_child_simple_type {
-              if existing != &simple_type {
-                return Err(syn::Error::new_spanned(
-                  meta,
-                  "all sdk choice text_child simple_type values must match",
-                ));
-              }
-            } else {
-              text_child_simple_type = Some(simple_type);
-            }
-          }
-          text_child_qnames.push(qname.unwrap_or_default());
-        }
-        Meta::List(meta) if meta.path.is_ident("any_child") => {
-          let mut qname = None;
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("qname") {
-              let value: LitStr = nested.value()?.parse()?;
-              qname = Some(value.value());
-              Ok(())
-            } else if is_sdk_version_marker_path(&nested.path) {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk choice any_child attribute"))
-            }
-          })?;
-          any_child_qnames.push(qname.unwrap_or_default());
-        }
-        Meta::Path(path) if path.is_ident("choice") => {
-          return Ok(Some(SdkChoiceVariantKind::Choice));
-        }
-        Meta::Path(path) if path.is_ident("sequence") => {
-          return Ok(Some(SdkChoiceVariantKind::Sequence));
-        }
-        Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkChoiceVariantKind::Any)),
-        Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkChoiceVariantKind::Text)),
-        Meta::List(meta) if meta.path.is_ident("text") => {
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("list") {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk choice text attribute"))
-            }
-          })?;
-          return Ok(Some(SdkChoiceVariantKind::Text));
-        }
-        other => {
-          let _ = other;
-        }
-      }
-    }
-  }
-  if !child_qnames.is_empty() {
-    return Ok(Some(SdkChoiceVariantKind::Child {
-      qnames: child_qnames,
-    }));
-  }
-  if !empty_child_qnames.is_empty() {
-    return Ok(Some(SdkChoiceVariantKind::EmptyChild {
-      qnames: empty_child_qnames,
-    }));
-  }
-  if !text_child_qnames.is_empty() {
-    return Ok(Some(SdkChoiceVariantKind::TextChild {
-      qnames: text_child_qnames,
-      simple_type: text_child_simple_type,
-    }));
-  }
-  if !any_child_qnames.is_empty() {
-    return Ok(Some(SdkChoiceVariantKind::AnyChild {
-      qnames: any_child_qnames,
-    }));
-  }
-  Ok(None)
-}
-
 fn normalize_attr_qname(qname: &str) -> String {
   qname.strip_prefix(':').unwrap_or(qname).to_string()
 }
@@ -1935,22 +1834,6 @@ fn is_option_type(ty: &Type) -> bool {
 
 fn is_vec_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Vec"))
-}
-
-fn is_vec_string_type(ty: &Type) -> bool {
-  if let Type::Path(TypePath { path, .. }) = ty
-    && let Some(segment) = path.segments.last()
-    && segment.ident == "Vec"
-    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
-  {
-    return is_string_type(inner_ty);
-  }
-  false
-}
-
-fn is_box_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Box"))
 }
 
 fn is_box_str_type(ty: &Type) -> bool {
@@ -2310,24 +2193,6 @@ fn is_datetime_value_effective_type(ty: &Type, simple_type: Option<&str>) -> boo
   effective_type_name(ty, simple_type).as_deref() == Some("DateTimeValue")
 }
 
-fn choice_variant_payload_type(variant: &syn::Variant) -> syn::Result<Type> {
-  match &variant.fields {
-    Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Ok(fields.unnamed[0].ty.clone()),
-    _ => Err(syn::Error::new_spanned(
-      variant,
-      "SdkChoice only supports single-field tuple variants",
-    )),
-  }
-}
-
-fn choice_variant_inner_type(ty: &Type) -> proc_macro2::TokenStream {
-  if let Some(inner_ty) = box_inner_type(ty) {
-    quote! { #inner_ty }
-  } else {
-    quote! { #ty }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -2387,30 +2252,6 @@ mod tests {
     ));
   }
 
-  #[test]
-  fn sdk_choice_omits_local_name_fallback_for_ambiguous_child_local_names() {
-    let input: DeriveInput = syn::parse_quote! {
-      #[derive(SdkChoice)]
-      enum FilterColumnChoice {
-        #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
-        X14CustomFilters(std::boxed::Box<X14CustomFilters>),
-        #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
-        XCustomFilters(std::boxed::Box<CustomFilters>),
-        #[sdk(child(qname = "x:CT_Top10/x:top10"))]
-        XTop10(std::boxed::Box<Top10>),
-      }
-    };
-
-    let generated = sdk_choice::expand_sdk_choice(&input)
-      .expect("SdkChoice expansion")
-      .to_string();
-
-    assert!(generated.contains("b\"x14:customFilters\" => true"));
-    assert!(!generated.contains("b\"x14:customFilters\" | b\"customFilters\" => true"));
-    assert!(generated.contains("b\"x:customFilters\" | b\"customFilters\" => true"));
-    assert!(generated.contains("b\"x:top10\" | b\"top10\" => true"));
-  }
-
   fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
     let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
     let _guard = lock.lock().expect("snapshot lock");
@@ -2450,7 +2291,6 @@ mod tests {
     let tokens = match kind {
       "SdkEnum" => sdk_enum::expand_sdk_enum(&input).expect("SdkEnum expansion"),
       "SdkType" => sdk_type::expand_sdk_type(&input).expect("SdkType expansion"),
-      "SdkChoice" => sdk_choice::expand_sdk_choice(&input).expect("SdkChoice expansion"),
       "SdkPart" => sdk_part::expand_sdk_part(&input).expect("SdkPart expansion"),
       "SdkPackage" => sdk_package::expand_sdk_package(&input).expect("SdkPackage expansion"),
       other => panic!("unexpected kind: {other}"),

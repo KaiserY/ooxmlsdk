@@ -58,23 +58,19 @@ pub struct OfficeArtExtensionList {
   #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineSketchStylePropertiesChoice {
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineSketchTypePropertiesChoice {
   /// Defines the LineSketchNoneEmpty Class.
-  #[sdk(empty_child(qname = "ask:lineSketchNone"))]
   LineSketchNoneEmpty,
   /// Defines the LineSketchCurvedEmpty Class.
-  #[sdk(empty_child(qname = "ask:lineSketchCurved"))]
   LineSketchCurvedEmpty,
   /// Defines the LineSketchFreehandEmpty Class.
-  #[sdk(empty_child(qname = "ask:lineSketchFreehand"))]
   LineSketchFreehandEmpty,
   /// Defines the LineSketchScribbleEmpty Class.
-  #[sdk(empty_child(qname = "ask:lineSketchScribble"))]
   LineSketchScribbleEmpty,
 }

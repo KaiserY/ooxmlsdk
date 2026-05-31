@@ -32,7 +32,7 @@ pub struct LockedCanvas {
   #[sdk(child(qname = "a:extLst"))]
   pub gvml_group_shape_extension_list: Option<crate::schemas::a::GvmlGroupShapeExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LockedCanvasChoice {
   TextShape(std::boxed::Box<crate::schemas::a::TextShape>),
   Shape(std::boxed::Box<crate::schemas::a::Shape>),

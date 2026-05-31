@@ -6505,14 +6505,14 @@ pub struct ContextMenus {
   #[sdk(child(qname = "mso14:contextMenu"))]
   pub context_menu: Vec<ContextMenu>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitButtonRegularChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuRegularChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6533,14 +6533,14 @@ pub enum MenuRegularChoice {
   /// Defines the DynamicMenuRegular Class.
   DynamicMenuRegular(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitButtonWithTitleChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuWithTitleChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6561,7 +6561,7 @@ pub enum MenuWithTitleChoice {
   /// Defines the DynamicMenuRegular Class.
   DynamicMenuRegular(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6582,14 +6582,14 @@ pub enum MenuChoice {
   /// Defines the DynamicMenuRegular Class.
   DynamicMenuRegular(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitButtonChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BoxChoice {
   /// Defines the ControlClone Class.
   ControlClone(std::boxed::Box<ControlClone>),
@@ -6620,7 +6620,7 @@ pub enum BoxChoice {
   /// Defines the ButtonGroup Class.
   ButtonGroup(std::boxed::Box<ButtonGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ButtonGroupChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6639,7 +6639,7 @@ pub enum ButtonGroupChoice {
   /// Defines the Separator Class.
   Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupBoxChoice {
   /// Defines the BackstageGroupButton Class.
   BackstageGroupButton(std::boxed::Box<BackstageGroupButton>),
@@ -6664,7 +6664,7 @@ pub enum GroupBoxChoice {
   /// Defines the ImageControl Class.
   ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LayoutContainerChoice {
   /// Defines the BackstageGroupButton Class.
   BackstageGroupButton(std::boxed::Box<BackstageGroupButton>),
@@ -6689,12 +6689,12 @@ pub enum LayoutContainerChoice {
   /// Defines the ImageControl Class.
   ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackstageGroupChoice {
   /// Defines the PrimaryItem Class.
   PrimaryItem(std::boxed::Box<PrimaryItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuRootChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6715,7 +6715,7 @@ pub enum MenuRootChoice {
   /// Defines the DynamicMenuRegular Class.
   DynamicMenuRegular(std::boxed::Box<DynamicMenuRegular>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
   /// Defines the ControlClone Class.
   ControlClone(std::boxed::Box<ControlClone>),
@@ -6748,7 +6748,7 @@ pub enum GroupChoice {
   /// Defines the Separator Class.
   Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SharedControlsQatItemsChoice {
   /// Defines the ControlCloneQat Class.
   ControlCloneQat(std::boxed::Box<ControlCloneQat>),
@@ -6757,7 +6757,7 @@ pub enum SharedControlsQatItemsChoice {
   /// Defines the Separator Class.
   Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DocumentControlsQatItemsChoice {
   /// Defines the ControlCloneQat Class.
   ControlCloneQat(std::boxed::Box<ControlCloneQat>),
@@ -6766,7 +6766,7 @@ pub enum DocumentControlsQatItemsChoice {
   /// Defines the Separator Class.
   Separator(std::boxed::Box<Separator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ContextMenuChoice {
   /// Defines the ControlCloneRegular Class.
   ControlCloneRegular(std::boxed::Box<ControlCloneRegular>),
@@ -6787,7 +6787,7 @@ pub enum ContextMenuChoice {
   /// Defines the MenuSeparatorNoTitle Class.
   MenuSeparatorNoTitle(std::boxed::Box<MenuSeparatorNoTitle>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackstageMenuGroupChoice {
   /// Defines the BackstageMenuButton Class.
   BackstageMenuButton(std::boxed::Box<BackstageMenuButton>),
@@ -6798,14 +6798,14 @@ pub enum BackstageMenuGroupChoice {
   /// Defines the BackstageMenuToggleButton Class.
   BackstageMenuToggleButton(std::boxed::Box<BackstageMenuToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PrimaryItemChoice {
   /// Defines the BackstageRegularButton Class.
   BackstageRegularButton(std::boxed::Box<BackstageRegularButton>),
   /// Defines the BackstagePrimaryMenu Class.
   BackstagePrimaryMenu(std::boxed::Box<BackstagePrimaryMenu>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TopItemsGroupControlsChoice {
   /// Defines the BackstageGroupButton Class.
   BackstageGroupButton(std::boxed::Box<BackstageGroupButton>),
@@ -6830,7 +6830,7 @@ pub enum TopItemsGroupControlsChoice {
   /// Defines the ImageControl Class.
   ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BottomItemsGroupControlsChoice {
   /// Defines the BackstageGroupButton Class.
   BackstageGroupButton(std::boxed::Box<BackstageGroupButton>),
@@ -6855,7 +6855,7 @@ pub enum BottomItemsGroupControlsChoice {
   /// Defines the ImageControl Class.
   ImageControl(std::boxed::Box<ImageControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackstageGroupsChoice {
   /// Defines the TaskFormGroup Class.
   TaskFormGroup(std::boxed::Box<TaskFormGroup>),
@@ -6864,14 +6864,14 @@ pub enum BackstageGroupsChoice {
   /// Defines the TaskGroup Class.
   TaskGroup(std::boxed::Box<TaskGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SimpleGroupsChoice {
   /// Defines the BackstageGroup Class.
   BackstageGroup(std::boxed::Box<BackstageGroup>),
   /// Defines the TaskGroup Class.
   TaskGroup(std::boxed::Box<TaskGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackstageChoice {
   /// Defines the BackstageTab Class.
   BackstageTab(std::boxed::Box<BackstageTab>),

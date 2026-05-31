@@ -55,10 +55,9 @@ pub struct NumberDiagramInfo {
   #[sdk(child(qname = "dgm1611:buPr"))]
   pub diagram_auto_bullet: std::boxed::Box<DiagramAutoBullet>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DiagramAutoBulletChoice {
   /// No Bullet.
-  #[sdk(empty_child(qname = "a:buNone"))]
   NoBullet,
   /// Auto-Numbered Bullet.
   AutoNumberedBullet(std::boxed::Box<crate::schemas::a::AutoNumberedBullet>),

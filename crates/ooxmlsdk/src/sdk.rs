@@ -523,11 +523,7 @@ pub trait SdkType: Sized {
     ))
   }
 
-  fn write_inner<W: std::io::Write>(
-    &self,
-    _writer: &mut W,
-    _name: ElementName,
-  ) -> Result<(), std::io::Error> {
+  fn write_inner<W: std::io::Write>(&self, _writer: &mut W) -> Result<bool, std::io::Error> {
     Err(std::io::Error::other(
       "SdkType does not support XML writing",
     ))
@@ -536,42 +532,6 @@ pub trait SdkType: Sized {
   #[inline]
   fn matches_type_start_qname(_name: &[u8]) -> bool {
     false
-  }
-}
-
-pub trait SdkChoice: Sized {
-  fn read_borrowed_inner<'de>(
-    xml_reader: &mut crate::common::SliceReader<'de>,
-    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn read_io_inner<R: std::io::BufRead>(
-    xml_reader: &mut crate::common::IoReader<R>,
-    xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
-  ) -> Result<Self, crate::common::SdkError>;
-
-  fn write_xml<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error>;
-
-  fn matches_specific_start_qname(name: &[u8]) -> bool;
-
-  #[inline]
-  fn matches_start_qname(name: &[u8]) -> bool {
-    Self::matches_specific_start_qname(name)
-  }
-
-  #[inline]
-  fn accepts_any_child() -> bool {
-    false
-  }
-
-  #[inline]
-  fn accepts_text() -> bool {
-    false
-  }
-
-  #[inline]
-  fn from_text_value(_value: &str) -> Option<Self> {
-    None
   }
 }
 
@@ -611,43 +571,6 @@ impl<T: SdkMce + ?Sized> SdkMce for Box<T> {
     context: &mut MceContext,
   ) -> Result<(), crate::common::SdkError> {
     self.as_mut().process_mce_with_context(settings, context)
-  }
-}
-
-#[cfg(feature = "mce")]
-pub trait SdkMceChoice: SdkChoice {
-  fn process_mce_choice(
-    &mut self,
-    _settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<(), crate::common::SdkError> {
-    Ok(())
-  }
-
-  fn process_mce_choice_with_context(
-    &mut self,
-    settings: &MarkupCompatibilityProcessSettings,
-    _context: &mut MceContext,
-  ) -> Result<(), crate::common::SdkError> {
-    self.process_mce_choice(settings)
-  }
-
-  fn process_mce_choices(
-    values: &mut Vec<Self>,
-    settings: &MarkupCompatibilityProcessSettings,
-  ) -> Result<(), crate::common::SdkError> {
-    let mut context = MceContext::default();
-    Self::process_mce_choices_with_context(values, settings, &mut context)
-  }
-
-  fn process_mce_choices_with_context(
-    values: &mut Vec<Self>,
-    settings: &MarkupCompatibilityProcessSettings,
-    context: &mut MceContext,
-  ) -> Result<(), crate::common::SdkError> {
-    for value in values {
-      value.process_mce_choice_with_context(settings, context)?;
-    }
-    Ok(())
   }
 }
 

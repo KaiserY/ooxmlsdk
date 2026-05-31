@@ -291,14 +291,14 @@ pub struct ChartDataPointUniqueIdMapEntry {
   #[sdk(child(qname = "c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -311,10 +311,9 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
@@ -363,10 +362,9 @@ pub struct DLblChoiceSequence {
   #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
   pub separator: Option<crate::schemas::c::Separator>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DLblChoice {
   Delete(std::boxed::Box<crate::schemas::c::Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
-  #[sdk(sequence)]
   Sequence(std::boxed::Box<DLblChoiceSequence>),
 }

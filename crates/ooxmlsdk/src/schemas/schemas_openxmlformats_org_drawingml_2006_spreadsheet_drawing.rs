@@ -643,7 +643,7 @@ pub struct GroupShapeProperties {
   #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TwoCellAnchorChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -658,10 +658,9 @@ pub enum TwoCellAnchorChoice {
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OneCellAnchorChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -676,7 +675,7 @@ pub enum OneCellAnchorChoice {
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AbsoluteAnchorChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -691,7 +690,7 @@ pub enum AbsoluteAnchorChoice {
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapeChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -705,7 +704,7 @@ pub enum GroupShapeChoice {
   Picture(std::boxed::Box<Picture>),
   ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WorksheetDrawingChoice {
   /// Two Cell Anchor Shape Size.
   TwoCellAnchor(std::boxed::Box<TwoCellAnchor>),
@@ -714,17 +713,16 @@ pub enum WorksheetDrawingChoice {
   /// Absolute Anchor Shape Size.
   AbsoluteAnchor(std::boxed::Box<AbsoluteAnchor>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -737,22 +735,21 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipFillChoice {
   Tile(std::boxed::Box<crate::schemas::a::Tile>),
   Stretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -765,10 +762,9 @@ pub enum GroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),

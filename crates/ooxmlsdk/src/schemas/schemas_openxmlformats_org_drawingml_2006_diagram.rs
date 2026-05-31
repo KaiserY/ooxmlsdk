@@ -2813,7 +2813,7 @@ pub struct DiagramDefinitionExtensionList {
   #[sdk(child(qname = "dgm:ext"))]
   pub diagram_definition_extension: Vec<DiagramDefinitionExtension>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2828,7 +2828,7 @@ pub enum FillColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2843,7 +2843,7 @@ pub enum LineColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2858,7 +2858,7 @@ pub enum EffectColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextLineColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2873,7 +2873,7 @@ pub enum TextLineColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextFillColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2888,7 +2888,7 @@ pub enum TextFillColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextEffectColorListChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2903,7 +2903,7 @@ pub enum TextEffectColorListChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ForEachChoice {
   /// Algorithm.
   Algorithm(std::boxed::Box<Algorithm>),
@@ -2924,7 +2924,7 @@ pub enum ForEachChoice {
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LayoutNodeChoice {
   /// Algorithm.
   Algorithm(std::boxed::Box<Algorithm>),
@@ -2947,7 +2947,7 @@ pub enum LayoutNodeChoice {
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DiagramChooseIfChoice {
   /// Algorithm.
   Algorithm(std::boxed::Box<Algorithm>),
@@ -2968,7 +2968,7 @@ pub enum DiagramChooseIfChoice {
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DiagramChooseElseChoice {
   /// Algorithm.
   Algorithm(std::boxed::Box<Algorithm>),
@@ -2989,22 +2989,21 @@ pub enum DiagramChooseElseChoice {
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextPropertiesChoice {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   FlatText(std::boxed::Box<crate::schemas::a::FlatText>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PointListChoice {
   /// Point.
   Point(std::boxed::Box<Point>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -3017,29 +3016,28 @@ pub enum BackgroundChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WholeChoice {
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -3052,22 +3050,20 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DiagramDefinitionExtensionChoice {
   /// Defines the NumberDiagramInfoList Class.
   NumberDiagramInfoList(std::boxed::Box<crate::schemas::dgm1611::NumberDiagramInfoList>),
   /// Defines the TextListStyleType Class.
   TextListStyleType(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }

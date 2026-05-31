@@ -137,7 +137,7 @@ pub struct ExtendedGuide {
   #[sdk(child(qname = "p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),

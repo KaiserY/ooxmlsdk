@@ -24,12 +24,10 @@ pub struct PlaceholderTypeAcb {
     )]
   pub placeholder_type_acb_choice: Option<PlaceholderTypeAcbChoice>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PlaceholderTypeAcbChoice {
   /// Defines the CameoEmpty Class.
-  #[sdk(empty_child(qname = "p232:cameo"))]
   CameoEmpty,
   /// Defines the UnknownEmpty Class.
-  #[sdk(empty_child(qname = "p232:unknown"))]
   UnknownEmpty,
 }

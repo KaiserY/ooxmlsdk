@@ -355,7 +355,7 @@ pub struct SingleDataSourceRecord {
   #[sdk(child(qname = "wne:hash"))]
   pub record_hash_code: std::boxed::Box<RecordHashCode>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum KeyMapEntryChoice {
   /// Defines the FixedCommandKeyboardCustomization Class.
   FixedCommandKeyboardCustomization(std::boxed::Box<FixedCommandKeyboardCustomization>),

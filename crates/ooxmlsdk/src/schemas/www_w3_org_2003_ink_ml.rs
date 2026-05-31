@@ -1313,7 +1313,7 @@ pub struct Definitions {
     )]
   pub definitions_choice: Vec<DefinitionsChoice>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InkChoice {
   /// Defines the Annotation Class.
   Annotation(std::boxed::Box<Annotation>),
@@ -1330,14 +1330,14 @@ pub enum InkChoice {
   /// Defines the TraceView Class.
   TraceView(std::boxed::Box<TraceView>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MappingChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<Table>),
   /// Defines the Matrix Class.
   Matrix(std::boxed::Box<Matrix>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TraceGroupChoice {
   /// Defines the Annotation Class.
   Annotation(std::boxed::Box<Annotation>),
@@ -1348,7 +1348,7 @@ pub enum TraceGroupChoice {
   /// Defines the TraceGroup Class.
   TraceGroup(std::boxed::Box<TraceGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TraceViewChoice {
   /// Defines the Annotation Class.
   Annotation(std::boxed::Box<Annotation>),
@@ -1357,7 +1357,7 @@ pub enum TraceViewChoice {
   /// Defines the TraceView Class.
   TraceView(std::boxed::Box<TraceView>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DefinitionsChoice {
   /// Defines the Brush Class.
   Brush(std::boxed::Box<Brush>),

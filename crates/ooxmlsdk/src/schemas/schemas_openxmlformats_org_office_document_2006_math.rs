@@ -2366,12 +2366,11 @@ pub struct ParagraphProperties {
   #[sdk(child(qname = "m:jc"))]
   pub justification: Option<Justification>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunChoice {
   /// Break.
   Break(std::boxed::Box<crate::schemas::w::Break>),
   /// Text.
-  #[sdk(child(qname = "w:t"))]
   WText(std::boxed::Box<crate::schemas::w::Text>),
   /// Deleted Text.
   DeletedText(std::boxed::Box<crate::schemas::w::DeletedText>),
@@ -2380,54 +2379,38 @@ pub enum RunChoice {
   /// Deleted Field Code.
   DeletedFieldCode(std::boxed::Box<crate::schemas::w::DeletedFieldCode>),
   /// Non Breaking Hyphen Character.
-  #[sdk(empty_child(qname = "w:noBreakHyphen"))]
   NoBreakHyphen,
   /// Optional Hyphen Character.
-  #[sdk(empty_child(qname = "w:softHyphen"))]
   SoftHyphen,
   /// Date Block - Short Day Format.
-  #[sdk(empty_child(qname = "w:dayShort"))]
   DayShort,
   /// Date Block - Short Month Format.
-  #[sdk(empty_child(qname = "w:monthShort"))]
   MonthShort,
   /// Date Block - Short Year Format.
-  #[sdk(empty_child(qname = "w:yearShort"))]
   YearShort,
   /// Date Block - Long Day Format.
-  #[sdk(empty_child(qname = "w:dayLong"))]
   DayLong,
   /// Date Block - Long Month Format.
-  #[sdk(empty_child(qname = "w:monthLong"))]
   MonthLong,
   /// Date Block - Long Year Format.
-  #[sdk(empty_child(qname = "w:yearLong"))]
   YearLong,
   /// Comment Information Block.
-  #[sdk(empty_child(qname = "w:annotationRef"))]
   AnnotationReferenceMark,
   /// Footnote Reference Mark.
-  #[sdk(empty_child(qname = "w:footnoteRef"))]
   FootnoteReferenceMark,
   /// Endnote Reference Mark.
-  #[sdk(empty_child(qname = "w:endnoteRef"))]
   EndnoteReferenceMark,
   /// Footnote/Endnote Separator Mark.
-  #[sdk(empty_child(qname = "w:separator"))]
   SeparatorMark,
   /// Continuation Separator Mark.
-  #[sdk(empty_child(qname = "w:continuationSeparator"))]
   ContinuationSeparatorMark,
   /// Symbol Character.
   SymbolChar(std::boxed::Box<crate::schemas::w::SymbolChar>),
   /// Page Number Block.
-  #[sdk(empty_child(qname = "w:pgNum"))]
   PageNumber,
   /// Carriage Return.
-  #[sdk(empty_child(qname = "w:cr"))]
   CarriageReturn,
   /// Tab Character.
-  #[sdk(empty_child(qname = "w:tab"))]
   TabChar,
   /// Inline Embedded Object.
   EmbeddedObject(std::boxed::Box<crate::schemas::w::EmbeddedObject>),
@@ -2448,21 +2431,17 @@ pub enum RunChoice {
   /// Absolute Position Tab Character.
   PositionalTab(std::boxed::Box<crate::schemas::w::PositionalTab>),
   /// Position of Last Calculated Page Break.
-  #[sdk(empty_child(qname = "w:lastRenderedPageBreak"))]
   LastRenderedPageBreak,
   /// Text.
-  #[sdk(child(qname = "m:t"))]
   MText(std::boxed::Box<Text>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<Run>),
   /// Defines the ProofError Class.
   ProofError(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -2533,13 +2512,11 @@ pub enum ParagraphChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OfficeMathChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -2662,7 +2639,7 @@ pub enum OfficeMathChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MathPropertiesChoice {
   /// Wrap Indent.
   WrapIndent(std::boxed::Box<WrapIndent>),
@@ -2678,17 +2655,15 @@ pub struct RunPropertiesChoiceSequence {
   #[sdk(child(qname = "m:sty"))]
   pub style: Option<Style>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Normal Text.
   NormalText(std::boxed::Box<NormalText>),
   /// Sequence of m:scr, m:sty
-  #[sdk(sequence)]
   Sequence(std::boxed::Box<RunPropertiesChoiceSequence>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ControlPropertiesChoice {
-  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<crate::schemas::w::RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<crate::schemas::w::InsertedMathControl>),
@@ -2700,7 +2675,7 @@ pub enum ControlPropertiesChoice {
   MoveToMathControl(std::boxed::Box<crate::schemas::w::MoveToMathControl>),
   DrawingRunProperties(std::boxed::Box<crate::schemas::a::RunProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BaseChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -2823,7 +2798,7 @@ pub enum BaseChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NumeratorChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -2946,7 +2921,7 @@ pub enum NumeratorChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DenominatorChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -3069,7 +3044,7 @@ pub enum DenominatorChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FunctionNameChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -3192,7 +3167,7 @@ pub enum FunctionNameChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LimitChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -3315,7 +3290,7 @@ pub enum LimitChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SubArgumentChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -3438,7 +3413,7 @@ pub enum SubArgumentChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SuperArgumentChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),
@@ -3561,7 +3536,7 @@ pub enum SuperArgumentChoice {
   /// Defines the OfficeMath Class.
   OfficeMath(std::boxed::Box<OfficeMath>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DegreeChoice {
   /// Accent.
   Accent(std::boxed::Box<Accent>),

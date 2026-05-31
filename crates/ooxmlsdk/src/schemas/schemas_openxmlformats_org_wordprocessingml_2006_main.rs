@@ -16362,7 +16362,7 @@ pub struct LevelOverride {
   #[sdk(child(qname = "w:lvl"))]
   pub level: Option<std::boxed::Box<Level>>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EmbeddedObjectChoice {
   /// Shape Group.
   Group(std::boxed::Box<crate::schemas::v::Group>),
@@ -16389,7 +16389,7 @@ pub enum EmbeddedObjectChoice {
   /// Embedded OLE Object.
   OleObject(std::boxed::Box<crate::schemas::o::OleObject>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EmbeddedObjectChoice2 {
   /// Defines the Control Class.
   Control(std::boxed::Box<Control>),
@@ -16398,7 +16398,7 @@ pub enum EmbeddedObjectChoice2 {
   /// Defines the ObjectLink Class.
   ObjectLink(std::boxed::Box<ObjectLink>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PictureChoice {
   /// Shape Group.
   Group(std::boxed::Box<crate::schemas::v::Group>),
@@ -16425,24 +16425,23 @@ pub enum PictureChoice {
   /// Embedded OLE Object.
   OleObject(std::boxed::Box<crate::schemas::o::OleObject>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FieldCharChoice {
   /// Custom Field Data.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
   FieldData(FieldData),
   /// Form Field Properties.
   FormFieldData(std::boxed::Box<FormFieldData>),
   /// Previous Paragraph Numbering Properties.
   NumberingChange(std::boxed::Box<NumberingChange>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DrawingChoice {
   /// Anchor for Floating DrawingML Object.
   Anchor(std::boxed::Box<crate::schemas::wp::Anchor>),
   /// Inline DrawingML Object.
   Inline(std::boxed::Box<crate::schemas::wp::Inline>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Defines the RunStyle Class.
   RunStyle(std::boxed::Box<RunStyle>),
@@ -16521,32 +16520,29 @@ pub enum RunPropertiesChoice {
   /// Defines the SpecVanish Class.
   SpecVanish(std::boxed::Box<SpecVanish>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InsertedMathControlChoice {
-  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the DeletedMathControl Class.
   DeletedMathControl(std::boxed::Box<DeletedMathControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MoveFromMathControlChoice {
-  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<InsertedMathControl>),
   /// Defines the DeletedMathControl Class.
   DeletedMathControl(std::boxed::Box<DeletedMathControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MoveToMathControlChoice {
-  #[sdk(child(qname = "w:rPr"))]
   RunProperties(std::boxed::Box<RunProperties>),
   /// Defines the InsertedMathControl Class.
   InsertedMathControl(std::boxed::Box<InsertedMathControl>),
   /// Defines the DeletedMathControl Class.
   DeletedMathControl(std::boxed::Box<DeletedMathControl>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlRubyChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -16555,7 +16551,6 @@ pub enum CustomXmlRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16670,10 +16665,9 @@ pub enum CustomXmlRubyChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SimpleFieldRubyChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -16682,7 +16676,6 @@ pub enum SimpleFieldRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16797,10 +16790,9 @@ pub enum SimpleFieldRubyChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkRubyChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -16809,7 +16801,6 @@ pub enum HyperlinkRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -16896,10 +16887,9 @@ pub enum HyperlinkRubyChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunChoice {
   /// Break.
   Break(std::boxed::Box<Break>),
@@ -16912,54 +16902,38 @@ pub enum RunChoice {
   /// Deleted Field Code.
   DeletedFieldCode(std::boxed::Box<DeletedFieldCode>),
   /// Non Breaking Hyphen Character.
-  #[sdk(empty_child(qname = "w:noBreakHyphen"))]
   NoBreakHyphen,
   /// Optional Hyphen Character.
-  #[sdk(empty_child(qname = "w:softHyphen"))]
   SoftHyphen,
   /// Date Block - Short Day Format.
-  #[sdk(empty_child(qname = "w:dayShort"))]
   DayShort,
   /// Date Block - Short Month Format.
-  #[sdk(empty_child(qname = "w:monthShort"))]
   MonthShort,
   /// Date Block - Short Year Format.
-  #[sdk(empty_child(qname = "w:yearShort"))]
   YearShort,
   /// Date Block - Long Day Format.
-  #[sdk(empty_child(qname = "w:dayLong"))]
   DayLong,
   /// Date Block - Long Month Format.
-  #[sdk(empty_child(qname = "w:monthLong"))]
   MonthLong,
   /// Date Block - Long Year Format.
-  #[sdk(empty_child(qname = "w:yearLong"))]
   YearLong,
   /// Comment Information Block.
-  #[sdk(empty_child(qname = "w:annotationRef"))]
   AnnotationReferenceMark,
   /// Footnote Reference Mark.
-  #[sdk(empty_child(qname = "w:footnoteRef"))]
   FootnoteReferenceMark,
   /// Endnote Reference Mark.
-  #[sdk(empty_child(qname = "w:endnoteRef"))]
   EndnoteReferenceMark,
   /// Footnote/Endnote Separator Mark.
-  #[sdk(empty_child(qname = "w:separator"))]
   SeparatorMark,
   /// Continuation Separator Mark.
-  #[sdk(empty_child(qname = "w:continuationSeparator"))]
   ContinuationSeparatorMark,
   /// Symbol Character.
   SymbolChar(std::boxed::Box<SymbolChar>),
   /// Page Number Block.
-  #[sdk(empty_child(qname = "w:pgNum"))]
   PageNumber,
   /// Carriage Return.
-  #[sdk(empty_child(qname = "w:cr"))]
   CarriageReturn,
   /// Tab Character.
-  #[sdk(empty_child(qname = "w:tab"))]
   TabChar,
   /// Inline Embedded Object.
   EmbeddedObject(std::boxed::Box<EmbeddedObject>),
@@ -16980,13 +16954,11 @@ pub enum RunChoice {
   /// Absolute Position Tab Character.
   PositionalTab(std::boxed::Box<PositionalTab>),
   /// Position of Last Calculated Page Break.
-  #[sdk(empty_child(qname = "w:lastRenderedPageBreak"))]
   LastRenderedPageBreak,
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtRunRubyChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -17037,7 +17009,7 @@ pub enum SdtRunRubyChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InsertedRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
@@ -17152,17 +17124,15 @@ pub enum InsertedRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DeletedRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
@@ -17277,17 +17247,15 @@ pub enum DeletedRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MoveFromRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
@@ -17402,17 +17370,15 @@ pub enum MoveFromRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MoveToRunChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<SdtRun>),
@@ -17527,17 +17493,15 @@ pub enum MoveToRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtRunChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -17588,7 +17552,7 @@ pub enum SdtRunChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlBlockChoice {
   /// Defines the CustomXmlBlock Class.
   CustomXmlBlock(std::boxed::Box<CustomXmlBlock>),
@@ -17667,7 +17631,7 @@ pub enum CustomXmlBlockChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtBlockChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -17718,7 +17682,7 @@ pub enum SdtBlockChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -17839,10 +17803,8 @@ pub enum ParagraphChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -17851,10 +17813,9 @@ pub enum ParagraphChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -17905,7 +17866,7 @@ pub enum TableChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableChoice2 {
   /// Table Row.
   TableRow(std::boxed::Box<TableRow>),
@@ -17982,7 +17943,7 @@ pub enum TableChoice2 {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableRowChoice {
   /// Table Cell.
   TableCell(std::boxed::Box<TableCell>),
@@ -18059,7 +18020,7 @@ pub enum TableRowChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlRowChoice {
   /// Table Row.
   TableRow(std::boxed::Box<TableRow>),
@@ -18136,7 +18097,7 @@ pub enum CustomXmlRowChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtRowChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -18187,7 +18148,7 @@ pub enum SdtRowChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -18268,7 +18229,7 @@ pub enum TableCellChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlCellChoice {
   /// Table Cell.
   TableCell(std::boxed::Box<TableCell>),
@@ -18345,7 +18306,7 @@ pub enum CustomXmlCellChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtCellChoice {
   /// Defines the BookmarkStart Class.
   BookmarkStart(std::boxed::Box<BookmarkStart>),
@@ -18396,7 +18357,7 @@ pub enum SdtCellChoice {
     std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlRunChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -18517,10 +18478,8 @@ pub enum CustomXmlRunChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18529,7 +18488,7 @@ pub enum CustomXmlRunChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SimpleFieldChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -18650,10 +18609,8 @@ pub enum SimpleFieldChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18662,7 +18619,7 @@ pub enum SimpleFieldChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HyperlinkChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -18755,10 +18712,8 @@ pub enum HyperlinkChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18767,7 +18722,7 @@ pub enum HyperlinkChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BidirectionalOverrideChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -18860,10 +18815,8 @@ pub enum BidirectionalOverrideChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18872,7 +18825,7 @@ pub enum BidirectionalOverrideChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BidirectionalEmbeddingChoice {
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -18965,10 +18918,8 @@ pub enum BidirectionalEmbeddingChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -18977,7 +18928,7 @@ pub enum BidirectionalEmbeddingChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBoxContentChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -19052,7 +19003,7 @@ pub enum TextBoxContentChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HeaderChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -19127,7 +19078,7 @@ pub enum HeaderChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FooterChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -19202,15 +19153,14 @@ pub enum FooterChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FontsChoice {
   /// Properties for a Single Font.
   Font(std::boxed::Box<Font>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PreviousTableCellPropertiesChoice {
   /// Table Cell Insertion.
   CellInsertion(std::boxed::Box<CellInsertion>),
@@ -19219,7 +19169,7 @@ pub enum PreviousTableCellPropertiesChoice {
   /// Vertically Merged/Split Table Cells.
   CellMerge(std::boxed::Box<CellMerge>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PreviousTableRowPropertiesChoice {
   /// Defines the ConditionalFormatStyle Class.
   ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
@@ -19246,7 +19196,7 @@ pub enum PreviousTableRowPropertiesChoice {
   /// Defines the TableJustification Class.
   TableJustification(std::boxed::Box<TableJustification>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PreviousRunPropertiesChoice {
   /// Defines the RunStyle Class.
   RunStyle(std::boxed::Box<RunStyle>),
@@ -19325,14 +19275,14 @@ pub enum PreviousRunPropertiesChoice {
   /// Defines the SpecVanish Class.
   SpecVanish(std::boxed::Box<SpecVanish>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PreviousParagraphMarkRunPropertiesChoice {
   /// Defines the ConflictInsertion Class.
   ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
   /// Defines the ConflictDeletion Class.
   ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PreviousParagraphMarkRunPropertiesChoice2 {
   /// Defines the RunStyle Class.
   RunStyle(std::boxed::Box<RunStyle>),
@@ -19411,14 +19361,14 @@ pub enum PreviousParagraphMarkRunPropertiesChoice2 {
   /// Defines the SpecVanish Class.
   SpecVanish(std::boxed::Box<SpecVanish>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphMarkRunPropertiesChoice {
   /// Defines the ConflictInsertion Class.
   ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
   /// Defines the ConflictDeletion Class.
   ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParagraphMarkRunPropertiesChoice2 {
   /// Defines the RunStyle Class.
   RunStyle(std::boxed::Box<RunStyle>),
@@ -19497,14 +19447,14 @@ pub enum ParagraphMarkRunPropertiesChoice2 {
   /// Defines the SpecVanish Class.
   SpecVanish(std::boxed::Box<SpecVanish>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SectionPropertiesChoice {
   /// Header Reference.
   HeaderReference(std::boxed::Box<HeaderReference>),
   /// Footer Reference.
   FooterReference(std::boxed::Box<FooterReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FormFieldDataChoice {
   /// Form Field Name.
   FormFieldName(std::boxed::Box<FormFieldName>),
@@ -19527,14 +19477,14 @@ pub enum FormFieldDataChoice {
   /// Text Box Form Field Properties.
   TextInput(std::boxed::Box<TextInput>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CheckBoxChoice {
   /// Checkbox Form Field Size.
   FormFieldSize(std::boxed::Box<FormFieldSize>),
   /// Automatically Size Form Field.
   AutomaticallySizeFormField(std::boxed::Box<AutomaticallySizeFormField>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RubyContentChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -19543,7 +19493,6 @@ pub enum RubyContentChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -19630,10 +19579,9 @@ pub enum RubyContentChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RubyBaseChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -19642,7 +19590,6 @@ pub enum RubyBaseChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -19729,10 +19676,9 @@ pub enum RubyBaseChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtPropertiesChoice {
   /// Run Properties.
   RunProperties(std::boxed::Box<RunProperties>),
@@ -19745,9 +19691,7 @@ pub enum SdtPropertiesChoice {
   /// Defines the ShowingPlaceholder Class.
   ShowingPlaceholder(std::boxed::Box<ShowingPlaceholder>),
   /// Defines the DataBinding Class.
-  #[sdk(child(qname = "w:dataBinding"))]
   WDataBinding(std::boxed::Box<DataBinding>),
-  #[sdk(child(qname = "w15:dataBinding"))]
   W15DataBinding(std::boxed::Box<crate::schemas::w15::DataBinding>),
   /// Defines the TemporarySdt Class.
   TemporarySdt(std::boxed::Box<TemporarySdt>),
@@ -19760,7 +19704,6 @@ pub enum SdtPropertiesChoice {
   WebExtensionLinked(std::boxed::Box<crate::schemas::w15::WebExtensionLinked>),
   WebExtensionCreated(std::boxed::Box<crate::schemas::w15::WebExtensionCreated>),
   /// Defines the SdtContentEquation Class.
-  #[sdk(empty_child(qname = "w:equation"))]
   SdtContentEquation,
   /// Defines the SdtContentComboBox Class.
   SdtContentComboBox(std::boxed::Box<SdtContentComboBox>),
@@ -19773,32 +19716,25 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtContentDropDownList Class.
   SdtContentDropDownList(std::boxed::Box<SdtContentDropDownList>),
   /// Defines the SdtContentPicture Class.
-  #[sdk(empty_child(qname = "w:picture"))]
   SdtContentPicture,
   /// Defines the SdtContentRichText Class.
-  #[sdk(empty_child(qname = "w:richText"))]
   SdtContentRichText,
   /// Defines the SdtContentText Class.
   SdtContentText(std::boxed::Box<SdtContentText>),
   /// Defines the SdtContentCitation Class.
-  #[sdk(empty_child(qname = "w:citation"))]
   SdtContentCitation,
   /// Defines the SdtContentGroup Class.
-  #[sdk(empty_child(qname = "w:group"))]
   SdtContentGroup,
   /// Defines the SdtContentBibliography Class.
-  #[sdk(empty_child(qname = "w:bibliography"))]
   SdtContentBibliography,
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(qname = "w14:entityPicker"))]
   EntityPickerEmpty,
   SdtContentCheckBox(std::boxed::Box<crate::schemas::w14::SdtContentCheckBox>),
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(qname = "w15:repeatingSectionItem"))]
   SdtRepeatedSectionItem,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentBlockChoice {
   /// Defines the CustomXmlBlock Class.
   CustomXmlBlock(std::boxed::Box<CustomXmlBlock>),
@@ -19871,9 +19807,8 @@ pub enum SdtContentBlockChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentRunChoice {
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Defines the CustomXmlRun Class.
   CustomXmlRun(std::boxed::Box<CustomXmlRun>),
@@ -19967,7 +19902,6 @@ pub enum SdtContentRunChoice {
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<BidirectionalOverride>),
@@ -19976,7 +19910,7 @@ pub enum SdtContentRunChoice {
   /// Anchor for Subdocument Location.
   SubDocumentReference(std::boxed::Box<SubDocumentReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentRunRubyChoice {
   /// Defines the CustomXmlRuby Class.
   CustomXmlRuby(std::boxed::Box<CustomXmlRuby>),
@@ -19985,7 +19919,6 @@ pub enum SdtContentRunRubyChoice {
   /// Defines the HyperlinkRuby Class.
   HyperlinkRuby(std::boxed::Box<HyperlinkRuby>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<Run>),
   /// Defines the SdtRunRuby Class.
   SdtRunRuby(std::boxed::Box<SdtRunRuby>),
@@ -20072,10 +20005,9 @@ pub enum SdtContentRunRubyChoice {
   Subscript(std::boxed::Box<crate::schemas::m::Subscript>),
   SubSuperscript(std::boxed::Box<crate::schemas::m::SubSuperscript>),
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentCellChoice {
   /// Table Cell.
   TableCell(std::boxed::Box<TableCell>),
@@ -20146,7 +20078,7 @@ pub enum SdtContentCellChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentRowChoice {
   /// Table Row.
   TableRow(std::boxed::Box<TableRow>),
@@ -20217,7 +20149,7 @@ pub enum SdtContentRowChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableCellPropertiesChoice {
   /// Table Cell Insertion.
   CellInsertion(std::boxed::Box<CellInsertion>),
@@ -20226,21 +20158,21 @@ pub enum TableCellPropertiesChoice {
   /// Vertically Merged/Split Table Cells.
   CellMerge(std::boxed::Box<CellMerge>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FramesetChoice {
   /// Nested Frameset Definition.
   Frameset(std::boxed::Box<Frameset>),
   /// Single Frame Properties.
   Frame(std::boxed::Box<Frame>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NumberingPictureBulletChoice {
   /// Defines the PictureBulletBase Class.
   PictureBulletBase(std::boxed::Box<PictureBulletBase>),
   /// DrawingML Object.
   Drawing(std::boxed::Box<Drawing>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableStyleConditionalFormattingTableRowPropertiesChoice {
   /// Defines the Hidden Class.
   Hidden(std::boxed::Box<Hidden>),
@@ -20253,7 +20185,7 @@ pub enum TableStyleConditionalFormattingTableRowPropertiesChoice {
   /// Defines the TableJustification Class.
   TableJustification(std::boxed::Box<TableJustification>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommentChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -20280,7 +20212,7 @@ pub enum CommentChoice {
   /// Defines the CommentRangeEnd Class.
   CommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FootnoteChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -20361,7 +20293,7 @@ pub enum FootnoteChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndnoteChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -20442,7 +20374,7 @@ pub enum EndnoteChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DocPartBodyChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -20523,7 +20455,7 @@ pub enum DocPartBodyChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BodyChoice {
   /// Defines the AltChunk Class.
   AltChunk(std::boxed::Box<AltChunk>),
@@ -20604,10 +20536,9 @@ pub enum BodyChoice {
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableRowPropertiesChoice {
   /// Defines the ConditionalFormatStyle Class.
   ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
@@ -20634,28 +20565,28 @@ pub enum TableRowPropertiesChoice {
   /// Defines the TableJustification Class.
   TableJustification(std::boxed::Box<TableJustification>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableRowPropertiesChoice2 {
   /// Defines the ConflictInsertion Class.
   ConflictInsertion(std::boxed::Box<crate::schemas::w14::ConflictInsertion>),
   /// Defines the ConflictDeletion Class.
   ConflictDeletion(std::boxed::Box<crate::schemas::w14::ConflictDeletion>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HeaderShapeDefaultsChoice {
   /// New Shape Defaults.
   ShapeDefaults(std::boxed::Box<crate::schemas::o::ShapeDefaults>),
   /// Shape Layout Properties.
   ShapeLayout(std::boxed::Box<crate::schemas::o::ShapeLayout>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapeDefaultsChoice {
   /// New Shape Defaults.
   ShapeDefaults(std::boxed::Box<crate::schemas::o::ShapeDefaults>),
   /// Shape Layout Properties.
   ShapeLayout(std::boxed::Box<crate::schemas::o::ShapeLayout>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PictureBulletBaseChoice {
   Group(std::boxed::Box<crate::schemas::v::Group>),
   ImageFile(std::boxed::Box<crate::schemas::v::ImageFile>),

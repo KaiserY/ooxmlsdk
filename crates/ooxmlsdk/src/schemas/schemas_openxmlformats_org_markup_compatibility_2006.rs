@@ -33,7 +33,7 @@ pub struct Fallback {
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AlternateContentChoice {
   /// Defines the Choice Class.
   Choice(std::boxed::Box<Choice>),

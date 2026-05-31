@@ -224,7 +224,11 @@ pub struct ArrayFeatureProperty {
             text_child(variant = Xsdinteger, qname = "xfpb:i"),
             text_child(variant = SXsdstring, qname = "xfpb:s"),
             text_child(variant = Xsdboolean, qname = "xfpb:b"),
-            text_child(variant = Xsddouble, qname = "xfpb:d"),
+            text_child(
+                variant = Xsddouble,
+                simple_type = "DoubleValue",
+                qname = "xfpb:d"
+            ),
             text_child(variant = RelXsdstring, qname = "xfpb:rel")
         )
     )]
@@ -328,7 +332,7 @@ pub type RelXsdstring = crate::simple_type::StringValue;
 pub type Xsdboolean = crate::simple_type::BooleanValue;
 /// Defines the Xsddouble Class.
 pub type Xsddouble = crate::simple_type::DoubleValue;
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FeaturePropertyBagChoice {
   /// Defines the ArrayFeatureProperty Class.
   ArrayFeatureProperty(std::boxed::Box<ArrayFeatureProperty>),
@@ -345,24 +349,18 @@ pub enum FeaturePropertyBagChoice {
   /// Defines the RelFeatureProperty Class.
   RelFeatureProperty(std::boxed::Box<RelFeatureProperty>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ArrayFeaturePropertyChoice {
   /// Defines the XsdunsignedInt Class.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "xfpb:bagId"))]
   XsdunsignedInt(XsdunsignedInt),
   /// Defines the Xsdinteger Class.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xfpb:i"))]
   Xsdinteger(Xsdinteger),
   /// Defines the SXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xfpb:s"))]
   SXsdstring(SXsdstring),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xfpb:b"))]
   Xsdboolean(Xsdboolean),
   /// Defines the Xsddouble Class.
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "xfpb:d"))]
   Xsddouble(Xsddouble),
   /// Defines the RelXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xfpb:rel"))]
   RelXsdstring(RelXsdstring),
 }

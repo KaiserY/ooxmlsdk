@@ -222,26 +222,17 @@ pub struct Comment {
   #[sdk(child(qname = "p188:extLst"))]
   pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommentChoice {
   SlideMonikerList(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
-  #[sdk(any_child(qname = "pc:sldLayoutMkLst"))]
   SlideLayoutMonikerList(crate::schemas::pc::SlideLayoutMonikerList),
-  #[sdk(any_child(qname = "pc:sldMasterMkLst"))]
   MainMasterMonikerList(crate::schemas::pc::MainMasterMonikerList),
-  #[sdk(any_child(qname = "oac:deMkLst"))]
   DeMkLstDrawingElementMonikerList(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
-  #[sdk(any_child(qname = "oac:txBodyMkLst"))]
   TextBodyMonikerList(crate::schemas::oac::TextBodyMonikerList),
-  #[sdk(any_child(qname = "oac:txMkLst"))]
   TextCharRangeMonikerList(crate::schemas::oac::TextCharRangeMonikerList),
-  #[sdk(any_child(qname = "oac:tcMkLst"))]
   TableCellMonikerList(crate::schemas::oac::TableCellMonikerList),
-  #[sdk(any_child(qname = "oac:trMkLst"))]
   TableRowMonikerList(crate::schemas::oac::TableRowMonikerList),
-  #[sdk(any_child(qname = "oac:gridColMkLst"))]
   TableColumnMonikerList(crate::schemas::oac::TableColumnMonikerList),
   /// Defines the CommentUnknownAnchor Class.
-  #[sdk(empty_child(qname = "p188:unknownAnchor"))]
   CommentUnknownAnchor,
 }

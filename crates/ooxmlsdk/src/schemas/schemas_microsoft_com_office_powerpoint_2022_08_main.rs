@@ -149,12 +149,11 @@ pub struct TaskHistory {
   #[sdk(child(qname = "p228:event"))]
   pub task_history_event: Vec<TaskHistoryEvent>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TaskHistoryEventChoice {
   /// Defines the AsgnTaskAssignUnassignUser Class.
   AsgnTaskAssignUnassignUser(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   /// Defines the AddEmpty Class.
-  #[sdk(empty_child(qname = "p228:add"))]
   AddEmpty,
   /// Defines the TaskTitleEventInfo Class.
   TaskTitleEventInfo(std::boxed::Box<TaskTitleEventInfo>),
@@ -163,11 +162,9 @@ pub enum TaskHistoryEventChoice {
   /// Defines the TaskProgressEventInfo Class.
   TaskProgressEventInfo(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the UnasgnAllEmpty Class.
-  #[sdk(empty_child(qname = "p228:unasgnAll"))]
   UnasgnAllEmpty,
   /// Defines the TaskUndo Class.
   TaskUndo(std::boxed::Box<TaskUndo>),
   /// Defines the TaskUnknownRecord Class.
-  #[sdk(empty_child(qname = "p228:unknown"))]
   TaskUnknownRecord,
 }

@@ -4819,15 +4819,14 @@ pub struct PlaceholderExtension {
   pub placeholder_type_extension:
     Option<std::boxed::Box<crate::schemas::p232::PlaceholderTypeExtension>>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorMapOverrideChoice {
   /// Master Color Mapping.
-  #[sdk(empty_child(qname = "a:masterClrMapping"))]
   MasterColorMapping,
   /// Override Color Mapping.
   OverrideColorMapping(std::boxed::Box<crate::schemas::a::OverrideColorMapping>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -4840,14 +4839,14 @@ pub enum BackgroundPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundPropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundStyleReferenceChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -4862,17 +4861,16 @@ pub enum BackgroundStyleReferenceChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OleObjectChoice {
   /// Defines the OleObjectEmbed Class.
   OleObjectEmbed(std::boxed::Box<OleObjectEmbed>),
   /// Defines the OleObjectLink Class.
   OleObjectLink(std::boxed::Box<OleObjectLink>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TargetElementChoice {
   /// Slide Target.
-  #[sdk(empty_child(qname = "p:sldTgt"))]
   SlideTarget,
   /// Sound Target.
   SoundTarget(std::boxed::Box<SoundTarget>),
@@ -4883,7 +4881,7 @@ pub enum TargetElementChoice {
   /// Defines the BookmarkTarget Class.
   BookmarkTarget(std::boxed::Box<crate::schemas::p14::BookmarkTarget>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConditionChoice {
   /// Target Element Trigger Choice.
   TargetElement(std::boxed::Box<TargetElement>),
@@ -4892,7 +4890,7 @@ pub enum ConditionChoice {
   /// Runtime Node Trigger Choice.
   RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EndSyncChoice {
   /// Target Element Trigger Choice.
   TargetElement(std::boxed::Box<TargetElement>),
@@ -4901,7 +4899,7 @@ pub enum EndSyncChoice {
   /// Runtime Node Trigger Choice.
   RuntimeNodeTrigger(std::boxed::Box<RuntimeNodeTrigger>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorValueChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -4916,7 +4914,7 @@ pub enum ColorValueChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PenColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -4931,7 +4929,7 @@ pub enum PenColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ToVariantValueChoice {
   /// Boolean Variant.
   BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
@@ -4944,7 +4942,7 @@ pub enum ToVariantValueChoice {
   /// Color Value.
   ColorValue(std::boxed::Box<ColorValue>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VariantValueChoice {
   /// Boolean Variant.
   BooleanVariantValue(std::boxed::Box<BooleanVariantValue>),
@@ -4957,22 +4955,21 @@ pub enum VariantValueChoice {
   /// Color Value.
   ColorValue(std::boxed::Box<ColorValue>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BuildSubElementChoice {
   /// Build Diagram.
   BuildDiagram(std::boxed::Box<crate::schemas::a::BuildDiagram>),
   /// Build Chart.
   BuildChart(std::boxed::Box<crate::schemas::a::BuildChart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BuildGraphicsChoice {
   /// Build As One.
-  #[sdk(empty_child(qname = "p:bldAsOne"))]
   BuildAsOne,
   /// Build Sub Elements.
   BuildSubElement(std::boxed::Box<BuildSubElement>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BuildListChoice {
   /// Build Paragraph.
   BuildParagraph(std::boxed::Box<BuildParagraph>),
@@ -4983,14 +4980,14 @@ pub enum BuildListChoice {
   /// Build Graphics.
   BuildGraphics(std::boxed::Box<BuildGraphics>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ByColorChoice {
   /// RGB.
   RgbColor(std::boxed::Box<RgbColor>),
   /// HSL.
   HslColor(std::boxed::Box<HslColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FromColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -5005,7 +5002,7 @@ pub enum FromColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ToColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -5020,7 +5017,7 @@ pub enum ToColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
@@ -5028,14 +5025,14 @@ pub enum ApplicationNonVisualDrawingPropertiesChoice {
   VideoFromFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   QuickTimeFromFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -5048,22 +5045,21 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipFillChoice {
   Tile(std::boxed::Box<crate::schemas::a::Tile>),
   Stretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SlideExtensionChoice {
   /// Defines the LaserTraceList Class.
   LaserTraceList(std::boxed::Box<crate::schemas::p14::LaserTraceList>),
@@ -5071,17 +5067,15 @@ pub enum SlideExtensionChoice {
   ShowEventRecordList(std::boxed::Box<crate::schemas::p14::ShowEventRecordList>),
   /// Defines the CommentRelationship Class.
   CommentRelationship(std::boxed::Box<crate::schemas::p188::CommentRelationship>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommonSlideDataExtensionChoice {
   /// Defines the CreationId Class.
   CreationId(std::boxed::Box<crate::schemas::p14::CreationId>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesExtensionChoice {
   /// Defines the BrowseMode Class.
   BrowseMode(std::boxed::Box<crate::schemas::p14::BrowseMode>),
@@ -5089,20 +5083,17 @@ pub enum ShowPropertiesExtensionChoice {
   LaserColor(std::boxed::Box<crate::schemas::p14::LaserColor>),
   /// Defines the ShowMediaControls Class.
   ShowMediaControls(std::boxed::Box<crate::schemas::p14::ShowMediaControls>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TransitionChoice {
   /// Defines the BlindsTransition Class.
   BlindsTransition(std::boxed::Box<BlindsTransition>),
   /// Defines the CheckerTransition Class.
   CheckerTransition(std::boxed::Box<CheckerTransition>),
   /// Defines the CircleTransition Class.
-  #[sdk(empty_child(qname = "p:circle"))]
   CircleTransition,
   /// Defines the DissolveTransition Class.
-  #[sdk(empty_child(qname = "p:dissolve"))]
   DissolveTransition,
   /// Defines the CombTransition Class.
   CombTransition(std::boxed::Box<CombTransition>),
@@ -5111,22 +5102,18 @@ pub enum TransitionChoice {
   /// Defines the CutTransition Class.
   CutTransition(std::boxed::Box<CutTransition>),
   /// Defines the DiamondTransition Class.
-  #[sdk(empty_child(qname = "p:diamond"))]
   DiamondTransition,
   /// Defines the FadeTransition Class.
   FadeTransition(std::boxed::Box<FadeTransition>),
   /// Defines the NewsflashTransition Class.
-  #[sdk(empty_child(qname = "p:newsflash"))]
   NewsflashTransition,
   /// Defines the PlusTransition Class.
-  #[sdk(empty_child(qname = "p:plus"))]
   PlusTransition,
   /// Defines the PullTransition Class.
   PullTransition(std::boxed::Box<PullTransition>),
   /// Defines the PushTransition Class.
   PushTransition(std::boxed::Box<PushTransition>),
   /// Defines the RandomTransition Class.
-  #[sdk(empty_child(qname = "p:random"))]
   RandomTransition,
   /// Defines the RandomBarTransition Class.
   RandomBarTransition(std::boxed::Box<RandomBarTransition>),
@@ -5135,7 +5122,6 @@ pub enum TransitionChoice {
   /// Defines the StripsTransition Class.
   StripsTransition(std::boxed::Box<StripsTransition>),
   /// Defines the WedgeTransition Class.
-  #[sdk(empty_child(qname = "p:wedge"))]
   WedgeTransition,
   /// Defines the WheelTransition Class.
   WheelTransition(std::boxed::Box<WheelTransition>),
@@ -5144,7 +5130,6 @@ pub enum TransitionChoice {
   /// Defines the ZoomTransition Class.
   ZoomTransition(std::boxed::Box<ZoomTransition>),
   /// Defines the FlashTransition Class.
-  #[sdk(empty_child(qname = "p14:flash"))]
   FlashTransition,
   VortexTransition(std::boxed::Box<crate::schemas::p14::VortexTransition>),
   SwitchTransition(std::boxed::Box<crate::schemas::p14::SwitchTransition>),
@@ -5152,7 +5137,6 @@ pub enum TransitionChoice {
   RippleTransition(std::boxed::Box<crate::schemas::p14::RippleTransition>),
   GlitterTransition(std::boxed::Box<crate::schemas::p14::GlitterTransition>),
   /// Defines the HoneycombTransition Class.
-  #[sdk(empty_child(qname = "p14:honeycomb"))]
   HoneycombTransition,
   PrismTransition(std::boxed::Box<crate::schemas::p14::PrismTransition>),
   DoorsTransition(std::boxed::Box<crate::schemas::p14::DoorsTransition>),
@@ -5168,14 +5152,14 @@ pub enum TransitionChoice {
   WheelReverseTransition(std::boxed::Box<crate::schemas::p14::WheelReverseTransition>),
   PresetTransition(std::boxed::Box<crate::schemas::p15::PresetTransition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundChoice {
   /// Background Properties.
   BackgroundProperties(std::boxed::Box<BackgroundProperties>),
   /// Background Style Reference.
   BackgroundStyleReference(std::boxed::Box<BackgroundStyleReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapeTreeChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -5190,10 +5174,9 @@ pub enum ShapeTreeChoice {
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapeChoice {
   /// Shape.
   Shape(std::boxed::Box<Shape>),
@@ -5208,15 +5191,14 @@ pub enum GroupShapeChoice {
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ControlListChoice {
   /// Embedded Control.
   Control(std::boxed::Box<Control>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -5229,20 +5211,18 @@ pub enum GroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapeTargetChoice {
   /// Background.
-  #[sdk(empty_child(qname = "p:bg"))]
   BackgroundAnimation,
   /// Subshape.
   SubShape(std::boxed::Box<SubShape>),
@@ -5253,65 +5233,58 @@ pub enum ShapeTargetChoice {
   /// Graphic Element.
   GraphicElement(std::boxed::Box<GraphicElement>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommentAuthorExtensionChoice {
   /// Defines the PresenceInfo Class.
   PresenceInfo(std::boxed::Box<crate::schemas::p15::PresenceInfo>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommentExtensionChoice {
   /// Defines the ThreadingInfo Class.
   ThreadingInfo(std::boxed::Box<crate::schemas::p15::ThreadingInfo>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SlideLayoutExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SlideMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HandoutMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NotesMasterExtensionChoice {
   /// Defines the SlideGuideList Class.
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
   /// Defines the Media Class.
   Media(std::boxed::Box<crate::schemas::p14::Media>),
   /// Defines the ModificationId Class.
   ModificationId(std::boxed::Box<crate::schemas::p14::ModificationId>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IterateChoice {
   /// Time Absolute.
   TimeAbsolute(std::boxed::Box<TimeAbsolute>),
   /// Time Percentage.
   TimePercentage(std::boxed::Box<TimePercentage>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ChildTimeNodeListChoice {
   /// Parallel Time Node.
   ParallelTimeNode(std::boxed::Box<ParallelTimeNode>),
@@ -5340,7 +5313,7 @@ pub enum ChildTimeNodeListChoice {
   /// Video.
   Video(std::boxed::Box<Video>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SubTimeNodeListChoice {
   /// Parallel Time Node.
   ParallelTimeNode(std::boxed::Box<ParallelTimeNode>),
@@ -5369,7 +5342,7 @@ pub enum SubTimeNodeListChoice {
   /// Video.
   Video(std::boxed::Box<Video>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PresentationExtensionChoice {
   /// Defines the SectionProperties Class.
   SectionProperties(std::boxed::Box<crate::schemas::p14::SectionProperties>),
@@ -5379,40 +5352,36 @@ pub enum PresentationExtensionChoice {
   SlideGuideList(std::boxed::Box<crate::schemas::p15::SlideGuideList>),
   /// Defines the NotesGuideList Class.
   NotesGuideList(std::boxed::Box<crate::schemas::p15::NotesGuideList>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HtmlPublishPropertiesChoice {
   /// All Slides.
-  #[sdk(empty_child(qname = "p:sldAll"))]
   SlideAll,
   /// Slide Range.
   SlideRange(std::boxed::Box<SlideRange>),
   /// Custom Show.
   CustomShowReference(std::boxed::Box<CustomShowReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesChoice {
   /// Presenter Slide Show Mode.
-  #[sdk(empty_child(qname = "p:present"))]
   PresenterSlideMode,
   /// Browse Slide Show Mode.
   BrowseSlideMode(std::boxed::Box<BrowseSlideMode>),
   /// Kiosk Slide Show Mode.
   KioskSlideMode(std::boxed::Box<KioskSlideMode>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShowPropertiesChoice2 {
   /// All Slides.
-  #[sdk(empty_child(qname = "p:sldAll"))]
   SlideAll,
   /// Slide Range.
   SlideRange(std::boxed::Box<SlideRange>),
   /// Custom Show.
   CustomShowReference(std::boxed::Box<CustomShowReference>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorMostRecentlyUsedChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -5427,7 +5396,7 @@ pub enum ColorMostRecentlyUsedChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PresentationPropertiesExtensionChoice {
   /// Defines the DiscardImageEditData Class.
   DiscardImageEditData(std::boxed::Box<crate::schemas::p14::DiscardImageEditData>),
@@ -5437,28 +5406,26 @@ pub enum PresentationPropertiesExtensionChoice {
   TextMath(std::boxed::Box<crate::schemas::a14::TextMath>),
   /// Defines the ChartTrackingReferenceBased Class.
   ChartTrackingReferenceBased(std::boxed::Box<crate::schemas::p15::ChartTrackingReferenceBased>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextElementChoice {
   /// Character Range.
   CharRange(std::boxed::Box<CharRange>),
   /// Paragraph Text Range.
   ParagraphIndexRange(std::boxed::Box<ParagraphIndexRange>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GraphicElementChoice {
   /// Diagram to Animate.
   Diagram(std::boxed::Box<crate::schemas::a::Diagram>),
   /// Chart to Animate.
   Chart(std::boxed::Box<crate::schemas::a::Chart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SoundActionChoice {
   /// Start Sound Action.
   StartSoundAction(std::boxed::Box<StartSoundAction>),
   /// Stop Sound Action.
-  #[sdk(empty_child(qname = "p:endSnd"))]
   EndSoundAction,
 }

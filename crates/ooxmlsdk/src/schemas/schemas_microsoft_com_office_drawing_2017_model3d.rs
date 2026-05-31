@@ -591,14 +591,14 @@ pub struct DirectionalLight {
   #[sdk(child(qname = "am3d:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Model3DChoice {
   /// Defines the ObjectViewport Class.
   ObjectViewport(std::boxed::Box<ObjectViewport>),
   /// Defines the WindowViewport Class.
   WindowViewport(std::boxed::Box<WindowViewport>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Model3DChoice2 {
   /// Defines the PointLight Class.
   PointLight(std::boxed::Box<PointLight>),
@@ -607,17 +607,14 @@ pub enum Model3DChoice2 {
   /// Defines the DirectionalLight Class.
   DirectionalLight(std::boxed::Box<DirectionalLight>),
   /// Defines the UnknownLight Class.
-  #[sdk(empty_child(qname = "am3d:unkLight"))]
   UnknownLight,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlipChoice {
   AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:alphaCeiling"))]
   AlphaCeiling,
   /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:alphaFloor"))]
   AlphaFloor,
   AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
@@ -630,13 +627,12 @@ pub enum BlipChoice {
   Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
   FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:grayscl"))]
   Grayscale,
   Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
   LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
   TintEffect(std::boxed::Box<crate::schemas::a::TintEffect>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -651,23 +647,22 @@ pub enum ColorTypeChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Model3DExtensionChoice {
   /// Defines the EmbeddedAnimation Class.
   EmbeddedAnimation(std::boxed::Box<crate::schemas::a3danim::EmbeddedAnimation>),
   /// Defines the PosterFrame Class.
   PosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -680,17 +675,16 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Model3DCameraChoice {
   /// Defines the OrthographicProjection Class.
   OrthographicProjection(std::boxed::Box<OrthographicProjection>),

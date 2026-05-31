@@ -695,7 +695,7 @@ pub struct NullEventRecord {
   #[sdk(attr(qname = ":objId"))]
   pub object_id: crate::simple_type::UInt32Value,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LaserColorChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -710,7 +710,7 @@ pub enum LaserColorChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShowEventRecordListChoice {
   /// Defines the TriggerEventRecord Class.
   TriggerEventRecord(std::boxed::Box<TriggerEventRecord>),
@@ -727,7 +727,7 @@ pub enum ShowEventRecordListChoice {
   /// Defines the NullEventRecord Class.
   NullEventRecord(std::boxed::Box<NullEventRecord>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   AudioFromCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   WaveAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),

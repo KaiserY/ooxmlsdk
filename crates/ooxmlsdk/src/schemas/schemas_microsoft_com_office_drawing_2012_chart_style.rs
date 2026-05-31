@@ -2072,7 +2072,7 @@ pub struct MarkerLayoutProperties {
   #[sdk(number_range(range = 2..= 72))]
   pub size: Option<crate::simple_type::ByteValue>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorStyleChoice {
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
@@ -2081,20 +2081,17 @@ pub enum ColorStyleChoice {
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ColorStyleVariationChoice {
   /// Tint.
   Tint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
   Shade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
@@ -2139,26 +2136,21 @@ pub enum ColorStyleVariationChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StyleColorChoice {
   /// Tint.
   Tint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
   Shade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
-  #[sdk(empty_child(qname = "a:comp"))]
   Complement,
   /// Inverse.
-  #[sdk(empty_child(qname = "a:inv"))]
   Inverse,
   /// Gray.
-  #[sdk(empty_child(qname = "a:gray"))]
   Gray,
   /// Alpha.
   Alpha(std::boxed::Box<crate::schemas::a::Alpha>),
@@ -2203,13 +2195,11 @@ pub enum StyleColorChoice {
   /// Blue Modification.
   BlueModulation(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
-  #[sdk(empty_child(qname = "a:gamma"))]
   Gamma,
   /// Inverse Gamma.
-  #[sdk(empty_child(qname = "a:invGamma"))]
   InverseGamma,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineReferenceChoice {
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
@@ -2218,7 +2208,7 @@ pub enum LineReferenceChoice {
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillReferenceChoice {
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
@@ -2227,7 +2217,7 @@ pub enum FillReferenceChoice {
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectReferenceChoice {
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
@@ -2236,7 +2226,7 @@ pub enum EffectReferenceChoice {
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FontReferenceChoice {
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   RgbColorModelHex(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
@@ -2245,14 +2235,14 @@ pub enum FontReferenceChoice {
   SchemeColor(std::boxed::Box<crate::schemas::a::SchemeColor>),
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -2265,17 +2255,16 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextCharacterPropertiesTypeChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -2288,44 +2277,39 @@ pub enum TextCharacterPropertiesTypeChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextCharacterPropertiesTypeChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextCharacterPropertiesTypeChoice3 {
   /// Underline Follows Text.
-  #[sdk(empty_child(qname = "a:uLnTx"))]
   UnderlineFollowsText,
   /// Underline Stroke.
   Underline(std::boxed::Box<crate::schemas::a::Underline>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextCharacterPropertiesTypeChoice4 {
   /// Underline Fill Properties Follow Text.
-  #[sdk(empty_child(qname = "a:uFillTx"))]
   UnderlineFillText,
   /// Underline Fill.
   UnderlineFill(std::boxed::Box<crate::schemas::a::UnderlineFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
-  #[sdk(empty_child(qname = "a:noAutofit"))]
   NoAutoFit,
   /// Normal AutoFit.
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  #[sdk(empty_child(qname = "a:spAutoFit"))]
   ShapeAutoFit,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),

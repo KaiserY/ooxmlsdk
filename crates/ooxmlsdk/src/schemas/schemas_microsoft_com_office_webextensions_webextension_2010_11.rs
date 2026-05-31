@@ -164,14 +164,12 @@ pub struct Snapshot {
   #[sdk(child(qname = "a:extLst"))]
   pub blip_extension_list: Option<crate::schemas::a::BlipExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SnapshotChoice {
   AlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:alphaCeiling"))]
   AlphaCeiling,
   /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:alphaFloor"))]
   AlphaFloor,
   AlphaInverse(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   AlphaModulationEffect(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
@@ -184,7 +182,6 @@ pub enum SnapshotChoice {
   Duotone(std::boxed::Box<crate::schemas::a::Duotone>),
   FillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:grayscl"))]
   Grayscale,
   Hsl(std::boxed::Box<crate::schemas::a::Hsl>),
   LuminanceEffect(std::boxed::Box<crate::schemas::a::LuminanceEffect>),

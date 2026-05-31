@@ -143,7 +143,6 @@ pub(crate) struct TypeContainmentGraph {
   any_children_alias_keys: HashSet<String>,
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
-  type_xml_qnames: HashMap<String, String>,
   nodes: HashSet<String>,
 }
 
@@ -160,11 +159,6 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
-        if let Some(xml_qname) = &type_decl.xml_qname {
-          graph
-            .type_xml_qnames
-            .insert(type_key.clone(), xml_qname.clone());
-        }
         if type_decl.kind == TypeKind::LeafTextAlias {
           graph.leaf_text_alias_keys.insert(type_key.clone());
         }
@@ -278,10 +272,6 @@ impl TypeContainmentGraph {
       .unwrap_or(module_path)
   }
 
-  fn type_xml_qname(&self, node: &str) -> Option<&str> {
-    self.type_xml_qnames.get(node).map(String::as_str)
-  }
-
   fn empty_leaf_marker_doc(&self, node: &str) -> Option<&str> {
     self.empty_leaf_marker_docs.get(node).map(String::as_str)
   }
@@ -338,13 +328,6 @@ fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
 
 pub(crate) fn schema_qname_element_name(qname: &str) -> &str {
   qname.split('/').nth(1).unwrap_or(qname)
-}
-
-fn schema_qname_local_name(qname: &str) -> &str {
-  schema_qname_element_name(qname)
-    .split_once(':')
-    .map(|(_, local_name)| local_name)
-    .unwrap_or_else(|| schema_qname_element_name(qname))
 }
 
 fn child_qname_field_rust_name(name: &str) -> String {
@@ -2109,13 +2092,11 @@ fn gen_choice_type_decl(
     VersionCfgContext::new(true)
   };
   let rendered_variant_name_map = anonymous_variant_render_name_map(type_decl, module);
-  let child_local_name_counts = choice_child_local_name_counts(type_decl);
   let render_context = ChoiceVariantRenderContext {
     module,
     type_graph,
     variant_cfg,
     rendered_variant_name_map: &rendered_variant_name_map,
-    child_local_name_counts: &child_local_name_counts,
   };
   let mut variants = Vec::new();
 
@@ -2135,7 +2116,7 @@ fn gen_choice_type_decl(
 
   Ok(quote! {
     #( #enum_attrs )*
-    #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+    #[derive(Clone, Debug, PartialEq)]
     pub enum #enum_ident {
       #( #variants )*
     }
@@ -2347,36 +2328,26 @@ fn inline_single_field_sequence_variant_tokens(
   } else {
     quote! {}
   };
-  let field_sdk_version_markers = sdk_version_markers(&field.version);
 
   match &field.wire {
-    FieldWireDecl::Child { qname } => {
-      let qname = sdk_element_qname(qname);
+    FieldWireDecl::Child { .. } => {
       if empty_leaf_marker_doc.is_some() {
         Ok(Some(quote! {
           #( #variant_attrs )*
           #empty_leaf_doc_attrs
-          #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))]
           #variant_ident,
         }))
       } else {
         Ok(Some(quote! {
           #( #variant_attrs )*
-          #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))]
           #variant_ident(std::boxed::Box<#payload_type>),
         }))
       }
     }
-    FieldWireDecl::TextChild { qname } => {
-      let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-      let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
-      let qname = sdk_element_qname(qname);
-      Ok(Some(quote! {
-        #( #variant_attrs )*
-        #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))]
-        #variant_ident(#payload_type),
-      }))
-    }
+    FieldWireDecl::TextChild { .. } => Ok(Some(quote! {
+      #( #variant_attrs )*
+      #variant_ident(#payload_type),
+    })),
     _ => Ok(None),
   }
 }
@@ -2451,75 +2422,6 @@ struct ChoiceVariantRenderContext<'a> {
   type_graph: &'a TypeContainmentGraph,
   variant_cfg: VersionCfgContext,
   rendered_variant_name_map: &'a HashMap<String, String>,
-  child_local_name_counts: &'a HashMap<String, usize>,
-}
-
-fn choice_child_local_name_counts(type_decl: &TypeDecl) -> HashMap<String, usize> {
-  let mut counts = HashMap::new();
-
-  for member in &type_decl.members {
-    let MemberDecl::Variant(variant) = member else {
-      continue;
-    };
-    match &variant.wire {
-      VariantWireDecl::Child { qnames } | VariantWireDecl::TextChild { qnames } => {
-        for qname in qnames {
-          *counts
-            .entry(schema_qname_local_name(qname).to_string())
-            .or_insert(0) += 1;
-        }
-      }
-      VariantWireDecl::Any | VariantWireDecl::Sequence { .. } | VariantWireDecl::Text => {}
-    }
-  }
-
-  counts
-}
-
-fn can_omit_choice_child_qname_attr(
-  variant: &VariantDecl,
-  render_context: &ChoiceVariantRenderContext<'_>,
-  qnames: &[String],
-) -> bool {
-  if choice_variant_is_math_drawing_run_properties(variant, qnames) {
-    return true;
-  }
-
-  if variant.docs.is_empty() {
-    return false;
-  }
-
-  if qnames.len() != 1 {
-    return false;
-  }
-
-  if render_context
-    .child_local_name_counts
-    .get(schema_qname_local_name(&qnames[0]))
-    .copied()
-    .unwrap_or_default()
-    != 1
-  {
-    return false;
-  }
-
-  let Some(type_key) = schema_type_key_from_ref(render_context.module, &variant.payload) else {
-    return false;
-  };
-
-  render_context
-    .type_graph
-    .type_xml_qname(&type_key)
-    .is_some_and(|xml_qname| xml_qname == qnames[0])
-}
-
-fn choice_variant_is_math_drawing_run_properties(variant: &VariantDecl, qnames: &[String]) -> bool {
-  qnames.len() == 1
-    && variant.rust_name == "DrawingRunProperties"
-    && qnames[0] == "a:CT_TextCharacterProperties/a:rPr"
-    && variant.payload.rust_type == "RunProperties"
-    && variant.payload.module_path.as_deref()
-      == Some("crate::schemas::schemas_openxmlformats_org_drawingml_2006_main")
 }
 
 fn gen_choice_variant_tokens(
@@ -2535,7 +2437,6 @@ fn gen_choice_variant_tokens(
   let variant_ident: Ident =
     parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
   let variant_attrs = module_version_cfg_attrs(&variant.version, render_context.variant_cfg);
-  let variant_sdk_version_markers = sdk_version_markers(&variant.version);
   let variant_doc_attrs = choice_variant_doc_attrs(
     variant,
     render_context.module,
@@ -2556,7 +2457,6 @@ fn gen_choice_variant_tokens(
         #prefix_attrs
         #( #variant_attrs )*
         #variant_doc_attrs
-        #[sdk(any)]
         #variant_ident(#payload_type),
       }])
     }
@@ -2600,7 +2500,6 @@ fn gen_choice_variant_tokens(
             #prefix_attrs
             #( #variant_attrs )*
             #variant_doc_attrs
-            #[sdk(sequence)]
             #variant_ident {
               #( #inline_fields )*
             },
@@ -2612,7 +2511,6 @@ fn gen_choice_variant_tokens(
             #prefix_attrs
             #( #variant_attrs )*
             #variant_doc_attrs
-            #[sdk(sequence)]
             #variant_ident(std::boxed::Box<#payload_type>),
           }])
         }
@@ -2623,111 +2521,54 @@ fn gen_choice_variant_tokens(
       if qnames.is_empty() {
         return Err(variant.rust_name.clone().into());
       }
-      let list_attr = is_list_type_ref(&variant.payload).then_some(quote! { list, });
-      let qname_attrs = qnames
-        .iter()
-        .map(|qname| {
-          let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
-          let qname = sdk_element_qname(qname);
-          quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
-        })
-        .collect::<Vec<_>>();
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
         #variant_doc_attrs
-        #( #qname_attrs )*
         #variant_ident(#payload_type),
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
       let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-      let is_nested_choice = render_context
-        .module
-        .types
-        .iter()
-        .any(|ty| ty.rust_name == variant.payload.rust_type && ty.kind == TypeKind::ChoiceEnum);
-      if is_nested_choice {
+      if qnames.is_empty() {
+        return Err(variant.rust_name.clone().into());
+      }
+      if is_empty_leaf_marker_ref_with_graph(
+        render_context.module,
+        &variant.payload,
+        render_context.type_graph,
+      ) {
+        Ok(vec![quote! {
+          #prefix_attrs
+          #( #variant_attrs )*
+          #empty_leaf_variant_doc_attrs
+          #variant_ident,
+        }])
+      } else {
+        let is_any_children_alias = is_any_children_alias_type_ref(
+          render_context.module,
+          &variant.payload,
+          render_context.type_graph,
+        );
+        let payload_tokens = if is_any_children_alias {
+          quote! { #payload_type }
+        } else {
+          quote! { std::boxed::Box<#payload_type> }
+        };
         Ok(vec![quote! {
           #prefix_attrs
           #( #variant_attrs )*
           #variant_doc_attrs
-          #[sdk(choice)]
-          #variant_ident(std::boxed::Box<#payload_type>),
+          #variant_ident(#payload_tokens),
         }])
-      } else {
-        if qnames.is_empty() {
-          return Err(variant.rust_name.clone().into());
-        }
-        if is_empty_leaf_marker_ref_with_graph(
-          render_context.module,
-          &variant.payload,
-          render_context.type_graph,
-        ) {
-          let qname_attrs = qnames
-            .iter()
-            .map(|qname| {
-              let qname = sdk_element_qname(qname);
-              quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
-            })
-            .collect::<Vec<_>>();
-          Ok(vec![quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #empty_leaf_variant_doc_attrs
-            #( #qname_attrs )*
-            #variant_ident,
-          }])
-        } else {
-          let is_any_children_alias = is_any_children_alias_type_ref(
-            render_context.module,
-            &variant.payload,
-            render_context.type_graph,
-          );
-          let qname_attrs = if !is_any_children_alias
-            && can_omit_choice_child_qname_attr(variant, render_context, qnames)
-          {
-            Vec::new()
-          } else {
-            qnames
-              .iter()
-              .map(|qname| {
-                let qname = sdk_element_qname(qname);
-                if is_any_children_alias {
-                  quote! { #[sdk(any_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
-                } else {
-                  quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] }
-                }
-              })
-              .collect::<Vec<_>>()
-          };
-          let payload_tokens = if is_any_children_alias {
-            quote! { #payload_type }
-          } else {
-            quote! { std::boxed::Box<#payload_type> }
-          };
-          Ok(vec![quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #variant_doc_attrs
-            #( #qname_attrs )*
-            #variant_ident(#payload_tokens),
-          }])
-        }
       }
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
       let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-      let sdk_text_attr = if is_list_type_ref(&variant.payload) {
-        quote! { #[sdk(text(list))] }
-      } else {
-        quote! { #[sdk(text)] }
-      };
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
         #variant_doc_attrs
-        #sdk_text_attr
         #variant_ident(#payload_type),
       }])
     }
@@ -3484,6 +3325,18 @@ fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
   }
 }
 
+fn xml_schema_float_simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
+  let Some((type_name, _)) = qname.split_once('/') else {
+    return quote! {};
+  };
+  let simple_type = simple_type_mapping(type_name);
+  if matches!(simple_type, "DoubleValue" | "SingleValue") {
+    quote! { simple_type = #simple_type, }
+  } else {
+    quote! {}
+  }
+}
+
 fn sdk_element_qname(qname: &str) -> String {
   schema_qname_element_name(qname).to_string()
 }
@@ -3712,16 +3565,26 @@ fn choice_sequence_child_metadata_tokens(
     .map(|field_name| quote! { field = #field_name, });
   let ty_attr = if include_field_name {
     let field_ty = type_from_decl_ref(&field.type_ref, type_graph)?;
-    let field_ty = match field.cardinality {
-      Cardinality::Optional => quote! { Option<#field_ty> },
-      Cardinality::Many => quote! { Vec<#field_ty> },
-      Cardinality::One => {
-        if matches!(field.wire, FieldWireDecl::Child { .. })
-          && !is_value_like_type_ref(module, &field.type_ref, type_graph)
-        {
-          quote! { std::boxed::Box<#field_ty> }
-        } else {
-          quote! { #field_ty }
+    let field_ty = if variant_ident.is_some() && !include_field_name {
+      if matches!(field.wire, FieldWireDecl::Child { .. })
+        && !is_value_like_type_ref(module, &field.type_ref, type_graph)
+      {
+        quote! { std::boxed::Box<#field_ty> }
+      } else {
+        quote! { #field_ty }
+      }
+    } else {
+      match field.cardinality {
+        Cardinality::Optional => quote! { Option<#field_ty> },
+        Cardinality::Many => quote! { Vec<#field_ty> },
+        Cardinality::One => {
+          if matches!(field.wire, FieldWireDecl::Child { .. })
+            && !is_value_like_type_ref(module, &field.type_ref, type_graph)
+          {
+            quote! { std::boxed::Box<#field_ty> }
+          } else {
+            quote! { #field_ty }
+          }
         }
       }
     };
@@ -3743,8 +3606,15 @@ fn choice_sequence_child_metadata_tokens(
       }
     }
     FieldWireDecl::TextChild { qname } => {
+      let simple_type_attr = if include_field_name {
+        quote! {}
+      } else {
+        xml_schema_float_simple_type_sdk_attr_from_qname(qname)
+      };
       let qname = choice_metadata_qname(qname);
-      Some(quote! { text_child(#variant_attr #field_attr #ty_attr qname = #qname) })
+      Some(
+        quote! { text_child(#variant_attr #field_attr #ty_attr #simple_type_attr qname = #qname) },
+      )
     }
     _ => None,
   })
@@ -3763,7 +3633,6 @@ fn choice_variant_metadata_tokens(
     .unwrap_or(&variant.rust_name);
   let variant_ident: Ident =
     parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
-
   match &variant.wire {
     VariantWireDecl::Any => Ok(vec![quote! { any }]),
     VariantWireDecl::Text => Ok(vec![quote! { text }]),
@@ -3771,8 +3640,9 @@ fn choice_variant_metadata_tokens(
       qnames
         .iter()
         .map(|qname| {
+          let simple_type_attr = xml_schema_float_simple_type_sdk_attr_from_qname(qname);
           let qname = choice_metadata_qname(qname);
-          quote! { text_child(variant = #variant_ident, qname = #qname) }
+          quote! { text_child(variant = #variant_ident, #simple_type_attr qname = #qname) }
         })
         .collect(),
     ),
@@ -4022,27 +3892,9 @@ fn gen_inline_sequence_variant_fields_from_decl(
       .or_else(|| meaningful_doc_text(&field.docs))
       .unwrap_or_else(|| " _".to_string());
     let property_comments = property_comments_owned.as_str();
-    let field_sdk_version_markers = sdk_version_markers(&field.version);
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
-    let sdk_field_attrs = match &field.wire {
-      FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
-        let qname = sdk_element_qname(qname);
-        quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
-      }
-      FieldWireDecl::Child { qname } if is_any_children_alias => {
-        let qname = sdk_element_qname(qname);
-        quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
-      }
-      FieldWireDecl::Child { qname } => {
-        let qname = sdk_element_qname(qname);
-        quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
-      }
-      FieldWireDecl::TextChild { qname } => {
-        let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-        let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
-        let qname = sdk_element_qname(qname);
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
-      }
+    match &field.wire {
+      FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } => {}
       _ => {
         return Err(
           format!(
@@ -4067,31 +3919,26 @@ fn gen_inline_sequence_variant_fields_from_decl(
       Cardinality::Many => quote! {
         #( #attr )*
         #[doc = #property_comments]
-        #sdk_field_attrs
         #field_name_ident: Vec<#field_type>,
       },
       Cardinality::Optional if wrap_box => quote! {
         #( #attr )*
         #[doc = #property_comments]
-        #sdk_field_attrs
         #field_name_ident: Option<std::boxed::Box<#field_type>>,
       },
       Cardinality::Optional => quote! {
         #( #attr )*
         #[doc = #property_comments]
-        #sdk_field_attrs
         #field_name_ident: Option<#field_type>,
       },
       Cardinality::One if wrap_box => quote! {
         #( #attr )*
         #[doc = #property_comments]
-        #sdk_field_attrs
         #field_name_ident: std::boxed::Box<#field_type>,
       },
       Cardinality::One => quote! {
         #( #attr )*
         #[doc = #property_comments]
-        #sdk_field_attrs
         #field_name_ident: #field_type,
       },
     };
@@ -4186,38 +4033,38 @@ fn gen_choice_fields_from_decl(
     if choice_accepts_text
       && !choice_items
         .iter()
-        .any(|tokens| tokens.to_string() == "text")
+        .any(|tokens| tokens.to_string().starts_with("text"))
     {
       choice_items.push(quote! { text });
     }
     if choice_accepts_any
       && !choice_items
         .iter()
-        .any(|tokens| tokens.to_string() == "any")
+        .any(|tokens| tokens.to_string().starts_with("any"))
     {
       choice_items.push(quote! { any });
     }
-    let mut sdk_choice_attrs = Vec::new();
+    let mut choice_field_attrs = Vec::new();
     if choice_items.is_empty() {
-      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
+      choice_field_attrs.push(quote! { #[sdk(choice)] });
     } else {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_items),*))] });
+      choice_field_attrs.push(quote! { #[sdk(choice(#(#choice_items),*))] });
     };
 
     match field.cardinality {
       Cardinality::Many => tokens.push(quote! {
         #( #attrs )*
-        #( #sdk_choice_attrs )*
+        #( #choice_field_attrs )*
         pub #field_name_ident: Vec<#field_type>,
       }),
       Cardinality::Optional => tokens.push(quote! {
         #( #attrs )*
-        #( #sdk_choice_attrs )*
+        #( #choice_field_attrs )*
         pub #field_name_ident: Option<#field_type>,
       }),
       Cardinality::One => tokens.push(quote! {
         #( #attrs )*
-        #( #sdk_choice_attrs )*
+        #( #choice_field_attrs )*
         pub #field_name_ident: #field_type,
       }),
     }
@@ -4455,8 +4302,10 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:empty\"))] VtEmpty"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"vt:null\"))] VtNull"));
+    assert!(generated.contains("empty_child (variant = VtEmpty , qname = \"vt:empty\")"));
+    assert!(generated.contains("empty_child (variant = VtNull , qname = \"vt:null\")"));
+    assert!(generated.contains("VtEmpty ,"));
+    assert!(generated.contains("VtNull ,"));
     assert!(!generated.contains("pub struct VtEmpty"));
     assert!(!generated.contains("pub struct VtNull"));
     assert!(!generated.contains("VtEmpty (std :: boxed :: Box < VtEmpty >)"));
@@ -4481,7 +4330,7 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (qname = \"w14:noFill\"))]"));
+    assert!(generated.contains("empty_child (variant = NoFillEmpty , qname = \"w14:noFill\")"));
     assert!(generated.contains("NoFillEmpty ,"));
     assert!(!generated.contains("pub struct NoFillEmpty"));
     assert!(!generated.contains("NoFillEmpty (std :: boxed :: Box < NoFillEmpty >)"));
@@ -4492,7 +4341,8 @@ mod tests {
     let generated = render_workspace_schema("schemas_microsoft_com_office_powerpoint_2022_08_main");
 
     assert!(!generated.contains("pub struct EmptyType"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"p228:add\"))]"));
+    assert!(generated.contains("empty_child (variant = AddEmpty , qname = \"p228:add\")"));
+    assert!(generated.contains("AddEmpty ,"));
   }
 
   #[test]
@@ -4758,10 +4608,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(
-      generated
-        .contains("# [sdk (sequence)] Sequence (std :: boxed :: Box < HolderChoiceSequence >)")
-    );
+    assert!(generated.contains("Sequence (std :: boxed :: Box < HolderChoiceSequence >)"));
     assert!(generated.contains("pub struct HolderChoiceSequence"));
   }
 
@@ -4822,10 +4669,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:first\"))] EgThing (std :: boxed :: Box < First >)")
-    );
+    assert!(generated.contains("EgThing (std :: boxed :: Box < First >)"));
     assert!(!generated.contains("# [sdk (sequence)] EgThing {"));
   }
 
@@ -4904,16 +4748,9 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (sequence)] Sequence {"));
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:f\"))] formula : std :: boxed :: Box < Formula >")
-    );
-    assert!(
-      generated.contains(
-        "# [sdk (text_child (simple_type = \"StringValue\" , qname = \"t:v\"))] value : Option < crate :: simple_type :: StringValue >"
-      )
-    );
+    assert!(generated.contains("Sequence {"));
+    assert!(generated.contains("formula : std :: boxed :: Box < Formula >"));
+    assert!(generated.contains("value : Option < crate :: simple_type :: StringValue >"));
     assert!(!generated.contains("pub struct HolderChoiceSequence1"));
   }
 
@@ -5091,7 +4928,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice (std :: boxed :: Box < HolderChoice2 >)"));
   }
 
   #[test]
@@ -5228,8 +5065,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("# [sdk (choice)] Choice1"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice1 (std :: boxed :: Box <"));
+    assert!(generated.contains("Choice2 (std :: boxed :: Box <"));
   }
 
   #[test]
@@ -5320,8 +5157,8 @@ mod tests {
 
     assert!(generated.contains("pub enum HolderChoice2"));
     assert!(generated.contains("pub enum HolderChoice3"));
-    assert!(generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
-    assert!(generated.contains("# [sdk (choice)] Choice2 (std :: boxed :: Box < HolderChoice3 >)"));
+    assert!(generated.contains("Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
+    assert!(generated.contains("Choice2 (std :: boxed :: Box < HolderChoice3 >)"));
   }
 
   #[test]
@@ -5418,8 +5255,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice1 (std :: boxed :: Box <"));
+    assert!(generated.contains("Choice2 (std :: boxed :: Box <"));
   }
 
   #[test]
@@ -5537,7 +5374,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice (std :: boxed :: Box < RootChoice2 >)"));
   }
 
   #[test]
@@ -5618,7 +5455,8 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (choice (child (variant = TFirst , qname = \"t:first\")"));
+    assert!(generated.contains("child (variant = TFirst"));
+    assert!(generated.contains("qname = \"t:first\""));
   }
 
   #[test]
@@ -5821,7 +5659,7 @@ mod tests {
 
     assert!(generated.contains("pub enum RootChoice"));
     assert!(generated.contains("TThird (std :: boxed :: Box < Third >)"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice (std :: boxed :: Box < RootChoice2 >)"));
   }
 
   #[test]
@@ -5922,7 +5760,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("Choice (std :: boxed :: Box < RangeMarkupChoice >)"));
     assert!(generated.contains("pub enum RangeMarkupChoice"));
   }
 
@@ -6010,9 +5848,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RangeMarkupChoice"));
-    assert!(
-      generated.contains("# [sdk (choice)] Choice (std :: boxed :: Box < RangeMarkupChoice >)")
-    );
+    assert!(generated.contains("Choice (std :: boxed :: Box < RangeMarkupChoice >)"));
   }
 
   #[test]
@@ -6093,10 +5929,7 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:second\"))] Second (std :: boxed :: Box < Second >)")
-    );
+    assert!(generated.contains("Second (std :: boxed :: Box < Second >)"));
     assert!(!generated.contains("Sequence32"));
   }
 
@@ -6197,14 +6030,8 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:first\"))] First (std :: boxed :: Box < First >)")
-    );
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:second\"))] Second (std :: boxed :: Box < Second >)")
-    );
+    assert!(generated.contains("First (std :: boxed :: Box < First >)"));
+    assert!(generated.contains("Second (std :: boxed :: Box < Second >)"));
     assert!(!generated.contains("Sequence32"));
     assert!(!generated.contains("Sequence8"));
   }
@@ -6650,7 +6477,6 @@ mod tests {
     assert!(!generated.contains("pub struct Marker"));
     assert!(generated.contains("pub struct AttributedMarker"));
     assert!(generated.contains("# [doc = \" Defines the Marker Class.\"]"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"t:marker\"))]"));
     assert!(generated.contains("TMarker ,"));
     assert!(generated.contains("# [doc = \" Defines the AttributedMarker Class.\"]"));
     assert!(generated.contains("TAttributedMarker (std :: boxed :: Box < AttributedMarker >)"));
@@ -7012,16 +6838,9 @@ mod tests {
     assert!(generated.contains("pub leaf_a : std :: boxed :: Box < LeafA >"));
     assert!(generated.contains("pub structured_holder_choice : Option < StructuredHolderChoice >"));
     assert!(generated.contains("pub enum StructuredHolderChoice"));
-    assert!(generated.contains("# [sdk (sequence)] Sequence"));
     assert!(generated.contains("Sequence {"));
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:c\"))] leaf_c : std :: boxed :: Box < LeafC >")
-    );
-    assert!(
-      generated
-        .contains("# [sdk (child (qname = \"t:d\"))] leaf_d : std :: boxed :: Box < LeafD >")
-    );
+    assert!(generated.contains("leaf_c : std :: boxed :: Box < LeafC >"));
+    assert!(generated.contains("leaf_d : std :: boxed :: Box < LeafD >"));
     assert!(!generated.contains("pub struct StructuredHolderChoiceSequence2"));
   }
 

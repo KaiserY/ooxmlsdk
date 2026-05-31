@@ -2253,15 +2253,14 @@ pub struct SlicerCacheDefinitionExtensionList {
   #[sdk(child(qname = "x:ext"))]
   pub slicer_cache_definition_extension: Vec<crate::schemas::x::SlicerCacheDefinitionExtension>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotUserEditChoice {
   /// Defines the Formula Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
   Formula(crate::schemas::xne::Formula),
   /// Defines the PivotEditValue Class.
   PivotEditValue(std::boxed::Box<PivotEditValue>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SlicerCacheDataChoice {
   /// Defines the OlapSlicerCache Class.
   OlapSlicerCache(std::boxed::Box<OlapSlicerCache>),

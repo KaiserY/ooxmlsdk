@@ -1254,7 +1254,11 @@ pub struct Binning {
   pub overflow: Option<crate::simple_type::StringValue>,
   #[sdk(
         choice(
-            text_child(variant = Xsddouble, qname = "cx:binSize"),
+            text_child(
+                variant = Xsddouble,
+                simple_type = "DoubleValue",
+                qname = "cx:binSize"
+            ),
             text_child(variant = BinCountXsdunsignedInt, qname = "cx:binCount")
         )
     )]
@@ -1946,7 +1950,7 @@ pub struct UnsignedIntegerType {
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MinColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -1961,7 +1965,7 @@ pub enum MinColorSolidColorFillPropertiesChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MidColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -1976,7 +1980,7 @@ pub enum MidColorSolidColorFillPropertiesChoice {
   /// Preset Color.
   PresetColor(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MaxColorSolidColorFillPropertiesChoice {
   /// RGB Color Model - Percentage Variant.
   RgbColorModelPercentage(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
@@ -2003,10 +2007,9 @@ pub struct NumericDimensionChoiceSequence {
   #[sdk(child(qname = "cx:lvl"))]
   pub numeric_level: Vec<NumericLevel>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NumericDimensionChoice {
   /// Sequence of cx:f, cx:nf, cx:lvl
-  #[sdk(sequence)]
   Sequence(std::boxed::Box<NumericDimensionChoiceSequence>),
   /// Defines the NumericLevel Class.
   NumericLevel(std::boxed::Box<NumericLevel>),
@@ -2023,52 +2026,47 @@ pub struct StringDimensionChoiceSequence {
   #[sdk(child(qname = "cx:lvl"))]
   pub string_level: Vec<StringLevel>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StringDimensionChoice {
   /// Sequence of cx:f, cx:nf, cx:lvl
-  #[sdk(sequence)]
   Sequence(std::boxed::Box<StringDimensionChoiceSequence>),
   /// Defines the StringLevel Class.
   StringLevel(std::boxed::Box<StringLevel>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataChoice {
   /// Defines the NumericDimension Class.
   NumericDimension(std::boxed::Box<NumericDimension>),
   /// Defines the StringDimension Class.
   StringDimension(std::boxed::Box<StringDimension>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextDataChoice {
   /// Sequence of cx:f, cx:v
-  #[sdk(sequence)]
   Sequence {
     /// Defines the Formula Class.
-    #[sdk(child(qname = "cx:f"))]
     formula: std::boxed::Box<Formula>,
     /// Defines the VXsdstring Class.
-    #[sdk(text_child(simple_type = "StringValue", qname = "cx:v"))]
     v_xsdstring: Option<VXsdstring>,
   },
   /// Defines the VXsdstring Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "cx:v"))]
   VXsdstring(VXsdstring),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextChoice {
   /// Defines the TextData Class.
   TextData(std::boxed::Box<TextData>),
   /// Defines the RichTextBody Class.
   RichTextBody(std::boxed::Box<RichTextBody>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -2081,69 +2079,62 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GeoCacheChoice {
   /// Defines the Xsdbase64Binary Class.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "cx:binary"))]
   Xsdbase64Binary(Xsdbase64Binary),
   /// Defines the Clear Class.
   Clear(std::boxed::Box<Clear>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BinningChoice {
   /// Defines the Xsddouble Class.
-  #[sdk(text_child(simple_type = "DoubleValue", qname = "cx:binSize"))]
   Xsddouble(Xsddouble),
   /// Defines the BinCountXsdunsignedInt Class.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "cx:binCount"))]
   BinCountXsdunsignedInt(BinCountXsdunsignedInt),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MinValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
-  #[sdk(empty_child(qname = "cx:extremeValue"))]
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
   NumberColorPosition(std::boxed::Box<NumberColorPosition>),
   /// Defines the PercentageColorPosition Class.
   PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MaxValueColorEndPositionChoice {
   /// Defines the ExtremeValueColorPosition Class.
-  #[sdk(empty_child(qname = "cx:extremeValue"))]
   ExtremeValueColorPosition,
   /// Defines the NumberColorPosition Class.
   NumberColorPosition(std::boxed::Box<NumberColorPosition>),
   /// Defines the PercentageColorPosition Class.
   PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ValueColorMiddlePositionChoice {
   /// Defines the NumberColorPosition Class.
   NumberColorPosition(std::boxed::Box<NumberColorPosition>),
   /// Defines the PercentageColorPosition Class.
   PercentageColorPosition(std::boxed::Box<PercentageColorPosition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SeriesLayoutPropertiesChoice {
   /// Defines the Aggregation Class.
-  #[sdk(empty_child(qname = "cx:aggregation"))]
   Aggregation,
   /// Defines the Binning Class.
   Binning(std::boxed::Box<Binning>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AxisChoice {
   /// Defines the CategoryAxisScaling Class.
   CategoryAxisScaling(std::boxed::Box<CategoryAxisScaling>),

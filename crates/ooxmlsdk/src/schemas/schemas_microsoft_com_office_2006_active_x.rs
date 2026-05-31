@@ -78,7 +78,7 @@ pub struct SharedComPicture {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ActiveXObjectPropertyChoice {
   /// Defines the SharedComFont Class.
   SharedComFont(std::boxed::Box<SharedComFont>),

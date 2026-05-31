@@ -555,7 +555,7 @@ pub struct RichValueTypeReservedKeyFlag {
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::BooleanValue,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RichFilterColumnChoice {
   /// Defines the RichFilters Class.
   RichFilters(std::boxed::Box<RichFilters>),
@@ -568,7 +568,7 @@ pub enum RichFilterColumnChoice {
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CustomRichFiltersChoice {
   /// Defines the CustomRichFilter Class.
   CustomRichFilter(std::boxed::Box<CustomRichFilter>),

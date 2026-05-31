@@ -96,7 +96,7 @@ pub struct OfficeArtExtensionList {
   #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WordprocessingCanvasChoice {
   WordprocessingShape(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
@@ -105,7 +105,7 @@ pub enum WordprocessingCanvasChoice {
   /// Defines the GraphicFrameType Class.
   GraphicFrameType(std::boxed::Box<GraphicFrameType>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundFormattingChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -118,17 +118,16 @@ pub enum BackgroundFormattingChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BackgroundFormattingChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WholeFormattingChoice {
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),

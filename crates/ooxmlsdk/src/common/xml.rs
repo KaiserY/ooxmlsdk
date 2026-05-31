@@ -64,6 +64,20 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
+  pub fn read_text(
+    &mut self,
+    end: quick_xml::name::QName<'_>,
+  ) -> Result<std::borrow::Cow<'_, str>, SdkError> {
+    self.current = None;
+    self.buf.clear();
+    let text = self
+      .reader
+      .read_text_into(end, &mut self.buf)?
+      .xml10_content()?;
+    unescape_text(text)
+  }
+
+  #[inline]
   pub(crate) fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
     self.current = None;
     if let Some(event) = self.pending.take() {
@@ -138,6 +152,15 @@ impl<'de> SliceReader<'de> {
     }
 
     Ok(self.reader.read_event()?)
+  }
+
+  #[inline]
+  pub fn read_text(
+    &mut self,
+    end: quick_xml::name::QName<'_>,
+  ) -> Result<std::borrow::Cow<'de, str>, SdkError> {
+    let text = self.reader.read_text(end)?.xml10_content()?;
+    unescape_text(text)
   }
 
   #[inline]
@@ -624,6 +647,19 @@ pub(crate) fn push_xml_general_ref(
   }
 
   Ok(())
+}
+
+#[inline]
+fn unescape_text<'a>(
+  text: std::borrow::Cow<'a, str>,
+) -> Result<std::borrow::Cow<'a, str>, SdkError> {
+  match text {
+    std::borrow::Cow::Borrowed(text) => Ok(unescape(text)?),
+    std::borrow::Cow::Owned(text) => match unescape(&text)? {
+      std::borrow::Cow::Borrowed(_) => Ok(std::borrow::Cow::Owned(text)),
+      std::borrow::Cow::Owned(text) => Ok(std::borrow::Cow::Owned(text)),
+    },
+  }
 }
 
 #[inline]

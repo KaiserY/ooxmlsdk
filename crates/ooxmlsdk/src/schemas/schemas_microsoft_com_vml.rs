@@ -2757,14 +2757,13 @@ pub struct Formula {
   #[sdk(attr(qname = ":eqn"))]
   pub equation: Option<crate::simple_type::StringValue>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBoxChoice {
   /// Rich Text Box Content Container.
   TextBoxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapeChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -2792,7 +2791,6 @@ pub enum ShapeChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -2802,10 +2800,9 @@ pub enum ShapeChoice {
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
   Ink(std::boxed::Box<crate::schemas::o::Ink>),
   /// Ink Annotation Flag.
-  #[sdk(empty_child(qname = "pvml:iscomment"))]
   InkAnnotationFlag,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapetypeChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -2833,7 +2830,6 @@ pub enum ShapetypeChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -2842,7 +2838,7 @@ pub enum ShapetypeChoice {
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
   /// Shape Group.
   Group(std::boxed::Box<Group>),
@@ -2875,12 +2871,11 @@ pub enum GroupChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Attached Object Data.
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ArcChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -2915,7 +2910,6 @@ pub enum ArcChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -2930,7 +2924,7 @@ pub enum ArcChoice {
   /// VML Diagram Text.
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CurveChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -2965,7 +2959,6 @@ pub enum CurveChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -2980,7 +2973,7 @@ pub enum CurveChoice {
   /// VML Diagram Text.
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ImageFileChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3015,7 +3008,6 @@ pub enum ImageFileChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -3030,7 +3022,7 @@ pub enum ImageFileChoice {
   /// VML Diagram Text.
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3065,7 +3057,6 @@ pub enum LineChoice {
   /// Text Wrapping.
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   /// Top Border.
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
@@ -3080,7 +3071,7 @@ pub enum LineChoice {
   /// VML Diagram Text.
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OvalChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3108,7 +3099,6 @@ pub enum OvalChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3117,7 +3107,7 @@ pub enum OvalChoice {
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PolyLineChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3145,7 +3135,6 @@ pub enum PolyLineChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3155,7 +3144,7 @@ pub enum PolyLineChoice {
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
   Ink(std::boxed::Box<crate::schemas::o::Ink>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RectangleChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3183,7 +3172,6 @@ pub enum RectangleChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),
@@ -3192,7 +3180,7 @@ pub enum RectangleChoice {
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RoundRectangleChoice {
   /// Defines the Path Class.
   Path(std::boxed::Box<Path>),
@@ -3220,7 +3208,6 @@ pub enum RoundRectangleChoice {
   SignatureLine(std::boxed::Box<crate::schemas::o::SignatureLine>),
   TextWrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
-  #[sdk(empty_child(qname = "w10:anchorlock"))]
   AnchorLock,
   TopBorder(std::boxed::Box<crate::schemas::w10::TopBorder>),
   BottomBorder(std::boxed::Box<crate::schemas::w10::BottomBorder>),

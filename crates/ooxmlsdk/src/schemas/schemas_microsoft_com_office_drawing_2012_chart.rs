@@ -773,14 +773,14 @@ pub struct DataLabelFieldTableEntry {
   #[sdk(child(qname = "c15:dlblFieldTableCache"))]
   pub data_label_field_table_cache: Option<std::boxed::Box<DataLabelFieldTableCache>>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -793,17 +793,16 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ChartTextChoice {
   /// Defines the StringReference Class.
   StringReference(std::boxed::Box<crate::schemas::c::StringReference>),
@@ -812,7 +811,7 @@ pub enum ChartTextChoice {
   /// String Literal.
   StringLiteral(std::boxed::Box<crate::schemas::c::StringLiteral>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AxisDataSourceTypeChoice {
   /// Multi Level String Reference.
   MultiLevelStringReference(std::boxed::Box<crate::schemas::c::MultiLevelStringReference>),
@@ -867,10 +866,9 @@ pub struct DataLabelChoiceSequence {
   #[sdk(text_child(simple_type = "StringValue", qname = "c:separator"))]
   pub separator: Option<crate::schemas::c::Separator>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataLabelChoice {
   Delete(std::boxed::Box<crate::schemas::c::Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
-  #[sdk(sequence)]
   Sequence(std::boxed::Box<DataLabelChoiceSequence>),
 }

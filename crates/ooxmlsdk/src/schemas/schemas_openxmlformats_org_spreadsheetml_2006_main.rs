@@ -10966,7 +10966,7 @@ pub struct WorkbookExtension {
     )]
   pub workbook_extension_choice: Option<WorkbookExtensionChoice>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevisionsChoice {
   /// Revision Row Column Insert Delete.
   RevisionRowColumn(std::boxed::Box<RevisionRowColumn>),
@@ -10993,7 +10993,7 @@ pub enum RevisionsChoice {
   /// Revision Merge Conflict.
   RevisionConflict(std::boxed::Box<RevisionConflict>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExternalLinkChoice {
   /// External Workbook.
   ExternalBook(std::boxed::Box<ExternalBook>),
@@ -11002,50 +11002,43 @@ pub enum ExternalLinkChoice {
   /// OLE Link.
   OleLink(std::boxed::Box<OleLink>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FilterColumnChoice {
   /// Filter Criteria.
   Filters(std::boxed::Box<Filters>),
   /// Top 10.
   Top10(std::boxed::Box<Top10>),
   /// Defines the CustomFilters Class.
-  #[sdk(child(qname = "x14:customFilters"))]
   X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
   /// Custom Filters.
-  #[sdk(child(qname = "x:customFilters"))]
   XCustomFilters(std::boxed::Box<CustomFilters>),
   /// Dynamic Filter.
   DynamicFilter(std::boxed::Box<DynamicFilter>),
   /// Color Filter Criteria.
   ColorFilter(std::boxed::Box<ColorFilter>),
   /// Defines the IconFilter Class.
-  #[sdk(child(qname = "x14:iconFilter"))]
   X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
   /// Icon Filter.
-  #[sdk(child(qname = "x:iconFilter"))]
   XIconFilter(std::boxed::Box<IconFilter>),
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SortStateChoice {
-  #[sdk(child(qname = "x14:sortCondition"))]
   X14SortCondition(std::boxed::Box<crate::schemas::x14::SortCondition>),
   /// Defines the SortCondition Class.
-  #[sdk(child(qname = "x:sortCondition"))]
   XSortCondition(std::boxed::Box<SortCondition>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TablesChoice {
   /// No Value.
-  #[sdk(empty_child(qname = "x:m"))]
   MissingTable,
   /// Character Value.
   CharacterValue(std::boxed::Box<CharacterValue>),
   /// Index.
   FieldItem(std::boxed::Box<FieldItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotCacheRecordChoice {
   /// No Value.
   MissingItem(std::boxed::Box<MissingItem>),
@@ -11062,7 +11055,7 @@ pub enum PivotCacheRecordChoice {
   /// Index.
   FieldItem(std::boxed::Box<FieldItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EntriesChoice {
   /// No Value.
   MissingItem(std::boxed::Box<MissingItem>),
@@ -11073,7 +11066,7 @@ pub enum EntriesChoice {
   /// Character Value.
   StringItem(std::boxed::Box<StringItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupItemsChoice {
   /// No Value.
   MissingItem(std::boxed::Box<MissingItem>),
@@ -11088,7 +11081,7 @@ pub enum GroupItemsChoice {
   /// Date Time.
   DateTimeItem(std::boxed::Box<DateTimeItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunPropertiesChoice {
   /// Bold.
   Bold(std::boxed::Box<Bold>),
@@ -11121,7 +11114,7 @@ pub enum RunPropertiesChoice {
   /// Font Scheme.
   FontScheme(std::boxed::Box<FontScheme>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevisionRowColumnChoice {
   /// Undo.
   Undo(std::boxed::Box<Undo>),
@@ -11130,7 +11123,7 @@ pub enum RevisionRowColumnChoice {
   /// Revision Format.
   RevisionFormat(std::boxed::Box<RevisionFormat>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RevisionMoveChoice {
   /// Undo.
   Undo(std::boxed::Box<Undo>),
@@ -11139,7 +11132,7 @@ pub enum RevisionMoveChoice {
   /// Revision Format.
   RevisionFormat(std::boxed::Box<RevisionFormat>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MdxChoice {
   /// Tuple MDX Metadata.
   MdxTuple(std::boxed::Box<MdxTuple>),
@@ -11150,7 +11143,7 @@ pub enum MdxChoice {
   /// KPI MDX Metadata.
   MdxKpi(std::boxed::Box<MdxKpi>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FontChoice {
   /// Bold.
   Bold(std::boxed::Box<Bold>),
@@ -11183,71 +11176,61 @@ pub enum FontChoice {
   /// Font Scheme.
   FontScheme(std::boxed::Box<FontScheme>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillChoice {
   /// Pattern.
   PatternFill(std::boxed::Box<PatternFill>),
   /// Gradient.
   GradientFill(std::boxed::Box<GradientFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OleItemsChoice {
   /// OLE Link Item.
-  #[sdk(child(qname = "x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
   /// Defines the OleItem Class.
-  #[sdk(child(qname = "x14:oleItem"))]
   X14OleItem(std::boxed::Box<crate::schemas::x14::OleItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConditionalFormattingRuleExtensionChoice {
   /// Defines the Id Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "x14:id"))]
   Id(crate::schemas::x14::Id),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotHierarchyExtensionChoice {
   /// Defines the PivotHierarchy Class.
   PivotHierarchy(std::boxed::Box<crate::schemas::x14::PivotHierarchy>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotFieldExtensionChoice {
   /// Defines the PivotField Class.
   PivotField(std::boxed::Box<crate::schemas::x14::PivotField>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CacheSourceExtensionChoice {
   /// Defines the SourceConnection Class.
   SourceConnection(std::boxed::Box<crate::schemas::x14::SourceConnection>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ControlsChoice {
   /// Embedded Control.
   Control(std::boxed::Box<Control>),
   /// Unknown XML child.
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FiltersChoice {
   /// Defines the Filter Class.
-  #[sdk(child(qname = "x14:filter"))]
   X14Filter(std::boxed::Box<crate::schemas::x14::Filter>),
   /// Filter.
-  #[sdk(child(qname = "x:filter"))]
   XFilter(std::boxed::Box<Filter>),
   /// Date Grouping.
   DateGroupItem(std::boxed::Box<DateGroupItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SlicerCacheDefinitionExtensionChoice {
   /// Defines the SlicerCachePivotTables Class.
   SlicerCachePivotTables(std::boxed::Box<crate::schemas::x15::SlicerCachePivotTables>),
@@ -11257,37 +11240,31 @@ pub enum SlicerCacheDefinitionExtensionChoice {
   SlicerCacheHideItemsWithNoData(
     std::boxed::Box<crate::schemas::x15::SlicerCacheHideItemsWithNoData>,
   ),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotFilterExtensionChoice {
   /// Defines the PivotFilter Class.
   PivotFilter(std::boxed::Box<crate::schemas::x15::PivotFilter>),
   /// Defines the MovingPeriodState Class.
   MovingPeriodState(std::boxed::Box<crate::schemas::x15::MovingPeriodState>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum QueryTableExtensionChoice {
   /// Defines the QueryTable Class.
   QueryTable(std::boxed::Box<crate::schemas::x15::QueryTable>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConnectionExtensionChoice {
   /// Defines the Connection Class.
-  #[sdk(child(qname = "x14:connection"))]
   X14Connection(std::boxed::Box<crate::schemas::x14::Connection>),
   /// Defines the Connection Class.
-  #[sdk(child(qname = "x15:connection"))]
   X15Connection(std::boxed::Box<crate::schemas::x15::Connection>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SharedItemsChoice {
   /// No Value.
   MissingItem(std::boxed::Box<MissingItem>),
@@ -11302,56 +11279,46 @@ pub enum SharedItemsChoice {
   /// Date Time.
   DateTimeItem(std::boxed::Box<DateTimeItem>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FieldGroupChoice {
   /// Range Grouping Properties.
   RangeProperties(std::boxed::Box<RangeProperties>),
   /// Discrete Grouping Properties.
   DiscreteProperties(std::boxed::Box<DiscreteProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CacheFieldExtensionChoice {
   /// Defines the CacheField Class.
   CacheField(std::boxed::Box<crate::schemas::x14::CacheField>),
   /// Defines the CachedUniqueNames Class.
   CachedUniqueNames(std::boxed::Box<crate::schemas::x15::CachedUniqueNames>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CacheHierarchyExtensionChoice {
   /// Defines the CacheHierarchy Class.
-  #[sdk(child(qname = "x14:cacheHierarchy"))]
   X14CacheHierarchy(std::boxed::Box<crate::schemas::x14::CacheHierarchy>),
   /// Defines the CacheHierarchy Class.
-  #[sdk(child(qname = "x15:cacheHierarchy"))]
   X15CacheHierarchy(std::boxed::Box<crate::schemas::x15::CacheHierarchy>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CalculatedMemberExtensionChoice {
   /// Defines the CalculatedMember Class.
-  #[sdk(child(qname = "x14:calculatedMember"))]
   X14CalculatedMember(std::boxed::Box<crate::schemas::x14::CalculatedMember>),
   /// Defines the CalculatedMember Class.
-  #[sdk(child(qname = "x15:calculatedMember"))]
   X15CalculatedMember(std::boxed::Box<crate::schemas::x15::CalculatedMember>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataFieldExtensionChoice {
   /// Defines the DataField Class.
-  #[sdk(child(qname = "x14:dataField"))]
   X14DataField(std::boxed::Box<crate::schemas::x14::DataField>),
   /// Defines the DataField Class.
-  #[sdk(child(qname = "x15:dataField"))]
   X15DataField(std::boxed::Box<crate::schemas::x15::DataField>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WorksheetExtensionChoice {
   /// Defines the ConditionalFormattings Class.
   ConditionalFormattings(std::boxed::Box<crate::schemas::x14::ConditionalFormattings>),
@@ -11369,25 +11336,21 @@ pub enum WorksheetExtensionChoice {
   WebExtensions(std::boxed::Box<crate::schemas::x15::WebExtensions>),
   /// Defines the TimelineReferences Class.
   TimelineReferences(std::boxed::Box<crate::schemas::x15::TimelineReferences>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StylesheetExtensionChoice {
   /// Defines the DifferentialFormats Class.
-  #[sdk(child(qname = "x14:dxfs"))]
   X14DifferentialFormats(std::boxed::Box<crate::schemas::x14::DifferentialFormats>),
   /// Defines the SlicerStyles Class.
   SlicerStyles(std::boxed::Box<crate::schemas::x14::SlicerStyles>),
   /// Defines the DifferentialFormats Class.
-  #[sdk(child(qname = "x15:dxfs"))]
   X15DifferentialFormats(std::boxed::Box<crate::schemas::x15::DifferentialFormats>),
   /// Defines the TimelineStyles Class.
   TimelineStyles(std::boxed::Box<crate::schemas::x15::TimelineStyles>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotTableDefinitionExtensionChoice {
   /// Defines the PivotTableDefinition Class.
   PivotTableDefinition(std::boxed::Box<crate::schemas::x14::PivotTableDefinition>),
@@ -11397,10 +11360,9 @@ pub enum PivotTableDefinitionExtensionChoice {
   PivotTableUiSettings(std::boxed::Box<crate::schemas::x15::PivotTableUiSettings>),
   /// Defines the PivotVersionInfo Class.
   PivotVersionInfo(std::boxed::Box<crate::schemas::xxpvi::PivotVersionInfo>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CacheSourceChoice {
   /// Defines the WorksheetSource Class.
   WorksheetSource(std::boxed::Box<WorksheetSource>),
@@ -11409,7 +11371,7 @@ pub enum CacheSourceChoice {
   /// Defines the CacheSourceExtensionList Class.
   CacheSourceExtensionList(std::boxed::Box<CacheSourceExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheDefinition Class.
   PivotCacheDefinition(std::boxed::Box<crate::schemas::x14::PivotCacheDefinition>),
@@ -11420,47 +11382,38 @@ pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheIdVersion Class.
   PivotCacheIdVersion(std::boxed::Box<crate::schemas::x15::PivotCacheIdVersion>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xxpim:implicitMeasureSupport"))]
   XxpimXsdboolean(crate::schemas::xxpim::Xsdboolean),
   /// Defines the PivotCacheRichInfo Class.
   PivotCacheRichInfo(std::boxed::Box<crate::schemas::xprd::PivotCacheRichInfo>),
   /// Defines the CacheVersionInfo Class.
   CacheVersionInfo(std::boxed::Box<crate::schemas::xxpvi::CacheVersionInfo>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(simple_type = "BooleanValue", qname = "xlpar:autoRefresh"))]
   XlparXsdboolean(crate::schemas::xlpar::Xsdboolean),
   /// Defines the PivotCacheDynamicArray Class.
   PivotCacheDynamicArray(std::boxed::Box<crate::schemas::xlpda::PivotCacheDynamicArray>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TableExtensionChoice {
   /// Defines the Table Class.
   Table(std::boxed::Box<crate::schemas::x14::Table>),
   /// Defines the MsForm Class.
   MsForm(std::boxed::Box<crate::schemas::xlmsforms::MsForm>),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WorkbookExtensionChoice {
   /// Defines the DefinedNames Class.
   DefinedNames(std::boxed::Box<crate::schemas::x14::DefinedNames>),
   /// Defines the PivotCaches Class.
-  #[sdk(child(qname = "x14:pivotCaches"))]
   X14PivotCaches(std::boxed::Box<crate::schemas::x14::PivotCaches>),
   /// Defines the SlicerCaches Class.
-  #[sdk(child(qname = "x14:slicerCaches"))]
   X14SlicerCaches(std::boxed::Box<crate::schemas::x14::SlicerCaches>),
   /// Defines the SlicerCaches Class.
-  #[sdk(child(qname = "x15:slicerCaches"))]
   X15SlicerCaches(std::boxed::Box<crate::schemas::x15::SlicerCaches>),
   /// Defines the WorkbookProperties Class.
-  #[sdk(child(qname = "x14:workbookPr"))]
   X14WorkbookProperties(std::boxed::Box<crate::schemas::x14::WorkbookProperties>),
   /// Defines the PivotCaches Class.
-  #[sdk(child(qname = "x15:pivotCaches"))]
   X15PivotCaches(std::boxed::Box<crate::schemas::x15::PivotCaches>),
   /// Defines the PivotTableReferences Class.
   PivotTableReferences(std::boxed::Box<crate::schemas::x15::PivotTableReferences>),
@@ -11469,7 +11422,6 @@ pub enum WorkbookExtensionChoice {
   /// Defines the TimelineCacheReferences Class.
   TimelineCacheReferences(std::boxed::Box<crate::schemas::x15::TimelineCacheReferences>),
   /// Defines the WorkbookProperties Class.
-  #[sdk(child(qname = "x15:workbookPr"))]
   X15WorkbookProperties(std::boxed::Box<crate::schemas::x15::WorkbookProperties>),
   /// Defines the DataModel Class.
   DataModel(std::boxed::Box<crate::schemas::x15::DataModel>),
@@ -11481,6 +11433,5 @@ pub enum WorkbookExtensionChoice {
   ExternalCodeServiceImageAsInput(
     std::boxed::Box<crate::schemas::xlecs2::ExternalCodeServiceImageAsInput>,
   ),
-  #[sdk(any)]
   XmlAny(std::boxed::Box<[u8]>),
 }

@@ -197,7 +197,7 @@ pub struct GraphicFrame {
   #[sdk(child(qname = "wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WordprocessingGroupChoice {
   WordprocessingShape(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   /// Defines the GroupShape Class.
@@ -207,7 +207,7 @@ pub enum WordprocessingGroupChoice {
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
   ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapeChoice {
   WordprocessingShape(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   /// Defines the GroupShape Class.
@@ -217,7 +217,7 @@ pub enum GroupShapeChoice {
   Picture(std::boxed::Box<crate::schemas::pic::Picture>),
   ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -230,10 +230,9 @@ pub enum GroupShapePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),

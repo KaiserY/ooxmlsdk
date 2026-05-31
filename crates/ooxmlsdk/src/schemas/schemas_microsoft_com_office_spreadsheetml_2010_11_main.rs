@@ -1212,7 +1212,7 @@ pub struct PivotRow {
   #[sdk(child(qname = "x15:c"))]
   pub pivot_value_cell: Vec<PivotValueCell>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OleDbPrpopertiesChoice {
   /// Defines the DbTables Class.
   DbTables(std::boxed::Box<DbTables>),

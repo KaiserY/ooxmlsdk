@@ -72,7 +72,7 @@ pub struct LiveFeedBackgroundProperties {
   #[sdk(child(qname = "alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LiveFeedBackgroundPropertiesChoice {
   /// Defines the BackgroundNormalProperties Class.
   BackgroundNormalProperties(std::boxed::Box<BackgroundNormalProperties>),

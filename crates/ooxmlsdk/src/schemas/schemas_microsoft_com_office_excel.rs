@@ -290,207 +290,140 @@ pub type ClipboardFormat = ClipboardFormatValues;
 pub type ScriptLanguage = crate::simple_type::IntegerValue;
 /// HTML Script Location.
 pub type ScriptLocation = crate::simple_type::IntegerValue;
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ClientDataChoice {
   /// Move with Cells.
-  #[sdk(text_child(qname = "xvml:MoveWithCells"))]
   MoveWithCells(MoveWithCells),
   /// Resize with Cells.
-  #[sdk(text_child(qname = "xvml:SizeWithCells"))]
   ResizeWithCells(ResizeWithCells),
   /// Anchor.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:Anchor"))]
   Anchor(Anchor),
   /// Lock Toggle.
-  #[sdk(text_child(qname = "xvml:Locked"))]
   Locked(Locked),
   /// Default Size Toggle.
-  #[sdk(text_child(qname = "xvml:DefaultSize"))]
   DefaultSize(DefaultSize),
   /// Print Toggle.
-  #[sdk(text_child(qname = "xvml:PrintObject"))]
   PrintObject(PrintObject),
   /// Macro Disable Toggle.
-  #[sdk(text_child(qname = "xvml:Disabled"))]
   Disabled(Disabled),
   /// AutoFill.
-  #[sdk(text_child(qname = "xvml:AutoFill"))]
   AutoFill(AutoFill),
   /// AutoLine.
-  #[sdk(text_child(qname = "xvml:AutoLine"))]
   AutoLine(AutoLine),
   /// Automatically Size.
-  #[sdk(text_child(qname = "xvml:AutoPict"))]
   AutoSizePicture(AutoSizePicture),
   /// Reference to Custom Function.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaMacro"))]
   FormulaMacro(FormulaMacro),
   /// Horizontal Text Alignment.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:TextHAlign"))]
   HorizontalTextAlignment(HorizontalTextAlignment),
   /// Vertical Text Alignment.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:TextVAlign"))]
   VerticalTextAlignment(VerticalTextAlignment),
   /// Text Lock.
-  #[sdk(text_child(qname = "xvml:LockText"))]
   LockText(LockText),
   /// East Asia Alignment Toggle.
-  #[sdk(text_child(qname = "xvml:JustLastX"))]
   JustifyLastLine(JustifyLastLine),
   /// Password Edit.
-  #[sdk(text_child(qname = "xvml:SecretEdit"))]
   SecretEdit(SecretEdit),
   /// Default Button.
-  #[sdk(text_child(qname = "xvml:Default"))]
   DefaultButton(DefaultButton),
   /// Help Button.
-  #[sdk(text_child(qname = "xvml:Help"))]
   HelpButton(HelpButton),
   /// Cancel Button.
-  #[sdk(text_child(qname = "xvml:Cancel"))]
   CancelButton(CancelButton),
   /// Dismiss Button.
-  #[sdk(text_child(qname = "xvml:Dismiss"))]
   DismissButton(DismissButton),
   /// Primary Keyboard Accelerator.
-  #[sdk(text_child(simple_type = "ByteValue", qname = "xvml:Accel"))]
   AcceleratorPrimary(AcceleratorPrimary),
   /// Secondary Keyboard Accelerator.
-  #[sdk(text_child(simple_type = "ByteValue", qname = "xvml:Accel2"))]
   AcceleratorSecondary(AcceleratorSecondary),
   /// Comment Row Target.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Row"))]
   CommentRowTarget(CommentRowTarget),
   /// Comment Column Target.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Column"))]
   CommentColumnTarget(CommentColumnTarget),
   /// Comment Visibility Toggle.
-  #[sdk(text_child(qname = "xvml:Visible"))]
   Visible(Visible),
   /// Comment's Row is Hidden.
-  #[sdk(text_child(qname = "xvml:RowHidden"))]
   RowHidden(RowHidden),
   /// Comment's Column is Hidden.
-  #[sdk(text_child(qname = "xvml:ColHidden"))]
   ColumnHidden(ColumnHidden),
   /// Validation Type.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:VTEdit"))]
   InputValidationType(InputValidationType),
   /// Multi-line.
-  #[sdk(text_child(qname = "xvml:MultiLine"))]
   MultiLine(MultiLine),
   /// Vertical Scroll.
-  #[sdk(text_child(qname = "xvml:VScroll"))]
   VerticalScrollBar(VerticalScrollBar),
   /// Valid ID.
-  #[sdk(text_child(qname = "xvml:ValidIds"))]
   ValidIds(ValidIds),
   /// List Items Source Range.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaRange"))]
   FormulaRange(FormulaRange),
   /// Minimum Width.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:WidthMin"))]
   MinDropDownWidth(MinDropDownWidth),
   /// Selected Entry.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Sel"))]
   SelectionEntry(SelectionEntry),
   /// Disable 3D.
-  #[sdk(text_child(qname = "xvml:NoThreeD2"))]
   Disable3DForListBoxAndDropDown(Disable3DForListBoxAndDropDown),
   /// Selection Type.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:SelType"))]
   SelectionType(SelectionType),
   /// Multiple Selections.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:MultiSel"))]
   MultiSelections(MultiSelections),
   /// Callback Type.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:LCT"))]
   ListBoxCallbackType(ListBoxCallbackType),
   /// Non-linked List Item.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:ListItem"))]
   ListItem(ListItem),
   /// Dropdown Style.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:DropStyle"))]
   DropStyle(DropStyle),
   /// Dropdown Color Toggle.
-  #[sdk(text_child(qname = "xvml:Colored"))]
   Colored(Colored),
   /// Dropdown Maximum Lines.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:DropLines"))]
   DropLines(DropLines),
   /// Checked.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Checked"))]
   Checked(Checked),
   /// Linked Formula.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaLink"))]
   FormulaLink(FormulaLink),
   /// Camera Source Range.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaPict"))]
   FormulaPicture(FormulaPicture),
   /// Disable 3D.
-  #[sdk(text_child(qname = "xvml:NoThreeD"))]
   Disable3D(Disable3D),
   /// First Radio Button.
-  #[sdk(text_child(qname = "xvml:FirstButton"))]
   FirstButton(FirstButton),
   /// Linked Formula - Group Box.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaGroup"))]
   FormulaGroup(FormulaGroup),
   /// Scroll bar position.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Val"))]
   ScrollBarPosition(ScrollBarPosition),
   /// Scroll Bar Minimum.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Min"))]
   ScrollBarMin(ScrollBarMin),
   /// Scroll Bar Maximum.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Max"))]
   ScrollBarMax(ScrollBarMax),
   /// Scroll Bar Increment.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Inc"))]
   ScrollBarIncrement(ScrollBarIncrement),
   /// Scroll Bar Page Increment.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Page"))]
   ScrollBarPageIncrement(ScrollBarPageIncrement),
   /// Scroll Bar Orientation.
-  #[sdk(text_child(qname = "xvml:Horiz"))]
   HorizontalScrollBar(HorizontalScrollBar),
   /// Scroll Bar Width.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:Dx"))]
   ScrollBarWidth(ScrollBarWidth),
   /// ActiveX Control.
-  #[sdk(text_child(qname = "xvml:MapOCX"))]
   MapOcxControl(MapOcxControl),
   /// Clipboard Format.
-  #[sdk(text_child(qname = "xvml:CF"))]
   ClipboardFormat(ClipboardFormat),
   /// Camera Tool.
-  #[sdk(text_child(qname = "xvml:Camera"))]
   CameraObject(CameraObject),
   /// Recalculation Toggle.
-  #[sdk(text_child(qname = "xvml:RecalcAlways"))]
   RecalculateAlways(RecalculateAlways),
   /// Font AutoScale.
-  #[sdk(text_child(qname = "xvml:AutoScale"))]
   AutoScaleFont(AutoScaleFont),
   /// Dynamic Data Exchange.
-  #[sdk(text_child(qname = "xvml:DDE"))]
   DdeObject(DdeObject),
   /// UI Object Toggle.
-  #[sdk(text_child(qname = "xvml:UIObj"))]
   UiObject(UiObject),
   /// HTML Script Text.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:ScriptText"))]
   ScriptText(ScriptText),
   /// HTML Script Attributes.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:ScriptExtended"))]
   ScriptExtended(ScriptExtended),
   /// HTML Script Language.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:ScriptLanguage"))]
   ScriptLanguage(ScriptLanguage),
   /// HTML Script Location.
-  #[sdk(text_child(simple_type = "IntegerValue", qname = "xvml:ScriptLocation"))]
   ScriptLocation(ScriptLocation),
   /// Text Formula.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:FmlaTxbx"))]
   FormulaTextBox(FormulaTextBox),
 }

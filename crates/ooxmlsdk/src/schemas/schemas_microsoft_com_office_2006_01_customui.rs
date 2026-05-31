@@ -4045,14 +4045,14 @@ pub struct Ribbon {
   #[sdk(child(qname = "mso:contextualTabs"))]
   pub contextual_tab_sets: Option<ContextualTabSets>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnsizedSplitButtonChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UnsizedMenuChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),
@@ -4073,14 +4073,14 @@ pub enum UnsizedMenuChoice {
   /// Defines the UnsizedDynamicMenu Class.
   UnsizedDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitButtonWithTitleChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuWithTitleChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),
@@ -4101,7 +4101,7 @@ pub enum MenuWithTitleChoice {
   /// Defines the UnsizedDynamicMenu Class.
   UnsizedDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),
@@ -4122,14 +4122,14 @@ pub enum MenuChoice {
   /// Defines the UnsizedDynamicMenu Class.
   UnsizedDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitButtonChoice {
   /// Defines the VisibleButton Class.
   VisibleButton(std::boxed::Box<VisibleButton>),
   /// Defines the VisibleToggleButton Class.
   VisibleToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BoxChoice {
   /// Defines the ControlClone Class.
   ControlClone(std::boxed::Box<ControlClone>),
@@ -4160,7 +4160,7 @@ pub enum BoxChoice {
   /// Defines the ButtonGroup Class.
   ButtonGroup(std::boxed::Box<ButtonGroup>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ButtonGroupChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),
@@ -4177,7 +4177,7 @@ pub enum ButtonGroupChoice {
   /// Defines the UnsizedSplitButton Class.
   UnsizedSplitButton(std::boxed::Box<UnsizedSplitButton>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MenuRootChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),
@@ -4198,7 +4198,7 @@ pub enum MenuRootChoice {
   /// Defines the UnsizedDynamicMenu Class.
   UnsizedDynamicMenu(std::boxed::Box<UnsizedDynamicMenu>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
   /// Defines the ControlClone Class.
   ControlClone(std::boxed::Box<ControlClone>),
@@ -4231,7 +4231,7 @@ pub enum GroupChoice {
   /// Defines the VerticalSeparator Class.
   VerticalSeparator(std::boxed::Box<VerticalSeparator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SharedQatControlsChoice {
   /// Defines the QuickAccessToolbarControlClone Class.
   QuickAccessToolbarControlClone(std::boxed::Box<QuickAccessToolbarControlClone>),
@@ -4240,7 +4240,7 @@ pub enum SharedQatControlsChoice {
   /// Defines the VerticalSeparator Class.
   VerticalSeparator(std::boxed::Box<VerticalSeparator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DocumentSpecificQuickAccessToolbarControlsChoice {
   /// Defines the QuickAccessToolbarControlClone Class.
   QuickAccessToolbarControlClone(std::boxed::Box<QuickAccessToolbarControlClone>),
@@ -4249,7 +4249,7 @@ pub enum DocumentSpecificQuickAccessToolbarControlsChoice {
   /// Defines the VerticalSeparator Class.
   VerticalSeparator(std::boxed::Box<VerticalSeparator>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OfficeMenuChoice {
   /// Defines the UnsizedControlClone Class.
   UnsizedControlClone(std::boxed::Box<UnsizedControlClone>),

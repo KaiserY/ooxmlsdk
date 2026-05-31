@@ -683,14 +683,14 @@ pub struct Emma {
     )]
   pub emma_choice: Vec<EmmaChoice>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LatticeChoice {
   /// Defines the Arc Class.
   Arc(std::boxed::Box<Arc>),
   /// Defines the Node Class.
   Node(std::boxed::Box<Node>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InterpretationChoice {
   /// Defines the DerivedFrom Class.
   DerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -699,12 +699,11 @@ pub enum InterpretationChoice {
   /// Defines the Lattice Class.
   Lattice(std::boxed::Box<Lattice>),
   /// Defines the Literal Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "emma:literal"))]
   Literal(Literal),
   /// Defines the ContextNode Class.
   ContextNode(std::boxed::Box<crate::schemas::msink::ContextNode>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OneOfChoice {
   /// Defines the DerivedFrom Class.
   DerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -719,7 +718,7 @@ pub enum OneOfChoice {
   /// Defines the Sequence Class.
   Sequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GroupChoice {
   /// Defines the DerivedFrom Class.
   DerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -736,7 +735,7 @@ pub enum GroupChoice {
   /// Defines the Sequence Class.
   Sequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SequenceChoice {
   /// Defines the DerivedFrom Class.
   DerivedFrom(std::boxed::Box<DerivedFrom>),
@@ -751,7 +750,7 @@ pub enum SequenceChoice {
   /// Defines the Sequence Class.
   Sequence(std::boxed::Box<Sequence>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DerivationChoice {
   /// Defines the Interpretation Class.
   Interpretation(std::boxed::Box<Interpretation>),
@@ -762,7 +761,7 @@ pub enum DerivationChoice {
   /// Defines the Group Class.
   Group(std::boxed::Box<Group>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EmmaChoice {
   /// Defines the Derivation Class.
   Derivation(std::boxed::Box<Derivation>),

@@ -40,7 +40,7 @@ pub struct Override {
   #[sdk(attr(qname = "PartName"))]
   pub part_name: crate::simple_type::StringValue,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypesChoice {
   /// Default content type.
   Default(std::boxed::Box<Default>),

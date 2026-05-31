@@ -58,11 +58,6 @@ fn is_canonical_xmlns_prefix_namespace(prefix: &str) -> bool {
   matches!(prefix, "x14" | "xne")
 }
 
-fn should_match_text_child_end_by_local_name(qname: &str, use_local_name_dispatch: bool) -> bool {
-  let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
-  use_local_name_dispatch && !tag_prefix.is_empty()
-}
-
 fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
   let QNameInfo { local_name, .. } = parse_qname_info(qname);
   if local_name.is_empty() {
@@ -279,13 +274,284 @@ fn write_typed_child_tokens(
   value: proc_macro2::TokenStream,
   qname: &str,
 ) -> proc_macro2::TokenStream {
-  let element_name = element_name_tokens_from_qname(qname);
+  let start_tag_open = write_start_tag_open_tokens(qname);
+  let end_tag = write_end_tag_tokens(qname);
   quote! {
-    <#child_ty as crate::sdk::SdkType>::write_inner(
-      #value,
-      writer,
-      #element_name,
-    )?;
+    #start_tag_open
+    if <#child_ty as crate::sdk::SdkType>::write_inner(#value, writer)? {
+      #end_tag
+    } else {
+      writer.write_all(b" />")?;
+    }
+  }
+}
+
+fn write_text_value_content_tokens(
+  value_expr: proc_macro2::TokenStream,
+  value_ty: &syn::Type,
+  simple_type: Option<&str>,
+  qname: &str,
+) -> proc_macro2::TokenStream {
+  if let Some(kind) = simple_union_effective_type_kind(value_ty, simple_type) {
+    write_simple_union_value_tokens(kind, value_expr)
+  } else if effective_type_name(value_ty, simple_type)
+    .as_deref()
+    .is_some_and(is_xml_schema_float_type_name)
+  {
+    write_xml_schema_float_effective_tokens(value_expr, value_ty, simple_type, qname)
+  } else if is_string_like_effective_type(value_ty, simple_type) {
+    quote! {
+      crate::common::write_escaped_content_str(writer, #value_expr.as_ref())?;
+    }
+  } else {
+    quote! {
+      crate::common::write_escaped_content_text(writer, #value_expr)?;
+    }
+  }
+}
+
+fn choice_sequence_child_write_tokens(
+  child: &SdkTypeChoiceSequenceChild,
+  value_expr: proc_macro2::TokenStream,
+) -> syn::Result<proc_macro2::TokenStream> {
+  let Some(field_ty) = child.ty.as_ref() else {
+    return Err(syn::Error::new(
+      Span::call_site(),
+      "sdk choice sequence child write path requires ty",
+    ));
+  };
+  let repeated = contains_vec_type(field_ty);
+  let optional = is_option_type(field_ty);
+  let payload_ty = unwrap_option_vec_type(field_ty);
+  let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+  let qname = &child.qname;
+  let tokens = match child.kind {
+    SdkTypeChoiceSequenceChildKind::Child => {
+      let child_write = write_typed_child_tokens(&child_ty, quote! { child }, qname);
+      let value_write = write_typed_child_tokens(&child_ty, value_expr.clone(), qname);
+      if repeated {
+        quote! {
+          for child in #value_expr {
+            #child_write
+          }
+        }
+      } else if optional {
+        quote! {
+          if let Some(child) = #value_expr {
+            #child_write
+          }
+        }
+      } else {
+        value_write
+      }
+    }
+    SdkTypeChoiceSequenceChildKind::EmptyChild => {
+      let start_tag_open = write_start_tag_open_tokens(qname);
+      let write_empty = quote! {
+        #start_tag_open
+        writer.write_all(b" />")?;
+      };
+      if repeated {
+        quote! {
+          for _ in #value_expr {
+            #write_empty
+          }
+        }
+      } else if optional {
+        quote! {
+          if #value_expr.is_some() {
+            #write_empty
+          }
+        }
+      } else {
+        write_empty
+      }
+    }
+    SdkTypeChoiceSequenceChildKind::TextChild => {
+      let start_tag_open = write_start_tag_open_tokens(qname);
+      let end_tag = write_end_tag_tokens(qname);
+      let write_value = |expr: proc_macro2::TokenStream| {
+        let content =
+          write_text_value_content_tokens(expr, &child_ty, child.simple_type.as_deref(), qname);
+        quote! {
+          #start_tag_open
+          writer.write_all(b">")?;
+          #content
+          #end_tag
+        }
+      };
+      if repeated {
+        let write_child = write_value(quote! { child });
+        quote! {
+          for child in #value_expr {
+            #write_child
+          }
+        }
+      } else if optional {
+        let write_child = write_value(quote! { child });
+        quote! {
+          if let Some(child) = #value_expr {
+            #write_child
+          }
+        }
+      } else {
+        write_value(value_expr)
+      }
+    }
+    SdkTypeChoiceSequenceChildKind::AnyChild => {
+      build_any_child_write_tokens_for_value(value_expr, qname, repeated, optional)
+    }
+  };
+  Ok(tokens)
+}
+
+fn build_choice_write_tokens(
+  choice_ty: &Type,
+  items: &[SdkTypeChoiceItem],
+  field_ident: &Ident,
+  repeated: bool,
+  optional: bool,
+) -> syn::Result<proc_macro2::TokenStream> {
+  let mut arms = Vec::new();
+  for item in items {
+    match item {
+      SdkTypeChoiceItem::Child { variant, ty, qname } => {
+        let _ = ty;
+        let value_expr = quote! { value.as_ref() };
+        let start_tag_open = write_start_tag_open_tokens(qname);
+        let end_tag = write_end_tag_tokens(qname);
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            #start_tag_open
+            if crate::sdk::SdkType::write_inner(#value_expr, writer)? {
+              #end_tag
+            } else {
+              writer.write_all(b" />")?;
+            }
+          }
+        });
+      }
+      SdkTypeChoiceItem::EmptyChild { variant, qname } => {
+        let start_tag_open = write_start_tag_open_tokens(qname);
+        arms.push(quote! {
+          #choice_ty::#variant => {
+            #start_tag_open
+            writer.write_all(b" />")?;
+          }
+        });
+      }
+      SdkTypeChoiceItem::TextChild {
+        variant,
+        ty,
+        simple_type,
+        qname,
+      } => {
+        let start_tag_open = write_start_tag_open_tokens(qname);
+        let end_tag = write_end_tag_tokens(qname);
+        let content = if let Some(payload_ty) = ty.clone().or_else(|| {
+          simple_type
+            .as_deref()
+            .and_then(|simple_type| syn::parse_str::<Type>(simple_type).ok())
+        }) {
+          write_text_value_content_tokens(
+            quote! { value },
+            &payload_ty,
+            simple_type.as_deref(),
+            qname,
+          )
+        } else {
+          quote! {
+            crate::common::write_escaped_content_text(writer, value)?;
+          }
+        };
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            #start_tag_open
+            writer.write_all(b">")?;
+            #content
+            #end_tag
+          }
+        });
+      }
+      SdkTypeChoiceItem::AnyChild { variant, qname } => {
+        let start_tag_open = write_start_tag_open_tokens(qname);
+        let end_tag = write_end_tag_tokens(qname);
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            #start_tag_open
+            writer.write_all(b">")?;
+            for value in value {
+              writer.write_all(value.as_bytes())?;
+            }
+            #end_tag
+          }
+        });
+      }
+      SdkTypeChoiceItem::Sequence { variant, children } => {
+        if children.iter().all(|child| child.field.is_some()) {
+          let field_idents = children
+            .iter()
+            .map(|child| child.field.as_ref().expect("sequence field"))
+            .collect::<Vec<_>>();
+          let write_tokens = children
+            .iter()
+            .map(|child| {
+              let field = child.field.as_ref().expect("sequence field");
+              choice_sequence_child_write_tokens(child, quote! { #field })
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+          arms.push(quote! {
+            #choice_ty::#variant { #( #field_idents ),* } => {
+              #( #write_tokens )*
+            }
+          });
+        } else {
+          arms.push(quote! {
+            #choice_ty::#variant(value) => {
+              crate::sdk::SdkType::write_inner(value.as_ref(), writer)?;
+            }
+          });
+        }
+      }
+      SdkTypeChoiceItem::Any { variant } => {
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            writer.write_all(value.as_ref())?;
+          }
+        });
+      }
+      SdkTypeChoiceItem::Text { variant } => {
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            crate::common::write_escaped_content_text(writer, value)?;
+          }
+        });
+      }
+    }
+  }
+
+  let write_one = quote! {
+    match choice {
+      #( #arms )*
+    }
+  };
+  if repeated {
+    Ok(quote! {
+      for choice in &self.#field_ident {
+        #write_one
+      }
+    })
+  } else if optional {
+    Ok(quote! {
+      if let Some(choice) = &self.#field_ident {
+        #write_one
+      }
+    })
+  } else {
+    Ok(quote! {
+      let choice = &self.#field_ident;
+      #write_one
+    })
   }
 }
 
@@ -464,9 +730,8 @@ fn expand_tuple_wrapper(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        name: crate::sdk::ElementName,
-      ) -> Result<(), std::io::Error> {
-        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer, name)
+      ) -> Result<bool, std::io::Error> {
+        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)
       }
 
       #[inline]
@@ -557,11 +822,14 @@ fn expand_tuple_wrapper(
       }
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
-        <Self as crate::sdk::SdkType>::write_inner(
-          self,
-          writer,
-          #element_name,
-        )
+        let name = #element_name;
+        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
+        if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
+          crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
+        } else {
+          writer.write_all(b" />")?;
+        }
+        Ok(())
       }
 
       pub fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
@@ -606,34 +874,301 @@ fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenSt
   }
 }
 
-fn mce_process_choice_field_tokens(field: &SdkChoiceField) -> proc_macro2::TokenStream {
+fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
   let ident = &field.ident;
   let choice_ty = unwrap_option_vec_type(&field.ty);
-  if field.repeated {
-    quote! {
-      <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choices_with_context(
-        &mut self.#ident,
-        settings,
-        context,
-      )?;
+  let mut choice_arms = Vec::new();
+  let mut any_variants = Vec::new();
+
+  for item in &field.items {
+    match item {
+      SdkTypeChoiceItem::Child { variant, .. } => {
+        choice_arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)?;
+          }
+        });
+      }
+      SdkTypeChoiceItem::Sequence { variant, children } => {
+        if children.iter().all(|child| child.field.is_some()) {
+          let pattern_fields = children
+            .iter()
+            .map(|child| {
+              let field_ident = child.field.as_ref().expect("sequence field");
+              if matches!(child.kind, SdkTypeChoiceSequenceChildKind::Child) {
+                quote! { #field_ident }
+              } else {
+                quote! { #field_ident: _ }
+              }
+            })
+            .collect::<Vec<_>>();
+          let process_tokens = children
+            .iter()
+            .filter(|child| matches!(child.kind, SdkTypeChoiceSequenceChildKind::Child))
+            .map(|child| {
+              let field_ident = child.field.as_ref().expect("sequence field");
+              quote! {
+                crate::sdk::SdkMce::process_mce_with_context(#field_ident, settings, context)?;
+              }
+            })
+            .collect::<Vec<_>>();
+          choice_arms.push(quote! {
+            #choice_ty::#variant { #( #pattern_fields ),* } => {
+              #( #process_tokens )*
+            }
+          });
+        } else {
+          choice_arms.push(quote! {
+            #choice_ty::#variant(value) => {
+              crate::sdk::SdkMce::process_mce_with_context(value, settings, context)?;
+            }
+          });
+        }
+      }
+      SdkTypeChoiceItem::EmptyChild { .. }
+      | SdkTypeChoiceItem::TextChild { .. }
+      | SdkTypeChoiceItem::AnyChild { .. }
+      | SdkTypeChoiceItem::Text { .. } => {}
+      SdkTypeChoiceItem::Any { variant } => {
+        any_variants.push(variant);
+      }
     }
-  } else if field.optional {
+  }
+
+  let process_choice_for = |choice_expr: proc_macro2::TokenStream| {
     quote! {
-      if let Some(choice) = &mut self.#ident {
-        <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
-          choice,
+      match #choice_expr {
+        #( #choice_arms )*
+        _ => {}
+      }
+    }
+  };
+  let process_self_choice = process_choice_for(quote! { self });
+
+  let mut parse_replacement_arms = Vec::new();
+  for item in &field.items {
+    match item {
+      SdkTypeChoiceItem::Child { variant, qname, .. } => {
+        let targets = qname_match_targets(std::slice::from_ref(qname));
+        parse_replacement_arms.push(quote! {
+          #( #targets )|* => {
+            Some(#choice_ty::#variant(std::boxed::Box::new(
+              <_ as crate::sdk::SdkType>::read_borrowed_inner(&mut child_reader, e, next_empty)?
+            )))
+          }
+        });
+      }
+      SdkTypeChoiceItem::EmptyChild { variant, qname } => {
+        let targets = qname_match_targets(std::slice::from_ref(qname));
+        let child_reader_ident = Ident::new("child_reader", Span::call_site());
+        let skip_tokens = build_empty_child_skip_tokens(
+          ident,
+          qname,
+          DeserializeMode::Borrowed,
+          &child_reader_ident,
+        );
+        parse_replacement_arms.push(quote! {
+          #( #targets )|* => {
+            #skip_tokens
+            Some(#choice_ty::#variant)
+          }
+        });
+      }
+      SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
+        let targets = qname_match_targets(std::slice::from_ref(qname));
+        parse_replacement_arms.push(quote! {
+          #( #targets )|* => {
+            let parsed_child = if next_empty {
+              crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
+            } else {
+              let value = child_reader.read_text(e.name())?;
+              crate::common::parse_value::<_>(
+                value.as_ref(),
+                stringify!(#ident),
+                stringify!(#variant),
+              )?
+            };
+            Some(#choice_ty::#variant(parsed_child))
+          }
+        });
+      }
+      SdkTypeChoiceItem::AnyChild { variant, qname } => {
+        let targets = qname_match_targets(std::slice::from_ref(qname));
+        let QNameInfo {
+          tag_prefix,
+          local_name,
+        } = parse_qname_info(qname);
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        let tag_qname_lit = LitByteStr::new(
+          format!("{tag_prefix}:{local_name}").as_bytes(),
+          Span::call_site(),
+        );
+        parse_replacement_arms.push(quote! {
+          #( #targets )|* => {
+            let mut parsed_child = Vec::new();
+            if !next_empty {
+              loop {
+                match child_reader.next()? {
+                  quick_xml::events::Event::Start(e) => {
+                    let xml = crate::common::read_raw_element_xml_borrowed(&mut child_reader, e)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::Empty(e) => {
+                    let xml = crate::common::read_raw_empty_xml_borrowed(e)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::End(end) => {
+                    if end.name().as_ref() == #tag_qname_lit
+                      || end.name().as_ref() == #local_name_lit
+                    {
+                      break;
+                    }
+                  }
+                  quick_xml::events::Event::Eof => {
+                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                  }
+                  _ => {}
+                }
+              }
+            }
+            Some(#choice_ty::#variant(parsed_child.into()))
+          }
+        });
+      }
+      SdkTypeChoiceItem::Sequence { .. }
+      | SdkTypeChoiceItem::Any { .. }
+      | SdkTypeChoiceItem::Text { .. } => {}
+    }
+  }
+
+  let mut mce_any_arms = Vec::new();
+  let mut mce_replacement_read_methods = Vec::new();
+  for variant in any_variants {
+    let method_ident = Ident::new(
+      &format!(
+        "__ooxmlsdk_read_mce_replacement_child_{}",
+        variant.to_string().to_ascii_lowercase()
+      ),
+      Span::call_site(),
+    );
+    mce_replacement_read_methods.push(quote! {
+      fn #method_ident(
+        child_xml: std::boxed::Box<[u8]>,
+      ) -> Result<Self, crate::common::SdkError> {
+        let parsed = {
+          let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
+          loop {
+            match child_reader.next()? {
+              quick_xml::events::Event::Start(e) => {
+                let next_empty = false;
+                let event_name = e.name().into_inner();
+                break match event_name {
+                  #( #parse_replacement_arms )*
+                  _ => None,
+                };
+              }
+              quick_xml::events::Event::Empty(e) => {
+                let next_empty = true;
+                let event_name = e.name().into_inner();
+                break match event_name {
+                  #( #parse_replacement_arms )*
+                  _ => None,
+                };
+              }
+              quick_xml::events::Event::Eof => {
+                return Err(crate::common::unexpected_eof(stringify!(#ident)));
+              }
+              _ => {}
+            }
+          }
+        };
+        Ok(parsed.unwrap_or_else(|| Self::#variant(child_xml)))
+      }
+    });
+    mce_any_arms.push(quote! {
+      #choice_ty::#variant(xml) => {
+        if let Some(children) = crate::common::mce_choice_replacement_child_bytes(
+          xml.as_ref(),
           settings,
           context,
-        )?;
+        )? {
+          for child_xml in children {
+            let mut child = Self::#method_ident(child_xml)?;
+            Self::process_mce_choice_with_context(&mut child, settings, context)?;
+            processed.push(child);
+          }
+        } else {
+          Self::process_mce_choice_with_context(&mut item, settings, context)?;
+          processed.push(item);
+        }
+      }
+    });
+  }
+
+  let process_repeated_choices = if mce_any_arms.is_empty() {
+    quote! {
+      for choice in values {
+        Self::process_mce_choice_with_context(choice, settings, context)?;
       }
     }
   } else {
     quote! {
-      <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
-        &mut self.#ident,
-        settings,
-        context,
-      )?;
+      let mut processed = Vec::with_capacity(values.len());
+      for mut item in std::mem::take(values) {
+        match &mut item {
+          #( #mce_any_arms )*
+          _ => {
+            Self::process_mce_choice_with_context(&mut item, settings, context)?;
+            processed.push(item);
+          }
+        }
+      }
+      *values = processed;
+    }
+  };
+
+  quote! {
+    #[cfg(feature = "mce")]
+    impl #choice_ty {
+      #( #mce_replacement_read_methods )*
+
+      fn process_mce_choice_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        #process_self_choice
+        Ok(())
+      }
+
+      fn process_mce_choices_with_context(
+        values: &mut Vec<Self>,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        #process_repeated_choices
+        Ok(())
+      }
+    }
+  }
+}
+
+fn mce_process_choice_field_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStream {
+  let ident = &field.ident;
+  let choice_ty = unwrap_option_vec_type(&field.ty);
+  if field.repeated {
+    quote! {
+      #choice_ty::process_mce_choices_with_context(&mut self.#ident, settings, context)?;
+    }
+  } else if field.optional {
+    quote! {
+      if let Some(choice) = &mut self.#ident {
+        #choice_ty::process_mce_choice_with_context(choice, settings, context)?;
+      }
+    }
+  } else {
+    quote! {
+      #choice_ty::process_mce_choice_with_context(&mut self.#ident, settings, context)?;
     }
   }
 }
@@ -1012,23 +1547,8 @@ fn build_text_child_parse_arm(
   xml_child_slot_assign: proc_macro2::TokenStream,
   options: TextChildParseArmOptions,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
   let target =
     text_child_match_target_with_local_name_dispatch(qname, options.use_local_name_dispatch);
-  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_qname_lit = LitByteStr::new(
-    format!("{tag_prefix}:{local_name}").as_bytes(),
-    Span::call_site(),
-  );
-  let end_match_tokens =
-    if should_match_text_child_end_by_local_name(qname, options.use_local_name_dispatch) {
-      quote! { end.local_name().as_ref() == #local_name_lit }
-    } else {
-      quote! { end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit }
-    };
   let value_ty = if options.list {
     vec_inner_type(&unwrap_option_type(field_ty))
       .unwrap_or_else(|| unwrap_option_vec_type(field_ty))
@@ -1038,9 +1558,8 @@ fn build_text_child_parse_arm(
   let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
   let parse_from_text_tokens = if options.list {
     quote! {{
-      let value = text.unwrap_or_default();
       crate::common::parse_list_value::<#value_ty>(
-        &value,
+        text.as_ref(),
         stringify!(#owner_ident),
         stringify!(#field_ident),
       )?
@@ -1048,16 +1567,15 @@ fn build_text_child_parse_arm(
   } else if let Some(kind) = simple_union_kind {
     let parse_tokens = parse_simple_union_value_tokens(kind, quote! { value });
     quote! {{
-      let value = text.unwrap_or_default();
+      let value = text.into_owned();
       #parse_tokens
     }}
   } else if is_string_like_effective_type(&value_ty, simple_type) {
-    quote! { text.unwrap_or_default() }
+    quote! { text.into_owned() }
   } else {
     quote! {{
-      let value = text.unwrap_or_default();
       crate::common::parse_value::<#value_ty>(
-        &value,
+        text.as_ref(),
         stringify!(#owner_ident),
         stringify!(#field_ident),
       )?
@@ -1100,31 +1618,7 @@ fn build_text_child_parse_arm(
       let parsed_child = if next_empty {
         #empty_value_tokens
       } else {
-        let mut text = None;
-        loop {
-          match xml_reader.next()? {
-            quick_xml::events::Event::Text(t) => {
-              crate::common::push_xml_text(&mut text, t)?;
-            }
-            quick_xml::events::Event::GeneralRef(t) => {
-              crate::common::push_xml_general_ref(
-                &mut text,
-                t,
-                stringify!(#owner_ident),
-                stringify!(#field_ident),
-              )?;
-            }
-            quick_xml::events::Event::End(end) => {
-              if #end_match_tokens {
-                break;
-              }
-            }
-            quick_xml::events::Event::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
-            }
-            _ => {}
-          }
-        }
+        let text = xml_reader.read_text(e.name())?;
         #parse_from_text_tokens
       };
       #assign_tokens
@@ -1342,6 +1836,15 @@ fn build_any_child_write_tokens(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
+  build_any_child_write_tokens_for_value(quote! { &self.#field_ident }, qname, repeated, optional)
+}
+
+fn build_any_child_write_tokens_for_value(
+  value_expr: proc_macro2::TokenStream,
+  qname: &str,
+  repeated: bool,
+  optional: bool,
+) -> proc_macro2::TokenStream {
   let start_tag_open = write_start_tag_open_tokens(qname);
   let end_tag = write_end_tag_tokens(qname);
   let write_value_tokens = quote! {
@@ -1355,19 +1858,19 @@ fn build_any_child_write_tokens(
 
   if repeated {
     quote! {
-      for value in &self.#field_ident {
+      for value in #value_expr {
         #write_value_tokens
       }
     }
   } else if optional {
     quote! {
-      if let Some(value) = &self.#field_ident {
+      if let Some(value) = #value_expr {
         #write_value_tokens
       }
     }
   } else {
     quote! {
-      let value = &self.#field_ident;
+      let value = #value_expr;
       #write_value_tokens
     }
   }
@@ -1503,506 +2006,6 @@ fn build_unmatched_child_tokens(
   }
 }
 
-fn expand_sequence_helper_struct(
-  input: &DeriveInput,
-  fields: &syn::FieldsNamed,
-) -> syn::Result<proc_macro2::TokenStream> {
-  let ident = &input.ident;
-
-  let mut child_decl_tokens = Vec::new();
-  let mut child_dispatch_tokens_borrowed = Vec::new();
-  let mut child_dispatch_tokens_io = Vec::new();
-  let mut child_write_tokens = Vec::new();
-  let mut child_init_tokens = Vec::new();
-  let mut child_validate_tokens = Vec::new();
-  let mut matcher_checks = Vec::new();
-
-  let xml_reader_ident = Ident::new("xml_reader", Span::call_site());
-
-  for field in &fields.named {
-    let field_ident = field
-      .ident
-      .as_ref()
-      .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
-    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
-    match parsed_attrs.kind {
-      Some(SdkTypeFieldKind::Child { qname, .. }) => {
-        let QNameInfo {
-          tag_prefix,
-          local_name,
-        } = parse_qname_info(&qname);
-        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-        let payload_ty = unwrap_option_vec_type(&field.ty);
-        let child_ty = if let Some(inner_ty) = box_inner_type(&payload_ty) {
-          inner_ty
-        } else {
-          payload_ty.clone()
-        };
-        let validate_child_tokens = if box_inner_type(&payload_ty).is_some() {
-          quote! { child.as_ref() }
-        } else {
-          quote! { child }
-        };
-        let validate_self_tokens = if box_inner_type(&payload_ty).is_some() {
-          quote! { self.#field_ident.as_ref() }
-        } else {
-          quote! { &self.#field_ident }
-        };
-        let parsed_child_expr = if box_inner_type(&payload_ty).is_some() {
-          quote! { std::boxed::Box::new(parsed_child) }
-        } else {
-          quote! { parsed_child }
-        };
-        let is_generic_child = qname.is_empty();
-        let match_target = if is_generic_child {
-          quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
-        } else if tag_prefix.is_empty() {
-          quote! { #local_name_lit }
-        } else {
-          let tag_qname_lit = LitByteStr::new(
-            format!("{tag_prefix}:{local_name}").as_bytes(),
-            Span::call_site(),
-          );
-          quote! { #tag_qname_lit | #local_name_lit }
-        };
-        if is_generic_child {
-          matcher_checks.push(quote! {
-            if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(name) {
-              return true;
-            }
-          });
-        } else {
-          matcher_checks.push(quote! {
-            if matches!(name, #match_target) {
-              return true;
-            }
-          });
-        }
-        let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &qname);
-        let self_write_call =
-          write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &qname);
-        let deserialize_borrowed_call =
-          quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner };
-        let deserialize_io_call = quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner };
-
-        if contains_vec_type(&field.ty) {
-          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-          child_init_tokens.push(quote! { #field_ident });
-          child_write_tokens.push(quote! {
-            for child in &self.#field_ident {
-              #child_write_call
-            }
-          });
-          child_validate_tokens.push(quote! {
-            for child in &self.#field_ident {
-              crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-            }
-          });
-          child_dispatch_tokens_borrowed.push(quote! {
-            if matches!(event_name, #match_target) {
-              match #deserialize_borrowed_call(#xml_reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                }
-                Err(crate::common::SdkError::MissingField { .. }) => {}
-                Err(err) => return Err(err),
-              }
-              continue;
-            }
-          });
-          child_dispatch_tokens_io.push(quote! {
-            if matches!(event_name, #match_target) {
-              match #deserialize_io_call(#xml_reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                }
-                Err(crate::common::SdkError::MissingField { .. }) => {}
-                Err(err) => return Err(err),
-              }
-              continue;
-            }
-          });
-        } else {
-          child_decl_tokens.push(quote! { let mut #field_ident = None; });
-          if is_option_type(&field.ty) {
-            child_init_tokens.push(quote! { #field_ident });
-          } else {
-            child_init_tokens.push(quote! {
-              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-                stringify!(#ident),
-                stringify!(#field_ident),
-              ))?
-            });
-          }
-          if is_option_type(&field.ty) {
-            child_write_tokens.push(quote! {
-              if let Some(child) = &self.#field_ident {
-                #child_write_call
-              }
-            });
-            child_validate_tokens.push(quote! {
-              if let Some(child) = &self.#field_ident {
-                crate::validator::SdkValidator::validate_into(#validate_child_tokens, context);
-              }
-            });
-          } else {
-            child_write_tokens.push(quote! {
-              #self_write_call
-            });
-            child_validate_tokens.push(quote! {
-              crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
-            });
-          }
-          child_dispatch_tokens_borrowed.push(quote! {
-            if matches!(event_name, #match_target) {
-              match #deserialize_borrowed_call(#xml_reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                }
-                Err(crate::common::SdkError::MissingField { .. }) => {}
-                Err(err) => return Err(err),
-              }
-              continue;
-            }
-          });
-          child_dispatch_tokens_io.push(quote! {
-            if matches!(event_name, #match_target) {
-              match #deserialize_io_call(#xml_reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                }
-                Err(crate::common::SdkError::MissingField { .. }) => {}
-                Err(err) => return Err(err),
-              }
-              continue;
-            }
-          });
-        }
-      }
-      Some(SdkTypeFieldKind::EmptyChild { qname }) => {
-        let QNameInfo {
-          tag_prefix,
-          local_name,
-        } = parse_qname_info(&qname);
-        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-        let match_target = if tag_prefix.is_empty() {
-          quote! { #local_name_lit }
-        } else {
-          let tag_qname_lit = LitByteStr::new(
-            format!("{tag_prefix}:{local_name}").as_bytes(),
-            Span::call_site(),
-          );
-          quote! { #tag_qname_lit | #local_name_lit }
-        };
-        matcher_checks.push(quote! {
-          if matches!(name, #match_target) {
-            return true;
-          }
-        });
-
-        if contains_vec_type(&field.ty) {
-          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-          child_init_tokens.push(quote! { #field_ident });
-        } else {
-          child_decl_tokens.push(quote! { let mut #field_ident = None; });
-          if is_option_type(&field.ty) {
-            child_init_tokens.push(quote! { #field_ident });
-          } else {
-            child_init_tokens.push(quote! {
-              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-                stringify!(#ident),
-                stringify!(#field_ident),
-              ))?
-            });
-          }
-        }
-        child_write_tokens.push(build_empty_child_write_tokens(
-          field_ident,
-          &qname,
-          contains_vec_type(&field.ty),
-          is_option_type(&field.ty),
-        ));
-
-        let skip_tokens_borrowed = build_empty_child_skip_tokens(
-          ident,
-          &qname,
-          DeserializeMode::Borrowed,
-          &xml_reader_ident,
-        );
-        let skip_tokens_io =
-          build_empty_child_skip_tokens(ident, &qname, DeserializeMode::Io, &xml_reader_ident);
-        let assign_tokens = if contains_vec_type(&field.ty) {
-          quote! { #field_ident.push(()); }
-        } else {
-          quote! { #field_ident = Some(()); }
-        };
-        child_dispatch_tokens_borrowed.push(quote! {
-          if matches!(event_name, #match_target) {
-            #skip_tokens_borrowed
-            #assign_tokens
-            continue;
-          }
-        });
-        child_dispatch_tokens_io.push(quote! {
-          if matches!(event_name, #match_target) {
-            #skip_tokens_io
-            #assign_tokens
-            continue;
-          }
-        });
-      }
-      Some(SdkTypeFieldKind::TextChild {
-        qname,
-        simple_type,
-        list,
-      }) => {
-        let repeated = !list && contains_vec_type(&field.ty);
-        if repeated {
-          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-          child_init_tokens.push(quote! { #field_ident });
-        } else {
-          child_decl_tokens.push(quote! { let mut #field_ident = None; });
-          if is_option_type(&field.ty) {
-            child_init_tokens.push(quote! { #field_ident });
-          } else {
-            child_init_tokens.push(quote! {
-              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-                stringify!(#ident),
-                stringify!(#field_ident),
-              ))?
-            });
-          }
-        }
-        child_write_tokens.push(build_text_child_write_tokens(
-          field_ident,
-          &qname,
-          simple_type.as_deref(),
-          &field.ty,
-          repeated,
-          is_option_type(&field.ty),
-          list,
-        ));
-        let match_target = text_child_match_target(&qname);
-        matcher_checks.push(quote! {
-          if matches!(name, #match_target) {
-            return true;
-          }
-        });
-        let parse_arm = build_text_child_parse_arm(
-          ident,
-          field_ident,
-          &qname,
-          simple_type.as_deref(),
-          &field.ty,
-          quote! {},
-          TextChildParseArmOptions {
-            repeated,
-            as_result: false,
-            use_local_name_dispatch: false,
-            list,
-          },
-        );
-        let text_child_dispatch = quote! {
-          if matches!(event_name, #match_target) {
-            match event_name {
-              #parse_arm
-              _ => false,
-            };
-            continue;
-          }
-        };
-        child_dispatch_tokens_borrowed.push(text_child_dispatch.clone());
-        child_dispatch_tokens_io.push(text_child_dispatch);
-      }
-      Some(SdkTypeFieldKind::AnyChild { qname }) => {
-        if contains_vec_type(&field.ty) {
-          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
-          child_init_tokens.push(quote! { #field_ident });
-        } else {
-          child_decl_tokens.push(quote! { let mut #field_ident = None; });
-          if is_option_type(&field.ty) {
-            child_init_tokens.push(quote! { #field_ident });
-          } else {
-            child_init_tokens.push(quote! {
-              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
-                stringify!(#ident),
-                stringify!(#field_ident),
-              ))?
-            });
-          }
-        }
-        child_write_tokens.push(build_any_child_write_tokens(
-          field_ident,
-          &qname,
-          contains_vec_type(&field.ty),
-          is_option_type(&field.ty),
-        ));
-        let match_target = text_child_match_target(&qname);
-        matcher_checks.push(quote! {
-          if matches!(name, #match_target) {
-            return true;
-          }
-        });
-        let parse_arm_borrowed = build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &qname,
-          contains_vec_type(&field.ty),
-          false,
-          DeserializeMode::Borrowed,
-          quote! {},
-        );
-        let parse_arm_io = build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &qname,
-          contains_vec_type(&field.ty),
-          false,
-          DeserializeMode::Io,
-          quote! {},
-        );
-        child_dispatch_tokens_borrowed.push(quote! {
-          if matches!(event_name, #match_target) {
-            match event_name {
-              #parse_arm_borrowed
-              _ => false,
-            };
-            continue;
-          }
-        });
-        child_dispatch_tokens_io.push(quote! {
-          if matches!(event_name, #match_target) {
-            match event_name {
-              #parse_arm_io
-              _ => false,
-            };
-            continue;
-          }
-        });
-      }
-      _ => {
-        return Err(syn::Error::new_spanned(
-          field,
-          "sequence helper structs require only #[sdk(child(...))], #[sdk(text_child(...))] or #[sdk(any_child(...))] fields",
-        ));
-      }
-    }
-  }
-  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  Ok(quote! {
-    impl #impl_generics #ident #type_generics #where_clause {
-      #[inline]
-      pub(crate) fn matches_specific_start_qname(name: &[u8]) -> bool {
-        #( #matcher_checks )*
-        false
-      }
-    }
-
-    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed_inner<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        start: quick_xml::events::BytesStart<'de>,
-        empty: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut pending_event = Some((start, empty));
-
-        #( #child_decl_tokens )*
-
-        loop {
-          if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name().into_inner();
-            #( #child_dispatch_tokens_borrowed )*
-            xml_reader.unread(if next_empty {
-              quick_xml::events::Event::Empty(e)
-            } else {
-              quick_xml::events::Event::Start(e)
-            })?;
-            break;
-          }
-
-          match xml_reader.next_tag_event()? {
-            crate::common::SliceTagEvent::Start(e, next_empty) => {
-              pending_event = Some((e, next_empty));
-            }
-            crate::common::SliceTagEvent::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
-              break;
-            }
-            crate::common::SliceTagEvent::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#ident)));
-            }
-            crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
-          }
-        }
-
-        Ok(Self {
-          #( #child_init_tokens, )*
-        })
-      }
-
-      fn read_io_inner<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        start: quick_xml::events::BytesStart<'static>,
-        empty: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut pending_event = Some((start, empty));
-
-        #( #child_decl_tokens )*
-
-        loop {
-          if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name().into_inner();
-            #( #child_dispatch_tokens_io )*
-            xml_reader.unread(if next_empty {
-              quick_xml::events::Event::Empty(e)
-            } else {
-              quick_xml::events::Event::Start(e)
-            })?;
-            break;
-          }
-
-          match xml_reader.next_tag_event()? {
-            crate::common::IoTagEvent::Start(e, next_empty) => {
-              pending_event = Some((e, next_empty));
-            }
-            crate::common::IoTagEvent::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
-              break;
-            }
-            crate::common::IoTagEvent::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#ident)));
-            }
-            crate::common::IoTagEvent::Decl(_) | crate::common::IoTagEvent::Other => {}
-          }
-        }
-
-        Ok(Self {
-          #( #child_init_tokens, )*
-        })
-      }
-
-      fn write_inner<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-        _name: crate::sdk::ElementName,
-      ) -> Result<(), std::io::Error> {
-        #( #child_write_tokens )*
-        Ok(())
-      }
-    }
-
-    #[cfg(feature = "mce")]
-    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
-
-    #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        #( #child_validate_tokens )*
-      }
-    }
-  })
-}
-
 fn expand_helper_struct(
   input: &DeriveInput,
   fields: &syn::FieldsNamed,
@@ -2056,7 +2059,7 @@ fn expand_helper_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::Choice) => choice_fields.push(SdkChoiceField {
+      Some(SdkTypeFieldKind::Choice) => choice_fields.push(SdkTypeChoiceField {
         ident: field_ident.clone(),
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
@@ -2087,9 +2090,6 @@ fn expand_helper_struct(
     }
   }
 
-  let xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
-  let has_xml_other_children_field = false;
-
   let mut child_decl_tokens = Vec::new();
   let mut direct_child_case_arms: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_dispatch_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
@@ -2111,15 +2111,7 @@ fn expand_helper_struct(
   let visitor_reader_ident = Ident::new("xml_reader", Span::call_site());
   for field in &child_fields {
     let field_ident = &field.ident;
-    let xml_child_slot = xml_child_slot_by_field
-      .get(&field_ident.to_string())
-      .copied()
-      .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
     let QNameInfo {
       tag_prefix,
       local_name,
@@ -2169,27 +2161,19 @@ fn expand_helper_struct(
         if as_result {
           quote! {
               #case_index => {
-                return match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    Ok(true)
-                  },
-                  Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                  Err(err) => Err(err),
-                };
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                __ooxmlsdk_seen_child = true;
+                return Ok(true);
               },
           }
         } else {
           quote! {
               #case_index => {
-                match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    continue;
-                  },
-                  Err(crate::common::SdkError::MissingField { .. }) => continue,
-                  Err(err) => return Err(err),
-                }
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                __ooxmlsdk_seen_child = true;
+                continue;
               },
           }
         }
@@ -2197,27 +2181,19 @@ fn expand_helper_struct(
         if as_result {
           quote! {
             #case_index => {
-              return match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              };
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              __ooxmlsdk_seen_child = true;
+              return Ok(true);
             },
           }
         } else {
           quote! {
             #case_index => {
-              match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  continue;
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => continue,
-                Err(err) => return Err(err),
-              }
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              __ooxmlsdk_seen_child = true;
+              continue;
             },
           }
         }
@@ -2233,56 +2209,40 @@ fn expand_helper_struct(
         if as_result {
           quote! {
             #target => {
-              return match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              };
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident.push(#parsed_child_expr);
+              __ooxmlsdk_seen_child = true;
+              #xml_child_slot_assign
+              return Ok(true);
             },
           }
         } else {
           quote! {
             #target => {
-              match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  continue;
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => continue,
-                Err(err) => return Err(err),
-              }
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident.push(#parsed_child_expr);
+              __ooxmlsdk_seen_child = true;
+              #xml_child_slot_assign
+              continue;
             },
           }
         }
       } else if as_result {
         quote! {
           #target => {
-            return match #deserialize_call(#reader_ident, e, next_empty) {
-              Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                Ok(true)
-              },
-              Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-              Err(err) => Err(err),
-            };
+            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            #field_ident = Some(#parsed_child_expr);
+            __ooxmlsdk_seen_child = true;
+            return Ok(true);
           },
         }
       } else {
         quote! {
           #target => {
-            match #deserialize_call(#reader_ident, e, next_empty) {
-              Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                continue;
-              },
-              Err(crate::common::SdkError::MissingField { .. }) => continue,
-              Err(err) => return Err(err),
-            }
+            let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+            #field_ident = Some(#parsed_child_expr);
+            __ooxmlsdk_seen_child = true;
+            continue;
           },
         }
       }
@@ -2319,46 +2279,6 @@ fn expand_helper_struct(
         &read_borrowed_inner_ident,
       ));
       direct_child_visit_dispatch_tokens_io.push(build_dispatch(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
         &visitor_reader_ident,
         true,
         &read_io_inner_ident,
@@ -2457,46 +2377,6 @@ fn expand_helper_struct(
         true,
         &read_io_inner_ident,
       ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
-      direct_child_match_tokens_borrowed.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_match_tokens_io.push(build_match(
-        &xml_reader_ident,
-        false,
-        &read_io_inner_ident,
-      ));
-      direct_child_visit_match_tokens_borrowed.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_borrowed_inner_ident,
-      ));
-      direct_child_visit_match_tokens_io.push(build_match(
-        &visitor_reader_ident,
-        true,
-        &read_io_inner_ident,
-      ));
     }
   }
 
@@ -2541,15 +2421,7 @@ fn expand_helper_struct(
     std::collections::BTreeMap::<String, Vec<GroupedChoiceAttempt>>::new();
   for field in &choice_fields {
     let field_ident = &field.ident;
-    let xml_child_slot = xml_child_slot_by_field
-      .get(&field_ident.to_string())
-      .copied()
-      .unwrap_or_default();
-    let xml_child_slot_assign = if has_xml_other_children_field {
-      quote! { __xml_child_slot = #xml_child_slot; }
-    } else {
-      quote! {}
-    };
+    let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
       quote! { choice.as_ref() }
@@ -2685,11 +2557,13 @@ fn expand_helper_struct(
     if field.repeated {
       choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       choice_init_tokens.push(quote! { #field_ident });
-      choice_write_tokens.push(quote! {
-        for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-        }
-      });
+      choice_write_tokens.push(build_choice_write_tokens(
+        &choice_ty,
+        &field.items,
+        field_ident,
+        true,
+        false,
+      )?);
       choice_validate_tokens.push(quote! {
         for choice in &self.#field_ident {
           crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
@@ -2710,20 +2584,26 @@ fn expand_helper_struct(
         });
       }
       if field.optional {
-        choice_write_tokens.push(quote! {
-          if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-          }
-        });
+        choice_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          true,
+        )?);
         choice_validate_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
             crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
           }
         });
       } else {
-        choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
-        });
+        choice_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          false,
+        )?);
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
@@ -2785,7 +2665,7 @@ fn expand_helper_struct(
       &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: false,
@@ -2801,7 +2681,7 @@ fn expand_helper_struct(
       &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: true,
@@ -2844,7 +2724,7 @@ fn expand_helper_struct(
       field.repeated,
       false,
       DeserializeMode::Borrowed,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
     ));
     child_parse_tokens_io.push(build_any_child_parse_arm(
       ident,
@@ -2853,7 +2733,7 @@ fn expand_helper_struct(
       field.repeated,
       false,
       DeserializeMode::Io,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
     ));
     child_visit_parse_tokens_borrowed.push(build_any_child_parse_arm(
       ident,
@@ -2862,7 +2742,7 @@ fn expand_helper_struct(
       field.repeated,
       true,
       DeserializeMode::Borrowed,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
     ));
     child_visit_parse_tokens_io.push(build_any_child_parse_arm(
       ident,
@@ -2871,17 +2751,8 @@ fn expand_helper_struct(
       field.repeated,
       true,
       DeserializeMode::Io,
-      quote! {},
+      quote! { __ooxmlsdk_seen_child = true; },
     ));
-  }
-
-  if child_fields.len()
-    + empty_child_fields.len()
-    + text_child_fields.len()
-    + any_child_fields.len()
-    == fields.named.len()
-  {
-    return expand_sequence_helper_struct(input, fields);
   }
 
   let has_choice_dispatch = !choice_fields.is_empty();
@@ -2956,6 +2827,15 @@ fn expand_helper_struct(
     }
   };
   let unmatched_child_tokens_borrowed = quote! {
+    if __ooxmlsdk_seen_child {
+      let _ = event_name;
+      xml_reader.unread(if next_empty {
+        quick_xml::events::Event::Empty(e)
+      } else {
+        quick_xml::events::Event::Start(e)
+      })?;
+      break;
+    }
     return Err(crate::common::unexpected_tag(
       stringify!(#ident),
       "known child",
@@ -2963,6 +2843,15 @@ fn expand_helper_struct(
     ));
   };
   let unmatched_child_tokens_io = quote! {
+    if __ooxmlsdk_seen_child {
+      let _ = event_name;
+      xml_reader.unread(if next_empty {
+        quick_xml::events::Event::Empty(e)
+      } else {
+        quick_xml::events::Event::Start(e)
+      })?;
+      break;
+    }
     return Err(crate::common::unexpected_tag(
       stringify!(#ident),
       "known child",
@@ -2977,8 +2866,20 @@ fn expand_helper_struct(
     .iter()
     .map(mce_process_choice_field_tokens)
     .collect::<Vec<_>>();
+  let mut mce_choice_impl_keys = std::collections::HashSet::new();
+  let mce_choice_impl_tokens = choice_fields
+    .iter()
+    .filter_map(|field| {
+      let choice_ty = unwrap_option_vec_type(&field.ty);
+      mce_choice_impl_keys
+        .insert(quote! { #choice_ty }.to_string())
+        .then(|| mce_choice_impl_tokens(field))
+    })
+    .collect::<Vec<_>>();
 
   Ok(quote! {
+    #( #mce_choice_impl_tokens )*
+
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_borrowed_inner<'de>(
         xml_reader: &mut crate::common::SliceReader<'de>,
@@ -2989,6 +2890,7 @@ fn expand_helper_struct(
 
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
+        let mut __ooxmlsdk_seen_child = false;
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
@@ -3012,7 +2914,10 @@ fn expand_helper_struct(
               #main_dispatch_tokens_borrowed
               #unmatched_child_tokens_borrowed
             }
-            quick_xml::events::Event::End(_) => {
+            quick_xml::events::Event::End(e) => {
+              if __ooxmlsdk_seen_child {
+                xml_reader.unread(quick_xml::events::Event::End(e))?;
+              }
               break;
             }
             quick_xml::events::Event::Eof => {
@@ -3037,6 +2942,7 @@ fn expand_helper_struct(
 
         #( #child_decl_tokens )*
         #( #choice_decl_tokens )*
+        let mut __ooxmlsdk_seen_child = false;
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
@@ -3047,7 +2953,12 @@ fn expand_helper_struct(
 
           let next_event = match xml_reader.next_tag_event()? {
             crate::common::IoTagEvent::Start(e, next_empty) => Some((e, next_empty)),
-            crate::common::IoTagEvent::End(_) => break,
+            crate::common::IoTagEvent::End(e) => {
+              if __ooxmlsdk_seen_child {
+                xml_reader.unread(quick_xml::events::Event::End(e))?;
+              }
+              break;
+            }
             crate::common::IoTagEvent::Eof => {
               return Err(crate::common::unexpected_eof(stringify!(#ident)));
             }
@@ -3070,11 +2981,10 @@ fn expand_helper_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        _name: crate::sdk::ElementName,
-      ) -> Result<(), std::io::Error> {
+      ) -> Result<bool, std::io::Error> {
         #( #child_write_tokens )*
         #( #choice_write_tokens )*
-        Ok(())
+        Ok(true)
       }
     }
     #[cfg(feature = "validators")]
@@ -3204,7 +3114,12 @@ fn expand_named_struct(
         "missing #[sdk(...)] field attribute",
       ));
     };
-    ordered_field_specs.push((field_ident.clone(), field.ty.clone(), field_kind.clone()));
+    ordered_field_specs.push((
+      field_ident.clone(),
+      field.ty.clone(),
+      field_kind.clone(),
+      parsed_attrs.choice_items.clone(),
+    ));
 
     match field_kind {
       SdkTypeFieldKind::Attr {
@@ -3252,7 +3167,7 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      SdkTypeFieldKind::Choice => choice_fields.push(SdkChoiceField {
+      SdkTypeFieldKind::Choice => choice_fields.push(SdkTypeChoiceField {
         ident: field_ident.clone(),
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
@@ -3309,7 +3224,7 @@ fn expand_named_struct(
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
-  for (field_ident, _, field_kind) in &ordered_field_specs {
+  for (field_ident, _, field_kind, _) in &ordered_field_specs {
     if matches!(
       field_kind,
       SdkTypeFieldKind::Child { .. }
@@ -3787,56 +3702,36 @@ fn expand_named_struct(
           if as_result {
             quote! {
               #case_index => {
-                return match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    Ok(true)
-                  },
-                  Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                  Err(err) => Err(err),
-                };
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                return Ok(true);
               },
             }
           } else {
             quote! {
               #case_index => {
-                match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                    #field_ident.push(#parsed_child_expr);
-                    continue;
-                  },
-                  Err(crate::common::SdkError::MissingField { .. }) => continue,
-                  Err(err) => return Err(err),
-                }
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                continue;
               },
             }
           }
         } else if as_result {
           quote! {
             #case_index => {
-              return match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  Ok(true)
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              };
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              return Ok(true);
             },
           }
         } else {
           quote! {
             #case_index => {
-              match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                  #field_ident = Some(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  continue;
-                },
-                Err(crate::common::SdkError::MissingField { .. }) => continue,
-                Err(err) => return Err(err),
-              }
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              continue;
             },
           }
         }
@@ -3891,58 +3786,38 @@ fn expand_named_struct(
           if as_result {
             quote! {
               #target => {
-                return match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  Ok(true)
-                },
-                  Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                  Err(err) => Err(err),
-                };
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                #xml_child_slot_assign
+                return Ok(true);
               },
             }
           } else {
             quote! {
               #target => {
-                match #deserialize_call(#reader_ident, e, next_empty) {
-                  Ok(parsed_child) => {
-                  #field_ident.push(#parsed_child_expr);
-                  #xml_child_slot_assign
-                  continue;
-                },
-                  Err(crate::common::SdkError::MissingField { .. }) => continue,
-                  Err(err) => return Err(err),
-                }
+                let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+                #field_ident.push(#parsed_child_expr);
+                #xml_child_slot_assign
+                continue;
               },
             }
           }
         } else if as_result {
           quote! {
             #target => {
-              return match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                #xml_child_slot_assign
-                Ok(true)
-              },
-                Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
-                Err(err) => Err(err),
-              };
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              return Ok(true);
             },
           }
         } else {
           quote! {
             #target => {
-              match #deserialize_call(#reader_ident, e, next_empty) {
-                Ok(parsed_child) => {
-                #field_ident = Some(#parsed_child_expr);
-                #xml_child_slot_assign
-                continue;
-              },
-                Err(crate::common::SdkError::MissingField { .. }) => continue,
-                Err(err) => return Err(err),
-              }
+              let parsed_child = #deserialize_call(#reader_ident, e, next_empty)?;
+              #field_ident = Some(#parsed_child_expr);
+              #xml_child_slot_assign
+              continue;
             },
           }
         }
@@ -4434,7 +4309,7 @@ fn expand_named_struct(
     .collect::<std::collections::HashMap<_, _>>();
   let mut required_before_choice = std::collections::HashMap::<String, Vec<Ident>>::new();
   let mut prior_required_children = Vec::<Ident>::new();
-  for (field_ident, _, field_kind) in &ordered_field_specs {
+  for (field_ident, _, field_kind, _) in &ordered_field_specs {
     match field_kind {
       SdkTypeFieldKind::Choice => {
         required_before_choice.insert(field_ident.to_string(), prior_required_children.clone());
@@ -4469,22 +4344,25 @@ fn expand_named_struct(
       if field.accepts_text == Some(false) {
         return quote! {};
       }
+      let text_variant = field.items.iter().find_map(|item| match item {
+        SdkTypeChoiceItem::Text { variant } => Some(variant),
+        _ => None,
+      });
+      let Some(text_variant) = text_variant else {
+        return quote! {};
+      };
       if field.repeated {
         quote! {
-          if let Some(parsed_choice) = <#choice_ty as crate::sdk::SdkChoice>::from_text_value(#string_expr) {
-            #field_ident.push(parsed_choice);
-            #xml_child_slot_assign
-            handled_text = true;
-          }
+          #field_ident.push(#choice_ty::#text_variant(#string_expr.to_string()));
+          #xml_child_slot_assign
+          handled_text = true;
         }
       } else {
         quote! {
           if !handled_text {
-            if let Some(parsed_choice) = <#choice_ty as crate::sdk::SdkChoice>::from_text_value(#string_expr) {
-              #field_ident = Some(parsed_choice);
-              #xml_child_slot_assign
-              handled_text = true;
-            }
+            #field_ident = Some(#choice_ty::#text_variant(#string_expr.to_string()));
+            #xml_child_slot_assign
+            handled_text = true;
           }
         }
       }
@@ -4575,7 +4453,7 @@ fn expand_named_struct(
       };
       for item in &field.items {
         match item {
-          SdkTypeChoiceItem::Child { variant, qname } => {
+          SdkTypeChoiceItem::Child { variant, qname, .. } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
             flat_choice_match_tokens_borrowed.push(quote! {
               #( #targets )|* => {
@@ -4718,50 +4596,14 @@ fn expand_named_struct(
               }
             });
           }
-          SdkTypeChoiceItem::TextChild { variant, qname } => {
+          SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
             let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let QNameInfo {
-              tag_prefix,
-              local_name,
-            } = parse_qname_info(qname);
-            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-            let tag_qname_lit = LitByteStr::new(
-              format!("{tag_prefix}:{local_name}").as_bytes(),
-              Span::call_site(),
-            );
             let parsed_tokens = quote! {
               let parsed_child = if next_empty {
                 crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
               } else {
-                let mut text = None;
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Text(t) => {
-                      crate::common::push_xml_text(&mut text, t)?;
-                    }
-                    quick_xml::events::Event::GeneralRef(t) => {
-                      crate::common::push_xml_general_ref(
-                        &mut text,
-                        t,
-                        stringify!(#ident),
-                        stringify!(#variant),
-                      )?;
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-                let value = text.unwrap_or_default();
-                crate::common::parse_value::<_>(&value, stringify!(#ident), stringify!(#variant))?
+                let value = xml_reader.read_text(e.name())?;
+                crate::common::parse_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
               };
             };
             let assign_tokens = if field.repeated {
@@ -4917,8 +4759,8 @@ fn expand_named_struct(
                 | SdkTypeChoiceItem::TextChild { qname, .. }
                 | SdkTypeChoiceItem::AnyChild { qname, .. } => Some(qname),
                 SdkTypeChoiceItem::Sequence { .. }
-                | SdkTypeChoiceItem::Any
-                | SdkTypeChoiceItem::Text => None,
+                | SdkTypeChoiceItem::Any { .. }
+                | SdkTypeChoiceItem::Text { .. } => None,
               })
               .collect::<Vec<_>>();
             let sequence_qnames = children
@@ -5010,50 +4852,13 @@ fn expand_named_struct(
                         }
                       }
                       SdkTypeChoiceSequenceChildKind::TextChild => {
-                        let QNameInfo {
-                          tag_prefix,
-                          local_name,
-                        } = parse_qname_info(&child.qname);
-                        let local_name_lit =
-                          LitByteStr::new(local_name.as_bytes(), Span::call_site());
-                        let tag_qname_lit = LitByteStr::new(
-                          format!("{tag_prefix}:{local_name}").as_bytes(),
-                          Span::call_site(),
-                        );
                         quote! {
                           #( #targets )|* => {
                             let parsed_value = if next_empty {
                               crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
                             } else {
-                              let mut text = None;
-                              loop {
-                                match xml_reader.next()? {
-                                  quick_xml::events::Event::Text(t) => {
-                                    crate::common::push_xml_text(&mut text, t)?;
-                                  }
-                                  quick_xml::events::Event::GeneralRef(t) => {
-                                    crate::common::push_xml_general_ref(
-                                      &mut text,
-                                      t,
-                                      stringify!(#ident),
-                                      stringify!(#field_ident),
-                                    )?;
-                                  }
-                                  quick_xml::events::Event::End(end) => {
-                                    if end.name().as_ref() == #tag_qname_lit
-                                      || end.name().as_ref() == #local_name_lit
-                                    {
-                                      break;
-                                    }
-                                  }
-                                  quick_xml::events::Event::Eof => {
-                                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                                  }
-                                  _ => {}
-                                }
-                              }
-                              let value = text.unwrap_or_default();
-                              crate::common::parse_value::<#value_ty>(&value, stringify!(#ident), stringify!(#field_ident))?
+                              let value = xml_reader.read_text(e.name())?;
+                              crate::common::parse_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
                             };
                             #field_ident = Some(parsed_value);
                             continue;
@@ -5212,12 +5017,12 @@ fn expand_named_struct(
               }
             });
           }
-          SdkTypeChoiceItem::Any => {
+          SdkTypeChoiceItem::Any { variant } => {
             flat_choice_has_wildcard = true;
             let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::XmlAny(xml)); }
+              quote! { #field_ident.push(#choice_ty::#variant(xml)); }
             } else {
-              quote! { #field_ident = Some(#choice_ty::XmlAny(xml)); }
+              quote! { #field_ident = Some(#choice_ty::#variant(xml)); }
             };
             flat_choice_match_tokens_borrowed.push(quote! {
               _ => {
@@ -5268,7 +5073,7 @@ fn expand_named_struct(
               }
             });
           }
-          SdkTypeChoiceItem::Text => {}
+          SdkTypeChoiceItem::Text { .. } => {}
         }
       }
     }
@@ -5375,7 +5180,7 @@ fn expand_named_struct(
 
       for item in &field.items {
         match item {
-          SdkTypeChoiceItem::Child { variant, qname } => {
+          SdkTypeChoiceItem::Child { variant, qname, .. } => {
             let targets = grouped_choice_match_target_keys(std::slice::from_ref(qname));
             let borrowed_parse = quote! {
               let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
@@ -5454,50 +5259,14 @@ fn expand_named_struct(
               io_parse,
             );
           }
-          SdkTypeChoiceItem::TextChild { variant, qname } => {
+          SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
             let targets = grouped_choice_match_target_keys(std::slice::from_ref(qname));
-            let QNameInfo {
-              tag_prefix,
-              local_name,
-            } = parse_qname_info(qname);
-            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-            let tag_qname_lit = LitByteStr::new(
-              format!("{tag_prefix}:{local_name}").as_bytes(),
-              Span::call_site(),
-            );
             let parsed_tokens = quote! {
               let parsed_child = if next_empty {
                 crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
               } else {
-                let mut text = None;
-                loop {
-                  match xml_reader.next()? {
-                    quick_xml::events::Event::Text(t) => {
-                      crate::common::push_xml_text(&mut text, t)?;
-                    }
-                    quick_xml::events::Event::GeneralRef(t) => {
-                      crate::common::push_xml_general_ref(
-                        &mut text,
-                        t,
-                        stringify!(#ident),
-                        stringify!(#variant),
-                      )?;
-                    }
-                    quick_xml::events::Event::End(end) => {
-                      if end.name().as_ref() == #tag_qname_lit
-                        || end.name().as_ref() == #local_name_lit
-                      {
-                        break;
-                      }
-                    }
-                    quick_xml::events::Event::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    _ => {}
-                  }
-                }
-                let value = text.unwrap_or_default();
-                crate::common::parse_value::<_>(&value, stringify!(#ident), stringify!(#variant))?
+                let value = xml_reader.read_text(e.name())?;
+                crate::common::parse_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
               };
             };
             let assign_tokens = if field.repeated {
@@ -5618,8 +5387,8 @@ fn expand_named_struct(
                 | SdkTypeChoiceItem::TextChild { qname, .. }
                 | SdkTypeChoiceItem::AnyChild { qname, .. } => Some(qname),
                 SdkTypeChoiceItem::Sequence { .. }
-                | SdkTypeChoiceItem::Any
-                | SdkTypeChoiceItem::Text => None,
+                | SdkTypeChoiceItem::Any { .. }
+                | SdkTypeChoiceItem::Text { .. } => None,
               })
               .collect::<Vec<_>>();
             let sequence_qnames = children
@@ -5711,50 +5480,13 @@ fn expand_named_struct(
                         }
                       }
                       SdkTypeChoiceSequenceChildKind::TextChild => {
-                        let QNameInfo {
-                          tag_prefix,
-                          local_name,
-                        } = parse_qname_info(&child.qname);
-                        let local_name_lit =
-                          LitByteStr::new(local_name.as_bytes(), Span::call_site());
-                        let tag_qname_lit = LitByteStr::new(
-                          format!("{tag_prefix}:{local_name}").as_bytes(),
-                          Span::call_site(),
-                        );
                         quote! {
                           #( #targets )|* => {
                             let parsed_value = if next_empty {
                               crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
                             } else {
-                              let mut text = None;
-                              loop {
-                                match xml_reader.next()? {
-                                  quick_xml::events::Event::Text(t) => {
-                                    crate::common::push_xml_text(&mut text, t)?;
-                                  }
-                                  quick_xml::events::Event::GeneralRef(t) => {
-                                    crate::common::push_xml_general_ref(
-                                      &mut text,
-                                      t,
-                                      stringify!(#ident),
-                                      stringify!(#field_ident),
-                                    )?;
-                                  }
-                                  quick_xml::events::Event::End(end) => {
-                                    if end.name().as_ref() == #tag_qname_lit
-                                      || end.name().as_ref() == #local_name_lit
-                                    {
-                                      break;
-                                    }
-                                  }
-                                  quick_xml::events::Event::Eof => {
-                                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                                  }
-                                  _ => {}
-                                }
-                              }
-                              let value = text.unwrap_or_default();
-                              crate::common::parse_value::<#value_ty>(&value, stringify!(#ident), stringify!(#field_ident))?
+                              let value = xml_reader.read_text(e.name())?;
+                              crate::common::parse_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
                             };
                             #field_ident = Some(parsed_value);
                             continue;
@@ -5883,7 +5615,7 @@ fn expand_named_struct(
               io_parse,
             );
           }
-          SdkTypeChoiceItem::Any | SdkTypeChoiceItem::Text => {}
+          SdkTypeChoiceItem::Any { .. } | SdkTypeChoiceItem::Text { .. } => {}
         }
       }
     }
@@ -6006,11 +5738,13 @@ fn expand_named_struct(
     if field.repeated {
       choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       choice_init_tokens.push(quote! { #field_ident });
-      choice_write_tokens.push(quote! {
-        for choice in &self.#field_ident {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-        }
-      });
+      choice_write_tokens.push(build_choice_write_tokens(
+        &choice_ty,
+        &field.items,
+        field_ident,
+        true,
+        false,
+      )?);
       choice_validate_tokens.push(quote! {
         for choice in &self.#field_ident {
           crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
@@ -6032,20 +5766,26 @@ fn expand_named_struct(
         });
       }
       if field.optional {
-        choice_write_tokens.push(quote! {
-          if let Some(choice) = &self.#field_ident {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-          }
-        });
+        choice_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          true,
+        )?);
         choice_validate_tokens.push(quote! {
           if let Some(choice) = &self.#field_ident {
             crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
           }
         });
       } else {
-        choice_write_tokens.push(quote! {
-          <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
-        });
+        choice_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          false,
+        )?);
         choice_validate_tokens.push(quote! {
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
@@ -6199,7 +5939,7 @@ fn expand_named_struct(
       || field
         .items
         .iter()
-        .any(|item| matches!(item, SdkTypeChoiceItem::Any))
+        .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
   });
   let has_non_any_choice_dispatch = choice_fields
     .iter()
@@ -6590,21 +6330,7 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
-  let xml_other_children_write_setup_tokens =
-    if has_xml_other_children_field && !compact_xml_other_children {
-      let xml_other_children_slot_count = xml_child_slot_count + 1usize;
-      quote! {
-        let mut xml_other_children_by_slot: [Vec<&[u8]>; #xml_other_children_slot_count] =
-          std::array::from_fn(|_| Vec::new());
-        for (slot, xml) in &self.xml_other_children {
-          if *slot < #xml_other_children_slot_count {
-            xml_other_children_by_slot[*slot].push(xml.as_ref());
-          }
-        }
-      }
-    } else {
-      quote! {}
-    };
+  let xml_other_children_write_setup_tokens = quote! {};
   let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
     if compact_xml_other_children {
       quote! {
@@ -6614,15 +6340,17 @@ fn expand_named_struct(
       }
     } else {
       quote! {
-        for xml in &xml_other_children_by_slot[#xml_child_slot_count] {
-          writer.write_all(xml)?;
+        for (slot, xml) in &self.xml_other_children {
+          if *slot == #xml_child_slot_count {
+            writer.write_all(xml.as_ref())?;
+          }
         }
       }
     }
   } else {
     quote! {}
   };
-  for (field_ident, field_ty, field_kind) in &ordered_field_specs {
+  for (field_ident, field_ty, field_kind, choice_items) in &ordered_field_specs {
     if has_xml_other_children_field
       && !compact_xml_other_children
       && matches!(
@@ -6641,8 +6369,10 @@ fn expand_named_struct(
         .unwrap_or_default()
         .saturating_sub(1usize);
       ordered_write_tokens.push(quote! {
-        for xml in &xml_other_children_by_slot[#xml_other_slot] {
-          writer.write_all(xml)?;
+        for (slot, xml) in &self.xml_other_children {
+          if *slot == #xml_other_slot {
+            writer.write_all(xml.as_ref())?;
+          }
         }
       });
     }
@@ -6709,23 +6439,13 @@ fn expand_named_struct(
         let choice_ty = unwrap_wrapped_type(field_ty);
         let repeated = contains_vec_type(field_ty);
         let optional = is_option_type(field_ty);
-        if repeated {
-          ordered_write_tokens.push(quote! {
-            for choice in &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-            }
-          });
-        } else if optional {
-          ordered_write_tokens.push(quote! {
-            if let Some(choice) = &self.#field_ident {
-              <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer)?;
-            }
-          });
-        } else {
-          ordered_write_tokens.push(quote! {
-            <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer)?;
-          });
-        }
+        ordered_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          choice_items,
+          field_ident,
+          repeated,
+          optional,
+        )?);
       }
       SdkTypeFieldKind::Any => {
         let repeated = contains_vec_type(field_ty);
@@ -6918,8 +6638,11 @@ fn expand_named_struct(
           if let Some(accepts_text) = field.accepts_text {
             quote! { #accepts_text }
           } else {
-            let choice_ty = unwrap_wrapped_type(&field.ty);
-            quote! { <#choice_ty as crate::sdk::SdkChoice>::accepts_text() }
+            let accepts_text = field
+              .items
+              .iter()
+              .any(|item| matches!(item, SdkTypeChoiceItem::Text { .. }));
+            quote! { #accepts_text }
           }
         })
         .collect();
@@ -7348,11 +7071,11 @@ fn expand_named_struct(
       writer.write_all(b">")?;
       #xml_other_children_write_setup_tokens
       #( #ordered_write_tokens )*
-      crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
+      Ok(true)
     }
   } else {
     quote! {
-      writer.write_all(b" />")?;
+      Ok(false)
     }
   };
   let mce_child_process_tokens = child_fields
@@ -7362,6 +7085,16 @@ fn expand_named_struct(
   let mce_choice_process_tokens = choice_fields
     .iter()
     .map(mce_process_choice_field_tokens)
+    .collect::<Vec<_>>();
+  let mut mce_choice_impl_keys = std::collections::HashSet::new();
+  let mce_choice_impl_tokens = choice_fields
+    .iter()
+    .filter_map(|field| {
+      let choice_ty = unwrap_option_vec_type(&field.ty);
+      mce_choice_impl_keys
+        .insert(quote! { #choice_ty }.to_string())
+        .then(|| mce_choice_impl_tokens(field))
+    })
     .collect::<Vec<_>>();
   let (mce_context_push_tokens, mce_xml_other_attrs_process_tokens, mce_context_pop_tokens) =
     mce_context_scope_tokens(&xmlns_fields, xml_other_attrs_field.as_ref());
@@ -7402,11 +7135,14 @@ fn expand_named_struct(
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
         #xml_header_tokens
-        <Self as crate::sdk::SdkType>::write_inner(
-          self,
-          writer,
-          #element_name,
-        )
+        let name = #element_name;
+        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
+        if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
+          crate::common::write_end_tag_bytes(writer, name.prefix, name.local)?;
+        } else {
+          writer.write_all(b" />")?;
+        }
+        Ok(())
       }
 
       pub fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
@@ -7434,6 +7170,8 @@ fn expand_named_struct(
     }
   };
   Ok(quote! {
+    #( #mce_choice_impl_tokens )*
+
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       const ELEMENT_NAME: crate::sdk::ElementName =
         crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit);
@@ -7503,14 +7241,11 @@ fn expand_named_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-        name: crate::sdk::ElementName,
-      ) -> Result<(), std::io::Error> {
-        crate::common::write_start_tag_open_bytes(writer, name.prefix, name.local)?;
+      ) -> Result<bool, std::io::Error> {
         #special_namespace_write_tokens
         #( #attr_write_tokens )*
         #xml_other_attrs_write_tokens
         #body_write_tokens
-        Ok(())
       }
 
       #[inline]

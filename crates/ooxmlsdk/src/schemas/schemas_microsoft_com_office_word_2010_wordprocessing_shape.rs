@@ -298,28 +298,28 @@ pub struct TextBodyProperties {
   #[sdk(child(qname = "a:extLst"))]
   pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WordprocessingShapeChoice {
   /// Defines the NonVisualDrawingShapeProperties Class.
   NonVisualDrawingShapeProperties(std::boxed::Box<NonVisualDrawingShapeProperties>),
   /// Defines the NonVisualConnectorProperties Class.
   NonVisualConnectorProperties(std::boxed::Box<NonVisualConnectorProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WordprocessingShapeChoice2 {
   /// Defines the TextBoxInfo2 Class.
   TextBoxInfo2(std::boxed::Box<TextBoxInfo2>),
   /// Defines the LinkedTextBox Class.
   LinkedTextBox(std::boxed::Box<LinkedTextBox>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   CustomGeometry(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   PresetGeometry(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -332,28 +332,25 @@ pub enum ShapePropertiesChoice2 {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
-  #[sdk(empty_child(qname = "a:noAutofit"))]
   NoAutoFit,
   /// Normal AutoFit.
   NormalAutoFit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
-  #[sdk(empty_child(qname = "a:spAutoFit"))]
   ShapeAutoFit,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   Shape3DType(std::boxed::Box<crate::schemas::a::Shape3DType>),

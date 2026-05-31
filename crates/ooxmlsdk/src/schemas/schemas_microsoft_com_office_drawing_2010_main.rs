@@ -797,7 +797,7 @@ pub struct Transform2D {
   #[sdk(child(qname = "a:ext"))]
   pub extents: Option<crate::schemas::a::Extents>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HiddenFillPropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -810,10 +810,9 @@ pub enum HiddenFillPropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
-  #[sdk(empty_child(qname = "a:grpFill"))]
   GroupFill,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice {
   /// Defines the NoFill Class.
   NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
@@ -824,32 +823,30 @@ pub enum HiddenLinePropertiesChoice {
   /// Pattern Fill.
   PatternFill(std::boxed::Box<crate::schemas::a::PatternFill>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice2 {
   /// Preset Dash.
   PresetDash(std::boxed::Box<crate::schemas::a::PresetDash>),
   /// Custom Dash.
   CustomDash(std::boxed::Box<crate::schemas::a::CustomDash>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HiddenLinePropertiesChoice3 {
   /// Round Line Join.
-  #[sdk(empty_child(qname = "a:round"))]
   Round,
   /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:bevel"))]
   LineJoinBevel,
   /// Miter Line Join.
   Miter(std::boxed::Box<crate::schemas::a::Miter>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HiddenEffectsPropertiesChoice {
   /// Effect Container.
   EffectList(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ImageEffectChoice {
   /// Defines the ArtisticBlur Class.
   ArtisticBlur(std::boxed::Box<ArtisticBlur>),

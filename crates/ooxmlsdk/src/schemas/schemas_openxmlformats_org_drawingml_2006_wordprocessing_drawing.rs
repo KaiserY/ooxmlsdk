@@ -464,10 +464,9 @@ pub type VerticalAlignment = VerticalAlignmentValues;
 pub type PositionOffset = crate::simple_type::Int32Value;
 /// Relative Horizontal Alignment.
 pub type HorizontalAlignment = HorizontalAlignmentValues;
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnchorChoice {
   /// No Text Wrapping.
-  #[sdk(empty_child(qname = "wp:wrapNone"))]
   WrapNone,
   /// Square Wrapping.
   WrapSquare(std::boxed::Box<WrapSquare>),
@@ -478,27 +477,21 @@ pub enum AnchorChoice {
   /// Top and Bottom Wrapping.
   WrapTopBottom(std::boxed::Box<WrapTopBottom>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HorizontalPositionChoice {
   /// Relative Horizontal Alignment.
-  #[sdk(text_child(qname = "wp:align"))]
   HorizontalAlignment(HorizontalAlignment),
   /// Defines the PositionOffset Class.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "wp:posOffset"))]
   PositionOffset(PositionOffset),
   /// Defines the PercentagePositionHeightOffset Class.
-  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosHOffset"))]
   PercentagePositionHeightOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VerticalPositionChoice {
   /// Relative Vertical Alignment.
-  #[sdk(text_child(qname = "wp:align"))]
   VerticalAlignment(VerticalAlignment),
   /// Defines the PositionOffset Class.
-  #[sdk(text_child(simple_type = "Int32Value", qname = "wp:posOffset"))]
   PositionOffset(PositionOffset),
   /// Defines the PercentagePositionVerticalOffset Class.
-  #[sdk(text_child(simple_type = "DrawingmlPercentageValue", qname = "wp14:pctPosVOffset"))]
   PercentagePositionVerticalOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
 }

@@ -240,32 +240,28 @@ pub struct RichSortCondition {
   #[sdk(attr(qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FilterColumnChoice {
   /// Filter Criteria.
   Filters(std::boxed::Box<crate::schemas::x::Filters>),
   /// Top 10.
   Top10(std::boxed::Box<crate::schemas::x::Top10>),
   /// Defines the CustomFilters Class.
-  #[sdk(child(qname = "x14:customFilters"))]
   X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
   /// Custom Filters.
-  #[sdk(child(qname = "x:customFilters"))]
   XCustomFilters(std::boxed::Box<crate::schemas::x::CustomFilters>),
   /// Dynamic Filter.
   DynamicFilter(std::boxed::Box<crate::schemas::x::DynamicFilter>),
   /// Color Filter Criteria.
   ColorFilter(std::boxed::Box<crate::schemas::x::ColorFilter>),
   /// Defines the IconFilter Class.
-  #[sdk(child(qname = "x14:iconFilter"))]
   X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
   /// Icon Filter.
-  #[sdk(child(qname = "x:iconFilter"))]
   XIconFilter(std::boxed::Box<crate::schemas::x::IconFilter>),
   /// Defines the ExtensionList Class.
   ExtensionList(std::boxed::Box<crate::schemas::x::ExtensionList>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SortRuleChoice {
   /// Defines the SortCondition Class.
   SortCondition(std::boxed::Box<SortCondition>),

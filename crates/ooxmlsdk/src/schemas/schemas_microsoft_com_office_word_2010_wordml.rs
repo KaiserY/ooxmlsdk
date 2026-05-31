@@ -1884,7 +1884,7 @@ pub struct OfficeArtExtensionList {
   #[sdk(child(qname = "a:ext"))]
   pub extension: Vec<crate::schemas::a::Extension>,
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunConflictInsertionChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
@@ -1991,17 +1991,15 @@ pub enum RunConflictInsertionChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RunConflictDeletionChoice {
   /// Defines the SdtRun Class.
   SdtRun(std::boxed::Box<crate::schemas::w::SdtRun>),
@@ -2108,17 +2106,15 @@ pub enum RunConflictDeletionChoice {
   /// Superscript Function.
   Superscript(std::boxed::Box<crate::schemas::m::Superscript>),
   /// Defines the Run Class.
-  #[sdk(child(qname = "m:r"))]
   MRun(std::boxed::Box<crate::schemas::m::Run>),
   /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:r"))]
   WRun(std::boxed::Box<crate::schemas::w::Run>),
   /// Defines the BidirectionalOverride Class.
   BidirectionalOverride(std::boxed::Box<crate::schemas::w::BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
   BidirectionalEmbedding(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RgbColorModelHexChoice {
   /// Defines the Tint Class.
   Tint(std::boxed::Box<Tint>),
@@ -2141,7 +2137,7 @@ pub enum RgbColorModelHexChoice {
   /// Defines the LuminanceModulation Class.
   LuminanceModulation(std::boxed::Box<LuminanceModulation>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SchemeColorChoice {
   /// Defines the Tint Class.
   Tint(std::boxed::Box<Tint>),
@@ -2164,80 +2160,76 @@ pub enum SchemeColorChoice {
   /// Defines the LuminanceModulation Class.
   LuminanceModulation(std::boxed::Box<LuminanceModulation>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SolidColorFillPropertiesChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GradientFillPropertiesChoice {
   /// Defines the LinearShadeProperties Class.
   LinearShadeProperties(std::boxed::Box<LinearShadeProperties>),
   /// Defines the PathShadeProperties Class.
   PathShadeProperties(std::boxed::Box<PathShadeProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GlowChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ShadowChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextOutlineEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(qname = "w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),
   /// Defines the GradientFillProperties Class.
   GradientFillProperties(std::boxed::Box<GradientFillProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextOutlineEffectChoice2 {
   /// Defines the RoundEmpty Class.
-  #[sdk(empty_child(qname = "w14:round"))]
   RoundEmpty,
   /// Defines the BevelEmpty Class.
-  #[sdk(empty_child(qname = "w14:bevel"))]
   BevelEmpty,
   /// Defines the LineJoinMiterProperties Class.
   LineJoinMiterProperties(std::boxed::Box<LineJoinMiterProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FillTextEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(qname = "w14:noFill"))]
   NoFillEmpty,
   /// Defines the SolidColorFillProperties Class.
   SolidColorFillProperties(std::boxed::Box<SolidColorFillProperties>),
   /// Defines the GradientFillProperties Class.
   GradientFillProperties(std::boxed::Box<GradientFillProperties>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GradientStopChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExtrusionColorChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
   SchemeColor(std::boxed::Box<SchemeColor>),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ContourColorChoice {
   /// Defines the RgbColorModelHex Class.
   RgbColorModelHex(std::boxed::Box<RgbColorModelHex>),

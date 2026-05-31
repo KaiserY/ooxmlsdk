@@ -2229,26 +2229,7 @@ fn expand_helper_struct(
     }
   }
 
-  let mut specific_choice_qname_counts = std::collections::HashMap::<String, usize>::new();
-  for field in &choice_fields {
-    if field.accepts_any.unwrap_or(false) {
-      continue;
-    }
-    let mut seen = std::collections::HashSet::new();
-    for qname in &field.specific_qnames {
-      if seen.insert(qname) {
-        *specific_choice_qname_counts
-          .entry(qname.clone())
-          .or_insert(0usize) += 1usize;
-      }
-    }
-  }
-
   let mut choice_decl_tokens = Vec::new();
-  let choice_match_init_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let choice_match_decl_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let mut choice_parse_tokens = Vec::new();
-  let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   let mut choice_validate_tokens = Vec::new();
@@ -2280,8 +2261,6 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
         }
       });
-      choice_parse_tokens.push(quote! {});
-      choice_visit_parse_tokens.push(quote! {});
     } else {
       choice_decl_tokens.push(quote! { let mut #field_ident = None; });
       if field.optional {
@@ -2319,13 +2298,8 @@ fn expand_helper_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      choice_parse_tokens.push(quote! {});
-      choice_visit_parse_tokens.push(quote! {});
     }
   }
-
-  let choice_match_count_decl_tokens = quote! {};
-  let choice_match_conflict_tokens = quote! {};
 
   for field in &text_child_fields {
     let field_ident = &field.ident;
@@ -2450,71 +2424,24 @@ fn expand_helper_struct(
     ));
   }
 
-  let has_choice_dispatch = !choice_fields.is_empty();
-  let main_dispatch_tokens_borrowed = if !has_choice_dispatch {
-    quote! {
-      let matched = match event_name {
-        #( #direct_child_match_tokens_borrowed )*
-        #( #child_parse_tokens_borrowed )*
-        _ => false,
-      };
-      if matched {
-        continue;
-      }
-    }
-  } else {
-    quote! {
-      #( #choice_match_init_tokens )*
-      let matched = match event_name {
-        #( #direct_child_match_tokens_borrowed )*
-        #( #child_parse_tokens_borrowed )*
-        _ => {
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #choice_match_conflict_tokens
-          }
-          let mut matched = false;
-          #( #choice_parse_tokens )*
-          matched
-        }
-      };
-      if matched {
-        continue;
-      }
+  let main_dispatch_tokens_borrowed = quote! {
+    let matched = match event_name {
+      #( #direct_child_match_tokens_borrowed )*
+      #( #child_parse_tokens_borrowed )*
+      _ => false,
+    };
+    if matched {
+      continue;
     }
   };
-  let main_dispatch_tokens_io = if !has_choice_dispatch {
-    quote! {
-      let matched = match event_name {
-        #( #direct_child_match_tokens_io )*
-        #( #child_parse_tokens_io )*
-        _ => false,
-      };
-      if matched {
-        continue;
-      }
-    }
-  } else {
-    quote! {
-      #( #choice_match_init_tokens )*
-      let matched = match event_name {
-        #( #direct_child_match_tokens_io )*
-        #( #child_parse_tokens_io )*
-        _ => {
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #choice_match_conflict_tokens
-          }
-          let mut matched = false;
-          #( #choice_parse_tokens )*
-          matched
-        }
-      };
-      if matched {
-        continue;
-      }
+  let main_dispatch_tokens_io = quote! {
+    let matched = match event_name {
+      #( #direct_child_match_tokens_io )*
+      #( #child_parse_tokens_io )*
+      _ => false,
+    };
+    if matched {
+      continue;
     }
   };
   let unmatched_child_tokens_borrowed = quote! {
@@ -3870,10 +3797,6 @@ fn expand_named_struct(
   }
 
   let mut choice_decl_tokens = Vec::new();
-  let choice_match_init_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let choice_match_decl_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let mut choice_parse_tokens = Vec::new();
-  let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   let mut choice_text_parse_tokens = Vec::new();
@@ -5237,8 +5160,6 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
         }
       });
-      choice_parse_tokens.push(quote! {});
-      choice_visit_parse_tokens.push(quote! {});
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     } else {
       choice_decl_tokens.push(quote! { let mut #field_ident = None; });
@@ -5277,8 +5198,6 @@ fn expand_named_struct(
           crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
         });
       }
-      choice_parse_tokens.push(quote! {});
-      choice_visit_parse_tokens.push(quote! {});
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     }
   }
@@ -5412,9 +5331,6 @@ fn expand_named_struct(
     quote! {}
   };
 
-  let choice_match_count_decl_tokens = quote! {};
-  let choice_match_conflict_tokens = quote! {};
-
   let has_child_dispatch = !child_fields.is_empty()
     || !empty_child_fields.is_empty()
     || !text_child_fields.is_empty()
@@ -5506,28 +5422,14 @@ fn expand_named_struct(
     quote! {}
   } else {
     quote! {
-      _ => {
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #choice_match_conflict_tokens
-        }
-      }
+      _ => {}
     }
   };
   let choice_fallback_tokens_io = if flat_choice_has_wildcard {
     quote! {}
   } else {
     quote! {
-      _ => {
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #choice_match_conflict_tokens
-        }
-      }
+      _ => {}
     }
   };
   let child_choice_dispatch_tokens_borrowed =
@@ -5541,25 +5443,12 @@ fn expand_named_struct(
       } else {
         quote! {
           #flat_choice_dispatch_tokens_borrowed
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #choice_match_conflict_tokens
-          }
         }
       }
     } else if !has_child_dispatch {
       quote! {
         #flat_choice_dispatch_tokens_borrowed
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #choice_match_conflict_tokens
-        }
         let mut matched = false;
-        #( #choice_parse_tokens )*
         #( #any_parse_tokens_borrowed )*
         if matched {
           continue;
@@ -5597,15 +5486,7 @@ fn expand_named_struct(
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
-          _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #choice_match_conflict_tokens
-            }
-            false
-          },
+          _ => false,
         };
         if matched {
           continue;
@@ -5618,14 +5499,7 @@ fn expand_named_struct(
           #( #flat_choice_match_tokens_borrowed )*
           #( #child_parse_tokens_borrowed )*
           _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #choice_match_conflict_tokens
-            }
             let mut matched = false;
-            #( #choice_parse_tokens )*
             #( #any_parse_tokens_borrowed )*
             matched
           }
@@ -5646,25 +5520,12 @@ fn expand_named_struct(
       } else {
         quote! {
           #flat_choice_dispatch_tokens_io
-          #( #choice_match_init_tokens )*
-          {
-            #choice_match_count_decl_tokens
-            #( #choice_match_decl_tokens )*
-            #choice_match_conflict_tokens
-          }
         }
       }
     } else if !has_child_dispatch {
       quote! {
         #flat_choice_dispatch_tokens_io
-        #( #choice_match_init_tokens )*
-        {
-          #choice_match_count_decl_tokens
-          #( #choice_match_decl_tokens )*
-          #choice_match_conflict_tokens
-        }
         let mut matched = false;
-        #( #choice_parse_tokens )*
         #( #any_parse_tokens_io )*
         if matched {
           continue;
@@ -5702,15 +5563,7 @@ fn expand_named_struct(
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
-          _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #choice_match_conflict_tokens
-            }
-            false
-          },
+          _ => false,
         };
         if matched {
           continue;
@@ -5723,14 +5576,7 @@ fn expand_named_struct(
           #( #flat_choice_match_tokens_io )*
           #( #child_parse_tokens_io )*
           _ => {
-            #( #choice_match_init_tokens )*
-            {
-              #choice_match_count_decl_tokens
-              #( #choice_match_decl_tokens )*
-              #choice_match_conflict_tokens
-            }
             let mut matched = false;
-            #( #choice_parse_tokens )*
             #( #any_parse_tokens_io )*
             matched
           }
@@ -5807,7 +5653,6 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
-  let xml_other_children_write_setup_tokens = quote! {};
   let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
     if compact_xml_other_children {
       quote! {
@@ -6553,7 +6398,6 @@ fn expand_named_struct(
   let body_write_tokens = if has_body {
     quote! {
       writer.write_all(b">")?;
-      #xml_other_children_write_setup_tokens
       #( #ordered_write_tokens )*
       #close_body_tokens
       Ok(())

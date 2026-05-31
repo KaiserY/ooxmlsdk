@@ -1779,34 +1779,35 @@ fn qname_write_prefix(prefix: &str) -> &str {
   }
 }
 
-fn write_start_tag_open_tokens(qname: &str) -> proc_macro2::TokenStream {
+fn write_tag_literal_tokens(qname: &str, open: &str, close: &str) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
   let write_prefix = qname_write_prefix(&tag_prefix);
   let tag = if write_prefix.is_empty() {
-    format!("<{local_name}")
+    format!("{open}{local_name}{close}")
   } else {
-    format!("<{write_prefix}:{local_name}")
+    format!("{open}{write_prefix}:{local_name}{close}")
   };
   let tag_lit = LitByteStr::new(tag.as_bytes(), Span::call_site());
   quote! { writer.write_all(#tag_lit)?; }
 }
 
+fn write_start_tag_open_tokens(qname: &str) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", "")
+}
+
+fn write_start_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", ">")
+}
+
+fn write_empty_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", " />")
+}
+
 fn write_end_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let write_prefix = qname_write_prefix(&tag_prefix);
-  let tag = if write_prefix.is_empty() {
-    format!("</{local_name}>")
-  } else {
-    format!("</{write_prefix}:{local_name}>")
-  };
-  let tag_lit = LitByteStr::new(tag.as_bytes(), Span::call_site());
-  quote! { writer.write_all(#tag_lit)?; }
+  write_tag_literal_tokens(qname, "</", ">")
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {

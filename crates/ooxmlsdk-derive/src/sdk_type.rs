@@ -275,14 +275,9 @@ fn write_typed_child_tokens(
   qname: &str,
 ) -> proc_macro2::TokenStream {
   let start_tag_open = write_start_tag_open_tokens(qname);
-  let end_tag = write_end_tag_tokens(qname);
   quote! {
     #start_tag_open
-    if <#child_ty as crate::sdk::SdkType>::write_inner(#value, writer)? {
-      #end_tag
-    } else {
-      writer.write_all(b" />")?;
-    }
+    <#child_ty as crate::sdk::SdkType>::write_inner(#value, writer)?;
   }
 }
 
@@ -346,10 +341,9 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::EmptyChild => {
-      let start_tag_open = write_start_tag_open_tokens(qname);
+      let empty_tag = write_empty_tag_tokens(qname);
       let write_empty = quote! {
-        #start_tag_open
-        writer.write_all(b" />")?;
+        #empty_tag
       };
       if repeated {
         quote! {
@@ -368,14 +362,13 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::TextChild => {
-      let start_tag_open = write_start_tag_open_tokens(qname);
+      let start_tag = write_start_tag_tokens(qname);
       let end_tag = write_end_tag_tokens(qname);
       let write_value = |expr: proc_macro2::TokenStream| {
         let content =
           write_text_value_content_tokens(expr, &child_ty, child.simple_type.as_deref(), qname);
         quote! {
-          #start_tag_open
-          writer.write_all(b">")?;
+          #start_tag
           #content
           #end_tag
         }
@@ -419,24 +412,18 @@ fn build_choice_write_tokens(
         let _ = ty;
         let value_expr = quote! { value.as_ref() };
         let start_tag_open = write_start_tag_open_tokens(qname);
-        let end_tag = write_end_tag_tokens(qname);
         arms.push(quote! {
           #choice_ty::#variant(value) => {
             #start_tag_open
-            if crate::sdk::SdkType::write_inner(#value_expr, writer)? {
-              #end_tag
-            } else {
-              writer.write_all(b" />")?;
-            }
+            crate::sdk::SdkType::write_inner(#value_expr, writer)?;
           }
         });
       }
       SdkTypeChoiceItem::EmptyChild { variant, qname } => {
-        let start_tag_open = write_start_tag_open_tokens(qname);
+        let empty_tag = write_empty_tag_tokens(qname);
         arms.push(quote! {
           #choice_ty::#variant => {
-            #start_tag_open
-            writer.write_all(b" />")?;
+            #empty_tag
           }
         });
       }
@@ -446,7 +433,7 @@ fn build_choice_write_tokens(
         simple_type,
         qname,
       } => {
-        let start_tag_open = write_start_tag_open_tokens(qname);
+        let start_tag = write_start_tag_tokens(qname);
         let end_tag = write_end_tag_tokens(qname);
         let content = if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
@@ -466,20 +453,18 @@ fn build_choice_write_tokens(
         };
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            #start_tag_open
-            writer.write_all(b">")?;
+            #start_tag
             #content
             #end_tag
           }
         });
       }
       SdkTypeChoiceItem::AnyChild { variant, qname } => {
-        let start_tag_open = write_start_tag_open_tokens(qname);
+        let start_tag = write_start_tag_tokens(qname);
         let end_tag = write_end_tag_tokens(qname);
         arms.push(quote! {
           #choice_ty::#variant(value) => {
-            #start_tag_open
-            writer.write_all(b">")?;
+            #start_tag
             for value in value {
               writer.write_all(value.as_bytes())?;
             }
@@ -724,8 +709,10 @@ fn expand_tuple_wrapper(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
-        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)
+      ) -> Result<(), std::io::Error> {
+        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)?;
+        #end_tag
+        Ok(())
       }
     }
 
@@ -812,11 +799,7 @@ fn expand_tuple_wrapper(
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
         #start_tag_open
-        if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
-          #end_tag
-        } else {
-          writer.write_all(b" />")?;
-        }
+        <Self as crate::sdk::SdkType>::write_inner(self, writer)?;
         Ok(())
       }
 
@@ -1631,7 +1614,7 @@ fn build_text_child_write_tokens(
     unwrap_wrapped_type(field_ty)
   };
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-    let start_tag_open = write_start_tag_open_tokens(qname);
+    let start_tag = write_start_tag_tokens(qname);
     let end_tag = write_end_tag_tokens(qname);
     let value_write_tokens = if list {
       quote! {
@@ -1654,8 +1637,7 @@ fn build_text_child_write_tokens(
       }
     };
     quote! {
-      #start_tag_open
-      writer.write_all(b">")?;
+      #start_tag
       #value_write_tokens
       #end_tag
     }
@@ -1689,10 +1671,9 @@ fn build_empty_child_write_tokens(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let start_tag_open = write_start_tag_open_tokens(qname);
+  let empty_tag = write_empty_tag_tokens(qname);
   let write_tokens = quote! {
-    #start_tag_open
-    writer.write_all(b" />")?;
+    #empty_tag
   };
 
   if repeated {
@@ -1729,9 +1710,8 @@ fn build_empty_child_skip_tokens(
     if !next_empty {
       loop {
         match #reader_ident.next_tag_event()? {
-          #next_tag_event::Start(e, next_empty) => {
+          #next_tag_event::Start(e, _) => {
             let event_name = e.name().into_inner();
-            let _ = next_empty;
             return Err(crate::common::unexpected_tag(
               stringify!(#owner_ident),
               "empty child",
@@ -1833,11 +1813,10 @@ fn build_any_child_write_tokens_for_value(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let start_tag_open = write_start_tag_open_tokens(qname);
+  let start_tag = write_start_tag_tokens(qname);
   let end_tag = write_end_tag_tokens(qname);
   let write_value_tokens = quote! {
-    #start_tag_open
-    writer.write_all(b">")?;
+    #start_tag
     for value in value {
       writer.write_all(value.as_bytes())?;
     }
@@ -2966,10 +2945,10 @@ fn expand_helper_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
+      ) -> Result<(), std::io::Error> {
         #( #child_write_tokens )*
         #( #choice_write_tokens )*
-        Ok(true)
+        Ok(())
       }
     }
     #[cfg(feature = "validators")]
@@ -6967,16 +6946,29 @@ fn expand_named_struct(
     || !any_fields.is_empty()
     || has_xml_other_children_field
     || text_field.is_some();
+  let close_body_tokens = if local_name.is_empty() {
+    quote! {}
+  } else {
+    quote! {
+      #end_tag
+    }
+  };
   let body_write_tokens = if has_body {
     quote! {
       writer.write_all(b">")?;
       #xml_other_children_write_setup_tokens
       #( #ordered_write_tokens )*
-      Ok(true)
+      #close_body_tokens
+      Ok(())
+    }
+  } else if local_name.is_empty() {
+    quote! {
+      Ok(())
     }
   } else {
     quote! {
-      Ok(false)
+      writer.write_all(b" />")?;
+      Ok(())
     }
   };
   let mce_child_process_tokens = child_fields
@@ -7037,11 +7029,7 @@ fn expand_named_struct(
       ) -> Result<(), std::io::Error> {
         #xml_header_tokens
         #start_tag_open
-        if <Self as crate::sdk::SdkType>::write_inner(self, writer)? {
-          #end_tag
-        } else {
-          writer.write_all(b" />")?;
-        }
+        <Self as crate::sdk::SdkType>::write_inner(self, writer)?;
         Ok(())
       }
 
@@ -7138,7 +7126,7 @@ fn expand_named_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
-      ) -> Result<bool, std::io::Error> {
+      ) -> Result<(), std::io::Error> {
         #special_namespace_write_tokens
         #( #attr_write_tokens )*
         #xml_other_attrs_write_tokens

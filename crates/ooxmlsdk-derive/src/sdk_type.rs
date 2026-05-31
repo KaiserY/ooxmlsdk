@@ -50,10 +50,6 @@ impl DeserializeMode {
   }
 }
 
-fn deserialize_type_inner_ident(mode: DeserializeMode) -> Ident {
-  mode.deserialize_inner_ident()
-}
-
 fn is_canonical_xmlns_prefix_namespace(prefix: &str) -> bool {
   matches!(prefix, "x14" | "xne")
 }
@@ -72,7 +68,9 @@ where
   I::Item: AsRef<str>,
 {
   let mut seen = std::collections::HashSet::new();
+  let mut any = false;
   for qname in qnames {
+    any = true;
     let Some(local_name) = dispatch_field_qname_local_name(qname.as_ref()) else {
       return false;
     };
@@ -80,7 +78,7 @@ where
       return false;
     }
   }
-  true
+  any
 }
 
 fn should_use_local_name_child_dispatch(
@@ -94,8 +92,7 @@ fn should_use_local_name_child_dispatch(
     return false;
   }
 
-  let child_qnames = child_qnames.into_iter().collect::<Vec<_>>();
-  !child_qnames.is_empty() && has_unique_local_name_dispatch(child_qnames)
+  has_unique_local_name_dispatch(child_qnames)
 }
 
 #[cfg(test)]
@@ -137,28 +134,13 @@ mod tests {
 }
 
 fn qname_match_targets(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
-  let mut seen = std::collections::HashSet::new();
-  let mut targets = Vec::new();
-
-  for qname in qnames {
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(qname);
-    if !tag_prefix.is_empty() {
-      let prefixed = format!("{tag_prefix}:{local_name}");
-      if seen.insert(prefixed.clone()) {
-        let tag_qname_lit = LitByteStr::new(prefixed.as_bytes(), Span::call_site());
-        targets.push(quote! { #tag_qname_lit });
-      }
-    }
-    if seen.insert(local_name.to_string()) {
-      let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-      targets.push(quote! { #local_name_lit });
-    }
-  }
-
-  targets
+  qname_match_target_keys(qnames)
+    .into_iter()
+    .map(|target| {
+      let target_lit = LitByteStr::new(target.as_bytes(), Span::call_site());
+      quote! { #target_lit }
+    })
+    .collect()
 }
 
 fn qname_match_target_keys(qnames: &[String]) -> Vec<String> {
@@ -182,24 +164,6 @@ fn qname_match_target_keys(qnames: &[String]) -> Vec<String> {
   }
 
   targets
-}
-
-fn build_choice_parse_attempt_tokens(
-  _field_ident: &Ident,
-  _choice_ty: &Type,
-  repeated: bool,
-  _mode: DeserializeMode,
-  _as_result: bool,
-  _xml_child_slot_assign: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  let message = if repeated {
-    "repeated choice read path must be flattened by SdkType"
-  } else {
-    "choice read path must be flattened by SdkType"
-  };
-  quote! {
-    compile_error!(#message);
-  }
 }
 
 #[derive(Clone)]
@@ -537,85 +501,6 @@ fn build_choice_write_tokens(
       let choice = &self.#field_ident;
       #write_one
     })
-  }
-}
-
-fn build_flat_choice_dispatch_match_tokens(
-  _field_ident: &Ident,
-  _choice_ty: &Type,
-  repeated: bool,
-  qnames: &[String],
-  xml_child_slot_assign: proc_macro2::TokenStream,
-) -> (
-  proc_macro2::TokenStream,
-  proc_macro2::TokenStream,
-  proc_macro2::TokenStream,
-  proc_macro2::TokenStream,
-) {
-  let targets = qname_match_targets(qnames);
-
-  if repeated {
-    (
-      quote! {
-        #( #targets )|* => {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          continue;
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          continue;
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          return Ok(true);
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          return Ok(true);
-        }
-      },
-    )
-  } else {
-    (
-      quote! {
-        #( #targets )|* => {
-          compile_error!("choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          continue;
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          continue;
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          return Ok(true);
-        }
-      },
-      quote! {
-        #( #targets )|* => {
-          compile_error!("choice read path must be flattened by SdkType");
-          #xml_child_slot_assign
-          return Ok(true);
-        }
-      },
-    )
   }
 }
 
@@ -1979,8 +1864,8 @@ fn expand_helper_struct(
 ) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  let read_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
-  let read_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = DeserializeMode::Borrowed.deserialize_inner_ident();
+  let read_io_inner_ident = DeserializeMode::Io.deserialize_inner_ident();
 
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
@@ -2362,30 +2247,13 @@ fn expand_helper_struct(
   let mut choice_decl_tokens = Vec::new();
   let choice_match_init_tokens = Vec::<proc_macro2::TokenStream>::new();
   let choice_match_decl_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let mut choice_unique_parse_tokens_borrowed = Vec::new();
-  let mut choice_unique_parse_tokens_io = Vec::new();
-  let mut choice_unique_visit_parse_tokens_borrowed = Vec::new();
-  let mut choice_unique_visit_parse_tokens_io = Vec::new();
   let mut choice_parse_tokens = Vec::new();
   let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
   let mut choice_init_tokens = Vec::new();
   let mut choice_validate_tokens = Vec::new();
-  let mut flat_choice_match_tokens_borrowed = Vec::new();
-  let mut flat_choice_match_tokens_io = Vec::new();
-  let mut flat_choice_visit_match_tokens_borrowed = Vec::new();
-  let mut flat_choice_visit_match_tokens_io = Vec::new();
-  let mut grouped_choice_match_tokens_borrowed =
-    std::collections::BTreeMap::<String, Vec<GroupedChoiceAttempt>>::new();
-  let mut grouped_choice_match_tokens_io =
-    std::collections::BTreeMap::<String, Vec<GroupedChoiceAttempt>>::new();
-  let mut grouped_choice_visit_match_tokens_borrowed =
-    std::collections::BTreeMap::<String, Vec<GroupedChoiceAttempt>>::new();
-  let mut grouped_choice_visit_match_tokens_io =
-    std::collections::BTreeMap::<String, Vec<GroupedChoiceAttempt>>::new();
   for field in &choice_fields {
     let field_ident = &field.ident;
-    let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
       quote! { choice.as_ref() }
@@ -2397,127 +2265,6 @@ fn expand_helper_struct(
     } else {
       quote! { &self.#field_ident }
     };
-    let field_accepts_any = field.accepts_any.unwrap_or(false);
-    let dispatch_qnames: Vec<_> = field
-      .specific_qnames
-      .iter()
-      .filter(|qname| !qname.is_empty())
-      .cloned()
-      .collect();
-    let flatten_specific_choice = !field_accepts_any
-      && !dispatch_qnames.is_empty()
-      && dispatch_qnames.iter().all(|qname| {
-        specific_choice_qname_counts
-          .get(qname)
-          .copied()
-          .unwrap_or_default()
-          == 1usize
-      });
-    if flatten_specific_choice {
-      let (borrowed_parse_tokens, io_parse_tokens, borrowed_visit_tokens, io_visit_tokens) =
-        build_flat_choice_dispatch_match_tokens(
-          field_ident,
-          &choice_ty,
-          field.repeated,
-          &dispatch_qnames,
-          xml_child_slot_assign.clone(),
-        );
-      flat_choice_match_tokens_borrowed.push(borrowed_parse_tokens);
-      flat_choice_match_tokens_io.push(io_parse_tokens);
-      flat_choice_visit_match_tokens_borrowed.push(borrowed_visit_tokens);
-      flat_choice_visit_match_tokens_io.push(io_visit_tokens);
-    }
-    if flatten_specific_choice {
-    } else if !field_accepts_any && !dispatch_qnames.is_empty() {
-      let borrowed_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Borrowed,
-        false,
-        xml_child_slot_assign.clone(),
-      );
-      let io_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Io,
-        false,
-        xml_child_slot_assign.clone(),
-      );
-      let borrowed_visit_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Borrowed,
-        true,
-        xml_child_slot_assign.clone(),
-      );
-      let io_visit_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Io,
-        true,
-        xml_child_slot_assign.clone(),
-      );
-      for target in qname_match_target_keys(&dispatch_qnames) {
-        grouped_choice_match_tokens_borrowed
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: None,
-            tokens: borrowed_attempt.clone(),
-          });
-        grouped_choice_match_tokens_io
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: None,
-            tokens: io_attempt.clone(),
-          });
-        grouped_choice_visit_match_tokens_borrowed
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: None,
-            tokens: borrowed_visit_attempt.clone(),
-          });
-        grouped_choice_visit_match_tokens_io
-          .entry(target)
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: None,
-            tokens: io_visit_attempt.clone(),
-          });
-      }
-    } else if field.repeated {
-      choice_unique_parse_tokens_borrowed.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_parse_tokens_io.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_io.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-    } else {
-      choice_unique_parse_tokens_borrowed.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_parse_tokens_io.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_io.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-    }
     if field.repeated {
       choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       choice_init_tokens.push(quote! { #field_ident });
@@ -2576,22 +2323,6 @@ fn expand_helper_struct(
       choice_visit_parse_tokens.push(quote! {});
     }
   }
-  flat_choice_match_tokens_borrowed.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_match_tokens_borrowed,
-    false,
-  ));
-  flat_choice_match_tokens_io.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_match_tokens_io,
-    false,
-  ));
-  flat_choice_visit_match_tokens_borrowed.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_visit_match_tokens_borrowed,
-    true,
-  ));
-  flat_choice_visit_match_tokens_io.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_visit_match_tokens_io,
-    true,
-  ));
 
   let choice_match_count_decl_tokens = quote! {};
   let choice_match_conflict_tokens = quote! {};
@@ -2736,13 +2467,11 @@ fn expand_helper_struct(
       #( #choice_match_init_tokens )*
       let matched = match event_name {
         #( #direct_child_match_tokens_borrowed )*
-        #( #flat_choice_match_tokens_borrowed )*
         #( #child_parse_tokens_borrowed )*
         _ => {
           {
             #choice_match_count_decl_tokens
             #( #choice_match_decl_tokens )*
-            #( #choice_unique_parse_tokens_borrowed )*
             #choice_match_conflict_tokens
           }
           let mut matched = false;
@@ -2771,13 +2500,11 @@ fn expand_helper_struct(
       #( #choice_match_init_tokens )*
       let matched = match event_name {
         #( #direct_child_match_tokens_io )*
-        #( #flat_choice_match_tokens_io )*
         #( #child_parse_tokens_io )*
         _ => {
           {
             #choice_match_count_decl_tokens
             #( #choice_match_decl_tokens )*
-            #( #choice_unique_parse_tokens_io )*
             #choice_match_conflict_tokens
           }
           let mut matched = false;
@@ -3025,8 +2752,8 @@ fn expand_named_struct(
     };
     LitByteStr::new(attr.as_bytes(), Span::call_site())
   });
-  let read_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
-  let read_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let read_borrowed_inner_ident = DeserializeMode::Borrowed.deserialize_inner_ident();
+  let read_io_inner_ident = DeserializeMode::Io.deserialize_inner_ident();
 
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
@@ -4145,10 +3872,6 @@ fn expand_named_struct(
   let mut choice_decl_tokens = Vec::new();
   let choice_match_init_tokens = Vec::<proc_macro2::TokenStream>::new();
   let choice_match_decl_tokens = Vec::<proc_macro2::TokenStream>::new();
-  let mut choice_unique_parse_tokens_borrowed = Vec::new();
-  let mut choice_unique_parse_tokens_io = Vec::new();
-  let mut choice_unique_visit_parse_tokens_borrowed = Vec::new();
-  let mut choice_unique_visit_parse_tokens_io = Vec::new();
   let mut choice_parse_tokens = Vec::new();
   let mut choice_visit_parse_tokens = Vec::new();
   let mut choice_write_tokens = Vec::new();
@@ -5499,122 +5222,6 @@ fn expand_named_struct(
         }
       }
     }
-    let flatten_specific_choice = !flatten_choice_items
-      && !grouped_choice_items
-      && !field_accepts_any
-      && !specific_qnames.is_empty()
-      && specific_qnames.iter().all(|qname| {
-        specific_choice_qname_counts
-          .get(qname)
-          .copied()
-          .unwrap_or_default()
-          == 1usize
-      });
-    if flatten_specific_choice {
-      let (borrowed_parse_tokens, io_parse_tokens, borrowed_visit_tokens, io_visit_tokens) =
-        build_flat_choice_dispatch_match_tokens(
-          field_ident,
-          &choice_ty,
-          field.repeated,
-          &specific_qnames,
-          xml_child_slot_assign.clone(),
-        );
-      flat_choice_match_tokens_borrowed.push(borrowed_parse_tokens);
-      flat_choice_match_tokens_io.push(io_parse_tokens);
-      flat_choice_visit_match_tokens_borrowed.push(borrowed_visit_tokens);
-      flat_choice_visit_match_tokens_io.push(io_visit_tokens);
-    }
-    if flatten_choice_items || grouped_choice_items || flatten_specific_choice {
-    } else if !field_accepts_any && !specific_qnames.is_empty() {
-      let borrowed_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Borrowed,
-        false,
-        xml_child_slot_assign.clone(),
-      );
-      let io_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Io,
-        false,
-        xml_child_slot_assign.clone(),
-      );
-      let borrowed_visit_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Borrowed,
-        true,
-        xml_child_slot_assign.clone(),
-      );
-      let io_visit_attempt = build_choice_parse_attempt_tokens(
-        field_ident,
-        &choice_ty,
-        field.repeated,
-        DeserializeMode::Io,
-        true,
-        xml_child_slot_assign.clone(),
-      );
-      for target in qname_match_target_keys(&specific_qnames) {
-        grouped_choice_match_tokens_borrowed
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: choice_order_condition.clone(),
-            tokens: borrowed_attempt.clone(),
-          });
-        grouped_choice_match_tokens_io
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: choice_order_condition.clone(),
-            tokens: io_attempt.clone(),
-          });
-        grouped_choice_visit_match_tokens_borrowed
-          .entry(target.clone())
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: choice_order_condition.clone(),
-            tokens: borrowed_visit_attempt.clone(),
-          });
-        grouped_choice_visit_match_tokens_io
-          .entry(target)
-          .or_default()
-          .push(GroupedChoiceAttempt {
-            condition: choice_order_condition.clone(),
-            tokens: io_visit_attempt.clone(),
-          });
-      }
-    } else if field.repeated {
-      choice_unique_parse_tokens_borrowed.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_parse_tokens_io.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_io.push(quote! {
-          compile_error!("repeated choice read path must be flattened by SdkType");
-      });
-    } else {
-      choice_unique_parse_tokens_borrowed.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_parse_tokens_io.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_borrowed.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-      choice_unique_visit_parse_tokens_io.push(quote! {
-          compile_error!("choice read path must be flattened by SdkType");
-      });
-    }
     if field.repeated {
       choice_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
       choice_init_tokens.push(quote! { #field_ident });
@@ -5904,7 +5511,6 @@ fn expand_named_struct(
         {
           #choice_match_count_decl_tokens
           #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_borrowed )*
           #choice_match_conflict_tokens
         }
       }
@@ -5919,7 +5525,6 @@ fn expand_named_struct(
         {
           #choice_match_count_decl_tokens
           #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_io )*
           #choice_match_conflict_tokens
         }
       }
@@ -5940,7 +5545,6 @@ fn expand_named_struct(
           {
             #choice_match_count_decl_tokens
             #( #choice_match_decl_tokens )*
-            #( #choice_unique_parse_tokens_borrowed )*
             #choice_match_conflict_tokens
           }
         }
@@ -5952,7 +5556,6 @@ fn expand_named_struct(
         {
           #choice_match_count_decl_tokens
           #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_borrowed )*
           #choice_match_conflict_tokens
         }
         let mut matched = false;
@@ -5999,7 +5602,6 @@ fn expand_named_struct(
             {
               #choice_match_count_decl_tokens
               #( #choice_match_decl_tokens )*
-              #( #choice_unique_parse_tokens_borrowed )*
               #choice_match_conflict_tokens
             }
             false
@@ -6020,7 +5622,6 @@ fn expand_named_struct(
             {
               #choice_match_count_decl_tokens
               #( #choice_match_decl_tokens )*
-              #( #choice_unique_parse_tokens_borrowed )*
               #choice_match_conflict_tokens
             }
             let mut matched = false;
@@ -6049,7 +5650,6 @@ fn expand_named_struct(
           {
             #choice_match_count_decl_tokens
             #( #choice_match_decl_tokens )*
-            #( #choice_unique_parse_tokens_io )*
             #choice_match_conflict_tokens
           }
         }
@@ -6061,7 +5661,6 @@ fn expand_named_struct(
         {
           #choice_match_count_decl_tokens
           #( #choice_match_decl_tokens )*
-          #( #choice_unique_parse_tokens_io )*
           #choice_match_conflict_tokens
         }
         let mut matched = false;
@@ -6108,7 +5707,6 @@ fn expand_named_struct(
             {
               #choice_match_count_decl_tokens
               #( #choice_match_decl_tokens )*
-              #( #choice_unique_parse_tokens_io )*
               #choice_match_conflict_tokens
             }
             false
@@ -6129,7 +5727,6 @@ fn expand_named_struct(
             {
               #choice_match_count_decl_tokens
               #( #choice_match_decl_tokens )*
-              #( #choice_unique_parse_tokens_io )*
               #choice_match_conflict_tokens
             }
             let mut matched = false;

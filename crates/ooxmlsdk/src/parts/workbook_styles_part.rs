@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct WorkbookStylesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WorkbookStylesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_workbook_styles_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Stylesheet,
-    WorkbookStylesPart,
-    as_workbook_styles_part,
-    as_workbook_styles_part_mut
-  );
+  >,
 }

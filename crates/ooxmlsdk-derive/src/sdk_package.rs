@@ -5,7 +5,7 @@ struct PackageChildInfo {
   field_ident: Ident,
   part_ty: Type,
   kind: PartChildKind,
-  relationship_type: String,
+  relationship_type: PartRelationshipTypeSource,
   main_accessor_ident: Option<Ident>,
 }
 
@@ -67,53 +67,19 @@ fn package_child_init_tokens(
 fn package_relationship_dispatch_tokens(
   child_infos: &[PackageChildInfo],
 ) -> proc_macro2::TokenStream {
-  use std::collections::BTreeMap;
-
-  let mut exact_groups: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
-  let mut alias_branches = Vec::new();
+  let mut branches = Vec::new();
   for (field_index, child) in child_infos.iter().enumerate() {
-    let relationship_type = child.relationship_type.as_str();
-    let relationship_type_bytes = proc_macro2::Literal::byte_string(relationship_type.as_bytes());
     let (_, load_tokens) = package_child_init_tokens(child, field_index);
-    exact_groups
-      .entry(relationship_type)
-      .or_default()
-      .push(load_tokens.clone());
-    if explicit_relationship_type_may_have_alias(relationship_type) {
-      alias_branches.push((
-        quote! {
-          crate::common::relationship_type_matches_alias_bytes(
-            relationship_type,
-            #relationship_type_bytes,
-          )
-        },
-        load_tokens,
-      ));
-    }
+    let relationship_type = relationship_namespace_uri_tokens(&child.relationship_type);
+    branches.push((
+      quote! {
+        relationship_type == &#relationship_type
+      },
+      load_tokens,
+    ));
   }
 
-  let exact_arms = exact_groups.iter().map(|(relationship_type, loads)| {
-    let relationship_type = proc_macro2::Literal::byte_string(relationship_type.as_bytes());
-    quote! {
-      #relationship_type => {
-        #( #loads )*
-      }
-    }
-  });
-  let alias_fallback = if alias_branches.is_empty() {
-    quote! {}
-  } else {
-    build_conditional_chain(&alias_branches, quote! {})
-  };
-
-  quote! {
-    match relationship_type {
-      #( #exact_arms )*
-      _ => {
-        #alias_fallback
-      }
-    }
-  }
+  build_conditional_chain(&branches, quote! {})
 }
 
 pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
@@ -359,7 +325,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let mut modeled_relationships = Vec::new();
     for relationship in storage.package_relationships().iter() {
       let mut represented_relationship = false;
-      let relationship_type = relationship.relationship_type_bytes();
+      let relationship_type = relationship.relationship_namespace_uri();
       #relationship_dispatch
       if relationship.is_reference_relationship() {
         let item_index = modeled_relationships.len();

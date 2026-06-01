@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct RdRichValueTypesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl RdRichValueTypesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_rd_rich_value_types_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichValueTypesInfo,
-    RdRichValueTypesPart,
-    as_rd_rich_value_types_part,
-    as_rd_rich_value_types_part_mut
-  );
+  >,
 }

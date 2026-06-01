@@ -15,16 +15,10 @@ pub const EXTENSION: &str = "";
 pub struct ViewPropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ViewPropertiesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_view_properties_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
-    ViewPropertiesPart,
-    as_view_properties_part,
-    as_view_properties_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated slide_parts => crate ::parts::slide_part::SlidePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipSlide))]
+  pub(crate) slide_parts: crate::sdk::RepeatedPart<crate::parts::slide_part::SlidePart>,
 }

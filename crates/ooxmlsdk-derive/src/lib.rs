@@ -13,6 +13,7 @@ mod namespaces;
 mod sdk_enum;
 mod sdk_package;
 mod sdk_part;
+mod sdk_part_ref;
 mod sdk_type;
 
 #[proc_macro_derive(SdkEnum, attributes(sdk))]
@@ -37,6 +38,15 @@ pub fn sdk_type(input: TokenStream) -> TokenStream {
 pub fn sdk_part(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   match sdk_part::expand_sdk_part(&input) {
+    Ok(tokens) => tokens.into(),
+    Err(err) => err.to_compile_error().into(),
+  }
+}
+
+#[proc_macro_derive(SdkPartRef, attributes(sdk))]
+pub fn sdk_part_ref(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  match sdk_part_ref::expand_sdk_part_ref(&input) {
     Ok(tokens) => tokens.into(),
     Err(err) => err.to_compile_error().into(),
   }
@@ -78,14 +88,35 @@ enum PartFieldMarker {
 
 #[derive(Clone)]
 struct PartChildAttr {
-  relationship_type: String,
+  relationship_type: PartRelationshipTypeSource,
   kind: PartChildKind,
 }
 
 #[derive(Clone)]
 enum PartRelationshipTypeSource {
   Explicit(String),
+  Known(Ident),
   TypeConst,
+}
+
+fn relationship_namespace_uri_tokens(
+  relationship_type: &PartRelationshipTypeSource,
+) -> proc_macro2::TokenStream {
+  match relationship_type {
+    PartRelationshipTypeSource::Explicit(value) => {
+      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(#value) }
+    }
+    PartRelationshipTypeSource::Known(variant_ident) => {
+      quote! {
+        crate::common::XmlRelationshipNamespaceUri::Known(
+          crate::namespaces::XmlKnownRelationshipNamespace::#variant_ident,
+        )
+      }
+    }
+    PartRelationshipTypeSource::TypeConst => {
+      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(Self::RELATIONSHIP_TYPE) }
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -513,7 +544,7 @@ fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInf
       field_ident,
       ty: inner_ty,
       kind: explicit.kind,
-      relationship_type: PartRelationshipTypeSource::Explicit(explicit.relationship_type),
+      relationship_type: explicit.relationship_type,
     }));
   }
 
@@ -702,7 +733,7 @@ fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAtt
         meta.parse_nested_meta(|nested| {
           if nested.path.is_ident("relationship_type") {
             let value: LitStr = nested.value()?.parse()?;
-            relationship_type = Some(value.value());
+            relationship_type = Some(PartRelationshipTypeSource::Explicit(value.value()));
             Ok(())
           } else if nested.path.is_ident("kind") {
             let value: LitStr = nested.value()?.parse()?;
@@ -740,7 +771,9 @@ fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAtt
   Ok(None)
 }
 
-fn parse_part_child_relationship_type_attr(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+fn parse_part_child_relationship_type_attr(
+  attrs: &[Attribute],
+) -> syn::Result<Option<PartRelationshipTypeSource>> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -754,8 +787,14 @@ fn parse_part_child_relationship_type_attr(attrs: &[Attribute]) -> syn::Result<O
         let mut relationship_type = None;
         meta.parse_nested_meta(|nested| {
           if nested.path.is_ident("relationship_type") {
-            let value: LitStr = nested.value()?.parse()?;
-            relationship_type = Some(value.value());
+            let value = nested.value()?;
+            if value.peek(LitStr) {
+              let value: LitStr = value.parse()?;
+              relationship_type = Some(PartRelationshipTypeSource::Explicit(value.value()));
+            } else {
+              let value: Ident = value.parse()?;
+              relationship_type = Some(PartRelationshipTypeSource::Known(value));
+            }
             Ok(())
           } else if nested.path.is_ident("kind") {
             let _value: LitStr = nested.value()?.parse()?;
@@ -785,7 +824,12 @@ fn parse_part_child_kind_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChi
         let mut kind = None;
         meta.parse_nested_meta(|nested| {
           if nested.path.is_ident("relationship_type") {
-            let _value: LitStr = nested.value()?.parse()?;
+            let value = nested.value()?;
+            if value.peek(LitStr) {
+              let _value: LitStr = value.parse()?;
+            } else {
+              let _value: Ident = value.parse()?;
+            }
             Ok(())
           } else if nested.path.is_ident("kind") {
             let value: LitStr = nested.value()?.parse()?;

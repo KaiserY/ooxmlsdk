@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct TableStylesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl TableStylesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_table_styles_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TableStyleList,
-    TableStylesPart,
-    as_table_styles_part,
-    as_table_styles_part_mut
-  );
+  >,
 }

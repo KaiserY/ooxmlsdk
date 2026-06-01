@@ -14,10 +14,6 @@ pub const EXTENSION: &str = "";
 pub struct RibbonExtensibilityPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl RibbonExtensibilityPart {
-  crate::sdk_part_child_methods! {
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

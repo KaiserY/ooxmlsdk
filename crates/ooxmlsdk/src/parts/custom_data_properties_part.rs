@@ -14,16 +14,11 @@ pub const EXTENSION: &str = "";
 pub struct CustomDataPropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CustomDataPropertiesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_custom_data_properties_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
-    CustomDataPropertiesPart,
-    as_custom_data_properties_part,
-    as_custom_data_properties_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      optional custom_data_part => crate ::parts::custom_data_part::CustomDataPart,
-      "http://schemas.microsoft.com/office/2007/relationships/customData";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipCustomData))]
+  pub(crate) custom_data_part:
+    crate::sdk::OptionalPart<crate::parts::custom_data_part::CustomDataPart>,
 }

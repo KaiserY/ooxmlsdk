@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct StyleDefinitionsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl StyleDefinitionsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_style_definitions_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
-    StyleDefinitionsPart,
-    as_style_definitions_part,
-    as_style_definitions_part_mut
-  );
+  >,
 }

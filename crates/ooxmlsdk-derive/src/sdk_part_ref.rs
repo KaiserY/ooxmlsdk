@@ -1,0 +1,427 @@
+use super::*;
+
+struct PartRefVariant {
+  attrs: Vec<Attribute>,
+  ident: Ident,
+  ty: Type,
+  relationship_type: Option<Ident>,
+  root: Option<PartRefRoot>,
+  extended: bool,
+}
+
+struct PartRefRoot {
+  element_ty: Type,
+  accessor: Ident,
+  content_type: String,
+}
+
+pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+  let ident = &input.ident;
+  let Data::Enum(data_enum) = &input.data else {
+    return Err(syn::Error::new_spanned(
+      input,
+      "SdkPartRef can only be derived for enums",
+    ));
+  };
+
+  let variants = parse_part_ref_variants(data_enum)?;
+  let extended_variant = variants
+    .iter()
+    .find(|variant| variant.extended)
+    .ok_or_else(|| syn::Error::new_spanned(input, "SdkPartRef requires ExtendedPart variant"))?;
+  let extended_ident = &extended_variant.ident;
+  let extended_ty = &extended_variant.ty;
+
+  let part_id_arms = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(part) => <_ as crate::sdk::SdkPart>::part_id(part),
+    }
+  });
+
+  let relationship_arms = variants
+    .iter()
+    .filter(|variant| !variant.extended)
+    .map(|variant| {
+      let attrs = cfg_attrs(&variant.attrs);
+      let variant_ty = &variant.ty;
+      let relationship_type = variant
+        .relationship_type
+        .as_ref()
+        .expect("non-extended PartRef variants require relationship type");
+      let pattern = quote! {
+        crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type
+      };
+      let make_part_ref = quote! {
+        return Some(<#variant_ty>::make_part_ref(storage, part_id, relationship_id));
+      };
+
+      if relationship_type == "RelationshipOfficeDocument" {
+        quote! {
+          #( #attrs )*
+          #pattern
+            if if <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE.is_empty() {
+              crate::common::package_main_part_path_matches(
+                part.path(),
+                <#variant_ty as crate::sdk::SdkPart>::PATH_PREFIX,
+                <#variant_ty as crate::sdk::SdkPart>::TARGET_NAME,
+              )
+            } else {
+              part.content_type() == <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE
+                || crate::common::package_main_part_path_matches(
+                  part.path(),
+                  <#variant_ty as crate::sdk::SdkPart>::PATH_PREFIX,
+                  <#variant_ty as crate::sdk::SdkPart>::TARGET_NAME,
+                )
+            } => {
+            #make_part_ref
+          }
+        }
+      } else {
+        quote! {
+          #( #attrs )*
+          #pattern
+            if <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE.is_empty()
+              || part.content_type() == <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE => {
+            #make_part_ref
+          }
+        }
+      }
+    });
+
+  let root_variants = variants
+    .iter()
+    .filter_map(|variant| variant.root.as_ref().map(|root| (variant, root)));
+  let root_enum_variants = root_variants.clone().map(|(variant, root)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let root_ty = &root.element_ty;
+    quote! {
+      #( #attrs )*
+      #variant_ident(Box<#root_ty>),
+    }
+  });
+  let root_part_type_name_arms = root_variants.clone().map(|(variant, _)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(_) => stringify!(#variant_ident),
+    }
+  });
+  let root_accessor_methods = root_variants.clone().map(|(variant, root)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let root_ty = &root.element_ty;
+    let accessor = &root.accessor;
+    let accessor_mut: Ident =
+      parse_str(&format!("{accessor}_mut")).expect("root accessor mut identifier");
+    quote! {
+      #( #attrs )*
+      pub fn #accessor(&self) -> Option<&#root_ty> {
+        match self {
+          Self::#variant_ident(root) => Some(root.as_ref()),
+          _ => None,
+        }
+      }
+
+      #( #attrs )*
+      pub fn #accessor_mut(&mut self) -> Option<&mut #root_ty> {
+        match self {
+          Self::#variant_ident(root) => Some(root.as_mut()),
+          _ => None,
+        }
+      }
+    }
+  });
+  let root_to_bytes_arms = root_variants.clone().map(|(variant, _)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(root) => Ok(root.to_bytes()?),
+    }
+  });
+  let root_from_part_id_branches = root_variants.clone().map(|(variant, root)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let root_ty = &root.element_ty;
+    let content_type = LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
+    quote! {
+      #( #attrs )*
+      if crate::sdk::part_root_content_type_matches_bytes(
+        #content_type,
+        part.content_type().as_bytes(),
+      ) {
+        #[cfg(feature = "mce")]
+        let mut root = <#root_ty>::from_bytes(part.data().bytes())?;
+        #[cfg(feature = "mce")]
+        crate::sdk::SdkMce::process_mce(
+          &mut root,
+          &open_settings.markup_compatibility_process_settings,
+        )?;
+        #[cfg(not(feature = "mce"))]
+        let root = <#root_ty>::from_bytes(part.data().bytes())?;
+        return Ok(Some(Self::#variant_ident(Box::new(root))));
+      }
+    }
+  });
+  let root_validate_arms = root_variants.map(|(variant, _)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(root) => crate::validator::SdkValidator::validate_into(root.as_ref(), context),
+    }
+  });
+
+  Ok(quote! {
+    #[derive(Clone, Debug)]
+    pub enum PartRootElement {
+      #( #root_enum_variants )*
+    }
+
+    impl PartRootElement {
+      #[inline]
+      pub fn part_type_name(&self) -> &'static str {
+        match self {
+          #( #root_part_type_name_arms )*
+        }
+      }
+
+      #( #root_accessor_methods )*
+
+      pub fn to_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
+        match self {
+          #( #root_to_bytes_arms )*
+        }
+      }
+
+      pub(crate) fn from_part_id(
+        storage: &crate::common::SdkPackageStorage,
+        part_id: crate::common::PartId,
+        open_settings: &crate::sdk::OpenSettings,
+      ) -> Result<Option<Self>, crate::common::SdkError> {
+        let Some(part) = storage.part(part_id) else {
+          return Ok(None);
+        };
+        if part.relationship_known_type()
+          == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAFChunk) {
+          return Ok(None);
+        }
+        #[cfg(not(feature = "mce"))]
+        let _ = open_settings;
+        #( #root_from_part_id_branches )*
+        Ok(None)
+      }
+    }
+
+    #[cfg(feature = "validators")]
+    impl crate::validator::SdkValidator for PartRootElement {
+      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
+        match self {
+          #( #root_validate_arms )*
+        }
+      }
+    }
+
+    impl #ident {
+      #[inline]
+      pub fn part_id(&self) -> crate::common::PartId {
+        match self {
+          #( #part_id_arms )*
+        }
+      }
+
+      #[inline]
+      pub(crate) fn from_part_id<P: crate::sdk::SdkPackage>(
+        package: &P,
+        part_id: crate::common::PartId,
+      ) -> Option<Self> {
+        Self::from_storage(crate::sdk::SdkPackage::storage(package), part_id, None)
+      }
+
+      #[inline]
+      pub(crate) fn from_relationship_storage(
+        storage: &crate::common::SdkPackageStorage,
+        relationship: &crate::common::RelationshipInfo,
+      ) -> Option<Self> {
+        Self::from_storage(storage, relationship.target_part_id()?, Some(relationship.id()))
+      }
+
+      fn from_storage(
+        storage: &crate::common::SdkPackageStorage,
+        part_id: crate::common::PartId,
+        relationship_id: Option<&str>,
+      ) -> Option<Self> {
+        let part = storage.part(part_id)?;
+        let Some(relationship_type) = part.relationship_known_type() else {
+          return Some(Self::extended_part(storage, part_id, relationship_id));
+        };
+
+        match relationship_type {
+          #( #relationship_arms )*
+          _ => {}
+        }
+
+        Some(Self::extended_part(storage, part_id, relationship_id))
+      }
+
+      #[inline]
+      fn extended_part(
+        storage: &crate::common::SdkPackageStorage,
+        part_id: crate::common::PartId,
+        relationship_id: Option<&str>,
+      ) -> Self {
+        let part = if let Some(relationship_id) = relationship_id {
+          <#extended_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+            storage,
+            relationship_id,
+            part_id,
+          )
+        } else {
+          <#extended_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
+            storage,
+            part_id,
+          )
+        };
+        Self::#extended_ident(part)
+      }
+    }
+  })
+}
+
+fn parse_part_ref_variants(data_enum: &DataEnum) -> syn::Result<Vec<PartRefVariant>> {
+  data_enum
+    .variants
+    .iter()
+    .map(|variant| {
+      let Fields::Unnamed(fields) = &variant.fields else {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "SdkPartRef variants must have one unnamed field",
+        ));
+      };
+      if fields.unnamed.len() != 1 {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "SdkPartRef variants must have one unnamed field",
+        ));
+      }
+      let extended = variant.ident == "ExtendedPart";
+      let part_ref_attr = parse_part_ref_attr(&variant.attrs)?;
+      if !extended && part_ref_attr.relationship_type.is_none() {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "SdkPartRef variants require #[sdk(relationship_type = ...)]",
+        ));
+      }
+      Ok(PartRefVariant {
+        attrs: variant
+          .attrs
+          .iter()
+          .filter(|attr| !attr.path().is_ident("sdk"))
+          .cloned()
+          .collect(),
+        ident: variant.ident.clone(),
+        ty: fields.unnamed[0].ty.clone(),
+        relationship_type: part_ref_attr.relationship_type,
+        root: part_ref_attr.root,
+        extended,
+      })
+    })
+    .collect()
+}
+
+#[derive(Default)]
+struct PartRefAttr {
+  relationship_type: Option<Ident>,
+  root: Option<PartRefRoot>,
+}
+
+fn parse_part_ref_attr(attrs: &[Attribute]) -> syn::Result<PartRefAttr> {
+  let mut parsed = PartRefAttr::default();
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      match meta {
+        Meta::NameValue(name_value) if name_value.path.is_ident("relationship_type") => {
+          if let Expr::Path(path) = &name_value.value
+            && let Some(ident) = path.path.get_ident()
+          {
+            parsed.relationship_type = Some(ident.clone());
+            continue;
+          }
+          return Err(syn::Error::new_spanned(
+            name_value.value,
+            "relationship_type must be a relationship enum variant",
+          ));
+        }
+        Meta::List(meta) if meta.path.is_ident("root") => {
+          parsed.root = Some(parse_part_ref_root(meta)?);
+        }
+        _ => {}
+      }
+    }
+  }
+  Ok(parsed)
+}
+
+fn parse_part_ref_root(meta: syn::MetaList) -> syn::Result<PartRefRoot> {
+  let mut element_ty = None;
+  let mut accessor = None;
+  let mut content_type = None;
+
+  meta.parse_nested_meta(|nested| {
+    if nested.path.is_ident("element") {
+      let value: Expr = nested.value()?.parse()?;
+      let Expr::Path(path) = value else {
+        return Err(nested.error("root element must be a type path"));
+      };
+      element_ty = Some(Type::Path(TypePath {
+        qself: None,
+        path: path.path,
+      }));
+      Ok(())
+    } else if nested.path.is_ident("accessor") {
+      let value: Expr = nested.value()?.parse()?;
+      let Expr::Path(path) = value else {
+        return Err(nested.error("root accessor must be an identifier"));
+      };
+      let Some(ident) = path.path.get_ident() else {
+        return Err(nested.error("root accessor must be an identifier"));
+      };
+      accessor = Some(ident.clone());
+      Ok(())
+    } else if nested.path.is_ident("content_type") {
+      let value: LitStr = nested.value()?.parse()?;
+      content_type = Some(value.value());
+      Ok(())
+    } else {
+      Err(nested.error("unsupported sdk root attribute"))
+    }
+  })?;
+
+  Ok(PartRefRoot {
+    element_ty: element_ty
+      .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires element"))?,
+    accessor: accessor
+      .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires accessor"))?,
+    content_type: content_type
+      .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires content_type"))?,
+  })
+}
+
+fn cfg_attrs(attrs: &[Attribute]) -> Vec<Attribute> {
+  attrs
+    .iter()
+    .filter(|attr| attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr"))
+    .cloned()
+    .collect()
+}

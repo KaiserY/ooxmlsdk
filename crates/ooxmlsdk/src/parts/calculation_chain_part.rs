@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct CalculationChainPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CalculationChainPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_calculation_chain_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculationChain,
-    CalculationChainPart,
-    as_calculation_chain_part,
-    as_calculation_chain_part_mut
-  );
+  >,
 }

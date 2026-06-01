@@ -15,17 +15,12 @@ pub const EXTENSION: &str = "";
 pub struct PivotTableCacheDefinitionPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl PivotTableCacheDefinitionPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_pivot_table_cache_definition_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheDefinition,
-    PivotTableCacheDefinitionPart,
-    as_pivot_table_cache_definition_part,
-    as_pivot_table_cache_definition_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      optional pivot_table_cache_records_part => crate
-      ::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipPivotCacheRecords))]
+  pub(crate) pivot_table_cache_records_part: crate::sdk::OptionalPart<
+    crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
+  >,
 }

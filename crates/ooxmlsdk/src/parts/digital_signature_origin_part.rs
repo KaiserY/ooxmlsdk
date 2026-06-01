@@ -14,11 +14,7 @@ pub const EXTENSION: &str = ".sigs";
 pub struct DigitalSignatureOriginPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl DigitalSignatureOriginPart {
-  crate::sdk_part_child_methods! {
-      repeated xml_signature_parts => crate
-      ::parts::xml_signature_part::XmlSignaturePart,
-      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature";
-  }
+  #[sdk(part_child(relationship_type = RelationshipSignature))]
+  pub(crate) xml_signature_parts:
+    crate::sdk::RepeatedPart<crate::parts::xml_signature_part::XmlSignaturePart>,
 }

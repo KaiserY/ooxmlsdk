@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct UserDefinedTagsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl UserDefinedTagsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_user_defined_tags_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TagList,
-    UserDefinedTagsPart,
-    as_user_defined_tags_part,
-    as_user_defined_tags_part_mut
-  );
+  >,
 }

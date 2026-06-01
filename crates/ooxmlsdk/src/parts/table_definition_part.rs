@@ -15,16 +15,10 @@ pub const EXTENSION: &str = "";
 pub struct TableDefinitionPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl TableDefinitionPart {
-  crate::sdk_part_root_methods!(
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table,
-    TableDefinitionPart,
-    as_table_definition_part,
-    as_table_definition_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated query_table_parts => crate ::parts::query_table_part::QueryTablePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
-  }
+  #[sdk(part_root(accessor = "as_table_definition_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table>,
+  #[sdk(part_child(relationship_type = RelationshipQueryTable))]
+  pub(crate) query_table_parts:
+    crate::sdk::RepeatedPart<crate::parts::query_table_part::QueryTablePart>,
 }

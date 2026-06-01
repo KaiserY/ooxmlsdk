@@ -13,12 +13,8 @@ pub const EXTENSION: &str = "";
 pub struct SlicersPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl SlicersPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_slicers_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers,
-    SlicersPart,
-    as_slicers_part,
-    as_slicers_part_mut
-  );
+  >,
 }

@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct DiagramColorsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl DiagramColorsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_diagram_colors_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::ColorsDefinition,
-    DiagramColorsPart,
-    as_diagram_colors_part,
-    as_diagram_colors_part_mut
-  );
+  >,
 }

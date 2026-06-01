@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct QueryTablePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl QueryTablePart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_query_table_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable,
-    QueryTablePart,
-    as_query_table_part,
-    as_query_table_part_mut
-  );
+  >,
 }

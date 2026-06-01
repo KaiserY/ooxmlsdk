@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct DocumentTasksPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl DocumentTasksPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_document_tasks_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks,
-    DocumentTasksPart,
-    as_document_tasks_part,
-    as_document_tasks_part_mut
-  );
+  >,
 }

@@ -15,12 +15,7 @@ pub const EXTENSION: &str = "";
 pub struct WorkbookUserDataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WorkbookUserDataPart {
-  crate::sdk_part_root_methods!(
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users,
-    WorkbookUserDataPart,
-    as_workbook_user_data_part,
-    as_workbook_user_data_part_mut
-  );
+  #[sdk(part_root(accessor = "as_workbook_user_data_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users>,
 }

@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct SlideSyncDataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl SlideSyncDataPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_slide_sync_data_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSyncProperties,
-    SlideSyncDataPart,
-    as_slide_sync_data_part,
-    as_slide_sync_data_part_mut
-  );
+  >,
 }

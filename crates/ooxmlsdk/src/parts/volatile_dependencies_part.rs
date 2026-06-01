@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct VolatileDependenciesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl VolatileDependenciesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_volatile_dependencies_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes,
-    VolatileDependenciesPart,
-    as_volatile_dependencies_part,
-    as_volatile_dependencies_part_mut
-  );
+  >,
 }

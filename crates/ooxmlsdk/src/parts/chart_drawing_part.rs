@@ -15,21 +15,15 @@ pub const EXTENSION: &str = "";
 pub struct ChartDrawingPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ChartDrawingPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_chart_drawing_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
-    ChartDrawingPart,
-    as_chart_drawing_part,
-    as_chart_drawing_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      optional chart_part => crate ::parts::chart_part::ChartPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
-      optional extended_chart_part => crate
-      ::parts::extended_chart_part::ExtendedChartPart,
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx"; repeated
-      image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipChart))]
+  pub(crate) chart_part: crate::sdk::OptionalPart<crate::parts::chart_part::ChartPart>,
+  #[sdk(part_child(relationship_type = RelationshipChartEx))]
+  pub(crate) extended_chart_part:
+    crate::sdk::OptionalPart<crate::parts::extended_chart_part::ExtendedChartPart>,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

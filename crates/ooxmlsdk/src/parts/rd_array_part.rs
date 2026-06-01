@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct RdArrayPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl RdArrayPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_rd_array_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::ArrayData,
-    RdArrayPart,
-    as_rd_array_part,
-    as_rd_array_part_mut
-  );
+  >,
 }

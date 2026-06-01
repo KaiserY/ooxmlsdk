@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct DiagramStylePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl DiagramStylePart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_diagram_style_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::StyleDefinition,
-    DiagramStylePart,
-    as_diagram_style_part,
-    as_diagram_style_part_mut
-  );
+  >,
 }

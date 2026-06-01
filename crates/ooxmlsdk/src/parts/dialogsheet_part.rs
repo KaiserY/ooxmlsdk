@@ -15,24 +15,20 @@ pub const EXTENSION: &str = "";
 pub struct DialogsheetPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl DialogsheetPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_dialogsheet_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet,
-    DialogsheetPart,
-    as_dialogsheet_part,
-    as_dialogsheet_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated spreadsheet_printer_settings_parts => crate
-      ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
-      optional drawings_part => crate ::parts::drawings_part::DrawingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
-      repeated vml_drawing_parts => crate ::parts::vml_drawing_part::VmlDrawingPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
-      repeated embedded_object_parts => crate
-      ::parts::embedded_object_part::EmbeddedObjectPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipPrinterSettings))]
+  pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
+    crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipDrawing))]
+  pub(crate) drawings_part: crate::sdk::OptionalPart<crate::parts::drawings_part::DrawingsPart>,
+  #[sdk(part_child(relationship_type = RelationshipVmlDrawing))]
+  pub(crate) vml_drawing_parts:
+    crate::sdk::RepeatedPart<crate::parts::vml_drawing_part::VmlDrawingPart>,
+  #[sdk(part_child(relationship_type = RelationshipOleObject))]
+  pub(crate) embedded_object_parts:
+    crate::sdk::RepeatedPart<crate::parts::embedded_object_part::EmbeddedObjectPart>,
 }

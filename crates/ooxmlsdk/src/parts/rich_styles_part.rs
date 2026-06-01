@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct RichStylesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl RichStylesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_rich_styles_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichStylesheet,
-    RichStylesPart,
-    as_rich_styles_part,
-    as_rich_styles_part_mut
-  );
+  >,
 }

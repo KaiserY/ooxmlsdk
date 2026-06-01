@@ -12,13 +12,10 @@ pub const TARGET_NAME: &str = "timelineCache";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct TimeLineCachePart {
-  pub(crate) relationship_id: Option<String>,
-  pub(crate) id: crate::common::PartId,
-}
-impl TimeLineCachePart {
-  crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
-        TimeLineCachePart, as_time_line_cache_part, as_time_line_cache_part_mut
-    );
+    pub(crate) relationship_id: Option<String>,
+    pub(crate) id: crate::common::PartId,
+    #[sdk(part_root(accessor = "as_time_line_cache_part"))]
+    pub(crate) root_element: crate::sdk::PartRoot<
+        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
+    >,
 }

@@ -13,7 +13,10 @@ use syn::{Attribute, Ident, ItemMod, LitByteStr, parse_str, parse2};
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::part_codegen_ir::PartModuleDecl;
-use crate::sdk_code::parts::{gen_part_module, gen_parts_mod, relationship_type_aliases};
+use crate::sdk_code::parts::{
+  gen_part_module_with_relationship_type_variants, gen_parts_mod, relationship_type_aliases,
+  relationship_type_variant_map,
+};
 use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
 use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::{
@@ -284,16 +287,22 @@ fn write_parts(
   fs::create_dir_all(&out_parts_dir_path)?;
   clear_generated_rs_files(&out_parts_dir_path)?;
 
+  let part_irs: Vec<_> = loaded_parts
+    .iter()
+    .map(|loaded_part| &loaded_part.ir)
+    .collect();
+  let relationship_type_variants = relationship_type_variant_map(&part_irs)?;
   for loaded_part in loaded_parts {
     let part_path = out_parts_dir_path.join(format!("{}.rs", loaded_part.ir.module_name));
     write_generated_module(
       &part_path,
-      gen_part_module(&loaded_part.ir).map_err(|err| {
-        format!(
-          "failed to generate part {}: {err}",
-          loaded_part.ir.module_name
-        )
-      })?,
+      gen_part_module_with_relationship_type_variants(&loaded_part.ir, &relationship_type_variants)
+        .map_err(|err| {
+          format!(
+            "failed to generate part {}: {err}",
+            loaded_part.ir.module_name
+          )
+        })?,
     )?;
   }
   write_generated_module(

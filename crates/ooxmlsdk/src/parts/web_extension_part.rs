@@ -14,16 +14,10 @@ pub const EXTENSION: &str = "";
 pub struct WebExtensionPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WebExtensionPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_web_extension_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_webextensions_webextension_2010_11::WebExtension,
-    WebExtensionPart,
-    as_web_extension_part,
-    as_web_extension_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

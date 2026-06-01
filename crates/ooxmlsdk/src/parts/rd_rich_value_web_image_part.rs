@@ -12,14 +12,10 @@ pub const TARGET_NAME: &str = "rdRichValueWebImage";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdRichValueWebImagePart {
-  pub(crate) relationship_id: Option<String>,
-  pub(crate) id: crate::common::PartId,
-}
-impl RdRichValueWebImagePart {
-  crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
-        RdRichValueWebImagePart, as_rd_rich_value_web_image_part,
-        as_rd_rich_value_web_image_part_mut
-    );
+    pub(crate) relationship_id: Option<String>,
+    pub(crate) id: crate::common::PartId,
+    #[sdk(part_root(accessor = "as_rd_rich_value_web_image_part"))]
+    pub(crate) root_element: crate::sdk::PartRoot<
+        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+    >,
 }

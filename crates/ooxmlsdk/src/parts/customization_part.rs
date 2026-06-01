@@ -14,17 +14,11 @@ pub const EXTENSION: &str = "";
 pub struct CustomizationPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CustomizationPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_customization_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
-    CustomizationPart,
-    as_customization_part,
-    as_customization_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      optional word_attached_toolbars_part => crate
-      ::parts::word_attached_toolbars_part::WordAttachedToolbarsPart,
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipAttachedToolbars))]
+  pub(crate) word_attached_toolbars_part:
+    crate::sdk::OptionalPart<crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>,
 }

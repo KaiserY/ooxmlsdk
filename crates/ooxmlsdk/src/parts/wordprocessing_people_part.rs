@@ -14,12 +14,7 @@ pub const EXTENSION: &str = "";
 pub struct WordprocessingPeoplePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WordprocessingPeoplePart {
-  crate::sdk_part_root_methods!(
-    crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People,
-    WordprocessingPeoplePart,
-    as_wordprocessing_people_part,
-    as_wordprocessing_people_part_mut
-  );
+  #[sdk(part_root(accessor = "as_wordprocessing_people_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People>,
 }

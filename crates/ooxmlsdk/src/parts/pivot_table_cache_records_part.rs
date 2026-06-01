@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct PivotTableCacheRecordsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl PivotTableCacheRecordsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_pivot_table_cache_records_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords,
-    PivotTableCacheRecordsPart,
-    as_pivot_table_cache_records_part,
-    as_pivot_table_cache_records_part_mut
-  );
+  >,
 }

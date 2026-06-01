@@ -15,23 +15,19 @@ pub const EXTENSION: &str = "";
 pub struct ChartsheetPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ChartsheetPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_chartsheet_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet,
-    ChartsheetPart,
-    as_chartsheet_part,
-    as_chartsheet_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated spreadsheet_printer_settings_parts => crate
-      ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
-      optional drawings_part => crate ::parts::drawings_part::DrawingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
-      repeated vml_drawing_parts => crate ::parts::vml_drawing_part::VmlDrawingPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipPrinterSettings))]
+  pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
+    crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipDrawing))]
+  pub(crate) drawings_part: crate::sdk::OptionalPart<crate::parts::drawings_part::DrawingsPart>,
+  #[sdk(part_child(relationship_type = RelationshipVmlDrawing))]
+  pub(crate) vml_drawing_parts:
+    crate::sdk::RepeatedPart<crate::parts::vml_drawing_part::VmlDrawingPart>,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

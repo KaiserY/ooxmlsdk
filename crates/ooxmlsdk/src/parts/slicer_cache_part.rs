@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct SlicerCachePart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl SlicerCachePart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_slicer_cache_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheDefinition,
-    SlicerCachePart,
-    as_slicer_cache_part,
-    as_slicer_cache_part_mut
-  );
+  >,
 }

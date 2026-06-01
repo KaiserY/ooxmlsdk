@@ -14,16 +14,9 @@ pub const EXTENSION: &str = "";
 pub struct RibbonAndBackstageCustomizationsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl RibbonAndBackstageCustomizationsPart {
-  crate::sdk_part_root_methods!(
-    crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi,
-    RibbonAndBackstageCustomizationsPart,
-    as_ribbon_and_backstage_customizations_part,
-    as_ribbon_and_backstage_customizations_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  #[sdk(part_root(accessor = "as_ribbon_and_backstage_customizations_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi>,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

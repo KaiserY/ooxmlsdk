@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct ExtendedFilePropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ExtendedFilePropertiesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_extended_file_properties_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties,
-    ExtendedFilePropertiesPart,
-    as_extended_file_properties_part,
-    as_extended_file_properties_part_mut
-  );
+  >,
 }

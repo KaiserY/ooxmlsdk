@@ -14,13 +14,9 @@ pub const EXTENSION: &str = ".vml";
 pub struct VmlDrawingPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl VmlDrawingPart {
-  crate::sdk_part_child_methods! {
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-      repeated legacy_diagram_text_parts => crate
-      ::parts::legacy_diagram_text_part::LegacyDiagramTextPart,
-      "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText";
-  }
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
+  #[sdk(part_child(relationship_type = RelationshipLegacyDiagramText))]
+  pub(crate) legacy_diagram_text_parts:
+    crate::sdk::RepeatedPart<crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>,
 }

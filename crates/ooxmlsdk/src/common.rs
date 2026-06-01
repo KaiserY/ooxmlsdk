@@ -437,10 +437,7 @@ pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -
   if actual == canonical {
     return true;
   }
-  let Some(canonical) = relationship_type_known_bytes(canonical) else {
-    return false;
-  };
-  relationship_type_matches_known_bytes(actual, canonical)
+  relationship_type_matches_alias_bytes(actual, canonical)
 }
 
 #[inline]
@@ -461,15 +458,6 @@ pub(crate) fn relationship_type_known_bytes(
   value: &[u8],
 ) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
   crate::namespaces::XmlKnownRelationshipNamespace::from_uri_bytes(value)
-}
-
-#[inline]
-#[cfg(feature = "parts")]
-pub(crate) fn relationship_type_matches_known_bytes(
-  actual: &[u8],
-  canonical: crate::namespaces::XmlKnownRelationshipNamespace,
-) -> bool {
-  actual == canonical.uri_bytes() || relationship_type_known_bytes(actual) == Some(canonical)
 }
 
 #[inline]
@@ -516,7 +504,7 @@ fn is_office_document_relationship_type(value: &[u8]) -> bool {
 
 #[inline]
 #[cfg(feature = "parts")]
-fn package_main_part_path_matches(
+pub(crate) fn package_main_part_path_matches(
   actual_path: &str,
   descriptor_path_prefix: &str,
   descriptor_target_name: &str,

@@ -14,11 +14,7 @@ pub const EXTENSION: &str = "";
 pub struct CustomXmlPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CustomXmlPart {
-  crate::sdk_part_child_methods! {
-      optional custom_xml_properties_part => crate
-      ::parts::custom_xml_properties_part::CustomXmlPropertiesPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps";
-  }
+  #[sdk(part_child(relationship_type = RelationshipCustomXmlProps))]
+  pub(crate) custom_xml_properties_part:
+    crate::sdk::OptionalPart<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
 }

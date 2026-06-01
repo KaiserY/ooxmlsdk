@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct VbaDataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl VbaDataPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_vba_data_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_word_2006_wordml::VbaSuppData,
-    VbaDataPart,
-    as_vba_data_part,
-    as_vba_data_part_mut
-  );
+  >,
 }

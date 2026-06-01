@@ -153,6 +153,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     let child_variant_ident: Ident = parse_str(&child_type_name)?;
     let relationship_type_pattern = match &child.relationship_type {
       PartRelationshipTypeSource::Explicit(value) => quote! { #value },
+      PartRelationshipTypeSource::Known(_) => {
+        unreachable!("known relationship variants are only supported for part handle markers")
+      }
       PartRelationshipTypeSource::TypeConst => {
         quote! { <#child_type as crate::sdk::SdkPartTree>::RELATIONSHIP_TYPE }
       }
@@ -167,6 +170,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             #relationship_type_pattern.as_bytes(),
           )
         })
+      }
+      PartRelationshipTypeSource::Known(_) => {
+        unreachable!("known relationship variants are only supported for part handle markers")
       }
       PartRelationshipTypeSource::TypeConst => Some(quote! {
         crate::common::relationship_type_matches_alias_bytes(
@@ -332,6 +338,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     let data_ref_type = &data_ref.ty;
     let relationship_type_pattern = match &data_ref.relationship_type {
       PartRelationshipTypeSource::Explicit(value) => quote! { #value },
+      PartRelationshipTypeSource::Known(_) => {
+        unreachable!("known relationship variants are only supported for part handle markers")
+      }
       PartRelationshipTypeSource::TypeConst => {
         quote! { <#data_ref_type as crate::sdk::SdkDataPartReference>::RELATIONSHIP_TYPE }
       }
@@ -346,6 +355,9 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             #relationship_type_pattern.as_bytes(),
           )
         })
+      }
+      PartRelationshipTypeSource::Known(_) => {
+        unreachable!("known relationship variants are only supported for part handle markers")
       }
       PartRelationshipTypeSource::TypeConst => Some(quote! {
         crate::common::relationship_type_matches_alias_bytes(
@@ -835,7 +847,7 @@ struct PartHandleChildInfo {
   field_ident: Ident,
   part_ty: Type,
   kind: PartChildKind,
-  relationship_type: String,
+  relationship_type: PartRelationshipTypeSource,
 }
 
 struct PartChildMarkerInfo {
@@ -1904,13 +1916,10 @@ fn part_handle_child_methods_tokens(
   let accessors = child_infos.iter().map(|child| {
     let method_ident = &child.field_ident;
     let part_ty = &child.part_ty;
-    let relationship_type = proc_macro2::Literal::byte_string(child.relationship_type.as_bytes());
+    let relationship_type = relationship_namespace_uri_tokens(&child.relationship_type);
     let map_relationship = quote! {
-      |relationship: &crate::common::RelationshipInfo| {
-        if crate::common::relationship_type_matches_bytes(
-          relationship.relationship_type_bytes(),
-          #relationship_type,
-        ) {
+      move |relationship: &crate::common::RelationshipInfo| {
+        if relationship.relationship_namespace_uri() == &relationship_type {
           relationship
             .target_part_id()
             .map(|part_id| {
@@ -1929,6 +1938,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
+          let relationship_type = #relationship_type;
           crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
@@ -1941,6 +1951,7 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
+          let relationship_type = #relationship_type;
           crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())

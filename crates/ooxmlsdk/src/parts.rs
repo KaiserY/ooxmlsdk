@@ -133,1549 +133,1032 @@ pub mod worksheet_part;
 pub mod worksheet_sort_map_part;
 pub mod worksheet_threaded_comments_part;
 pub mod xml_signature_part;
-macro_rules! define_part_ref {
-    ($($(#[$attrs:meta])* $variant:ident ($part_ty:ty),)*) => {
-        #[derive(Clone, Debug, Eq, PartialEq)] pub enum PartRef { $($(#[$attrs])*
-        $variant ($part_ty),)* ExtendedPart(crate ::parts::extended_part::ExtendedPart),
-        } impl PartRef { pub fn part_id(& self) -> crate ::common::PartId { match self {
-        $($(#[$attrs])* Self:: $variant (part) => part.part_id(),)*
-        Self::ExtendedPart(part) => { < crate ::parts::extended_part::ExtendedPart as
-        crate ::sdk::SdkPart > ::part_id(part) } } } }
-    };
-}
-define_part_ref! {
-    AlternativeFormatImportPart(crate
-    ::parts::alternative_format_import_part::AlternativeFormatImportPart),
-    CalculationChainPart(crate ::parts::calculation_chain_part::CalculationChainPart),
-    CellMetadataPart(crate ::parts::cell_metadata_part::CellMetadataPart),
-    ChartColorStylePart(crate ::parts::chart_color_style_part::ChartColorStylePart),
-    ChartDrawingPart(crate ::parts::chart_drawing_part::ChartDrawingPart),
-    ChartPart(crate ::parts::chart_part::ChartPart), ChartStylePart(crate
-    ::parts::chart_style_part::ChartStylePart), ChartsheetPart(crate
-    ::parts::chartsheet_part::ChartsheetPart), CommentAuthorsPart(crate
-    ::parts::comment_authors_part::CommentAuthorsPart), ConnectionsPart(crate
-    ::parts::connections_part::ConnectionsPart), ControlPropertiesPart(crate
-    ::parts::control_properties_part::ControlPropertiesPart),
-    CoreFilePropertiesPart(crate
-    ::parts::core_file_properties_part::CoreFilePropertiesPart), CustomDataPart(crate
-    ::parts::custom_data_part::CustomDataPart), CustomDataPropertiesPart(crate
-    ::parts::custom_data_properties_part::CustomDataPropertiesPart),
-    CustomFilePropertiesPart(crate
-    ::parts::custom_file_properties_part::CustomFilePropertiesPart),
-    CustomPropertyPart(crate ::parts::custom_property_part::CustomPropertyPart),
-    CustomXmlMappingsPart(crate
-    ::parts::custom_xml_mappings_part::CustomXmlMappingsPart), CustomXmlPart(crate
-    ::parts::custom_xml_part::CustomXmlPart), CustomXmlPropertiesPart(crate
-    ::parts::custom_xml_properties_part::CustomXmlPropertiesPart),
-    CustomizationPart(crate ::parts::customization_part::CustomizationPart),
-    DiagramColorsPart(crate ::parts::diagram_colors_part::DiagramColorsPart),
-    DiagramDataPart(crate ::parts::diagram_data_part::DiagramDataPart),
-    DiagramLayoutDefinitionPart(crate
-    ::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart),
-    DiagramPersistLayoutPart(crate
-    ::parts::diagram_persist_layout_part::DiagramPersistLayoutPart),
-    DiagramStylePart(crate ::parts::diagram_style_part::DiagramStylePart),
-    DialogsheetPart(crate ::parts::dialogsheet_part::DialogsheetPart),
-    DigitalSignatureOriginPart(crate
-    ::parts::digital_signature_origin_part::DigitalSignatureOriginPart),
-    DocumentSettingsPart(crate ::parts::document_settings_part::DocumentSettingsPart),
-    DocumentTasksPart(crate ::parts::document_tasks_part::DocumentTasksPart),
-    DrawingsPart(crate ::parts::drawings_part::DrawingsPart),
-    EmbeddedControlPersistenceBinaryDataPart(crate
-    ::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart),
-    EmbeddedControlPersistencePart(crate
-    ::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart),
-    EmbeddedObjectPart(crate ::parts::embedded_object_part::EmbeddedObjectPart),
-    EmbeddedPackagePart(crate ::parts::embedded_package_part::EmbeddedPackagePart),
-    EndnotesPart(crate ::parts::endnotes_part::EndnotesPart),
-    ExcelAttachedToolbarsPart(crate
-    ::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart),
-    ExtendedChartPart(crate ::parts::extended_chart_part::ExtendedChartPart),
-    ExtendedFilePropertiesPart(crate
-    ::parts::extended_file_properties_part::ExtendedFilePropertiesPart),
-    ExternalWorkbookPart(crate ::parts::external_workbook_part::ExternalWorkbookPart),
-    FeaturePropertyBagsPart(crate
-    ::parts::feature_property_bags_part::FeaturePropertyBagsPart), FontPart(crate
-    ::parts::font_part::FontPart), FontTablePart(crate
-    ::parts::font_table_part::FontTablePart), FooterPart(crate
-    ::parts::footer_part::FooterPart), FootnotesPart(crate
-    ::parts::footnotes_part::FootnotesPart), GlossaryDocumentPart(crate
-    ::parts::glossary_document_part::GlossaryDocumentPart), HandoutMasterPart(crate
-    ::parts::handout_master_part::HandoutMasterPart), HeaderPart(crate
-    ::parts::header_part::HeaderPart), ImagePart(crate ::parts::image_part::ImagePart),
-    InternationalMacroSheetPart(crate
-    ::parts::international_macro_sheet_part::InternationalMacroSheetPart),
-    LabelInfoPart(crate ::parts::label_info_part::LabelInfoPart),
-    LegacyDiagramTextInfoPart(crate
-    ::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart),
-    LegacyDiagramTextPart(crate
-    ::parts::legacy_diagram_text_part::LegacyDiagramTextPart), MacroSheetPart(crate
-    ::parts::macro_sheet_part::MacroSheetPart), MailMergeRecipientDataPart(crate
-    ::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart),
-    MainDocumentPart(crate ::parts::main_document_part::MainDocumentPart),
-    Model3DReferenceRelationshipPart(crate
-    ::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart),
-    NamedSheetViewsPart(crate ::parts::named_sheet_views_part::NamedSheetViewsPart),
-    NotesMasterPart(crate ::parts::notes_master_part::NotesMasterPart),
-    NotesSlidePart(crate ::parts::notes_slide_part::NotesSlidePart),
-    NumberingDefinitionsPart(crate
-    ::parts::numbering_definitions_part::NumberingDefinitionsPart),
-    PivotTableCacheDefinitionPart(crate
-    ::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart),
-    PivotTableCacheRecordsPart(crate
-    ::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart),
-    PivotTablePart(crate ::parts::pivot_table_part::PivotTablePart),
-    PowerPointAuthorsPart(crate
-    ::parts::power_point_authors_part::PowerPointAuthorsPart),
-    PowerPointCommentPart(crate
-    ::parts::power_point_comment_part::PowerPointCommentPart), PresentationPart(crate
-    ::parts::presentation_part::PresentationPart), PresentationPropertiesPart(crate
-    ::parts::presentation_properties_part::PresentationPropertiesPart),
-    QueryTablePart(crate ::parts::query_table_part::QueryTablePart),
-    QuickAccessToolbarCustomizationsPart(crate
-    ::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart),
-    RdArrayPart(crate ::parts::rd_array_part::RdArrayPart), RdRichValuePart(crate
-    ::parts::rd_rich_value_part::RdRichValuePart), RdRichValueStructurePart(crate
-    ::parts::rd_rich_value_structure_part::RdRichValueStructurePart),
-    RdRichValueTypesPart(crate ::parts::rd_rich_value_types_part::RdRichValueTypesPart),
-    RdRichValueWebImagePart(crate
-    ::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart),
-    RdSupportingPropertyBagPart(crate
-    ::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart),
-    RdSupportingPropertyBagStructurePart(crate
-    ::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart),
-    RibbonAndBackstageCustomizationsPart(crate
-    ::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart),
-    RibbonExtensibilityPart(crate
-    ::parts::ribbon_extensibility_part::RibbonExtensibilityPart), RichStylesPart(crate
-    ::parts::rich_styles_part::RichStylesPart), SharedStringTablePart(crate
-    ::parts::shared_string_table_part::SharedStringTablePart), SingleCellTablePart(crate
-    ::parts::single_cell_table_part::SingleCellTablePart), SlicerCachePart(crate
-    ::parts::slicer_cache_part::SlicerCachePart), SlicersPart(crate
-    ::parts::slicers_part::SlicersPart), SlideCommentsPart(crate
-    ::parts::slide_comments_part::SlideCommentsPart), SlideLayoutPart(crate
-    ::parts::slide_layout_part::SlideLayoutPart), SlideMasterPart(crate
-    ::parts::slide_master_part::SlideMasterPart), SlidePart(crate
-    ::parts::slide_part::SlidePart), SlideSyncDataPart(crate
-    ::parts::slide_sync_data_part::SlideSyncDataPart),
-    SpreadsheetPrinterSettingsPart(crate
-    ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart),
-    StyleDefinitionsPart(crate ::parts::style_definitions_part::StyleDefinitionsPart),
-    StylesWithEffectsPart(crate
-    ::parts::styles_with_effects_part::StylesWithEffectsPart), TableDefinitionPart(crate
-    ::parts::table_definition_part::TableDefinitionPart), TableStylesPart(crate
-    ::parts::table_styles_part::TableStylesPart), ThemeOverridePart(crate
-    ::parts::theme_override_part::ThemeOverridePart), ThemePart(crate
-    ::parts::theme_part::ThemePart), ThumbnailPart(crate
-    ::parts::thumbnail_part::ThumbnailPart), TimeLineCachePart(crate
-    ::parts::time_line_cache_part::TimeLineCachePart), TimeLinePart(crate
-    ::parts::time_line_part::TimeLinePart), UserDefinedTagsPart(crate
-    ::parts::user_defined_tags_part::UserDefinedTagsPart), VbaDataPart(crate
-    ::parts::vba_data_part::VbaDataPart), VbaProjectPart(crate
-    ::parts::vba_project_part::VbaProjectPart), ViewPropertiesPart(crate
-    ::parts::view_properties_part::ViewPropertiesPart), VmlDrawingPart(crate
-    ::parts::vml_drawing_part::VmlDrawingPart), VolatileDependenciesPart(crate
-    ::parts::volatile_dependencies_part::VolatileDependenciesPart),
-    WebExTaskpanesPart(crate ::parts::web_ex_taskpanes_part::WebExTaskpanesPart),
-    WebExtensionPart(crate ::parts::web_extension_part::WebExtensionPart),
-    WebSettingsPart(crate ::parts::web_settings_part::WebSettingsPart),
-    WordAttachedToolbarsPart(crate
-    ::parts::word_attached_toolbars_part::WordAttachedToolbarsPart),
-    WordCommentsExtensiblePart(crate
-    ::parts::word_comments_extensible_part::WordCommentsExtensiblePart),
-    WordprocessingCommentsExPart(crate
-    ::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart),
-    WordprocessingCommentsIdsPart(crate
-    ::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart),
-    WordprocessingCommentsPart(crate
-    ::parts::wordprocessing_comments_part::WordprocessingCommentsPart),
-    WordprocessingPeoplePart(crate
-    ::parts::wordprocessing_people_part::WordprocessingPeoplePart),
-    WordprocessingPrinterSettingsPart(crate
-    ::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart),
-    WorkbookPart(crate ::parts::workbook_part::WorkbookPart), WorkbookPersonPart(crate
-    ::parts::workbook_person_part::WorkbookPersonPart), WorkbookRevisionHeaderPart(crate
-    ::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart),
-    WorkbookRevisionLogPart(crate
-    ::parts::workbook_revision_log_part::WorkbookRevisionLogPart),
-    WorkbookStylesPart(crate ::parts::workbook_styles_part::WorkbookStylesPart),
-    WorkbookUserDataPart(crate ::parts::workbook_user_data_part::WorkbookUserDataPart),
-    WorksheetCommentsPart(crate ::parts::worksheet_comments_part::WorksheetCommentsPart),
-    WorksheetPart(crate ::parts::worksheet_part::WorksheetPart),
-    WorksheetSortMapPart(crate ::parts::worksheet_sort_map_part::WorksheetSortMapPart),
-    WorksheetThreadedCommentsPart(crate
-    ::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart),
-    XmlSignaturePart(crate ::parts::xml_signature_part::XmlSignaturePart),
-}
-impl PartRef {
-  pub(crate) fn from_part_id<P: crate::sdk::SdkPackage>(
-    package: &P,
-    part_id: crate::common::PartId,
-  ) -> Option<Self> {
-    Self::from_storage(crate::sdk::SdkPackage::storage(package), part_id, None)
-  }
-  pub(crate) fn from_relationship_storage(
-    storage: &crate::common::SdkPackageStorage,
-    relationship: &crate::common::RelationshipInfo,
-  ) -> Option<Self> {
-    Self::from_storage(
-      storage,
-      relationship.target_part_id()?,
-      Some(relationship.id()),
-    )
-  }
-  fn from_storage(
-    storage: &crate::common::SdkPackageStorage,
-    part_id: crate::common::PartId,
-    relationship_id: Option<&str>,
-  ) -> Option<Self> {
-    let part = storage.part(part_id)?;
-    let Some(relationship_type) = part.relationship_known_type() else {
-      let part = if let Some(relationship_id) = relationship_id {
-        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                    storage,
-                    relationship_id,
-                    part_id,
-                )
-      } else {
-        <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                    storage,
-                    part_id,
-                )
-      };
-      return Some(PartRef::ExtendedPart(part));
-    };
-    match relationship_type {
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipActiveXControlBinary => {
-                return Some(
-                    <crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAttachedToolbars if part
-                .content_type() == "application/vnd.ms-excel.attachedToolbars" => {
-                return Some(
-                    <crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAttachedToolbars if part
-                .content_type() == "application/vnd.ms-word.attachedToolbars" => {
-                return Some(
-                    <crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipKeyMapCustomizations if part
-                .content_type()
-                == "application/vnd.ms-word.keyMapCustomizations+xml" => {
-                return Some(
-                    <crate::parts::customization_part::CustomizationPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipLegacyDiagramText if part
-                .content_type() == "application/vnd.ms-office.legacyDiagramText" => {
-                return Some(
-                    <crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipLegacyDocTextInfo if part
-                .content_type() == "application/vnd.ms-office.legacyDocTextInfo" => {
-                return Some(
-                    <crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipExtensibility2 if part
-                .content_type() == "application/xml" => {
-                return Some(
-                    <crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipUserCustomization if part
-                .content_type() == "application/xml" => {
-                return Some(
-                    <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipVbaProject if part
-                .content_type() == "application/vnd.ms-office.vbaProject" => {
-                return Some(
-                    <crate::parts::vba_project_part::VbaProjectPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWordVbaData if part
-                .content_type() == "application/vnd.ms-word.vbaData+xml" => {
-                return Some(
-                    <crate::parts::vba_data_part::VbaDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWsSortMap if part
-                .content_type() == "application/vnd.ms-excel.wsSortMap+xml" => {
-                return Some(
-                    <crate::parts::worksheet_sort_map_part::WorksheetSortMapPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipXlIntlMacrosheet if part
-                .content_type() == "application/vnd.ms-excel.intlmacrosheet+xml" => {
-                return Some(
-                    <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipXlMacrosheet if part
-                .content_type() == "application/vnd.ms-excel.macrosheet+xml" => {
-                return Some(
-                    <crate::parts::macro_sheet_part::MacroSheetPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomData if part
-                .content_type() == "application/binary" => {
-                return Some(
-                    <crate::parts::custom_data_part::CustomDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomDataProps if part
-                .content_type()
-                == "application/vnd.ms-excel.customDataProperties+xml" => {
-                return Some(
-                    <crate::parts::custom_data_properties_part::CustomDataPropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDiagramDrawing if part
-                .content_type()
-                == "application/vnd.ms-office.drawingml.diagramDrawing+xml" => {
-                return Some(
-                    <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlicer if part
-                .content_type() == "application/vnd.ms-excel.slicer+xml" => {
-                return Some(
-                    <crate::parts::slicers_part::SlicersPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlicerCache if part
-                .content_type() == "application/vnd.ms-excel.slicerCache+xml" => {
-                return Some(
-                    <crate::parts::slicer_cache_part::SlicerCachePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipStylesWithEffects if part
-                .content_type() == "application/vnd.ms-word.stylesWithEffects+xml" => {
-                return Some(
-                    <crate::parts::styles_with_effects_part::StylesWithEffectsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipExtensibility if part
-                .content_type() == "application/xml" => {
-                return Some(
-                    <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChartColorStyle if part
-                .content_type() == "application/vnd.ms-office.chartcolorstyle+xml" => {
-                return Some(
-                    <crate::parts::chart_color_style_part::ChartColorStylePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChartStyle if part
-                .content_type() == "application/vnd.ms-office.chartstyle+xml" => {
-                return Some(
-                    <crate::parts::chart_style_part::ChartStylePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCommentsExtended if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml" => {
-                return Some(
-                    <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPeople if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml" => {
-                return Some(
-                    <crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTimeline if part
-                .content_type() == "application/vnd.ms-excel.timeline+xml" => {
-                return Some(
-                    <crate::parts::time_line_part::TimeLinePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTimelineCache if part
-                .content_type() == "application/vnd.ms-excel.timelineCache+xml" => {
-                return Some(
-                    <crate::parts::time_line_cache_part::TimeLineCachePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWebextension if part
-                .content_type() == "application/vnd.ms-office.webextension+xml" => {
-                return Some(
-                    <crate::parts::web_extension_part::WebExtensionPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWebextensiontaskpanes if part
-                .content_type()
-                == "application/vnd.ms-office.webextensiontaskpanes+xml" => {
-                return Some(
-                    <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChartEx if part
-                .content_type() == "application/vnd.ms-office.chartex+xml" => {
-                return Some(
-                    <crate::parts::extended_chart_part::ExtendedChartPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCommentsIds if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml" => {
-                return Some(
-                    <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipModel3d if part
-                .content_type() == "model/gltf-binary" => {
-                return Some(
-                    <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdArray if part
-                .content_type() == "application/vnd.ms-excel.rdarray+xml" => {
-                return Some(
-                    <crate::parts::rd_array_part::RdArrayPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdRichValue if part
-                .content_type() == "application/vnd.ms-excel.rdrichvalue+xml" => {
-                return Some(
-                    <crate::parts::rd_rich_value_part::RdRichValuePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdRichValueStructure if part
-                .content_type()
-                == "application/vnd.ms-excel.rdrichvaluestructure+xml" => {
-                return Some(
-                    <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdRichValueTypes if part
-                .content_type() == "application/vnd.ms-excel.rdrichvaluetypes+xml" => {
-                return Some(
-                    <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdSupportingPropertyBag if part
-                .content_type()
-                == "application/vnd.ms-excel.rdsupportingpropertybag+xml" => {
-                return Some(
-                    <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdSupportingPropertyBagStructure if part
-                .content_type()
-                == "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml" => {
-                return Some(
-                    <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRichStyles if part
-                .content_type() == "application/vnd.ms-excel.richstyles+xml" => {
-                return Some(
-                    <crate::parts::rich_styles_part::RichStylesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPerson if part
-                .content_type() == "application/vnd.ms-excel.person+xml" => {
-                return Some(
-                    <crate::parts::workbook_person_part::WorkbookPersonPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipThreadedComment if part
-                .content_type() == "application/vnd.ms-excel.threadedcomments+xml" => {
-                return Some(
-                    <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCommentsExtensible if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml" => {
-                return Some(
-                    <crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAuthors if part
-                .content_type() == "application/vnd.ms-powerpoint.authors+xml" => {
-                return Some(
-                    <crate::parts::power_point_authors_part::PowerPointAuthorsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipComments if part
-                .content_type() == "application/vnd.ms-powerpoint.comments+xml" => {
-                return Some(
-                    <crate::parts::power_point_comment_part::PowerPointCommentPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipNamedSheetView if part
-                .content_type() == "application/vnd.ms-excel.namedsheetviews+xml" => {
-                return Some(
-                    <crate::parts::named_sheet_views_part::NamedSheetViewsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDocumenttasks if part
-                .content_type() == "application/vnd.ms-office.documenttasks+xml" => {
-                return Some(
-                    <crate::parts::document_tasks_part::DocumentTasksPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipClassificationlabels if part
-                .content_type()
-                == "application/vnd.ms-office.classificationlabels+xml" => {
-                return Some(
-                    <crate::parts::label_info_part::LabelInfoPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRdRichValueWebImage if part
-                .content_type()
-                == "application/vnd.ms-excel.rdrichvaluewebimage+xml" => {
-                return Some(
-                    <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipFeaturePropertyBag if part
-                .content_type() == "application/vnd.ms-excel.featurepropertybag+xml" => {
-                return Some(
-                    <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAFChunk => {
-                return Some(
-                    <crate::parts::alternative_format_import_part::AlternativeFormatImportPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCalcChain if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml" => {
-                return Some(
-                    <crate::parts::calculation_chain_part::CalculationChainPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChart if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.chart+xml" => {
-                return Some(
-                    <crate::parts::chart_part::ChartPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChartUserShapes if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml" => {
-                return Some(
-                    <crate::parts::chart_drawing_part::ChartDrawingPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipChartsheet if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml" => {
-                return Some(
-                    <crate::parts::chartsheet_part::ChartsheetPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCommentAuthors if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml" => {
-                return Some(
-                    <crate::parts::comment_authors_part::CommentAuthorsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipComments2 if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.comments+xml" => {
-                return Some(
-                    <crate::parts::slide_comments_part::SlideCommentsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipComments2 if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml" => {
-                return Some(
-                    <crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipComments2 if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml" => {
-                return Some(
-                    <crate::parts::worksheet_comments_part::WorksheetCommentsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipConnections if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml" => {
-                return Some(
-                    <crate::parts::connections_part::ConnectionsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipControl => {
-                return Some(
-                    <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCtrlProp if part
-                .content_type() == "application/vnd.ms-excel.controlproperties+xml" => {
-                return Some(
-                    <crate::parts::control_properties_part::ControlPropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomProperties if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.custom-properties+xml" => {
-                return Some(
-                    <crate::parts::custom_file_properties_part::CustomFilePropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomProperty => {
-                return Some(
-                    <crate::parts::custom_property_part::CustomPropertyPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomXml => {
-                return Some(
-                    <crate::parts::custom_xml_part::CustomXmlPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCustomXmlProps if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.customXmlProperties+xml" => {
-                return Some(
-                    <crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDiagramColors if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml" => {
-                return Some(
-                    <crate::parts::diagram_colors_part::DiagramColorsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDiagramData if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml" => {
-                return Some(
-                    <crate::parts::diagram_data_part::DiagramDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDiagramLayout if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml" => {
-                return Some(
-                    <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDiagramQuickStyle if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml" => {
-                return Some(
-                    <crate::parts::diagram_style_part::DiagramStylePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDialogsheet if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml" => {
-                return Some(
-                    <crate::parts::dialogsheet_part::DialogsheetPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipDrawing if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.drawing+xml" => {
-                return Some(
-                    <crate::parts::drawings_part::DrawingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipEndnotes if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml" => {
-                return Some(
-                    <crate::parts::endnotes_part::EndnotesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipExtendedProperties if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.extended-properties+xml" => {
-                return Some(
-                    <crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipExternalLink if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml" => {
-                return Some(
-                    <crate::parts::external_workbook_part::ExternalWorkbookPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipFont => {
-                return Some(
-                    <crate::parts::font_part::FontPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipFontTable if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml" => {
-                return Some(
-                    <crate::parts::font_table_part::FontTablePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipFooter if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml" => {
-                return Some(
-                    <crate::parts::footer_part::FooterPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipFootnotes if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml" => {
-                return Some(
-                    <crate::parts::footnotes_part::FootnotesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipGlossaryDocument if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml" => {
-                return Some(
-                    <crate::parts::glossary_document_part::GlossaryDocumentPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipHandoutMaster if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml" => {
-                return Some(
-                    <crate::parts::handout_master_part::HandoutMasterPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipHeader if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" => {
-                return Some(
-                    <crate::parts::header_part::HeaderPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipImage => {
-                return Some(
-                    <crate::parts::image_part::ImagePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipNotesMaster if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml" => {
-                return Some(
-                    <crate::parts::notes_master_part::NotesMasterPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipNotesSlide if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml" => {
-                return Some(
-                    <crate::parts::notes_slide_part::NotesSlidePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipNumbering if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml" => {
-                return Some(
-                    <crate::parts::numbering_definitions_part::NumberingDefinitionsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument if part
-                .path() == "word/document.xml" => {
-                return Some(
-                    <crate::parts::main_document_part::MainDocumentPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument if part
-                .path() == "ppt/presentation.xml" => {
-                return Some(
-                    <crate::parts::presentation_part::PresentationPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument if part
-                .path() == "xl/workbook.xml" => {
-                return Some(
-                    <crate::parts::workbook_part::WorkbookPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOleObject => {
-                return Some(
-                    <crate::parts::embedded_object_part::EmbeddedObjectPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPackage => {
-                return Some(
-                    <crate::parts::embedded_package_part::EmbeddedPackagePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPivotCacheDefinition if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml" => {
-                return Some(
-                    <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPivotCacheRecords if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml" => {
-                return Some(
-                    <crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPivotTable if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml" => {
-                return Some(
-                    <crate::parts::pivot_table_part::PivotTablePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPresProps if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml" => {
-                return Some(
-                    <crate::parts::presentation_properties_part::PresentationPropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPrinterSettings if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings" => {
-                return Some(
-                    <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipPrinterSettings if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings" => {
-                return Some(
-                    <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipQueryTable if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml" => {
-                return Some(
-                    <crate::parts::query_table_part::QueryTablePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRecipientData => {
-                return Some(
-                    <crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRevisionHeaders if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml" => {
-                return Some(
-                    <crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipRevisionLog if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml" => {
-                return Some(
-                    <crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSettings if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml" => {
-                return Some(
-                    <crate::parts::document_settings_part::DocumentSettingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSharedStrings if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml" => {
-                return Some(
-                    <crate::parts::shared_string_table_part::SharedStringTablePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSheetMetadata if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml" => {
-                return Some(
-                    <crate::parts::cell_metadata_part::CellMetadataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlide if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.slide+xml" => {
-                return Some(
-                    <crate::parts::slide_part::SlidePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlideLayout if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml" => {
-                return Some(
-                    <crate::parts::slide_layout_part::SlideLayoutPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlideMaster if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml" => {
-                return Some(
-                    <crate::parts::slide_master_part::SlideMasterPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSlideUpdateInfo if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml" => {
-                return Some(
-                    <crate::parts::slide_sync_data_part::SlideSyncDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipStyles if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml" => {
-                return Some(
-                    <crate::parts::style_definitions_part::StyleDefinitionsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipStyles if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml" => {
-                return Some(
-                    <crate::parts::workbook_styles_part::WorkbookStylesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTable if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml" => {
-                return Some(
-                    <crate::parts::table_definition_part::TableDefinitionPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTableSingleCells if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml" => {
-                return Some(
-                    <crate::parts::single_cell_table_part::SingleCellTablePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTableStyles if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml" => {
-                return Some(
-                    <crate::parts::table_styles_part::TableStylesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTags if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.tags+xml" => {
-                return Some(
-                    <crate::parts::user_defined_tags_part::UserDefinedTagsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipTheme if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.theme+xml" => {
-                return Some(
-                    <crate::parts::theme_part::ThemePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipThemeOverride if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.themeOverride+xml" => {
-                return Some(
-                    <crate::parts::theme_override_part::ThemeOverridePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipUsernames if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml" => {
-                return Some(
-                    <crate::parts::workbook_user_data_part::WorkbookUserDataPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipViewProps if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml" => {
-                return Some(
-                    <crate::parts::view_properties_part::ViewPropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipVmlDrawing if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.vmlDrawing" => {
-                return Some(
-                    <crate::parts::vml_drawing_part::VmlDrawingPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipVolatileDependencies if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml" => {
-                return Some(
-                    <crate::parts::volatile_dependencies_part::VolatileDependenciesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWebSettings if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml" => {
-                return Some(
-                    <crate::parts::web_settings_part::WebSettingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipWorksheet if part
-                .content_type()
-                == "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml" => {
-                return Some(
-                    <crate::parts::worksheet_part::WorksheetPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipXmlMaps if part
-                .content_type() == "application/xml" => {
-                return Some(
-                    <crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOrigin if part
-                .content_type()
-                == "application/vnd.openxmlformats-package.digital-signature-origin" => {
-                return Some(
-                    <crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipSignature if part
-                .content_type()
-                == "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml" => {
-                return Some(
-                    <crate::parts::xml_signature_part::XmlSignaturePart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCoreProperties if part
-                .content_type()
-                == "application/vnd.openxmlformats-package.core-properties+xml" => {
-                return Some(
-                    <crate::parts::core_file_properties_part::CoreFilePropertiesPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            crate::namespaces::XmlKnownRelationshipNamespace::RelationshipThumbnail => {
-                return Some(
-                    <crate::parts::thumbnail_part::ThumbnailPart>::make_part_ref(
-                        storage,
-                        part_id,
-                        relationship_id,
-                    ),
-                );
-            }
-            _ => {}
-        }
-    let part = if let Some(relationship_id) = relationship_id {
-      <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                storage,
-                relationship_id,
-                part_id,
-            )
-    } else {
-      <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-                storage,
-                part_id,
-            )
-    };
-    Some(PartRef::ExtendedPart(part))
-  }
+#[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPartRef)]
+pub enum PartRef {
+  #[sdk(relationship_type = RelationshipAFChunk)]
+    AlternativeFormatImportPart(
+        crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipCalcChain,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculationChain,
+            accessor = as_calculation_chain_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"
+        )
+    )]
+    CalculationChainPart(crate::parts::calculation_chain_part::CalculationChainPart),
+    #[sdk(
+        relationship_type = RelationshipSheetMetadata,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata,
+            accessor = as_cell_metadata_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
+        )
+    )]
+    CellMetadataPart(crate::parts::cell_metadata_part::CellMetadataPart),
+    #[sdk(
+        relationship_type = RelationshipChartColorStyle,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ColorStyle,
+            accessor = as_chart_color_style_part,
+            content_type = "application/vnd.ms-office.chartcolorstyle+xml"
+        )
+    )]
+    ChartColorStylePart(crate::parts::chart_color_style_part::ChartColorStylePart),
+    #[sdk(
+        relationship_type = RelationshipChartUserShapes,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
+            accessor = as_chart_drawing_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml"
+        )
+    )]
+    ChartDrawingPart(crate::parts::chart_drawing_part::ChartDrawingPart),
+    #[sdk(
+        relationship_type = RelationshipChart,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace,
+            accessor = as_chart_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
+        )
+    )]
+    ChartPart(crate::parts::chart_part::ChartPart),
+    #[sdk(
+        relationship_type = RelationshipChartStyle,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ChartStyle,
+            accessor = as_chart_style_part,
+            content_type = "application/vnd.ms-office.chartstyle+xml"
+        )
+    )]
+    ChartStylePart(crate::parts::chart_style_part::ChartStylePart),
+    #[sdk(
+        relationship_type = RelationshipChartsheet,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet,
+            accessor = as_chartsheet_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"
+        )
+    )]
+    ChartsheetPart(crate::parts::chartsheet_part::ChartsheetPart),
+    #[sdk(
+        relationship_type = RelationshipCommentAuthors,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentAuthorList,
+            accessor = as_comment_authors_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml"
+        )
+    )]
+    CommentAuthorsPart(crate::parts::comment_authors_part::CommentAuthorsPart),
+    #[sdk(
+        relationship_type = RelationshipConnections,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections,
+            accessor = as_connections_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"
+        )
+    )]
+    ConnectionsPart(crate::parts::connections_part::ConnectionsPart),
+    #[sdk(
+        relationship_type = RelationshipCtrlProp,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FormControlProperties,
+            accessor = as_control_properties_part,
+            content_type = "application/vnd.ms-excel.controlproperties+xml"
+        )
+    )]
+    ControlPropertiesPart(crate::parts::control_properties_part::ControlPropertiesPart),
+    #[sdk(
+        relationship_type = RelationshipCoreProperties,
+        root(
+            element = crate::schemas::opc_core_properties::CoreProperties,
+            accessor = as_core_file_properties_part,
+            content_type = "application/vnd.openxmlformats-package.core-properties+xml"
+        )
+    )]
+    CoreFilePropertiesPart(
+        crate::parts::core_file_properties_part::CoreFilePropertiesPart,
+    ),
+    #[sdk(relationship_type = RelationshipCustomData)]
+    CustomDataPart(crate::parts::custom_data_part::CustomDataPart),
+    #[sdk(
+        relationship_type = RelationshipCustomDataProps,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
+            accessor = as_custom_data_properties_part,
+            content_type = "application/vnd.ms-excel.customDataProperties+xml"
+        )
+    )]
+    CustomDataPropertiesPart(
+        crate::parts::custom_data_properties_part::CustomDataPropertiesPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipCustomProperties,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_office_document_2006_custom_properties::Properties,
+            accessor = as_custom_file_properties_part,
+            content_type = "application/vnd.openxmlformats-officedocument.custom-properties+xml"
+        )
+    )]
+    CustomFilePropertiesPart(
+        crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
+    ),
+    #[sdk(relationship_type = RelationshipCustomProperty)]
+    CustomPropertyPart(crate::parts::custom_property_part::CustomPropertyPart),
+    #[sdk(
+        relationship_type = RelationshipXmlMaps,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::MapInfo,
+            accessor = as_custom_xml_mappings_part,
+            content_type = "application/xml"
+        )
+    )]
+    CustomXmlMappingsPart(crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart),
+    #[sdk(relationship_type = RelationshipCustomXml)]
+    CustomXmlPart(crate::parts::custom_xml_part::CustomXmlPart),
+    #[sdk(
+        relationship_type = RelationshipCustomXmlProps,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_office_document_2006_custom_xml::DataStoreItem,
+            accessor = as_custom_xml_properties_part,
+            content_type = "application/vnd.openxmlformats-officedocument.customXmlProperties+xml"
+        )
+    )]
+    CustomXmlPropertiesPart(
+        crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipKeyMapCustomizations,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
+            accessor = as_customization_part,
+            content_type = "application/vnd.ms-word.keyMapCustomizations+xml"
+        )
+    )]
+    CustomizationPart(crate::parts::customization_part::CustomizationPart),
+    #[sdk(
+        relationship_type = RelationshipDiagramColors,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::ColorsDefinition,
+            accessor = as_diagram_colors_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"
+        )
+    )]
+    DiagramColorsPart(crate::parts::diagram_colors_part::DiagramColorsPart),
+    #[sdk(
+        relationship_type = RelationshipDiagramData,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::DataModelRoot,
+            accessor = as_diagram_data_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"
+        )
+    )]
+    DiagramDataPart(crate::parts::diagram_data_part::DiagramDataPart),
+    #[sdk(
+        relationship_type = RelationshipDiagramLayout,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::LayoutDefinition,
+            accessor = as_diagram_layout_definition_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"
+        )
+    )]
+    DiagramLayoutDefinitionPart(
+        crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipDiagramDrawing,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing,
+            accessor = as_diagram_persist_layout_part,
+            content_type = "application/vnd.ms-office.drawingml.diagramDrawing+xml"
+        )
+    )]
+    DiagramPersistLayoutPart(
+        crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipDiagramQuickStyle,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::StyleDefinition,
+            accessor = as_diagram_style_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"
+        )
+    )]
+    DiagramStylePart(crate::parts::diagram_style_part::DiagramStylePart),
+    #[sdk(
+        relationship_type = RelationshipDialogsheet,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet,
+            accessor = as_dialogsheet_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml"
+        )
+    )]
+    DialogsheetPart(crate::parts::dialogsheet_part::DialogsheetPart),
+    #[sdk(relationship_type = RelationshipOrigin)]
+    DigitalSignatureOriginPart(
+        crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipSettings,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings,
+            accessor = as_document_settings_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
+        )
+    )]
+    DocumentSettingsPart(crate::parts::document_settings_part::DocumentSettingsPart),
+    #[sdk(
+        relationship_type = RelationshipDocumenttasks,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks,
+            accessor = as_document_tasks_part,
+            content_type = "application/vnd.ms-office.documenttasks+xml"
+        )
+    )]
+    DocumentTasksPart(crate::parts::document_tasks_part::DocumentTasksPart),
+    #[sdk(
+        relationship_type = RelationshipDrawing,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing::WorksheetDrawing,
+            accessor = as_drawings_part,
+            content_type = "application/vnd.openxmlformats-officedocument.drawing+xml"
+        )
+    )]
+    DrawingsPart(crate::parts::drawings_part::DrawingsPart),
+    #[sdk(relationship_type = RelationshipActiveXControlBinary)]
+    EmbeddedControlPersistenceBinaryDataPart(
+        crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
+    ),
+    #[sdk(relationship_type = RelationshipControl)]
+    EmbeddedControlPersistencePart(
+        crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+    ),
+    #[sdk(relationship_type = RelationshipOleObject)]
+    EmbeddedObjectPart(crate::parts::embedded_object_part::EmbeddedObjectPart),
+    #[sdk(relationship_type = RelationshipPackage)]
+    EmbeddedPackagePart(crate::parts::embedded_package_part::EmbeddedPackagePart),
+    #[sdk(
+        relationship_type = RelationshipEndnotes,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes,
+            accessor = as_endnotes_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"
+        )
+    )]
+    EndnotesPart(crate::parts::endnotes_part::EndnotesPart),
+    #[sdk(relationship_type = RelationshipAttachedToolbars)]
+    ExcelAttachedToolbarsPart(
+        crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipChartEx,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
+            accessor = as_extended_chart_part,
+            content_type = "application/vnd.ms-office.chartex+xml"
+        )
+    )]
+    ExtendedChartPart(crate::parts::extended_chart_part::ExtendedChartPart),
+    #[sdk(
+        relationship_type = RelationshipExtendedProperties,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties,
+            accessor = as_extended_file_properties_part,
+            content_type = "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+        )
+    )]
+    ExtendedFilePropertiesPart(
+        crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipExternalLink,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink,
+            accessor = as_external_workbook_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"
+        )
+    )]
+    ExternalWorkbookPart(crate::parts::external_workbook_part::ExternalWorkbookPart),
+    #[sdk(
+        relationship_type = RelationshipFeaturePropertyBag,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
+            accessor = as_feature_property_bags_part,
+            content_type = "application/vnd.ms-excel.featurepropertybag+xml"
+        )
+    )]
+    FeaturePropertyBagsPart(
+        crate::parts::feature_property_bags_part::FeaturePropertyBagsPart,
+    ),
+    #[sdk(relationship_type = RelationshipFont)]
+    FontPart(crate::parts::font_part::FontPart),
+    #[sdk(
+        relationship_type = RelationshipFontTable,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
+            accessor = as_font_table_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"
+        )
+    )]
+    FontTablePart(crate::parts::font_table_part::FontTablePart),
+    #[sdk(
+        relationship_type = RelationshipFooter,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footer,
+            accessor = as_footer_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+        )
+    )]
+    FooterPart(crate::parts::footer_part::FooterPart),
+    #[sdk(
+        relationship_type = RelationshipFootnotes,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footnotes,
+            accessor = as_footnotes_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
+        )
+    )]
+    FootnotesPart(crate::parts::footnotes_part::FootnotesPart),
+    #[sdk(
+        relationship_type = RelationshipGlossaryDocument,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::GlossaryDocument,
+            accessor = as_glossary_document_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml"
+        )
+    )]
+    GlossaryDocumentPart(crate::parts::glossary_document_part::GlossaryDocumentPart),
+    #[sdk(
+        relationship_type = RelationshipHandoutMaster,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::HandoutMaster,
+            accessor = as_handout_master_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"
+        )
+    )]
+    HandoutMasterPart(crate::parts::handout_master_part::HandoutMasterPart),
+    #[sdk(
+        relationship_type = RelationshipHeader,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header,
+            accessor = as_header_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
+        )
+    )]
+    HeaderPart(crate::parts::header_part::HeaderPart),
+    #[sdk(relationship_type = RelationshipImage)]
+    ImagePart(crate::parts::image_part::ImagePart),
+    #[sdk(relationship_type = RelationshipXlIntlMacrosheet)]
+    InternationalMacroSheetPart(
+        crate::parts::international_macro_sheet_part::InternationalMacroSheetPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipClassificationlabels,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
+            accessor = as_label_info_part,
+            content_type = "application/vnd.ms-office.classificationlabels+xml"
+        )
+    )]
+    LabelInfoPart(crate::parts::label_info_part::LabelInfoPart),
+    #[sdk(relationship_type = RelationshipLegacyDocTextInfo)]
+    LegacyDiagramTextInfoPart(
+        crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart,
+    ),
+    #[sdk(relationship_type = RelationshipLegacyDiagramText)]
+    LegacyDiagramTextPart(crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart),
+    #[sdk(
+        relationship_type = RelationshipXlMacrosheet,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet,
+            accessor = as_macro_sheet_part,
+            content_type = "application/vnd.ms-excel.macrosheet+xml"
+        )
+    )]
+    MacroSheetPart(crate::parts::macro_sheet_part::MacroSheetPart),
+    #[sdk(relationship_type = RelationshipRecipientData)]
+    MailMergeRecipientDataPart(
+        crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipOfficeDocument,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
+            accessor = as_main_document_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+        )
+    )]
+    MainDocumentPart(crate::parts::main_document_part::MainDocumentPart),
+    #[sdk(relationship_type = RelationshipModel3d)]
+    Model3DReferenceRelationshipPart(
+        crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipNamedSheetView,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
+            accessor = as_named_sheet_views_part,
+            content_type = "application/vnd.ms-excel.namedsheetviews+xml"
+        )
+    )]
+    NamedSheetViewsPart(crate::parts::named_sheet_views_part::NamedSheetViewsPart),
+    #[sdk(
+        relationship_type = RelationshipNotesMaster,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesMaster,
+            accessor = as_notes_master_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
+        )
+    )]
+    NotesMasterPart(crate::parts::notes_master_part::NotesMasterPart),
+    #[sdk(
+        relationship_type = RelationshipNotesSlide,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide,
+            accessor = as_notes_slide_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
+        )
+    )]
+    NotesSlidePart(crate::parts::notes_slide_part::NotesSlidePart),
+    #[sdk(
+        relationship_type = RelationshipNumbering,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Numbering,
+            accessor = as_numbering_definitions_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
+        )
+    )]
+    NumberingDefinitionsPart(
+        crate::parts::numbering_definitions_part::NumberingDefinitionsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipPivotCacheDefinition,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheDefinition,
+            accessor = as_pivot_table_cache_definition_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"
+        )
+    )]
+    PivotTableCacheDefinitionPart(
+        crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipPivotCacheRecords,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords,
+            accessor = as_pivot_table_cache_records_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"
+        )
+    )]
+    PivotTableCacheRecordsPart(
+        crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipPivotTable,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
+            accessor = as_pivot_table_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"
+        )
+    )]
+    PivotTablePart(crate::parts::pivot_table_part::PivotTablePart),
+    #[sdk(
+        relationship_type = RelationshipAuthors,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList,
+            accessor = as_power_point_authors_part,
+            content_type = "application/vnd.ms-powerpoint.authors+xml"
+        )
+    )]
+    PowerPointAuthorsPart(crate::parts::power_point_authors_part::PowerPointAuthorsPart),
+    #[sdk(
+        relationship_type = RelationshipComments,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList,
+            accessor = as_power_point_comment_part,
+            content_type = "application/vnd.ms-powerpoint.comments+xml"
+        )
+    )]
+    PowerPointCommentPart(crate::parts::power_point_comment_part::PowerPointCommentPart),
+    #[sdk(
+        relationship_type = RelationshipOfficeDocument,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation,
+            accessor = as_presentation_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+        )
+    )]
+    PresentationPart(crate::parts::presentation_part::PresentationPart),
+    #[sdk(
+        relationship_type = RelationshipPresProps,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::PresentationProperties,
+            accessor = as_presentation_properties_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"
+        )
+    )]
+    PresentationPropertiesPart(
+        crate::parts::presentation_properties_part::PresentationPropertiesPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipQueryTable,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable,
+            accessor = as_query_table_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"
+        )
+    )]
+    QueryTablePart(crate::parts::query_table_part::QueryTablePart),
+    #[sdk(relationship_type = RelationshipUserCustomization)]
+    QuickAccessToolbarCustomizationsPart(
+        crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRdArray,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::ArrayData,
+            accessor = as_rd_array_part,
+            content_type = "application/vnd.ms-excel.rdarray+xml"
+        )
+    )]
+    RdArrayPart(crate::parts::rd_array_part::RdArrayPart),
+    #[sdk(
+        relationship_type = RelationshipRdRichValue,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueData,
+            accessor = as_rd_rich_value_part,
+            content_type = "application/vnd.ms-excel.rdrichvalue+xml"
+        )
+    )]
+    RdRichValuePart(crate::parts::rd_rich_value_part::RdRichValuePart),
+    #[sdk(
+        relationship_type = RelationshipRdRichValueStructure,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueStructures,
+            accessor = as_rd_rich_value_structure_part,
+            content_type = "application/vnd.ms-excel.rdrichvaluestructure+xml"
+        )
+    )]
+    RdRichValueStructurePart(
+        crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRdRichValueTypes,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichValueTypesInfo,
+            accessor = as_rd_rich_value_types_part,
+            content_type = "application/vnd.ms-excel.rdrichvaluetypes+xml"
+        )
+    )]
+    RdRichValueTypesPart(crate::parts::rd_rich_value_types_part::RdRichValueTypesPart),
+    #[sdk(
+        relationship_type = RelationshipRdRichValueWebImage,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+            accessor = as_rd_rich_value_web_image_part,
+            content_type = "application/vnd.ms-excel.rdrichvaluewebimage+xml"
+        )
+    )]
+    RdRichValueWebImagePart(
+        crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRdSupportingPropertyBag,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
+            accessor = as_rd_supporting_property_bag_part,
+            content_type = "application/vnd.ms-excel.rdsupportingpropertybag+xml"
+        )
+    )]
+    RdSupportingPropertyBagPart(
+        crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRdSupportingPropertyBagStructure,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
+            accessor = as_rd_supporting_property_bag_structure_part,
+            content_type = "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml"
+        )
+    )]
+    RdSupportingPropertyBagStructurePart(
+        crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipExtensibility,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi,
+            accessor = as_ribbon_and_backstage_customizations_part,
+            content_type = "application/xml"
+        )
+    )]
+    RibbonAndBackstageCustomizationsPart(
+        crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart,
+    ),
+    #[sdk(relationship_type = RelationshipExtensibility2)]
+    RibbonExtensibilityPart(
+        crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRichStyles,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichStylesheet,
+            accessor = as_rich_styles_part,
+            content_type = "application/vnd.ms-excel.richstyles+xml"
+        )
+    )]
+    RichStylesPart(crate::parts::rich_styles_part::RichStylesPart),
+    #[sdk(
+        relationship_type = RelationshipSharedStrings,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringTable,
+            accessor = as_shared_string_table_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"
+        )
+    )]
+    SharedStringTablePart(crate::parts::shared_string_table_part::SharedStringTablePart),
+    #[sdk(
+        relationship_type = RelationshipTableSingleCells,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SingleXmlCells,
+            accessor = as_single_cell_table_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml"
+        )
+    )]
+    SingleCellTablePart(crate::parts::single_cell_table_part::SingleCellTablePart),
+    #[sdk(
+        relationship_type = RelationshipSlicerCache,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheDefinition,
+            accessor = as_slicer_cache_part,
+            content_type = "application/vnd.ms-excel.slicerCache+xml"
+        )
+    )]
+    SlicerCachePart(crate::parts::slicer_cache_part::SlicerCachePart),
+    #[sdk(
+        relationship_type = RelationshipSlicer,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers,
+            accessor = as_slicers_part,
+            content_type = "application/vnd.ms-excel.slicer+xml"
+        )
+    )]
+    SlicersPart(crate::parts::slicers_part::SlicersPart),
+    #[sdk(
+        relationship_type = RelationshipComments2,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentList,
+            accessor = as_slide_comments_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.comments+xml"
+        )
+    )]
+    SlideCommentsPart(crate::parts::slide_comments_part::SlideCommentsPart),
+    #[sdk(
+        relationship_type = RelationshipSlideLayout,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideLayout,
+            accessor = as_slide_layout_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"
+        )
+    )]
+    SlideLayoutPart(crate::parts::slide_layout_part::SlideLayoutPart),
+    #[sdk(
+        relationship_type = RelationshipSlideMaster,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideMaster,
+            accessor = as_slide_master_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"
+        )
+    )]
+    SlideMasterPart(crate::parts::slide_master_part::SlideMasterPart),
+    #[sdk(
+        relationship_type = RelationshipSlide,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Slide,
+            accessor = as_slide_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
+        )
+    )]
+    SlidePart(crate::parts::slide_part::SlidePart),
+    #[sdk(
+        relationship_type = RelationshipSlideUpdateInfo,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSyncProperties,
+            accessor = as_slide_sync_data_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml"
+        )
+    )]
+    SlideSyncDataPart(crate::parts::slide_sync_data_part::SlideSyncDataPart),
+    #[sdk(relationship_type = RelationshipPrinterSettings)]
+    SpreadsheetPrinterSettingsPart(
+        crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipStyles,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
+            accessor = as_style_definitions_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
+        )
+    )]
+    StyleDefinitionsPart(crate::parts::style_definitions_part::StyleDefinitionsPart),
+    #[sdk(
+        relationship_type = RelationshipStylesWithEffects,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
+            accessor = as_styles_with_effects_part,
+            content_type = "application/vnd.ms-word.stylesWithEffects+xml"
+        )
+    )]
+    StylesWithEffectsPart(crate::parts::styles_with_effects_part::StylesWithEffectsPart),
+    #[sdk(
+        relationship_type = RelationshipTable,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table,
+            accessor = as_table_definition_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+        )
+    )]
+    TableDefinitionPart(crate::parts::table_definition_part::TableDefinitionPart),
+    #[sdk(
+        relationship_type = RelationshipTableStyles,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TableStyleList,
+            accessor = as_table_styles_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"
+        )
+    )]
+    TableStylesPart(crate::parts::table_styles_part::TableStylesPart),
+    #[sdk(
+        relationship_type = RelationshipThemeOverride,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ThemeOverride,
+            accessor = as_theme_override_part,
+            content_type = "application/vnd.openxmlformats-officedocument.themeOverride+xml"
+        )
+    )]
+    ThemeOverridePart(crate::parts::theme_override_part::ThemeOverridePart),
+    #[sdk(
+        relationship_type = RelationshipTheme,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Theme,
+            accessor = as_theme_part,
+            content_type = "application/vnd.openxmlformats-officedocument.theme+xml"
+        )
+    )]
+    ThemePart(crate::parts::theme_part::ThemePart),
+    #[sdk(relationship_type = RelationshipThumbnail)]
+    ThumbnailPart(crate::parts::thumbnail_part::ThumbnailPart),
+    #[sdk(
+        relationship_type = RelationshipTimelineCache,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
+            accessor = as_time_line_cache_part,
+            content_type = "application/vnd.ms-excel.timelineCache+xml"
+        )
+    )]
+    TimeLineCachePart(crate::parts::time_line_cache_part::TimeLineCachePart),
+    #[sdk(
+        relationship_type = RelationshipTimeline,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Timelines,
+            accessor = as_time_line_part,
+            content_type = "application/vnd.ms-excel.timeline+xml"
+        )
+    )]
+    TimeLinePart(crate::parts::time_line_part::TimeLinePart),
+    #[sdk(
+        relationship_type = RelationshipTags,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TagList,
+            accessor = as_user_defined_tags_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.tags+xml"
+        )
+    )]
+    UserDefinedTagsPart(crate::parts::user_defined_tags_part::UserDefinedTagsPart),
+    #[sdk(
+        relationship_type = RelationshipWordVbaData,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2006_wordml::VbaSuppData,
+            accessor = as_vba_data_part,
+            content_type = "application/vnd.ms-word.vbaData+xml"
+        )
+    )]
+    VbaDataPart(crate::parts::vba_data_part::VbaDataPart),
+    #[sdk(relationship_type = RelationshipVbaProject)]
+    VbaProjectPart(crate::parts::vba_project_part::VbaProjectPart),
+    #[sdk(
+        relationship_type = RelationshipViewProps,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
+            accessor = as_view_properties_part,
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"
+        )
+    )]
+    ViewPropertiesPart(crate::parts::view_properties_part::ViewPropertiesPart),
+    #[sdk(relationship_type = RelationshipVmlDrawing)]
+    VmlDrawingPart(crate::parts::vml_drawing_part::VmlDrawingPart),
+    #[sdk(
+        relationship_type = RelationshipVolatileDependencies,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes,
+            accessor = as_volatile_dependencies_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml"
+        )
+    )]
+    VolatileDependenciesPart(
+        crate::parts::volatile_dependencies_part::VolatileDependenciesPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipWebextensiontaskpanes,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
+            accessor = as_web_ex_taskpanes_part,
+            content_type = "application/vnd.ms-office.webextensiontaskpanes+xml"
+        )
+    )]
+    WebExTaskpanesPart(crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart),
+    #[sdk(
+        relationship_type = RelationshipWebextension,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_webextensions_webextension_2010_11::WebExtension,
+            accessor = as_web_extension_part,
+            content_type = "application/vnd.ms-office.webextension+xml"
+        )
+    )]
+    WebExtensionPart(crate::parts::web_extension_part::WebExtensionPart),
+    #[sdk(
+        relationship_type = RelationshipWebSettings,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
+            accessor = as_web_settings_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"
+        )
+    )]
+    WebSettingsPart(crate::parts::web_settings_part::WebSettingsPart),
+    #[sdk(relationship_type = RelationshipAttachedToolbars)]
+    WordAttachedToolbarsPart(
+        crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipCommentsExtensible,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2018_wordml_cex::CommentsExtensible,
+            accessor = as_word_comments_extensible_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml"
+        )
+    )]
+    WordCommentsExtensiblePart(
+        crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipCommentsExtended,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx,
+            accessor = as_wordprocessing_comments_ex_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml"
+        )
+    )]
+    WordprocessingCommentsExPart(
+        crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipCommentsIds,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2016_wordml_cid::CommentsIds,
+            accessor = as_wordprocessing_comments_ids_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml"
+        )
+    )]
+    WordprocessingCommentsIdsPart(
+        crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipComments2,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comments,
+            accessor = as_wordprocessing_comments_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"
+        )
+    )]
+    WordprocessingCommentsPart(
+        crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipPeople,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_word_2012_wordml::People,
+            accessor = as_wordprocessing_people_part,
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml"
+        )
+    )]
+    WordprocessingPeoplePart(
+        crate::parts::wordprocessing_people_part::WordprocessingPeoplePart,
+    ),
+    #[sdk(relationship_type = RelationshipPrinterSettings)]
+    WordprocessingPrinterSettingsPart(
+        crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipOfficeDocument,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook,
+            accessor = as_workbook_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+        )
+    )]
+    WorkbookPart(crate::parts::workbook_part::WorkbookPart),
+    #[sdk(
+        relationship_type = RelationshipPerson,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::PersonList,
+            accessor = as_workbook_person_part,
+            content_type = "application/vnd.ms-excel.person+xml"
+        )
+    )]
+    WorkbookPersonPart(crate::parts::workbook_person_part::WorkbookPersonPart),
+    #[sdk(
+        relationship_type = RelationshipRevisionHeaders,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
+            accessor = as_workbook_revision_header_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml"
+        )
+    )]
+    WorkbookRevisionHeaderPart(
+        crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipRevisionLog,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Revisions,
+            accessor = as_workbook_revision_log_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
+        )
+    )]
+    WorkbookRevisionLogPart(
+        crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
+    ),
+    #[sdk(
+        relationship_type = RelationshipStyles,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Stylesheet,
+            accessor = as_workbook_styles_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
+        )
+    )]
+    WorkbookStylesPart(crate::parts::workbook_styles_part::WorkbookStylesPart),
+    #[sdk(
+        relationship_type = RelationshipUsernames,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users,
+            accessor = as_workbook_user_data_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml"
+        )
+    )]
+    WorkbookUserDataPart(crate::parts::workbook_user_data_part::WorkbookUserDataPart),
+    #[sdk(
+        relationship_type = RelationshipComments2,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Comments,
+            accessor = as_worksheet_comments_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
+        )
+    )]
+    WorksheetCommentsPart(crate::parts::worksheet_comments_part::WorksheetCommentsPart),
+    #[sdk(
+        relationship_type = RelationshipWorksheet,
+        root(
+            element = crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Worksheet,
+            accessor = as_worksheet_part,
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+        )
+    )]
+    WorksheetPart(crate::parts::worksheet_part::WorksheetPart),
+    #[sdk(
+        relationship_type = RelationshipWsSortMap,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap,
+            accessor = as_worksheet_sort_map_part,
+            content_type = "application/vnd.ms-excel.wsSortMap+xml"
+        )
+    )]
+    WorksheetSortMapPart(crate::parts::worksheet_sort_map_part::WorksheetSortMapPart),
+    #[sdk(
+        relationship_type = RelationshipThreadedComment,
+        root(
+            element = crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
+            accessor = as_worksheet_threaded_comments_part,
+            content_type = "application/vnd.ms-excel.threadedcomments+xml"
+        )
+    )]
+    WorksheetThreadedCommentsPart(
+        crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart,
+    ),
+    #[sdk(relationship_type = RelationshipSignature)]
+    XmlSignaturePart(crate::parts::xml_signature_part::XmlSignaturePart),
+    ExtendedPart(crate::parts::extended_part::ExtendedPart),
 }
 #[derive(Clone, Debug)]
 pub struct IdPartPair<'a> {
@@ -1689,406 +1172,6 @@ impl<'a> IdPartPair<'a> {
       part,
     }
   }
-}
-macro_rules! define_part_root_element {
-    (
-        $($(#[$attrs:meta])* $variant:ident ($root_ty:ty, $root_accessor:ident,
-        $root_accessor_mut:ident, $content_type:literal),)*
-    ) => {
-        #[derive(Clone, Debug)] pub enum PartRootElement { $($(#[$attrs])* $variant (Box
-        < $root_ty >),)* } impl PartRootElement { pub fn part_type_name(& self) -> &
-        'static str { match self { $($(#[$attrs])* Self:: $variant (_) =>
-        stringify!($variant),)* } } $($(#[$attrs])* pub fn $root_accessor (& self) ->
-        Option < & $root_ty > { match self { Self:: $variant (root) => Some(root
-        .as_ref()), _ => None, } } $(#[$attrs])* pub fn $root_accessor_mut (& mut self)
-        -> Option < & mut $root_ty > { match self { Self:: $variant (root) => Some(root
-        .as_mut()), _ => None, } })* pub fn to_bytes(& self) -> Result < Vec < u8 >,
-        crate ::common::SdkError > { match self { $($(#[$attrs])* Self:: $variant (root)
-        => Ok(root.to_bytes() ?),)* } } pub (crate) fn from_part_id(storage : & crate
-        ::common::SdkPackageStorage, part_id : crate ::common::PartId, open_settings : &
-        crate ::sdk::OpenSettings,) -> Result < Option < Self >, crate ::common::SdkError
-        > { let Some(part) = storage.part(part_id) else { return Ok(None); }; if part
-        .relationship_known_type() == Some(crate
-        ::namespaces::XmlKnownRelationshipNamespace::RelationshipAFChunk) { return
-        Ok(None); } #[cfg(not(feature = "mce"))] let _ = open_settings; $($(#[$attrs])*
-        if crate ::sdk::part_root_content_type_matches($content_type, part
-        .content_type()) { #[cfg(feature = "mce")] let mut root = < $root_ty >
-        ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
-        ::sdk::SdkMce::process_mce(& mut root, & open_settings
-        .markup_compatibility_process_settings,) ?; #[cfg(not(feature = "mce"))] let root
-        = < $root_ty > ::from_bytes(part.data().bytes()) ?; return Ok(Some(Self::
-        $variant (Box::new(root)))); })* Ok(None) } } #[cfg(feature = "validators")] impl
-        crate ::validator::SdkValidator for PartRootElement { fn validate_into(& self,
-        context : & mut crate ::validator::ValidationContext) { match self {
-        $($(#[$attrs])* Self:: $variant (root) => crate
-        ::validator::SdkValidator::validate_into(root.as_ref(), context),)* } } }
-    };
-}
-define_part_root_element! {
-    CalculationChainPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculationChain,
-    as_calculation_chain_part, as_calculation_chain_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"),
-    CellMetadataPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata,
-    as_cell_metadata_part, as_cell_metadata_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"),
-    ChartColorStylePart(crate
-    ::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ColorStyle,
-    as_chart_color_style_part, as_chart_color_style_part_mut,
-    "application/vnd.ms-office.chartcolorstyle+xml"), ChartDrawingPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
-    as_chart_drawing_part, as_chart_drawing_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml"),
-    ChartPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace,
-    as_chart_part, as_chart_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"),
-    ChartStylePart(crate
-    ::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ChartStyle,
-    as_chart_style_part, as_chart_style_part_mut,
-    "application/vnd.ms-office.chartstyle+xml"), ChartsheetPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Chartsheet,
-    as_chartsheet_part, as_chartsheet_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"),
-    CommentAuthorsPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentAuthorList,
-    as_comment_authors_part, as_comment_authors_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml"),
-    ConnectionsPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections,
-    as_connections_part, as_connections_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"),
-    ControlPropertiesPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FormControlProperties,
-    as_control_properties_part, as_control_properties_part_mut,
-    "application/vnd.ms-excel.controlproperties+xml"), CoreFilePropertiesPart(crate
-    ::schemas::opc_core_properties::CoreProperties, as_core_file_properties_part,
-    as_core_file_properties_part_mut,
-    "application/vnd.openxmlformats-package.core-properties+xml"),
-    CustomDataPropertiesPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
-    as_custom_data_properties_part, as_custom_data_properties_part_mut,
-    "application/vnd.ms-excel.customDataProperties+xml"), CustomFilePropertiesPart(crate
-    ::schemas::schemas_openxmlformats_org_office_document_2006_custom_properties::Properties,
-    as_custom_file_properties_part, as_custom_file_properties_part_mut,
-    "application/vnd.openxmlformats-officedocument.custom-properties+xml"),
-    CustomXmlMappingsPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::MapInfo,
-    as_custom_xml_mappings_part, as_custom_xml_mappings_part_mut, "application/xml"),
-    CustomXmlPropertiesPart(crate
-    ::schemas::schemas_openxmlformats_org_office_document_2006_custom_xml::DataStoreItem,
-    as_custom_xml_properties_part, as_custom_xml_properties_part_mut,
-    "application/vnd.openxmlformats-officedocument.customXmlProperties+xml"),
-    CustomizationPart(crate
-    ::schemas::schemas_microsoft_com_office_word_2006_wordml::TemplateCommandGroup,
-    as_customization_part, as_customization_part_mut,
-    "application/vnd.ms-word.keyMapCustomizations+xml"), DiagramColorsPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::ColorsDefinition,
-    as_diagram_colors_part, as_diagram_colors_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"),
-    DiagramDataPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::DataModelRoot,
-    as_diagram_data_part, as_diagram_data_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"),
-    DiagramLayoutDefinitionPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::LayoutDefinition,
-    as_diagram_layout_definition_part, as_diagram_layout_definition_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"),
-    DiagramPersistLayoutPart(crate
-    ::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing,
-    as_diagram_persist_layout_part, as_diagram_persist_layout_part_mut,
-    "application/vnd.ms-office.drawingml.diagramDrawing+xml"), DiagramStylePart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::StyleDefinition,
-    as_diagram_style_part, as_diagram_style_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"),
-    DialogsheetPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DialogSheet,
-    as_dialogsheet_part, as_dialogsheet_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml"),
-    DocumentSettingsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings,
-    as_document_settings_part, as_document_settings_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"),
-    DocumentTasksPart(crate
-    ::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks,
-    as_document_tasks_part, as_document_tasks_part_mut,
-    "application/vnd.ms-office.documenttasks+xml"), DrawingsPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing::WorksheetDrawing,
-    as_drawings_part, as_drawings_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawing+xml"), EndnotesPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes,
-    as_endnotes_part, as_endnotes_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"),
-    ExtendedChartPart(crate
-    ::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
-    as_extended_chart_part, as_extended_chart_part_mut,
-    "application/vnd.ms-office.chartex+xml"), ExtendedFilePropertiesPart(crate
-    ::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties,
-    as_extended_file_properties_part, as_extended_file_properties_part_mut,
-    "application/vnd.openxmlformats-officedocument.extended-properties+xml"),
-    ExternalWorkbookPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink,
-    as_external_workbook_part, as_external_workbook_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"),
-    FeaturePropertyBagsPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
-    as_feature_property_bags_part, as_feature_property_bags_part_mut,
-    "application/vnd.ms-excel.featurepropertybag+xml"), FontTablePart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Fonts,
-    as_font_table_part, as_font_table_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"),
-    FooterPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footer,
-    as_footer_part, as_footer_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"),
-    FootnotesPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Footnotes,
-    as_footnotes_part, as_footnotes_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"),
-    GlossaryDocumentPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::GlossaryDocument,
-    as_glossary_document_part, as_glossary_document_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml"),
-    HandoutMasterPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::HandoutMaster,
-    as_handout_master_part, as_handout_master_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"),
-    HeaderPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header,
-    as_header_part, as_header_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"),
-    LabelInfoPart(crate
-    ::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
-    as_label_info_part, as_label_info_part_mut,
-    "application/vnd.ms-office.classificationlabels+xml"), MacroSheetPart(crate
-    ::schemas::schemas_microsoft_com_office_excel_2006_main::Macrosheet,
-    as_macro_sheet_part, as_macro_sheet_part_mut,
-    "application/vnd.ms-excel.macrosheet+xml"), MainDocumentPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
-    as_main_document_part, as_main_document_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"),
-    NamedSheetViewsPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
-    as_named_sheet_views_part, as_named_sheet_views_part_mut,
-    "application/vnd.ms-excel.namedsheetviews+xml"), NotesMasterPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesMaster,
-    as_notes_master_part, as_notes_master_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"),
-    NotesSlidePart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::NotesSlide,
-    as_notes_slide_part, as_notes_slide_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"),
-    NumberingDefinitionsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Numbering,
-    as_numbering_definitions_part, as_numbering_definitions_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"),
-    PivotTableCacheDefinitionPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheDefinition,
-    as_pivot_table_cache_definition_part, as_pivot_table_cache_definition_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"),
-    PivotTableCacheRecordsPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCacheRecords,
-    as_pivot_table_cache_records_part, as_pivot_table_cache_records_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"),
-    PivotTablePart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
-    as_pivot_table_part, as_pivot_table_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"),
-    PowerPointAuthorsPart(crate
-    ::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList,
-    as_power_point_authors_part, as_power_point_authors_part_mut,
-    "application/vnd.ms-powerpoint.authors+xml"), PowerPointCommentPart(crate
-    ::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList,
-    as_power_point_comment_part, as_power_point_comment_part_mut,
-    "application/vnd.ms-powerpoint.comments+xml"), PresentationPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation,
-    as_presentation_part, as_presentation_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"),
-    PresentationPropertiesPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::PresentationProperties,
-    as_presentation_properties_part, as_presentation_properties_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"),
-    QueryTablePart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable,
-    as_query_table_part, as_query_table_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"),
-    RdArrayPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::ArrayData,
-    as_rd_array_part, as_rd_array_part_mut, "application/vnd.ms-excel.rdarray+xml"),
-    RdRichValuePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueData,
-    as_rd_rich_value_part, as_rd_rich_value_part_mut,
-    "application/vnd.ms-excel.rdrichvalue+xml"), RdRichValueStructurePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueStructures,
-    as_rd_rich_value_structure_part, as_rd_rich_value_structure_part_mut,
-    "application/vnd.ms-excel.rdrichvaluestructure+xml"), RdRichValueTypesPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichValueTypesInfo,
-    as_rd_rich_value_types_part, as_rd_rich_value_types_part_mut,
-    "application/vnd.ms-excel.rdrichvaluetypes+xml"), RdRichValueWebImagePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
-    as_rd_rich_value_web_image_part, as_rd_rich_value_web_image_part_mut,
-    "application/vnd.ms-excel.rdrichvaluewebimage+xml"),
-    RdSupportingPropertyBagPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
-    as_rd_supporting_property_bag_part, as_rd_supporting_property_bag_part_mut,
-    "application/vnd.ms-excel.rdsupportingpropertybag+xml"),
-    RdSupportingPropertyBagStructurePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
-    as_rd_supporting_property_bag_structure_part,
-    as_rd_supporting_property_bag_structure_part_mut,
-    "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml"),
-    RibbonAndBackstageCustomizationsPart(crate
-    ::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi,
-    as_ribbon_and_backstage_customizations_part,
-    as_ribbon_and_backstage_customizations_part_mut, "application/xml"),
-    RichStylesPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichStylesheet,
-    as_rich_styles_part, as_rich_styles_part_mut,
-    "application/vnd.ms-excel.richstyles+xml"), SharedStringTablePart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringTable,
-    as_shared_string_table_part, as_shared_string_table_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"),
-    SingleCellTablePart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SingleXmlCells,
-    as_single_cell_table_part, as_single_cell_table_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml"),
-    SlicerCachePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheDefinition,
-    as_slicer_cache_part, as_slicer_cache_part_mut,
-    "application/vnd.ms-excel.slicerCache+xml"), SlicersPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers,
-    as_slicers_part, as_slicers_part_mut, "application/vnd.ms-excel.slicer+xml"),
-    SlideCommentsPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentList,
-    as_slide_comments_part, as_slide_comments_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.comments+xml"),
-    SlideLayoutPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideLayout,
-    as_slide_layout_part, as_slide_layout_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"),
-    SlideMasterPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideMaster,
-    as_slide_master_part, as_slide_master_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"),
-    SlidePart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::Slide, as_slide_part,
-    as_slide_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"),
-    SlideSyncDataPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSyncProperties,
-    as_slide_sync_data_part, as_slide_sync_data_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml"),
-    StyleDefinitionsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
-    as_style_definitions_part, as_style_definitions_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"),
-    StylesWithEffectsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
-    as_styles_with_effects_part, as_styles_with_effects_part_mut,
-    "application/vnd.ms-word.stylesWithEffects+xml"), TableDefinitionPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Table,
-    as_table_definition_part, as_table_definition_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"),
-    TableStylesPart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_main::TableStyleList,
-    as_table_styles_part, as_table_styles_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"),
-    ThemeOverridePart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_main::ThemeOverride,
-    as_theme_override_part, as_theme_override_part_mut,
-    "application/vnd.openxmlformats-officedocument.themeOverride+xml"), ThemePart(crate
-    ::schemas::schemas_openxmlformats_org_drawingml_2006_main::Theme, as_theme_part,
-    as_theme_part_mut, "application/vnd.openxmlformats-officedocument.theme+xml"),
-    TimeLineCachePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
-    as_time_line_cache_part, as_time_line_cache_part_mut,
-    "application/vnd.ms-excel.timelineCache+xml"), TimeLinePart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Timelines,
-    as_time_line_part, as_time_line_part_mut, "application/vnd.ms-excel.timeline+xml"),
-    UserDefinedTagsPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::TagList,
-    as_user_defined_tags_part, as_user_defined_tags_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.tags+xml"),
-    VbaDataPart(crate
-    ::schemas::schemas_microsoft_com_office_word_2006_wordml::VbaSuppData,
-    as_vba_data_part, as_vba_data_part_mut, "application/vnd.ms-word.vbaData+xml"),
-    ViewPropertiesPart(crate
-    ::schemas::schemas_openxmlformats_org_presentationml_2006_main::ViewProperties,
-    as_view_properties_part, as_view_properties_part_mut,
-    "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"),
-    VolatileDependenciesPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes,
-    as_volatile_dependencies_part, as_volatile_dependencies_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml"),
-    WebExTaskpanesPart(crate
-    ::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
-    as_web_ex_taskpanes_part, as_web_ex_taskpanes_part_mut,
-    "application/vnd.ms-office.webextensiontaskpanes+xml"), WebExtensionPart(crate
-    ::schemas::schemas_microsoft_com_office_webextensions_webextension_2010_11::WebExtension,
-    as_web_extension_part, as_web_extension_part_mut,
-    "application/vnd.ms-office.webextension+xml"), WebSettingsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
-    as_web_settings_part, as_web_settings_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"),
-    WordCommentsExtensiblePart(crate
-    ::schemas::schemas_microsoft_com_office_word_2018_wordml_cex::CommentsExtensible,
-    as_word_comments_extensible_part, as_word_comments_extensible_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml"),
-    WordprocessingCommentsExPart(crate
-    ::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx,
-    as_wordprocessing_comments_ex_part, as_wordprocessing_comments_ex_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml"),
-    WordprocessingCommentsIdsPart(crate
-    ::schemas::schemas_microsoft_com_office_word_2016_wordml_cid::CommentsIds,
-    as_wordprocessing_comments_ids_part, as_wordprocessing_comments_ids_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml"),
-    WordprocessingCommentsPart(crate
-    ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comments,
-    as_wordprocessing_comments_part, as_wordprocessing_comments_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"),
-    WordprocessingPeoplePart(crate
-    ::schemas::schemas_microsoft_com_office_word_2012_wordml::People,
-    as_wordprocessing_people_part, as_wordprocessing_people_part_mut,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml"),
-    WorkbookPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook,
-    as_workbook_part, as_workbook_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"),
-    WorkbookPersonPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::PersonList,
-    as_workbook_person_part, as_workbook_person_part_mut,
-    "application/vnd.ms-excel.person+xml"), WorkbookRevisionHeaderPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
-    as_workbook_revision_header_part, as_workbook_revision_header_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml"),
-    WorkbookRevisionLogPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Revisions,
-    as_workbook_revision_log_part, as_workbook_revision_log_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"),
-    WorkbookStylesPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Stylesheet,
-    as_workbook_styles_part, as_workbook_styles_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"),
-    WorkbookUserDataPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Users,
-    as_workbook_user_data_part, as_workbook_user_data_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml"),
-    WorksheetCommentsPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Comments,
-    as_worksheet_comments_part, as_worksheet_comments_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"),
-    WorksheetPart(crate
-    ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Worksheet,
-    as_worksheet_part, as_worksheet_part_mut,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"),
-    WorksheetSortMapPart(crate
-    ::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap,
-    as_worksheet_sort_map_part, as_worksheet_sort_map_part_mut,
-    "application/vnd.ms-excel.wsSortMap+xml"), WorksheetThreadedCommentsPart(crate
-    ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
-    as_worksheet_threaded_comments_part, as_worksheet_threaded_comments_part_mut,
-    "application/vnd.ms-excel.threadedcomments+xml"),
 }
 pub(crate) fn initialize_root_elements(
   storage: &crate::common::SdkPackageStorage,

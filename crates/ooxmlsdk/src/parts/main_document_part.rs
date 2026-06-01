@@ -14,107 +14,117 @@ pub const EXTENSION: &str = "";
 pub struct MainDocumentPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl MainDocumentPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_main_document_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
-    MainDocumentPart,
-    as_main_document_part,
-    as_main_document_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated custom_xml_parts => crate ::parts::custom_xml_part::CustomXmlPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
-      optional glossary_document_part => crate
-      ::parts::glossary_document_part::GlossaryDocumentPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument";
-      optional theme_part => crate ::parts::theme_part::ThemePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
-      optional thumbnail_part => crate ::parts::thumbnail_part::ThumbnailPart,
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail";
-      optional wordprocessing_comments_part => crate
-      ::parts::wordprocessing_comments_part::WordprocessingCommentsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
-      optional document_settings_part => crate
-      ::parts::document_settings_part::DocumentSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
-      optional endnotes_part => crate ::parts::endnotes_part::EndnotesPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";
-      optional font_table_part => crate ::parts::font_table_part::FontTablePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable";
-      optional footnotes_part => crate ::parts::footnotes_part::FootnotesPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes";
-      optional numbering_definitions_part => crate
-      ::parts::numbering_definitions_part::NumberingDefinitionsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
-      optional style_definitions_part => crate
-      ::parts::style_definitions_part::StyleDefinitionsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
-      optional styles_with_effects_part => crate
-      ::parts::styles_with_effects_part::StylesWithEffectsPart,
-      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects";
-      optional web_settings_part => crate ::parts::web_settings_part::WebSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
-      repeated footer_parts => crate ::parts::footer_part::FooterPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
-      repeated header_parts => crate ::parts::header_part::HeaderPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
-      repeated wordprocessing_printer_settings_parts => crate
-      ::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
-      optional customization_part => crate
-      ::parts::customization_part::CustomizationPart,
-      "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations";
-      optional vba_project_part => crate ::parts::vba_project_part::VbaProjectPart,
-      "http://schemas.microsoft.com/office/2006/relationships/vbaProject"; optional
-      wordprocessing_comments_ex_part => crate
-      ::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart,
-      "http://schemas.microsoft.com/office/2011/relationships/commentsExtended";
-      optional wordprocessing_people_part => crate
-      ::parts::wordprocessing_people_part::WordprocessingPeoplePart,
-      "http://schemas.microsoft.com/office/2011/relationships/people"; optional
-      wordprocessing_comments_ids_part => crate
-      ::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart,
-      "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds"; optional
-      document_tasks_part => crate ::parts::document_tasks_part::DocumentTasksPart,
-      "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks";
-      optional word_comments_extensible_part => crate
-      ::parts::word_comments_extensible_part::WordCommentsExtensiblePart,
-      "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible";
-      repeated alternative_format_import_parts => crate
-      ::parts::alternative_format_import_part::AlternativeFormatImportPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
-      repeated chart_parts => crate ::parts::chart_part::ChartPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
-      repeated extended_chart_parts => crate
-      ::parts::extended_chart_part::ExtendedChartPart,
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx"; repeated
-      diagram_colors_parts => crate ::parts::diagram_colors_part::DiagramColorsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors";
-      repeated diagram_data_parts => crate ::parts::diagram_data_part::DiagramDataPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData";
-      repeated diagram_persist_layout_parts => crate
-      ::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
-      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"; repeated
-      diagram_layout_definition_parts => crate
-      ::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout";
-      repeated diagram_style_parts => crate
-      ::parts::diagram_style_part::DiagramStylePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle";
-      repeated embedded_control_persistence_parts => crate
-      ::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control";
-      repeated embedded_object_parts => crate
-      ::parts::embedded_object_part::EmbeddedObjectPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
-      repeated embedded_package_parts => crate
-      ::parts::embedded_package_part::EmbeddedPackagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-      repeated model3_d_reference_relationship_parts => crate
-      ::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
-      "http://schemas.microsoft.com/office/2017/06/relationships/model3d";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipCustomXml))]
+  pub(crate) custom_xml_parts:
+    crate::sdk::RepeatedPart<crate::parts::custom_xml_part::CustomXmlPart>,
+  #[sdk(part_child(relationship_type = RelationshipGlossaryDocument))]
+  pub(crate) glossary_document_part:
+    crate::sdk::OptionalPart<crate::parts::glossary_document_part::GlossaryDocumentPart>,
+  #[sdk(part_child(relationship_type = RelationshipTheme))]
+  pub(crate) theme_part: crate::sdk::OptionalPart<crate::parts::theme_part::ThemePart>,
+  #[sdk(part_child(relationship_type = RelationshipThumbnail))]
+  pub(crate) thumbnail_part: crate::sdk::OptionalPart<crate::parts::thumbnail_part::ThumbnailPart>,
+  #[sdk(part_child(relationship_type = RelationshipComments2))]
+  pub(crate) wordprocessing_comments_part: crate::sdk::OptionalPart<
+    crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipSettings))]
+  pub(crate) document_settings_part:
+    crate::sdk::OptionalPart<crate::parts::document_settings_part::DocumentSettingsPart>,
+  #[sdk(part_child(relationship_type = RelationshipEndnotes))]
+  pub(crate) endnotes_part: crate::sdk::OptionalPart<crate::parts::endnotes_part::EndnotesPart>,
+  #[sdk(part_child(relationship_type = RelationshipFontTable))]
+  pub(crate) font_table_part:
+    crate::sdk::OptionalPart<crate::parts::font_table_part::FontTablePart>,
+  #[sdk(part_child(relationship_type = RelationshipFootnotes))]
+  pub(crate) footnotes_part: crate::sdk::OptionalPart<crate::parts::footnotes_part::FootnotesPart>,
+  #[sdk(part_child(relationship_type = RelationshipNumbering))]
+  pub(crate) numbering_definitions_part:
+    crate::sdk::OptionalPart<crate::parts::numbering_definitions_part::NumberingDefinitionsPart>,
+  #[sdk(part_child(relationship_type = RelationshipStyles))]
+  pub(crate) style_definitions_part:
+    crate::sdk::OptionalPart<crate::parts::style_definitions_part::StyleDefinitionsPart>,
+  #[sdk(part_child(relationship_type = RelationshipStylesWithEffects))]
+  pub(crate) styles_with_effects_part:
+    crate::sdk::OptionalPart<crate::parts::styles_with_effects_part::StylesWithEffectsPart>,
+  #[sdk(part_child(relationship_type = RelationshipWebSettings))]
+  pub(crate) web_settings_part:
+    crate::sdk::OptionalPart<crate::parts::web_settings_part::WebSettingsPart>,
+  #[sdk(part_child(relationship_type = RelationshipFooter))]
+  pub(crate) footer_parts: crate::sdk::RepeatedPart<crate::parts::footer_part::FooterPart>,
+  #[sdk(part_child(relationship_type = RelationshipHeader))]
+  pub(crate) header_parts: crate::sdk::RepeatedPart<crate::parts::header_part::HeaderPart>,
+  #[sdk(part_child(relationship_type = RelationshipPrinterSettings))]
+  pub(crate) wordprocessing_printer_settings_parts: crate::sdk::RepeatedPart<
+    crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipKeyMapCustomizations))]
+  pub(crate) customization_part:
+    crate::sdk::OptionalPart<crate::parts::customization_part::CustomizationPart>,
+  #[sdk(part_child(relationship_type = RelationshipVbaProject))]
+  pub(crate) vba_project_part:
+    crate::sdk::OptionalPart<crate::parts::vba_project_part::VbaProjectPart>,
+  #[sdk(part_child(relationship_type = RelationshipCommentsExtended))]
+  pub(crate) wordprocessing_comments_ex_part: crate::sdk::OptionalPart<
+    crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipPeople))]
+  pub(crate) wordprocessing_people_part:
+    crate::sdk::OptionalPart<crate::parts::wordprocessing_people_part::WordprocessingPeoplePart>,
+  #[sdk(part_child(relationship_type = RelationshipCommentsIds))]
+  pub(crate) wordprocessing_comments_ids_part: crate::sdk::OptionalPart<
+    crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipDocumenttasks))]
+  pub(crate) document_tasks_part:
+    crate::sdk::OptionalPart<crate::parts::document_tasks_part::DocumentTasksPart>,
+  #[sdk(part_child(relationship_type = RelationshipCommentsExtensible))]
+  pub(crate) word_comments_extensible_part: crate::sdk::OptionalPart<
+    crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipAFChunk))]
+  pub(crate) alternative_format_import_parts: crate::sdk::RepeatedPart<
+    crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipChart))]
+  pub(crate) chart_parts: crate::sdk::RepeatedPart<crate::parts::chart_part::ChartPart>,
+  #[sdk(part_child(relationship_type = RelationshipChartEx))]
+  pub(crate) extended_chart_parts:
+    crate::sdk::RepeatedPart<crate::parts::extended_chart_part::ExtendedChartPart>,
+  #[sdk(part_child(relationship_type = RelationshipDiagramColors))]
+  pub(crate) diagram_colors_parts:
+    crate::sdk::RepeatedPart<crate::parts::diagram_colors_part::DiagramColorsPart>,
+  #[sdk(part_child(relationship_type = RelationshipDiagramData))]
+  pub(crate) diagram_data_parts:
+    crate::sdk::RepeatedPart<crate::parts::diagram_data_part::DiagramDataPart>,
+  #[sdk(part_child(relationship_type = RelationshipDiagramDrawing))]
+  pub(crate) diagram_persist_layout_parts:
+    crate::sdk::RepeatedPart<crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>,
+  #[sdk(part_child(relationship_type = RelationshipDiagramLayout))]
+  pub(crate) diagram_layout_definition_parts: crate::sdk::RepeatedPart<
+    crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipDiagramQuickStyle))]
+  pub(crate) diagram_style_parts:
+    crate::sdk::RepeatedPart<crate::parts::diagram_style_part::DiagramStylePart>,
+  #[sdk(part_child(relationship_type = RelationshipControl))]
+  pub(crate) embedded_control_persistence_parts: crate::sdk::RepeatedPart<
+    crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipOleObject))]
+  pub(crate) embedded_object_parts:
+    crate::sdk::RepeatedPart<crate::parts::embedded_object_part::EmbeddedObjectPart>,
+  #[sdk(part_child(relationship_type = RelationshipPackage))]
+  pub(crate) embedded_package_parts:
+    crate::sdk::RepeatedPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
+  #[sdk(part_child(relationship_type = RelationshipModel3d))]
+  pub(crate) model3_d_reference_relationship_parts: crate::sdk::RepeatedPart<
+    crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
+  >,
 }

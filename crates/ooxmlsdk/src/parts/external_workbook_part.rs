@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct ExternalWorkbookPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ExternalWorkbookPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_external_workbook_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink,
-    ExternalWorkbookPart,
-    as_external_workbook_part,
-    as_external_workbook_part_mut
-  );
+  >,
 }

@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct WorksheetCommentsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WorksheetCommentsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_worksheet_comments_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Comments,
-    WorksheetCommentsPart,
-    as_worksheet_comments_part,
-    as_worksheet_comments_part_mut
-  );
+  >,
 }

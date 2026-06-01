@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct WorksheetSortMapPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WorksheetSortMapPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_worksheet_sort_map_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap,
-    WorksheetSortMapPart,
-    as_worksheet_sort_map_part,
-    as_worksheet_sort_map_part_mut
-  );
+  >,
 }

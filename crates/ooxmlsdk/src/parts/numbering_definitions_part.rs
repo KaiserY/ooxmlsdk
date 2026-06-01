@@ -15,16 +15,10 @@ pub const EXTENSION: &str = "";
 pub struct NumberingDefinitionsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl NumberingDefinitionsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_numbering_definitions_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Numbering,
-    NumberingDefinitionsPart,
-    as_numbering_definitions_part,
-    as_numbering_definitions_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

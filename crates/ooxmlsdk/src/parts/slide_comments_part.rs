@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct SlideCommentsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl SlideCommentsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_slide_comments_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentList,
-    SlideCommentsPart,
-    as_slide_comments_part,
-    as_slide_comments_part_mut
-  );
+  >,
 }

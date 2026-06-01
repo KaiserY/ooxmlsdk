@@ -14,17 +14,11 @@ pub const EXTENSION: &str = "";
 pub struct WebExTaskpanesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WebExTaskpanesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_web_ex_taskpanes_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
-    WebExTaskpanesPart,
-    as_web_ex_taskpanes_part,
-    as_web_ex_taskpanes_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated web_extension_parts => crate
-      ::parts::web_extension_part::WebExtensionPart,
-      "http://schemas.microsoft.com/office/2011/relationships/webextension";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipWebextension))]
+  pub(crate) web_extension_parts:
+    crate::sdk::RepeatedPart<crate::parts::web_extension_part::WebExtensionPart>,
 }

@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct CellMetadataPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CellMetadataPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_cell_metadata_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata,
-    CellMetadataPart,
-    as_cell_metadata_part,
-    as_cell_metadata_part_mut
-  );
+  >,
 }

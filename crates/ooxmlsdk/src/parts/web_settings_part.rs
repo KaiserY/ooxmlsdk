@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct WebSettingsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WebSettingsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_web_settings_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
-    WebSettingsPart,
-    as_web_settings_part,
-    as_web_settings_part_mut
-  );
+  >,
 }

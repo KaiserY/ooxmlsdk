@@ -14,29 +14,27 @@ pub const EXTENSION: &str = "";
 pub struct InternationalMacroSheetPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl InternationalMacroSheetPart {
-  crate::sdk_part_child_methods! {
-      repeated spreadsheet_printer_settings_parts => crate
-      ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
-      optional drawings_part => crate ::parts::drawings_part::DrawingsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
-      repeated vml_drawing_parts => crate ::parts::vml_drawing_part::VmlDrawingPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
-      optional worksheet_comments_part => crate
-      ::parts::worksheet_comments_part::WorksheetCommentsPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
-      repeated custom_property_parts => crate
-      ::parts::custom_property_part::CustomPropertyPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty";
-      repeated embedded_object_parts => crate
-      ::parts::embedded_object_part::EmbeddedObjectPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
-      repeated embedded_package_parts => crate
-      ::parts::embedded_package_part::EmbeddedPackagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
-      repeated image_parts => crate ::parts::image_part::ImagePart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-  }
+  #[sdk(part_child(relationship_type = RelationshipPrinterSettings))]
+  pub(crate) spreadsheet_printer_settings_parts: crate::sdk::RepeatedPart<
+    crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+  >,
+  #[sdk(part_child(relationship_type = RelationshipDrawing))]
+  pub(crate) drawings_part: crate::sdk::OptionalPart<crate::parts::drawings_part::DrawingsPart>,
+  #[sdk(part_child(relationship_type = RelationshipVmlDrawing))]
+  pub(crate) vml_drawing_parts:
+    crate::sdk::RepeatedPart<crate::parts::vml_drawing_part::VmlDrawingPart>,
+  #[sdk(part_child(relationship_type = RelationshipComments2))]
+  pub(crate) worksheet_comments_part:
+    crate::sdk::OptionalPart<crate::parts::worksheet_comments_part::WorksheetCommentsPart>,
+  #[sdk(part_child(relationship_type = RelationshipCustomProperty))]
+  pub(crate) custom_property_parts:
+    crate::sdk::RepeatedPart<crate::parts::custom_property_part::CustomPropertyPart>,
+  #[sdk(part_child(relationship_type = RelationshipOleObject))]
+  pub(crate) embedded_object_parts:
+    crate::sdk::RepeatedPart<crate::parts::embedded_object_part::EmbeddedObjectPart>,
+  #[sdk(part_child(relationship_type = RelationshipPackage))]
+  pub(crate) embedded_package_parts:
+    crate::sdk::RepeatedPart<crate::parts::embedded_package_part::EmbeddedPackagePart>,
+  #[sdk(part_child(relationship_type = RelationshipImage))]
+  pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

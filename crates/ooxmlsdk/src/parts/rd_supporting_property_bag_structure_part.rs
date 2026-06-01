@@ -12,15 +12,10 @@ pub const TARGET_NAME: &str = "rdsupportingpropertybagstructure";
 pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RdSupportingPropertyBagStructurePart {
-  pub(crate) relationship_id: Option<String>,
-  pub(crate) id: crate::common::PartId,
-}
-impl RdSupportingPropertyBagStructurePart {
-  crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
-        RdSupportingPropertyBagStructurePart,
-        as_rd_supporting_property_bag_structure_part,
-        as_rd_supporting_property_bag_structure_part_mut
-    );
+    pub(crate) relationship_id: Option<String>,
+    pub(crate) id: crate::common::PartId,
+    #[sdk(part_root(accessor = "as_rd_supporting_property_bag_structure_part"))]
+    pub(crate) root_element: crate::sdk::PartRoot<
+        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
+    >,
 }

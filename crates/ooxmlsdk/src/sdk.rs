@@ -307,23 +307,23 @@ fn extension_for_content_type<T: SdkPart>(content_type: &str) -> std::borrow::Co
 
 #[cfg(feature = "parts")]
 #[inline]
-pub(crate) fn part_root_content_type_matches(
-  root_content_type: &str,
-  part_content_type: &str,
+pub(crate) fn part_root_content_type_matches_bytes(
+  root_content_type: &[u8],
+  part_content_type: &[u8],
 ) -> bool {
-  if matches!(root_content_type, "" | "application/xml" | "text/xml") {
+  if matches!(root_content_type, b"" | b"application/xml" | b"text/xml") {
     return false;
   }
   root_content_type == part_content_type
     || match root_content_type {
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
-        WordprocessingDocumentType::from_content_type(part_content_type).is_some()
+      b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
+        WordprocessingDocumentType::from_content_type_bytes(part_content_type).is_some()
       }
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
-        SpreadsheetDocumentType::from_content_type(part_content_type).is_some()
+      b"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
+        SpreadsheetDocumentType::from_content_type_bytes(part_content_type).is_some()
       }
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
-        PresentationDocumentType::from_content_type(part_content_type).is_some()
+      b"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
+        PresentationDocumentType::from_content_type_bytes(part_content_type).is_some()
       }
       _ => false,
     }
@@ -357,15 +357,19 @@ impl WordprocessingDocumentType {
   }
 
   pub fn from_content_type(content_type: &str) -> Option<Self> {
+    Self::from_content_type_bytes(content_type.as_bytes())
+  }
+
+  pub fn from_content_type_bytes(content_type: &[u8]) -> Option<Self> {
     match content_type {
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
         Some(Self::Document)
       }
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml" => {
         Some(Self::Template)
       }
-      "application/vnd.ms-word.document.macroEnabled.main+xml" => Some(Self::MacroEnabledDocument),
-      "application/vnd.ms-word.template.macroEnabledTemplate.main+xml" => {
+      b"application/vnd.ms-word.document.macroEnabled.main+xml" => Some(Self::MacroEnabledDocument),
+      b"application/vnd.ms-word.template.macroEnabledTemplate.main+xml" => {
         Some(Self::MacroEnabledTemplate)
       }
       _ => None,
@@ -401,16 +405,22 @@ impl SpreadsheetDocumentType {
   }
 
   pub fn from_content_type(content_type: &str) -> Option<Self> {
+    Self::from_content_type_bytes(content_type.as_bytes())
+  }
+
+  pub fn from_content_type_bytes(content_type: &[u8]) -> Option<Self> {
     match content_type {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
         Some(Self::Workbook)
       }
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml" => {
         Some(Self::Template)
       }
-      "application/vnd.ms-excel.sheet.macroEnabled.main+xml" => Some(Self::MacroEnabledWorkbook),
-      "application/vnd.ms-excel.template.macroEnabled.main+xml" => Some(Self::MacroEnabledTemplate),
-      "application/vnd.ms-excel.addin.macroEnabled.main+xml" => Some(Self::AddIn),
+      b"application/vnd.ms-excel.sheet.macroEnabled.main+xml" => Some(Self::MacroEnabledWorkbook),
+      b"application/vnd.ms-excel.template.macroEnabled.main+xml" => {
+        Some(Self::MacroEnabledTemplate)
+      }
+      b"application/vnd.ms-excel.addin.macroEnabled.main+xml" => Some(Self::AddIn),
       _ => None,
     }
   }
@@ -454,26 +464,30 @@ impl PresentationDocumentType {
   }
 
   pub fn from_content_type(content_type: &str) -> Option<Self> {
+    Self::from_content_type_bytes(content_type.as_bytes())
+  }
+
+  pub fn from_content_type_bytes(content_type: &[u8]) -> Option<Self> {
     match content_type {
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
         Some(Self::Presentation)
       }
-      "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.presentationml.template.main+xml" => {
         Some(Self::Template)
       }
-      "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml" => {
+      b"application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml" => {
         Some(Self::Slideshow)
       }
-      "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml" => {
+      b"application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml" => {
         Some(Self::MacroEnabledPresentation)
       }
-      "application/vnd.ms-powerpoint.template.macroEnabled.main+xml" => {
+      b"application/vnd.ms-powerpoint.template.macroEnabled.main+xml" => {
         Some(Self::MacroEnabledTemplate)
       }
-      "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml" => {
+      b"application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml" => {
         Some(Self::MacroEnabledSlideshow)
       }
-      "application/vnd.ms-powerpoint.addin.macroEnabled.main+xml" => Some(Self::AddIn),
+      b"application/vnd.ms-powerpoint.addin.macroEnabled.main+xml" => Some(Self::AddIn),
       _ => None,
     }
   }

@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct ControlPropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl ControlPropertiesPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_control_properties_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FormControlProperties,
-    ControlPropertiesPart,
-    as_control_properties_part,
-    as_control_properties_part_mut
-  );
+  >,
 }

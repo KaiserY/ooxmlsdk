@@ -15,12 +15,8 @@ pub const EXTENSION: &str = "";
 pub struct CommentAuthorsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CommentAuthorsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_comment_authors_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentAuthorList,
-    CommentAuthorsPart,
-    as_comment_authors_part,
-    as_comment_authors_part_mut
-  );
+  >,
 }

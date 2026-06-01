@@ -15,17 +15,11 @@ pub const EXTENSION: &str = "";
 pub struct WorkbookRevisionHeaderPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl WorkbookRevisionHeaderPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_workbook_revision_header_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Headers,
-    WorkbookRevisionHeaderPart,
-    as_workbook_revision_header_part,
-    as_workbook_revision_header_part_mut
-  );
-  crate::sdk_part_child_methods! {
-      repeated workbook_revision_log_parts => crate
-      ::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog";
-  }
+  >,
+  #[sdk(part_child(relationship_type = RelationshipRevisionLog))]
+  pub(crate) workbook_revision_log_parts:
+    crate::sdk::RepeatedPart<crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart>,
 }

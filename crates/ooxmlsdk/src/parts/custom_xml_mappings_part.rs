@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct CustomXmlMappingsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CustomXmlMappingsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_custom_xml_mappings_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::MapInfo,
-    CustomXmlMappingsPart,
-    as_custom_xml_mappings_part,
-    as_custom_xml_mappings_part_mut
-  );
+  >,
 }

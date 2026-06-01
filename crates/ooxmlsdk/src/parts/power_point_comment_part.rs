@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct PowerPointCommentPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl PowerPointCommentPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_power_point_comment_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList,
-    PowerPointCommentPart,
-    as_power_point_comment_part,
-    as_power_point_comment_part_mut
-  );
+  >,
 }

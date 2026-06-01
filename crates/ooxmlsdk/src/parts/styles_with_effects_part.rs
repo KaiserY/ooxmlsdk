@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct StylesWithEffectsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl StylesWithEffectsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_styles_with_effects_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
-    StylesWithEffectsPart,
-    as_styles_with_effects_part,
-    as_styles_with_effects_part_mut
-  );
+  >,
 }

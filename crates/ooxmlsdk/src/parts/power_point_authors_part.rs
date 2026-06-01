@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct PowerPointAuthorsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl PowerPointAuthorsPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_power_point_authors_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList,
-    PowerPointAuthorsPart,
-    as_power_point_authors_part,
-    as_power_point_authors_part_mut
-  );
+  >,
 }

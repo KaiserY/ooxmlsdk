@@ -14,12 +14,8 @@ pub const EXTENSION: &str = "";
 pub struct LabelInfoPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl LabelInfoPart {
-  crate::sdk_part_root_methods!(
+  #[sdk(part_root(accessor = "as_label_info_part"))]
+  pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
-    LabelInfoPart,
-    as_label_info_part,
-    as_label_info_part_mut
-  );
+  >,
 }

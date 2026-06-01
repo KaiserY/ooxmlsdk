@@ -14,12 +14,7 @@ pub const EXTENSION: &str = "";
 pub struct CoreFilePropertiesPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl CoreFilePropertiesPart {
-  crate::sdk_part_root_methods!(
-    crate::schemas::opc_core_properties::CoreProperties,
-    CoreFilePropertiesPart,
-    as_core_file_properties_part,
-    as_core_file_properties_part_mut
-  );
+  #[sdk(part_root(accessor = "as_core_file_properties_part"))]
+  pub(crate) root_element:
+    crate::sdk::PartRoot<crate::schemas::opc_core_properties::CoreProperties>,
 }

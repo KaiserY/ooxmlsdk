@@ -14,10 +14,6 @@ pub const EXTENSION: &str = ".bin";
 pub struct VbaProjectPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-}
-impl VbaProjectPart {
-  crate::sdk_part_child_methods! {
-      optional vba_data_part => crate ::parts::vba_data_part::VbaDataPart,
-      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData";
-  }
+  #[sdk(part_child(relationship_type = RelationshipWordVbaData))]
+  pub(crate) vba_data_part: crate::sdk::OptionalPart<crate::parts::vba_data_part::VbaDataPart>,
 }

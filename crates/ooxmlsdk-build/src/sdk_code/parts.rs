@@ -19,65 +19,20 @@ pub fn gen_part_module_with_relationship_type_variants(
   part: &PartModuleDecl,
   relationship_type_variants: &HashMap<String, Ident>,
 ) -> Result<TokenStream> {
-  let relationship_type_str = part.relationship_type.as_str();
-  let relationship_type_stmt: Stmt = parse2(quote! {
-    pub const RELATIONSHIP_TYPE: &str = #relationship_type_str;
-  })?;
-
-  let path_prefix_str = part.path_prefix.as_str();
-  let path_prefix_stmt: Stmt = parse2(quote! {
-    pub const PATH_PREFIX: &str = #path_prefix_str;
-  })?;
-
-  let content_type_str = part.content_type.as_str();
-  let content_type_stmt: Stmt = parse2(quote! {
-    pub const CONTENT_TYPE: &str = #content_type_str;
-  })?;
-
-  let target_name_str = part.target_name.as_str();
-  let target_name_stmt: Stmt = parse2(quote! {
-    pub const TARGET_NAME: &str = #target_name_str;
-  })?;
-
-  let extension_str = part.extension.as_str();
-  let extension_stmt: Stmt = parse2(quote! {
-    pub const EXTENSION: &str = #extension_str;
-  })?;
-
   if is_package_part(part) {
-    return gen_package_module(
-      part,
-      relationship_type_variants,
-      relationship_type_stmt,
-      path_prefix_stmt,
-      content_type_stmt,
-      target_name_stmt,
-      extension_stmt,
-    );
+    return gen_package_module(part, relationship_type_variants);
   }
 
-  gen_part_handle_module(
-    part,
-    relationship_type_variants,
-    relationship_type_stmt,
-    path_prefix_stmt,
-    content_type_stmt,
-    target_name_stmt,
-    extension_stmt,
-  )
+  gen_part_handle_module(part, relationship_type_variants)
 }
 
 fn gen_package_module(
   part: &PartModuleDecl,
-  relationship_type_variants: &HashMap<String, Ident>,
-  relationship_type_stmt: Stmt,
-  path_prefix_stmt: Stmt,
-  content_type_stmt: Stmt,
-  target_name_stmt: Stmt,
-  extension_stmt: Stmt,
+  _relationship_type_variants: &HashMap<String, Ident>,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
-  let marker_fields = package_marker_fields(part, relationship_type_variants)?;
+  let descriptor_consts = part_descriptor_consts(part)?;
+  let marker_fields = package_marker_fields(part)?;
   let package_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
     pub struct #struct_name_ident {
@@ -90,19 +45,12 @@ fn gen_package_module(
   })?;
 
   Ok(quote! {
-    #relationship_type_stmt
-    #path_prefix_stmt
-    #content_type_stmt
-    #target_name_stmt
-    #extension_stmt
+    #descriptor_consts
     #package_struct
   })
 }
 
-fn package_marker_fields(
-  part: &PartModuleDecl,
-  relationship_type_variants: &HashMap<String, Ident>,
-) -> Result<Vec<TokenStream>> {
+fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
   let mut fields = Vec::new();
   let main_part_accessor = part.main_part_accessor_name.as_deref();
 
@@ -129,12 +77,15 @@ fn package_marker_fields(
       quote! {}
     };
     let kind = part_child_kind_value(*cardinality);
-    let relationship_type =
-      relationship_type_attr_value(relationship_type, relationship_type_variants);
+    let kind_attr = if *cardinality == PartChildCardinality::Optional {
+      quote! {}
+    } else {
+      quote! { #[sdk(part_child(kind = #kind))] }
+    };
     fields.push(quote! {
       #( #attrs )*
       #main_attr
-      #[sdk(part_child(relationship_type = #relationship_type, kind = #kind))]
+      #kind_attr
       pub(crate) #field_ident: #field_ty,
     });
   }
@@ -154,15 +105,10 @@ fn package_marker_fields(
 
 fn gen_part_handle_module(
   part: &PartModuleDecl,
-  relationship_type_variants: &HashMap<String, Ident>,
-  relationship_type_stmt: Stmt,
-  path_prefix_stmt: Stmt,
-  content_type_stmt: Stmt,
-  target_name_stmt: Stmt,
-  extension_stmt: Stmt,
+  _relationship_type_variants: &HashMap<String, Ident>,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
-  let marker_fields = part_handle_marker_fields(part, relationship_type_variants)?;
+  let marker_fields = part_handle_marker_fields(part)?;
   let part_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
     pub struct #struct_name_ident {
@@ -173,25 +119,51 @@ fn gen_part_handle_module(
   })?;
 
   Ok(quote! {
+    #part_struct
+  })
+}
+
+fn part_descriptor_consts(part: &PartModuleDecl) -> Result<TokenStream> {
+  let relationship_type_str = part.relationship_type.as_str();
+  let relationship_type_stmt: Stmt = parse2(quote! {
+    pub const RELATIONSHIP_TYPE: &str = #relationship_type_str;
+  })?;
+
+  let path_prefix_str = part.path_prefix.as_str();
+  let path_prefix_stmt: Stmt = parse2(quote! {
+    pub const PATH_PREFIX: &str = #path_prefix_str;
+  })?;
+
+  let content_type_str = part.content_type.as_str();
+  let content_type_stmt: Stmt = parse2(quote! {
+    pub const CONTENT_TYPE: &str = #content_type_str;
+  })?;
+
+  let target_name_str = part.target_name.as_str();
+  let target_name_stmt: Stmt = parse2(quote! {
+    pub const TARGET_NAME: &str = #target_name_str;
+  })?;
+
+  let extension_str = part.extension.as_str();
+  let extension_stmt: Stmt = parse2(quote! {
+    pub const EXTENSION: &str = #extension_str;
+  })?;
+
+  Ok(quote! {
     #relationship_type_stmt
     #path_prefix_stmt
     #content_type_stmt
     #target_name_stmt
     #extension_stmt
-    #part_struct
   })
 }
 
-fn part_handle_marker_fields(
-  part: &PartModuleDecl,
-  relationship_type_variants: &HashMap<String, Ident>,
-) -> Result<Vec<TokenStream>> {
+fn part_handle_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
   let mut fields = Vec::new();
 
-  if let Some((root_type, accessor_name)) = part_root_element_info(part) {
+  if let Some((root_type, _accessor_name)) = part_root_element_info(part) {
     let root_ty: Type = parse_str(&root_type)?;
     fields.push(quote! {
-      #[sdk(part_root(accessor = #accessor_name))]
       pub(crate) root_element: crate::sdk::PartRoot<#root_ty>,
     });
   }
@@ -211,11 +183,9 @@ fn part_handle_marker_fields(
     let attrs = part_field_attrs(field);
     let field_ident: Ident = parse_str(&field.rust_name)?;
     let part_ty: Type = parse_str(&field.rust_type)?;
-    let relationship_type =
-      relationship_type_attr_value(relationship_type, relationship_type_variants);
     let kind_attr = match cardinality {
       PartChildCardinality::RequiredRepeated => {
-        quote! { , kind = "required_repeated" }
+        quote! { #[sdk(part_child(kind = "required_repeated"))] }
       }
       _ => quote! {},
     };
@@ -228,7 +198,7 @@ fn part_handle_marker_fields(
     };
     fields.push(quote! {
       #( #attrs )*
-      #[sdk(part_child(relationship_type = #relationship_type #kind_attr))]
+      #kind_attr
       pub(crate) #field_ident: #field_ty,
     });
   }
@@ -253,17 +223,6 @@ fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
     PartChildCardinality::Required => "required",
     PartChildCardinality::Repeated => "repeated",
     PartChildCardinality::RequiredRepeated => "required_repeated",
-  }
-}
-
-fn relationship_type_attr_value(
-  relationship_type: &str,
-  relationship_type_variants: &HashMap<String, Ident>,
-) -> TokenStream {
-  if let Some(variant_ident) = relationship_type_variants.get(relationship_type) {
-    quote! { #variant_ident }
-  } else {
-    quote! { #relationship_type }
   }
 }
 
@@ -301,15 +260,37 @@ pub fn gen_parts_mod(
         .into(),
       );
     };
-    let root_attr = if let Some((root_type, accessor_name)) = part_root_element_info(part) {
+    let path_prefix = part.path_prefix.as_str();
+    let content_type = part.content_type.as_str();
+    let target_name = part.target_name.as_str();
+    let extension = part.extension.as_str();
+    let path_prefix_attr = if path_prefix == "." {
+      quote! {}
+    } else {
+      quote! { , path_prefix = #path_prefix }
+    };
+    let content_type_attr = if content_type.is_empty() {
+      quote! {}
+    } else {
+      quote! { , content_type = #content_type }
+    };
+    let extension_attr = if extension.is_empty() {
+      quote! {}
+    } else {
+      quote! { , extension = #extension }
+    };
+    let root_attr = if let Some((root_type, _accessor_name)) = part_root_element_info(part) {
       let root_ty: Type = parse_str(&root_type)?;
-      let root_accessor_ident: Ident = parse_str(&accessor_name)?;
-      let content_type_str = root_part_content_type(part);
+      let root_content_type = root_part_content_type(part);
+      let root_content_type_attr = if root_content_type == content_type {
+        quote! {}
+      } else {
+        quote! { , content_type = #root_content_type }
+      };
       quote! {
         , root(
-          element = #root_ty,
-          accessor = #root_accessor_ident,
-          content_type = #content_type_str
+          element = #root_ty
+          #root_content_type_attr
         )
       }
     } else {
@@ -317,7 +298,14 @@ pub fn gen_parts_mod(
     };
     part_ref_variants.push(quote! {
       #( #part_attrs )*
-      #[sdk(relationship_type = #relationship_type_variant #root_attr)]
+      #[sdk(
+        relationship_type = #relationship_type_variant,
+        target_name = #target_name
+        #path_prefix_attr
+        #content_type_attr
+        #extension_attr
+        #root_attr
+      )]
       #struct_ident(#part_ty),
     });
   }
@@ -676,7 +664,7 @@ mod tests {
     let rendered = gen_part_module(&part).unwrap().to_string();
     assert!(rendered.contains("PartRoot"));
     assert!(rendered.contains("MainDocumentPart"));
-    assert!(rendered.contains("as_main_document_part"));
+    assert!(!rendered.contains("as_main_document_part"));
   }
 
   #[test]
@@ -758,7 +746,7 @@ mod tests {
     assert!(rendered.contains(
       "element = crate :: schemas :: schemas_openxmlformats_org_wordprocessingml_2006_main :: Document"
     ));
-    assert!(rendered.contains("as_main_document_part"));
+    assert!(!rendered.contains("as_main_document_part"));
   }
 
   #[test]

@@ -12,12 +12,14 @@ pub struct ExtendedPart {
   pub(crate) relationship_order: Vec<crate::sdk::RelationshipModelEntry>,
   pub(crate) modeled_relationships: Vec<crate::common::RelationshipInfo>,
 }
-impl crate::sdk::SdkPart for ExtendedPart {
+impl crate::sdk::SdkPartDescriptor for ExtendedPart {
   const RELATIONSHIP_TYPE: &'static str = "";
   const PATH_PREFIX: &'static str = "";
   const CONTENT_TYPE: &'static str = "";
   const TARGET_NAME: &'static str = "extendedPart";
   const EXTENSION: &'static str = "";
+}
+impl crate::sdk::SdkPart for ExtendedPart {
   #[inline]
   fn from_part_id(part_id: crate::common::PartId) -> Self {
     Self {

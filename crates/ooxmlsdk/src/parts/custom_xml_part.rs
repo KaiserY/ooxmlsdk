@@ -4,17 +4,10 @@
 // -----------------------------------------------------------------------------
 //
 
-pub const RELATIONSHIP_TYPE: &str =
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
-pub const PATH_PREFIX: &str = "../customXml";
-pub const CONTENT_TYPE: &str = "";
-pub const TARGET_NAME: &str = "item";
-pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct CustomXmlPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_child(relationship_type = RelationshipCustomXmlProps))]
   pub(crate) custom_xml_properties_part:
     crate::sdk::OptionalPart<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart>,
 }

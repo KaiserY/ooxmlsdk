@@ -4,26 +4,15 @@
 // -----------------------------------------------------------------------------
 //
 
-pub const RELATIONSHIP_TYPE: &str =
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes";
-pub const PATH_PREFIX: &str = "../drawings";
-pub const CONTENT_TYPE: &str =
-  "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml";
-pub const TARGET_NAME: &str = "drawing";
-pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct ChartDrawingPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_chart_drawing_part"))]
   pub(crate) root_element: crate::sdk::PartRoot<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::UserShapes,
   >,
-  #[sdk(part_child(relationship_type = RelationshipChart))]
   pub(crate) chart_part: crate::sdk::OptionalPart<crate::parts::chart_part::ChartPart>,
-  #[sdk(part_child(relationship_type = RelationshipChartEx))]
   pub(crate) extended_chart_part:
     crate::sdk::OptionalPart<crate::parts::extended_chart_part::ExtendedChartPart>,
-  #[sdk(part_child(relationship_type = RelationshipImage))]
   pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

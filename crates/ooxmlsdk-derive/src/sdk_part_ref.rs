@@ -5,8 +5,16 @@ struct PartRefVariant {
   ident: Ident,
   ty: Type,
   relationship_type: Option<Ident>,
+  descriptor: Option<PartRefDescriptor>,
   root: Option<PartRefRoot>,
   extended: bool,
+}
+
+struct PartRefDescriptor {
+  path_prefix: String,
+  content_type: String,
+  target_name: String,
+  extension: String,
 }
 
 struct PartRefRoot {
@@ -41,7 +49,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     }
   });
 
-  let relationship_arms = variants
+  let descriptor_impls = variants
     .iter()
     .filter(|variant| !variant.extended)
     .map(|variant| {
@@ -51,41 +59,93 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         .relationship_type
         .as_ref()
         .expect("non-extended PartRef variants require relationship type");
+      let descriptor = variant
+        .descriptor
+        .as_ref()
+        .expect("non-extended PartRef variants require descriptor");
+      let path_prefix = descriptor.path_prefix.as_str();
+      let content_type = descriptor.content_type.as_str();
+      let target_name = descriptor.target_name.as_str();
+      let extension = descriptor.extension.as_str();
+      quote! {
+        #( #attrs )*
+        impl crate::sdk::SdkPartDescriptor for #variant_ty {
+          const RELATIONSHIP_TYPE: &'static str =
+            crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type.uri();
+          const PATH_PREFIX: &'static str = #path_prefix;
+          const CONTENT_TYPE: &'static str = #content_type;
+          const TARGET_NAME: &'static str = #target_name;
+          const EXTENSION: &'static str = #extension;
+        }
+      }
+    });
+
+  let relationship_arms = variants
+    .iter()
+    .filter(|variant| !variant.extended)
+    .map(|variant| {
+      let attrs = cfg_attrs(&variant.attrs);
+      let variant_ident = &variant.ident;
+      let variant_ty = &variant.ty;
+      let relationship_type = variant
+        .relationship_type
+        .as_ref()
+        .expect("non-extended PartRef variants require relationship type");
       let pattern = quote! {
         crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type
       };
-      let make_part_ref = quote! {
-        return Some(<#variant_ty>::make_part_ref(storage, part_id, relationship_id));
+      let construct_part_ref = quote! {
+        let part = if let Some(relationship_id) = relationship_id {
+          <#variant_ty as crate::sdk::SdkPart>::from_relationship_id(relationship_id, part_id)
+        } else {
+          <#variant_ty as crate::sdk::SdkPart>::from_part_id(part_id)
+        };
+        return Some(Self::#variant_ident(part));
+      };
+      let descriptor = variant
+        .descriptor
+        .as_ref()
+        .expect("non-extended PartRef variants require descriptor");
+      let content_type = LitByteStr::new(descriptor.content_type.as_bytes(), Span::call_site());
+      let path_prefix = descriptor.path_prefix.as_str();
+      let target_name = descriptor.target_name.as_str();
+      let content_type_match = quote! { part.content_type().as_bytes() == #content_type };
+      let part_ref_guard = if descriptor.content_type.is_empty() {
+        quote! {}
+      } else {
+        quote! { if #content_type_match }
+      };
+      let office_document_guard = if descriptor.content_type.is_empty() {
+        quote! {
+          if crate::common::package_main_part_path_matches(
+            part.path(),
+            #path_prefix,
+            #target_name,
+          )
+        }
+      } else {
+        quote! {
+          if #content_type_match
+            || crate::common::package_main_part_path_matches(
+              part.path(),
+              #path_prefix,
+              #target_name,
+            )
+        }
       };
 
       if relationship_type == "RelationshipOfficeDocument" {
         quote! {
           #( #attrs )*
-          #pattern
-            if if <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE.is_empty() {
-              crate::common::package_main_part_path_matches(
-                part.path(),
-                <#variant_ty as crate::sdk::SdkPart>::PATH_PREFIX,
-                <#variant_ty as crate::sdk::SdkPart>::TARGET_NAME,
-              )
-            } else {
-              part.content_type() == <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE
-                || crate::common::package_main_part_path_matches(
-                  part.path(),
-                  <#variant_ty as crate::sdk::SdkPart>::PATH_PREFIX,
-                  <#variant_ty as crate::sdk::SdkPart>::TARGET_NAME,
-                )
-            } => {
-            #make_part_ref
+          #pattern #office_document_guard => {
+            #construct_part_ref
           }
         }
       } else {
         quote! {
           #( #attrs )*
-          #pattern
-            if <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE.is_empty()
-              || part.content_type() == <#variant_ty as crate::sdk::SdkPart>::CONTENT_TYPE => {
-            #make_part_ref
+          #pattern #part_ref_guard => {
+            #construct_part_ref
           }
         }
       }
@@ -94,6 +154,43 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
   let root_variants = variants
     .iter()
     .filter_map(|variant| variant.root.as_ref().map(|root| (variant, root)));
+  let root_bridge_impls = root_variants.clone().map(|(variant, root)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ty = &variant.ty;
+    let variant_ident = &variant.ident;
+    let root_ty = &root.element_ty;
+    quote! {
+      #( #attrs )*
+      impl crate::sdk::SdkPartRoot for #variant_ty {
+        type RootElement = #root_ty;
+
+        #[inline]
+        fn wrap_root_element(root_element: Self::RootElement) -> crate::parts::PartRootElement {
+          crate::parts::PartRootElement::#variant_ident(Box::new(root_element))
+        }
+
+        #[inline]
+        fn root_element_ref(
+          root_element: &crate::parts::PartRootElement,
+        ) -> Option<&Self::RootElement> {
+          match root_element {
+            crate::parts::PartRootElement::#variant_ident(root) => Some(root.as_ref()),
+            _ => None,
+          }
+        }
+
+        #[inline]
+        fn root_element_mut(
+          root_element: &mut crate::parts::PartRootElement,
+        ) -> Option<&mut Self::RootElement> {
+          match root_element {
+            crate::parts::PartRootElement::#variant_ident(root) => Some(root.as_mut()),
+            _ => None,
+          }
+        }
+      }
+    }
+  });
   let root_enum_variants = root_variants.clone().map(|(variant, root)| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
@@ -178,6 +275,9 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
   });
 
   Ok(quote! {
+    #( #descriptor_impls )*
+    #( #root_bridge_impls )*
+
     #[derive(Clone, Debug)]
     pub enum PartRootElement {
       #( #root_enum_variants )*
@@ -311,13 +411,30 @@ fn parse_part_ref_variants(data_enum: &DataEnum) -> syn::Result<Vec<PartRefVaria
         ));
       }
       let extended = variant.ident == "ExtendedPart";
-      let part_ref_attr = parse_part_ref_attr(&variant.attrs)?;
+      let part_ref_attr = parse_part_ref_attr(&variant.attrs, &variant.ident)?;
       if !extended && part_ref_attr.relationship_type.is_none() {
         return Err(syn::Error::new_spanned(
           variant,
           "SdkPartRef variants require #[sdk(relationship_type = ...)]",
         ));
       }
+      if !extended && part_ref_attr.descriptor.is_none() {
+        return Err(syn::Error::new_spanned(
+          variant,
+          "SdkPartRef variants require descriptor attributes",
+        ));
+      }
+      let root = match part_ref_attr.root {
+        Some(mut root) => {
+          if root.content_type.is_empty()
+            && let Some(descriptor) = &part_ref_attr.descriptor
+          {
+            root.content_type = descriptor.content_type.clone();
+          }
+          Some(root)
+        }
+        None => None,
+      };
       Ok(PartRefVariant {
         attrs: variant
           .attrs
@@ -328,7 +445,8 @@ fn parse_part_ref_variants(data_enum: &DataEnum) -> syn::Result<Vec<PartRefVaria
         ident: variant.ident.clone(),
         ty: fields.unnamed[0].ty.clone(),
         relationship_type: part_ref_attr.relationship_type,
-        root: part_ref_attr.root,
+        descriptor: part_ref_attr.descriptor,
+        root,
         extended,
       })
     })
@@ -338,11 +456,17 @@ fn parse_part_ref_variants(data_enum: &DataEnum) -> syn::Result<Vec<PartRefVaria
 #[derive(Default)]
 struct PartRefAttr {
   relationship_type: Option<Ident>,
+  descriptor: Option<PartRefDescriptor>,
   root: Option<PartRefRoot>,
 }
 
-fn parse_part_ref_attr(attrs: &[Attribute]) -> syn::Result<PartRefAttr> {
+fn parse_part_ref_attr(attrs: &[Attribute], variant_ident: &Ident) -> syn::Result<PartRefAttr> {
   let mut parsed = PartRefAttr::default();
+  let mut path_prefix = ".".to_string();
+  let mut content_type = String::new();
+  let mut target_name = None;
+  let mut extension = String::new();
+  let mut has_descriptor = false;
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -363,20 +487,55 @@ fn parse_part_ref_attr(attrs: &[Attribute]) -> syn::Result<PartRefAttr> {
             "relationship_type must be a relationship enum variant",
           ));
         }
+        Meta::NameValue(name_value) if name_value.path.is_ident("path_prefix") => {
+          path_prefix = parse_lit_str_value(name_value.value)?;
+          has_descriptor = true;
+        }
+        Meta::NameValue(name_value) if name_value.path.is_ident("content_type") => {
+          content_type = parse_lit_str_value(name_value.value)?;
+          has_descriptor = true;
+        }
+        Meta::NameValue(name_value) if name_value.path.is_ident("target_name") => {
+          target_name = Some(parse_lit_str_value(name_value.value)?);
+          has_descriptor = true;
+        }
+        Meta::NameValue(name_value) if name_value.path.is_ident("extension") => {
+          extension = parse_lit_str_value(name_value.value)?;
+          has_descriptor = true;
+        }
         Meta::List(meta) if meta.path.is_ident("root") => {
-          parsed.root = Some(parse_part_ref_root(meta)?);
+          parsed.root = Some(parse_part_ref_root(meta, variant_ident)?);
         }
         _ => {}
       }
     }
   }
+  if has_descriptor {
+    parsed.descriptor = Some(PartRefDescriptor {
+      path_prefix,
+      content_type,
+      target_name: target_name
+        .ok_or_else(|| syn::Error::new(Span::call_site(), "sdk part ref requires target_name"))?,
+      extension,
+    });
+  }
   Ok(parsed)
 }
 
-fn parse_part_ref_root(meta: syn::MetaList) -> syn::Result<PartRefRoot> {
+fn parse_lit_str_value(value: Expr) -> syn::Result<String> {
+  match value {
+    Expr::Lit(ExprLit {
+      lit: Lit::Str(value),
+      ..
+    }) => Ok(value.value()),
+    value => Err(syn::Error::new_spanned(value, "expected string literal")),
+  }
+}
+
+fn parse_part_ref_root(meta: syn::MetaList, variant_ident: &Ident) -> syn::Result<PartRefRoot> {
   let mut element_ty = None;
   let mut accessor = None;
-  let mut content_type = None;
+  let mut content_type = String::new();
 
   meta.parse_nested_meta(|nested| {
     if nested.path.is_ident("element") {
@@ -401,7 +560,7 @@ fn parse_part_ref_root(meta: syn::MetaList) -> syn::Result<PartRefRoot> {
       Ok(())
     } else if nested.path.is_ident("content_type") {
       let value: LitStr = nested.value()?.parse()?;
-      content_type = Some(value.value());
+      content_type = value.value();
       Ok(())
     } else {
       Err(nested.error("unsupported sdk root attribute"))
@@ -411,11 +570,29 @@ fn parse_part_ref_root(meta: syn::MetaList) -> syn::Result<PartRefRoot> {
   Ok(PartRefRoot {
     element_ty: element_ty
       .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires element"))?,
-    accessor: accessor
-      .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires accessor"))?,
-    content_type: content_type
-      .ok_or_else(|| syn::Error::new_spanned(&meta, "sdk root requires content_type"))?,
+    accessor: accessor.unwrap_or_else(|| {
+      Ident::new(
+        &format!("as_{}", simple_snake_case(&variant_ident.to_string())),
+        Span::call_site(),
+      )
+    }),
+    content_type,
   })
+}
+
+fn simple_snake_case(value: &str) -> String {
+  let mut out = String::new();
+  for (index, ch) in value.chars().enumerate() {
+    if ch.is_uppercase() {
+      if index > 0 {
+        out.push('_');
+      }
+      out.extend(ch.to_lowercase());
+    } else {
+      out.push(ch);
+    }
+  }
+  out
 }
 
 fn cfg_attrs(attrs: &[Attribute]) -> Vec<Attribute> {

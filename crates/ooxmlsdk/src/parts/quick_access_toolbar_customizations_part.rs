@@ -4,12 +4,6 @@
 // -----------------------------------------------------------------------------
 //
 
-pub const RELATIONSHIP_TYPE: &str =
-  "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization";
-pub const PATH_PREFIX: &str = "userCustomization";
-pub const CONTENT_TYPE: &str = "application/xml";
-pub const TARGET_NAME: &str = "customUI";
-pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct QuickAccessToolbarCustomizationsPart {
   pub(crate) relationship_id: Option<String>,

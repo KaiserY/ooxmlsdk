@@ -70,7 +70,11 @@ fn package_relationship_dispatch_tokens(
   let mut branches = Vec::new();
   for (field_index, child) in child_infos.iter().enumerate() {
     let (_, load_tokens) = package_child_init_tokens(child, field_index);
-    let relationship_type = relationship_namespace_uri_tokens(&child.relationship_type);
+    let part_ty = &child.part_ty;
+    let relationship_type = relationship_namespace_uri_tokens(
+      &child.relationship_type,
+      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
+    );
     branches.push((
       quote! {
         relationship_type == &#relationship_type
@@ -167,12 +171,8 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         "SdkPackage fields require storage, main_part_id, root_elements, or PartChild markers",
       ));
     };
-    let Some(relationship_type) = parse_part_child_relationship_type_attr(&field.attrs)? else {
-      return Err(syn::Error::new_spanned(
-        field,
-        "PartChild marker field requires #[sdk(part_child(relationship_type = ...))]",
-      ));
-    };
+    let relationship_type = parse_part_child_relationship_type_attr(&field.attrs)?
+      .unwrap_or(PartRelationshipTypeSource::TypeConst);
     child_infos.push(PackageChildInfo {
       attrs: passthrough_attrs(&field.attrs),
       field_ident: field_ident.clone(),
@@ -189,7 +189,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let part_ty = &child.part_ty;
     quote! {
       pub const MAIN_PART_RELATIONSHIP_TYPE: &'static str =
-        <#part_ty as crate::sdk::SdkPart>::RELATIONSHIP_TYPE;
+        <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE;
     }
   });
   let main_part_method = main_child.map(|child| {
@@ -229,7 +229,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
             self,
             relationship_id.clone(),
             content_type,
-            <#part_ty as crate::sdk::SdkPart>::EXTENSION,
+            <#part_ty as crate::sdk::SdkPartDescriptor>::EXTENSION,
             crate::common::NewPartTargetMode::Fixed,
           )?;
         self.#main_part_id_ident = Some(part.part_id());

@@ -69,29 +69,6 @@ enum PartChildKind {
   Optional,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum DerivedPartContentKind {
-  Text,
-  Binary,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum PartFieldMarker {
-  Rid,
-  ContentTypes,
-  Relationships,
-  RelsPath,
-  InnerPath,
-  Root,
-  ExtendedParts,
-}
-
-#[derive(Clone)]
-struct PartChildAttr {
-  relationship_type: PartRelationshipTypeSource,
-  kind: PartChildKind,
-}
-
 #[derive(Clone)]
 enum PartRelationshipTypeSource {
   Explicit(String),
@@ -101,6 +78,7 @@ enum PartRelationshipTypeSource {
 
 fn relationship_namespace_uri_tokens(
   relationship_type: &PartRelationshipTypeSource,
+  type_relationship_const: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   match relationship_type {
     PartRelationshipTypeSource::Explicit(value) => {
@@ -114,31 +92,9 @@ fn relationship_namespace_uri_tokens(
       }
     }
     PartRelationshipTypeSource::TypeConst => {
-      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(Self::RELATIONSHIP_TYPE) }
+      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(#type_relationship_const) }
     }
   }
-}
-
-#[derive(Clone)]
-struct PartChildInfo {
-  field_ident: Ident,
-  ty: Type,
-  kind: PartChildKind,
-  relationship_type: PartRelationshipTypeSource,
-}
-
-#[derive(Clone)]
-struct PartDataRefAttr {
-  relationship_type: String,
-  kind: PartChildKind,
-}
-
-#[derive(Clone)]
-struct PartDataRefInfo {
-  field_ident: Ident,
-  ty: Type,
-  kind: PartChildKind,
-  relationship_type: PartRelationshipTypeSource,
 }
 
 #[derive(Clone)]
@@ -447,11 +403,6 @@ struct QNameInfo {
   local_name: String,
 }
 
-fn is_system_part_field(field: &syn::Field) -> bool {
-  part_field_marker(field).ok().flatten().is_some()
-    || part_content_kind(field).ok().flatten().is_some()
-}
-
 fn build_conditional_chain(
   branches: &[(proc_macro2::TokenStream, proc_macro2::TokenStream)],
   fallback: proc_macro2::TokenStream,
@@ -487,288 +438,8 @@ fn build_conditional_chain(
   chain
 }
 
-fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
-  relationship_type_has_known_namespace(value, "r")
-    || relationship_type_has_known_namespace(value, "prm")
-    || relationship_type_has_known_namespace(value, "orswe")
-}
-
-fn relationship_type_has_known_namespace(value: &str, prefix: &str) -> bool {
-  let Some(namespace) = namespaces::uri_by_prefix(prefix) else {
-    return false;
-  };
-  value == namespace
-    || value
-      .strip_prefix(namespace)
-      .is_some_and(|suffix| suffix.starts_with('/'))
-}
-
 fn is_relationship_model_field(ident: &Ident) -> bool {
   ident == "fallback_parts" || ident == "relationship_order" || ident == "modeled_relationships"
-}
-
-fn part_root_type_from_fields(fields: &syn::FieldsNamed) -> Option<Type> {
-  fields
-    .named
-    .iter()
-    .find(|field| matches!(part_field_marker(field), Ok(Some(PartFieldMarker::Root))))
-    .map(|field| field.ty.clone())
-}
-
-fn part_content_kind_from_fields(fields: &syn::FieldsNamed) -> Option<DerivedPartContentKind> {
-  fields
-    .named
-    .iter()
-    .find_map(|field| part_content_kind(field).ok().flatten())
-}
-
-fn parse_part_child_field(field: &syn::Field) -> syn::Result<Option<PartChildInfo>> {
-  let Some(field_ident) = field.ident.clone() else {
-    return Ok(None);
-  };
-
-  if let Some(explicit) = parse_part_child_attr(&field.attrs)? {
-    let inner_ty = match explicit.kind {
-      PartChildKind::Repeated | PartChildKind::RequiredRepeated => unwrap_vec_inner(&field.ty),
-      PartChildKind::Required => unwrap_box_inner(&field.ty),
-      PartChildKind::Optional => unwrap_optional_box_inner(&field.ty),
-    }
-    .ok_or_else(|| {
-      syn::Error::new_spanned(
-        &field.ty,
-        "part_child field type does not match declared kind",
-      )
-    })?;
-
-    return Ok(Some(PartChildInfo {
-      field_ident,
-      ty: inner_ty,
-      kind: explicit.kind,
-      relationship_type: explicit.relationship_type,
-    }));
-  }
-
-  if let Some((kind, inner_ty)) = infer_part_field_kind_and_inner_type(field)
-    && is_part_terminal_type(&inner_ty)
-    && !is_data_ref_terminal_type(&inner_ty)
-  {
-    return Ok(Some(PartChildInfo {
-      field_ident,
-      ty: inner_ty,
-      kind,
-      relationship_type: PartRelationshipTypeSource::TypeConst,
-    }));
-  }
-
-  Ok(None)
-}
-
-fn parse_part_data_ref_field(field: &syn::Field) -> syn::Result<Option<PartDataRefInfo>> {
-  let Some(field_ident) = field.ident.clone() else {
-    return Ok(None);
-  };
-
-  if let Some(explicit) = parse_part_data_ref_attr(&field.attrs)? {
-    let inner_ty = match explicit.kind {
-      PartChildKind::Repeated | PartChildKind::RequiredRepeated => unwrap_vec_inner(&field.ty),
-      PartChildKind::Required => unwrap_box_inner(&field.ty),
-      PartChildKind::Optional => unwrap_optional_box_inner(&field.ty),
-    }
-    .ok_or_else(|| {
-      syn::Error::new_spanned(
-        &field.ty,
-        "part_data_ref field type does not match declared kind",
-      )
-    })?;
-
-    return Ok(Some(PartDataRefInfo {
-      field_ident,
-      ty: inner_ty,
-      kind: explicit.kind,
-      relationship_type: PartRelationshipTypeSource::Explicit(explicit.relationship_type),
-    }));
-  }
-
-  if let Some((kind, inner_ty)) = infer_part_field_kind_and_inner_type(field)
-    && is_data_ref_terminal_type(&inner_ty)
-  {
-    return Ok(Some(PartDataRefInfo {
-      field_ident,
-      ty: inner_ty,
-      kind,
-      relationship_type: PartRelationshipTypeSource::TypeConst,
-    }));
-  }
-
-  Ok(None)
-}
-
-fn parse_part_field_marker(attrs: &[Attribute]) -> syn::Result<Option<PartFieldMarker>> {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      match meta {
-        Meta::Path(path) if path.is_ident("part_rid") => return Ok(Some(PartFieldMarker::Rid)),
-        Meta::Path(path) if path.is_ident("part_content_types") => {
-          return Ok(Some(PartFieldMarker::ContentTypes));
-        }
-        Meta::Path(path) if path.is_ident("part_relationships") => {
-          return Ok(Some(PartFieldMarker::Relationships));
-        }
-        Meta::Path(path) if path.is_ident("part_rels_path") => {
-          return Ok(Some(PartFieldMarker::RelsPath));
-        }
-        Meta::Path(path) if path.is_ident("part_inner_path") => {
-          return Ok(Some(PartFieldMarker::InnerPath));
-        }
-        Meta::Path(path) if path.is_ident("part_root") => return Ok(Some(PartFieldMarker::Root)),
-        Meta::Path(path) if path.is_ident("part_extended_parts") => {
-          return Ok(Some(PartFieldMarker::ExtendedParts));
-        }
-        _ => {}
-      }
-    }
-  }
-  Ok(None)
-}
-
-fn part_field_marker(field: &syn::Field) -> syn::Result<Option<PartFieldMarker>> {
-  if let Some(marker) = parse_part_field_marker(&field.attrs)? {
-    return Ok(Some(marker));
-  }
-
-  Ok(infer_part_field_marker(field))
-}
-
-fn infer_part_field_marker(field: &syn::Field) -> Option<PartFieldMarker> {
-  let ident = field.ident.as_ref()?.to_string();
-
-  match ident.as_str() {
-    "r_id" if is_string_type(&field.ty) => Some(PartFieldMarker::Rid),
-    "content_types" if is_terminal_type(&field.ty, "Types") => Some(PartFieldMarker::ContentTypes),
-    "relationships" if is_option_of_terminal_type(&field.ty, "Relationships") => {
-      Some(PartFieldMarker::Relationships)
-    }
-    "rels_path" if is_string_type(&field.ty) => Some(PartFieldMarker::RelsPath),
-    "inner_path" if is_string_type(&field.ty) => Some(PartFieldMarker::InnerPath),
-    "root_element" if !is_wrapped_collection_type(&field.ty) => Some(PartFieldMarker::Root),
-    "extended_parts" if is_vec_of_terminal_type(&field.ty, "ExtendedPart") => {
-      Some(PartFieldMarker::ExtendedParts)
-    }
-    _ => None,
-  }
-}
-
-fn parse_part_content_attr(attrs: &[Attribute]) -> syn::Result<Option<DerivedPartContentKind>> {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      if let Meta::List(meta) = meta
-        && meta.path.is_ident("part_content")
-      {
-        let mut kind = None;
-        meta.parse_nested_meta(|nested| {
-          if nested.path.is_ident("kind") {
-            let value: LitStr = nested.value()?.parse()?;
-            kind = Some(match value.value().as_str() {
-              "text" => DerivedPartContentKind::Text,
-              "binary" => DerivedPartContentKind::Binary,
-              _ => return Err(nested.error("unsupported sdk part_content kind")),
-            });
-            Ok(())
-          } else {
-            Err(nested.error("unsupported sdk part_content attribute"))
-          }
-        })?;
-        return Ok(kind);
-      }
-    }
-  }
-  Ok(None)
-}
-
-fn part_content_kind(field: &syn::Field) -> syn::Result<Option<DerivedPartContentKind>> {
-  if let Some(kind) = parse_part_content_attr(&field.attrs)? {
-    return Ok(Some(kind));
-  }
-
-  let Some(field_ident) = &field.ident else {
-    return Ok(None);
-  };
-  if field_ident != "part_content" {
-    return Ok(None);
-  }
-
-  if is_string_type(&field.ty) {
-    return Ok(Some(DerivedPartContentKind::Text));
-  }
-  if is_vec_of_u8_type(&field.ty) {
-    return Ok(Some(DerivedPartContentKind::Binary));
-  }
-
-  Ok(None)
-}
-
-fn parse_part_child_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChildAttr>> {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      if let Meta::List(meta) = meta
-        && meta.path.is_ident("part_child")
-      {
-        let mut relationship_type = None;
-        let mut kind = None;
-        meta.parse_nested_meta(|nested| {
-          if nested.path.is_ident("relationship_type") {
-            let value: LitStr = nested.value()?.parse()?;
-            relationship_type = Some(PartRelationshipTypeSource::Explicit(value.value()));
-            Ok(())
-          } else if nested.path.is_ident("kind") {
-            let value: LitStr = nested.value()?.parse()?;
-            kind = Some(match value.value().as_str() {
-              "optional" => PartChildKind::Optional,
-              "required" => PartChildKind::Required,
-              "repeated" => PartChildKind::Repeated,
-              "required_repeated" => PartChildKind::RequiredRepeated,
-              _ => return Err(nested.error("unsupported sdk part_child kind")),
-            });
-            Ok(())
-          } else {
-            Err(nested.error("unsupported sdk part_child attribute"))
-          }
-        })?;
-        let Some(relationship_type) = relationship_type else {
-          return Err(syn::Error::new_spanned(
-            meta,
-            "sdk part_child requires relationship_type",
-          ));
-        };
-        let Some(kind) = kind else {
-          return Err(syn::Error::new_spanned(
-            meta,
-            "sdk part_child requires kind",
-          ));
-        };
-        return Ok(Some(PartChildAttr {
-          relationship_type,
-          kind,
-        }));
-      }
-    }
-  }
-  Ok(None)
 }
 
 fn parse_part_child_relationship_type_attr(
@@ -853,145 +524,6 @@ fn parse_part_child_kind_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChi
   Ok(None)
 }
 
-fn parse_part_data_ref_attr(attrs: &[Attribute]) -> syn::Result<Option<PartDataRefAttr>> {
-  for attr in attrs {
-    if !attr.path().is_ident("sdk") {
-      continue;
-    }
-    let metas =
-      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in metas {
-      if let Meta::List(meta) = meta
-        && meta.path.is_ident("part_data_ref")
-      {
-        let mut relationship_type = None;
-        let mut kind = None;
-        let mut has_reference_kind = false;
-        meta.parse_nested_meta(|nested| {
-          if nested.path.is_ident("relationship_type") {
-            let value: LitStr = nested.value()?.parse()?;
-            relationship_type = Some(value.value());
-            Ok(())
-          } else if nested.path.is_ident("kind") {
-            let value: LitStr = nested.value()?.parse()?;
-            kind = Some(match value.value().as_str() {
-              "optional" => PartChildKind::Optional,
-              "required" => PartChildKind::Required,
-              "repeated" => PartChildKind::Repeated,
-              "required_repeated" => PartChildKind::RequiredRepeated,
-              _ => return Err(nested.error("unsupported sdk part_data_ref kind")),
-            });
-            Ok(())
-          } else if nested.path.is_ident("reference_kind") {
-            let value: LitStr = nested.value()?.parse()?;
-            match value.value().as_str() {
-              "audio" | "media" | "video" => {
-                has_reference_kind = true;
-              }
-              _ => return Err(nested.error("unsupported sdk part_data_ref reference_kind")),
-            }
-            Ok(())
-          } else {
-            Err(nested.error("unsupported sdk part_data_ref attribute"))
-          }
-        })?;
-        let Some(relationship_type) = relationship_type else {
-          return Err(syn::Error::new_spanned(
-            meta,
-            "sdk part_data_ref requires relationship_type",
-          ));
-        };
-        let Some(kind) = kind else {
-          return Err(syn::Error::new_spanned(
-            meta,
-            "sdk part_data_ref requires kind",
-          ));
-        };
-        if !has_reference_kind {
-          return Err(syn::Error::new_spanned(
-            meta,
-            "sdk part_data_ref requires reference_kind",
-          ));
-        }
-        return Ok(Some(PartDataRefAttr {
-          relationship_type,
-          kind,
-        }));
-      }
-    }
-  }
-  Ok(None)
-}
-
-fn unwrap_vec_inner(ty: &Type) -> Option<Type> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let seg = path.segments.last()?;
-  if seg.ident != "Vec" {
-    return None;
-  }
-  let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-    return None;
-  };
-  args.args.iter().find_map(|arg| match arg {
-    syn::GenericArgument::Type(inner) => Some(inner.clone()),
-    _ => None,
-  })
-}
-
-fn unwrap_box_inner(ty: &Type) -> Option<Type> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let seg = path.segments.last()?;
-  if seg.ident != "Box" {
-    return None;
-  }
-  let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-    return None;
-  };
-  args.args.iter().find_map(|arg| match arg {
-    syn::GenericArgument::Type(inner) => Some(inner.clone()),
-    _ => None,
-  })
-}
-
-fn unwrap_optional_box_inner(ty: &Type) -> Option<Type> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let seg = path.segments.last()?;
-  if seg.ident != "Option" {
-    return None;
-  }
-  let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-    return None;
-  };
-  let inner = args.args.iter().find_map(|arg| match arg {
-    syn::GenericArgument::Type(inner) => Some(inner.clone()),
-    _ => None,
-  })?;
-  unwrap_box_inner(&inner)
-}
-
-fn infer_part_field_kind_and_inner_type(field: &syn::Field) -> Option<(PartChildKind, Type)> {
-  if let Some(inner) = unwrap_vec_inner(&field.ty) {
-    return Some((PartChildKind::Repeated, inner));
-  }
-  if let Some(inner) = unwrap_optional_box_inner(&field.ty) {
-    return Some((PartChildKind::Optional, inner));
-  }
-  if let Some(inner) = unwrap_box_inner(&field.ty) {
-    return Some((PartChildKind::Required, inner));
-  }
-  None
-}
-
-fn is_string_type(ty: &Type) -> bool {
-  is_terminal_type(ty, "String")
-}
-
 fn is_terminal_type(ty: &Type, expected: &str) -> bool {
   let Type::Path(TypePath { path, .. }) = ty else {
     return false;
@@ -1002,70 +534,6 @@ fn is_terminal_type(ty: &Type, expected: &str) -> bool {
     .last()
     .map(|segment| segment.ident == expected)
     .unwrap_or(false)
-}
-
-fn is_option_of_terminal_type(ty: &Type, expected: &str) -> bool {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return false;
-  };
-  let Some(seg) = path.segments.last() else {
-    return false;
-  };
-  if seg.ident != "Option" {
-    return false;
-  }
-  let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-    return false;
-  };
-
-  args.args.iter().any(|arg| match arg {
-    syn::GenericArgument::Type(inner) => is_terminal_type(inner, expected),
-    _ => false,
-  })
-}
-
-fn is_vec_of_terminal_type(ty: &Type, expected: &str) -> bool {
-  unwrap_vec_inner(ty)
-    .map(|inner| is_terminal_type(&inner, expected))
-    .unwrap_or(false)
-}
-
-fn is_vec_of_u8_type(ty: &Type) -> bool {
-  unwrap_vec_inner(ty)
-    .map(|inner| matches!(inner, Type::Path(TypePath { path, .. }) if path.is_ident("u8")))
-    .unwrap_or(false)
-}
-
-fn terminal_type_ident(ty: &Type) -> Option<String> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-
-  path
-    .segments
-    .last()
-    .map(|segment| segment.ident.to_string())
-}
-
-fn is_part_terminal_type(ty: &Type) -> bool {
-  terminal_type_ident(ty)
-    .map(|ident| ident.ends_with("Part"))
-    .unwrap_or(false)
-}
-
-fn is_data_ref_terminal_type(ty: &Type) -> bool {
-  matches!(
-    terminal_type_ident(ty).as_deref(),
-    Some("AudioReferenceRelationship")
-      | Some("MediaReferenceRelationship")
-      | Some("VideoReferenceRelationship")
-  )
-}
-
-fn is_wrapped_collection_type(ty: &Type) -> bool {
-  unwrap_vec_inner(ty).is_some()
-    || unwrap_box_inner(ty).is_some()
-    || unwrap_optional_box_inner(ty).is_some()
 }
 
 fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
@@ -2261,37 +1729,6 @@ mod tests {
     );
   }
 
-  #[test]
-  fn infers_part_system_markers_from_field_name_and_type() {
-    let relationships: syn::Field = syn::parse_quote! { pub relationships: Option<crate::schemas::opc_relationships::Relationships> };
-    let root_element: syn::Field = syn::parse_quote! { pub root_element: crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document };
-    let extended_parts: syn::Field =
-      syn::parse_quote! { pub extended_parts: Vec<crate::common::extended_part::ExtendedPart> };
-    let binary_part_content: syn::Field = syn::parse_quote! { pub part_content: Vec<u8> };
-    let text_part_content: syn::Field = syn::parse_quote! { pub part_content: String };
-
-    assert!(matches!(
-      part_field_marker(&relationships),
-      Ok(Some(PartFieldMarker::Relationships))
-    ));
-    assert!(matches!(
-      part_field_marker(&root_element),
-      Ok(Some(PartFieldMarker::Root))
-    ));
-    assert!(matches!(
-      part_field_marker(&extended_parts),
-      Ok(Some(PartFieldMarker::ExtendedParts))
-    ));
-    assert!(matches!(
-      part_content_kind(&binary_part_content),
-      Ok(Some(DerivedPartContentKind::Binary))
-    ));
-    assert!(matches!(
-      part_content_kind(&text_part_content),
-      Ok(Some(DerivedPartContentKind::Text))
-    ));
-  }
-
   fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
     let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
     let _guard = lock.lock().expect("snapshot lock");
@@ -2332,6 +1769,7 @@ mod tests {
       "SdkEnum" => sdk_enum::expand_sdk_enum(&input).expect("SdkEnum expansion"),
       "SdkType" => sdk_type::expand_sdk_type(&input).expect("SdkType expansion"),
       "SdkPart" => sdk_part::expand_sdk_part(&input).expect("SdkPart expansion"),
+      "SdkPartRef" => sdk_part_ref::expand_sdk_part_ref(&input).expect("SdkPartRef expansion"),
       "SdkPackage" => sdk_package::expand_sdk_package(&input).expect("SdkPackage expansion"),
       other => panic!("unexpected kind: {other}"),
     };

@@ -4,19 +4,11 @@
 // -----------------------------------------------------------------------------
 //
 
-pub const RELATIONSHIP_TYPE: &str =
-  "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility";
-pub const PATH_PREFIX: &str = "customUI";
-pub const CONTENT_TYPE: &str = "application/xml";
-pub const TARGET_NAME: &str = "customUI";
-pub const EXTENSION: &str = "";
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPart)]
 pub struct RibbonAndBackstageCustomizationsPart {
   pub(crate) relationship_id: Option<String>,
   pub(crate) id: crate::common::PartId,
-  #[sdk(part_root(accessor = "as_ribbon_and_backstage_customizations_part"))]
   pub(crate) root_element:
     crate::sdk::PartRoot<crate::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi>,
-  #[sdk(part_child(relationship_type = RelationshipImage))]
   pub(crate) image_parts: crate::sdk::RepeatedPart<crate::parts::image_part::ImagePart>,
 }

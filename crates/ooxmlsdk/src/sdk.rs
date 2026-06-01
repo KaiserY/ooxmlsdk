@@ -2106,13 +2106,29 @@ impl<'a, T> RelatedPart<'a, T> {
 }
 
 #[cfg(feature = "parts")]
-pub trait SdkPart: Clone + Sized + 'static {
+pub trait SdkPartDescriptor {
   const RELATIONSHIP_TYPE: &'static str;
   const PATH_PREFIX: &'static str;
   const CONTENT_TYPE: &'static str;
   const TARGET_NAME: &'static str;
   const EXTENSION: &'static str;
+}
 
+#[cfg(feature = "parts")]
+pub(crate) trait SdkPartRoot: SdkPart {
+  type RootElement;
+
+  fn wrap_root_element(root_element: Self::RootElement) -> crate::parts::PartRootElement;
+
+  fn root_element_ref(root_element: &crate::parts::PartRootElement) -> Option<&Self::RootElement>;
+
+  fn root_element_mut(
+    root_element: &mut crate::parts::PartRootElement,
+  ) -> Option<&mut Self::RootElement>;
+}
+
+#[cfg(feature = "parts")]
+pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
   fn from_part_id(part_id: crate::common::PartId) -> Self;
 
   fn from_relationship_id(
@@ -2125,31 +2141,6 @@ pub trait SdkPart: Clone + Sized + 'static {
   fn part_id(&self) -> crate::common::PartId;
 
   fn relationship_id(&self) -> Option<&str>;
-
-  #[inline(always)]
-  fn relationship_type() -> &'static str {
-    Self::RELATIONSHIP_TYPE
-  }
-
-  #[inline(always)]
-  fn path_prefix() -> &'static str {
-    Self::PATH_PREFIX
-  }
-
-  #[inline(always)]
-  fn static_content_type() -> &'static str {
-    Self::CONTENT_TYPE
-  }
-
-  #[inline(always)]
-  fn target_name() -> &'static str {
-    Self::TARGET_NAME
-  }
-
-  #[inline(always)]
-  fn extension() -> &'static str {
-    Self::EXTENSION
-  }
 
   #[inline]
   fn missing_part_storage_error(&self) -> crate::common::SdkError {
@@ -3876,177 +3867,6 @@ pub(crate) trait SdkPartInternal: Clone + Sized + 'static {
     part.set_relationship_id(relationship_id.into());
     part
   }
-}
-
-#[cfg(feature = "parts")]
-#[macro_export]
-macro_rules! sdk_part_root_methods {
-  ($root_ty:ty, $part_variant:ident, $root_accessor:ident, $root_accessor_mut:ident) => {
-    #[inline]
-    pub fn is_root_element_loaded<P: $crate::sdk::SdkPackage>(&self, package: &P) -> bool {
-      $crate::sdk::SdkPackage::is_root_element_loaded(package, self.id)
-    }
-
-    #[inline]
-    pub fn unload_root_element<P: $crate::sdk::SdkPackage>(
-      &self,
-      package: &mut P,
-    ) -> Option<$crate::parts::PartRootElement> {
-      $crate::sdk::SdkPackage::unload_root_element(package, self.id)
-    }
-
-    pub fn root_element<'a, P: $crate::sdk::SdkPackage>(
-      &self,
-      package: &'a mut P,
-    ) -> Result<&'a $root_ty, $crate::common::SdkError> {
-      if $crate::sdk::SdkPackage::root_element(package, self.id)
-        .and_then($crate::parts::PartRootElement::$root_accessor)
-        .is_none()
-      {
-        let root_element = {
-          let part = $crate::sdk::SdkPackage::storage(package)
-            .part(self.id)
-            .ok_or_else(|| {
-              $crate::common::SdkError::CommonError(format!(
-                "part id {:?} is not present in package storage",
-                self.id,
-              ))
-            })?;
-          <$root_ty>::from_bytes(part.data().bytes())?
-        };
-
-        *$crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-          $crate::common::SdkError::CommonError(format!(
-            "part id {:?} is not present in package root cache",
-            self.id,
-          ))
-        })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
-          root_element,
-        )));
-      }
-
-      $crate::sdk::SdkPackage::root_element(package, self.id)
-        .and_then($crate::parts::PartRootElement::$root_accessor)
-        .ok_or_else(|| {
-          $crate::common::SdkError::CommonError(
-            concat!(
-              "cached root element has unexpected type for ",
-              stringify!($part_variant)
-            )
-            .to_string(),
-          )
-        })
-    }
-
-    pub fn root_element_mut<'a, P: $crate::sdk::SdkPackage>(
-      &self,
-      package: &'a mut P,
-    ) -> Result<&'a mut $root_ty, $crate::common::SdkError> {
-      if $crate::sdk::SdkPackage::root_element(package, self.id)
-        .and_then($crate::parts::PartRootElement::$root_accessor)
-        .is_none()
-      {
-        let root_element = {
-          let part = $crate::sdk::SdkPackage::storage(package)
-            .part(self.id)
-            .ok_or_else(|| {
-              $crate::common::SdkError::CommonError(format!(
-                "part id {:?} is not present in package storage",
-                self.id,
-              ))
-            })?;
-          <$root_ty>::from_bytes(part.data().bytes())?
-        };
-
-        *$crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-          $crate::common::SdkError::CommonError(format!(
-            "part id {:?} is not present in package root cache",
-            self.id,
-          ))
-        })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
-          root_element,
-        )));
-      }
-
-      $crate::sdk::SdkPackage::root_element_slot_mut(package, self.id)
-        .and_then(Option::as_mut)
-        .and_then($crate::parts::PartRootElement::$root_accessor_mut)
-        .ok_or_else(|| {
-          $crate::common::SdkError::CommonError(
-            concat!(
-              "cached root element has unexpected type for ",
-              stringify!($part_variant)
-            )
-            .to_string(),
-          )
-        })
-    }
-
-    pub fn set_root_element<P: $crate::sdk::SdkPackage>(
-      &self,
-      package: &mut P,
-      root_element: $root_ty,
-    ) -> Result<(), $crate::common::SdkError> {
-      *$crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
-        $crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package root cache",
-          self.id,
-        ))
-      })? = Some($crate::parts::PartRootElement::$part_variant(Box::new(
-        root_element,
-      )));
-
-      Ok(())
-    }
-  };
-}
-
-#[cfg(feature = "parts")]
-#[macro_export]
-macro_rules! sdk_part_child_methods {
-  () => {};
-  (
-    $(#[$attrs:meta])*
-    optional $method:ident => $part_ty:ty, $relationship_type:expr;
-    $($rest:tt)*
-  ) => {
-    $(#[$attrs])*
-    pub fn $method<P: $crate::sdk::SdkPackage>(
-      &self,
-      package: &P,
-    ) -> Option<$part_ty> {
-      <Self as $crate::sdk::SdkPart>::child_part_by_relationship_type::<P, $part_ty>(
-        self,
-        package,
-        $relationship_type,
-      )
-    }
-
-    $crate::sdk_part_child_methods! {
-      $($rest)*
-    }
-  };
-  (
-    $(#[$attrs:meta])*
-    repeated $method:ident => $part_ty:ty, $relationship_type:expr;
-    $($rest:tt)*
-  ) => {
-    $(#[$attrs])*
-    pub fn $method<'a, P: $crate::sdk::SdkPackage>(
-      &'a self,
-      package: &'a P,
-    ) -> impl Iterator<Item = $part_ty> + 'a {
-      <Self as $crate::sdk::SdkPart>::child_parts_by_relationship_type::<P, $part_ty>(
-        self,
-        package,
-        $relationship_type,
-      )
-    }
-
-    $crate::sdk_part_child_methods! {
-      $($rest)*
-    }
-  };
 }
 
 #[cfg(feature = "parts")]

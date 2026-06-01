@@ -18,6 +18,7 @@ The runtime crate exposes a small public feature surface:
 The always-available modules in the crate root are:
 
 - `common`
+- `namespaces`
 - `schemas`
 - `sdk`
 - `simple_type`
@@ -46,7 +47,9 @@ The generated runtime includes Office 2010, 2013, 2016, 2019, 2021, Microsoft 36
 
 Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmlsdk).
 
-For Open XML package concepts, file format background, and WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility guidance, see the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk). This crate follows many of the same package and schema concepts while exposing Rust APIs and feature flags.
+Guides and examples are maintained separately in [KaiserY/ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
+
+For background on Open XML package concepts, file format structure, WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility, the Microsoft Learn documentation remains the upstream conceptual reference. This crate follows many of the same package and schema concepts while exposing Rust-native generated types and feature flags.
 
 ## Package API
 

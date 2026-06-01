@@ -462,44 +462,19 @@ pub(crate) fn relationship_type_known_bytes(
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn part_descriptor_matches(
-  actual_relationship_type: &str,
-  actual_content_type: &str,
-  actual_path: &str,
-  descriptor_relationship_type: &str,
-  descriptor_content_type: &str,
-  descriptor_path_prefix: &str,
-  descriptor_target_name: &str,
+pub(crate) fn is_data_part_reference_relationship_type(
+  relationship_type: Option<crate::namespaces::XmlKnownRelationshipNamespace>,
 ) -> bool {
-  let actual_relationship_type = actual_relationship_type.as_bytes();
-  if !relationship_type_matches_bytes(
-    actual_relationship_type,
-    descriptor_relationship_type.as_bytes(),
-  ) {
-    return false;
-  }
-  if descriptor_content_type.is_empty()
-    && is_office_document_relationship_type(actual_relationship_type)
-  {
-    return package_main_part_path_matches(
-      actual_path,
-      descriptor_path_prefix,
-      descriptor_target_name,
-    );
-  }
-  if descriptor_content_type.is_empty() || actual_content_type == descriptor_content_type {
-    return true;
-  }
+  use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
 
-  is_office_document_relationship_type(actual_relationship_type)
-    && package_main_part_path_matches(actual_path, descriptor_path_prefix, descriptor_target_name)
-}
-
-#[inline]
-#[cfg(feature = "parts")]
-fn is_office_document_relationship_type(value: &[u8]) -> bool {
-  relationship_type_known_bytes(value)
-    == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument)
+  matches!(
+    relationship_type,
+    Some(
+      RelationshipType::RelationshipAudio
+        | RelationshipType::RelationshipMedia
+        | RelationshipType::RelationshipVideo
+    )
+  )
 }
 
 #[inline]
@@ -650,26 +625,14 @@ mod tests {
 
   #[cfg(feature = "parts")]
   #[test]
-  fn variable_content_main_part_descriptors_match_by_target_path() {
-    let office_document_relationship_type = format!(
-      "{}/officeDocument",
-      crate::namespaces::XmlKnownNamespace::R.uri()
-    );
-    assert!(part_descriptor_matches(
-      &office_document_relationship_type,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+  fn variable_content_main_part_paths_match_by_target_path() {
+    assert!(package_main_part_path_matches(
       "xl/workbook.xml",
-      &office_document_relationship_type,
-      "",
       "xl",
       "workbook",
     ));
-    assert!(!part_descriptor_matches(
-      &office_document_relationship_type,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    assert!(!package_main_part_path_matches(
       "xl/workbook.xml",
-      &office_document_relationship_type,
-      "",
       "word",
       "document",
     ));

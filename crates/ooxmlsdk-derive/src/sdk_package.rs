@@ -71,13 +71,15 @@ fn package_relationship_dispatch_tokens(
   for (field_index, child) in child_infos.iter().enumerate() {
     let (_, load_tokens) = package_child_init_tokens(child, field_index);
     let part_ty = &child.part_ty;
-    let relationship_type = relationship_namespace_uri_tokens(
+    let relationship_matches = relationship_match_condition_tokens(
       &child.relationship_type,
+      quote! { relationship },
+      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_KNOWN_TYPE },
       quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
     );
     branches.push((
       quote! {
-        relationship_type == &#relationship_type
+        #relationship_matches
       },
       load_tokens,
     ));
@@ -325,7 +327,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     let mut modeled_relationships = Vec::new();
     for relationship in storage.package_relationships().iter() {
       let mut represented_relationship = false;
-      let relationship_type = relationship.relationship_namespace_uri();
       #relationship_dispatch
       if relationship.is_reference_relationship() {
         let item_index = modeled_relationships.len();

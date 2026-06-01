@@ -2331,27 +2331,12 @@ fn same_known_relationship_type(left: &[u8], right: &[u8]) -> bool {
 }
 
 fn data_part_reference_relationship_types_are_compatible_bytes(left: &[u8], right: &[u8]) -> bool {
-  is_data_part_reference_relationship_type(super::relationship_type_known_bytes(left))
-    && is_data_part_reference_relationship_type(super::relationship_type_known_bytes(right))
-}
-
-fn is_data_part_reference_relationship_type(
-  relationship_type: Option<crate::namespaces::XmlKnownRelationshipNamespace>,
-) -> bool {
-  use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
-  matches!(
-    relationship_type,
-    Some(
-      RelationshipType::RelationshipAudio
-        | RelationshipType::RelationshipMedia
-        | RelationshipType::RelationshipVideo
-    )
-  )
+  super::is_data_part_reference_relationship_type(super::relationship_type_known_bytes(left))
+    && super::is_data_part_reference_relationship_type(super::relationship_type_known_bytes(right))
 }
 
 fn is_media_data_part(part: &StoredPart) -> bool {
-  is_data_part_reference_relationship_type(part.relationship_known_type())
+  super::is_data_part_reference_relationship_type(part.relationship_known_type())
     || media_data_part_content_type(part.content_type())
     || part
       .path()

@@ -72,6 +72,8 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         impl crate::sdk::SdkPartDescriptor for #variant_ty {
           const RELATIONSHIP_TYPE: &'static str =
             crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type.uri();
+          const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace> =
+            Some(crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type);
           const PATH_PREFIX: &'static str = #path_prefix;
           const CONTENT_TYPE: &'static str = #content_type;
           const TARGET_NAME: &'static str = #target_name;
@@ -376,13 +378,13 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         relationship_id: Option<&str>,
       ) -> Self {
         let part = if let Some(relationship_id) = relationship_id {
-          <#extended_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
+          <#extended_ty>::from_relationship_id_with_relationships(
             storage,
             relationship_id,
             part_id,
           )
         } else {
-          <#extended_ty as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
+          <#extended_ty>::from_part_id_with_relationships(
             storage,
             part_id,
           )

@@ -76,23 +76,38 @@ enum PartRelationshipTypeSource {
   TypeConst,
 }
 
-fn relationship_namespace_uri_tokens(
+fn relationship_match_condition_tokens(
   relationship_type: &PartRelationshipTypeSource,
+  relationship_expr: proc_macro2::TokenStream,
+  type_relationship_known_const: proc_macro2::TokenStream,
   type_relationship_const: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   match relationship_type {
     PartRelationshipTypeSource::Explicit(value) => {
-      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(#value) }
-    }
-    PartRelationshipTypeSource::Known(variant_ident) => {
       quote! {
-        crate::common::XmlRelationshipNamespaceUri::Known(
-          crate::namespaces::XmlKnownRelationshipNamespace::#variant_ident,
+        crate::common::relationship_type_matches_bytes(
+          #relationship_expr.relationship_type_bytes(),
+          #value.as_bytes(),
         )
       }
     }
+    PartRelationshipTypeSource::Known(variant_ident) => {
+      quote! {
+        #relationship_expr.relationship_known_type()
+          == Some(crate::namespaces::XmlKnownRelationshipNamespace::#variant_ident)
+      }
+    }
     PartRelationshipTypeSource::TypeConst => {
-      quote! { crate::common::XmlRelationshipNamespaceUri::from_uri(#type_relationship_const) }
+      quote! {
+        if let Some(relationship_type) = #type_relationship_known_const {
+          #relationship_expr.relationship_known_type() == Some(relationship_type)
+        } else {
+          crate::common::relationship_type_matches_bytes(
+            #relationship_expr.relationship_type_bytes(),
+            #type_relationship_const.as_bytes(),
+          )
+        }
+      }
     }
   }
 }

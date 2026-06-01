@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{Ident, ItemMod, ItemStruct, Stmt, Type, parse_str, parse2};
+use syn::{Ident, ItemMod, ItemStruct, Type, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::part_codegen_ir::{
@@ -31,7 +31,6 @@ fn gen_package_module(
   _relationship_type_variants: &HashMap<String, Ident>,
 ) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
-  let descriptor_consts = part_descriptor_consts(part)?;
   let marker_fields = package_marker_fields(part)?;
   let package_struct: ItemStruct = parse2(quote! {
     #[derive(Clone, Debug, ooxmlsdk_derive::SdkPackage)]
@@ -45,7 +44,6 @@ fn gen_package_module(
   })?;
 
   Ok(quote! {
-    #descriptor_consts
     #package_struct
   })
 }
@@ -120,41 +118,6 @@ fn gen_part_handle_module(
 
   Ok(quote! {
     #part_struct
-  })
-}
-
-fn part_descriptor_consts(part: &PartModuleDecl) -> Result<TokenStream> {
-  let relationship_type_str = part.relationship_type.as_str();
-  let relationship_type_stmt: Stmt = parse2(quote! {
-    pub const RELATIONSHIP_TYPE: &str = #relationship_type_str;
-  })?;
-
-  let path_prefix_str = part.path_prefix.as_str();
-  let path_prefix_stmt: Stmt = parse2(quote! {
-    pub const PATH_PREFIX: &str = #path_prefix_str;
-  })?;
-
-  let content_type_str = part.content_type.as_str();
-  let content_type_stmt: Stmt = parse2(quote! {
-    pub const CONTENT_TYPE: &str = #content_type_str;
-  })?;
-
-  let target_name_str = part.target_name.as_str();
-  let target_name_stmt: Stmt = parse2(quote! {
-    pub const TARGET_NAME: &str = #target_name_str;
-  })?;
-
-  let extension_str = part.extension.as_str();
-  let extension_stmt: Stmt = parse2(quote! {
-    pub const EXTENSION: &str = #extension_str;
-  })?;
-
-  Ok(quote! {
-    #relationship_type_stmt
-    #path_prefix_stmt
-    #content_type_stmt
-    #target_name_stmt
-    #extension_stmt
   })
 }
 

@@ -233,35 +233,34 @@ fn relationship_target_as_part<T: SdkPart>(
     return None;
   }
 
-  let relationship_type = part.relationship_type()?;
-  if crate::common::part_descriptor_matches(
-    relationship_type,
-    part.content_type(),
-    part.path(),
-    T::RELATIONSHIP_TYPE,
-    T::CONTENT_TYPE,
-    T::PATH_PREFIX,
-    T::TARGET_NAME,
-  ) {
-    Some(T::from_relationship_id(relationship.id(), part_id))
-  } else {
-    None
+  let expected_relationship_type = T::RELATIONSHIP_KNOWN_TYPE?;
+  if part.relationship_known_type() != Some(expected_relationship_type) {
+    return None;
   }
+  if T::CONTENT_TYPE.is_empty()
+    && expected_relationship_type
+      == crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument
+  {
+    return crate::common::package_main_part_path_matches(
+      part.path(),
+      T::PATH_PREFIX,
+      T::TARGET_NAME,
+    )
+    .then(|| T::from_relationship_id(relationship.id(), part_id));
+  }
+  if T::CONTENT_TYPE.is_empty() || part.content_type().as_bytes() == T::CONTENT_TYPE.as_bytes() {
+    return Some(T::from_relationship_id(relationship.id(), part_id));
+  }
+  (expected_relationship_type
+    == crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument
+    && crate::common::package_main_part_path_matches(part.path(), T::PATH_PREFIX, T::TARGET_NAME))
+  .then(|| T::from_relationship_id(relationship.id(), part_id))
 }
 
 #[cfg(feature = "parts")]
 #[inline]
 fn is_data_part_reference_relationship(relationship: &crate::common::RelationshipInfo) -> bool {
-  use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
-  matches!(
-    relationship.relationship_known_type(),
-    Some(
-      RelationshipType::RelationshipAudio
-        | RelationshipType::RelationshipMedia
-        | RelationshipType::RelationshipVideo
-    )
-  )
+  crate::common::is_data_part_reference_relationship_type(relationship.relationship_known_type())
 }
 
 #[cfg(feature = "parts")]
@@ -2108,6 +2107,7 @@ impl<'a, T> RelatedPart<'a, T> {
 #[cfg(feature = "parts")]
 pub trait SdkPartDescriptor {
   const RELATIONSHIP_TYPE: &'static str;
+  const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace>;
   const PATH_PREFIX: &'static str;
   const CONTENT_TYPE: &'static str;
   const TARGET_NAME: &'static str;
@@ -2213,7 +2213,7 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    self.child_related_part_by_relationship_type(package, T::RELATIONSHIP_TYPE)
+    self.child_related_parts_of_type(package).next()
   }
 
   #[inline]
@@ -2225,7 +2225,42 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    self.child_related_parts_by_relationship_type(package, T::RELATIONSHIP_TYPE)
+    self.child_related_parts_of_type(package)
+  }
+
+  #[inline]
+  fn child_related_parts_of_type<'a, P, T>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = RelatedPart<'a, T>> + 'a
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    crate::sdk::SdkPackage::storage(package)
+      .relationships(self.part_id())
+      .into_iter()
+      .flat_map(|relationships| relationships.iter())
+      .filter_map(move |relationship| {
+        let matches_type = if let Some(relationship_type) = T::RELATIONSHIP_KNOWN_TYPE {
+          relationship.relationship_known_type() == Some(relationship_type)
+        } else {
+          crate::common::relationship_type_matches_bytes(
+            relationship.relationship_type_bytes(),
+            T::RELATIONSHIP_TYPE.as_bytes(),
+          )
+        };
+        matches_type
+          .then(|| relationship.target_part_id())
+          .flatten()
+          .map(|part_id| {
+            RelatedPart::new(
+              relationship.id(),
+              relationship.relationship_type(),
+              T::from_relationship_id(relationship.id(), part_id),
+            )
+          })
+      })
   }
 
   #[inline]
@@ -3839,33 +3874,6 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     )?;
     crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
     Ok(relationship_id)
-  }
-}
-
-#[cfg(feature = "parts")]
-pub(crate) trait SdkPartInternal: Clone + Sized + 'static {
-  fn from_part_id_with_relationships(
-    storage: &crate::common::SdkPackageStorage,
-    part_id: crate::common::PartId,
-  ) -> Self
-  where
-    Self: SdkPart,
-  {
-    let _ = storage;
-    Self::from_part_id(part_id)
-  }
-
-  fn from_relationship_id_with_relationships(
-    storage: &crate::common::SdkPackageStorage,
-    relationship_id: impl Into<String>,
-    part_id: crate::common::PartId,
-  ) -> Self
-  where
-    Self: SdkPart,
-  {
-    let mut part = Self::from_part_id_with_relationships(storage, part_id);
-    part.set_relationship_id(relationship_id.into());
-    part
   }
 }
 

@@ -1066,13 +1066,15 @@ fn part_handle_child_methods_tokens(
   let accessors = child_infos.iter().map(|child| {
     let method_ident = &child.field_ident;
     let part_ty = &child.part_ty;
-    let relationship_type = relationship_namespace_uri_tokens(
+    let relationship_matches = relationship_match_condition_tokens(
       &child.relationship_type,
+      quote! { relationship },
+      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_KNOWN_TYPE },
       quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
     );
     let map_relationship = quote! {
       move |relationship: &crate::common::RelationshipInfo| {
-        if relationship.relationship_namespace_uri() == &relationship_type {
+        if #relationship_matches {
           relationship
             .target_part_id()
             .map(|part_id| {
@@ -1091,7 +1093,6 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
-          let relationship_type = #relationship_type;
           crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
@@ -1104,7 +1105,6 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
-          let relationship_type = #relationship_type;
           crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())

@@ -318,6 +318,7 @@ fn write_parts(
         }
       impl crate::sdk::SdkPartDescriptor for ExtendedPart {
         const RELATIONSHIP_TYPE: &'static str = "";
+        const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace> = None;
         const PATH_PREFIX: &'static str = "";
         const CONTENT_TYPE: &'static str = "";
         const TARGET_NAME: &'static str = "extendedPart";
@@ -366,9 +367,9 @@ fn write_parts(
 
       }
 
-      impl crate::sdk::SdkPartInternal for ExtendedPart {
+      impl ExtendedPart {
         #[inline]
-        fn from_part_id_with_relationships(
+        pub(crate) fn from_part_id_with_relationships(
           storage: &crate::common::SdkPackageStorage,
           part_id: crate::common::PartId,
         ) -> Self {
@@ -402,13 +403,12 @@ fn write_parts(
         }
 
         #[inline]
-        fn from_relationship_id_with_relationships(
+        pub(crate) fn from_relationship_id_with_relationships(
           storage: &crate::common::SdkPackageStorage,
           relationship_id: impl Into<String>,
           part_id: crate::common::PartId,
         ) -> Self {
-          let mut part =
-            <Self as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(storage, part_id);
+          let mut part = Self::from_part_id_with_relationships(storage, part_id);
           part.relationship_id = Some(relationship_id.into());
           part
         }

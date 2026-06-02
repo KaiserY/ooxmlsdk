@@ -24,6 +24,5 @@ base64 = { workspace = true, optional = true }
 ooxmlsdk-derive = { workspace = true }
 quick-xml = { workspace = true }
 regex = { workspace = true, optional = true }
-smallvec = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true, optional = true }

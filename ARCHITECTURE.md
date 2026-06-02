@@ -56,7 +56,7 @@ The workspace currently has six crates:
 - `crates/ooxmlsdk-derive`: procedural macros used by generated/runtime schema types
 - `crates/ooxmlsdk-pdf`: DOCX -> PDF conversion pipeline
 - `crates/ooxmlsdk-pdf-test`: PDF parity helpers and fixture-based PDF assertions
-- `crates/ooxmlsdk-test`: integration tests, generated round-trip harness, validators, and benches
+- `crates/ooxmlsdk-test`: focused integration tests, validators, smoke round-trip coverage, and benches
 
 ## Runtime Architecture
 
@@ -178,26 +178,29 @@ The PDF path is separate from the core OOXML runtime:
 
 This split matters:
 
-- `ooxmlsdk-test` owns package/schema/round-trip correctness
+- `ooxmlsdk-test` owns focused package/schema correctness and smoke round-trip coverage
 - `ooxmlsdk-pdf-test` owns visible-output and PDF-object parity checks
+- `../ooxmlsdk-test-suite` owns corpus-scale package round-trip coverage
 
 Do not mix PDF rendering fixtures into package round-trip harnesses.
 
 ## Test Architecture
 
-`crates/ooxmlsdk-test` has two different fixture-driven lanes:
+`crates/ooxmlsdk-test` keeps focused fixture-driven lanes in this repository.
+Corpus-scale package round-trip coverage is split out to the adjacent
+`../ooxmlsdk-test-suite/` checkout.
 
-1. generated round-trip tests in `tests/doc_samples.rs`
-2. compatibility smoke coverage in `tests/round_trip.rs`
+The in-repository package round-trip lane is compatibility smoke coverage in
+`tests/round_trip.rs`.
 
-They have different scopes by design.
+This lane is intentionally narrower than the external corpus suite.
 
 ### Fixture Buckets
 
 Package fixtures live under `test-data/ooxmlsdk-test/`:
 
 - `Open-XML-SDK/`: copied from upstream `../Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles`
-- `libreoffice/`: copied from `../core` and used for package round-trip coverage
+- `libreoffice/`: copied from `../core` as supplemental real-world OOXML evidence
 - `specs/`: project-owned fixtures grouped by domain
 - `misc/`: fixtures intentionally outside upstream assets and outside spec buckets
 
@@ -207,15 +210,12 @@ PDF fixtures live under `test-data/ooxmlsdk-pdf-test/`:
 
 ### Round-Trip Coverage
 
-Generated round-trip coverage:
+Corpus round-trip coverage:
 
-- implemented by `crates/ooxmlsdk-test/build.rs`
-- emits test cases into `tests/doc_samples.rs`
-- walks:
-  - `test-data/ooxmlsdk-test/Open-XML-SDK/`
-  - `test-data/ooxmlsdk-test/libreoffice/`
-  - `test-data/ooxmlsdk-test/specs/`
-  - `test-data/ooxmlsdk-test/misc/`
+- maintained in `../ooxmlsdk-test-suite/`
+- prefer the local checkout; remote: `https://github.com/KaiserY/ooxmlsdk-test-suite`
+- covers external package fixture corpora such as Open-XML-SDK, LibreOffice,
+  and Apache POI
 
 Compatibility smoke coverage:
 
@@ -334,6 +334,19 @@ Key paths:
 - `../Open-XML-SDK/data`
 - `../Open-XML-SDK/test`
 - `../Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets`
+
+### Round-Trip Corpus Suite
+
+Local checkout:
+
+- `../ooxmlsdk-test-suite`
+
+Remote:
+
+- `https://github.com/KaiserY/ooxmlsdk-test-suite`
+
+Use this suite for corpus-scale package round-trip validation instead of adding
+generated corpus harnesses to this repository.
 
 ### LibreOffice Upstream
 

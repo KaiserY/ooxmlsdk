@@ -139,6 +139,7 @@ Prefer local checkouts before browsing:
 
 - `../Open-XML-SDK`: primary upstream for package API, generated metadata, tests, and assets
 - `../core`: LibreOffice upstream for PDF rendering fixtures and visible-output expectations
+- `../ooxmlsdk-test-suite`: package round-trip corpus suite for Open-XML-SDK, LibreOffice, Apache POI, and other external fixture sets; remote: `https://github.com/KaiserY/ooxmlsdk-test-suite`
 - `../ooxmlsdk`: sibling checkout reference when it is distinct from this repository
 - `../open-xml-docs`: Microsoft Learn Open XML docs and samples
 
@@ -153,8 +154,8 @@ Use GitHub only when the local checkout is missing or clearly stale.
 
 Important:
 
-- `crates/ooxmlsdk-test/tests/doc_samples.rs` covers `Open-XML-SDK/`, `specs/`, and `misc/`
-- `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test` scans only `test-data/ooxmlsdk-test/specs/`
+- full package round-trip corpus coverage belongs in `../ooxmlsdk-test-suite`, not in this repository
+- `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test` is a lightweight smoke test and scans only `test-data/ooxmlsdk-test/specs/`
 - `test-data/ooxmlsdk-test/specs/known_failures.toml` applies only to `specs/`
 - `test-data/ooxmlsdk-pdf-test/` is not part of package round-trip coverage
 
@@ -183,7 +184,7 @@ Place tests near the behavior they protect:
 - package/parts and Flat OPC: `packages.rs`
 - MCE: `packages.rs` or `markup_compatibility_calibration.rs`
 - validators: `validators.rs` and `file_validators.rs`
-- fixture-generated round trips: `doc_samples.rs`
+- corpus-scale package round trips: `../ooxmlsdk-test-suite`
 
 Prefer upstream-derived assertions and add `// Source:` comments on upstream-based tests.
 

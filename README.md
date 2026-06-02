@@ -122,11 +122,15 @@ cargo fmt --all
 
 For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` as a whole. The `packages` and `xml` suites have shown a persistent disagreement on `wordprocessing_document/write/parsed`, so treat that one case as an anomaly rather than as the sole performance signal.
 
-The compatibility round-trip lane is:
+The in-repository compatibility smoke lane is:
 
 ```bash
 cargo test -p ooxmlsdk-test round_trip -- --nocapture
 ```
+
+Corpus-scale package round-trip validation is maintained in the adjacent
+`../ooxmlsdk-test-suite/` checkout. Prefer that local path; the remote is
+`https://github.com/KaiserY/ooxmlsdk-test-suite`.
 
 The committed fixture set includes document, presentation, MCE, OPC, DrawingML, WML, and SpreadsheetML coverage, including spreadsheet cell types, defined names, formatting, formulas, freeze panes, merged cells, number formats, row/column dimensions, sheet visibility, and rich shared strings.
 

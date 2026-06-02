@@ -3,7 +3,6 @@ name = "ooxmlsdk-test"
 version.workspace = true
 edition.workspace = true
 publish = false
-build = "build.rs"
 
 [features]
 default = ["parts"]
@@ -15,12 +14,8 @@ mce = ["ooxmlsdk/mce"]
 [dependencies]
 ooxmlsdk = { workspace = true, default-features = false }
 
-[build-dependencies]
-serde_json = { workspace = true }
-
 [dev-dependencies]
 criterion = { workspace = true }
-quick-xml = { workspace = true }
 zip = { workspace = true }
 base64 = { workspace = true }
 walkdir = { workspace = true }

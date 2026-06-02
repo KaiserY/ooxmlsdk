@@ -57,121 +57,6 @@ pub enum XmlHeaderType {
   Standalone,
 }
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct XmlPrefix(smallvec::SmallVec<[u8; 8]>);
-
-impl XmlPrefix {
-  #[inline]
-  pub fn new(prefix: impl AsRef<[u8]>) -> Self {
-    Self(smallvec::SmallVec::from_slice(prefix.as_ref()))
-  }
-
-  #[inline]
-  pub fn as_bytes(&self) -> &[u8] {
-    self.0.as_slice()
-  }
-
-  #[inline]
-  pub fn as_str(&self) -> Option<&str> {
-    std::str::from_utf8(self.as_bytes()).ok()
-  }
-
-  #[inline]
-  pub fn is_empty(&self) -> bool {
-    self.0.is_empty()
-  }
-}
-
-impl AsRef<[u8]> for XmlPrefix {
-  #[inline]
-  fn as_ref(&self) -> &[u8] {
-    self.as_bytes()
-  }
-}
-
-impl From<&str> for XmlPrefix {
-  #[inline]
-  fn from(value: &str) -> Self {
-    Self::new(value.as_bytes())
-  }
-}
-
-impl From<String> for XmlPrefix {
-  #[inline]
-  fn from(value: String) -> Self {
-    Self::new(value.as_bytes())
-  }
-}
-
-impl From<Box<str>> for XmlPrefix {
-  #[inline]
-  fn from(value: Box<str>) -> Self {
-    Self::new(value.as_bytes())
-  }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum XmlNamespaceUri {
-  Known(crate::namespaces::XmlKnownNamespace),
-  Custom(Box<[u8]>),
-}
-
-impl Default for XmlNamespaceUri {
-  #[inline]
-  fn default() -> Self {
-    Self::Custom(Box::new([]))
-  }
-}
-
-impl XmlNamespaceUri {
-  #[inline]
-  pub fn new(uri: impl AsRef<[u8]>) -> Self {
-    Self::from_uri_bytes(uri.as_ref())
-  }
-
-  #[inline]
-  pub fn from_uri(uri: &str) -> Self {
-    Self::from_uri_bytes(uri.as_bytes())
-  }
-
-  #[inline]
-  pub fn from_uri_bytes(uri: &[u8]) -> Self {
-    if let Some(namespace) = crate::namespaces::XmlKnownNamespace::from_uri_bytes(uri) {
-      Self::Known(namespace)
-    } else {
-      Self::Custom(uri.into())
-    }
-  }
-
-  #[inline]
-  pub fn as_str(&self) -> &str {
-    std::str::from_utf8(self.uri_bytes()).unwrap_or("")
-  }
-
-  #[inline]
-  pub fn uri_bytes(&self) -> &[u8] {
-    match self {
-      Self::Known(namespace) => namespace.uri_bytes(),
-      Self::Custom(uri) => uri.as_ref(),
-    }
-  }
-
-  #[inline]
-  pub(crate) fn canonical_prefix_bytes<'a>(&self, prefix: &'a [u8]) -> &'a [u8] {
-    match self {
-      Self::Known(namespace) => namespace.prefix_bytes(),
-      Self::Custom(_) => prefix,
-    }
-  }
-}
-
-impl AsRef<str> for XmlNamespaceUri {
-  #[inline]
-  fn as_ref(&self) -> &str {
-    self.as_str()
-  }
-}
-
 #[cfg(feature = "parts")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum XmlRelationshipNamespaceUri {
@@ -230,34 +115,60 @@ impl AsRef<str> for XmlRelationshipNamespaceUri {
   }
 }
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct XmlNamespace {
-  pub prefix: XmlPrefix,
-  pub uri: XmlNamespaceUri,
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum XmlNamespace {
+  Known(crate::namespaces::XmlKnownNamespace),
+  Raw(Box<[u8]>),
+}
+
+impl Default for XmlNamespace {
+  #[inline]
+  fn default() -> Self {
+    Self::Raw(Box::new([]))
+  }
 }
 
 impl XmlNamespace {
   #[inline]
-  pub fn new(prefix: impl AsRef<[u8]>, uri: impl AsRef<[u8]>) -> Self {
-    Self {
-      prefix: XmlPrefix::new(prefix),
-      uri: XmlNamespaceUri::new(uri),
+  pub const fn known(namespace: crate::namespaces::XmlKnownNamespace) -> Self {
+    Self::Known(namespace)
+  }
+
+  #[inline]
+  pub(crate) fn raw(prefix: impl AsRef<[u8]>, uri: impl AsRef<[u8]>) -> Self {
+    let prefix = prefix.as_ref();
+    let uri = uri.as_ref();
+    let mut raw = Vec::with_capacity(prefix.len() + 1 + uri.len());
+    raw.extend_from_slice(prefix);
+    raw.push(0);
+    raw.extend_from_slice(uri);
+    Self::Raw(raw.into_boxed_slice())
+  }
+
+  #[inline]
+  pub(crate) fn parts(&self) -> (&[u8], &[u8]) {
+    match self {
+      Self::Known(namespace) => (namespace.prefix_bytes(), namespace.uri_bytes()),
+      Self::Raw(raw) => split_raw_namespace(raw),
     }
   }
+}
 
-  #[inline]
-  pub fn is_default(&self) -> bool {
-    self.prefix.is_empty()
+#[inline]
+fn split_raw_namespace(raw: &[u8]) -> (&[u8], &[u8]) {
+  if let Some(separator) = raw.iter().position(|byte| *byte == 0) {
+    (&raw[..separator], &raw[separator + 1..])
+  } else {
+    (raw, &[])
   }
+}
 
-  #[inline]
-  pub fn prefix_bytes(&self) -> &[u8] {
-    self.prefix.as_bytes()
-  }
-
-  #[inline]
-  pub fn uri_bytes(&self) -> &[u8] {
-    self.uri.uri_bytes()
+#[inline]
+pub(crate) fn canonical_xmlns_prefix_bytes<'a>(prefix: &'a [u8], uri: &[u8]) -> &'a [u8] {
+  match uri {
+    b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => b"x14",
+    b"http://schemas.microsoft.com/office/excel/2006/main" => b"xne",
+    _ => prefix,
   }
 }
 

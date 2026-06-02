@@ -10,6 +10,19 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 use ooxmlsdk::simple_type::TwipsMeasureValue;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
+fn xml_namespace_prefix_matches(
+  declaration: &ooxmlsdk::common::XmlNamespace,
+  expected: &[u8],
+) -> bool {
+  match declaration {
+    ooxmlsdk::common::XmlNamespace::Known(namespace) => namespace.prefix_bytes() == expected,
+    ooxmlsdk::common::XmlNamespace::Raw(raw) => raw
+      .split(|byte| *byte == 0)
+      .next()
+      .is_some_and(|prefix| prefix == expected),
+  }
+}
+
 fn first_body(document: &Document) -> &Body {
   document.body.as_ref().expect("expected document body")
 }
@@ -412,7 +425,7 @@ fn document_round_trip_from_openxml_reader_test() {
     parsed
       .xmlns
       .iter()
-      .all(|declaration| declaration.prefix.as_bytes() != b"w")
+      .all(|declaration| !xml_namespace_prefix_matches(declaration, b"w"))
   );
   assert!(!serialized.starts_with("<?xml"));
   assert!(

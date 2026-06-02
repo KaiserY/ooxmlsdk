@@ -20,6 +20,19 @@ fn xml_other_attr<'a>(attrs: &'a [ooxmlsdk::common::XmlOtherAttr], name: &str) -
     .find_map(|attr| (attr.name() == name).then_some(attr.raw_value()))
 }
 
+fn xml_namespace_prefix_matches(
+  declaration: &ooxmlsdk::common::XmlNamespace,
+  expected: &[u8],
+) -> bool {
+  match declaration {
+    ooxmlsdk::common::XmlNamespace::Known(namespace) => namespace.prefix_bytes() == expected,
+    ooxmlsdk::common::XmlNamespace::Raw(raw) => raw
+      .split(|byte| *byte == 0)
+      .next()
+      .is_some_and(|prefix| prefix == expected),
+  }
+}
+
 fn doc_sample_part(file_name: &str, part_name: &str) -> String {
   let bytes = std::fs::read(fixtures::doc_sample_path(file_name)).unwrap();
   let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
@@ -256,7 +269,7 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
     parsed
       .xmlns
       .iter()
-      .all(|declaration| declaration.prefix.as_bytes() != b"x")
+      .all(|declaration| !xml_namespace_prefix_matches(declaration, b"x"))
   );
   let items = shared_string_items(&parsed);
   assert_eq!(items.len(), 1);

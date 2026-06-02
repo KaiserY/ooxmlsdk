@@ -702,7 +702,7 @@ impl RelationshipSet {
 
   pub(crate) fn to_relationships(&self) -> Relationships {
     Relationships {
-      xmlns: vec![super::XmlNamespace::new(
+      xmlns: vec![super::XmlNamespace::raw(
         "",
         "http://schemas.openxmlformats.org/package/2006/relationships",
       )],
@@ -1019,7 +1019,7 @@ impl SdkPackageStorage {
   {
     writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
     writer.write_all(b"\n<pkg:package")?;
-    super::write_xmlns_attr(writer, Some(b"pkg"), FLAT_OPC_PACKAGE_NS.as_bytes())?;
+    super::xml::write_xmlns_attr(writer, Some(b"pkg"), FLAT_OPC_PACKAGE_NS.as_bytes())?;
     writer.write_all(b">\n")?;
 
     if !self.package_relationships.is_empty() {
@@ -1986,7 +1986,7 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
 
 fn empty_content_types() -> Types {
   Types {
-    xmlns: vec![super::XmlNamespace::new(
+    xmlns: vec![super::XmlNamespace::raw(
       "",
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],

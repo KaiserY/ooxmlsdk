@@ -691,11 +691,10 @@ impl MceContext {
   }
 
   pub(crate) fn namespace_for_prefix_bytes(&self, prefix: &[u8]) -> Option<&[u8]> {
-    self
-      .namespaces
-      .iter()
-      .rev()
-      .find_map(|candidate| (candidate.prefix_bytes() == prefix).then(|| candidate.uri_bytes()))
+    self.namespaces.iter().rev().find_map(|candidate| {
+      let (candidate_prefix, candidate_uri) = candidate.parts();
+      (candidate_prefix == prefix).then_some(candidate_uri)
+    })
   }
 
   pub(crate) fn is_ignorable_namespace_bytes(&self, namespace: &[u8]) -> bool {

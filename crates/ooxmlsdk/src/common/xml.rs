@@ -971,8 +971,9 @@ fn mce_unknown_element_replacement_bytes(
       .iter()
       .rev()
       .find_map(|namespace| {
-        (namespace.prefix_bytes() == prefix)
-          .then_some(namespace.uri_bytes())
+        let (namespace_prefix, namespace_uri) = namespace.parts();
+        (namespace_prefix == prefix)
+          .then_some(namespace_uri)
           .filter(|ns| context.is_ignorable_namespace_bytes(ns))
       })
       .is_some()
@@ -1120,12 +1121,10 @@ fn choice_requires_supported(
     .split(u8::is_ascii_whitespace)
     .filter(|part| !part.is_empty())
   {
-    let Some(ns) = namespaces
-      .iter()
-      .rev()
-      .find(|candidate| candidate.prefix_bytes() == prefix)
-      .map(|namespace| namespace.uri_bytes())
-    else {
+    let Some(ns) = namespaces.iter().rev().find_map(|namespace| {
+      let (namespace_prefix, namespace_uri) = namespace.parts();
+      (namespace_prefix == prefix).then_some(namespace_uri)
+    }) else {
       return Ok(false);
     };
     if !namespace_supported(ns, target) {
@@ -1164,7 +1163,7 @@ fn namespace_decls(
     let attr = attr?;
     let key = attr.key.as_ref();
     if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-      namespaces.push(crate::common::XmlNamespace::new(
+      namespaces.push(crate::common::XmlNamespace::raw(
         prefix,
         attr.value.as_ref(),
       ));

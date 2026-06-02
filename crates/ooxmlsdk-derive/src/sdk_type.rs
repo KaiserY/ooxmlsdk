@@ -1326,6 +1326,148 @@ fn build_choice_write_tokens(
   }
 }
 
+fn build_choice_payload_validate_tokens(
+  value_expr: proc_macro2::TokenStream,
+  ty: &Type,
+) -> proc_macro2::TokenStream {
+  if let Some(inner_ty) = vec_inner_type(ty) {
+    let inner_tokens = build_choice_payload_validate_tokens(quote! { value }, &inner_ty);
+    return quote! {
+      for value in #value_expr {
+        #inner_tokens
+      }
+    };
+  }
+
+  if is_option_type(ty) {
+    let inner_ty = unwrap_option_type(ty);
+    let inner_tokens = build_choice_payload_validate_tokens(quote! { value }, &inner_ty);
+    return quote! {
+      if let Some(value) = #value_expr {
+        #inner_tokens
+      }
+    };
+  }
+
+  if box_inner_type(ty).is_some() {
+    quote! {
+      crate::validator::SdkValidator::validate_into(#value_expr.as_ref(), context);
+    }
+  } else {
+    quote! {
+      crate::validator::SdkValidator::validate_into(#value_expr, context);
+    }
+  }
+}
+
+fn build_choice_sequence_validate_tokens(
+  children: &[SdkTypeChoiceSequenceChild],
+) -> proc_macro2::TokenStream {
+  children
+    .iter()
+    .filter_map(|child| {
+      if !matches!(child.kind, SdkTypeChoiceSequenceChildKind::Child) {
+        return None;
+      }
+      let field = child.field.as_ref()?;
+      let ty = child.ty.as_ref()?;
+      Some(build_choice_payload_validate_tokens(quote! { #field }, ty))
+    })
+    .collect()
+}
+
+fn build_choice_validate_tokens(
+  choice_ty: &Type,
+  items: &[SdkTypeChoiceItem],
+  field_ident: &Ident,
+  repeated: bool,
+  optional: bool,
+) -> proc_macro2::TokenStream {
+  let mut arms = Vec::new();
+  for item in items {
+    match item {
+      SdkTypeChoiceItem::Child { variant, ty, .. } => {
+        let validate_tokens = if let Some(ty) = ty {
+          build_choice_payload_validate_tokens(quote! { value }, ty)
+        } else {
+          quote! {
+            crate::validator::SdkValidator::validate_into(value.as_ref(), context);
+          }
+        };
+        arms.push(quote! {
+          #choice_ty::#variant(value) => {
+            #validate_tokens
+          }
+        });
+      }
+      SdkTypeChoiceItem::Sequence { variant, children } => {
+        if children.iter().all(|child| child.field.is_some()) {
+          let field_patterns = children
+            .iter()
+            .map(|child| {
+              let field = child.field.as_ref().expect("sequence field");
+              if matches!(child.kind, SdkTypeChoiceSequenceChildKind::Child) && child.ty.is_some() {
+                quote! { #field }
+              } else {
+                quote! { #field: _ }
+              }
+            })
+            .collect::<Vec<_>>();
+          let validate_tokens = build_choice_sequence_validate_tokens(children);
+          arms.push(quote! {
+            #choice_ty::#variant { #( #field_patterns ),* } => {
+              #validate_tokens
+            }
+          });
+        } else {
+          arms.push(quote! {
+            #choice_ty::#variant(value) => {
+              crate::validator::SdkValidator::validate_into(value.as_ref(), context);
+            }
+          });
+        }
+      }
+      SdkTypeChoiceItem::EmptyChild { variant, .. } => {
+        arms.push(quote! {
+          #choice_ty::#variant => {}
+        });
+      }
+      SdkTypeChoiceItem::TextChild { variant, .. }
+      | SdkTypeChoiceItem::AnyChild { variant, .. }
+      | SdkTypeChoiceItem::Any { variant }
+      | SdkTypeChoiceItem::Text { variant } => {
+        arms.push(quote! {
+          #choice_ty::#variant(_) => {}
+        });
+      }
+    }
+  }
+
+  let validate_one = quote! {
+    match choice {
+      #( #arms )*
+    }
+  };
+  if repeated {
+    quote! {
+      for choice in &self.#field_ident {
+        #validate_one
+      }
+    }
+  } else if optional {
+    quote! {
+      if let Some(choice) = &self.#field_ident {
+        #validate_one
+      }
+    }
+  } else {
+    quote! {
+      let choice = &self.#field_ident;
+      #validate_one
+    }
+  }
+}
+
 pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let ident = &input.ident;
   let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
@@ -3056,16 +3198,6 @@ fn expand_helper_struct(
   for field in &choice_fields {
     let field_ident = &field.ident;
     let choice_ty = unwrap_option_vec_type(&field.ty);
-    let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
-      quote! { choice.as_ref() }
-    } else {
-      quote! { choice }
-    };
-    let validate_self_tokens = if box_inner_type(&choice_ty).is_some() {
-      quote! { self.#field_ident.as_ref() }
-    } else {
-      quote! { &self.#field_ident }
-    };
     let (decl_tokens, init_tokens) =
       field_decl_init_tokens(ident, field_ident, field.repeated, field.optional);
     choice_decl_tokens.push(decl_tokens);
@@ -3078,11 +3210,13 @@ fn expand_helper_struct(
         true,
         false,
       )?);
-      choice_validate_tokens.push(quote! {
-        for choice in &self.#field_ident {
-          crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
-        }
-      });
+      choice_validate_tokens.push(build_choice_validate_tokens(
+        &choice_ty,
+        &field.items,
+        field_ident,
+        true,
+        false,
+      ));
     } else {
       if field.optional {
         choice_write_tokens.push(build_choice_write_tokens(
@@ -3092,11 +3226,13 @@ fn expand_helper_struct(
           false,
           true,
         )?);
-        choice_validate_tokens.push(quote! {
-          if let Some(choice) = &self.#field_ident {
-            crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
-          }
-        });
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          true,
+        ));
       } else {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -3105,9 +3241,13 @@ fn expand_helper_struct(
           false,
           false,
         )?);
-        choice_validate_tokens.push(quote! {
-          crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
-        });
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          false,
+        ));
       }
     }
   }
@@ -4380,16 +4520,6 @@ fn expand_named_struct(
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
     let choice_ty = unwrap_option_vec_type(&field.ty);
-    let validate_choice_tokens = if box_inner_type(&choice_ty).is_some() {
-      quote! { choice.as_ref() }
-    } else {
-      quote! { choice }
-    };
-    let validate_self_tokens = if box_inner_type(&choice_ty).is_some() {
-      quote! { self.#field_ident.as_ref() }
-    } else {
-      quote! { &self.#field_ident }
-    };
     let build_text_block = |string_expr: proc_macro2::TokenStream| {
       if field.accepts_text == Some(false) {
         return quote! {};
@@ -5386,11 +5516,13 @@ fn expand_named_struct(
         true,
         false,
       )?);
-      choice_validate_tokens.push(quote! {
-        for choice in &self.#field_ident {
-          crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
-        }
-      });
+      choice_validate_tokens.push(build_choice_validate_tokens(
+        &choice_ty,
+        &field.items,
+        field_ident,
+        true,
+        false,
+      ));
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     } else {
       if field.optional {
@@ -5401,11 +5533,13 @@ fn expand_named_struct(
           false,
           true,
         )?);
-        choice_validate_tokens.push(quote! {
-          if let Some(choice) = &self.#field_ident {
-            crate::validator::SdkValidator::validate_into(#validate_choice_tokens, context);
-          }
-        });
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          true,
+        ));
       } else {
         choice_write_tokens.push(build_choice_write_tokens(
           &choice_ty,
@@ -5414,9 +5548,13 @@ fn expand_named_struct(
           false,
           false,
         )?);
-        choice_validate_tokens.push(quote! {
-          crate::validator::SdkValidator::validate_into(#validate_self_tokens, context);
-        });
+        choice_validate_tokens.push(build_choice_validate_tokens(
+          &choice_ty,
+          &field.items,
+          field_ident,
+          false,
+          false,
+        ));
       }
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     }

@@ -17,6 +17,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Color, ConditionalFormatStyle, DivId, DocPartId, DocumentProtection, Panose1Number,
   SdtContentDate, UniqueTag,
 };
+use ooxmlsdk::simple_type::CoordinateValue;
 use ooxmlsdk::validator::ValidationErrorType;
 use ooxmlsdk::validator::validate_number_type;
 use ooxmlsdk::validator::{SdkValidator, StringFormatKind, validate_string_format};
@@ -135,18 +136,18 @@ fn int32_attribute_validation_test2() {
 fn int64_attribute_validation_test() {
   // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs Int64AttributeValidationTest
   let mut element = ChildExtents {
-    cx: 914400,
-    cy: 914400,
+    cx: CoordinateValue::Emu(914400),
+    cy: CoordinateValue::Emu(914400),
   };
   assert!(element.validate().is_empty());
 
-  element.cx = 2_147_483_647;
+  element.cx = CoordinateValue::Emu(2_147_483_647);
   assert!(element.validate().is_empty());
 
-  element.cx = -1;
+  element.cx = CoordinateValue::Emu(-1);
   assert!(!element.validate().is_empty());
 
-  element.cx = 2_147_483_648;
+  element.cx = CoordinateValue::Emu(2_147_483_648);
   assert!(!element.validate().is_empty());
 }
 
@@ -267,24 +268,24 @@ fn date_time_attribute_validation_test() {
 #[test]
 fn string_attribute_validation_test() {
   let mut element = ConditionalFormatStyle {
-    val: "010101010101".to_string(),
+    val: Some("010101010101".to_string()),
     ..Default::default()
   };
   assert!(element.validate().is_empty());
 
-  element.val = String::new();
+  element.val = Some(String::new());
   assert!(!element.validate().is_empty());
 
-  element.val = "0101".to_string();
+  element.val = Some("0101".to_string());
   assert!(!element.validate().is_empty());
 
-  element.val = "0101010101010".to_string();
+  element.val = Some("0101010101010".to_string());
   assert!(!element.validate().is_empty());
 
-  element.val = "010101010102".to_string();
+  element.val = Some("010101010102".to_string());
   assert!(!element.validate().is_empty());
 
-  element.val = "invalid".to_string();
+  element.val = Some("invalid".to_string());
   assert!(!element.validate().is_empty());
 
   let mut sources = Sources {

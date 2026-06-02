@@ -343,6 +343,13 @@ struct ParsedSdkTypeFieldAttrs {
 }
 
 #[derive(Clone)]
+struct SdkStackParserAttrs {
+  read_borrowed: syn::Path,
+  write: Option<syn::Path>,
+  child_borrowed: Option<syn::Path>,
+}
+
+#[derive(Clone)]
 enum SdkTypeChoiceItem {
   Child {
     variant: Ident,
@@ -585,6 +592,57 @@ fn parse_sdk_default_ns(attrs: &[Attribute]) -> syn::Result<bool> {
     }
   }
   Ok(false)
+}
+
+fn parse_sdk_stack_parser(attrs: &[Attribute]) -> syn::Result<Option<SdkStackParserAttrs>> {
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      let Meta::List(meta) = meta else {
+        continue;
+      };
+      if !meta.path.is_ident("stack_parser") {
+        continue;
+      }
+
+      let mut read_borrowed = None;
+      let mut write = None;
+      let mut child_borrowed = None;
+      meta.parse_nested_meta(|nested| {
+        if nested.path.is_ident("read_borrowed") {
+          let value: LitStr = nested.value()?.parse()?;
+          read_borrowed = Some(parse_str::<syn::Path>(&value.value())?);
+          Ok(())
+        } else if nested.path.is_ident("write") {
+          let value: LitStr = nested.value()?.parse()?;
+          write = Some(parse_str::<syn::Path>(&value.value())?);
+          Ok(())
+        } else if nested.path.is_ident("child_borrowed") {
+          let value: LitStr = nested.value()?.parse()?;
+          child_borrowed = Some(parse_str::<syn::Path>(&value.value())?);
+          Ok(())
+        } else {
+          Err(nested.error("unsupported sdk stack_parser attribute"))
+        }
+      })?;
+
+      let read_borrowed = read_borrowed.ok_or_else(|| {
+        syn::Error::new_spanned(&meta.path, "sdk stack_parser requires read_borrowed")
+      })?;
+      return Ok(Some(SdkStackParserAttrs {
+        read_borrowed,
+        write,
+        child_borrowed,
+      }));
+    }
+  }
+
+  Ok(None)
 }
 
 fn is_sdk_version_marker_path(path: &syn::Path) -> bool {

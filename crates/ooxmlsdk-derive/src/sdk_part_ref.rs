@@ -243,6 +243,23 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       Self::#variant_ident(root) => Ok(root.to_bytes()?),
     }
   });
+  let root_clear_arms = root_variants.clone().map(|(variant, _)| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    if variant_ident == "MainDocumentPart" {
+      quote! {
+        #( #attrs )*
+        Self::#variant_ident(root) => {
+          crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::__ooxmlsdk_clear_recursive_table_dom_from_document(root.as_mut());
+        }
+      }
+    } else {
+      quote! {
+        #( #attrs )*
+        Self::#variant_ident(_) => {}
+      }
+    }
+  });
   let root_from_part_id_branches = root_variants.clone().map(|(variant, root)| {
     let attrs = cfg_attrs(&variant.attrs);
     let variant_ident = &variant.ident;
@@ -298,6 +315,13 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       pub fn to_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
         match self {
           #( #root_to_bytes_arms )*
+        }
+      }
+
+      #[doc(hidden)]
+      pub(crate) fn clear_recursive_dom(&mut self) {
+        match self {
+          #( #root_clear_arms )*
         }
       }
 

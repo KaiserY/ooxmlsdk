@@ -143,6 +143,828 @@ fn qname_match_targets(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
     .collect()
 }
 
+fn stack_child_value_type(ty: &Type, optional: bool, repeated: bool) -> Type {
+  if repeated {
+    vec_inner_type(ty).unwrap_or_else(|| unwrap_wrapped_type(ty))
+  } else if optional {
+    unwrap_option_type(ty)
+  } else {
+    ty.clone()
+  }
+}
+
+fn stack_child_read_type_and_expr(value_ty: &Type) -> (Type, proc_macro2::TokenStream) {
+  if let Some(inner_ty) = box_inner_type(value_ty) {
+    (inner_ty, quote! { std::boxed::Box::new(parsed_child) })
+  } else {
+    (value_ty.clone(), quote! { parsed_child })
+  }
+}
+
+fn recursive_table_frame_tokens(
+  owner_ident: &Ident,
+  field_ident: &Ident,
+  variant_ident: &Ident,
+) -> Option<proc_macro2::TokenStream> {
+  match (
+    owner_ident.to_string().as_str(),
+    field_ident.to_string().as_str(),
+    variant_ident.to_string().as_str(),
+  ) {
+    ("Table", "table_choice2", "TableRow") => Some(quote! {
+      __OoxmlsdkRecursiveTableFrame::TableRow {
+        value: TableRow::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        attach: __OoxmlsdkRecursiveTableAttach::TableChoice2TableRow,
+      }
+    }),
+    ("TableRow", "table_row_choice", "TableCell") => Some(quote! {
+      __OoxmlsdkRecursiveTableFrame::TableCell {
+        value: TableCell::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        attach: __OoxmlsdkRecursiveTableAttach::TableRowChoiceTableCell,
+      }
+    }),
+    ("TableCell", "table_cell_choice", "Table") => Some(quote! {
+      __OoxmlsdkRecursiveTableFrame::Table {
+        value: Table::default(),
+        attach: __OoxmlsdkRecursiveTableAttach::TableCellChoiceTable,
+      }
+    }),
+    _ => None,
+  }
+}
+
+fn recursive_table_write_task_tokens(
+  owner_ident: &Ident,
+  field_ident: &Ident,
+  variant_ident: &Ident,
+) -> Option<proc_macro2::TokenStream> {
+  match (
+    owner_ident.to_string().as_str(),
+    field_ident.to_string().as_str(),
+    variant_ident.to_string().as_str(),
+  ) {
+    ("Table", "table_choice2", "TableRow") => {
+      Some(quote! { __OoxmlsdkRecursiveTableWriteTask::TableRow(value.as_ref()) })
+    }
+    ("TableRow", "table_row_choice", "TableCell") => {
+      Some(quote! { __OoxmlsdkRecursiveTableWriteTask::TableCell(value.as_ref()) })
+    }
+    ("TableCell", "table_cell_choice", "Table") => {
+      Some(quote! { __OoxmlsdkRecursiveTableWriteTask::Table(value.as_ref()) })
+    }
+    _ => None,
+  }
+}
+
+fn recursive_table_choice_write_fn_ident(
+  owner_ident: &Ident,
+  field_ident: &Ident,
+) -> Option<Ident> {
+  match (
+    owner_ident.to_string().as_str(),
+    field_ident.to_string().as_str(),
+  ) {
+    ("Table", "table_choice1") => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_choice",
+      Span::call_site(),
+    )),
+    ("Table", "table_choice2") => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_choice2",
+      Span::call_site(),
+    )),
+    ("TableRow", "table_row_choice") => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_row_choice",
+      Span::call_site(),
+    )),
+    ("TableCell", "table_cell_choice") => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_cell_choice",
+      Span::call_site(),
+    )),
+    _ => None,
+  }
+}
+
+fn stack_parser_choice_write_step_tokens(
+  ident: &Ident,
+  stack_parser: Option<&SdkStackParserAttrs>,
+  choice_fields: &[SdkTypeChoiceField],
+) -> proc_macro2::TokenStream {
+  if stack_parser.is_none() {
+    return quote! {};
+  }
+
+  let mut helpers = Vec::new();
+  for field in choice_fields {
+    let Some(fn_ident) = recursive_table_choice_write_fn_ident(ident, &field.ident) else {
+      continue;
+    };
+    let choice_ty = unwrap_option_vec_type(&field.ty);
+    let mut arms = Vec::new();
+    for item in &field.items {
+      let SdkTypeChoiceItem::Child { variant, ty, qname } = item else {
+        continue;
+      };
+      let start_tag_open = write_start_tag_open_tokens(qname);
+      let body = if let Some(task_tokens) =
+        recursive_table_write_task_tokens(ident, &field.ident, variant)
+      {
+        quote! {
+          #start_tag_open
+          Some(#task_tokens)
+        }
+      } else {
+        let write_ty = ty.clone().unwrap_or_else(|| syn::parse_quote! { _ });
+        quote! {
+          #start_tag_open
+          <#write_ty as crate::sdk::SdkType>::write_inner(value.as_ref(), writer)?;
+          None
+        }
+      };
+      arms.push(quote! {
+        #choice_ty::#variant(value) => {
+          #body
+        }
+      });
+    }
+    helpers.push(quote! {
+      fn #fn_ident<'a, W: std::io::Write>(
+        value: &'a #choice_ty,
+        writer: &mut W,
+      ) -> Result<Option<__OoxmlsdkRecursiveTableWriteTask<'a>>, std::io::Error> {
+        Ok(match value {
+          #( #arms )*
+        })
+      }
+    });
+  }
+
+  quote! {
+    #( #helpers )*
+  }
+}
+
+fn stack_parser_shared_table_tokens(
+  ident: &Ident,
+  stack_parser: Option<&SdkStackParserAttrs>,
+) -> proc_macro2::TokenStream {
+  if stack_parser.is_none() || ident != "Table" {
+    return quote! {};
+  }
+
+  quote! {
+    enum __OoxmlsdkRecursiveTableAttach {
+      Root,
+      TableChoice2TableRow,
+      TableRowChoiceTableCell,
+      TableCellChoiceTable,
+    }
+
+    enum __OoxmlsdkRecursiveTableFrame {
+      Table {
+        value: Table,
+        attach: __OoxmlsdkRecursiveTableAttach,
+      },
+      TableRow {
+        value: TableRow,
+        attach: __OoxmlsdkRecursiveTableAttach,
+      },
+      TableCell {
+        value: TableCell,
+        attach: __OoxmlsdkRecursiveTableAttach,
+      },
+    }
+
+    fn __ooxmlsdk_read_recursive_table_as_table_borrowed<'de>(
+      xml_reader: &mut crate::common::SliceReader<'de>,
+      e: quick_xml::events::BytesStart<'de>,
+      empty_tag: bool,
+    ) -> Result<Table, crate::common::SdkError> {
+      let _ = e;
+      let frame = __OoxmlsdkRecursiveTableFrame::Table {
+        value: Table::default(),
+        attach: __OoxmlsdkRecursiveTableAttach::Root,
+      };
+      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+        __OoxmlsdkRecursiveTableFrame::Table { value, .. } => Ok(value),
+        _ => unreachable!("recursive table parser returned wrong root frame"),
+      }
+    }
+
+    fn __ooxmlsdk_read_recursive_table_as_table_row_borrowed<'de>(
+      xml_reader: &mut crate::common::SliceReader<'de>,
+      e: quick_xml::events::BytesStart<'de>,
+      empty_tag: bool,
+    ) -> Result<TableRow, crate::common::SdkError> {
+      let frame = __OoxmlsdkRecursiveTableFrame::TableRow {
+        value: TableRow::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        attach: __OoxmlsdkRecursiveTableAttach::Root,
+      };
+      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+        __OoxmlsdkRecursiveTableFrame::TableRow { value, .. } => Ok(value),
+        _ => unreachable!("recursive table parser returned wrong root frame"),
+      }
+    }
+
+    fn __ooxmlsdk_read_recursive_table_as_table_cell_borrowed<'de>(
+      xml_reader: &mut crate::common::SliceReader<'de>,
+      e: quick_xml::events::BytesStart<'de>,
+      empty_tag: bool,
+    ) -> Result<TableCell, crate::common::SdkError> {
+      let frame = __OoxmlsdkRecursiveTableFrame::TableCell {
+        value: TableCell::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        attach: __OoxmlsdkRecursiveTableAttach::Root,
+      };
+      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+        __OoxmlsdkRecursiveTableFrame::TableCell { value, .. } => Ok(value),
+        _ => unreachable!("recursive table parser returned wrong root frame"),
+      }
+    }
+
+    fn __ooxmlsdk_read_recursive_table_borrowed<'de>(
+      xml_reader: &mut crate::common::SliceReader<'de>,
+      initial_frame: __OoxmlsdkRecursiveTableFrame,
+      empty_tag: bool,
+    ) -> Result<__OoxmlsdkRecursiveTableFrame, crate::common::SdkError> {
+      if empty_tag {
+        return Ok(initial_frame);
+      }
+
+      let mut stack = vec![initial_frame];
+      loop {
+        match xml_reader.next_tag_event()? {
+          crate::common::SliceTagEvent::Start(e, next_empty) => {
+            let next_frame = {
+              let top = stack
+                .last_mut()
+                .expect("recursive table parser stack should not be empty");
+              match top {
+                __OoxmlsdkRecursiveTableFrame::Table { value, .. } => {
+                  value.__ooxmlsdk_read_recursive_table_child_borrowed(
+                    xml_reader,
+                    e,
+                    next_empty,
+                  )?
+                }
+                __OoxmlsdkRecursiveTableFrame::TableRow { value, .. } => {
+                  value.__ooxmlsdk_read_recursive_table_row_child_borrowed(
+                    xml_reader,
+                    e,
+                    next_empty,
+                  )?
+                }
+                __OoxmlsdkRecursiveTableFrame::TableCell { value, .. } => {
+                  value.__ooxmlsdk_read_recursive_table_cell_child_borrowed(
+                    xml_reader,
+                    e,
+                    next_empty,
+                  )?
+                }
+              }
+            };
+
+            if let Some(frame) = next_frame {
+              if next_empty {
+                if let Some(root) = __ooxmlsdk_attach_recursive_table_frame(&mut stack, frame)? {
+                  return Ok(root);
+                }
+              } else {
+                stack.push(frame);
+              }
+            }
+          }
+          crate::common::SliceTagEvent::End(e) => {
+            let matches_top = match stack
+              .last()
+              .expect("recursive table parser stack should not be empty")
+            {
+              __OoxmlsdkRecursiveTableFrame::Table { .. } => {
+                e.name().as_ref() == b"w:tbl" || e.name().as_ref() == b"tbl"
+              }
+              __OoxmlsdkRecursiveTableFrame::TableRow { .. } => {
+                e.name().as_ref() == b"w:tr" || e.name().as_ref() == b"tr"
+              }
+              __OoxmlsdkRecursiveTableFrame::TableCell { .. } => {
+                e.name().as_ref() == b"w:tc" || e.name().as_ref() == b"tc"
+              }
+            };
+            if matches_top {
+              let frame = stack
+                .pop()
+                .expect("recursive table parser stack should not be empty");
+              if let Some(root) = __ooxmlsdk_attach_recursive_table_frame(&mut stack, frame)? {
+                return Ok(root);
+              }
+            }
+          }
+          crate::common::SliceTagEvent::Eof => {
+            return Err(crate::common::unexpected_eof("recursive table"));
+          }
+          crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
+        }
+      }
+    }
+
+    fn __ooxmlsdk_attach_recursive_table_frame(
+      stack: &mut [__OoxmlsdkRecursiveTableFrame],
+      frame: __OoxmlsdkRecursiveTableFrame,
+    ) -> Result<Option<__OoxmlsdkRecursiveTableFrame>, crate::common::SdkError> {
+      match frame {
+        __OoxmlsdkRecursiveTableFrame::Table { value, attach } => match attach {
+          __OoxmlsdkRecursiveTableAttach::Root => Ok(Some(
+            __OoxmlsdkRecursiveTableFrame::Table { value, attach },
+          )),
+          __OoxmlsdkRecursiveTableAttach::TableCellChoiceTable => {
+            let parent = stack.last_mut().ok_or_else(|| {
+              crate::common::SdkError::CommonError(
+                "recursive table parser missing TableCell parent".to_string(),
+              )
+            })?;
+            let __OoxmlsdkRecursiveTableFrame::TableCell { value: parent, .. } = parent else {
+              return Err(crate::common::SdkError::CommonError(
+                "recursive table parser expected TableCell parent".to_string(),
+              ));
+            };
+            parent
+              .table_cell_choice
+              .push(TableCellChoice::Table(std::boxed::Box::new(value)));
+            Ok(None)
+          }
+          _ => Err(crate::common::SdkError::CommonError(
+            "recursive table parser invalid Table attach target".to_string(),
+          )),
+        },
+        __OoxmlsdkRecursiveTableFrame::TableRow { value, attach } => match attach {
+          __OoxmlsdkRecursiveTableAttach::Root => Ok(Some(
+            __OoxmlsdkRecursiveTableFrame::TableRow { value, attach },
+          )),
+          __OoxmlsdkRecursiveTableAttach::TableChoice2TableRow => {
+            let parent = stack.last_mut().ok_or_else(|| {
+              crate::common::SdkError::CommonError(
+                "recursive table parser missing Table parent".to_string(),
+              )
+            })?;
+            let __OoxmlsdkRecursiveTableFrame::Table { value: parent, .. } = parent else {
+              return Err(crate::common::SdkError::CommonError(
+                "recursive table parser expected Table parent".to_string(),
+              ));
+            };
+            parent
+              .table_choice2
+              .push(TableChoice2::TableRow(std::boxed::Box::new(value)));
+            Ok(None)
+          }
+          _ => Err(crate::common::SdkError::CommonError(
+            "recursive table parser invalid TableRow attach target".to_string(),
+          )),
+        },
+        __OoxmlsdkRecursiveTableFrame::TableCell { value, attach } => match attach {
+          __OoxmlsdkRecursiveTableAttach::Root => Ok(Some(
+            __OoxmlsdkRecursiveTableFrame::TableCell { value, attach },
+          )),
+          __OoxmlsdkRecursiveTableAttach::TableRowChoiceTableCell => {
+            let parent = stack.last_mut().ok_or_else(|| {
+              crate::common::SdkError::CommonError(
+                "recursive table parser missing TableRow parent".to_string(),
+              )
+            })?;
+            let __OoxmlsdkRecursiveTableFrame::TableRow { value: parent, .. } = parent else {
+              return Err(crate::common::SdkError::CommonError(
+                "recursive table parser expected TableRow parent".to_string(),
+              ));
+            };
+            parent
+              .table_row_choice
+              .push(TableRowChoice::TableCell(std::boxed::Box::new(value)));
+            Ok(None)
+          }
+          _ => Err(crate::common::SdkError::CommonError(
+            "recursive table parser invalid TableCell attach target".to_string(),
+          )),
+        },
+      }
+    }
+
+    fn __ooxmlsdk_write_recursive_table_as_table<W: std::io::Write>(
+      value: &Table,
+      writer: &mut W,
+    ) -> Result<(), std::io::Error> {
+      __ooxmlsdk_write_recursive_table_stack(
+        vec![__OoxmlsdkRecursiveTableWriteTask::Table(value)],
+        writer,
+      )
+    }
+
+    fn __ooxmlsdk_write_recursive_table_as_table_row<W: std::io::Write>(
+      value: &TableRow,
+      writer: &mut W,
+    ) -> Result<(), std::io::Error> {
+      __ooxmlsdk_write_recursive_table_stack(
+        vec![__OoxmlsdkRecursiveTableWriteTask::TableRow(value)],
+        writer,
+      )
+    }
+
+    fn __ooxmlsdk_write_recursive_table_as_table_cell<W: std::io::Write>(
+      value: &TableCell,
+      writer: &mut W,
+    ) -> Result<(), std::io::Error> {
+      __ooxmlsdk_write_recursive_table_stack(
+        vec![__OoxmlsdkRecursiveTableWriteTask::TableCell(value)],
+        writer,
+      )
+    }
+
+    enum __OoxmlsdkRecursiveTableWriteTask<'a> {
+      Table(&'a Table),
+      TableRow(&'a TableRow),
+      TableCell(&'a TableCell),
+      TableChoice(&'a TableChoice),
+      TableChoice2(&'a TableChoice2),
+      TableRowChoice(&'a TableRowChoice),
+      TableCellChoice(&'a TableCellChoice),
+      TableProperties(&'a TableProperties),
+      TableGrid(&'a TableGrid),
+      TablePropertyExceptions(&'a TablePropertyExceptions),
+      TableRowProperties(&'a TableRowProperties),
+      TableCellProperties(&'a TableCellProperties),
+      End(&'static [u8]),
+    }
+
+    fn __ooxmlsdk_write_recursive_table_stack<'a, W: std::io::Write>(
+      mut stack: Vec<__OoxmlsdkRecursiveTableWriteTask<'a>>,
+      writer: &mut W,
+    ) -> Result<(), std::io::Error> {
+      while let Some(task) = stack.pop() {
+        match task {
+          __OoxmlsdkRecursiveTableWriteTask::Table(value) => {
+            value.__ooxmlsdk_write_recursive_table_table_body(&mut stack, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableRow(value) => {
+            value.__ooxmlsdk_write_recursive_table_row_body(&mut stack, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableCell(value) => {
+            value.__ooxmlsdk_write_recursive_table_cell_body(&mut stack, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableChoice(value) => {
+            if let Some(task) = __ooxmlsdk_write_recursive_table_choice(value, writer)? {
+              stack.push(task);
+            }
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableChoice2(value) => {
+            if let Some(task) = __ooxmlsdk_write_recursive_table_choice2(value, writer)? {
+              stack.push(task);
+            }
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableRowChoice(value) => {
+            if let Some(task) = __ooxmlsdk_write_recursive_table_row_choice(value, writer)? {
+              stack.push(task);
+            }
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableCellChoice(value) => {
+            if let Some(task) = __ooxmlsdk_write_recursive_table_cell_choice(value, writer)? {
+              stack.push(task);
+            }
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableProperties(value) => {
+            writer.write_all(b"<w:tblPr")?;
+            crate::sdk::SdkType::write_inner(value, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableGrid(value) => {
+            writer.write_all(b"<w:tblGrid")?;
+            crate::sdk::SdkType::write_inner(value, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TablePropertyExceptions(value) => {
+            writer.write_all(b"<w:tblPrEx")?;
+            crate::sdk::SdkType::write_inner(value, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableRowProperties(value) => {
+            writer.write_all(b"<w:trPr")?;
+            crate::sdk::SdkType::write_inner(value, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::TableCellProperties(value) => {
+            writer.write_all(b"<w:tcPr")?;
+            crate::sdk::SdkType::write_inner(value, writer)?;
+          }
+          __OoxmlsdkRecursiveTableWriteTask::End(end) => {
+            writer.write_all(end)?;
+          }
+        }
+      }
+      Ok(())
+    }
+
+    pub(crate) fn __ooxmlsdk_clear_recursive_table_dom_from_document(root: &mut Document) {
+      enum __OoxmlsdkRecursiveTableClearTask {
+        Table(std::boxed::Box<Table>),
+        TableRow(std::boxed::Box<TableRow>),
+        TableCell(std::boxed::Box<TableCell>),
+      }
+
+      let Some(mut body) = root.body.take() else {
+        return;
+      };
+
+      let mut stack = Vec::new();
+      for child in std::mem::take(&mut body.body_choice) {
+        if let BodyChoice::Table(table) = child {
+          stack.push(__OoxmlsdkRecursiveTableClearTask::Table(table));
+        }
+      }
+      drop(body);
+
+      while let Some(task) = stack.pop() {
+        match task {
+          __OoxmlsdkRecursiveTableClearTask::Table(mut table) => {
+            for child in std::mem::take(&mut table.table_choice2) {
+              if let TableChoice2::TableRow(row) = child {
+                stack.push(__OoxmlsdkRecursiveTableClearTask::TableRow(row));
+              }
+            }
+          }
+          __OoxmlsdkRecursiveTableClearTask::TableRow(mut row) => {
+            for child in std::mem::take(&mut row.table_row_choice) {
+              if let TableRowChoice::TableCell(cell) = child {
+                stack.push(__OoxmlsdkRecursiveTableClearTask::TableCell(cell));
+              }
+            }
+          }
+          __OoxmlsdkRecursiveTableClearTask::TableCell(mut cell) => {
+            for child in std::mem::take(&mut cell.table_cell_choice) {
+              if let TableCellChoice::Table(table) = child {
+                stack.push(__OoxmlsdkRecursiveTableClearTask::Table(table));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fn recursive_table_write_body_fn_ident(ident: &Ident) -> Option<Ident> {
+  match ident.to_string().as_str() {
+    "Table" => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_table_body",
+      Span::call_site(),
+    )),
+    "TableRow" => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_row_body",
+      Span::call_site(),
+    )),
+    "TableCell" => Some(Ident::new(
+      "__ooxmlsdk_write_recursive_table_cell_body",
+      Span::call_site(),
+    )),
+    _ => None,
+  }
+}
+
+fn recursive_table_child_write_task_variant(ty: &Type) -> Option<Ident> {
+  let ty = unwrap_wrapped_type(ty);
+  let name = type_terminal_name(&ty)?;
+  let variant = match name.as_str() {
+    "TableProperties" => "TableProperties",
+    "TableGrid" => "TableGrid",
+    "TablePropertyExceptions" => "TablePropertyExceptions",
+    "TableRowProperties" => "TableRowProperties",
+    "TableCellProperties" => "TableCellProperties",
+    _ => return None,
+  };
+  Some(Ident::new(variant, Span::call_site()))
+}
+
+fn recursive_table_choice_write_task_variant(ty: &Type) -> Option<Ident> {
+  let ty = unwrap_wrapped_type(ty);
+  let name = type_terminal_name(&ty)?;
+  let variant = match name.as_str() {
+    "TableChoice" => "TableChoice",
+    "TableChoice2" => "TableChoice2",
+    "TableRowChoice" => "TableRowChoice",
+    "TableCellChoice" => "TableCellChoice",
+    _ => return None,
+  };
+  Some(Ident::new(variant, Span::call_site()))
+}
+
+fn stack_parser_write_body_tokens(
+  ident: &Ident,
+  stack_parser: Option<&SdkStackParserAttrs>,
+  schema_qname: &str,
+  special_namespace_write_tokens: &proc_macro2::TokenStream,
+  attr_write_tokens: &[proc_macro2::TokenStream],
+  xml_other_attrs_write_tokens: &proc_macro2::TokenStream,
+  ordered_field_specs: &[(Ident, Type, SdkTypeFieldKind, Vec<SdkTypeChoiceItem>)],
+) -> proc_macro2::TokenStream {
+  if stack_parser.is_none() {
+    return quote! {};
+  }
+  let Some(fn_ident) = recursive_table_write_body_fn_ident(ident) else {
+    return quote! {};
+  };
+
+  let end_tag = LitByteStr::new(format!("</{schema_qname}>").as_bytes(), Span::call_site());
+  let mut push_tokens = Vec::new();
+  for (field_ident, field_ty, field_kind, _) in ordered_field_specs.iter().rev() {
+    match field_kind {
+      SdkTypeFieldKind::Child { .. } => {
+        let Some(task_variant) = recursive_table_child_write_task_variant(field_ty) else {
+          continue;
+        };
+        let repeated = contains_vec_type(field_ty);
+        let optional = is_option_type(field_ty);
+        let field_value_ty = if repeated {
+          vec_inner_type(field_ty).unwrap_or_else(|| unwrap_wrapped_type(field_ty))
+        } else if optional {
+          unwrap_option_type(field_ty)
+        } else {
+          field_ty.clone()
+        };
+        let value_expr = if box_inner_type(&field_value_ty).is_some() {
+          quote! { child.as_ref() }
+        } else {
+          quote! { child }
+        };
+        let self_expr = if box_inner_type(&field_value_ty).is_some() {
+          quote! { self.#field_ident.as_ref() }
+        } else {
+          quote! { &self.#field_ident }
+        };
+        if repeated {
+          push_tokens.push(quote! {
+            for child in self.#field_ident.iter().rev() {
+              stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(#value_expr));
+            }
+          });
+        } else if optional {
+          push_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(#value_expr));
+            }
+          });
+        } else {
+          push_tokens.push(quote! {
+            stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(#self_expr));
+          });
+        }
+      }
+      SdkTypeFieldKind::Choice => {
+        let Some(task_variant) = recursive_table_choice_write_task_variant(field_ty) else {
+          continue;
+        };
+        let repeated = contains_vec_type(field_ty);
+        let optional = is_option_type(field_ty);
+        if repeated {
+          push_tokens.push(quote! {
+            for child in self.#field_ident.iter().rev() {
+              stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(child));
+            }
+          });
+        } else if optional {
+          push_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(child));
+            }
+          });
+        } else {
+          push_tokens.push(quote! {
+            stack.push(__OoxmlsdkRecursiveTableWriteTask::#task_variant(&self.#field_ident));
+          });
+        }
+      }
+      SdkTypeFieldKind::Attr { .. }
+      | SdkTypeFieldKind::EmptyChild { .. }
+      | SdkTypeFieldKind::TextChild { .. }
+      | SdkTypeFieldKind::AnyChild { .. }
+      | SdkTypeFieldKind::Any
+      | SdkTypeFieldKind::Text { .. } => {}
+    }
+  }
+
+  quote! {
+    impl #ident {
+      fn #fn_ident<'a, W: std::io::Write>(
+        &'a self,
+        stack: &mut Vec<__OoxmlsdkRecursiveTableWriteTask<'a>>,
+        writer: &mut W,
+      ) -> Result<(), std::io::Error> {
+        #special_namespace_write_tokens
+        #( #attr_write_tokens )*
+        #xml_other_attrs_write_tokens
+        writer.write_all(b">")?;
+        stack.push(__OoxmlsdkRecursiveTableWriteTask::End(#end_tag));
+        #( #push_tokens )*
+        Ok(())
+      }
+    }
+  }
+}
+
+fn stack_parser_child_step_tokens(
+  ident: &Ident,
+  stack_parser: Option<&SdkStackParserAttrs>,
+  child_fields: &[SdkChildField],
+  choice_fields: &[SdkTypeChoiceField],
+) -> proc_macro2::TokenStream {
+  let Some(child_borrowed) = stack_parser.and_then(|parser| parser.child_borrowed.as_ref()) else {
+    return quote! {};
+  };
+  let Some(child_borrowed_ident) = child_borrowed.segments.last().map(|segment| &segment.ident)
+  else {
+    return quote! {};
+  };
+
+  let mut arms = Vec::new();
+  for field in child_fields {
+    let field_ident = &field.ident;
+    let targets = qname_match_targets(std::slice::from_ref(&field.qname));
+    let value_ty = stack_child_value_type(&field.ty, field.optional, field.repeated);
+    let (read_ty, parsed_expr) = stack_child_read_type_and_expr(&value_ty);
+    let assign_tokens = if field.repeated {
+      quote! { self.#field_ident.push(#parsed_expr); }
+    } else if field.optional {
+      quote! { self.#field_ident = Some(#parsed_expr); }
+    } else {
+      quote! { self.#field_ident = #parsed_expr; }
+    };
+    arms.push(quote! {
+      #( #targets )|* => {
+        let parsed_child = <#read_ty as crate::sdk::SdkType>::read_borrowed_inner(
+          xml_reader,
+          e,
+          next_empty,
+        )?;
+        #assign_tokens
+        None
+      }
+    });
+  }
+
+  for field in choice_fields {
+    if ident == "Table" && field.ident == "table_choice1" {
+      continue;
+    }
+    let field_ident = &field.ident;
+    let choice_ty = unwrap_option_vec_type(&field.ty);
+    for item in &field.items {
+      let SdkTypeChoiceItem::Child { variant, ty, qname } = item else {
+        continue;
+      };
+      let targets = qname_match_targets(std::slice::from_ref(qname));
+      if let Some(frame_tokens) = recursive_table_frame_tokens(ident, field_ident, variant) {
+        arms.push(quote! {
+          #( #targets )|* => {
+            Some(#frame_tokens)
+          }
+        });
+        continue;
+      }
+      let read_ty = ty.clone().unwrap_or_else(|| syn::parse_quote! { _ });
+      let assign_tokens = if field.repeated {
+        quote! {
+          self.#field_ident.push(#choice_ty::#variant(std::boxed::Box::new(parsed_child)));
+        }
+      } else {
+        quote! {
+          self.#field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child)));
+        }
+      };
+      arms.push(quote! {
+        #( #targets )|* => {
+          let parsed_child = <#read_ty as crate::sdk::SdkType>::read_borrowed_inner(
+            xml_reader,
+            e,
+            next_empty,
+          )?;
+          #assign_tokens
+          None
+        }
+      });
+    }
+  }
+
+  quote! {
+    impl #ident {
+      fn #child_borrowed_ident<'de>(
+        &mut self,
+        xml_reader: &mut crate::common::SliceReader<'de>,
+        e: quick_xml::events::BytesStart<'de>,
+        next_empty: bool,
+      ) -> Result<Option<__OoxmlsdkRecursiveTableFrame>, crate::common::SdkError> {
+        Ok(match e.name().into_inner() {
+          #( #arms )*
+          event_name => {
+            return Err(crate::common::unexpected_tag(
+              stringify!(#ident),
+              "known child",
+              event_name,
+            ));
+          }
+        })
+      }
+    }
+  }
+}
+
 fn qname_match_target_keys(qnames: &[String]) -> Vec<String> {
   let mut seen = std::collections::HashSet::new();
   let mut targets = Vec::new();
@@ -2453,6 +3275,75 @@ fn expand_helper_struct(
         .then(|| mce_choice_impl_tokens(field))
     })
     .collect::<Vec<_>>();
+  let stack_parser = None::<SdkStackParserAttrs>;
+  let read_borrowed_inner_body = if let Some(stack_parser) = &stack_parser {
+    let read_borrowed = &stack_parser.read_borrowed;
+    quote! {
+      #read_borrowed(xml_reader, start, empty)
+    }
+  } else {
+    quote! {
+      let mut pending_event = Some((start, empty));
+
+      #( #child_decl_tokens )*
+      #( #choice_decl_tokens )*
+      let mut __ooxmlsdk_seen_child = false;
+
+      loop {
+        if let Some((e, next_empty)) = pending_event.take() {
+          let event_name = e.name().into_inner();
+          #main_dispatch_tokens_borrowed
+          #unmatched_child_tokens_borrowed
+        }
+
+        match xml_reader.next()? {
+          quick_xml::events::Event::Start(e) => {
+            let e = e.into_owned();
+            let next_empty = false;
+            let event_name = e.name().into_inner();
+            #main_dispatch_tokens_borrowed
+            #unmatched_child_tokens_borrowed
+          }
+          quick_xml::events::Event::Empty(e) => {
+            let e = e.into_owned();
+            let next_empty = true;
+            let event_name = e.name().into_inner();
+            #main_dispatch_tokens_borrowed
+            #unmatched_child_tokens_borrowed
+          }
+          quick_xml::events::Event::End(e) => {
+            if __ooxmlsdk_seen_child {
+              xml_reader.unread(quick_xml::events::Event::End(e))?;
+            }
+            break;
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#ident)));
+          }
+          _ => continue,
+        }
+      }
+
+      Ok(Self {
+        #( #child_init_tokens, )*
+        #( #choice_init_tokens, )*
+      })
+    }
+  };
+  let write_inner_body = if let Some(write) = stack_parser
+    .as_ref()
+    .and_then(|parser| parser.write.as_ref())
+  {
+    quote! {
+      #write(self, writer)
+    }
+  } else {
+    quote! {
+      #( #child_write_tokens )*
+      #( #choice_write_tokens )*
+      Ok(())
+    }
+  };
 
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
@@ -2463,51 +3354,7 @@ fn expand_helper_struct(
         start: quick_xml::events::BytesStart<'de>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        let mut pending_event = Some((start, empty));
-
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        let mut __ooxmlsdk_seen_child = false;
-
-        loop {
-          if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name().into_inner();
-            #main_dispatch_tokens_borrowed
-            #unmatched_child_tokens_borrowed
-          }
-
-          match xml_reader.next()? {
-            quick_xml::events::Event::Start(e) => {
-              let e = e.into_owned();
-              let next_empty = false;
-              let event_name = e.name().into_inner();
-              #main_dispatch_tokens_borrowed
-              #unmatched_child_tokens_borrowed
-            }
-            quick_xml::events::Event::Empty(e) => {
-              let e = e.into_owned();
-              let next_empty = true;
-              let event_name = e.name().into_inner();
-              #main_dispatch_tokens_borrowed
-              #unmatched_child_tokens_borrowed
-            }
-            quick_xml::events::Event::End(e) => {
-              if __ooxmlsdk_seen_child {
-                xml_reader.unread(quick_xml::events::Event::End(e))?;
-              }
-              break;
-            }
-            quick_xml::events::Event::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#ident)));
-            }
-            _ => continue,
-          }
-        }
-
-        Ok(Self {
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-        })
+        #read_borrowed_inner_body
       }
 
       fn read_io_inner<R: std::io::BufRead>(
@@ -2559,9 +3406,7 @@ fn expand_helper_struct(
         &self,
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
-        #( #child_write_tokens )*
-        #( #choice_write_tokens )*
-        Ok(())
+        #write_inner_body
       }
     }
     #[cfg(feature = "validators")]
@@ -2627,6 +3472,7 @@ fn expand_named_struct(
   let start_tag_open = write_start_tag_open_tokens(schema_qname);
   let end_tag = write_end_tag_tokens(schema_qname);
   let default_ns = parse_sdk_default_ns(&input.attrs)?;
+  let stack_parser = parse_sdk_stack_parser(&input.attrs)?;
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
   let fixed_namespace_uri_lit =
     fixed_namespace_uri.map(|uri| LitByteStr::new(uri.as_bytes(), Span::call_site()));
@@ -5759,8 +6605,92 @@ fn expand_named_struct(
       }
     }
   };
+  let default_read_borrowed_inner_body = quote! {
+    #xml_header_decl_tokens
+    #end_qname_decl
+    #( #attr_decl_tokens )*
+    #namespace_attr_parse_tokens
+    #( #child_decl_tokens )*
+    #( #choice_decl_tokens )*
+    #( #any_decl_tokens )*
+    #xml_other_children_decl_tokens
+    #text_decl_tokens
+
+    #borrowed_children_loop_tokens
+
+    Ok(Self {
+      #( #attr_init_tokens, )*
+      #( #child_init_tokens, )*
+      #( #choice_init_tokens, )*
+      #( #any_init_tokens, )*
+      #text_finish_tokens
+      #( #attr_finish_tokens, )*
+      #special_namespace_init_tokens
+      #xml_header_init_tokens
+      #xml_other_attrs_init_tokens
+      #xml_other_children_init_tokens
+    })
+  };
+  let default_read_borrowed_inner_helper = if stack_parser.is_some() {
+    quote! {
+      impl #impl_generics #ident #type_generics #where_clause {
+        fn __ooxmlsdk_read_borrowed_inner_default<'de>(
+          xml_reader: &mut crate::common::SliceReader<'de>,
+          e: quick_xml::events::BytesStart<'de>,
+          empty_tag: bool,
+        ) -> Result<Self, crate::common::SdkError> {
+          #default_read_borrowed_inner_body
+        }
+      }
+    }
+  } else {
+    quote! {}
+  };
+  let stack_parser_child_step_helper =
+    stack_parser_child_step_tokens(ident, stack_parser.as_ref(), &child_fields, &choice_fields);
+  let stack_parser_choice_write_step_helpers =
+    stack_parser_choice_write_step_tokens(ident, stack_parser.as_ref(), &choice_fields);
+  let stack_parser_shared_table_helper =
+    stack_parser_shared_table_tokens(ident, stack_parser.as_ref());
+  let stack_parser_write_body_helper = stack_parser_write_body_tokens(
+    ident,
+    stack_parser.as_ref(),
+    schema_qname,
+    &special_namespace_write_tokens,
+    &attr_write_tokens,
+    &xml_other_attrs_write_tokens,
+    &ordered_field_specs,
+  );
+  let read_borrowed_inner_body = if let Some(stack_parser) = &stack_parser {
+    let read_borrowed = &stack_parser.read_borrowed;
+    quote! {
+      #read_borrowed(xml_reader, e, empty_tag)
+    }
+  } else {
+    default_read_borrowed_inner_body.clone()
+  };
+  let write_inner_body = if let Some(write) = stack_parser
+    .as_ref()
+    .and_then(|parser| parser.write.as_ref())
+  {
+    quote! {
+      #write(self, writer)
+    }
+  } else {
+    quote! {
+      #special_namespace_write_tokens
+      #( #attr_write_tokens )*
+      #xml_other_attrs_write_tokens
+      #body_write_tokens
+    }
+  };
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
+    #stack_parser_shared_table_helper
+    #default_read_borrowed_inner_helper
+    #stack_parser_child_step_helper
+    #stack_parser_choice_write_step_helpers
+    #stack_parser_write_body_helper
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn read_borrowed_inner<'de>(
@@ -5768,30 +6698,7 @@ fn expand_named_struct(
         e: quick_xml::events::BytesStart<'de>,
         empty_tag: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        #xml_header_decl_tokens
-        #end_qname_decl
-        #( #attr_decl_tokens )*
-        #namespace_attr_parse_tokens
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        #( #any_decl_tokens )*
-        #xml_other_children_decl_tokens
-        #text_decl_tokens
-
-        #borrowed_children_loop_tokens
-
-        Ok(Self {
-          #( #attr_init_tokens, )*
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-          #( #any_init_tokens, )*
-          #text_finish_tokens
-          #( #attr_finish_tokens, )*
-          #special_namespace_init_tokens
-          #xml_header_init_tokens
-          #xml_other_attrs_init_tokens
-          #xml_other_children_init_tokens
-        })
+        #read_borrowed_inner_body
       }
 
       fn read_io_inner<R: std::io::BufRead>(
@@ -5829,10 +6736,7 @@ fn expand_named_struct(
         &self,
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
-        #special_namespace_write_tokens
-        #( #attr_write_tokens )*
-        #xml_other_attrs_write_tokens
-        #body_write_tokens
+        #write_inner_body
       }
     }
     #[cfg(feature = "validators")]

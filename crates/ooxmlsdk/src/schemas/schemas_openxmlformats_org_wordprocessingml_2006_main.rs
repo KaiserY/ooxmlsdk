@@ -7814,6 +7814,11 @@ pub struct Paragraph {
 /// Defines the Table Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tbl")]
+#[sdk(stack_parser(
+  read_borrowed = "__ooxmlsdk_read_recursive_table_as_table_borrowed",
+  write = "__ooxmlsdk_write_recursive_table_as_table",
+  child_borrowed = "__ooxmlsdk_read_recursive_table_child_borrowed"
+))]
 pub struct Table {
   #[sdk(
         choice(
@@ -7936,6 +7941,11 @@ pub struct Table {
 /// Table Row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tr")]
+#[sdk(stack_parser(
+  read_borrowed = "__ooxmlsdk_read_recursive_table_as_table_row_borrowed",
+  write = "__ooxmlsdk_write_recursive_table_as_table_row",
+  child_borrowed = "__ooxmlsdk_read_recursive_table_row_child_borrowed"
+))]
 pub struct TableRow {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Table Row Glyph Formatting
@@ -8167,6 +8177,11 @@ pub struct SdtRow {
 /// Table Cell.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tc")]
+#[sdk(stack_parser(
+  read_borrowed = "__ooxmlsdk_read_recursive_table_as_table_cell_borrowed",
+  write = "__ooxmlsdk_write_recursive_table_as_table_cell",
+  child_borrowed = "__ooxmlsdk_read_recursive_table_cell_child_borrowed"
+))]
 pub struct TableCell {
   /// Table Cell Properties
   #[sdk(child(qname = "w:tcPr"))]

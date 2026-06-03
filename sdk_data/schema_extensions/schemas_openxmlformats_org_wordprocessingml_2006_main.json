@@ -52,6 +52,10 @@
       ]
     },
     {
+      "ClassName": "Compatibility",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "DataBinding",
       "Attributes": [
         {
@@ -121,6 +125,7 @@
     },
     {
       "ClassName": "Paragraph",
+      "HaveXmlnsFields": true,
       "HaveXmlOtherAttrs": true
     },
     {
@@ -192,6 +197,18 @@
     },
     {
       "ClassName": "CustomXmlBlock",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CustomXmlRow",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CustomXmlCell",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CustomXmlRun",
       "HaveXmlOtherAttrs": true
     },
     {

@@ -625,6 +625,7 @@ pub struct OfficeMath {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:mathPr")]
 pub struct MathProperties {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Math Font
   #[sdk(child(qname = "m:mathFont"))]
   pub math_font: Option<MathFont>,

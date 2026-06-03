@@ -26,6 +26,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "MathProperties",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Paragraph",
       "HaveXmlnsFields": true
     }

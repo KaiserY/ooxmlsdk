@@ -7685,6 +7685,7 @@ pub struct SdtBlock {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:p")]
 pub struct Paragraph {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Revision Identifier for Paragraph Glyph Formatting
   #[sdk(attr(qname = "w:rsidRPr"))]
@@ -8045,6 +8046,7 @@ pub struct TableRow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlRow {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -8255,6 +8257,7 @@ pub struct TableCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlCell {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -8388,6 +8391,7 @@ pub struct SdtCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:customXml")]
 pub struct CustomXmlRun {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Custom XML Element Properties.
   #[sdk(child(qname = "w:customXmlPr"))]
   pub custom_xml_properties: Option<std::boxed::Box<CustomXmlProperties>>,
@@ -15913,6 +15917,7 @@ pub struct EndnoteDocumentWideProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:compat")]
 pub struct Compatibility {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Use Simplified Rules For Table Border Conflicts
   #[sdk(child(qname = "w:useSingleBorderforContiguousCells"))]
   pub use_single_border_for_contiguous_cells: Option<UseSingleBorderForContiguousCells>,

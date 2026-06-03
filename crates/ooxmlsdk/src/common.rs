@@ -61,6 +61,12 @@ pub enum XmlHeaderType {
 pub(crate) const REL_OFFICE_DOCUMENT: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 #[cfg(feature = "parts")]
+const REL_CORE_PROPERTIES: &[u8] =
+  b"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties";
+#[cfg(feature = "parts")]
+const REL_EXTENDED_PROPERTIES: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties";
+#[cfg(feature = "parts")]
 pub(crate) const REL_HYPERLINK: &[u8] =
   b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
 #[cfg(feature = "parts")]
@@ -351,7 +357,9 @@ where
 #[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
-  actual == canonical || strict_office_relationship_type_matches(actual, canonical)
+  actual == canonical
+    || strict_office_relationship_type_matches(actual, canonical)
+    || o12_relationship_type_matches(actual, canonical)
 }
 
 #[inline]
@@ -369,6 +377,24 @@ fn office_relationship_type_suffix(value: &[u8]) -> Option<&[u8]> {
   value
     .strip_prefix(TRANSITIONAL_OFFICE_REL_PREFIX)
     .or_else(|| value.strip_prefix(STRICT_OFFICE_REL_PREFIX))
+}
+
+#[inline]
+#[cfg(feature = "parts")]
+fn o12_relationship_type_matches(actual: &[u8], canonical: &[u8]) -> bool {
+  matches!(
+    (actual, canonical),
+    (
+      b"http://schemas.microsoft.com/office/2006/relationships/officeDocument",
+      REL_OFFICE_DOCUMENT
+    ) | (
+      b"http://schemas.microsoft.com/office/2006/relationships/docPropsApp",
+      REL_EXTENDED_PROPERTIES
+    ) | (
+      b"http://schemas.microsoft.com/package/2005/06/relationships/metadata/core-properties",
+      REL_CORE_PROPERTIES
+    )
+  )
 }
 
 #[inline]
@@ -537,6 +563,27 @@ mod tests {
       "xl/workbook.xml",
       "word",
       "document",
+    ));
+  }
+
+  #[cfg(feature = "parts")]
+  #[test]
+  fn o12_relationship_aliases_match_only_known_standard_relationships() {
+    assert!(relationship_type_matches_bytes(
+      b"http://schemas.microsoft.com/office/2006/relationships/officeDocument",
+      REL_OFFICE_DOCUMENT,
+    ));
+    assert!(relationship_type_matches_bytes(
+      b"http://schemas.microsoft.com/office/2006/relationships/docPropsApp",
+      REL_EXTENDED_PROPERTIES,
+    ));
+    assert!(relationship_type_matches_bytes(
+      b"http://schemas.microsoft.com/package/2005/06/relationships/metadata/core-properties",
+      REL_CORE_PROPERTIES,
+    ));
+    assert!(!relationship_type_matches_bytes(
+      b"http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+      b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vbaProject",
     ));
   }
 }

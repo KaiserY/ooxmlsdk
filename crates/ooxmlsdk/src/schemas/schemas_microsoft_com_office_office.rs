@@ -238,6 +238,7 @@ pub enum BlackAndWhiteModeValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:shapedefaults")]
 pub struct ShapeDefaults {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
@@ -306,6 +307,7 @@ pub struct ShapeDefaults {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:shapelayout")]
 pub struct ShapeLayout {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
@@ -1121,6 +1123,7 @@ pub struct FillExtendedProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "o:idmap")]
 pub struct ShapeIdMap {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,

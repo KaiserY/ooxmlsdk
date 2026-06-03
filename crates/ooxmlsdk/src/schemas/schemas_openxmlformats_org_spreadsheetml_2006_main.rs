@@ -2981,6 +2981,16 @@ pub struct Formula2 {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
+/// Defines the XstringType Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(default_ns, qname = "")]
+pub struct XstringType {
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::StringValue>,
+}
 /// XML Schema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:Schema")]

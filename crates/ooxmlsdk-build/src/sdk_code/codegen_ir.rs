@@ -66,6 +66,8 @@ pub struct TypeDecl {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub base_rust_name: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
+  pub base_module_path: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub xml_content: Option<TypeRefDecl>,
   pub support: SystemSupportDecl,
   pub members: Vec<MemberDecl>,
@@ -329,6 +331,7 @@ mod tests {
         element_kind: Some(ElementKind::Composite),
         content_model: Some(ContentModelDecl::GenericChildrenFallback),
         base_rust_name: None,
+        base_module_path: None,
         xml_content: None,
         support: SystemSupportDecl {
           have_xmlns_fields: true,
@@ -412,6 +415,7 @@ mod tests {
         element_kind: None,
         content_model: None,
         base_rust_name: None,
+        base_module_path: None,
         xml_content: None,
         support: SystemSupportDecl::default(),
         members: vec![MemberDecl::Variant(VariantDecl {

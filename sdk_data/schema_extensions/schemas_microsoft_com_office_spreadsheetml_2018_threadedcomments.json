@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "ThreadedCommentText",
+      "OverrideBaseClass": "crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::XstringType"
+    }
+  ]
+}

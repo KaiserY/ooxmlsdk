@@ -579,7 +579,7 @@ pub enum HeaderFooterValues {
   #[sdk(rename = "even")]
   #[default]
   Even,
-  #[sdk(rename = "default")]
+  #[sdk(rename = "default", alias = "odd")]
   Default,
   #[sdk(rename = "first")]
   First,

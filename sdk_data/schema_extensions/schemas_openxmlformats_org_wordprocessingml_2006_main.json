@@ -31,6 +31,18 @@
           "Value": "end"
         }
       ]
+    },
+    {
+      "Name": "HeaderFooterValues",
+      "AddFacets": [
+        {
+          "Name": "Default",
+          "Value": "default",
+          "Aliases": [
+            "odd"
+          ]
+        }
+      ]
     }
   ],
   "Types": [

@@ -60,6 +60,8 @@ pub struct SchemaTypeExtension {
 pub struct SchemaTypeAttributeExtension {
   pub q_name: String,
   pub property_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub property_comments: String,
   pub optional: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_type: String,
@@ -170,13 +172,18 @@ pub fn apply_schema_extensions(
       }
 
       for facet_extension in &extension.add_facets {
-        let already_exists = schema_enum.facets.iter().any(|facet| {
+        let existing_facet = schema_enum.facets.iter_mut().find(|facet| {
           facet.name == facet_extension.name
             && facet.value == facet_extension.value
             && facet.version == facet_extension.version
         });
 
-        if already_exists {
+        if let Some(facet) = existing_facet {
+          for alias in &facet_extension.aliases {
+            if !facet.aliases.contains(alias) {
+              facet.aliases.push(alias.clone());
+            }
+          }
           continue;
         }
 
@@ -214,6 +221,28 @@ pub fn apply_schema_extensions(
       }
       if !extension.override_base_class.is_empty() {
         schema_type.base_class = extension.override_base_class.clone();
+        let base_class_name = explicit_schema_base_class_name(schema_type.base_class.as_str())
+          .unwrap_or(schema_type.base_class.as_str());
+        match base_class_name {
+          "OpenXmlLeafElement" => {
+            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf;
+            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+          }
+          "OpenXmlCompositeElement" | "OpenXmlPartRootElement" => {
+            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite;
+            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+          }
+          "OpenXmlLeafTextElement" => {
+            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText;
+            schema_type.api_kind =
+              crate::sdk_data::sdk_data_model::SchemaTypeApiKind::LeafTextWrapper;
+          }
+          _ if explicit_schema_base_class_name(schema_type.base_class.as_str()).is_some() => {
+            schema_type.kind = crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived;
+            schema_type.api_kind = crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct;
+          }
+          _ => {}
+        }
       }
       if let Some(have_xml_other_attrs) = extension.have_xml_other_attrs {
         schema_type.have_xml_other_attrs = have_xml_other_attrs;
@@ -231,13 +260,30 @@ pub fn apply_schema_extensions(
             || (!attr_extension.property_name.is_empty()
               && attr.property_name == attr_extension.property_name)
         }) else {
-          return Err(
-            format!(
-              "schema extension attribute {}.{} not found",
-              module_name, extension.class_name
-            )
-            .into(),
-          );
+          if attr_extension.q_name.is_empty()
+            || attr_extension.property_name.is_empty()
+            || attr_extension.override_type.is_empty()
+          {
+            return Err(
+              format!(
+                "schema extension attribute {}.{} not found",
+                module_name, extension.class_name
+              )
+              .into(),
+            );
+          }
+
+          schema_type
+            .attributes
+            .push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
+              q_name: attr_extension.q_name.clone(),
+              property_name: attr_extension.property_name.clone(),
+              r#type: attr_extension.override_type.clone(),
+              property_comments: attr_extension.property_comments.clone(),
+              required: !attr_extension.optional.unwrap_or(false),
+              ..Default::default()
+            });
+          continue;
         };
 
         if !attr_extension.override_type.is_empty() {
@@ -273,6 +319,13 @@ pub fn apply_schema_extensions(
   }
 
   Ok(())
+}
+
+fn explicit_schema_base_class_name(base_class: &str) -> Option<&str> {
+  let (module_path, rust_name) = base_class.rsplit_once("::")?;
+  module_path
+    .starts_with("crate::schemas::")
+    .then_some(rust_name)
 }
 
 pub fn apply_codegen_ir_schema_extensions(
@@ -690,6 +743,52 @@ mod tests {
   }
 
   #[test]
+  fn applies_attribute_add_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "AxisId".to_string(),
+        base_class: "UnsignedIntegerType".to_string(),
+        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived,
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "AxisId".to_string(),
+          override_base_class: "OpenXmlLeafElement".to_string(),
+          attributes: vec![SchemaTypeAttributeExtension {
+            q_name: ":val".to_string(),
+            property_name: "Val".to_string(),
+            property_comments: "Integer Value".to_string(),
+            optional: Some(false),
+            override_type: "Int32Value".to_string(),
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    let attr = &schemas[0].types[0].attributes[0];
+    assert_eq!(schemas[0].types[0].base_class, "OpenXmlLeafElement");
+    assert_eq!(
+      schemas[0].types[0].kind,
+      crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf
+    );
+    assert_eq!(attr.q_name, ":val");
+    assert_eq!(attr.property_name, "Val");
+    assert_eq!(attr.property_comments, "Integer Value");
+    assert_eq!(attr.r#type, "Int32Value");
+    assert!(attr.required);
+  }
+
+  #[test]
   fn applies_enum_add_facets_extension() {
     let mut schemas = vec![Schema {
       module_name: "test_schema".to_string(),
@@ -738,6 +837,44 @@ mod tests {
     assert_eq!(schemas[0].enums[0].facets[2].name, "End");
     assert_eq!(schemas[0].enums[0].facets[2].value, "end");
     assert_eq!(schemas[0].enums[0].facets[2].version, "Office2010");
+  }
+
+  #[test]
+  fn applies_enum_alias_extension_to_existing_facet() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      enums: vec![SchemaEnum {
+        name: "HeaderFooterValues".to_string(),
+        facets: vec![SchemaEnumFacet {
+          name: "Default".to_string(),
+          value: "default".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        enums: vec![SchemaEnumExtension {
+          name: "HeaderFooterValues".to_string(),
+          add_facets: vec![SchemaEnumFacetExtension {
+            name: "Default".to_string(),
+            value: "default".to_string(),
+            aliases: vec!["odd".to_string()],
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(schemas[0].enums[0].facets.len(), 1);
+    assert_eq!(schemas[0].enums[0].facets[0].aliases, ["odd"]);
   }
 
   #[test]

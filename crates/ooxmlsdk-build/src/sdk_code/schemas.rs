@@ -144,6 +144,7 @@ pub(crate) struct TypeContainmentGraph {
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
+  explicit_base_keys: HashSet<String>,
 }
 
 impl TypeContainmentGraph {
@@ -189,6 +190,14 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let owner_key = local_type_key(module, &type_decl.rust_name);
         let mut owner_edges = Vec::new();
+        if let Some(base_module_path) = &type_decl.base_module_path
+          && let Some(base_rust_name) = &type_decl.base_rust_name
+        {
+          graph.explicit_base_keys.insert(format!(
+            "{base_module_path}::{}",
+            base_rust_name.to_upper_camel_case()
+          ));
+        }
 
         for member in &type_decl.members {
           match member {
@@ -262,6 +271,10 @@ impl TypeContainmentGraph {
 
   fn is_leaf_text_alias(&self, node: &str) -> bool {
     self.leaf_text_alias_keys.contains(node)
+  }
+
+  fn is_explicit_base(&self, node: &str) -> bool {
+    self.explicit_base_keys.contains(node)
   }
 
   fn rendered_module_path<'a>(&'a self, module_path: &'a str) -> &'a str {
@@ -1449,7 +1462,10 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
-    .filter(|ty| should_emit_schema_type_decl(ty))
+    .filter(|ty| {
+      should_emit_schema_type_decl(ty)
+        || type_graph.is_explicit_base(&local_type_key(ir, &ty.rust_name))
+    })
     .map(|ty| ty.rust_name.as_str())
     .collect();
 
@@ -1465,7 +1481,10 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
-    .filter(|ty| should_emit_schema_type_decl(ty))
+    .filter(|ty| {
+      should_emit_schema_type_decl(ty)
+        || type_graph.is_explicit_base(&local_type_key(ir, &ty.rust_name))
+    })
   {
     let type_key = local_type_key(ir, &type_decl.rust_name);
     let recursive_scc_info = recursive_scc_graph.info_for_key(&type_key);
@@ -1612,13 +1631,36 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       continue;
     }
 
-    if let Some(base_type_decl) = type_decl
+    let derived_base_type = if let Some(base_type_decl) = type_decl
       .base_rust_name
       .as_deref()
       .and_then(|base_name| type_decl_by_name.get(base_name).copied())
       && can_wrap_derived_to_base_decl(type_decl, base_type_decl)
     {
-      let base_type_ident: Ident = parse_str(&base_type_decl.rust_name.to_upper_camel_case())?;
+      Some(TypeRefDecl {
+        rust_type: base_type_decl.rust_name.clone(),
+        module_path: None,
+      })
+    } else if type_decl.base_module_path.is_some()
+      && type_decl.kind == TypeKind::ElementStruct
+      && type_decl.element_kind == Some(ElementKind::Derived)
+      && type_decl.members.is_empty()
+      && type_decl.content_model.is_none()
+      && type_decl.xml_content.is_some()
+    {
+      Some(TypeRefDecl {
+        rust_type: type_decl
+          .base_rust_name
+          .clone()
+          .ok_or_else(|| format!("type {} missing IR base type", type_decl.rust_name))?,
+        module_path: type_decl.base_module_path.clone(),
+      })
+    } else {
+      None
+    };
+
+    if let Some(base_type) = derived_base_type {
+      let base_type_ident = type_from_decl_ref(&base_type, type_graph)?;
 
       token_stream_list.push(quote! {
         #( #type_attrs )*

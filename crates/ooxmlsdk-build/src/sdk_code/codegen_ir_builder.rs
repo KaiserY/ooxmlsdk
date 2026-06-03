@@ -828,7 +828,8 @@ fn build_type_decl(
       content_model,
       base_rust_name: (!schema_type.base_class.is_empty()
         && schema_type.base_class != "OpenXmlPartRootElement")
-        .then(|| schema_type.base_class.clone()),
+        .then(|| schema_base_rust_name(schema_type.base_class.as_str()).to_string()),
+      base_module_path: schema_base_module_path(schema_type.base_class.as_str()),
       xml_content,
       support: SystemSupportDecl {
         have_xmlns_fields: schema_type.have_xmlns_fields,
@@ -929,6 +930,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members: choice_members,
@@ -1191,6 +1193,7 @@ fn build_recursive_choice_enum_decl(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members,
@@ -1831,6 +1834,23 @@ fn build_list_type_ref_from_inner_type(
   })
 }
 
+fn schema_base_module_path(base_class: &str) -> Option<String> {
+  explicit_schema_base_class(base_class).map(|(module_path, _)| module_path.to_string())
+}
+
+fn schema_base_rust_name(base_class: &str) -> &str {
+  explicit_schema_base_class(base_class)
+    .map(|(_, rust_name)| rust_name)
+    .unwrap_or(base_class)
+}
+
+fn explicit_schema_base_class(base_class: &str) -> Option<(&str, &str)> {
+  let (module_path, rust_name) = base_class.rsplit_once("::")?;
+  module_path
+    .starts_with("crate::schemas::")
+    .then_some((module_path, rust_name))
+}
+
 fn build_xml_content_type_ref(
   schema_type: &SchemaType,
   schema: &Schema,
@@ -1856,7 +1876,9 @@ fn build_xml_content_type_ref(
   if schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::LeafText {
     // continue below
   } else if schema_type.kind == crate::sdk_data::sdk_data_model::SchemaTypeKind::Derived {
-    let Some(base_type) = context.type_by_class_name(schema_type.base_class.as_str()) else {
+    let Some(base_type) =
+      context.type_by_class_name(schema_base_rust_name(schema_type.base_class.as_str()))
+    else {
       return Ok(None);
     };
     if base_type.text_value_type.is_empty()
@@ -2340,6 +2362,7 @@ fn build_simple_one_choice_members(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members: enum_members,
@@ -2534,6 +2557,7 @@ fn build_flatten_one_sequence_members(
           element_kind: None,
           content_model: None,
           base_rust_name: None,
+          base_module_path: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
           members: enum_members,
@@ -2744,6 +2768,7 @@ fn build_structured_one_sequence_members(
           element_kind: None,
           content_model: None,
           base_rust_name: None,
+          base_module_path: None,
           xml_content: None,
           support: SystemSupportDecl::default(),
           members: enum_members,
@@ -2967,6 +2992,7 @@ fn build_structured_one_sequence_helper_struct_decl(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members: sequence_variant
@@ -3147,6 +3173,7 @@ fn build_mixed_choice_children_members(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members: enum_members,
@@ -3607,6 +3634,7 @@ fn build_generic_children_members(
     element_kind: None,
     content_model: None,
     base_rust_name: None,
+    base_module_path: None,
     xml_content: None,
     support: SystemSupportDecl::default(),
     members: enum_members,

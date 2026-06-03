@@ -1258,7 +1258,19 @@ fn namespace_supported(ns: &[u8], target: crate::sdk::FileFormatVersion) -> bool
 
 #[cfg(feature = "mce")]
 fn qname_in(name: &[u8], expected: &[&[u8]]) -> bool {
-  expected.contains(&name)
+  if expected.contains(&name) {
+    return true;
+  }
+
+  let mut index = name.len();
+  while index > 0 {
+    index -= 1;
+    if name[index] == b':' {
+      return expected.contains(&&name[index + 1..]);
+    }
+  }
+
+  false
 }
 
 #[inline]

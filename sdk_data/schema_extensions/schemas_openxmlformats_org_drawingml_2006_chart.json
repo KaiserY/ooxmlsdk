@@ -7,6 +7,32 @@
   ],
   "Types": [
     {
+      "ClassName": "AxisId",
+      "OverrideBaseClass": "OpenXmlLeafElement",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "PropertyName": "Val",
+          "PropertyComments": "Integer Value",
+          "Optional": false,
+          "OverrideType": "Int32Value"
+        }
+      ]
+    },
+    {
+      "ClassName": "CrossingAxis",
+      "OverrideBaseClass": "OpenXmlLeafElement",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "PropertyName": "Val",
+          "PropertyComments": "Integer Value",
+          "Optional": false,
+          "OverrideType": "Int32Value"
+        }
+      ]
+    },
+    {
       "ClassName": "Area3DChartExtension",
       "HaveXmlnsFields": true
     },

@@ -879,7 +879,7 @@ pub struct Order {
 pub struct AxisId {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Crossing Axis ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -887,7 +887,7 @@ pub struct AxisId {
 pub struct CrossingAxis {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::Int32Value,
 }
 /// Point Count.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

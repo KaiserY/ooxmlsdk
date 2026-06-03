@@ -142,7 +142,10 @@ impl ThreadedCommentModel {
       person_id: comment.person_id.clone(),
       date_time: comment.d_t.clone(),
       done: comment.done.is_some_and(|value| value.as_bool()),
-      text: comment.threaded_comment_text.clone(),
+      text: comment
+        .threaded_comment_text
+        .as_ref()
+        .and_then(|text| text.0.xml_content.clone()),
       mentions: comment
         .threaded_comment_mentions
         .as_ref()

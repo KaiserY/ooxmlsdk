@@ -499,6 +499,31 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
 
 #[cfg(feature = "mce")]
 #[test]
+fn process_all_parts_selects_alternate_content_with_non_mc_prefix() {
+  // Source: Apache POI test-data/document/Bug51170.docx
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:ve="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w13="http://example.com/w13"><w:body><ve:AlternateContent><ve:Choice Requires="w13"><w:p><w:r><w:t>choice</w:t></w:r></w:p></ve:Choice><ve:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></ve:Fallback></ve:AlternateContent><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2010,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+
+  let serialized = root.to_xml().unwrap();
+  assert!(!serialized.contains("AlternateContent"));
+  assert!(serialized.contains("<w:t>fallback</w:t>"));
+  assert!(serialized.contains("<w:t>after</w:t>"));
+}
+
+#[cfg(feature = "mce")]
+#[test]
 fn process_all_parts_applies_alternate_content_selection_edges() {
   // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
   //   NoChoice_NoFallback_O12Mode

@@ -89,7 +89,7 @@ pub struct ThreadedComment {
   #[sdk(attr(qname = ":done"))]
   pub done: Option<crate::simple_type::BooleanValue>,
   /// Defines the ThreadedCommentText Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xltc:text"))]
+  #[sdk(child(qname = "xltc:text"))]
   pub threaded_comment_text: Option<ThreadedCommentText>,
   /// Defines the ThreadedCommentMentions Class.
   #[sdk(child(qname = "xltc:mentions"))]
@@ -99,7 +99,9 @@ pub struct ThreadedComment {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedCommentText Class.
-pub type ThreadedCommentText = crate::simple_type::StringValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "xltc:text")]
+pub struct ThreadedCommentText(pub crate::schemas::x::XstringType);
 /// Defines the ThreadedCommentMentions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xltc:mentions")]

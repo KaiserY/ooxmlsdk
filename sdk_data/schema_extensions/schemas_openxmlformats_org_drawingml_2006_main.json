@@ -1,4 +1,19 @@
 {
+  "Enums": [
+    {
+      "Name": "TextAnchoringTypeValues",
+      "AddFacets": [
+        {
+          "Name": "Justified",
+          "Value": "just"
+        },
+        {
+          "Name": "Distributed",
+          "Value": "dist"
+        }
+      ]
+    }
+  ],
   "Types": [
     {
       "ClassName": "Blip",
@@ -15,6 +30,10 @@
     {
       "ClassName": "ConnectorLockingExtensionList",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Duotone",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "EffectList",

@@ -1363,6 +1363,10 @@ pub enum TextAnchoringTypeValues {
   Center,
   #[sdk(rename = "b")]
   Bottom,
+  #[sdk(rename = "just")]
+  Justified,
+  #[sdk(rename = "dist")]
+  Distributed,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum TextAutoNumberSchemeValues {
@@ -2918,6 +2922,7 @@ pub struct ColorReplacement {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:duotone")]
 pub struct Duotone {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
             child(variant = RgbColorModelPercentage, qname = "a:scrgbClr"),

@@ -246,6 +246,85 @@ pub(crate) fn from_bytes_inner(bytes: &[u8]) -> Result<SliceReader<'_>, SdkError
   Ok(SliceReader::new(xml_reader))
 }
 
+pub(crate) fn decode_utf16_xml_bytes(bytes: &[u8]) -> Result<Option<Vec<u8>>, SdkError> {
+  let (endian, bytes) = match bytes {
+    [0xFF, 0xFE, rest @ ..] => (Utf16Endian::Little, rest),
+    [0xFE, 0xFF, rest @ ..] => (Utf16Endian::Big, rest),
+    [b'<', 0, b'?', 0, ..] => (Utf16Endian::Little, bytes),
+    [0, b'<', 0, b'?', ..] => (Utf16Endian::Big, bytes),
+    _ => return Ok(None),
+  };
+
+  if bytes.len() % 2 != 0 {
+    return Err(SdkError::CommonError(
+      "invalid UTF-16 XML byte length".to_string(),
+    ));
+  }
+
+  let code_units = bytes.chunks_exact(2).map(|chunk| match endian {
+    Utf16Endian::Little => u16::from_le_bytes([chunk[0], chunk[1]]),
+    Utf16Endian::Big => u16::from_be_bytes([chunk[0], chunk[1]]),
+  });
+  let xml = std::char::decode_utf16(code_units)
+    .collect::<Result<String, _>>()
+    .map_err(|err| SdkError::CommonError(format!("invalid UTF-16 XML: {err}")))?;
+
+  Ok(Some(normalize_utf16_xml_decl(xml).into_bytes()))
+}
+
+#[derive(Clone, Copy)]
+enum Utf16Endian {
+  Little,
+  Big,
+}
+
+fn normalize_utf16_xml_decl(mut xml: String) -> String {
+  let Some(decl_end) = xml.find("?>").map(|end| end + 2) else {
+    return xml;
+  };
+  if !xml[..decl_end].starts_with("<?xml") {
+    return xml;
+  }
+
+  let Some(encoding_pos) = find_ascii_ignore_case(&xml[..decl_end], "encoding") else {
+    return xml;
+  };
+  let bytes = xml.as_bytes();
+  let mut pos = encoding_pos + "encoding".len();
+  while pos < decl_end && bytes[pos].is_ascii_whitespace() {
+    pos += 1;
+  }
+  if pos >= decl_end || bytes[pos] != b'=' {
+    return xml;
+  }
+  pos += 1;
+  while pos < decl_end && bytes[pos].is_ascii_whitespace() {
+    pos += 1;
+  }
+  if pos >= decl_end || (bytes[pos] != b'"' && bytes[pos] != b'\'') {
+    return xml;
+  }
+
+  let quote = bytes[pos];
+  let value_start = pos + 1;
+  let Some(value_end) = bytes[value_start..decl_end]
+    .iter()
+    .position(|&b| b == quote)
+    .map(|offset| value_start + offset)
+  else {
+    return xml;
+  };
+  xml.replace_range(value_start..value_end, "UTF-8");
+  xml
+}
+
+fn find_ascii_ignore_case(haystack: &str, needle: &str) -> Option<usize> {
+  haystack
+    .as_bytes()
+    .windows(needle.len())
+    .position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+}
+
 #[inline]
 pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
   let mut xml_reader = Reader::from_str(s);

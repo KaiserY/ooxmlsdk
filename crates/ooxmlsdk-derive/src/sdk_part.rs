@@ -983,7 +983,12 @@ fn part_handle_root_method_tokens(
                 self.id,
               ))
             })?;
-            #root_ty::from_bytes(part.data().bytes())?
+            let bytes = part.data().bytes();
+            if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
+              #root_ty::from_reader(std::io::Cursor::new(bytes))?
+            } else {
+              #root_ty::from_bytes(bytes)?
+            }
           };
 
           *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
@@ -1019,7 +1024,12 @@ fn part_handle_root_method_tokens(
                 self.id,
               ))
             })?;
-            #root_ty::from_bytes(part.data().bytes())?
+            let bytes = part.data().bytes();
+            if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
+              #root_ty::from_reader(std::io::Cursor::new(bytes))?
+            } else {
+              #root_ty::from_bytes(bytes)?
+            }
           };
 
           *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {

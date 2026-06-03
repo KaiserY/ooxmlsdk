@@ -112,6 +112,7 @@ pub enum VerticalAnchorValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:bordertop")]
 pub struct TopBorder {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Border Style
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
@@ -127,6 +128,7 @@ pub struct TopBorder {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:borderleft")]
 pub struct LeftBorder {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Border Style
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
@@ -142,6 +144,7 @@ pub struct LeftBorder {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:borderright")]
 pub struct RightBorder {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Border Style
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
@@ -157,6 +160,7 @@ pub struct RightBorder {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:borderbottom")]
 pub struct BottomBorder {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Border Style
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,

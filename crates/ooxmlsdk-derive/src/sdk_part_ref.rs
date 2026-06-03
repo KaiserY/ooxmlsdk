@@ -275,15 +275,19 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         #content_type,
         part.content_type().as_bytes(),
       ) {
+        let bytes = part.data().bytes();
+        let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
+          <#root_ty>::from_reader(std::io::Cursor::new(bytes))?
+        } else {
+          <#root_ty>::from_bytes(bytes)?
+        };
         #[cfg(feature = "mce")]
-        let mut root = <#root_ty>::from_bytes(part.data().bytes())?;
+        let mut root = root;
         #[cfg(feature = "mce")]
         crate::sdk::SdkMce::process_mce(
           &mut root,
           &open_settings.markup_compatibility_process_settings,
         )?;
-        #[cfg(not(feature = "mce"))]
-        let root = <#root_ty>::from_bytes(part.data().bytes())?;
         return Ok(Some(Self::#variant_ident(Box::new(root))));
       }
     }

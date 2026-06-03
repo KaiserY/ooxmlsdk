@@ -1,0 +1,20 @@
+{
+  "Types": [
+    {
+      "ClassName": "TopBorder",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LeftBorder",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "RightBorder",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "BottomBorder",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

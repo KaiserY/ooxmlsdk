@@ -8917,9 +8917,8 @@ pub struct CustomSheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:oleObjects")]
 pub struct OleObjects {
-  /// OLE Object.
-  #[sdk(child(qname = "x:oleObject"))]
-  pub ole_object: Vec<OleObject>,
+  #[sdk(choice(child(variant = OleObject, qname = "x:oleObject"), any))]
+  pub xml_children: Vec<OleObjectsChoice>,
 }
 /// Defines the Controls Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11212,6 +11211,13 @@ pub enum PivotFieldExtensionChoice {
 pub enum CacheSourceExtensionChoice {
   /// Defines the SourceConnection Class.
   SourceConnection(std::boxed::Box<crate::schemas::x14::SourceConnection>),
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum OleObjectsChoice {
+  /// OLE Object.
+  OleObject(std::boxed::Box<OleObject>),
+  /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]

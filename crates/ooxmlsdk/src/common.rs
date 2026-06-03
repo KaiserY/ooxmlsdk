@@ -34,8 +34,8 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
-  from_reader_inner, from_str_inner, parse_decimal_number_or_percent_attr,
+  IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, decode_utf16_xml_bytes,
+  from_bytes_inner, from_reader_inner, from_str_inner, parse_decimal_number_or_percent_attr,
   parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
   read_raw_element_xml_borrowed, read_raw_element_xml_borrowed_bytes, read_raw_element_xml_io,
   read_raw_element_xml_io_bytes, read_raw_empty_xml_borrowed, read_raw_empty_xml_borrowed_bytes,
@@ -173,6 +173,7 @@ pub(crate) fn canonical_xmlns_prefix_bytes<'a>(prefix: &'a [u8], uri: &[u8]) -> 
   match uri {
     b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => b"x14",
     b"http://schemas.microsoft.com/office/excel/2006/main" => b"xne",
+    b"urn:schemas-microsoft-com:office:word" => b"w10",
     _ => prefix,
   }
 }

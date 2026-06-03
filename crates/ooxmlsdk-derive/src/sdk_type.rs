@@ -84,11 +84,11 @@ where
 fn should_use_local_name_child_dispatch(
   _schema_qname: &str,
   child_qnames: impl IntoIterator<Item = String>,
-  has_choice_dispatch: bool,
+  _has_choice_dispatch: bool,
   has_any_dispatch: bool,
   has_xml_other_children_dispatch: bool,
 ) -> bool {
-  if has_choice_dispatch || has_any_dispatch || has_xml_other_children_dispatch {
+  if has_any_dispatch || has_xml_other_children_dispatch {
     return false;
   }
 
@@ -129,6 +129,34 @@ mod tests {
       false,
       false,
       true,
+    ));
+  }
+
+  #[test]
+  fn local_name_child_dispatch_allows_choice_when_unambiguous() {
+    assert!(should_use_local_name_child_dispatch(
+      "v:CT_Shape/v:shape",
+      [
+        "v:CT_ImageData/v:imagedata".to_string(),
+        "w10:CT_Border/w10:bordertop".to_string(),
+      ],
+      true,
+      false,
+      false,
+    ));
+  }
+
+  #[test]
+  fn local_name_child_dispatch_rejects_choice_local_name_conflicts() {
+    assert!(!should_use_local_name_child_dispatch(
+      "v:CT_Shape/v:shape",
+      [
+        "w10:CT_Border/w10:bordertop".to_string(),
+        "wvml:CT_Border/wvml:bordertop".to_string(),
+      ],
+      true,
+      false,
+      false,
     ));
   }
 }
@@ -3415,6 +3443,88 @@ fn expand_helper_struct(
         .then(|| mce_choice_impl_tokens(field))
     })
     .collect::<Vec<_>>();
+  let mut ordered_write_tokens = Vec::new();
+  for field in &fields.named {
+    let field_ident = field
+      .ident
+      .as_ref()
+      .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
+    let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
+    match parsed_attrs.kind {
+      Some(SdkTypeFieldKind::Child { qname, .. }) => {
+        let repeated = contains_vec_type(&field.ty);
+        let optional = is_option_type(&field.ty);
+        let payload_ty = unwrap_option_vec_type(&field.ty);
+        let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+        let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &qname);
+        let self_write_call =
+          write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &qname);
+        if repeated {
+          ordered_write_tokens.push(quote! {
+            for child in &self.#field_ident {
+              #child_write_call
+            }
+          });
+        } else if optional {
+          ordered_write_tokens.push(quote! {
+            if let Some(child) = &self.#field_ident {
+              #child_write_call
+            }
+          });
+        } else {
+          ordered_write_tokens.push(quote! {
+            #self_write_call
+          });
+        }
+      }
+      Some(SdkTypeFieldKind::TextChild {
+        qname,
+        simple_type,
+        list,
+      }) => {
+        let repeated = !list && contains_vec_type(&field.ty);
+        ordered_write_tokens.push(build_text_child_write_tokens(
+          field_ident,
+          &qname,
+          simple_type.as_deref(),
+          &field.ty,
+          repeated,
+          is_option_type(&field.ty),
+          list,
+        ));
+      }
+      Some(SdkTypeFieldKind::AnyChild { qname }) => {
+        ordered_write_tokens.push(build_any_child_write_tokens(
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        ));
+      }
+      Some(SdkTypeFieldKind::EmptyChild { qname }) => {
+        ordered_write_tokens.push(build_empty_child_write_tokens(
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        ));
+      }
+      Some(SdkTypeFieldKind::Choice) => {
+        let choice_ty = unwrap_option_vec_type(&field.ty);
+        ordered_write_tokens.push(build_choice_write_tokens(
+          &choice_ty,
+          &parsed_attrs.choice_items,
+          field_ident,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        )?);
+      }
+      Some(SdkTypeFieldKind::Attr { .. })
+      | Some(SdkTypeFieldKind::Text { .. })
+      | Some(SdkTypeFieldKind::Any)
+      | None => {}
+    }
+  }
   let stack_parser = None::<SdkStackParserAttrs>;
   let read_borrowed_inner_body = if let Some(stack_parser) = &stack_parser {
     let read_borrowed = &stack_parser.read_borrowed;
@@ -3479,8 +3589,7 @@ fn expand_helper_struct(
     }
   } else {
     quote! {
-      #( #child_write_tokens )*
-      #( #choice_write_tokens )*
+      #( #ordered_write_tokens )*
       Ok(())
     }
   };
@@ -3773,9 +3882,21 @@ fn expand_named_struct(
       .map(|field| field.qname.clone())
       .chain(empty_child_fields.iter().map(|field| field.qname.clone()))
       .chain(text_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(any_child_fields.iter().map(|field| field.qname.clone())),
+      .chain(any_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(
+        choice_fields
+          .iter()
+          .flat_map(|field| field.specific_qnames.iter().cloned()),
+      ),
     !choice_fields.is_empty(),
-    !any_fields.is_empty(),
+    !any_fields.is_empty()
+      || choice_fields.iter().any(|field| {
+        field.accepts_any.unwrap_or(false)
+          || field
+            .items
+            .iter()
+            .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
+      }),
     has_xml_other_children_field,
   );
 

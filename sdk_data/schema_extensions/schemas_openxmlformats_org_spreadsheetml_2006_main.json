@@ -111,6 +111,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "OleObjects",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "PivotCacheDefinitionExtension",
       "HaveXmlnsFields": true
     },

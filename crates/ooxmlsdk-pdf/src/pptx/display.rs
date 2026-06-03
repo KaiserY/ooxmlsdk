@@ -1233,7 +1233,9 @@ fn lower_diagram_text_body_at_with_style_and_scale(
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
-    a::TextAnchoringTypeValues::Top => frame.y_pt,
+    a::TextAnchoringTypeValues::Top
+    | a::TextAnchoringTypeValues::Justified
+    | a::TextAnchoringTypeValues::Distributed => frame.y_pt,
   };
 
   let mut cursor = TextCursor {
@@ -3859,7 +3861,9 @@ fn lower_text_body_at_with_style_and_scale(
   let y_pt = match text_body.display_properties.anchor {
     a::TextAnchoringTypeValues::Center => frame.y_pt + (frame.height_pt - estimated_height) / 2.0,
     a::TextAnchoringTypeValues::Bottom => frame.y_pt + frame.height_pt - estimated_height,
-    a::TextAnchoringTypeValues::Top => frame.y_pt,
+    a::TextAnchoringTypeValues::Top
+    | a::TextAnchoringTypeValues::Justified
+    | a::TextAnchoringTypeValues::Distributed => frame.y_pt,
   };
 
   let mut cursor = TextCursor {

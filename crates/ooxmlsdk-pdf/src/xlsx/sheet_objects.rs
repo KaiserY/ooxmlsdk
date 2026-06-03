@@ -62,9 +62,14 @@ impl SheetObjectCatalog {
         .as_ref()
         .map(|objects| {
           objects
-            .ole_object
+            .xml_children
             .iter()
-            .map(OleObjectModel::from_ole_object)
+            .filter_map(|child| match child {
+              x::OleObjectsChoice::OleObject(object) => {
+                Some(OleObjectModel::from_ole_object(object))
+              }
+              x::OleObjectsChoice::XmlAny(_) => None,
+            })
             .collect()
         })
         .unwrap_or_default(),

@@ -1279,6 +1279,7 @@ pub(crate) fn read_root_start_borrowed<'de>(
   owner: &'static str,
   tag_qname: &'static [u8],
   local_name: &'static [u8],
+  namespace_uri: Option<&'static [u8]>,
 ) -> Result<
   (
     quick_xml::events::BytesStart<'de>,
@@ -1298,7 +1299,7 @@ pub(crate) fn read_root_start_borrowed<'de>(
         };
       }
       SliceTagEvent::Start(e, empty) => {
-        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1315,6 +1316,7 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   owner: &'static str,
   tag_qname: &'static [u8],
   local_name: &'static [u8],
+  namespace_uri: Option<&'static [u8]>,
 ) -> Result<
   (
     quick_xml::events::BytesStart<'static>,
@@ -1334,7 +1336,7 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
         };
       }
       IoTagEvent::Start(e, empty) => {
-        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1351,11 +1353,12 @@ pub(crate) fn read_root_start_borrowed_no_header<'de>(
   owner: &'static str,
   tag_qname: &'static [u8],
   local_name: &'static [u8],
+  namespace_uri: Option<&'static [u8]>,
 ) -> Result<(quick_xml::events::BytesStart<'de>, bool), SdkError> {
   loop {
     match reader.next_tag_event()? {
       SliceTagEvent::Start(e, empty) => {
-        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
           return Ok((e, empty));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1372,11 +1375,12 @@ pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
   owner: &'static str,
   tag_qname: &'static [u8],
   local_name: &'static [u8],
+  namespace_uri: Option<&'static [u8]>,
 ) -> Result<(quick_xml::events::BytesStart<'static>, bool), SdkError> {
   loop {
     match reader.next_tag_event()? {
       IoTagEvent::Start(e, empty) => {
-        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
           return Ok((e, empty));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1385,6 +1389,81 @@ pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
       IoTagEvent::Decl(_) | IoTagEvent::End(_) | IoTagEvent::Other => {}
     }
   }
+}
+
+#[inline]
+fn root_start_matches(
+  start: &quick_xml::events::BytesStart<'_>,
+  tag_qname: &[u8],
+  local_name: &[u8],
+  namespace_uri: Option<&[u8]>,
+) -> Result<bool, SdkError> {
+  let name = start.name();
+  let name = name.as_ref();
+  if name == tag_qname || name == local_name {
+    return Ok(true);
+  }
+
+  let Some(namespace_uri) = namespace_uri else {
+    return Ok(false);
+  };
+  let (prefix, root_local_name) = split_qname(name);
+  if prefix.is_none() || root_local_name != local_name {
+    return Ok(false);
+  }
+  root_namespace_matches(start, prefix, namespace_uri)
+}
+
+pub(crate) fn root_element_matches_namespace_local(
+  bytes: &[u8],
+  namespace_uri: &[u8],
+  local_name: &[u8],
+) -> Result<bool, SdkError> {
+  if let Some(bytes) = decode_utf16_xml_bytes(bytes)? {
+    return root_element_matches_namespace_local(&bytes, namespace_uri, local_name);
+  }
+
+  let mut reader = Reader::from_reader(bytes);
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) | Event::Empty(e) => {
+        let name = e.name();
+        let name = name.as_ref();
+        let (prefix, root_local_name) = split_qname(name);
+        return Ok(
+          root_local_name == local_name && root_namespace_matches(&e, prefix, namespace_uri)?,
+        );
+      }
+      Event::Eof => return Ok(false),
+      _ => {}
+    }
+  }
+}
+
+fn split_qname(qname: &[u8]) -> (Option<&[u8]>, &[u8]) {
+  if let Some(index) = qname.iter().position(|byte| *byte == b':') {
+    (Some(&qname[..index]), &qname[index + 1..])
+  } else {
+    (None, qname)
+  }
+}
+
+fn root_namespace_matches(
+  start: &quick_xml::events::BytesStart<'_>,
+  prefix: Option<&[u8]>,
+  namespace_uri: &[u8],
+) -> Result<bool, SdkError> {
+  for attr in start.attributes() {
+    let attr = attr?;
+    let key = attr.key.as_ref();
+    if match prefix {
+      Some(prefix) => key.strip_prefix(b"xmlns:") == Some(prefix),
+      None => key == b"xmlns",
+    } {
+      return Ok(attr.value.as_ref() == namespace_uri);
+    }
+  }
+  Ok(false)
 }
 
 #[inline]

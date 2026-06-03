@@ -3563,12 +3563,13 @@ pub struct ShowPropertiesExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:pic")]
 pub struct Picture {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Non-Visual Properties for a Picture
   #[sdk(child(qname = "p:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
   /// Picture Fill
   #[sdk(child(qname = "p:blipFill"))]
-  pub blip_fill: std::boxed::Box<BlipFill>,
+  pub blip_fill: Option<std::boxed::Box<BlipFill>>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "p:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,

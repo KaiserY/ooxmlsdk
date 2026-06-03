@@ -287,7 +287,9 @@ impl PPTShapeGroupContext {
     if let Some(style) = &picture.shape_style {
       shape.shape.set_shape_style_refs(style);
     }
-    if let Some(blip) = picture.blip_fill.blip.as_ref() {
+    if let Some(blip_fill) = picture.blip_fill.as_deref()
+      && let Some(blip) = blip_fill.blip.as_ref()
+    {
       let image_resource = blip
         .embed
         .as_deref()
@@ -296,7 +298,7 @@ impl PPTShapeGroupContext {
       shape.shape.set_picture(
         blip.embed.clone(),
         blip.link.clone(),
-        image_crop_from_source_rectangle(picture.blip_fill.source_rectangle.as_ref()),
+        image_crop_from_source_rectangle(blip_fill.source_rectangle.as_ref()),
         blip.blip_choice.clone(),
         image_resource,
       );

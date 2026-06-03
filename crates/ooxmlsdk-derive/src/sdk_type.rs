@@ -1562,6 +1562,14 @@ fn expand_tuple_wrapper(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let root_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
+  let root_namespace_uri_tokens = match root_namespace_uri {
+    Some(uri) => {
+      let uri_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
+      quote! { Some(#uri_lit) }
+    }
+    None => quote! { None },
+  };
   let start_tag_open = write_start_tag_open_tokens(schema_qname);
   let end_tag = write_end_tag_tokens(schema_qname);
 
@@ -1644,6 +1652,7 @@ fn expand_tuple_wrapper(
           stringify!(#ident),
           #tag_qname_lit,
           #local_name_lit,
+          #root_namespace_uri_tokens,
         )?;
         <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
       }
@@ -1657,6 +1666,7 @@ fn expand_tuple_wrapper(
           stringify!(#ident),
           #tag_qname_lit,
           #local_name_lit,
+          #root_namespace_uri_tokens,
         )?;
         <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
       }
@@ -1670,6 +1680,7 @@ fn expand_tuple_wrapper(
           stringify!(#ident),
           #tag_qname_lit,
           #local_name_lit,
+          #root_namespace_uri_tokens,
         )?;
         <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
       }
@@ -3705,24 +3716,21 @@ fn expand_named_struct(
   };
   let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let end_name_matches = if local_name.is_empty() {
-    quote! { e.name() == __end_qname }
-  } else if tag_prefix.is_empty() {
-    quote! { e.name().as_ref() == #local_name_lit }
-  } else {
-    quote! { e.name().as_ref() == #tag_qname_lit || e.name().as_ref() == #local_name_lit }
-  };
-  let end_qname_decl = if local_name.is_empty() {
-    quote! { let __end_qname = e.name(); }
-  } else {
-    quote! {}
-  };
+  let end_name_matches = quote! { e.name() == __end_qname };
+  let end_qname_decl = quote! { let __end_qname = e.name(); };
   let raw_tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
   let start_tag_open = write_start_tag_open_tokens(schema_qname);
   let end_tag = write_end_tag_tokens(schema_qname);
   let default_ns = parse_sdk_default_ns(&input.attrs)?;
   let stack_parser = parse_sdk_stack_parser(&input.attrs)?;
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
+  let root_namespace_uri_tokens = match fixed_namespace_uri {
+    Some(uri) => {
+      let uri_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
+      quote! { Some(#uri_lit) }
+    }
+    None => quote! { None },
+  };
   let fixed_namespace_uri_lit =
     fixed_namespace_uri.map(|uri| LitByteStr::new(uri.as_bytes(), Span::call_site()));
   let fixed_namespace_write_lit = fixed_namespace_uri.map(|uri| {
@@ -3871,6 +3879,8 @@ fn expand_named_struct(
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
+  let preserve_fixed_prefixed_namespace =
+    has_xml_other_children_field && default_ns && tag_prefix == "x";
   let use_canonical_xmlns_prefix = has_xmlns_fields && {
     let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
     is_canonical_xmlns_prefix_namespace(&tag_prefix)
@@ -4195,7 +4205,11 @@ fn expand_named_struct(
         xmlns.push(crate::common::XmlNamespace::raw("", attr.value.as_ref()));
       }
     };
-    let prefixed_xmlns_parse_tokens = if let Some(uri_lit) = &fixed_namespace_uri_lit {
+    let prefixed_xmlns_parse_tokens = if preserve_fixed_prefixed_namespace {
+      quote! {
+        xmlns.push(crate::common::XmlNamespace::raw(&key[6..], attr.value.as_ref()));
+      }
+    } else if let Some(uri_lit) = &fixed_namespace_uri_lit {
       quote! {
         if &key[6..] != #raw_tag_prefix_lit.as_slice()
           || attr.value.as_ref() != #uri_lit.as_slice()
@@ -6687,6 +6701,7 @@ fn expand_named_struct(
         stringify!(#ident),
         #tag_qname_lit,
         #local_name_lit,
+        #root_namespace_uri_tokens,
       )?;
       let mut value = <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)?;
       #xml_header_assign_tokens
@@ -6699,6 +6714,7 @@ fn expand_named_struct(
         stringify!(#ident),
         #tag_qname_lit,
         #local_name_lit,
+        #root_namespace_uri_tokens,
       )?;
       <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
     }
@@ -6710,6 +6726,7 @@ fn expand_named_struct(
         stringify!(#ident),
         #tag_qname_lit,
         #local_name_lit,
+        #root_namespace_uri_tokens,
       )?;
       let mut value = <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)?;
       #xml_header_assign_tokens
@@ -6722,6 +6739,7 @@ fn expand_named_struct(
         stringify!(#ident),
         #tag_qname_lit,
         #local_name_lit,
+        #root_namespace_uri_tokens,
       )?;
       <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
     }

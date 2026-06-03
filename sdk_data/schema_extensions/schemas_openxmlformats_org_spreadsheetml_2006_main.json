@@ -280,12 +280,26 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "CalculationProperties",
+      "HaveXmlnsFields": true,
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "CellFormats",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "DataValidation",
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "DifferentialFormats",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "Fonts",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Hyperlink",

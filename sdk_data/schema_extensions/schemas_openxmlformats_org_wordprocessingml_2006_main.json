@@ -90,6 +90,14 @@
       ]
     },
     {
+      "ClassName": "HeaderReference",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "FooterReference",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Drawing",
       "HaveXmlOtherAttrs": true
     },
@@ -287,6 +295,53 @@
     {
       "RustName": "RunChoice",
       "AddXmlAny": true
+    },
+    {
+      "RustName": "TableStyleConditionalFormattingTableRowPropertiesChoice",
+      "AddVariants": [
+        {
+          "RustName": "ConditionalFormatStyle",
+          "QName": "w:cnfStyle",
+          "Docs": "Defines the ConditionalFormatStyle Class.",
+          "PayloadRustType": "ConditionalFormatStyle"
+        },
+        {
+          "RustName": "DivId",
+          "QName": "w:divId",
+          "Docs": "Defines the DivId Class.",
+          "PayloadRustType": "DivId"
+        },
+        {
+          "RustName": "GridBefore",
+          "QName": "w:gridBefore",
+          "Docs": "Defines the GridBefore Class.",
+          "PayloadRustType": "GridBefore"
+        },
+        {
+          "RustName": "GridAfter",
+          "QName": "w:gridAfter",
+          "Docs": "Defines the GridAfter Class.",
+          "PayloadRustType": "GridAfter"
+        },
+        {
+          "RustName": "WidthBeforeTableRow",
+          "QName": "w:wBefore",
+          "Docs": "Defines the WidthBeforeTableRow Class.",
+          "PayloadRustType": "WidthBeforeTableRow"
+        },
+        {
+          "RustName": "WidthAfterTableRow",
+          "QName": "w:wAfter",
+          "Docs": "Defines the WidthAfterTableRow Class.",
+          "PayloadRustType": "WidthAfterTableRow"
+        },
+        {
+          "RustName": "TableRowHeight",
+          "QName": "w:trHeight",
+          "Docs": "Defines the TableRowHeight Class.",
+          "PayloadRustType": "TableRowHeight"
+        }
+      ]
     }
   ]
 }

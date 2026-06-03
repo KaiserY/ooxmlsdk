@@ -4955,6 +4955,7 @@ pub struct ParagraphPropertiesChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:headerReference")]
 pub struct HeaderReference {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
@@ -4966,6 +4967,7 @@ pub struct HeaderReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:footerReference")]
 pub struct FooterReference {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
@@ -13842,7 +13844,14 @@ pub struct TableStyleConditionalFormattingTableRowProperties {
             child(variant = CantSplit, qname = "w:cantSplit"),
             child(variant = TableHeader, qname = "w:tblHeader"),
             child(variant = TableCellSpacing, qname = "w:tblCellSpacing"),
-            child(variant = TableJustification, qname = "w:jc")
+            child(variant = TableJustification, qname = "w:jc"),
+            child(variant = ConditionalFormatStyle, qname = "w:cnfStyle"),
+            child(variant = DivId, qname = "w:divId"),
+            child(variant = GridBefore, qname = "w:gridBefore"),
+            child(variant = GridAfter, qname = "w:gridAfter"),
+            child(variant = WidthBeforeTableRow, qname = "w:wBefore"),
+            child(variant = WidthAfterTableRow, qname = "w:wAfter"),
+            child(variant = TableRowHeight, qname = "w:trHeight")
         )
     )]
   pub table_style_conditional_formatting_table_row_properties_choice:
@@ -20204,6 +20213,20 @@ pub enum TableStyleConditionalFormattingTableRowPropertiesChoice {
   TableCellSpacing(std::boxed::Box<TableCellSpacing>),
   /// Defines the TableJustification Class.
   TableJustification(std::boxed::Box<TableJustification>),
+  /// Defines the ConditionalFormatStyle Class.
+  ConditionalFormatStyle(std::boxed::Box<ConditionalFormatStyle>),
+  /// Defines the DivId Class.
+  DivId(std::boxed::Box<DivId>),
+  /// Defines the GridBefore Class.
+  GridBefore(std::boxed::Box<GridBefore>),
+  /// Defines the GridAfter Class.
+  GridAfter(std::boxed::Box<GridAfter>),
+  /// Defines the WidthBeforeTableRow Class.
+  WidthBeforeTableRow(std::boxed::Box<WidthBeforeTableRow>),
+  /// Defines the WidthAfterTableRow Class.
+  WidthAfterTableRow(std::boxed::Box<WidthAfterTableRow>),
+  /// Defines the TableRowHeight Class.
+  TableRowHeight(std::boxed::Box<TableRowHeight>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommentChoice {

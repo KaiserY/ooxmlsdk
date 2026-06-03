@@ -1,4 +1,15 @@
 {
+  "Types": [
+    {
+      "ClassName": "Picture",
+      "Children": [
+        {
+          "PropertyName": "BlipFill",
+          "Optional": true
+        }
+      ]
+    }
+  ],
   "ChoiceEnums": [
     {
       "RustName": "TwoCellAnchorChoice",

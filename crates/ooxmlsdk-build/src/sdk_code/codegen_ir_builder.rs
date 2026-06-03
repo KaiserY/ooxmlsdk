@@ -865,10 +865,31 @@ fn has_child_like_members(members: &[MemberDecl]) -> bool {
 
 fn promote_single_repeated_child_to_xml_other_choice(
   schema_type: &SchemaType,
-  members: &mut Vec<MemberDecl>,
+  members: &mut [MemberDecl],
   extra_types: &mut Vec<TypeDecl>,
 ) -> bool {
-  let [MemberDecl::Field(field)] = members.as_slice() else {
+  let child_field_indexes: Vec<usize> = members
+    .iter()
+    .enumerate()
+    .filter_map(|(index, member)| match member {
+      MemberDecl::Field(field)
+        if matches!(
+          field.wire,
+          FieldWireDecl::Child { .. }
+            | FieldWireDecl::TextChild { .. }
+            | FieldWireDecl::Any
+            | FieldWireDecl::Choice
+        ) =>
+      {
+        Some(index)
+      }
+      _ => None,
+    })
+    .collect();
+  let [field_index] = child_field_indexes.as_slice() else {
+    return false;
+  };
+  let MemberDecl::Field(field) = &members[*field_index] else {
     return false;
   };
   let field = field.clone();
@@ -906,8 +927,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
   ];
   disambiguate_choice_variant_names(&mut choice_members);
 
-  members.clear();
-  members.push(MemberDecl::Field(FieldDecl {
+  members[*field_index] = MemberDecl::Field(FieldDecl {
     rust_name: "xml_children".to_string(),
     docs: field.docs.clone(),
     version: field.version.clone(),
@@ -918,7 +938,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
       module_path: None,
     },
     validators: field.validators.clone(),
-  }));
+  });
 
   extra_types.push(TypeDecl {
     rust_name: choice_name,
@@ -4919,6 +4939,75 @@ mod tests {
     assert!(choice.members.iter().any(|member| {
       matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
     }));
+  }
+
+  #[test]
+  fn direct_xml_other_children_promotion_ignores_attributes() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Leaf/t:leaf".to_string(),
+          class_name: "Leaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Parent/t:parent".to_string(),
+          class_name: "Parent".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          have_xml_other_attrs: true,
+          have_direct_xml_other_children: true,
+          attributes: vec![SchemaTypeAttribute {
+            q_name: ":count".to_string(),
+            property_name: "Count".to_string(),
+            r#type: "UInt32Value".to_string(),
+            ..Default::default()
+          }],
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            name: "t:CT_Leaf/t:leaf".to_string(),
+            kind: SchemaTypeChildKind::Child,
+            repeated: true,
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
+    assert!(parent.support.have_xml_other_attrs);
+    assert!(!parent.support.have_xml_other_children);
+    assert!(parent.members.iter().any(|member| {
+      matches!(
+        member,
+        MemberDecl::Field(FieldDecl {
+          rust_name,
+          wire: FieldWireDecl::Attribute { .. },
+          ..
+        }) if rust_name == "count"
+      )
+    }));
+    assert!(parent.members.iter().any(|member| {
+      matches!(
+        member,
+        MemberDecl::Field(FieldDecl {
+          rust_name,
+          wire: FieldWireDecl::Choice,
+          cardinality: Cardinality::Many,
+          ..
+        }) if rust_name == "xml_children"
+      )
+    }));
+    assert!(ir.types.iter().any(|ty| ty.rust_name == "ParentChoice"));
   }
 
   #[test]

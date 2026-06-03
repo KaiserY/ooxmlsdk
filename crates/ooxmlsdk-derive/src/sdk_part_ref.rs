@@ -269,6 +269,19 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     let variant_ident = &variant.ident;
     let root_ty = &root.element_ty;
     let content_type = LitByteStr::new(root.content_type.as_bytes(), Span::call_site());
+    let chart_raw_fallback = if variant_ident == "ChartPart" {
+      quote! {
+        if crate::common::root_element_matches_namespace_local(
+          bytes,
+          b"http://schemas.microsoft.com/office/drawing/2014/chartex",
+          b"chartSpace",
+        )? {
+          return Ok(None);
+        }
+      }
+    } else {
+      quote! {}
+    };
     quote! {
       #( #attrs )*
       if crate::sdk::part_root_content_type_matches_bytes(
@@ -276,6 +289,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         part.content_type().as_bytes(),
       ) {
         let bytes = part.data().bytes();
+        #chart_raw_fallback
         let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
           <#root_ty>::from_reader(std::io::Cursor::new(bytes))?
         } else {

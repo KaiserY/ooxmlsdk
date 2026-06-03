@@ -10,6 +10,7 @@
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Sheet Properties
   #[sdk(child(qname = "x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<crate::schemas::x::SheetProperties>>,

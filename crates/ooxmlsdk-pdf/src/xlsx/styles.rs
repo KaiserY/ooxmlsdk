@@ -158,8 +158,12 @@ impl StylesCatalog {
         .as_ref()
         .map(|formats| {
           formats
-            .cell_format
+            .xml_children
             .iter()
+            .filter_map(|child| match child {
+              x::CellFormatsChoice::CellFormat(format) => Some(format.as_ref()),
+              x::CellFormatsChoice::XmlAny(_) => None,
+            })
             .map(|format| CellFormatRecord::from_cell_format(format, false))
             .collect()
         })
@@ -169,8 +173,12 @@ impl StylesCatalog {
         .as_ref()
         .map(|fonts| {
           fonts
-            .font
+            .xml_children
             .iter()
+            .filter_map(|child| match child {
+              x::FontsChoice::Font(font) => Some(font.as_ref()),
+              x::FontsChoice::XmlAny(_) => None,
+            })
             .map(|font| FontRecord::from_font_with_colors(font, &indexed_colors))
             .collect()
         })
@@ -202,8 +210,12 @@ impl StylesCatalog {
         .as_ref()
         .map(|formats| {
           formats
-            .differential_format
+            .xml_children
             .iter()
+            .filter_map(|child| match child {
+              x::DifferentialFormatsChoice::DifferentialFormat(format) => Some(format.as_ref()),
+              x::DifferentialFormatsChoice::XmlAny(_) => None,
+            })
             .map(|format| {
               DifferentialFormatRecord::from_differential_format_with_colors(
                 format,

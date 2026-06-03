@@ -29,6 +29,9 @@ Feature-gated modules are:
 - `parts` behind `parts`
 - `validator` behind `validators`
 
+The minimum supported Rust version is 1.88, and the workspace uses the Rust
+2024 edition.
+
 ## Version Coverage
 
 Office 2007 is the baseline. The checked-in generated schemas also include newer OOXML namespaces and package parts from the upstream metadata.
@@ -50,6 +53,18 @@ Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmls
 Guides and examples are maintained separately in [KaiserY/ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
 
 For background on Open XML package concepts, file format structure, WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility, the Microsoft Learn documentation remains the upstream conceptual reference. This crate follows many of the same package and schema concepts while exposing Rust-native generated types and feature flags.
+
+## Round-Trip Coverage
+
+Corpus-scale round-trip data is tracked in [KaiserY/ooxmlsdk-test-suite](https://github.com/KaiserY/ooxmlsdk-test-suite). Latest recorded results:
+
+| Corpus | Files | Result |
+| --- | ---: | --- |
+| Apache POI | 677 | 649 passed / 28 failed |
+| LibreOffice | 3368 | 3051 passed / 317 failed |
+| Open-XML-SDK | 884 | 884 passed / 0 failed |
+
+Last run: 2026-06-04.
 
 ## Package API
 
@@ -107,11 +122,13 @@ For release validation, this repository uses the full workspace sequence:
 
 ```bash
 cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture
+cargo fmt --all
 cargo test --workspace
 cargo test --workspace --no-default-features
 cargo test --workspace --no-default-features --features parts
 cargo test --workspace --no-default-features --features flat-opc
 cargo test --workspace --no-default-features --features mce
+cargo test -p ooxmlsdk-test --features validators
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings

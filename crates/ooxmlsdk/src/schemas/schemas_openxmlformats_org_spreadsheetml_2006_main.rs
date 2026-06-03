@@ -9905,9 +9905,8 @@ pub struct Fonts {
   /// knownFonts
   #[sdk(attr(qname = "x14ac:knownFonts"))]
   pub known_fonts: Option<crate::simple_type::BooleanValue>,
-  /// Font Properties.
-  #[sdk(child(qname = "x:font"))]
-  pub font: Vec<Font>,
+  #[sdk(choice(child(variant = Font, qname = "x:font"), any))]
+  pub xml_children: Vec<FontsChoice>,
 }
 /// Defines the Fills Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9949,9 +9948,8 @@ pub struct CellFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// Formatting Elements.
-  #[sdk(child(qname = "x:xf"))]
-  pub cell_format: Vec<CellFormat>,
+  #[sdk(choice(child(variant = CellFormat, qname = "x:xf"), any))]
+  pub xml_children: Vec<CellFormatsChoice>,
 }
 /// Defines the CellStyles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9971,9 +9969,8 @@ pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// Formatting.
-  #[sdk(child(qname = "x:dxf"))]
-  pub differential_format: Vec<DifferentialFormat>,
+  #[sdk(choice(child(variant = DifferentialFormat, qname = "x:dxf"), any))]
+  pub xml_children: Vec<DifferentialFormatsChoice>,
 }
 /// Defines the TableStyles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10717,6 +10714,8 @@ pub struct DefinedNames {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:calcPr")]
 pub struct CalculationProperties {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Calculation Id
   #[sdk(attr(qname = ":calcId"))]
   pub calculation_id: Option<crate::simple_type::UInt32Value>,
@@ -11263,6 +11262,27 @@ pub enum WorksheetExtensionChoice {
   WebExtensions(std::boxed::Box<crate::schemas::x15::WebExtensions>),
   /// Defines the TimelineReferences Class.
   TimelineReferences(std::boxed::Box<crate::schemas::x15::TimelineReferences>),
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum FontsChoice {
+  /// Font Properties.
+  Font(std::boxed::Box<Font>),
+  /// Unknown XML child.
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum CellFormatsChoice {
+  /// Formatting Elements.
+  CellFormat(std::boxed::Box<CellFormat>),
+  /// Unknown XML child.
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum DifferentialFormatsChoice {
+  /// Formatting.
+  DifferentialFormat(std::boxed::Box<DifferentialFormat>),
+  /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]

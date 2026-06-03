@@ -200,7 +200,7 @@ pub struct Picture {
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,
   /// Picture Fill
   #[sdk(child(qname = "xdr:blipFill"))]
-  pub blip_fill: std::boxed::Box<BlipFill>,
+  pub blip_fill: Option<std::boxed::Box<BlipFill>>,
   /// Shape Properties.
   #[sdk(child(qname = "xdr:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,

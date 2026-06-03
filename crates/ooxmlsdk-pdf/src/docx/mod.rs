@@ -10228,8 +10228,9 @@ fn drawing_picture_image_properties(
   picture: &pic::Picture,
   theme_colors: &ThemeColors,
 ) -> Option<DrawingImageProperties> {
+  let blip_fill = picture.blip_fill.as_deref()?;
   let mut properties = DrawingImageProperties {
-    relationship_id: picture.blip_fill.blip.as_ref()?.embed.clone(),
+    relationship_id: blip_fill.blip.as_ref()?.embed.clone(),
     hyperlink_relationship_id: picture
       .non_visual_picture_properties
       .as_deref()
@@ -10243,8 +10244,7 @@ fn drawing_picture_image_properties(
     ..DrawingImageProperties::default()
   };
 
-  if let Some(crop) = picture
-    .blip_fill
+  if let Some(crop) = blip_fill
     .blip_fill_choice
     .as_ref()
     .and_then(|choice| match choice {
@@ -10253,8 +10253,7 @@ fn drawing_picture_image_properties(
     })
     .map(image_crop_from_fill_rectangle)
     .or_else(|| {
-      picture
-        .blip_fill
+      blip_fill
         .source_rectangle
         .as_ref()
         .map(image_crop_from_source_rectangle)
@@ -10271,7 +10270,7 @@ fn drawing_picture_image_properties(
     apply_image_transform(&mut properties, transform);
   }
 
-  if let Some(blip) = picture.blip_fill.blip.as_ref() {
+  if let Some(blip) = blip_fill.blip.as_ref() {
     apply_image_effects_from_blip(&mut properties, blip, theme_colors);
   }
 

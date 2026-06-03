@@ -13,6 +13,16 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "Picture",
+      "HaveDirectXmlOtherChildren": true,
+      "Children": [
+        {
+          "PropertyName": "BlipFill",
+          "Optional": true
+        }
+      ]
+    },
+    {
       "ClassName": "Shape",
       "HaveXmlnsFields": true
     },

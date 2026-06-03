@@ -188,8 +188,12 @@ impl TableStyleList {
       path,
       default_style_id: (!source.default.is_empty()).then(|| source.default.clone()),
       styles: source
-        .table_style_entry
+        .xml_children
         .iter()
+        .filter_map(|child| match child {
+          a::TableStyleListChoice::TableStyleEntry(entry) => Some(entry.as_ref()),
+          a::TableStyleListChoice::XmlAny(_) => None,
+        })
         .map(TableStyle::from_dml_table_style_entry)
         .collect(),
     }

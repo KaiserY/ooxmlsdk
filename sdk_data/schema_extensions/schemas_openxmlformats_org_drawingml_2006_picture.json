@@ -3,9 +3,14 @@
     {
       "ClassName": "Picture",
       "HaveXmlnsFields": true,
+      "HaveDirectXmlOtherChildren": true,
       "Children": [
         {
           "PropertyName": "NonVisualPictureProperties",
+          "Optional": true
+        },
+        {
+          "PropertyName": "BlipFill",
           "Optional": true
         },
         {

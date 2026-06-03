@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+## 0.9.0
+
+### Breaking Changes
+
+- Regenerated schema APIs with more precise wrapper and optional-child modeling. Some generated fields that previously exposed required values now use `Option<T>`, and some single repeated child collections that also preserve unknown XML now expose generated choice enums instead of direct `Vec<T>` fields.
+- Changed generated leaf-text derived types to newtype wrappers where the schema type is only a text specialization. This reduces duplicate struct fields but can require downstream code to construct or access the wrapped value through the regenerated newtype surface.
+- Simplified XML namespace preservation types. `XmlNamespace` now stores known namespaces directly and raw namespace declarations as compact byte payloads; code that matched the older prefix/URI field layout must switch to the current enum-based API.
+- Removed the `smallvec` dependency from the public runtime dependency graph.
+
+### Added
+
+- Added stack-safe generated parsing for recursive WordprocessingML table content, covering deeply nested `w:tbl`, `w:tr`, and `w:tc` structures without relying on recursive Rust call depth.
+- Added root-element namespace/local-name fallback matching so package parts can load XML whose root element uses a non-canonical prefix while still keeping the normal fast path for canonical names.
+- Added UTF-16 XML byte decoding support for package parts that declare or contain UTF-16 encoded XML payloads.
+- Added schema extension support for generated child optionality, additional choice variants, XML namespace fields, unknown attributes, and direct unknown children in more WordprocessingML, SpreadsheetML, DrawingML, PresentationML, chart, math, threaded-comment, and Office extension types.
+- Added round-trip coverage reporting to the README with current corpus-scale results from `ooxmlsdk-test-suite`.
+
+### Changed
+
+- Simplified generated namespace and relationship namespace handling by replacing the large generated namespace extension table with direct generated namespace metadata and byte-oriented matching.
+- Moved corpus-scale round-trip fixtures and generated corpus tests out of `ooxmlsdk-test` and into the adjacent `ooxmlsdk-test-suite` repository.
+- Kept generated raw XML preservation more targeted: fixed spreadsheet root namespace preservation for raw children without retaining redundant fixed prefixes on typed-only roots such as shared string tables.
+- Updated PDF conversion code to tolerate optional or compatibility-preserved drawing content produced by the regenerated schemas while continuing to consume only typed children for rendering.
+
+### Fixed
+
+- Fixed Open XML SDK corpus round trips; the recorded Open-XML-SDK round-trip lane now passes all 884 tests.
+- Fixed additional Apache POI and LibreOffice corpus round-trip cases involving alternate content, non-canonical namespace prefixes, chart extension parts, optional picture `blipFill`, SpreadsheetML styles, macrosheet attributes, table-style row properties, and core-properties compatibility children.
+- Fixed Markup Compatibility processing for `mc:AlternateContent` elements that use a non-`mc` prefix bound to the markup-compatibility namespace.
+- Fixed generated validator support for choice fields and schema-derived typed values used by validator tests.
+- Fixed package and XML compatibility for chart extension roots by preserving unsupported chart extension payloads as raw bytes when they cannot be parsed as classic chart roots.
+- Fixed parsing and preservation of unknown attributes and namespace declarations in additional SpreadsheetML calculation properties, macrosheets, fonts, cell formats, and differential formats.
+- Fixed generated direct-unknown-child promotion so attributes do not participate in child choice layout decisions.
+
+### Performance
+
+- Reduced generated namespace lookup and write overhead by removing the large namespace extension dispatch table and matching common namespace data directly from bytes.
+- Reduced stack usage for deeply nested table XML by using generated stack parsers for recursive table structures.
+
+### Testing
+
+- Updated round-trip corpus status from the external test suite: Apache POI `649 passed / 28 failed`, LibreOffice `3051 passed / 317 failed`, and Open-XML-SDK `884 passed / 0 failed`.
+- Added focused tests for stack-safe nested table parsing, non-canonical MCE prefixes, UTF-16 XML package loading, generated validator choice fields, namespace canonicalization, and schema extension regressions.
+- Regenerated the checked-in runtime from updated schema extension metadata and kept formatting aligned with the release output.
+
+### Documentation
+
+- Added `docs/specs/nested_xml_parsing.md` documenting the stack-safe recursive XML parsing model.
+- Updated repository and test documentation to describe the external corpus round-trip suite and its role in release validation.
+
 ## 0.8.0
 
 ### Breaking Changes

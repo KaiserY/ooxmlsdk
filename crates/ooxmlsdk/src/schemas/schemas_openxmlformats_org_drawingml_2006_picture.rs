@@ -9,12 +9,13 @@
 #[sdk(qname = "pic:pic")]
 pub struct Picture {
   pub xmlns: Vec<crate::common::XmlNamespace>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:nvPicPr"))]
   pub non_visual_picture_properties: Option<std::boxed::Box<NonVisualPictureProperties>>,
   /// Picture Fill
   #[sdk(child(qname = "pic:blipFill"))]
-  pub blip_fill: std::boxed::Box<BlipFill>,
+  pub blip_fill: Option<std::boxed::Box<BlipFill>>,
   /// Shape Properties
   #[sdk(child(qname = "pic:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,

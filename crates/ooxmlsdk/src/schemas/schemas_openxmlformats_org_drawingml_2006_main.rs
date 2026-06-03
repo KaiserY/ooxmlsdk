@@ -4455,15 +4455,13 @@ pub struct Table {
 pub struct TableStyleList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Default
   #[sdk(attr(qname = ":def"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
   #[sdk(string_format(kind = "token"))]
   pub default: crate::simple_type::StringValue,
-  /// Table Style.
-  #[sdk(child(qname = "a:tblStyle"))]
-  pub table_style_entry: Vec<TableStyleEntry>,
+  #[sdk(choice(child(variant = TableStyleEntry, qname = "a:tblStyle"), any))]
+  pub xml_children: Vec<TableStyleListChoice>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10843,6 +10841,13 @@ pub enum BlipChoice {
   LuminanceEffect(std::boxed::Box<LuminanceEffect>),
   /// Defines the TintEffect Class.
   TintEffect(std::boxed::Box<TintEffect>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum TableStyleListChoice {
+  /// Table Style.
+  TableStyleEntry(std::boxed::Box<TableStyleEntry>),
+  /// Unknown XML child.
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomColorChoice {

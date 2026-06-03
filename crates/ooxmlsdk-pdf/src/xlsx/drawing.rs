@@ -612,8 +612,8 @@ impl DrawingObjectModel {
       text_len: 0,
       relationship_id: picture
         .blip_fill
-        .blip
-        .as_ref()
+        .as_deref()
+        .and_then(|blip_fill| blip_fill.blip.as_ref())
         .and_then(|blip| blip_relationship_id(blip)),
       hyperlink_relationship_id: hyperlink_relationship_id(
         properties.hyperlink_on_click.as_deref(),

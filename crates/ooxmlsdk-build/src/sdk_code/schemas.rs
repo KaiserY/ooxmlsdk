@@ -144,7 +144,7 @@ pub(crate) struct TypeContainmentGraph {
   leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
-  explicit_base_keys: HashSet<String>,
+  wrapped_base_keys: HashSet<String>,
 }
 
 impl TypeContainmentGraph {
@@ -190,13 +190,22 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let owner_key = local_type_key(module, &type_decl.rust_name);
         let mut owner_edges = Vec::new();
-        if let Some(base_module_path) = &type_decl.base_module_path
-          && let Some(base_rust_name) = &type_decl.base_rust_name
-        {
-          graph.explicit_base_keys.insert(format!(
-            "{base_module_path}::{}",
-            base_rust_name.to_upper_camel_case()
-          ));
+        if let Some(base_rust_name) = &type_decl.base_rust_name {
+          if let Some(base_module_path) = &type_decl.base_module_path {
+            graph.wrapped_base_keys.insert(format!(
+              "{base_module_path}::{}",
+              base_rust_name.to_upper_camel_case()
+            ));
+          } else if let Some(base_type_decl) = module
+            .types
+            .iter()
+            .find(|base_type_decl| base_type_decl.rust_name == *base_rust_name)
+            && can_wrap_derived_to_base_decl(type_decl, base_type_decl)
+          {
+            graph
+              .wrapped_base_keys
+              .insert(local_type_key(module, base_rust_name));
+          }
         }
 
         for member in &type_decl.members {
@@ -273,8 +282,8 @@ impl TypeContainmentGraph {
     self.leaf_text_alias_keys.contains(node)
   }
 
-  fn is_explicit_base(&self, node: &str) -> bool {
-    self.explicit_base_keys.contains(node)
+  fn is_wrapped_base(&self, node: &str) -> bool {
+    self.wrapped_base_keys.contains(node)
   }
 
   fn rendered_module_path<'a>(&'a self, module_path: &'a str) -> &'a str {
@@ -1464,7 +1473,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
     .filter(|ty| {
       should_emit_schema_type_decl(ty)
-        || type_graph.is_explicit_base(&local_type_key(ir, &ty.rust_name))
+        || type_graph.is_wrapped_base(&local_type_key(ir, &ty.rust_name))
     })
     .map(|ty| ty.rust_name.as_str())
     .collect();
@@ -1483,7 +1492,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
     .filter(|ty| {
       should_emit_schema_type_decl(ty)
-        || type_graph.is_explicit_base(&local_type_key(ir, &ty.rust_name))
+        || type_graph.is_wrapped_base(&local_type_key(ir, &ty.rust_name))
     })
   {
     let type_key = local_type_key(ir, &type_decl.rust_name);
@@ -4408,7 +4417,6 @@ fn can_wrap_derived_to_base_decl(type_decl: &TypeDecl, base_type_decl: &TypeDecl
     && type_decl.element_kind == Some(ElementKind::Derived)
     && base_type_decl.kind == TypeKind::ElementStruct
     && base_type_decl.element_kind == Some(ElementKind::LeafText)
-    && should_emit_schema_type_decl(base_type_decl)
     && type_decl.members.is_empty()
     && type_decl.content_model.is_none()
     && type_decl.xml_content.is_some()

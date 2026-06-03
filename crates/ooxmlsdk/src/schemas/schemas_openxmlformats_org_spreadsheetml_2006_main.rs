@@ -2833,13 +2833,7 @@ pub struct Comment {
 /// Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:author")]
-pub struct Author {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Author(pub XstringType);
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:t")]
@@ -2854,133 +2848,55 @@ pub struct Text {
 /// Cell Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:v")]
-pub struct CellValue {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct CellValue(pub XstringType);
 /// Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:formula")]
-pub struct Formula {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula(pub XstringType);
 /// Old Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:oldFormula")]
-pub struct OldFormula {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OldFormula(pub XstringType);
 /// Odd Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:oddHeader")]
-pub struct OddHeader {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OddHeader(pub XstringType);
 /// Odd Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:oddFooter")]
-pub struct OddFooter {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OddFooter(pub XstringType);
 /// Even Page Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:evenHeader")]
-pub struct EvenHeader {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct EvenHeader(pub XstringType);
 /// Even Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:evenFooter")]
-pub struct EvenFooter {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct EvenFooter(pub XstringType);
 /// First Page Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:firstHeader")]
-pub struct FirstHeader {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FirstHeader(pub XstringType);
 /// First Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:firstFooter")]
-pub struct FirstFooter {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FirstFooter(pub XstringType);
 /// DDE Link Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:val")]
-pub struct DdeLinkValue {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct DdeLinkValue(pub XstringType);
 /// Strings in Subtopic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:stp")]
-pub struct Subtopic {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Subtopic(pub XstringType);
 /// Defines the Formula1 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:formula1")]
-pub struct Formula1 {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula1(pub XstringType);
 /// Defines the Formula2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:formula2")]
-pub struct Formula2 {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula2(pub XstringType);
 /// Defines the XstringType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "")]
@@ -7861,20 +7777,15 @@ pub struct TableColumn {
 /// Calculated Column Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:calculatedColumnFormula")]
-pub struct CalculatedColumnFormula {
-  /// Array
-  #[sdk(attr(qname = ":array"))]
-  pub array: Option<crate::simple_type::BooleanValue>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct CalculatedColumnFormula(pub TableFormulaType);
 /// Totals Row Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:totalsRowFormula")]
-pub struct TotalsRowFormula {
+pub struct TotalsRowFormula(pub TableFormulaType);
+/// Defines the TableFormulaType Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(default_ns, qname = "")]
+pub struct TableFormulaType {
   /// Array
   #[sdk(attr(qname = ":array"))]
   pub array: Option<crate::simple_type::BooleanValue>,

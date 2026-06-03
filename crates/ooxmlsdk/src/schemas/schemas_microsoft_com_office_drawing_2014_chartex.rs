@@ -378,17 +378,15 @@ pub struct ChartStringValue {
 /// Defines the Formula Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:f")]
-pub struct Formula {
-  /// dir
-  #[sdk(attr(qname = ":dir"))]
-  pub dir: Option<FormulaDirection>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula(pub OpenXmlFormulaElement);
 /// Defines the NfFormula Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:nf")]
-pub struct NfFormula {
+pub struct NfFormula(pub OpenXmlFormulaElement);
+/// Defines the OpenXmlFormulaElement Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "")]
+pub struct OpenXmlFormulaElement {
   /// dir
   #[sdk(attr(qname = ":dir"))]
   pub dir: Option<FormulaDirection>,

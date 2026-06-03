@@ -224,18 +224,6 @@ impl RelationshipInfo {
   }
 
   #[inline]
-  pub(crate) fn relationship_namespace_uri(&self) -> &super::XmlRelationshipNamespaceUri {
-    &self.relationship_type
-  }
-
-  #[inline]
-  pub(crate) fn relationship_known_type(
-    &self,
-  ) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
-    self.relationship_type.known()
-  }
-
-  #[inline]
   pub fn target(&self) -> &str {
     &self.target
   }
@@ -262,17 +250,19 @@ impl RelationshipInfo {
 
   #[inline]
   pub fn reference_kind(&self) -> Option<ReferenceRelationshipKind> {
-    use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
-    match self.relationship_known_type() {
-      Some(RelationshipType::RelationshipHyperlink) => Some(ReferenceRelationshipKind::Hyperlink),
-      Some(RelationshipType::RelationshipAudio) => Some(ReferenceRelationshipKind::Audio),
-      Some(RelationshipType::RelationshipMedia) => Some(ReferenceRelationshipKind::Media),
-      Some(RelationshipType::RelationshipVideo) => Some(ReferenceRelationshipKind::Video),
-      _ if self.target_kind == RelationshipTargetKind::External => {
-        Some(ReferenceRelationshipKind::External)
-      }
-      _ => None,
+    let relationship_type = self.relationship_type_bytes();
+    if super::relationship_type_matches_bytes(relationship_type, super::REL_HYPERLINK) {
+      Some(ReferenceRelationshipKind::Hyperlink)
+    } else if super::relationship_type_matches_bytes(relationship_type, super::REL_AUDIO) {
+      Some(ReferenceRelationshipKind::Audio)
+    } else if super::relationship_type_matches_bytes(relationship_type, super::REL_MEDIA) {
+      Some(ReferenceRelationshipKind::Media)
+    } else if super::relationship_type_matches_bytes(relationship_type, super::REL_VIDEO) {
+      Some(ReferenceRelationshipKind::Video)
+    } else if self.target_kind == RelationshipTargetKind::External {
+      Some(ReferenceRelationshipKind::External)
+    } else {
+      None
     }
   }
 
@@ -346,13 +336,13 @@ impl_relationship_accessors!(Relationship);
 
 impl<'a> RelationshipRef<'a> {
   pub const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipHyperlink.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
   pub const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAudio.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
   pub const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipMedia.uri();
+    "http://schemas.microsoft.com/office/2007/relationships/media";
   pub const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipVideo.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
 
   #[inline]
   pub(crate) const fn new(inner: &'a RelationshipInfo) -> Self {
@@ -443,13 +433,13 @@ fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a Relationship
 
 impl RelationshipSet {
   pub(crate) const HYPERLINK_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipHyperlink.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
   pub(crate) const AUDIO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAudio.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
   pub(crate) const MEDIA_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipMedia.uri();
+    "http://schemas.microsoft.com/office/2007/relationships/media";
   pub(crate) const VIDEO_REFERENCE_RELATIONSHIP_TYPE: &'static str =
-    crate::namespaces::XmlKnownRelationshipNamespace::RelationshipVideo.uri();
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
 
   #[inline]
   pub(crate) fn is_empty(&self) -> bool {
@@ -652,20 +642,22 @@ impl RelationshipSet {
 
   #[inline]
   pub(crate) fn external_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
-    use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
     self.relationships.iter().filter(|relationship| {
       relationship.target_kind() == RelationshipTargetKind::External
-        && relationship.relationship_known_type() != Some(RelationshipType::RelationshipHyperlink)
+        && !super::relationship_type_matches_bytes(
+          relationship.relationship_type_bytes(),
+          super::REL_HYPERLINK,
+        )
     })
   }
 
   #[inline]
   pub(crate) fn hyperlink_relationships(&self) -> impl Iterator<Item = &RelationshipInfo> {
-    use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
     self.relationships.iter().filter(|relationship| {
-      relationship.relationship_known_type() == Some(RelationshipType::RelationshipHyperlink)
+      super::relationship_type_matches_bytes(
+        relationship.relationship_type_bytes(),
+        super::REL_HYPERLINK,
+      )
     })
   }
 
@@ -673,16 +665,9 @@ impl RelationshipSet {
   pub(crate) fn data_part_reference_relationships(
     &self,
   ) -> impl Iterator<Item = &RelationshipInfo> {
-    use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
     self.relationships.iter().filter(|relationship| {
-      matches!(
-        relationship.relationship_known_type(),
-        Some(
-          RelationshipType::RelationshipAudio
-            | RelationshipType::RelationshipMedia
-            | RelationshipType::RelationshipVideo
-        )
+      crate::common::is_data_part_reference_relationship_type_bytes(
+        relationship.relationship_type_bytes(),
       )
     })
   }
@@ -692,11 +677,13 @@ impl RelationshipSet {
     &self,
     relationship_type: &str,
   ) -> Option<PartId> {
-    let relationship_type = super::XmlRelationshipNamespaceUri::from_uri(relationship_type);
     self.relationships.iter().find_map(|relationship| {
-      (relationship.relationship_namespace_uri() == &relationship_type)
-        .then(|| relationship.target_part_id())
-        .flatten()
+      super::relationship_type_matches_bytes(
+        relationship.relationship_type_bytes(),
+        relationship_type.as_bytes(),
+      )
+      .then(|| relationship.target_part_id())
+      .flatten()
     })
   }
 
@@ -803,13 +790,11 @@ impl StoredPart {
   }
 
   #[inline]
-  pub(crate) fn relationship_known_type(
-    &self,
-  ) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
+  pub(crate) fn relationship_type_bytes(&self) -> Option<&[u8]> {
     self
       .relationship_type
       .as_ref()
-      .and_then(super::XmlRelationshipNamespaceUri::known)
+      .map(super::XmlRelationshipNamespaceUri::uri_bytes)
   }
 
   #[inline]
@@ -1939,8 +1924,6 @@ impl SdkPackageStorage {
 
   #[cfg(feature = "flat-opc")]
   fn alt_chunk_part_ids(&self) -> HashSet<PartId> {
-    use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
     self
       .parts
       .iter()
@@ -1948,7 +1931,10 @@ impl SdkPackageStorage {
       .flat_map(|part| part.relationships().iter())
       .chain(self.package_relationships().iter())
       .filter(|relationship| {
-        relationship.relationship_known_type() == Some(RelationshipType::RelationshipAFChunk)
+        super::relationship_type_matches_bytes(
+          relationship.relationship_type_bytes(),
+          super::REL_AF_CHUNK,
+        )
       })
       .filter_map(RelationshipInfo::target_part_id)
       .collect()
@@ -2318,25 +2304,18 @@ fn relationship_types_by_part(
 }
 
 fn relationship_types_are_compatible_bytes(left: &[u8], right: &[u8]) -> bool {
-  left == right
-    || same_known_relationship_type(left, right)
-    || data_part_reference_relationship_types_are_compatible_bytes(left, right)
-}
-
-fn same_known_relationship_type(left: &[u8], right: &[u8]) -> bool {
-  let Some(left) = super::relationship_type_known_bytes(left) else {
-    return false;
-  };
-  super::relationship_type_known_bytes(right) == Some(left)
+  left == right || data_part_reference_relationship_types_are_compatible_bytes(left, right)
 }
 
 fn data_part_reference_relationship_types_are_compatible_bytes(left: &[u8], right: &[u8]) -> bool {
-  super::is_data_part_reference_relationship_type(super::relationship_type_known_bytes(left))
-    && super::is_data_part_reference_relationship_type(super::relationship_type_known_bytes(right))
+  super::is_data_part_reference_relationship_type_bytes(left)
+    && super::is_data_part_reference_relationship_type_bytes(right)
 }
 
 fn is_media_data_part(part: &StoredPart) -> bool {
-  super::is_data_part_reference_relationship_type(part.relationship_known_type())
+  part
+    .relationship_type_bytes()
+    .is_some_and(super::is_data_part_reference_relationship_type_bytes)
     || media_data_part_content_type(part.content_type())
     || part
       .path()

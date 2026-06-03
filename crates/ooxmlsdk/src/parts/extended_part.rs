@@ -14,7 +14,6 @@ pub struct ExtendedPart {
 }
 impl crate::sdk::SdkPartDescriptor for ExtendedPart {
   const RELATIONSHIP_TYPE: &'static str = "";
-  const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace> = None;
   const PATH_PREFIX: &'static str = "";
   const CONTENT_TYPE: &'static str = "";
   const TARGET_NAME: &'static str = "extendedPart";

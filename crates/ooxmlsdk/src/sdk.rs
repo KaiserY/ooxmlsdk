@@ -233,13 +233,15 @@ fn relationship_target_as_part<T: SdkPart>(
     return None;
   }
 
-  let expected_relationship_type = T::RELATIONSHIP_KNOWN_TYPE?;
-  if part.relationship_known_type() != Some(expected_relationship_type) {
+  let part_relationship_type = part.relationship_type_bytes()?;
+  if !crate::common::relationship_type_matches_bytes(
+    part_relationship_type,
+    T::RELATIONSHIP_TYPE.as_bytes(),
+  ) {
     return None;
   }
   if T::CONTENT_TYPE.is_empty()
-    && expected_relationship_type
-      == crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument
+    && T::RELATIONSHIP_TYPE.as_bytes() == crate::common::REL_OFFICE_DOCUMENT
   {
     return crate::common::package_main_part_path_matches(
       part.path(),
@@ -251,8 +253,7 @@ fn relationship_target_as_part<T: SdkPart>(
   if T::CONTENT_TYPE.is_empty() || part.content_type().as_bytes() == T::CONTENT_TYPE.as_bytes() {
     return Some(T::from_relationship_id(relationship.id(), part_id));
   }
-  (expected_relationship_type
-    == crate::namespaces::XmlKnownRelationshipNamespace::RelationshipOfficeDocument
+  (T::RELATIONSHIP_TYPE.as_bytes() == crate::common::REL_OFFICE_DOCUMENT
     && crate::common::package_main_part_path_matches(part.path(), T::PATH_PREFIX, T::TARGET_NAME))
   .then(|| T::from_relationship_id(relationship.id(), part_id))
 }
@@ -260,7 +261,9 @@ fn relationship_target_as_part<T: SdkPart>(
 #[cfg(feature = "parts")]
 #[inline]
 fn is_data_part_reference_relationship(relationship: &crate::common::RelationshipInfo) -> bool {
-  crate::common::is_data_part_reference_relationship_type(relationship.relationship_known_type())
+  crate::common::is_data_part_reference_relationship_type_bytes(
+    relationship.relationship_type_bytes(),
+  )
 }
 
 #[cfg(feature = "parts")]
@@ -2106,7 +2109,6 @@ impl<'a, T> RelatedPart<'a, T> {
 #[cfg(feature = "parts")]
 pub trait SdkPartDescriptor {
   const RELATIONSHIP_TYPE: &'static str;
-  const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace>;
   const PATH_PREFIX: &'static str;
   const CONTENT_TYPE: &'static str;
   const TARGET_NAME: &'static str;
@@ -2241,14 +2243,10 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
       .into_iter()
       .flat_map(|relationships| relationships.iter())
       .filter_map(move |relationship| {
-        let matches_type = if let Some(relationship_type) = T::RELATIONSHIP_KNOWN_TYPE {
-          relationship.relationship_known_type() == Some(relationship_type)
-        } else {
-          crate::common::relationship_type_matches_bytes(
-            relationship.relationship_type_bytes(),
-            T::RELATIONSHIP_TYPE.as_bytes(),
-          )
-        };
+        let matches_type = crate::common::relationship_type_matches_bytes(
+          relationship.relationship_type_bytes(),
+          T::RELATIONSHIP_TYPE.as_bytes(),
+        );
         matches_type
           .then(|| relationship.target_part_id())
           .flatten()
@@ -2287,22 +2285,24 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    let relationship_type = crate::common::XmlRelationshipNamespaceUri::from_uri(relationship_type);
     crate::sdk::SdkPackage::storage(package)
       .relationships(self.part_id())
       .into_iter()
       .flat_map(|relationships| relationships.iter())
       .filter_map(move |relationship| {
-        (relationship.relationship_namespace_uri() == &relationship_type)
-          .then(|| relationship.target_part_id())
-          .flatten()
-          .map(|part_id| {
-            RelatedPart::new(
-              relationship.id(),
-              relationship.relationship_type(),
-              T::from_relationship_id(relationship.id(), part_id),
-            )
-          })
+        crate::common::relationship_type_matches_bytes(
+          relationship.relationship_type_bytes(),
+          relationship_type.as_bytes(),
+        )
+        .then(|| relationship.target_part_id())
+        .flatten()
+        .map(|part_id| {
+          RelatedPart::new(
+            relationship.id(),
+            relationship.relationship_type(),
+            T::from_relationship_id(relationship.id(), part_id),
+          )
+        })
       })
   }
 

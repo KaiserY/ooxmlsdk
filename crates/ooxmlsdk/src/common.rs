@@ -58,11 +58,31 @@ pub enum XmlHeaderType {
 }
 
 #[cfg(feature = "parts")]
+pub(crate) const REL_OFFICE_DOCUMENT: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+#[cfg(feature = "parts")]
+pub(crate) const REL_HYPERLINK: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+#[cfg(feature = "parts")]
+pub(crate) const REL_AUDIO: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
+#[cfg(feature = "parts")]
+pub(crate) const REL_MEDIA: &[u8] = b"http://schemas.microsoft.com/office/2007/relationships/media";
+#[cfg(feature = "parts")]
+pub(crate) const REL_VIDEO: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/video";
+#[cfg(feature = "parts")]
+pub(crate) const REL_AF_CHUNK: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
+#[cfg(feature = "parts")]
+const TRANSITIONAL_OFFICE_REL_PREFIX: &[u8] =
+  b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+#[cfg(feature = "parts")]
+const STRICT_OFFICE_REL_PREFIX: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships/";
+
+#[cfg(feature = "parts")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum XmlRelationshipNamespaceUri {
-  Known(crate::namespaces::XmlKnownRelationshipNamespace),
-  Custom(Box<[u8]>),
-}
+pub struct XmlRelationshipNamespaceUri(Box<[u8]>);
 
 #[cfg(feature = "parts")]
 impl XmlRelationshipNamespaceUri {
@@ -78,11 +98,7 @@ impl XmlRelationshipNamespaceUri {
 
   #[inline]
   pub fn from_uri_bytes(uri: &[u8]) -> Self {
-    if let Some(namespace) = crate::namespaces::XmlKnownRelationshipNamespace::from_uri_bytes(uri) {
-      Self::Known(namespace)
-    } else {
-      Self::Custom(uri.into())
-    }
+    Self(uri.into())
   }
 
   #[inline]
@@ -92,18 +108,7 @@ impl XmlRelationshipNamespaceUri {
 
   #[inline]
   pub fn uri_bytes(&self) -> &[u8] {
-    match self {
-      Self::Known(namespace) => namespace.uri_bytes(),
-      Self::Custom(uri) => uri.as_ref(),
-    }
-  }
-
-  #[inline]
-  pub fn known(&self) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
-    match self {
-      Self::Known(namespace) => Some(*namespace),
-      Self::Custom(_) => None,
-    }
+    self.0.as_ref()
   }
 }
 
@@ -345,47 +350,32 @@ where
 #[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
-  if actual == canonical {
-    return true;
-  }
-  relationship_type_matches_alias_bytes(actual, canonical)
+  actual == canonical || strict_office_relationship_type_matches(actual, canonical)
 }
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn relationship_type_matches_alias_bytes(actual: &[u8], canonical: &[u8]) -> bool {
-  if actual == canonical {
-    return false;
-  }
-  let Some(canonical) = relationship_type_known_bytes(canonical) else {
+fn strict_office_relationship_type_matches(left: &[u8], right: &[u8]) -> bool {
+  let Some(left_suffix) = office_relationship_type_suffix(left) else {
     return false;
   };
-  relationship_type_known_bytes(actual).is_some_and(|actual| actual == canonical)
+  office_relationship_type_suffix(right).is_some_and(|right_suffix| left_suffix == right_suffix)
 }
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn relationship_type_known_bytes(
-  value: &[u8],
-) -> Option<crate::namespaces::XmlKnownRelationshipNamespace> {
-  crate::namespaces::XmlKnownRelationshipNamespace::from_uri_bytes(value)
+fn office_relationship_type_suffix(value: &[u8]) -> Option<&[u8]> {
+  value
+    .strip_prefix(TRANSITIONAL_OFFICE_REL_PREFIX)
+    .or_else(|| value.strip_prefix(STRICT_OFFICE_REL_PREFIX))
 }
 
 #[inline]
 #[cfg(feature = "parts")]
-pub(crate) fn is_data_part_reference_relationship_type(
-  relationship_type: Option<crate::namespaces::XmlKnownRelationshipNamespace>,
-) -> bool {
-  use crate::namespaces::XmlKnownRelationshipNamespace as RelationshipType;
-
-  matches!(
-    relationship_type,
-    Some(
-      RelationshipType::RelationshipAudio
-        | RelationshipType::RelationshipMedia
-        | RelationshipType::RelationshipVideo
-    )
-  )
+pub(crate) fn is_data_part_reference_relationship_type_bytes(relationship_type: &[u8]) -> bool {
+  relationship_type_matches_bytes(relationship_type, REL_AUDIO)
+    || relationship_type_matches_bytes(relationship_type, REL_MEDIA)
+    || relationship_type_matches_bytes(relationship_type, REL_VIDEO)
 }
 
 #[inline]

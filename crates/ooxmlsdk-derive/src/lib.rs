@@ -15,6 +15,7 @@ mod sdk_package;
 mod sdk_part;
 mod sdk_part_ref;
 mod sdk_type;
+mod sdk_xml_namespace;
 
 #[proc_macro_derive(SdkEnum, attributes(sdk))]
 pub fn sdk_enum(input: TokenStream) -> TokenStream {
@@ -61,6 +62,15 @@ pub fn sdk_package(input: TokenStream) -> TokenStream {
   }
 }
 
+#[proc_macro_derive(SdkXmlNamespace, attributes(sdk))]
+pub fn sdk_xml_namespace(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  match sdk_xml_namespace::expand_sdk_xml_namespace(&input) {
+    Ok(tokens) => tokens.into(),
+    Err(err) => err.to_compile_error().into(),
+  }
+}
+
 #[derive(Clone, Copy)]
 enum PartChildKind {
   Repeated,
@@ -72,14 +82,12 @@ enum PartChildKind {
 #[derive(Clone)]
 enum PartRelationshipTypeSource {
   Explicit(String),
-  Known(Ident),
   TypeConst,
 }
 
 fn relationship_match_condition_tokens(
   relationship_type: &PartRelationshipTypeSource,
   relationship_expr: proc_macro2::TokenStream,
-  type_relationship_known_const: proc_macro2::TokenStream,
   type_relationship_const: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   match relationship_type {
@@ -91,22 +99,12 @@ fn relationship_match_condition_tokens(
         )
       }
     }
-    PartRelationshipTypeSource::Known(variant_ident) => {
-      quote! {
-        #relationship_expr.relationship_known_type()
-          == Some(crate::namespaces::XmlKnownRelationshipNamespace::#variant_ident)
-      }
-    }
     PartRelationshipTypeSource::TypeConst => {
       quote! {
-        if let Some(relationship_type) = #type_relationship_known_const {
-          #relationship_expr.relationship_known_type() == Some(relationship_type)
-        } else {
-          crate::common::relationship_type_matches_bytes(
-            #relationship_expr.relationship_type_bytes(),
-            #type_relationship_const.as_bytes(),
-          )
-        }
+        crate::common::relationship_type_matches_bytes(
+          #relationship_expr.relationship_type_bytes(),
+          #type_relationship_const.as_bytes(),
+        )
       }
     }
   }
@@ -481,13 +479,8 @@ fn parse_part_child_relationship_type_attr(
         meta.parse_nested_meta(|nested| {
           if nested.path.is_ident("relationship_type") {
             let value = nested.value()?;
-            if value.peek(LitStr) {
-              let value: LitStr = value.parse()?;
-              relationship_type = Some(PartRelationshipTypeSource::Explicit(value.value()));
-            } else {
-              let value: Ident = value.parse()?;
-              relationship_type = Some(PartRelationshipTypeSource::Known(value));
-            }
+            let value: LitStr = value.parse()?;
+            relationship_type = Some(PartRelationshipTypeSource::Explicit(value.value()));
             Ok(())
           } else if nested.path.is_ident("kind") {
             let _value: LitStr = nested.value()?.parse()?;
@@ -517,12 +510,7 @@ fn parse_part_child_kind_attr(attrs: &[Attribute]) -> syn::Result<Option<PartChi
         let mut kind = None;
         meta.parse_nested_meta(|nested| {
           if nested.path.is_ident("relationship_type") {
-            let value = nested.value()?;
-            if value.peek(LitStr) {
-              let _value: LitStr = value.parse()?;
-            } else {
-              let _value: Ident = value.parse()?;
-            }
+            let _value: LitStr = nested.value()?.parse()?;
             Ok(())
           } else if nested.path.is_ident("kind") {
             let value: LitStr = nested.value()?.parse()?;

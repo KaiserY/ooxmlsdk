@@ -4,7 +4,7 @@ struct PartRefVariant {
   attrs: Vec<Attribute>,
   ident: Ident,
   ty: Type,
-  relationship_type: Option<Ident>,
+  relationship_type: Option<String>,
   descriptor: Option<PartRefDescriptor>,
   root: Option<PartRefRoot>,
   extended: bool,
@@ -70,10 +70,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       quote! {
         #( #attrs )*
         impl crate::sdk::SdkPartDescriptor for #variant_ty {
-          const RELATIONSHIP_TYPE: &'static str =
-            crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type.uri();
-          const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace> =
-            Some(crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type);
+          const RELATIONSHIP_TYPE: &'static str = #relationship_type;
           const PATH_PREFIX: &'static str = #path_prefix;
           const CONTENT_TYPE: &'static str = #content_type;
           const TARGET_NAME: &'static str = #target_name;
@@ -93,9 +90,8 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         .relationship_type
         .as_ref()
         .expect("non-extended PartRef variants require relationship type");
-      let pattern = quote! {
-        crate::namespaces::XmlKnownRelationshipNamespace::#relationship_type
-      };
+      let relationship_type_bytes =
+        LitByteStr::new(relationship_type.as_bytes(), Span::call_site());
       let construct_part_ref = quote! {
         let part = if let Some(relationship_id) = relationship_id {
           <#variant_ty as crate::sdk::SdkPart>::from_relationship_id(relationship_id, part_id)
@@ -113,13 +109,13 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       let target_name = descriptor.target_name.as_str();
       let content_type_match = quote! { part.content_type().as_bytes() == #content_type };
       let part_ref_guard = if descriptor.content_type.is_empty() {
-        quote! {}
+        quote! { true }
       } else {
-        quote! { if #content_type_match }
+        quote! { #content_type_match }
       };
       let office_document_guard = if descriptor.content_type.is_empty() {
         quote! {
-          if crate::common::package_main_part_path_matches(
+          crate::common::package_main_part_path_matches(
             part.path(),
             #path_prefix,
             #target_name,
@@ -127,7 +123,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         }
       } else {
         quote! {
-          if #content_type_match
+          #content_type_match
             || crate::common::package_main_part_path_matches(
               part.path(),
               #path_prefix,
@@ -136,17 +132,25 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         }
       };
 
-      if relationship_type == "RelationshipOfficeDocument" {
+      if relationship_type
+        == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+      {
         quote! {
           #( #attrs )*
-          #pattern #office_document_guard => {
+          if crate::common::relationship_type_matches_bytes(
+            relationship_type,
+            #relationship_type_bytes,
+          ) && (#office_document_guard) {
             #construct_part_ref
           }
         }
       } else {
         quote! {
           #( #attrs )*
-          #pattern #part_ref_guard => {
+          if crate::common::relationship_type_matches_bytes(
+            relationship_type,
+            #relationship_type_bytes,
+          ) && (#part_ref_guard) {
             #construct_part_ref
           }
         }
@@ -333,8 +337,13 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let Some(part) = storage.part(part_id) else {
           return Ok(None);
         };
-        if part.relationship_known_type()
-          == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipAFChunk) {
+        if part.relationship_type_bytes().is_some_and(|relationship_type| {
+          crate::common::relationship_type_matches_bytes(
+            relationship_type,
+            crate::common::REL_AF_CHUNK,
+          )
+        })
+        {
           return Ok(None);
         }
         #[cfg(not(feature = "mce"))]
@@ -383,14 +392,11 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         relationship_id: Option<&str>,
       ) -> Option<Self> {
         let part = storage.part(part_id)?;
-        let Some(relationship_type) = part.relationship_known_type() else {
+        let Some(relationship_type) = part.relationship_type_bytes() else {
           return Some(Self::extended_part(storage, part_id, relationship_id));
         };
 
-        match relationship_type {
-          #( #relationship_arms )*
-          _ => {}
-        }
+        #( #relationship_arms )*
 
         Some(Self::extended_part(storage, part_id, relationship_id))
       }
@@ -481,7 +487,7 @@ fn parse_part_ref_variants(data_enum: &DataEnum) -> syn::Result<Vec<PartRefVaria
 
 #[derive(Default)]
 struct PartRefAttr {
-  relationship_type: Option<Ident>,
+  relationship_type: Option<String>,
   descriptor: Option<PartRefDescriptor>,
   root: Option<PartRefRoot>,
 }
@@ -502,16 +508,7 @@ fn parse_part_ref_attr(attrs: &[Attribute], variant_ident: &Ident) -> syn::Resul
     for meta in metas {
       match meta {
         Meta::NameValue(name_value) if name_value.path.is_ident("relationship_type") => {
-          if let Expr::Path(path) = &name_value.value
-            && let Some(ident) = path.path.get_ident()
-          {
-            parsed.relationship_type = Some(ident.clone());
-            continue;
-          }
-          return Err(syn::Error::new_spanned(
-            name_value.value,
-            "relationship_type must be a relationship enum variant",
-          ));
+          parsed.relationship_type = Some(parse_lit_str_value(name_value.value)?);
         }
         Meta::NameValue(name_value) if name_value.path.is_ident("path_prefix") => {
           path_prefix = parse_lit_str_value(name_value.value)?;

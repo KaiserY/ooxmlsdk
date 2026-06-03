@@ -1,28 +1,22 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use syn::{Attribute, Ident, ItemMod, LitByteStr, parse_str, parse2};
+use syn::{Attribute, Ident, ItemMod, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::SchemaModuleDecl;
 use crate::sdk_code::part_codegen_ir::PartModuleDecl;
-use crate::sdk_code::parts::{
-  gen_part_module_with_relationship_type_variants, gen_parts_mod, relationship_type_aliases,
-  relationship_type_variant_map,
-};
+use crate::sdk_code::parts::{gen_part_module_with_relationship_type_variants, gen_parts_mod};
 use crate::sdk_code::schemas::{TypeContainmentGraph, gen_schema_from_ir_with_type_graph};
 use crate::sdk_code::versioning::version_cfg_attrs;
-use crate::sdk_data::sdk_data_model::{
-  Namespace as SdkDataNamespace, NamespaceAlias as SdkDataNamespaceAlias,
-  NamespaceExtensions as SdkDataNamespaceExtensions,
-};
+use crate::sdk_data::sdk_data_model::Namespace as SdkDataNamespace;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 pub mod codegen_ir;
@@ -48,34 +42,18 @@ struct LoadedPart {
   ir: PartModuleDecl,
 }
 
-struct GeneratedRelationshipUri {
-  variant_name: String,
-  uri: String,
-  version: String,
-}
-
 pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
   let sdk_data_schemas_dir_path = sdk_data_dir.as_ref().join("schemas");
   let sdk_data_parts_dir_path = sdk_data_dir.as_ref().join("parts");
   let loaded_schemas = read_schemas(&sdk_data_schemas_dir_path)?;
   let loaded_parts = read_parts(&sdk_data_parts_dir_path)?;
-  let mut namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
-  let namespace_extensions =
-    read_namespace_extensions(sdk_data_dir.as_ref().join("namespace_extensions.json"))?;
-  namespaces.extend(namespace_extensions.namespaces);
-  sort_namespaces(&mut namespaces);
-  let relationship_type_uris = relationship_type_known_uris(&loaded_parts);
-  let relationship_type_aliases =
-    relationship_type_generated_aliases(&loaded_parts, &namespace_extensions.aliases);
+  let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   let out_dir_path = out_dir.as_ref();
 
   write_schemas(&loaded_schemas, out_dir_path)?;
-  write_parts(&loaded_parts, &namespace_extensions.aliases, out_dir_path)?;
+  write_parts(&loaded_parts, out_dir_path)?;
   write_namespaces(NamespacesInput {
     sdk_data_namespaces: &namespaces,
-    namespace_aliases: &namespace_extensions.aliases,
-    generated_relationship_uris: &relationship_type_uris,
-    generated_relationship_aliases: &relationship_type_aliases,
     out_dir_path,
     include_known_namespace: true,
     include_uri_by_prefix: false,
@@ -86,16 +64,9 @@ pub fn gen_sdk_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
 }
 
 pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) -> Result<()> {
-  let mut namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
-  let namespace_extensions =
-    read_namespace_extensions(sdk_data_dir.as_ref().join("namespace_extensions.json"))?;
-  namespaces.extend(namespace_extensions.namespaces);
-  sort_namespaces(&mut namespaces);
+  let namespaces = read_namespaces(sdk_data_dir.as_ref().join("namespaces.json"))?;
   write_namespaces(NamespacesInput {
     sdk_data_namespaces: &namespaces,
-    namespace_aliases: &[],
-    generated_relationship_uris: &[],
-    generated_relationship_aliases: &[],
     out_dir_path: out_dir.as_ref(),
     include_known_namespace: false,
     include_uri_by_prefix: true,
@@ -183,25 +154,6 @@ fn read_namespaces(path: impl AsRef<Path>) -> Result<Vec<SdkDataNamespace>> {
   Ok(namespaces)
 }
 
-fn read_namespace_extensions(path: impl AsRef<Path>) -> Result<SdkDataNamespaceExtensions> {
-  let path = path.as_ref();
-  if !path.exists() {
-    return Ok(SdkDataNamespaceExtensions::default());
-  }
-
-  let file = File::open(path)?;
-  let reader = BufReader::new(file);
-  let mut extensions: SdkDataNamespaceExtensions = serde_json::from_reader(reader)?;
-  sort_namespaces(&mut extensions.namespaces);
-  extensions.aliases.sort_by(|left, right| {
-    left
-      .uri
-      .cmp(&right.uri)
-      .then(left.canonical_uri.cmp(&right.canonical_uri))
-  });
-  Ok(extensions)
-}
-
 fn sort_namespaces(namespaces: &mut [SdkDataNamespace]) {
   namespaces.sort_by(|left, right| {
     left
@@ -278,31 +230,21 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
   Ok(())
 }
 
-fn write_parts(
-  loaded_parts: &[LoadedPart],
-  namespace_aliases: &[SdkDataNamespaceAlias],
-  out_dir_path: &Path,
-) -> Result<()> {
+fn write_parts(loaded_parts: &[LoadedPart], out_dir_path: &Path) -> Result<()> {
   let out_parts_dir_path = out_dir_path.join("parts");
   fs::create_dir_all(&out_parts_dir_path)?;
   clear_generated_rs_files(&out_parts_dir_path)?;
 
-  let part_irs: Vec<_> = loaded_parts
-    .iter()
-    .map(|loaded_part| &loaded_part.ir)
-    .collect();
-  let relationship_type_variants = relationship_type_variant_map(&part_irs)?;
   for loaded_part in loaded_parts {
     let part_path = out_parts_dir_path.join(format!("{}.rs", loaded_part.ir.module_name));
     write_generated_module(
       &part_path,
-      gen_part_module_with_relationship_type_variants(&loaded_part.ir, &relationship_type_variants)
-        .map_err(|err| {
-          format!(
-            "failed to generate part {}: {err}",
-            loaded_part.ir.module_name
-          )
-        })?,
+      gen_part_module_with_relationship_type_variants(&loaded_part.ir).map_err(|err| {
+        format!(
+          "failed to generate part {}: {err}",
+          loaded_part.ir.module_name
+        )
+      })?,
     )?;
   }
   write_generated_module(
@@ -318,7 +260,6 @@ fn write_parts(
         }
       impl crate::sdk::SdkPartDescriptor for ExtendedPart {
         const RELATIONSHIP_TYPE: &'static str = "";
-        const RELATIONSHIP_KNOWN_TYPE: Option<crate::namespaces::XmlKnownRelationshipNamespace> = None;
         const PATH_PREFIX: &'static str = "";
         const CONTENT_TYPE: &'static str = "";
         const TARGET_NAME: &'static str = "extendedPart";
@@ -423,7 +364,6 @@ fn write_parts(
         .iter()
         .map(|loaded| &loaded.ir)
         .collect::<Vec<_>>(),
-      namespace_aliases,
     )?,
   )?;
 
@@ -432,9 +372,6 @@ fn write_parts(
 
 struct NamespacesInput<'a> {
   sdk_data_namespaces: &'a [SdkDataNamespace],
-  namespace_aliases: &'a [SdkDataNamespaceAlias],
-  generated_relationship_uris: &'a [GeneratedRelationshipUri],
-  generated_relationship_aliases: &'a [(String, String)],
   out_dir_path: &'a Path,
   include_known_namespace: bool,
   include_uri_by_prefix: bool,
@@ -444,14 +381,9 @@ struct NamespacesInput<'a> {
 fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   let mut prefix_to_uri_arms: Vec<syn::Arm> = vec![];
   let mut known_namespace_variants: Vec<TokenStream> = vec![];
-  let mut known_prefix_bytes_arms: Vec<syn::Arm> = vec![];
-  let mut known_uri_bytes_arms: Vec<syn::Arm> = vec![];
-  let mut known_from_uri_bytes_arms: Vec<syn::Arm> = vec![];
   let mut seen_uris = HashSet::new();
   let mut seen_prefixes = HashSet::new();
   let mut seen_variants = HashSet::new();
-  let mut seen_from_uri_inputs = HashSet::new();
-  let mut namespace_by_uri: HashMap<String, (Ident, Vec<Attribute>)> = HashMap::new();
 
   for namespace in input.sdk_data_namespaces {
     if namespace.prefix.is_empty() || namespace.uri.is_empty() {
@@ -464,27 +396,12 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
     if seen_uris.insert(uri) {
       let variant_name = namespace_variant_name(prefix);
       let variant_ident: Ident = parse_str(&variant_name)?;
-      namespace_by_uri.insert(uri.to_string(), (variant_ident.clone(), attrs.clone()));
       if seen_variants.insert(variant_name) {
         known_namespace_variants.push(quote! {
           #( #attrs )*
+          #[sdk(#prefix, #uri)]
           #variant_ident,
         });
-        known_prefix_bytes_arms.push(parse2(quote! {
-          #( #attrs )*
-          Self::#variant_ident => #prefix.as_bytes(),
-        })?);
-        known_uri_bytes_arms.push(parse2(quote! {
-          #( #attrs )*
-          Self::#variant_ident => #uri.as_bytes(),
-        })?);
-      }
-      let uri_bytes = LitByteStr::new(uri.as_bytes(), Span::call_site());
-      if seen_from_uri_inputs.insert(uri.to_string()) {
-        known_from_uri_bytes_arms.push(parse2(quote! {
-          #( #attrs )*
-          #uri_bytes => Some(Self::#variant_ident),
-        })?);
       }
     }
 
@@ -492,38 +409,6 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
       prefix_to_uri_arms.push(parse2(quote! {
         #( #attrs )*
         #prefix => Some(#uri),
-      })?);
-    }
-  }
-
-  for alias in input.namespace_aliases {
-    if alias.uri.is_empty() || alias.canonical_uri.is_empty() {
-      return Err("namespace aliases must have non-empty Uri and CanonicalUri".into());
-    }
-    if alias.uri == alias.canonical_uri {
-      return Err(
-        format!(
-          "namespace alias {} points to itself as CanonicalUri",
-          alias.uri
-        )
-        .into(),
-      );
-    }
-    let Some((variant_ident, attrs)) = namespace_by_uri.get(alias.canonical_uri.as_str()) else {
-      return Err(
-        format!(
-          "namespace alias {} points to unknown CanonicalUri {}",
-          alias.uri, alias.canonical_uri
-        )
-        .into(),
-      );
-    };
-    let uri = alias.uri.as_str();
-    let uri_bytes = LitByteStr::new(uri.as_bytes(), Span::call_site());
-    if seen_from_uri_inputs.insert(uri.to_string()) {
-      known_from_uri_bytes_arms.push(parse2(quote! {
-        #( #attrs )*
-        #uri_bytes => Some(Self::#variant_ident),
       })?);
     }
   }
@@ -553,7 +438,7 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   let known_namespace_tokens = if input.include_known_namespace {
     quote! {
       #[repr(u16)]
-      #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+      #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkXmlNamespace)]
       pub enum XmlKnownNamespace {
         #( #known_namespace_variants )*
       }
@@ -565,56 +450,12 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
         }
       }
 
-      impl XmlKnownNamespace {
-        pub const fn prefix_bytes(self) -> &'static [u8] {
-          match self {
-            #( #known_prefix_bytes_arms )*
-          }
-        }
-
-        pub const fn prefix(self) -> &'static str {
-          // Generated namespace prefixes are ASCII and therefore valid UTF-8.
-          unsafe { std::str::from_utf8_unchecked(self.prefix_bytes()) }
-        }
-
-        pub const fn uri_bytes(self) -> &'static [u8] {
-          match self {
-            #( #known_uri_bytes_arms )*
-          }
-        }
-
-        pub const fn uri(self) -> &'static str {
-          // Generated namespace URIs are ASCII and therefore valid UTF-8.
-          unsafe { std::str::from_utf8_unchecked(self.uri_bytes()) }
-        }
-
-        pub fn from_uri(uri: &str) -> Option<Self> {
-          Self::from_uri_bytes(uri.as_bytes())
-        }
-
-        pub fn from_uri_bytes(uri: &[u8]) -> Option<Self> {
-          match uri {
-            #( #known_from_uri_bytes_arms )*
-            _ => None,
-          }
-        }
-      }
-
     }
-  } else {
-    quote! {}
-  };
-  let known_relationship_namespace_tokens = if input.include_known_namespace {
-    relationship_namespace_tokens(
-      input.generated_relationship_uris,
-      input.generated_relationship_aliases,
-    )?
   } else {
     quote! {}
   };
   let token_stream: TokenStream = quote! {
     #known_namespace_tokens
-    #known_relationship_namespace_tokens
 
     #uri_by_prefix_tokens
     #default_namespace_style_tokens
@@ -624,200 +465,12 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
   Ok(())
 }
 
-fn relationship_namespace_tokens(
-  generated_uris: &[GeneratedRelationshipUri],
-  generated_aliases: &[(String, String)],
-) -> Result<TokenStream> {
-  if generated_uris.is_empty() {
-    return Ok(quote! {});
-  }
-
-  let mut variants = Vec::new();
-  let mut uri_bytes_arms: Vec<syn::Arm> = Vec::new();
-  let mut from_uri_bytes_arms: Vec<syn::Arm> = Vec::new();
-  let mut namespace_by_uri = HashMap::new();
-  let mut seen_from_uri_inputs = HashSet::new();
-
-  for generated_uri in generated_uris {
-    if generated_uri.uri.is_empty() {
-      continue;
-    }
-    let attrs = version_cfg_attrs(&generated_uri.version);
-    let variant_ident: Ident = parse_str(&generated_uri.variant_name)?;
-    namespace_by_uri.insert(
-      generated_uri.uri.as_str(),
-      (variant_ident.clone(), attrs.clone()),
-    );
-    variants.push(quote! {
-      #( #attrs )*
-      #variant_ident,
-    });
-    let uri_bytes = LitByteStr::new(generated_uri.uri.as_bytes(), Span::call_site());
-    uri_bytes_arms.push(parse2(quote! {
-      #( #attrs )*
-      Self::#variant_ident => #uri_bytes,
-    })?);
-    if seen_from_uri_inputs.insert(generated_uri.uri.as_str()) {
-      from_uri_bytes_arms.push(parse2(quote! {
-        #( #attrs )*
-        #uri_bytes => Some(Self::#variant_ident),
-      })?);
-    }
-  }
-
-  for (uri, canonical_uri) in generated_aliases {
-    if uri.is_empty() || canonical_uri.is_empty() {
-      return Err(
-        "generated relationship aliases must have non-empty URI and canonical URI".into(),
-      );
-    }
-    let Some((variant_ident, attrs)) = namespace_by_uri.get(canonical_uri.as_str()) else {
-      return Err(
-        format!(
-          "generated relationship alias {uri} points to unknown canonical URI {canonical_uri}"
-        )
-        .into(),
-      );
-    };
-    if seen_from_uri_inputs.insert(uri.as_str()) {
-      let uri_bytes = LitByteStr::new(uri.as_bytes(), Span::call_site());
-      from_uri_bytes_arms.push(parse2(quote! {
-        #( #attrs )*
-        #uri_bytes => Some(Self::#variant_ident),
-      })?);
-    }
-  }
-
-  Ok(quote! {
-    #[repr(u16)]
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    pub enum XmlKnownRelationshipNamespace {
-      #( #variants )*
-    }
-
-    impl XmlKnownRelationshipNamespace {
-      pub const fn uri_bytes(self) -> &'static [u8] {
-        match self {
-          #( #uri_bytes_arms )*
-        }
-      }
-
-      pub const fn uri(self) -> &'static str {
-        // Generated relationship URIs are ASCII and therefore valid UTF-8.
-        unsafe { std::str::from_utf8_unchecked(self.uri_bytes()) }
-      }
-
-      pub fn from_uri(uri: &str) -> Option<Self> {
-        Self::from_uri_bytes(uri.as_bytes())
-      }
-
-      pub fn from_uri_bytes(uri: &[u8]) -> Option<Self> {
-        match uri {
-          #( #from_uri_bytes_arms )*
-          _ => None,
-        }
-      }
-    }
-  })
-}
-
-fn relationship_type_known_uris(loaded_parts: &[LoadedPart]) -> Vec<GeneratedRelationshipUri> {
-  let mut known_uris = HashSet::new();
-  let mut used_variants = HashSet::new();
-  let mut generated = Vec::new();
-
-  for relationship_type in EXTRA_RELATIONSHIP_TYPES {
-    known_uris.insert((*relationship_type).to_string());
-    generated.push(GeneratedRelationshipUri {
-      variant_name: relationship_type_variant_name(relationship_type, &mut used_variants),
-      uri: (*relationship_type).to_string(),
-      version: "Office2007".to_string(),
-    });
-  }
-
-  for part in loaded_parts {
-    let relationship_type = part.ir.relationship_type.as_str();
-    if relationship_type.is_empty() || !known_uris.insert(relationship_type.to_string()) {
-      continue;
-    }
-
-    generated.push(GeneratedRelationshipUri {
-      variant_name: relationship_type_variant_name(relationship_type, &mut used_variants),
-      uri: relationship_type.to_string(),
-      version: part.ir.version.clone(),
-    });
-  }
-  generated
-}
-
-const EXTRA_RELATIONSHIP_TYPES: &[&str] = &[
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
-  "http://schemas.microsoft.com/office/2007/relationships/media",
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video",
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate",
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath",
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/mailMergeSource",
-  "http://schemas.microsoft.com/office/2006/relationships/txbx",
-  "http://schemas.microsoft.com/office/2007/relationships/hdphoto",
-  "http://schemas.microsoft.com/office/2015/10/relationships/revisionInfo",
-  "http://schemas.microsoft.com/office/2016/11/relationships/changesInfo",
-];
-
-fn relationship_type_generated_aliases(
-  loaded_parts: &[LoadedPart],
-  namespace_aliases: &[SdkDataNamespaceAlias],
-) -> Vec<(String, String)> {
-  let mut aliases = HashSet::new();
-  for relationship_type in EXTRA_RELATIONSHIP_TYPES {
-    for alias_uri in relationship_type_aliases(relationship_type, namespace_aliases) {
-      aliases.insert((alias_uri, (*relationship_type).to_string()));
-    }
-  }
-
-  for part in loaded_parts {
-    let relationship_type = part.ir.relationship_type.as_str();
-    if relationship_type.is_empty() {
-      continue;
-    }
-
-    for alias_uri in relationship_type_aliases(relationship_type, namespace_aliases) {
-      aliases.insert((alias_uri, relationship_type.to_string()));
-    }
-  }
-  let mut aliases: Vec<_> = aliases.into_iter().collect();
-  aliases.sort();
-  aliases
-}
-
 fn namespace_variant_name(prefix: &str) -> String {
   let mut name = prefix.to_upper_camel_case();
   if name.is_empty() {
     name.push_str("Default");
   }
   escape_upper_camel_case(name)
-}
-
-fn relationship_type_variant_name(uri: &str, used_variants: &mut HashSet<String>) -> String {
-  let suffix = uri.rsplit('/').next().unwrap_or(uri);
-  let mut base = String::from("Relationship");
-  base.push_str(&suffix.to_upper_camel_case());
-  let base = escape_upper_camel_case(base);
-  unique_variant_name(base, used_variants)
-}
-
-fn unique_variant_name(base: String, used_variants: &mut HashSet<String>) -> String {
-  if used_variants.insert(base.clone()) {
-    return base;
-  }
-  let mut index = 2usize;
-  loop {
-    let candidate = format!("{base}{index}");
-    if used_variants.insert(candidate.clone()) {
-      return candidate;
-    }
-    index += 1;
-  }
 }
 
 fn write_generated_module(path: &Path, token_stream: TokenStream) -> Result<()> {

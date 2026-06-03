@@ -136,7 +136,7 @@ pub mod xml_signature_part;
 #[derive(Clone, Debug, Eq, PartialEq, ooxmlsdk_derive::SdkPartRef)]
 pub enum PartRef {
   #[sdk(
-        relationship_type = RelationshipAFChunk,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
         target_name = "afchunk",
         extension = ".dat"
     )]
@@ -144,7 +144,7 @@ pub enum PartRef {
         crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCalcChain,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
         target_name = "calcChain",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml",
         root(
@@ -153,7 +153,7 @@ pub enum PartRef {
     )]
     CalculationChainPart(crate::parts::calculation_chain_part::CalculationChainPart),
     #[sdk(
-        relationship_type = RelationshipSheetMetadata,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
         target_name = "metadata",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
         root(
@@ -162,7 +162,7 @@ pub enum PartRef {
     )]
     CellMetadataPart(crate::parts::cell_metadata_part::CellMetadataPart),
     #[sdk(
-        relationship_type = RelationshipChartColorStyle,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
         target_name = "colors",
         content_type = "application/vnd.ms-office.chartcolorstyle+xml",
         root(
@@ -171,7 +171,7 @@ pub enum PartRef {
     )]
     ChartColorStylePart(crate::parts::chart_color_style_part::ChartColorStylePart),
     #[sdk(
-        relationship_type = RelationshipChartUserShapes,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes",
         target_name = "drawing",
         path_prefix = "../drawings",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml",
@@ -181,7 +181,7 @@ pub enum PartRef {
     )]
     ChartDrawingPart(crate::parts::chart_drawing_part::ChartDrawingPart),
     #[sdk(
-        relationship_type = RelationshipChart,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
         target_name = "chart",
         path_prefix = "charts",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
@@ -191,7 +191,7 @@ pub enum PartRef {
     )]
     ChartPart(crate::parts::chart_part::ChartPart),
     #[sdk(
-        relationship_type = RelationshipChartStyle,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
         target_name = "style",
         content_type = "application/vnd.ms-office.chartstyle+xml",
         root(
@@ -200,7 +200,7 @@ pub enum PartRef {
     )]
     ChartStylePart(crate::parts::chart_style_part::ChartStylePart),
     #[sdk(
-        relationship_type = RelationshipChartsheet,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
         target_name = "sheet",
         path_prefix = "chartsheets",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
@@ -210,7 +210,7 @@ pub enum PartRef {
     )]
     ChartsheetPart(crate::parts::chartsheet_part::ChartsheetPart),
     #[sdk(
-        relationship_type = RelationshipCommentAuthors,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors",
         target_name = "commentAuthors",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml",
         root(
@@ -219,7 +219,7 @@ pub enum PartRef {
     )]
     CommentAuthorsPart(crate::parts::comment_authors_part::CommentAuthorsPart),
     #[sdk(
-        relationship_type = RelationshipConnections,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
         target_name = "connections",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml",
         root(
@@ -228,7 +228,7 @@ pub enum PartRef {
     )]
     ConnectionsPart(crate::parts::connections_part::ConnectionsPart),
     #[sdk(
-        relationship_type = RelationshipCtrlProp,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
         target_name = "ctrlProp",
         path_prefix = "../ctrlProps",
         content_type = "application/vnd.ms-excel.controlproperties+xml",
@@ -238,7 +238,7 @@ pub enum PartRef {
     )]
     ControlPropertiesPart(crate::parts::control_properties_part::ControlPropertiesPart),
     #[sdk(
-        relationship_type = RelationshipCoreProperties,
+        relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
         target_name = "core",
         path_prefix = "docProps",
         content_type = "application/vnd.openxmlformats-package.core-properties+xml",
@@ -248,14 +248,14 @@ pub enum PartRef {
         crate::parts::core_file_properties_part::CoreFilePropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCustomData,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customData",
         target_name = "customData",
         path_prefix = "customData",
         content_type = "application/binary"
     )]
     CustomDataPart(crate::parts::custom_data_part::CustomDataPart),
     #[sdk(
-        relationship_type = RelationshipCustomDataProps,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
         target_name = "customDataProps",
         path_prefix = "customData",
         content_type = "application/vnd.ms-excel.customDataProperties+xml",
@@ -267,7 +267,7 @@ pub enum PartRef {
         crate::parts::custom_data_properties_part::CustomDataPropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCustomProperties,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
         target_name = "custom",
         path_prefix = "docProps",
         content_type = "application/vnd.openxmlformats-officedocument.custom-properties+xml",
@@ -279,13 +279,13 @@ pub enum PartRef {
         crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCustomProperty,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customProperty",
         target_name = "CustomProperty",
         extension = ".bin"
     )]
     CustomPropertyPart(crate::parts::custom_property_part::CustomPropertyPart),
     #[sdk(
-        relationship_type = RelationshipXmlMaps,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
         target_name = "xmlMaps",
         content_type = "application/xml",
         root(
@@ -294,13 +294,13 @@ pub enum PartRef {
     )]
     CustomXmlMappingsPart(crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart),
     #[sdk(
-        relationship_type = RelationshipCustomXml,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
         target_name = "item",
         path_prefix = "../customXml"
     )]
     CustomXmlPart(crate::parts::custom_xml_part::CustomXmlPart),
     #[sdk(
-        relationship_type = RelationshipCustomXmlProps,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
         target_name = "itemProps",
         content_type = "application/vnd.openxmlformats-officedocument.customXmlProperties+xml",
         root(
@@ -311,7 +311,7 @@ pub enum PartRef {
         crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipKeyMapCustomizations,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/keyMapCustomizations",
         target_name = "customizations",
         content_type = "application/vnd.ms-word.keyMapCustomizations+xml",
         root(
@@ -320,7 +320,7 @@ pub enum PartRef {
     )]
     CustomizationPart(crate::parts::customization_part::CustomizationPart),
     #[sdk(
-        relationship_type = RelationshipDiagramColors,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
         target_name = "colors",
         path_prefix = "../graphics",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml",
@@ -330,7 +330,7 @@ pub enum PartRef {
     )]
     DiagramColorsPart(crate::parts::diagram_colors_part::DiagramColorsPart),
     #[sdk(
-        relationship_type = RelationshipDiagramData,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
         target_name = "data",
         path_prefix = "../graphics",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml",
@@ -340,7 +340,7 @@ pub enum PartRef {
     )]
     DiagramDataPart(crate::parts::diagram_data_part::DiagramDataPart),
     #[sdk(
-        relationship_type = RelationshipDiagramLayout,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
         target_name = "layout",
         path_prefix = "../graphics",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml",
@@ -352,7 +352,7 @@ pub enum PartRef {
         crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
     ),
     #[sdk(
-        relationship_type = RelationshipDiagramDrawing,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
         target_name = "drawing",
         path_prefix = "../diagrams",
         content_type = "application/vnd.ms-office.drawingml.diagramDrawing+xml",
@@ -364,7 +364,7 @@ pub enum PartRef {
         crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
     ),
     #[sdk(
-        relationship_type = RelationshipDiagramQuickStyle,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
         target_name = "quickStyle",
         path_prefix = "../graphics",
         content_type = "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml",
@@ -374,7 +374,7 @@ pub enum PartRef {
     )]
     DiagramStylePart(crate::parts::diagram_style_part::DiagramStylePart),
     #[sdk(
-        relationship_type = RelationshipDialogsheet,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
         target_name = "sheet",
         path_prefix = "dialogsheets",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml",
@@ -384,7 +384,7 @@ pub enum PartRef {
     )]
     DialogsheetPart(crate::parts::dialogsheet_part::DialogsheetPart),
     #[sdk(
-        relationship_type = RelationshipOrigin,
+        relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
         target_name = "origin",
         path_prefix = "_xmlsignatures",
         content_type = "application/vnd.openxmlformats-package.digital-signature-origin",
@@ -394,7 +394,7 @@ pub enum PartRef {
         crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
     ),
     #[sdk(
-        relationship_type = RelationshipSettings,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
         target_name = "settings",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
         root(
@@ -403,7 +403,7 @@ pub enum PartRef {
     )]
     DocumentSettingsPart(crate::parts::document_settings_part::DocumentSettingsPart),
     #[sdk(
-        relationship_type = RelationshipDocumenttasks,
+        relationship_type = "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
         target_name = "tasks",
         content_type = "application/vnd.ms-office.documenttasks+xml",
         root(
@@ -412,7 +412,7 @@ pub enum PartRef {
     )]
     DocumentTasksPart(crate::parts::document_tasks_part::DocumentTasksPart),
     #[sdk(
-        relationship_type = RelationshipDrawing,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
         target_name = "drawing",
         path_prefix = "../drawings",
         content_type = "application/vnd.openxmlformats-officedocument.drawing+xml",
@@ -422,7 +422,7 @@ pub enum PartRef {
     )]
     DrawingsPart(crate::parts::drawings_part::DrawingsPart),
     #[sdk(
-        relationship_type = RelationshipActiveXControlBinary,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
         target_name = "ActiveXControl",
         extension = ".bin"
     )]
@@ -430,7 +430,7 @@ pub enum PartRef {
         crate::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart,
     ),
     #[sdk(
-        relationship_type = RelationshipControl,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
         target_name = "control",
         path_prefix = "embeddings",
         extension = ".bin"
@@ -439,21 +439,21 @@ pub enum PartRef {
         crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
     ),
     #[sdk(
-        relationship_type = RelationshipOleObject,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
         target_name = "embeddedObject",
         path_prefix = "embeddings",
         extension = ".bin"
     )]
     EmbeddedObjectPart(crate::parts::embedded_object_part::EmbeddedObjectPart),
     #[sdk(
-        relationship_type = RelationshipPackage,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
         target_name = "package",
         path_prefix = "embeddings",
         extension = ".bin"
     )]
     EmbeddedPackagePart(crate::parts::embedded_package_part::EmbeddedPackagePart),
     #[sdk(
-        relationship_type = RelationshipEndnotes,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
         target_name = "endnotes",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
         root(
@@ -462,7 +462,7 @@ pub enum PartRef {
     )]
     EndnotesPart(crate::parts::endnotes_part::EndnotesPart),
     #[sdk(
-        relationship_type = RelationshipAttachedToolbars,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
         target_name = "attachedToolbars",
         content_type = "application/vnd.ms-excel.attachedToolbars",
         extension = ".bin"
@@ -471,7 +471,7 @@ pub enum PartRef {
         crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipChartEx,
+        relationship_type = "http://schemas.microsoft.com/office/2014/relationships/chartEx",
         target_name = "chart",
         path_prefix = "extendedCharts",
         content_type = "application/vnd.ms-office.chartex+xml",
@@ -481,7 +481,7 @@ pub enum PartRef {
     )]
     ExtendedChartPart(crate::parts::extended_chart_part::ExtendedChartPart),
     #[sdk(
-        relationship_type = RelationshipExtendedProperties,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
         target_name = "app",
         path_prefix = "docProps",
         content_type = "application/vnd.openxmlformats-officedocument.extended-properties+xml",
@@ -493,7 +493,7 @@ pub enum PartRef {
         crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipExternalLink,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
         target_name = "externalReference",
         path_prefix = "externalReferences",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml",
@@ -503,7 +503,7 @@ pub enum PartRef {
     )]
     ExternalWorkbookPart(crate::parts::external_workbook_part::ExternalWorkbookPart),
     #[sdk(
-        relationship_type = RelationshipFeaturePropertyBag,
+        relationship_type = "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag",
         target_name = "featurePropertyBag",
         path_prefix = "featurePropertyBag",
         content_type = "application/vnd.ms-excel.featurepropertybag+xml",
@@ -515,14 +515,14 @@ pub enum PartRef {
         crate::parts::feature_property_bags_part::FeaturePropertyBagsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipFont,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
         target_name = "font",
         path_prefix = "fonts",
         extension = ".dat"
     )]
     FontPart(crate::parts::font_part::FontPart),
     #[sdk(
-        relationship_type = RelationshipFontTable,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
         target_name = "fontTable",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
         root(
@@ -531,7 +531,7 @@ pub enum PartRef {
     )]
     FontTablePart(crate::parts::font_table_part::FontTablePart),
     #[sdk(
-        relationship_type = RelationshipFooter,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
         target_name = "footer",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
         root(
@@ -540,7 +540,7 @@ pub enum PartRef {
     )]
     FooterPart(crate::parts::footer_part::FooterPart),
     #[sdk(
-        relationship_type = RelationshipFootnotes,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
         target_name = "footnotes",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
         root(
@@ -549,7 +549,7 @@ pub enum PartRef {
     )]
     FootnotesPart(crate::parts::footnotes_part::FootnotesPart),
     #[sdk(
-        relationship_type = RelationshipGlossaryDocument,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument",
         target_name = "document",
         path_prefix = "glossary",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
@@ -559,7 +559,7 @@ pub enum PartRef {
     )]
     GlossaryDocumentPart(crate::parts::glossary_document_part::GlossaryDocumentPart),
     #[sdk(
-        relationship_type = RelationshipHandoutMaster,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster",
         target_name = "handoutMaster",
         path_prefix = "handoutMasters",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
@@ -569,7 +569,7 @@ pub enum PartRef {
     )]
     HandoutMasterPart(crate::parts::handout_master_part::HandoutMasterPart),
     #[sdk(
-        relationship_type = RelationshipHeader,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
         target_name = "header",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
         root(
@@ -578,14 +578,14 @@ pub enum PartRef {
     )]
     HeaderPart(crate::parts::header_part::HeaderPart),
     #[sdk(
-        relationship_type = RelationshipImage,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
         target_name = "image",
         path_prefix = "../media",
         extension = ".bin"
     )]
     ImagePart(crate::parts::image_part::ImagePart),
     #[sdk(
-        relationship_type = RelationshipXlIntlMacrosheet,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
         target_name = "intlsheet",
         path_prefix = "macrosheets",
         content_type = "application/vnd.ms-excel.intlmacrosheet+xml"
@@ -594,7 +594,7 @@ pub enum PartRef {
         crate::parts::international_macro_sheet_part::InternationalMacroSheetPart,
     ),
     #[sdk(
-        relationship_type = RelationshipClassificationlabels,
+        relationship_type = "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
         target_name = "LabelInfo",
         path_prefix = "docMetadata",
         content_type = "application/vnd.ms-office.classificationlabels+xml",
@@ -604,7 +604,7 @@ pub enum PartRef {
     )]
     LabelInfoPart(crate::parts::label_info_part::LabelInfoPart),
     #[sdk(
-        relationship_type = RelationshipLegacyDocTextInfo,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDocTextInfo",
         target_name = "legacyDocTextInfo",
         content_type = "application/vnd.ms-office.legacyDocTextInfo",
         extension = ".bin"
@@ -613,14 +613,14 @@ pub enum PartRef {
         crate::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart,
     ),
     #[sdk(
-        relationship_type = RelationshipLegacyDiagramText,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
         target_name = "legacyDiagramText",
         content_type = "application/vnd.ms-office.legacyDiagramText",
         extension = ".bin"
     )]
     LegacyDiagramTextPart(crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart),
     #[sdk(
-        relationship_type = RelationshipXlMacrosheet,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
         target_name = "sheet",
         path_prefix = "macrosheets",
         content_type = "application/vnd.ms-excel.macrosheet+xml",
@@ -629,12 +629,15 @@ pub enum PartRef {
         )
     )]
     MacroSheetPart(crate::parts::macro_sheet_part::MacroSheetPart),
-    #[sdk(relationship_type = RelationshipRecipientData, target_name = "recipients")]
+    #[sdk(
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
+        target_name = "recipients"
+    )]
     MailMergeRecipientDataPart(
         crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
     ),
     #[sdk(
-        relationship_type = RelationshipOfficeDocument,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
         target_name = "document",
         path_prefix = "word",
         root(
@@ -644,7 +647,7 @@ pub enum PartRef {
     )]
     MainDocumentPart(crate::parts::main_document_part::MainDocumentPart),
     #[sdk(
-        relationship_type = RelationshipModel3d,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
         target_name = "model3d",
         path_prefix = "../media",
         content_type = "model/gltf-binary",
@@ -654,7 +657,7 @@ pub enum PartRef {
         crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
     ),
     #[sdk(
-        relationship_type = RelationshipNamedSheetView,
+        relationship_type = "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView",
         target_name = "namedSheetView",
         path_prefix = "../namedSheetViews",
         content_type = "application/vnd.ms-excel.namedsheetviews+xml",
@@ -664,7 +667,7 @@ pub enum PartRef {
     )]
     NamedSheetViewsPart(crate::parts::named_sheet_views_part::NamedSheetViewsPart),
     #[sdk(
-        relationship_type = RelationshipNotesMaster,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster",
         target_name = "notesMaster",
         path_prefix = "notesMasters",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
@@ -674,7 +677,7 @@ pub enum PartRef {
     )]
     NotesMasterPart(crate::parts::notes_master_part::NotesMasterPart),
     #[sdk(
-        relationship_type = RelationshipNotesSlide,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide",
         target_name = "notesSlide",
         path_prefix = "../notesSlides",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
@@ -684,7 +687,7 @@ pub enum PartRef {
     )]
     NotesSlidePart(crate::parts::notes_slide_part::NotesSlidePart),
     #[sdk(
-        relationship_type = RelationshipNumbering,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
         target_name = "numbering",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
         root(
@@ -695,7 +698,7 @@ pub enum PartRef {
         crate::parts::numbering_definitions_part::NumberingDefinitionsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipPivotCacheDefinition,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
         target_name = "pivotCacheDefinition",
         path_prefix = "../pivotCache",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml",
@@ -707,7 +710,7 @@ pub enum PartRef {
         crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
     ),
     #[sdk(
-        relationship_type = RelationshipPivotCacheRecords,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
         target_name = "pivotCacheRecords",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml",
         root(
@@ -718,7 +721,7 @@ pub enum PartRef {
         crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipPivotTable,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable",
         target_name = "pivotTable",
         path_prefix = "../pivotTables",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml",
@@ -728,7 +731,7 @@ pub enum PartRef {
     )]
     PivotTablePart(crate::parts::pivot_table_part::PivotTablePart),
     #[sdk(
-        relationship_type = RelationshipAuthors,
+        relationship_type = "http://schemas.microsoft.com/office/2018/10/relationships/authors",
         target_name = "authors",
         content_type = "application/vnd.ms-powerpoint.authors+xml",
         root(
@@ -737,7 +740,7 @@ pub enum PartRef {
     )]
     PowerPointAuthorsPart(crate::parts::power_point_authors_part::PowerPointAuthorsPart),
     #[sdk(
-        relationship_type = RelationshipComments,
+        relationship_type = "http://schemas.microsoft.com/office/2018/10/relationships/comments",
         target_name = "modernComment",
         path_prefix = "../comments",
         content_type = "application/vnd.ms-powerpoint.comments+xml",
@@ -747,7 +750,7 @@ pub enum PartRef {
     )]
     PowerPointCommentPart(crate::parts::power_point_comment_part::PowerPointCommentPart),
     #[sdk(
-        relationship_type = RelationshipOfficeDocument,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
         target_name = "presentation",
         path_prefix = "ppt",
         root(
@@ -757,7 +760,7 @@ pub enum PartRef {
     )]
     PresentationPart(crate::parts::presentation_part::PresentationPart),
     #[sdk(
-        relationship_type = RelationshipPresProps,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
         target_name = "presProps",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml",
         root(
@@ -768,7 +771,7 @@ pub enum PartRef {
         crate::parts::presentation_properties_part::PresentationPropertiesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipQueryTable,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
         target_name = "queryTable",
         path_prefix = "../queryTables",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml",
@@ -778,7 +781,7 @@ pub enum PartRef {
     )]
     QueryTablePart(crate::parts::query_table_part::QueryTablePart),
     #[sdk(
-        relationship_type = RelationshipUserCustomization,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/userCustomization",
         target_name = "customUI",
         path_prefix = "userCustomization",
         content_type = "application/xml"
@@ -787,7 +790,7 @@ pub enum PartRef {
         crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipRdArray,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
         target_name = "rdarray",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdarray+xml",
@@ -797,7 +800,7 @@ pub enum PartRef {
     )]
     RdArrayPart(crate::parts::rd_array_part::RdArrayPart),
     #[sdk(
-        relationship_type = RelationshipRdRichValue,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
         target_name = "rdrichvalue",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdrichvalue+xml",
@@ -807,7 +810,7 @@ pub enum PartRef {
     )]
     RdRichValuePart(crate::parts::rd_rich_value_part::RdRichValuePart),
     #[sdk(
-        relationship_type = RelationshipRdRichValueStructure,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
         target_name = "rdrichvaluestructure",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdrichvaluestructure+xml",
@@ -819,7 +822,7 @@ pub enum PartRef {
         crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart,
     ),
     #[sdk(
-        relationship_type = RelationshipRdRichValueTypes,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
         target_name = "rdRichValueTypes",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdrichvaluetypes+xml",
@@ -829,7 +832,7 @@ pub enum PartRef {
     )]
     RdRichValueTypesPart(crate::parts::rd_rich_value_types_part::RdRichValueTypesPart),
     #[sdk(
-        relationship_type = RelationshipRdRichValueWebImage,
+        relationship_type = "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
         target_name = "rdRichValueWebImage",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdrichvaluewebimage+xml",
@@ -841,7 +844,7 @@ pub enum PartRef {
         crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart,
     ),
     #[sdk(
-        relationship_type = RelationshipRdSupportingPropertyBag,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
         target_name = "rdsupportingpropertybag",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdsupportingpropertybag+xml",
@@ -853,7 +856,7 @@ pub enum PartRef {
         crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart,
     ),
     #[sdk(
-        relationship_type = RelationshipRdSupportingPropertyBagStructure,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
         target_name = "rdsupportingpropertybagstructure",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml",
@@ -865,7 +868,7 @@ pub enum PartRef {
         crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart,
     ),
     #[sdk(
-        relationship_type = RelationshipExtensibility,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
         target_name = "customUI",
         path_prefix = "customUI",
         content_type = "application/xml",
@@ -877,7 +880,7 @@ pub enum PartRef {
         crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipExtensibility2,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/ui/extensibility",
         target_name = "customUI",
         path_prefix = "customUI",
         content_type = "application/xml"
@@ -886,7 +889,7 @@ pub enum PartRef {
         crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart,
     ),
     #[sdk(
-        relationship_type = RelationshipRichStyles,
+        relationship_type = "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
         target_name = "richStyles",
         path_prefix = "richData",
         content_type = "application/vnd.ms-excel.richstyles+xml",
@@ -896,7 +899,7 @@ pub enum PartRef {
     )]
     RichStylesPart(crate::parts::rich_styles_part::RichStylesPart),
     #[sdk(
-        relationship_type = RelationshipSharedStrings,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
         target_name = "sharedStrings",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml",
         root(
@@ -905,7 +908,7 @@ pub enum PartRef {
     )]
     SharedStringTablePart(crate::parts::shared_string_table_part::SharedStringTablePart),
     #[sdk(
-        relationship_type = RelationshipTableSingleCells,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells",
         target_name = "tableSingleCells",
         path_prefix = "../tables",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml",
@@ -915,7 +918,7 @@ pub enum PartRef {
     )]
     SingleCellTablePart(crate::parts::single_cell_table_part::SingleCellTablePart),
     #[sdk(
-        relationship_type = RelationshipSlicerCache,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
         target_name = "slicerCache",
         path_prefix = "slicerCaches",
         content_type = "application/vnd.ms-excel.slicerCache+xml",
@@ -925,7 +928,7 @@ pub enum PartRef {
     )]
     SlicerCachePart(crate::parts::slicer_cache_part::SlicerCachePart),
     #[sdk(
-        relationship_type = RelationshipSlicer,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/slicer",
         target_name = "slicer",
         path_prefix = "../slicers",
         content_type = "application/vnd.ms-excel.slicer+xml",
@@ -935,7 +938,7 @@ pub enum PartRef {
     )]
     SlicersPart(crate::parts::slicers_part::SlicersPart),
     #[sdk(
-        relationship_type = RelationshipComments2,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
         target_name = "comment",
         path_prefix = "../comments",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.comments+xml",
@@ -945,7 +948,7 @@ pub enum PartRef {
     )]
     SlideCommentsPart(crate::parts::slide_comments_part::SlideCommentsPart),
     #[sdk(
-        relationship_type = RelationshipSlideLayout,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
         target_name = "slideLayout",
         path_prefix = "../slideLayouts",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
@@ -955,7 +958,7 @@ pub enum PartRef {
     )]
     SlideLayoutPart(crate::parts::slide_layout_part::SlideLayoutPart),
     #[sdk(
-        relationship_type = RelationshipSlideMaster,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
         target_name = "slideMaster",
         path_prefix = "slideMasters",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
@@ -965,7 +968,7 @@ pub enum PartRef {
     )]
     SlideMasterPart(crate::parts::slide_master_part::SlideMasterPart),
     #[sdk(
-        relationship_type = RelationshipSlide,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
         target_name = "slide",
         path_prefix = "slides",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
@@ -975,7 +978,7 @@ pub enum PartRef {
     )]
     SlidePart(crate::parts::slide_part::SlidePart),
     #[sdk(
-        relationship_type = RelationshipSlideUpdateInfo,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideUpdateInfo",
         target_name = "slideUpdateInfo",
         path_prefix = "slideUpdateInfo",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml",
@@ -985,7 +988,7 @@ pub enum PartRef {
     )]
     SlideSyncDataPart(crate::parts::slide_sync_data_part::SlideSyncDataPart),
     #[sdk(
-        relationship_type = RelationshipPrinterSettings,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
         target_name = "printerSettings",
         path_prefix = "../printerSettings",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings",
@@ -995,7 +998,7 @@ pub enum PartRef {
         crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipStyles,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
         target_name = "styles",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
         root(
@@ -1004,7 +1007,7 @@ pub enum PartRef {
     )]
     StyleDefinitionsPart(crate::parts::style_definitions_part::StyleDefinitionsPart),
     #[sdk(
-        relationship_type = RelationshipStylesWithEffects,
+        relationship_type = "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
         target_name = "stylesWithEffects",
         content_type = "application/vnd.ms-word.stylesWithEffects+xml",
         root(
@@ -1013,7 +1016,7 @@ pub enum PartRef {
     )]
     StylesWithEffectsPart(crate::parts::styles_with_effects_part::StylesWithEffectsPart),
     #[sdk(
-        relationship_type = RelationshipTable,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
         target_name = "table",
         path_prefix = "../tables",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml",
@@ -1023,7 +1026,7 @@ pub enum PartRef {
     )]
     TableDefinitionPart(crate::parts::table_definition_part::TableDefinitionPart),
     #[sdk(
-        relationship_type = RelationshipTableStyles,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
         target_name = "tableStyles",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml",
         root(
@@ -1032,7 +1035,7 @@ pub enum PartRef {
     )]
     TableStylesPart(crate::parts::table_styles_part::TableStylesPart),
     #[sdk(
-        relationship_type = RelationshipThemeOverride,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
         target_name = "themeoverride",
         path_prefix = "theme",
         content_type = "application/vnd.openxmlformats-officedocument.themeOverride+xml",
@@ -1042,7 +1045,7 @@ pub enum PartRef {
     )]
     ThemeOverridePart(crate::parts::theme_override_part::ThemeOverridePart),
     #[sdk(
-        relationship_type = RelationshipTheme,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
         target_name = "theme",
         path_prefix = "theme",
         content_type = "application/vnd.openxmlformats-officedocument.theme+xml",
@@ -1052,14 +1055,14 @@ pub enum PartRef {
     )]
     ThemePart(crate::parts::theme_part::ThemePart),
     #[sdk(
-        relationship_type = RelationshipThumbnail,
+        relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
         target_name = "thumbnail",
         path_prefix = "docProps",
         extension = ".bin"
     )]
     ThumbnailPart(crate::parts::thumbnail_part::ThumbnailPart),
     #[sdk(
-        relationship_type = RelationshipTimelineCache,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
         target_name = "timelineCache",
         path_prefix = "timelineCaches",
         content_type = "application/vnd.ms-excel.timelineCache+xml",
@@ -1069,7 +1072,7 @@ pub enum PartRef {
     )]
     TimeLineCachePart(crate::parts::time_line_cache_part::TimeLineCachePart),
     #[sdk(
-        relationship_type = RelationshipTimeline,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/timeline",
         target_name = "timeline",
         path_prefix = "../timelines",
         content_type = "application/vnd.ms-excel.timeline+xml",
@@ -1079,7 +1082,7 @@ pub enum PartRef {
     )]
     TimeLinePart(crate::parts::time_line_part::TimeLinePart),
     #[sdk(
-        relationship_type = RelationshipTags,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags",
         target_name = "tag",
         path_prefix = "tags",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.tags+xml",
@@ -1089,7 +1092,7 @@ pub enum PartRef {
     )]
     UserDefinedTagsPart(crate::parts::user_defined_tags_part::UserDefinedTagsPart),
     #[sdk(
-        relationship_type = RelationshipWordVbaData,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
         target_name = "vbaData",
         content_type = "application/vnd.ms-word.vbaData+xml",
         root(
@@ -1098,14 +1101,14 @@ pub enum PartRef {
     )]
     VbaDataPart(crate::parts::vba_data_part::VbaDataPart),
     #[sdk(
-        relationship_type = RelationshipVbaProject,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
         target_name = "vbaProject",
         content_type = "application/vnd.ms-office.vbaProject",
         extension = ".bin"
     )]
     VbaProjectPart(crate::parts::vba_project_part::VbaProjectPart),
     #[sdk(
-        relationship_type = RelationshipViewProps,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
         target_name = "viewProps",
         content_type = "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml",
         root(
@@ -1114,7 +1117,7 @@ pub enum PartRef {
     )]
     ViewPropertiesPart(crate::parts::view_properties_part::ViewPropertiesPart),
     #[sdk(
-        relationship_type = RelationshipVmlDrawing,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
         target_name = "vmldrawing",
         path_prefix = "../drawings",
         content_type = "application/vnd.openxmlformats-officedocument.vmlDrawing",
@@ -1122,7 +1125,7 @@ pub enum PartRef {
     )]
     VmlDrawingPart(crate::parts::vml_drawing_part::VmlDrawingPart),
     #[sdk(
-        relationship_type = RelationshipVolatileDependencies,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
         target_name = "volatileDependencies",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml",
         root(
@@ -1133,7 +1136,7 @@ pub enum PartRef {
         crate::parts::volatile_dependencies_part::VolatileDependenciesPart,
     ),
     #[sdk(
-        relationship_type = RelationshipWebextensiontaskpanes,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
         target_name = "taskpanes",
         path_prefix = "../webextensions",
         content_type = "application/vnd.ms-office.webextensiontaskpanes+xml",
@@ -1143,7 +1146,7 @@ pub enum PartRef {
     )]
     WebExTaskpanesPart(crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart),
     #[sdk(
-        relationship_type = RelationshipWebextension,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextension",
         target_name = "webextension",
         path_prefix = "../webextensions",
         content_type = "application/vnd.ms-office.webextension+xml",
@@ -1153,7 +1156,7 @@ pub enum PartRef {
     )]
     WebExtensionPart(crate::parts::web_extension_part::WebExtensionPart),
     #[sdk(
-        relationship_type = RelationshipWebSettings,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
         target_name = "webSettings",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
         root(
@@ -1162,7 +1165,7 @@ pub enum PartRef {
     )]
     WebSettingsPart(crate::parts::web_settings_part::WebSettingsPart),
     #[sdk(
-        relationship_type = RelationshipAttachedToolbars,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
         target_name = "attachedToolbars",
         content_type = "application/vnd.ms-word.attachedToolbars",
         extension = ".bin"
@@ -1171,7 +1174,7 @@ pub enum PartRef {
         crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCommentsExtensible,
+        relationship_type = "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible",
         target_name = "commentsExtensible",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml",
         root(
@@ -1182,7 +1185,7 @@ pub enum PartRef {
         crate::parts::word_comments_extensible_part::WordCommentsExtensiblePart,
     ),
     #[sdk(
-        relationship_type = RelationshipCommentsExtended,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
         target_name = "commentsExtended",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
         root(
@@ -1193,7 +1196,7 @@ pub enum PartRef {
         crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart,
     ),
     #[sdk(
-        relationship_type = RelationshipCommentsIds,
+        relationship_type = "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
         target_name = "commentsIds",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml",
         root(
@@ -1204,7 +1207,7 @@ pub enum PartRef {
         crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipComments2,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
         target_name = "comments",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
         root(
@@ -1215,7 +1218,7 @@ pub enum PartRef {
         crate::parts::wordprocessing_comments_part::WordprocessingCommentsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipPeople,
+        relationship_type = "http://schemas.microsoft.com/office/2011/relationships/people",
         target_name = "people",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml",
         root(
@@ -1226,7 +1229,7 @@ pub enum PartRef {
         crate::parts::wordprocessing_people_part::WordprocessingPeoplePart,
     ),
     #[sdk(
-        relationship_type = RelationshipPrinterSettings,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
         target_name = "printerSettings",
         path_prefix = "../printerSettings",
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings",
@@ -1236,7 +1239,7 @@ pub enum PartRef {
         crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipOfficeDocument,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
         target_name = "workbook",
         path_prefix = "xl",
         root(
@@ -1246,7 +1249,7 @@ pub enum PartRef {
     )]
     WorkbookPart(crate::parts::workbook_part::WorkbookPart),
     #[sdk(
-        relationship_type = RelationshipPerson,
+        relationship_type = "http://schemas.microsoft.com/office/2017/10/relationships/person",
         target_name = "person",
         path_prefix = "persons",
         content_type = "application/vnd.ms-excel.person+xml",
@@ -1256,7 +1259,7 @@ pub enum PartRef {
     )]
     WorkbookPersonPart(crate::parts::workbook_person_part::WorkbookPersonPart),
     #[sdk(
-        relationship_type = RelationshipRevisionHeaders,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
         target_name = "revisionHeaders",
         path_prefix = "revisions",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml",
@@ -1268,7 +1271,7 @@ pub enum PartRef {
         crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart,
     ),
     #[sdk(
-        relationship_type = RelationshipRevisionLog,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
         target_name = "revisionLog",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml",
         root(
@@ -1279,7 +1282,7 @@ pub enum PartRef {
         crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
     ),
     #[sdk(
-        relationship_type = RelationshipStyles,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
         target_name = "styles",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml",
         root(
@@ -1288,7 +1291,7 @@ pub enum PartRef {
     )]
     WorkbookStylesPart(crate::parts::workbook_styles_part::WorkbookStylesPart),
     #[sdk(
-        relationship_type = RelationshipUsernames,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
         target_name = "userNames",
         path_prefix = "revisions",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml",
@@ -1298,7 +1301,7 @@ pub enum PartRef {
     )]
     WorkbookUserDataPart(crate::parts::workbook_user_data_part::WorkbookUserDataPart),
     #[sdk(
-        relationship_type = RelationshipComments2,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
         target_name = "comments",
         path_prefix = "..",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml",
@@ -1308,7 +1311,7 @@ pub enum PartRef {
     )]
     WorksheetCommentsPart(crate::parts::worksheet_comments_part::WorksheetCommentsPart),
     #[sdk(
-        relationship_type = RelationshipWorksheet,
+        relationship_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
         target_name = "sheet",
         path_prefix = "worksheets",
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
@@ -1318,7 +1321,7 @@ pub enum PartRef {
     )]
     WorksheetPart(crate::parts::worksheet_part::WorksheetPart),
     #[sdk(
-        relationship_type = RelationshipWsSortMap,
+        relationship_type = "http://schemas.microsoft.com/office/2006/relationships/wsSortMap",
         target_name = "wsSortMap",
         content_type = "application/vnd.ms-excel.wsSortMap+xml",
         root(
@@ -1327,7 +1330,7 @@ pub enum PartRef {
     )]
     WorksheetSortMapPart(crate::parts::worksheet_sort_map_part::WorksheetSortMapPart),
     #[sdk(
-        relationship_type = RelationshipThreadedComment,
+        relationship_type = "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
         target_name = "threadedcomment",
         path_prefix = "../threadedcomments",
         content_type = "application/vnd.ms-excel.threadedcomments+xml",
@@ -1339,7 +1342,7 @@ pub enum PartRef {
         crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart,
     ),
     #[sdk(
-        relationship_type = RelationshipSignature,
+        relationship_type = "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
         target_name = "sig",
         path_prefix = "_xmlsignatures",
         content_type = "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"
@@ -1446,8 +1449,8 @@ fn should_ignore_missing_relationship(
   relationship: &crate::common::RelationshipInfo,
 ) -> bool {
   open_settings.ignore_calculation_chain_part_relationship
-    && relationship.relationship_known_type()
-      == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCalcChain)
+    && relationship.relationship_type_bytes()
+      == b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain"
 }
 pub fn save_package<P, W>(package: &P, writer: W) -> Result<(), crate::common::SdkError>
 where

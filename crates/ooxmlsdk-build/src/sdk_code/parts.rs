@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
 use syn::{Ident, ItemMod, ItemStruct, Type, parse_str, parse2};
 
 use crate::Result;
@@ -8,28 +7,22 @@ use crate::sdk_code::part_codegen_ir::{
   PartChildCardinality, PartFieldDecl, PartFieldKind, PartModuleDecl,
 };
 use crate::sdk_code::versioning::features_cfg_attrs;
-use crate::sdk_data::sdk_data_model::NamespaceAlias as SdkDataNamespaceAlias;
 
 pub fn gen_part_module(part: &PartModuleDecl) -> Result<TokenStream> {
-  let relationship_type_variants = relationship_type_variant_map(&[part])?;
-  gen_part_module_with_relationship_type_variants(part, &relationship_type_variants)
+  gen_part_module_with_relationship_type_variants(part)
 }
 
 pub fn gen_part_module_with_relationship_type_variants(
   part: &PartModuleDecl,
-  relationship_type_variants: &HashMap<String, Ident>,
 ) -> Result<TokenStream> {
   if is_package_part(part) {
-    return gen_package_module(part, relationship_type_variants);
+    return gen_package_module(part);
   }
 
-  gen_part_handle_module(part, relationship_type_variants)
+  gen_part_handle_module(part)
 }
 
-fn gen_package_module(
-  part: &PartModuleDecl,
-  _relationship_type_variants: &HashMap<String, Ident>,
-) -> Result<TokenStream> {
+fn gen_package_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = package_marker_fields(part)?;
   let package_struct: ItemStruct = parse2(quote! {
@@ -101,10 +94,7 @@ fn package_marker_fields(part: &PartModuleDecl) -> Result<Vec<TokenStream>> {
   Ok(fields)
 }
 
-fn gen_part_handle_module(
-  part: &PartModuleDecl,
-  _relationship_type_variants: &HashMap<String, Ident>,
-) -> Result<TokenStream> {
+fn gen_part_handle_module(part: &PartModuleDecl) -> Result<TokenStream> {
   let struct_name_ident: Ident = parse_str(&part.struct_name)?;
   let marker_fields = part_handle_marker_fields(part)?;
   let part_struct: ItemStruct = parse2(quote! {
@@ -189,13 +179,9 @@ fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
   }
 }
 
-pub fn gen_parts_mod(
-  parts: &[&PartModuleDecl],
-  _namespace_aliases: &[SdkDataNamespaceAlias],
-) -> Result<TokenStream> {
+pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut mod_list: Vec<ItemMod> = vec![];
   let mut part_ref_variants: Vec<TokenStream> = vec![];
-  let relationship_type_variants = relationship_type_variant_map(parts)?;
 
   for part in parts {
     let mod_ident: Ident = parse_str(&part.module_name)?;
@@ -213,16 +199,7 @@ pub fn gen_parts_mod(
       continue;
     }
 
-    let Some(relationship_type_variant) = relationship_type_variants.get(&part.relationship_type)
-    else {
-      return Err(
-        format!(
-          "unknown relationship type variant for {}",
-          part.relationship_type
-        )
-        .into(),
-      );
-    };
+    let relationship_type = part.relationship_type.as_str();
     let path_prefix = part.path_prefix.as_str();
     let content_type = part.content_type.as_str();
     let target_name = part.target_name.as_str();
@@ -262,7 +239,7 @@ pub fn gen_parts_mod(
     part_ref_variants.push(quote! {
       #( #part_attrs )*
       #[sdk(
-        relationship_type = #relationship_type_variant,
+        relationship_type = #relationship_type,
         target_name = #target_name
         #path_prefix_attr
         #content_type_attr
@@ -397,8 +374,8 @@ pub fn gen_parts_mod(
     ) -> bool
     {
       open_settings.ignore_calculation_chain_part_relationship
-        && relationship.relationship_known_type()
-          == Some(crate::namespaces::XmlKnownRelationshipNamespace::RelationshipCalcChain)
+        && relationship.relationship_type_bytes()
+          == b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain"
     }
 
     pub fn save_package<P, W>(
@@ -465,61 +442,6 @@ pub fn gen_parts_mod(
       Ok(())
     }
   })
-}
-
-pub(crate) fn relationship_type_variant_map(
-  parts: &[&PartModuleDecl],
-) -> Result<HashMap<String, Ident>> {
-  let mut known_uris = HashSet::new();
-  let mut used_variants = HashSet::new();
-  let mut variants = HashMap::new();
-
-  for relationship_type in super::EXTRA_RELATIONSHIP_TYPES {
-    known_uris.insert((*relationship_type).to_string());
-    variants.insert(
-      (*relationship_type).to_string(),
-      parse_str(&super::relationship_type_variant_name(
-        relationship_type,
-        &mut used_variants,
-      ))?,
-    );
-  }
-
-  for part in parts {
-    let relationship_type = part.relationship_type.as_str();
-    if relationship_type.is_empty() || !known_uris.insert(relationship_type.to_string()) {
-      continue;
-    }
-    variants.insert(
-      relationship_type.to_string(),
-      parse_str(&super::relationship_type_variant_name(
-        relationship_type,
-        &mut used_variants,
-      ))?,
-    );
-  }
-
-  Ok(variants)
-}
-
-pub(crate) fn relationship_type_aliases(
-  relationship_type: &str,
-  namespace_aliases: &[SdkDataNamespaceAlias],
-) -> Vec<String> {
-  let Some((canonical_base, canonical_suffix)) = relationship_type.rsplit_once('/') else {
-    return Vec::new();
-  };
-
-  let mut aliases = HashSet::new();
-  for alias in namespace_aliases {
-    if alias.canonical_uri == relationship_type {
-      aliases.insert(alias.uri.clone());
-    }
-    if alias.canonical_uri == canonical_base {
-      aliases.insert(format!("{}/{canonical_suffix}", alias.uri));
-    }
-  }
-  aliases.into_iter().collect()
 }
 
 fn part_module_attrs(part: &PartModuleDecl) -> Vec<syn::Attribute> {
@@ -688,10 +610,14 @@ mod tests {
       ..Default::default()
     };
 
-    let rendered = gen_parts_mod(&[&part], &[]).unwrap().to_string();
+    let rendered = gen_parts_mod(&[&part]).unwrap().to_string();
     assert!(rendered.contains("pub enum PartRef"));
     assert!(rendered.contains("ooxmlsdk_derive :: SdkPartRef"));
-    assert!(rendered.contains("relationship_type = RelationshipOfficeDocument"));
+    assert!(
+      rendered.contains(
+        "relationship_type = \"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\""
+      )
+    );
     assert!(rendered.contains("root ("));
     assert!(rendered.contains("pub mod extended_part"));
     assert!(
@@ -767,7 +693,7 @@ mod tests {
       ..Default::default()
     };
 
-    let rendered = gen_parts_mod(&[&package, &part], &[]).unwrap().to_string();
+    let rendered = gen_parts_mod(&[&package, &part]).unwrap().to_string();
     assert!(rendered.contains("pub mod wordprocessing_document"));
     assert!(!rendered.contains("WordprocessingDocument (& 'a"));
     assert!(rendered.contains("MainDocumentPart (crate :: parts"));

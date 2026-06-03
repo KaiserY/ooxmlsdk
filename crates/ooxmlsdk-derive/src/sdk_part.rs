@@ -1069,7 +1069,6 @@ fn part_handle_child_methods_tokens(
     let relationship_matches = relationship_match_condition_tokens(
       &child.relationship_type,
       quote! { relationship },
-      quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_KNOWN_TYPE },
       quote! { <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE },
     );
     let map_relationship = quote! {

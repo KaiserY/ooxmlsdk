@@ -25,6 +25,13 @@ pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
     })
     .collect();
 
+  namespaces.push(Namespace {
+    prefix: "pct".to_string(),
+    uri: "http://schemas.openxmlformats.org/package/2006/content-types".to_string(),
+    version: String::new(),
+    source: "opc-contentTypes.xsd".to_string(),
+  });
+
   namespaces.sort_by(|left, right| {
     left
       .prefix

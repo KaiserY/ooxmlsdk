@@ -47,6 +47,14 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
+      "ClassName": "NotesMaster",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "NotesSlide",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "SlideMasterExtensionList",
       "HaveXmlOtherAttrs": true
     },
@@ -70,6 +78,10 @@
   "ChoiceEnums": [
     {
       "RustName": "ShapeTreeChoice",
+      "AddXmlAny": true
+    },
+    {
+      "RustName": "GroupShapeChoice",
       "AddXmlAny": true
     }
   ]

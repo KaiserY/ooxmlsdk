@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm14:cNvPr")]
 pub struct NonVisualDrawingProperties {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Application defined unique identifier.
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,

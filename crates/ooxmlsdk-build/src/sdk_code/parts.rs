@@ -404,7 +404,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           zip.add_directory("_rels", options)?;
         }
         zip.start_file("_rels/.rels", options)?;
-        zip.write_all(&package_relationships.to_relationships().to_bytes()?)?;
+        package_relationships.write_xml(&mut zip)?;
       }
 
       for (index, part) in storage.parts().iter().enumerate() {
@@ -427,7 +427,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           }
           let rels_path = crate::common::part_relationships_path(part.path());
           zip.start_file(&rels_path, options)?;
-          zip.write_all(&relationships.to_relationships().to_bytes()?)?;
+          relationships.write_xml(&mut zip)?;
         }
 
         zip.start_file(part.path(), options)?;

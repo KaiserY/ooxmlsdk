@@ -247,6 +247,8 @@ pub enum XmlKnownNamespace {
     "http://schemas.microsoft.com/office/powerpoint/2022/06/main/command"
   )]
   Pc226,
+  #[sdk("pct", "http://schemas.openxmlformats.org/package/2006/content-types")]
+  Pct,
   #[sdk("pic", "http://schemas.openxmlformats.org/drawingml/2006/picture")]
   Pic,
   #[sdk("pic14", "http://schemas.microsoft.com/office/drawing/2010/picture")]

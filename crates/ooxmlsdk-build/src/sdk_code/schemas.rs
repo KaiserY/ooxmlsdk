@@ -1544,7 +1544,8 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     let type_sdk_version_markers = sdk_version_markers(schema_type_version);
     let sdk_type_attrs = if let Some(qname) = &type_decl.xml_qname {
       let qname = sdk_element_qname(qname);
-      let default_ns = if ir.prefix == "x" {
+      let is_root_element = type_decl.support.xml_header != XmlHeaderMode::None;
+      let default_ns = if is_root_element && matches!(ir.prefix.as_str(), "x" | "pct") {
         quote! { default_ns, }
       } else {
         quote! {}

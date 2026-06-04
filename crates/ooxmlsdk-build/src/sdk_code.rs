@@ -429,7 +429,7 @@ fn write_namespaces(input: NamespacesInput<'_>) -> Result<()> {
     quote! {
       #[inline]
       pub(crate) fn uses_default_namespace(prefix: &str) -> bool {
-        matches!(prefix, "x")
+        matches!(prefix, "x" | "pct")
       }
     }
   } else {

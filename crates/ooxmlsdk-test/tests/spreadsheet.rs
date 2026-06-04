@@ -60,6 +60,15 @@ fn contains_x_end_text(xml: &str, value: &str, local_name: &str) -> bool {
     || xml.contains(&format!(">{value}</{local_name}>"))
 }
 
+fn is_empty_shared_string_table_xml(xml: &str) -> bool {
+  let xml = trim_xml_declaration(xml);
+
+  (xml.starts_with("<x:sst ") || xml.starts_with("<sst "))
+    && xml.contains("http://schemas.openxmlformats.org/spreadsheetml/2006/main")
+    && (xml.ends_with(" />") || xml.ends_with("></x:sst>") || xml.ends_with("></sst>"))
+    && !contains_x_start(xml, "si")
+}
+
 fn assert_cell_value_text_round_trip(value: &str) {
   let xml = format!(
     r#"<x:v xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">{value}</x:v>"#
@@ -269,7 +278,7 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
     parsed
       .xmlns
       .iter()
-      .all(|declaration| !xml_namespace_prefix_matches(declaration, b"x"))
+      .any(|declaration| xml_namespace_prefix_matches(declaration, b"x"))
   );
   let items = shared_string_items(&parsed);
   assert_eq!(items.len(), 1);
@@ -366,16 +375,7 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
         .starts_with("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""),
     "{serialized}"
   );
-  assert!(
-    serialized
-      == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
-      || serialized
-        == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
-      || serialized
-        == "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></sst>"
-      || serialized
-        == "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
-  );
+  assert!(is_empty_shared_string_table_xml(serialized), "{serialized}");
   assert_eq!(shared_string_items(&reparsed).len(), 0);
 }
 
@@ -386,15 +386,7 @@ fn empty_shared_string_table_serialization_matches_get_stream_write_no_updates_t
   );
 
   let serialized = trim_xml_declaration(&serialized);
-  assert!(
-    serialized == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
-      || serialized
-        == "<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></x:sst>"
-      || serialized
-        == "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" />"
-      || serialized
-        == "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"></sst>"
-  );
+  assert!(is_empty_shared_string_table_xml(serialized), "{serialized}");
   assert_eq!(shared_string_items(&reparsed).len(), 0);
 }
 

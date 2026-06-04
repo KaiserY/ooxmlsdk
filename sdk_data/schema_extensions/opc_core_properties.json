@@ -15,6 +15,10 @@
     {
       "ClassName": "Modified",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Subject",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

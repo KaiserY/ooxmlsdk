@@ -3921,17 +3921,7 @@ fn expand_named_struct(
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
-  let preserves_raw_children = has_xml_other_children_field
-    || !any_child_fields.is_empty()
-    || !any_fields.is_empty()
-    || choice_fields.iter().any(|field| {
-      field.accepts_any.unwrap_or(false)
-        || field
-          .items
-          .iter()
-          .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
-    });
-  let preserve_fixed_prefixed_namespace = preserves_raw_children && default_ns && tag_prefix == "x";
+  let preserve_fixed_prefixed_namespace = has_xmlns_fields && default_ns && tag_prefix == "x";
   let use_canonical_xmlns_prefix = has_xmlns_fields && {
     let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
     is_canonical_xmlns_prefix_namespace(&tag_prefix)

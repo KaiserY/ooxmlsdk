@@ -1245,6 +1245,7 @@ pub struct HandoutMaster {
 pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1267,6 +1268,7 @@ pub struct NotesMaster {
 pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -3758,7 +3760,8 @@ pub struct GroupShape {
             child(variant = GraphicFrame, qname = "p:graphicFrame"),
             child(variant = ConnectionShape, qname = "p:cxnSp"),
             child(variant = Picture, qname = "p:pic"),
-            child(variant = ContentPart, qname = "p:contentPart")
+            child(variant = ContentPart, qname = "p:contentPart"),
+            any
         )
     )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
@@ -5191,6 +5194,8 @@ pub enum GroupShapeChoice {
   Picture(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   ContentPart(std::boxed::Box<ContentPart>),
+  /// Unknown XML child.
+  XmlAny(std::boxed::Box<[u8]>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControlListChoice {

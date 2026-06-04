@@ -163,6 +163,9 @@ pub mod schemas_openxmlformats_org_wordprocessingml_2006_main;
 pub mod www_w3_org_2003_04_emma;
 pub mod www_w3_org_2003_ink_ml;
 pub mod www_w3_org_xml_1998_namespace;
+pub mod pct {
+  pub use super::opc_content_types::*;
+}
 pub mod cp {
   pub use super::opc_core_properties::*;
 }

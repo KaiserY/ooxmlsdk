@@ -90,6 +90,7 @@ pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
     "pc" => Some("http://schemas.microsoft.com/office/powerpoint/2013/main/command"),
     "pc2" => Some("http://schemas.microsoft.com/office/powerpoint/2019/9/main/command"),
     "pc226" => Some("http://schemas.microsoft.com/office/powerpoint/2022/06/main/command"),
+    "pct" => Some("http://schemas.openxmlformats.org/package/2006/content-types"),
     "pic" => Some("http://schemas.openxmlformats.org/drawingml/2006/picture"),
     "pic14" => Some("http://schemas.microsoft.com/office/drawing/2010/picture"),
     "pj15" => Some("http://schemas.microsoft.com/projectml/2012/main"),
@@ -182,5 +183,5 @@ pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
 }
 #[inline]
 pub(crate) fn uses_default_namespace(prefix: &str) -> bool {
-  matches!(prefix, "x")
+  matches!(prefix, "x" | "pct")
 }

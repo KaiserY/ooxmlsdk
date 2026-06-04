@@ -176,12 +176,12 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
 
   Ok(Schema {
     target_namespace: xsd.target_namespace,
-    prefix: String::new(),
+    prefix: "pct".to_string(),
     typed_namespace: String::new(),
     module_name: "opc_content_types".to_string(),
     types: vec![
       SchemaType {
-        name: "CT_Types/Types".to_string(),
+        name: "pct:CT_Types/pct:Types".to_string(),
         class_name: "Types".to_string(),
         summary: "Content Types.".to_string(),
         version: Some("Office2007".to_string()),
@@ -225,13 +225,13 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
         }],
       },
       simple_leaf_type(
-        "CT_Default/Default",
+        "pct:CT_Default/pct:Default",
         "Default",
         "Default content type.",
         &default_type.attributes,
       ),
       simple_leaf_type(
-        "CT_Override/Override",
+        "pct:CT_Override/pct:Override",
         "Override",
         "Override content type.",
         &override_type.attributes,
@@ -243,8 +243,8 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
 
 fn content_types_child_type_name(q_name: &str) -> String {
   match q_name {
-    "Default" => "CT_Default/Default".to_string(),
-    "Override" => "CT_Override/Override".to_string(),
+    "Default" => "pct:CT_Default/pct:Default".to_string(),
+    "Override" => "pct:CT_Override/pct:Override".to_string(),
     _ => q_name.to_string(),
   }
 }

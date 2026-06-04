@@ -713,6 +713,16 @@ impl RelationshipSet {
     Ok(Cow::Owned(self.to_relationships().to_bytes()?))
   }
 
+  #[inline]
+  pub(crate) fn write_xml<W: std::io::Write>(&self, writer: &mut W) -> Result<(), SdkError> {
+    if let Some(bytes) = &self.raw_bytes {
+      writer.write_all(bytes)?;
+    } else {
+      writer.write_all(&self.to_relationships().to_bytes()?)?;
+    }
+    Ok(())
+  }
+
   fn from_relationships(
     relationships: Option<Relationships>,
     source_path: &str,

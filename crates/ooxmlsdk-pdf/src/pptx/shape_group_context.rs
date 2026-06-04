@@ -99,6 +99,7 @@ impl PPTShapeGroupContext {
       p::GroupShapeChoice::ContentPart(content_part) => {
         Some(self.import_content_part(slide_persist, content_part))
       }
+      p::GroupShapeChoice::XmlAny(_) => None,
     }
   }
 

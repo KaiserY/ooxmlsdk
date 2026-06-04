@@ -1472,7 +1472,7 @@ where
       zip.add_directory("_rels", options)?;
     }
     zip.start_file("_rels/.rels", options)?;
-    zip.write_all(&package_relationships.to_relationships().to_bytes()?)?;
+    package_relationships.write_xml(&mut zip)?;
   }
   for (index, part) in storage.parts().iter().enumerate() {
     if part.is_deleted() {
@@ -1493,7 +1493,7 @@ where
       }
       let rels_path = crate::common::part_relationships_path(part.path());
       zip.start_file(&rels_path, options)?;
-      zip.write_all(&relationships.to_relationships().to_bytes()?)?;
+      relationships.write_xml(&mut zip)?;
     }
     zip.start_file(part.path(), options)?;
     if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {

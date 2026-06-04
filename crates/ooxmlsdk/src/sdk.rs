@@ -2569,6 +2569,36 @@ pub trait SdkPart: SdkPartDescriptor + Clone + Sized + 'static {
   }
 
   #[inline]
+  fn add_new_part_with_content_type_and_path<P, T>(
+    &self,
+    package: &mut P,
+    relationship_id: impl Into<String>,
+    content_type: impl Into<std::borrow::Cow<'static, str>>,
+    part_path: impl AsRef<str>,
+  ) -> Result<T, crate::common::SdkError>
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    let relationship_id = relationship_id.into();
+    let part_id = crate::sdk::SdkPackage::storage_mut(package).add_child_part_with_path(
+      self.part_id(),
+      relationship_id.clone(),
+      crate::common::NewPartDescriptor {
+        relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
+        content_type: content_type.into(),
+        path_prefix: T::PATH_PREFIX,
+        target_name: T::TARGET_NAME,
+        extension: std::borrow::Cow::Borrowed(T::EXTENSION),
+      },
+      part_path,
+    )?;
+    crate::sdk::SdkPackage::push_root_element_slot(package);
+    crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
+    Ok(T::from_relationship_id(relationship_id, part_id))
+  }
+
+  #[inline]
   fn add_new_part_auto_id<P, T>(&self, package: &mut P) -> Result<T, crate::common::SdkError>
   where
     P: SdkPackage,

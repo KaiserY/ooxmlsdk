@@ -466,6 +466,27 @@ fn expand_part_handle(
       }
 
       #[inline]
+      pub fn add_new_part_with_content_type_and_path<P, T>(
+        &self,
+        package: &mut P,
+        relationship_id: impl Into<String>,
+        content_type: impl Into<std::borrow::Cow<'static, str>>,
+        part_path: impl AsRef<str>,
+      ) -> Result<T, crate::common::SdkError>
+      where
+        P: crate::sdk::SdkPackage,
+        T: crate::sdk::SdkPart,
+      {
+        <Self as crate::sdk::SdkPart>::add_new_part_with_content_type_and_path::<P, T>(
+          self,
+          package,
+          relationship_id,
+          content_type,
+          part_path,
+        )
+      }
+
+      #[inline]
       pub fn add_alternative_format_import_part<P>(
         &self,
         package: &mut P,

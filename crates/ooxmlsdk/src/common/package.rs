@@ -1644,6 +1644,64 @@ impl SdkPackageStorage {
     Ok(part_id)
   }
 
+  pub(crate) fn add_child_part_with_path(
+    &mut self,
+    source_part_id: PartId,
+    relationship_id: impl Into<String>,
+    descriptor: NewPartDescriptor,
+    part_path: impl AsRef<str>,
+  ) -> Result<PartId, SdkError> {
+    if descriptor.relationship_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty relationship type".to_string(),
+      ));
+    }
+    if descriptor.content_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot add a part with an empty content type".to_string(),
+      ));
+    }
+
+    let relationship_id = relationship_id.into();
+    let source_part_path = self
+      .part(source_part_id)
+      .ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {source_part_id:?} is not present in package storage"
+        ))
+      })?
+      .path()
+      .to_string();
+    if self
+      .relationships(source_part_id)
+      .is_some_and(|relationships| relationships.contains_id(&relationship_id))
+    {
+      return Err(SdkError::CommonError(format!(
+        "relationship id {relationship_id} already exists"
+      )));
+    }
+
+    let child_path =
+      self.unique_new_part_path(part_path.as_ref(), descriptor.content_type.as_ref())?;
+
+    let relationship_target = relationship_target_from_source(&source_part_path, &child_path);
+    let part_id = self.push_part(
+      child_path,
+      &descriptor.content_type,
+      Some(descriptor.relationship_type.as_ref()),
+    );
+    self
+      .relationships_mut(source_part_id)
+      .expect("source part was already resolved")
+      .add_internal_part_relationship(
+        relationship_id,
+        descriptor.relationship_type.as_ref(),
+        relationship_target,
+        part_id,
+      )?;
+    Ok(part_id)
+  }
+
   fn push_part(
     &mut self,
     path: String,
@@ -1920,6 +1978,29 @@ impl SdkPackageStorage {
     }
 
     unreachable!("usize iteration should always find a free data part path")
+  }
+
+  fn unique_new_part_path(&self, path: &str, content_type: &str) -> Result<String, SdkError> {
+    let normalized = normalized_new_part_path(path)?;
+    let (stem, extension) = part_path_stem_and_extension(&normalized);
+
+    let mut sequence = if is_numbered_part_content_type(content_type) {
+      1
+    } else {
+      0
+    };
+
+    loop {
+      let candidate = if sequence == 0 {
+        normalized.clone()
+      } else {
+        format!("{stem}{sequence}{extension}")
+      };
+      if !self.by_path.contains_key(candidate.as_str()) {
+        return Ok(candidate);
+      }
+      sequence = if sequence == 0 { 2 } else { sequence + 1 };
+    }
   }
 
   #[cfg(feature = "flat-opc")]
@@ -2257,6 +2338,84 @@ fn normalized_part_extension(extension: &str) -> String {
   } else {
     format!(".{extension}")
   }
+}
+
+fn normalized_new_part_path(path: &str) -> Result<String, SdkError> {
+  let path = path.trim_start_matches('/');
+  if path.is_empty() {
+    return Err(SdkError::CommonError("part path is empty".to_string()));
+  }
+  if path.split('/').any(|component| component == "..") {
+    return Err(SdkError::CommonError(format!(
+      "part path {path} is not allowed"
+    )));
+  }
+
+  let normalized = resolve_zip_file_path(path);
+  if normalized.is_empty()
+    || normalized.ends_with('/')
+    || normalized == "[Content_Types].xml"
+    || is_relationships_part_path(&normalized)
+  {
+    return Err(SdkError::CommonError(format!(
+      "part path {path} is not allowed"
+    )));
+  }
+
+  Ok(normalized)
+}
+
+fn part_path_stem_and_extension(path: &str) -> (&str, &str) {
+  let file_name_start = path.rfind('/').map(|index| index + 1).unwrap_or(0);
+  let file_name = &path[file_name_start..];
+  if let Some(extension_start) = file_name.rfind('.') {
+    let extension_start = file_name_start + extension_start;
+    (&path[..extension_start], &path[extension_start..])
+  } else {
+    (path, "")
+  }
+}
+
+fn is_numbered_part_content_type(content_type: &str) -> bool {
+  matches!(
+    content_type,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+      | "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml"
+      | "application/vnd.openxmlformats-officedocument.drawing+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.comments+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.slideUpdateInfo+xml"
+      | "application/vnd.openxmlformats-officedocument.presentationml.tags+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"
+      | "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"
+      | "application/vnd.openxmlformats-officedocument.theme+xml"
+      | "application/vnd.openxmlformats-officedocument.themeOverride+xml"
+      | "application/vnd.openxmlformats-officedocument.customXmlProperties+xml"
+      | "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"
+      | "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings"
+      | "application/vnd.openxmlformats-officedocument.presentationml.printerSettings"
+  )
 }
 
 fn relationship_target_from_source(source_part_path: &str, child_part_path: &str) -> String {

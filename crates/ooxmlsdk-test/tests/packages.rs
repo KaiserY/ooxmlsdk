@@ -2469,6 +2469,114 @@ fn image_part_feed_data_is_saved() {
 }
 
 #[test]
+fn add_new_part_with_content_type_and_path_uses_specified_package_path() {
+  // Source: upstream OpenXmlPart.CreateInternal(contentType, partUri) path semantics.
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let relationship_id = "rIdSdkImageAtPath";
+  let image_bytes = b"\x89PNG\r\n\x1a\nsdk-image-at-path".to_vec();
+
+  let image_part = main_part
+    .add_new_part_with_content_type_and_path::<_, ImagePart>(
+      &mut package,
+      relationship_id,
+      "image/png",
+      "word/media/img_zbox_003.png",
+    )
+    .unwrap();
+  image_part
+    .feed_data(&mut package, &mut Cursor::new(image_bytes.clone()))
+    .unwrap();
+
+  assert_eq!(
+    image_part.path(&package),
+    Some("word/media/img_zbox_003.png")
+  );
+  assert_eq!(
+    main_part.get_id_of_part(&package, &image_part),
+    Some(relationship_id)
+  );
+
+  let mut buffer = Cursor::new(Vec::new());
+  package.save(&mut buffer).unwrap();
+
+  let reopened = WordprocessingDocument::new(Cursor::new(buffer.into_inner())).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  let reopened_image = reopened_main
+    .get_part_by_id(&reopened, relationship_id)
+    .and_then(|part| part_ref_variant!(part, ImagePart))
+    .unwrap();
+
+  assert_eq!(
+    reopened_image.path(&reopened),
+    Some("word/media/img_zbox_003.png")
+  );
+  assert_eq!(reopened_image.content_type(&reopened), Some("image/png"));
+  assert_eq!(reopened_image.data(&reopened), Some(image_bytes.as_slice()));
+}
+
+#[test]
+fn add_new_part_with_content_type_and_path_ensures_unique_package_path() {
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  let image_part1 = main_part
+    .add_new_part_with_content_type_and_path::<_, ImagePart>(
+      &mut package,
+      "rIdSdkImageAtPath1",
+      "image/png",
+      "word/media/shared_name.png",
+    )
+    .unwrap();
+  let image_part2 = main_part
+    .add_new_part_with_content_type_and_path::<_, ImagePart>(
+      &mut package,
+      "rIdSdkImageAtPath2",
+      "image/png",
+      "word/media/shared_name.png",
+    )
+    .unwrap();
+
+  assert_eq!(
+    image_part1.path(&package),
+    Some("word/media/shared_name.png")
+  );
+  assert_eq!(
+    image_part2.path(&package),
+    Some("word/media/shared_name2.png")
+  );
+}
+
+#[test]
+fn add_new_part_with_content_type_and_path_numbers_upstream_numbered_content_types() {
+  let mut package = WordprocessingDocument::new_from_file_with_settings(
+    doc_sample("Hyperlink.docx"),
+    lazy_open_settings(),
+  )
+  .unwrap();
+  let main_part = package.main_document_part().unwrap();
+
+  let header_part = main_part
+    .add_new_part_with_content_type_and_path::<_, HeaderPart>(
+      &mut package,
+      "rIdSdkHeaderAtPath",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+      "word/header.xml",
+    )
+    .unwrap();
+
+  assert_eq!(header_part.path(&package), Some("word/header1.xml"));
+}
+
+#[test]
 fn set_data_replaces_existing_part_bytes() {
   // Source: upstream GetStream(FileMode.Create) replacement semantics adapted to raw bytes.
   let mut package = WordprocessingDocument::new_from_file_with_settings(

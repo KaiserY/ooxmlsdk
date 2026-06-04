@@ -53,6 +53,7 @@ pub struct SchemaTypeExtension {
   pub have_direct_xml_other_children: Option<bool>,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
+  pub add_children: Vec<SchemaTypeAddChildExtension>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -76,6 +77,27 @@ pub struct SchemaTypeChildExtension {
   pub repeated: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_name: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAddChildExtension {
+  pub name: String,
+  pub property_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub property_comments: String,
+  pub optional: Option<bool>,
+  pub repeated: Option<bool>,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub initial_version: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub before_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub after_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub before_property_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub after_property_name: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -315,6 +337,15 @@ pub fn apply_schema_extensions(
           child.name = child_extension.override_name.clone();
         }
       }
+
+      for child_extension in &extension.add_children {
+        add_schema_type_child(
+          module_name,
+          &extension.class_name,
+          schema_type,
+          child_extension,
+        )?;
+      }
     }
   }
 
@@ -463,6 +494,109 @@ fn variant_wire_qnames(wire: &VariantWireDecl) -> Option<&[String]> {
     | VariantWireDecl::TextChild { qnames } => Some(qnames),
     VariantWireDecl::Any | VariantWireDecl::Text => None,
   }
+}
+
+fn add_schema_type_child(
+  module_name: &str,
+  class_name: &str,
+  schema_type: &mut crate::sdk_data::sdk_data_model::SchemaType,
+  extension: &SchemaTypeAddChildExtension,
+) -> Result<()> {
+  if extension.name.is_empty() || extension.property_name.is_empty() {
+    return Err(
+      format!("schema extension child {module_name}.{class_name} add child is incomplete").into(),
+    );
+  }
+  if schema_type
+    .children
+    .iter()
+    .any(|child| child.name == extension.name)
+  {
+    return Err(
+      format!(
+        "schema extension child {module_name}.{class_name} already has child {}",
+        extension.name
+      )
+      .into(),
+    );
+  }
+  if schema_type
+    .children
+    .iter()
+    .any(|child| child.property_name == extension.property_name)
+  {
+    return Err(
+      format!(
+        "schema extension child {module_name}.{class_name} already has property {}",
+        extension.property_name
+      )
+      .into(),
+    );
+  }
+
+  let location_count = [
+    extension.before_name.as_str(),
+    extension.after_name.as_str(),
+    extension.before_property_name.as_str(),
+    extension.after_property_name.as_str(),
+  ]
+  .iter()
+  .filter(|value| !value.is_empty())
+  .count();
+  if location_count != 1 {
+    return Err(
+      format!(
+        "schema extension child {module_name}.{class_name} add child must specify one location"
+      )
+      .into(),
+    );
+  }
+
+  let index = find_add_child_location_index(&schema_type.children, extension).ok_or_else(|| {
+    format!("schema extension child {module_name}.{class_name} add child location not found")
+  })?;
+
+  schema_type.children.insert(
+    index,
+    crate::sdk_data::sdk_data_model::SchemaTypeChild {
+      name: extension.name.clone(),
+      property_name: extension.property_name.clone(),
+      property_comments: extension.property_comments.clone(),
+      kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child,
+      optional: extension.optional.unwrap_or(false),
+      repeated: extension.repeated.unwrap_or(false),
+      initial_version: extension.initial_version.clone(),
+      ..Default::default()
+    },
+  );
+
+  Ok(())
+}
+
+fn find_add_child_location_index(
+  children: &[crate::sdk_data::sdk_data_model::SchemaTypeChild],
+  extension: &SchemaTypeAddChildExtension,
+) -> Option<usize> {
+  for (index, child) in children.iter().enumerate() {
+    if !extension.before_name.is_empty() && child.name == extension.before_name {
+      return Some(index);
+    }
+    if !extension.after_name.is_empty() && child.name == extension.after_name {
+      return Some(index + 1);
+    }
+    if !extension.before_property_name.is_empty()
+      && child.property_name == extension.before_property_name
+    {
+      return Some(index);
+    }
+    if !extension.after_property_name.is_empty()
+      && child.property_name == extension.after_property_name
+    {
+      return Some(index + 1);
+    }
+  }
+
+  None
 }
 
 fn find_child_mut<'a>(
@@ -632,6 +766,109 @@ mod tests {
 
     assert_eq!(schemas[0].types[0].children[0].name, "t:CT_New/t:child");
     assert_eq!(schemas[0].types[0].children[0].property_name, "Child");
+  }
+
+  #[test]
+  fn applies_child_add_extensions_after_property_name_chain() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "Parent".to_string(),
+        children: vec![SchemaTypeChild {
+          name: "t:CT_Existing/t:existing".to_string(),
+          property_name: "Existing".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          add_children: vec![
+            SchemaTypeAddChildExtension {
+              name: "t:CT_First/t:first".to_string(),
+              property_name: "First".to_string(),
+              property_comments: "Defines the First Class.".to_string(),
+              optional: Some(true),
+              initial_version: "Office2010".to_string(),
+              after_property_name: "Existing".to_string(),
+              ..Default::default()
+            },
+            SchemaTypeAddChildExtension {
+              name: "t:CT_Second/t:second".to_string(),
+              property_name: "Second".to_string(),
+              property_comments: "Defines the Second Class.".to_string(),
+              optional: Some(true),
+              initial_version: "Office2010".to_string(),
+              after_property_name: "First".to_string(),
+              ..Default::default()
+            },
+          ],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    let first = &schemas[0].types[0].children[1];
+    assert_eq!(first.name, "t:CT_First/t:first");
+    assert_eq!(first.property_name, "First");
+    assert_eq!(first.property_comments, "Defines the First Class.");
+    assert!(first.optional);
+    assert_eq!(first.initial_version, "Office2010");
+
+    let second = &schemas[0].types[0].children[2];
+    assert_eq!(second.name, "t:CT_Second/t:second");
+    assert_eq!(second.property_name, "Second");
+    assert_eq!(second.property_comments, "Defines the Second Class.");
+    assert!(second.optional);
+    assert_eq!(second.initial_version, "Office2010");
+  }
+
+  #[test]
+  fn rejects_child_add_extension_without_location() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "Parent".to_string(),
+        children: vec![SchemaTypeChild {
+          name: "t:CT_Existing/t:existing".to_string(),
+          property_name: "Existing".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          add_children: vec![SchemaTypeAddChildExtension {
+            name: "t:CT_New/t:new".to_string(),
+            property_name: "New".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    let err = apply_schema_extensions(&mut schemas, &extensions).unwrap_err();
+
+    assert!(
+      err
+        .to_string()
+        .contains("add child must specify one location")
+    );
   }
 
   #[test]

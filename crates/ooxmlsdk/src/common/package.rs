@@ -705,6 +705,7 @@ impl RelationshipSet {
     }
   }
 
+  #[cfg(feature = "flat-opc")]
   pub(crate) fn to_bytes_cow(&self) -> Result<Cow<'_, [u8]>, SdkError> {
     if let Some(bytes) = &self.raw_bytes {
       return Ok(Cow::Borrowed(bytes));

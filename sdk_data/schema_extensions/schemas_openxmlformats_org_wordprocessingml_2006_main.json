@@ -149,7 +149,104 @@
     },
     {
       "ClassName": "NumberingSymbolRunProperties",
-      "HaveDirectXmlOtherChildren": true
+      "AddChildren": [
+        {
+          "Name": "w14:CT_Glow/w14:glow",
+          "PropertyName": "W14Glow",
+          "PropertyComments": "Defines the Glow Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "SpecVanish"
+        },
+        {
+          "Name": "w14:CT_Shadow/w14:shadow",
+          "PropertyName": "W14Shadow",
+          "PropertyComments": "Defines the Shadow Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Glow"
+        },
+        {
+          "Name": "w14:CT_Reflection/w14:reflection",
+          "PropertyName": "W14Reflection",
+          "PropertyComments": "Defines the Reflection Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Shadow"
+        },
+        {
+          "Name": "w14:CT_TextOutlineEffect/w14:textOutline",
+          "PropertyName": "W14TextOutlineEffect",
+          "PropertyComments": "Defines the TextOutlineEffect Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Reflection"
+        },
+        {
+          "Name": "w14:CT_FillTextEffect/w14:textFill",
+          "PropertyName": "W14FillTextEffect",
+          "PropertyComments": "Defines the FillTextEffect Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14TextOutlineEffect"
+        },
+        {
+          "Name": "w14:CT_Scene3D/w14:scene3d",
+          "PropertyName": "W14Scene3D",
+          "PropertyComments": "Defines the Scene3D Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14FillTextEffect"
+        },
+        {
+          "Name": "w14:CT_Props3D/w14:props3d",
+          "PropertyName": "W14Properties3D",
+          "PropertyComments": "Defines the Properties3D Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Scene3D"
+        },
+        {
+          "Name": "w14:CT_Ligatures/w14:ligatures",
+          "PropertyName": "W14Ligatures",
+          "PropertyComments": "Defines the Ligatures Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Properties3D"
+        },
+        {
+          "Name": "w14:CT_NumForm/w14:numForm",
+          "PropertyName": "W14NumberingFormat",
+          "PropertyComments": "Defines the NumberingFormat Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14Ligatures"
+        },
+        {
+          "Name": "w14:CT_NumSpacing/w14:numSpacing",
+          "PropertyName": "W14NumberSpacing",
+          "PropertyComments": "Defines the NumberSpacing Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberingFormat"
+        },
+        {
+          "Name": "w14:CT_StylisticSets/w14:stylisticSets",
+          "PropertyName": "W14StylisticSets",
+          "PropertyComments": "Defines the StylisticSets Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14NumberSpacing"
+        },
+        {
+          "Name": "w14:CT_OnOff/w14:cntxtAlts",
+          "PropertyName": "W14ContextualAlternatives",
+          "PropertyComments": "Defines the ContextualAlternatives Class.",
+          "Optional": true,
+          "InitialVersion": "Office2010",
+          "AfterPropertyName": "W14StylisticSets"
+        }
+      ]
     },
     {
       "ClassName": "Paragraph",

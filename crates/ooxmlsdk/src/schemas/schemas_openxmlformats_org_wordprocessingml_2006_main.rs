@@ -13481,7 +13481,6 @@ pub struct PreviousParagraphProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:rPr")]
 pub struct NumberingSymbolRunProperties {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -13590,6 +13589,42 @@ pub struct NumberingSymbolRunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
+  /// Defines the Glow Class.
+  #[sdk(child(qname = "w14:glow"))]
+  pub w14_glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
+  /// Defines the Shadow Class.
+  #[sdk(child(qname = "w14:shadow"))]
+  pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
+  /// Defines the Reflection Class.
+  #[sdk(child(qname = "w14:reflection"))]
+  pub w14_reflection: Option<crate::schemas::w14::Reflection>,
+  /// Defines the TextOutlineEffect Class.
+  #[sdk(child(qname = "w14:textOutline"))]
+  pub w14_text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
+  /// Defines the FillTextEffect Class.
+  #[sdk(child(qname = "w14:textFill"))]
+  pub w14_fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
+  /// Defines the Scene3D Class.
+  #[sdk(child(qname = "w14:scene3d"))]
+  pub w14_scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
+  /// Defines the Properties3D Class.
+  #[sdk(child(qname = "w14:props3d"))]
+  pub w14_properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
+  /// Defines the Ligatures Class.
+  #[sdk(child(qname = "w14:ligatures"))]
+  pub w14_ligatures: Option<crate::schemas::w14::Ligatures>,
+  /// Defines the NumberingFormat Class.
+  #[sdk(child(qname = "w14:numForm"))]
+  pub w14_numbering_format: Option<crate::schemas::w14::NumberingFormat>,
+  /// Defines the NumberSpacing Class.
+  #[sdk(child(qname = "w14:numSpacing"))]
+  pub w14_number_spacing: Option<crate::schemas::w14::NumberSpacing>,
+  /// Defines the StylisticSets Class.
+  #[sdk(child(qname = "w14:stylisticSets"))]
+  pub w14_stylistic_sets: Option<crate::schemas::w14::StylisticSets>,
+  /// Defines the ContextualAlternatives Class.
+  #[sdk(child(qname = "w14:cntxtAlts"))]
+  pub w14_contextual_alternatives: Option<crate::schemas::w14::ContextualAlternatives>,
 }
 /// Abstract Numbering Definition Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -7449,6 +7449,7 @@ pub struct CellStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:xf")]
 pub struct CellFormat {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Number Format Id
   #[sdk(attr(qname = ":numFmtId"))]
   pub number_format_id: Option<crate::simple_type::UInt32Value>,
@@ -8497,6 +8498,7 @@ pub struct CustomChartsheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(default_ns, qname = "x:drawing")]
 pub struct Drawing {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Relationship id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -9915,9 +9917,8 @@ pub struct Fills {
   /// Fill Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// Fill.
-  #[sdk(child(qname = "x:fill"))]
-  pub fill: Vec<Fill>,
+  #[sdk(choice(child(variant = Fill, qname = "x:fill"), any))]
+  pub xml_children: Vec<FillsChoice>,
 }
 /// Defines the Borders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11268,6 +11269,13 @@ pub enum WorksheetExtensionChoice {
 pub enum FontsChoice {
   /// Font Properties.
   Font(std::boxed::Box<Font>),
+  /// Unknown XML child.
+  XmlAny(std::boxed::Box<[u8]>),
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum FillsChoice {
+  /// Fill.
+  Fill(std::boxed::Box<Fill>),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }

@@ -3,6 +3,18 @@
     {
       "ClassName": "CoreProperties",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Created",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Language",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Modified",
+      "HaveXmlnsFields": true
     }
   ]
 }

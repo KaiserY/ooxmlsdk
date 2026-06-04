@@ -4660,7 +4660,7 @@ pub struct SpacingBetweenLines {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub before: Option<crate::simple_type::TwipsMeasureValue>,
+  pub before: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Spacing Above Paragraph IN Line Units
   #[sdk(attr(qname = "w:beforeLines"))]
   pub before_lines: Option<crate::simple_type::Int32Value>,
@@ -4676,7 +4676,7 @@ pub struct SpacingBetweenLines {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub after: Option<crate::simple_type::TwipsMeasureValue>,
+  pub after: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Spacing Below Paragraph in Line Units
   #[sdk(attr(qname = "w:afterLines"))]
   pub after_lines: Option<crate::simple_type::Int32Value>,
@@ -9636,6 +9636,7 @@ pub struct NumberingRestart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:altChunk")]
 pub struct AltChunk {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -13602,6 +13603,7 @@ pub struct MultiLevelType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:lvl")]
 pub struct Level {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Numbering Level
   #[sdk(attr(qname = "w:ilvl"))]
   pub level_index: crate::simple_type::Int32Value,

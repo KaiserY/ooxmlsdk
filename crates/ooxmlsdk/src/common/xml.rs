@@ -1394,24 +1394,11 @@ pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
 #[inline]
 fn root_start_matches(
   start: &quick_xml::events::BytesStart<'_>,
-  tag_qname: &[u8],
+  _tag_qname: &[u8],
   local_name: &[u8],
-  namespace_uri: Option<&[u8]>,
+  _namespace_uri: Option<&[u8]>,
 ) -> Result<bool, SdkError> {
-  let name = start.name();
-  let name = name.as_ref();
-  if name == tag_qname || name == local_name {
-    return Ok(true);
-  }
-
-  let Some(namespace_uri) = namespace_uri else {
-    return Ok(false);
-  };
-  let (prefix, root_local_name) = split_qname(name);
-  if prefix.is_none() || root_local_name != local_name {
-    return Ok(false);
-  }
-  root_namespace_matches(start, prefix, namespace_uri)
+  Ok(start.local_name().into_inner() == local_name)
 }
 
 pub(crate) fn root_element_matches_namespace_local(

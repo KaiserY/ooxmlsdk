@@ -81,14 +81,53 @@ where
   any
 }
 
+fn local_name_fallback_qnames<I>(qnames: I) -> std::collections::HashSet<String>
+where
+  I: IntoIterator,
+  I::Item: AsRef<str>,
+{
+  let mut local_name_qnames = std::collections::HashMap::<String, Vec<String>>::new();
+  for qname in qnames {
+    let qname = qname.as_ref();
+    let QNameInfo { local_name, .. } = parse_qname_info(qname);
+    let qnames = local_name_qnames.entry(local_name).or_default();
+    if !qnames.iter().any(|existing| existing == qname) {
+      qnames.push(qname.to_string());
+    }
+  }
+
+  local_name_qnames
+    .into_values()
+    .filter_map(|qnames| {
+      if qnames.len() == 1 {
+        return qnames.into_iter().next();
+      }
+
+      let base_qnames = qnames
+        .into_iter()
+        .filter(|qname| {
+          let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
+          !tag_prefix.as_bytes().last().is_some_and(u8::is_ascii_digit)
+        })
+        .collect::<Vec<_>>();
+
+      if base_qnames.len() == 1 {
+        base_qnames.into_iter().next()
+      } else {
+        None
+      }
+    })
+    .collect()
+}
+
 fn should_use_local_name_child_dispatch(
   _schema_qname: &str,
   child_qnames: impl IntoIterator<Item = String>,
   _has_choice_dispatch: bool,
   has_any_dispatch: bool,
-  has_xml_other_children_dispatch: bool,
+  _has_xml_other_children_dispatch: bool,
 ) -> bool {
-  if has_any_dispatch || has_xml_other_children_dispatch {
+  if has_any_dispatch {
     return false;
   }
 
@@ -114,7 +153,10 @@ mod tests {
   fn local_name_child_dispatch_rejects_same_parent_conflicts() {
     assert!(!should_use_local_name_child_dispatch(
       "w:CT_SomeParent/w:parent",
-      ["w:CT_R/w:r".to_string(), "m:CT_R/m:r".to_string()],
+      [
+        "w:CT_OnOff/w:shadow".to_string(),
+        "w14:CT_Shadow/w14:shadow".to_string(),
+      ],
       false,
       false,
       false,
@@ -122,8 +164,8 @@ mod tests {
   }
 
   #[test]
-  fn local_name_child_dispatch_rejects_xml_other_children() {
-    assert!(!should_use_local_name_child_dispatch(
+  fn local_name_child_dispatch_allows_xml_other_children_when_unambiguous() {
+    assert!(should_use_local_name_child_dispatch(
       "w:CT_RPrList/w:rPr",
       ["w:CT_OnOff/w:shadow".to_string()],
       false,
@@ -3879,8 +3921,17 @@ fn expand_named_struct(
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
-  let preserve_fixed_prefixed_namespace =
-    has_xml_other_children_field && default_ns && tag_prefix == "x";
+  let preserves_raw_children = has_xml_other_children_field
+    || !any_child_fields.is_empty()
+    || !any_fields.is_empty()
+    || choice_fields.iter().any(|field| {
+      field.accepts_any.unwrap_or(false)
+        || field
+          .items
+          .iter()
+          .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
+    });
+  let preserve_fixed_prefixed_namespace = preserves_raw_children && default_ns && tag_prefix == "x";
   let use_canonical_xmlns_prefix = has_xmlns_fields && {
     let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
     is_canonical_xmlns_prefix_namespace(&tag_prefix)
@@ -3908,6 +3959,19 @@ fn expand_named_struct(
             .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
       }),
     has_xml_other_children_field,
+  );
+  let child_local_name_fallback_qnames = local_name_fallback_qnames(
+    child_fields
+      .iter()
+      .map(|field| field.qname.clone())
+      .chain(empty_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(text_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(any_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(
+        choice_fields
+          .iter()
+          .flat_map(|field| field.specific_qnames.iter().cloned()),
+      ),
   );
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
@@ -4366,7 +4430,11 @@ fn expand_named_struct(
         format!("{tag_prefix}:{local_name}").as_bytes(),
         Span::call_site(),
       );
-      quote! { #tag_qname_lit | #local_name_lit }
+      if child_local_name_fallback_qnames.contains(&field.qname) {
+        quote! { #tag_qname_lit | #local_name_lit }
+      } else {
+        quote! { #tag_qname_lit }
+      }
     };
     let child_write_call = write_typed_child_tokens(&child_ty, quote! { child }, &field.qname);
     let self_write_call =
@@ -4709,37 +4777,7 @@ fn expand_named_struct(
             == 1usize
         }));
     if flatten_choice_items {
-      let mut flat_choice_local_name_qnames =
-        std::collections::HashMap::<String, Vec<String>>::new();
-      for qname in &specific_qnames {
-        let QNameInfo { local_name, .. } = parse_qname_info(qname);
-        let qnames = flat_choice_local_name_qnames.entry(local_name).or_default();
-        if !qnames.iter().any(|existing| existing == qname) {
-          qnames.push(qname.clone());
-        }
-      }
-      let flat_choice_local_name_fallback_qnames = flat_choice_local_name_qnames
-        .into_values()
-        .filter_map(|qnames| {
-          if qnames.len() == 1 {
-            return qnames.into_iter().next();
-          }
-
-          let base_qnames = qnames
-            .into_iter()
-            .filter(|qname| {
-              let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
-              !tag_prefix.as_bytes().last().is_some_and(u8::is_ascii_digit)
-            })
-            .collect::<Vec<_>>();
-
-          if base_qnames.len() == 1 {
-            base_qnames.into_iter().next()
-          } else {
-            None
-          }
-        })
-        .collect::<std::collections::HashSet<_>>();
+      let flat_choice_local_name_fallback_qnames = local_name_fallback_qnames(&specific_qnames);
       let flat_choice_match_targets = |qnames: &[String]| {
         let mut seen = std::collections::HashSet::new();
         let mut targets = Vec::new();
@@ -5177,39 +5215,7 @@ fn expand_named_struct(
     }
     let mut grouped_choice_items = false;
     if !flatten_choice_items && !field.items.is_empty() && !field_accepts_any {
-      let mut grouped_choice_local_name_qnames =
-        std::collections::HashMap::<String, Vec<String>>::new();
-      for qname in &specific_qnames {
-        let QNameInfo { local_name, .. } = parse_qname_info(qname);
-        let qnames = grouped_choice_local_name_qnames
-          .entry(local_name)
-          .or_default();
-        if !qnames.iter().any(|existing| existing == qname) {
-          qnames.push(qname.clone());
-        }
-      }
-      let grouped_choice_local_name_fallback_qnames = grouped_choice_local_name_qnames
-        .into_values()
-        .filter_map(|qnames| {
-          if qnames.len() == 1 {
-            return qnames.into_iter().next();
-          }
-
-          let base_qnames = qnames
-            .into_iter()
-            .filter(|qname| {
-              let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
-              !tag_prefix.as_bytes().last().is_some_and(u8::is_ascii_digit)
-            })
-            .collect::<Vec<_>>();
-
-          if base_qnames.len() == 1 {
-            base_qnames.into_iter().next()
-          } else {
-            None
-          }
-        })
-        .collect::<std::collections::HashSet<_>>();
+      let grouped_choice_local_name_fallback_qnames = local_name_fallback_qnames(&specific_qnames);
       let grouped_choice_match_target_keys = |qnames: &[String]| {
         let mut seen = std::collections::HashSet::new();
         let mut targets = Vec::new();

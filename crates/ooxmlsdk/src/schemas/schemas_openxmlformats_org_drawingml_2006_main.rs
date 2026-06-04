@@ -2599,6 +2599,7 @@ pub struct Tile {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:stretch")]
 pub struct Stretch {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Fill Rectangle
   #[sdk(child(qname = "a:fillRect"))]
   pub fill_rectangle: Option<FillRectangle>,
@@ -6039,6 +6040,7 @@ pub struct TileRectangle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:fillRect")]
 pub struct FillRectangle {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
   pub left: Option<crate::simple_type::DrawingmlPercentageValue>,
@@ -9630,6 +9632,7 @@ pub struct NonVisualDrawingPropertiesExtension {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:picLocks")]
 pub struct PictureLocks {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Disallow Shape Grouping
   #[sdk(attr(qname = ":noGrp"))]
   pub no_grouping: Option<crate::simple_type::BooleanValue>,

@@ -39,7 +39,7 @@ pub struct CoreProperties {
   #[sdk(child(qname = "cp:keywords"))]
   pub keywords: Option<Keywords>,
   /// dc:language
-  #[sdk(text_child(qname = "dc:language"))]
+  #[sdk(child(qname = "dc:language"))]
   pub language: Option<Language>,
   /// cp:lastModifiedBy
   #[sdk(text_child(qname = "cp:lastModifiedBy"))]
@@ -71,6 +71,7 @@ pub type ContentStatus = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dcterms:created")]
 pub struct Created {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// type
   #[sdk(attr(qname = "xsi:type"))]
   pub xsi_type: Option<XsiTypeValue>,
@@ -84,7 +85,13 @@ pub type Description = crate::simple_type::StringValue;
 /// dc:identifier
 pub type Identifier = crate::simple_type::StringValue;
 /// dc:language
-pub type Language = crate::simple_type::StringValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "dc:language")]
+pub struct Language {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::StringValue>,
+}
 /// cp:lastModifiedBy
 pub type LastModifiedBy = crate::simple_type::StringValue;
 /// cp:lastPrinted
@@ -93,6 +100,7 @@ pub type LastPrinted = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dcterms:modified")]
 pub struct Modified {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// type
   #[sdk(attr(qname = "xsi:type"))]
   pub xsi_type: Option<XsiTypeValue>,

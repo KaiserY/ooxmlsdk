@@ -188,8 +188,12 @@ impl StylesCatalog {
         .as_ref()
         .map(|fills| {
           fills
-            .fill
+            .xml_children
             .iter()
+            .filter_map(|child| match child {
+              x::FillsChoice::Fill(fill) => Some(fill.as_ref()),
+              x::FillsChoice::XmlAny(_) => None,
+            })
             .map(|fill| FillRecord::from_fill_with_colors(fill, &indexed_colors))
             .collect()
         })

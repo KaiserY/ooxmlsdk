@@ -52,6 +52,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "FillRectangle",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "FontReference",
       "HaveXmlnsFields": true
     },
@@ -116,6 +120,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "PictureLocks",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "PresetGeometry",
       "HaveXmlnsFields": true
     },
@@ -138,6 +146,10 @@
     },
     {
       "ClassName": "SolidFill",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Stretch",
       "HaveXmlnsFields": true
     },
     {

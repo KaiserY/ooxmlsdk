@@ -10,6 +10,7 @@
 pub struct CommentsIds {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the CommentId Class.
   #[sdk(child(qname = "w16cid:commentId"))]
   pub comment_id: Vec<CommentId>,

@@ -2479,11 +2479,11 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(spacing) = properties.spacing_between_lines() {
     if let Some(before) = spacing.before.as_ref() {
       format.spacing_before_set = true;
-      format.spacing_before_pt = twips_measure_to_points(before).unwrap_or(0.0);
+      format.spacing_before_pt = signed_twips_measure_to_points(before).unwrap_or(0.0);
     }
     if let Some(after) = spacing.after.as_ref() {
       format.spacing_after_set = true;
-      format.spacing_after_pt = twips_measure_to_points(after).unwrap_or(0.0);
+      format.spacing_after_pt = signed_twips_measure_to_points(after).unwrap_or(0.0);
     }
     if let Some(line) = spacing.line.as_ref() {
       match spacing.line_rule {

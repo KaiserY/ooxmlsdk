@@ -276,6 +276,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "CellFormat",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "CellStyle",
       "HaveXmlOtherAttrs": true
     },
@@ -293,7 +297,15 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Drawing",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "DifferentialFormats",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Fills",
       "HaveDirectXmlOtherChildren": true
     },
     {

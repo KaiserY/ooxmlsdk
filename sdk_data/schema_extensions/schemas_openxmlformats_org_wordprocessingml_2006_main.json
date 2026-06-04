@@ -51,6 +51,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "AltChunk",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Comments",
       "HaveXmlOtherAttrs": true
     },
@@ -140,6 +144,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Level",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "NumberingSymbolRunProperties",
       "HaveDirectXmlOtherChildren": true
     },
@@ -185,7 +193,17 @@
     },
     {
       "ClassName": "SpacingBetweenLines",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "Attributes": [
+        {
+          "PropertyName": "Before",
+          "OverrideType": "SignedTwipsMeasureValue"
+        },
+        {
+          "PropertyName": "After",
+          "OverrideType": "SignedTwipsMeasureValue"
+        }
+      ]
     },
     {
       "ClassName": "Styles",

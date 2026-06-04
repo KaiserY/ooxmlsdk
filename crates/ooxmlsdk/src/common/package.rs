@@ -419,6 +419,7 @@ pub struct RelationshipSet {
   xml_header: super::XmlHeaderType,
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
+  raw_bytes: Option<Box<[u8]>>,
 }
 
 fn next_relationship_id<'a>(relationships: impl Iterator<Item = &'a RelationshipInfo>) -> String {
@@ -443,7 +444,7 @@ impl RelationshipSet {
 
   #[inline]
   pub(crate) fn is_empty(&self) -> bool {
-    self.relationships.is_empty()
+    self.relationships.is_empty() && self.raw_bytes.is_none()
   }
 
   #[inline]
@@ -532,6 +533,7 @@ impl RelationshipSet {
 
   pub(crate) fn remove(&mut self, relationship_id: &str) -> Option<RelationshipInfo> {
     let index = *self.by_id.get(relationship_id)?;
+    self.raw_bytes = None;
     let removed = self.relationships.remove(index);
     self.rebuild_index();
     Some(removed)
@@ -628,6 +630,7 @@ impl RelationshipSet {
     };
 
     self.relationships[index].id = new_relationship_id.into_boxed_str();
+    self.raw_bytes = None;
     self.rebuild_index();
     Ok(())
   }
@@ -702,6 +705,13 @@ impl RelationshipSet {
     }
   }
 
+  pub(crate) fn to_bytes_cow(&self) -> Result<Cow<'_, [u8]>, SdkError> {
+    if let Some(bytes) = &self.raw_bytes {
+      return Ok(Cow::Borrowed(bytes));
+    }
+    Ok(Cow::Owned(self.to_relationships().to_bytes()?))
+  }
+
   fn from_relationships(
     relationships: Option<Relationships>,
     source_path: &str,
@@ -716,6 +726,7 @@ impl RelationshipSet {
       xml_header: relationships.xml_header,
       relationships: Vec::with_capacity(relationships.relationship.len()),
       by_id: HashMap::with_capacity(relationships.relationship.len()),
+      raw_bytes: None,
     };
 
     for relationship in relationships.relationship {
@@ -724,6 +735,15 @@ impl RelationshipSet {
     }
 
     set
+  }
+
+  fn from_raw_bytes(bytes: Box<[u8]>) -> Self {
+    Self {
+      xml_header: super::XmlHeaderType::default(),
+      relationships: Vec::new(),
+      by_id: HashMap::new(),
+      raw_bytes: Some(bytes),
+    }
   }
 
   fn push_relationship(
@@ -741,6 +761,7 @@ impl RelationshipSet {
   }
 
   fn push_relationship_unchecked(&mut self, relationship: RelationshipInfo) {
+    self.raw_bytes = None;
     let index = self.relationships.len();
     self.by_id.insert(relationship.id.clone(), index);
     self.relationships.push(relationship);
@@ -880,12 +901,12 @@ impl SdkPackageStorage {
     let mut part_relationships = Vec::with_capacity(raw_parts.len());
     for raw_part in &raw_parts {
       let rels_path = part_relationships_path(&raw_part.path);
-      let relationships = read_relationships(&mut archive, &rels_path)?;
-      part_relationships.push(RelationshipSet::from_relationships(
-        relationships,
+      part_relationships.push(read_part_relationships(
+        &mut archive,
+        &rels_path,
         &raw_part.path,
         &by_path,
-      ));
+      )?);
     }
 
     let relationship_types =
@@ -1008,11 +1029,12 @@ impl SdkPackageStorage {
     writer.write_all(b">\n")?;
 
     if !self.package_relationships.is_empty() {
+      let bytes = self.package_relationships.to_bytes_cow()?;
       write_flat_opc_xml_part(
         writer,
         "/_rels/.rels",
         RELATIONSHIP_CONTENT_TYPE,
-        &self.package_relationships.to_relationships().to_bytes()?,
+        bytes.as_ref(),
       )?;
     }
 
@@ -1032,12 +1054,13 @@ impl SdkPackageStorage {
       }
 
       if !part.relationships().is_empty() {
+        let bytes = part.relationships().to_bytes_cow()?;
         let rels_name = format!("/{}", part_relationships_path(part.path()));
         write_flat_opc_xml_part(
           writer,
           &rels_name,
           RELATIONSHIP_CONTENT_TYPE,
-          &part.relationships().to_relationships().to_bytes()?,
+          bytes.as_ref(),
         )?;
       }
     }
@@ -2529,6 +2552,33 @@ fn read_relationships<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
   path: &str,
 ) -> Result<Option<Relationships>, SdkError> {
+  let Some(bytes) = read_relationship_bytes(archive, path)? else {
+    return Ok(None);
+  };
+  Relationships::from_bytes(&bytes).map(Some)
+}
+
+fn read_part_relationships<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+  path: &str,
+  source_path: &str,
+  by_path: &HashMap<Box<str>, PartId>,
+) -> Result<RelationshipSet, SdkError> {
+  let Some(bytes) = read_relationship_bytes(archive, path)? else {
+    return Ok(RelationshipSet::default());
+  };
+  Ok(match Relationships::from_bytes(&bytes) {
+    Ok(relationships) => {
+      RelationshipSet::from_relationships(Some(relationships), source_path, by_path)
+    }
+    Err(_) => RelationshipSet::from_raw_bytes(bytes.into_boxed_slice()),
+  })
+}
+
+fn read_relationship_bytes<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+  path: &str,
+) -> Result<Option<Vec<u8>>, SdkError> {
   let Some(index) = archive.index_for_name(path) else {
     return Ok(None);
   };
@@ -2536,7 +2586,7 @@ fn read_relationships<R: Read + Seek>(
   let mut entry = archive.by_index(index)?;
   let mut bytes = Vec::with_capacity(entry.size() as usize);
   entry.read_to_end(&mut bytes)?;
-  Relationships::from_bytes(&bytes).map(Some)
+  Ok(Some(bytes))
 }
 
 fn relationship_info(

@@ -2100,6 +2100,9 @@ pub struct SharedStringTable {
   /// Unique String Count
   #[sdk(attr(qname = ":uniqueCount"))]
   pub unique_count: Option<crate::simple_type::UInt32Value>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   /// String Item.
   #[sdk(child(qname = "x:si"))]
   pub shared_string_item: Vec<SharedStringItem>,

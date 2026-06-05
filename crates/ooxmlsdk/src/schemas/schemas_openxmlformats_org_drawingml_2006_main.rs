@@ -2503,6 +2503,7 @@ pub struct PresetColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:sp3d")]
 pub struct Shape3DType {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
@@ -4529,6 +4530,7 @@ pub struct SupplementalFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:scene3d")]
 pub struct Scene3DType {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Camera
   #[sdk(child(qname = "a:camera"))]
   pub camera: std::boxed::Box<Camera>,

@@ -1,6 +1,18 @@
 {
   "Types": [
     {
+      "ClassName": "AxisId",
+      "Attributes": [
+        {
+          "QName": ":val",
+          "PropertyName": "Val",
+          "PropertyComments": "Axis ID",
+          "Optional": true,
+          "OverrideType": "UInt32Value"
+        }
+      ]
+    },
+    {
       "ClassName": "Chart",
       "HaveXmlnsFields": true
     },

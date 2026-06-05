@@ -94,6 +94,15 @@
       ]
     },
     {
+      "ClassName": "Indentation",
+      "Attributes": [
+        {
+          "PropertyName": "Hanging",
+          "OverrideType": "SignedTwipsMeasureValue"
+        }
+      ]
+    },
+    {
       "ClassName": "HeaderReference",
       "HaveXmlnsFields": true
     },
@@ -142,6 +151,44 @@
     {
       "ClassName": "Numbering",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PreviousTableProperties",
+      "AddChildren": [
+        {
+          "Name": "w:CT_UnsignedDecimalNumberMax3/w:tblStyleRowBandSize",
+          "PropertyName": "TableStyleRowBandSize",
+          "PropertyComments": "Defines the TableStyleRowBandSize Class.",
+          "Optional": true,
+          "AfterPropertyName": "BiDiVisual"
+        },
+        {
+          "Name": "w:CT_UnsignedDecimalNumberMax3/w:tblStyleColBandSize",
+          "PropertyName": "TableStyleColumnBandSize",
+          "PropertyComments": "Defines the TableStyleColumnBandSize Class.",
+          "Optional": true,
+          "AfterPropertyName": "TableStyleRowBandSize"
+        }
+      ]
+    },
+    {
+      "ClassName": "TableProperties",
+      "AddChildren": [
+        {
+          "Name": "w:CT_UnsignedDecimalNumberMax3/w:tblStyleRowBandSize",
+          "PropertyName": "TableStyleRowBandSize",
+          "PropertyComments": "Defines the TableStyleRowBandSize Class.",
+          "Optional": true,
+          "AfterPropertyName": "BiDiVisual"
+        },
+        {
+          "Name": "w:CT_UnsignedDecimalNumberMax3/w:tblStyleColBandSize",
+          "PropertyName": "TableStyleColumnBandSize",
+          "PropertyComments": "Defines the TableStyleColumnBandSize Class.",
+          "Optional": true,
+          "AfterPropertyName": "TableStyleRowBandSize"
+        }
+      ]
     },
     {
       "ClassName": "Level",
@@ -249,9 +296,27 @@
       ]
     },
     {
+      "ClassName": "MailMerge",
+      "Children": [
+        {
+          "PropertyName": "DataType",
+          "Optional": true
+        }
+      ]
+    },
+    {
       "ClassName": "Paragraph",
       "HaveXmlnsFields": true,
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ParagraphPropertiesChange",
+      "Children": [
+        {
+          "PropertyName": "ParagraphPropertiesExtended",
+          "Optional": true
+        }
+      ]
     },
     {
       "ClassName": "ParagraphBorders",
@@ -260,6 +325,18 @@
     {
       "ClassName": "ParagraphPropertiesBaseStyle",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "StyleParagraphProperties",
+      "AddChildren": [
+        {
+          "Name": "w:CT_ParaRPr/w:rPr",
+          "PropertyName": "ParagraphMarkRunProperties",
+          "PropertyComments": "Paragraph Mark Run Properties.",
+          "Optional": true,
+          "AfterPropertyName": "OutlineLevel"
+        }
+      ]
     },
     {
       "ClassName": "Run",
@@ -392,6 +469,10 @@
       "ClassName": "Table",
       "Children": [
         {
+          "Name": "w:CT_TblPr/w:tblPr",
+          "Optional": true
+        },
+        {
           "Name": "w:CT_TblGrid/w:tblGrid",
           "Optional": true
         }
@@ -410,6 +491,17 @@
     {
       "RustName": "RunChoice",
       "AddXmlAny": true
+    },
+    {
+      "RustName": "TableCellChoice",
+      "AddVariants": [
+        {
+          "RustName": "Break",
+          "QName": "w:CT_Br/w:br",
+          "Docs": "Out-of-place break in table cell.",
+          "PayloadRustType": "Break"
+        }
+      ]
     },
     {
       "RustName": "TableStyleConditionalFormattingTableRowPropertiesChoice",

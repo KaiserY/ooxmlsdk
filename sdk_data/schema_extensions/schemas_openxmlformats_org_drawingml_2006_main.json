@@ -133,6 +133,14 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Scene3DType",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Shape3DType",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Run",
       "HaveDirectXmlOtherChildren": true
     },

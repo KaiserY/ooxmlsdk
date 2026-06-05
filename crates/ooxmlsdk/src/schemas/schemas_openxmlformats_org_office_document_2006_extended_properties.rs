@@ -152,7 +152,7 @@ pub struct HeadingPairs {
 pub struct HyperlinkList {
   /// Vector
   #[sdk(child(qname = "vt:vector"))]
-  pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
+  pub vt_vector: Option<crate::schemas::vt::VtVector>,
 }
 /// Part Titles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

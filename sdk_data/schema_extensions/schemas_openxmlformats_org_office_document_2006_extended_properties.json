@@ -1,0 +1,13 @@
+{
+  "Types": [
+    {
+      "ClassName": "HyperlinkList",
+      "Children": [
+        {
+          "PropertyName": "VTVector",
+          "Optional": true
+        }
+      ]
+    }
+  ]
+}

@@ -58,7 +58,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   let paragraph_properties = paragraph.paragraph_properties.as_deref();
   let previous_paragraph_properties = paragraph_properties
     .and_then(|properties| properties.paragraph_properties_change.as_deref())
-    .map(|change| change.paragraph_properties_extended.as_ref());
+    .and_then(|change| change.paragraph_properties_extended.as_deref());
   let use_previous_paragraph_properties =
     paragraph_mark_is_deleted(paragraph) && previous_paragraph_properties.is_some();
   let effective_style_id = if use_previous_paragraph_properties {

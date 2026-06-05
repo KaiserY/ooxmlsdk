@@ -98,6 +98,18 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "SharedStringTable",
+      "Attributes": [
+        {
+          "QName": "xml:space",
+          "PropertyName": "Space",
+          "PropertyComments": "Content Contains Significant Whitespace",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.SpaceProcessingModeValues>"
+        }
+      ]
+    },
+    {
       "ClassName": "ExternalCell",
       "Children": [
         {

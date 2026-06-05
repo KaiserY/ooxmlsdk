@@ -216,7 +216,11 @@ impl TwipsMeasureValue {
     if let Some(value) = try_parse_u64_bytes(value) {
       return Ok(Self::Twips(value));
     }
-    parse_positive_universal_measure_bytes(value).map(Self::UniversalMeasure)
+    parse_positive_universal_measure_bytes(value)
+      .map(Self::UniversalMeasure)
+      .or_else(|_| {
+        parse_bare_twips_decimal_bytes(value, false).map(|value| Self::Twips(value as u64))
+      })
   }
 
   #[inline]
@@ -275,7 +279,9 @@ impl SignedTwipsMeasureValue {
     if let Some(value) = try_parse_i64_bytes(value) {
       return Ok(Self::Twips(value));
     }
-    parse_universal_measure_bytes(value).map(Self::UniversalMeasure)
+    parse_universal_measure_bytes(value)
+      .map(Self::UniversalMeasure)
+      .or_else(|_| parse_bare_twips_decimal_bytes(value, true).map(Self::Twips))
   }
 
   #[inline]
@@ -1349,6 +1355,17 @@ fn parse_decimal_scaled_to_i64_bytes(
   i64::try_from(signed).map_err(|_| UnitParseError::Overflow)
 }
 
+#[inline]
+fn parse_bare_twips_decimal_bytes(
+  value: &[u8],
+  allow_negative: bool,
+) -> Result<i64, UnitParseError> {
+  if !value.contains(&b'.') {
+    return Err(UnitParseError::InvalidNumber);
+  }
+  parse_decimal_scaled_to_i64_bytes(value, 1, allow_negative, None)
+}
+
 #[inline(always)]
 fn try_parse_u64_bytes(value: &[u8]) -> Option<u64> {
   let digits = match value {
@@ -1643,6 +1660,22 @@ mod tests {
     assert_eq!(
       TextBulletSizeValue::from_bytes(b"25%"),
       Ok(TextBulletSizeValue::PercentString(25_000))
+    );
+  }
+
+  #[test]
+  fn parses_bare_decimal_twips_like_libreoffice() {
+    assert_eq!(
+      TwipsMeasureValue::from_bytes(b"1133.8582677165355"),
+      Ok(TwipsMeasureValue::Twips(1134))
+    );
+    assert_eq!(
+      SignedTwipsMeasureValue::from_bytes(b"-1133.8582677165355"),
+      Ok(SignedTwipsMeasureValue::Twips(-1134))
+    );
+    assert_eq!(
+      TwipsMeasureValue::from_bytes(b"-1.5"),
+      Err(UnitParseError::InvalidNumber)
     );
   }
 

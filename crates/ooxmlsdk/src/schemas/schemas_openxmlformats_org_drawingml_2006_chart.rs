@@ -4500,6 +4500,9 @@ pub struct SurfaceSerExtension {
 pub struct DataDisplayOptions16 {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
+  /// Uniform Resource Identifier
+  #[sdk(attr(qname = ":uri"))]
+  pub uri: Option<crate::simple_type::StringValue>,
   /// Defines the BooleanFalse Class.
   #[sdk(child(qname = "c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,

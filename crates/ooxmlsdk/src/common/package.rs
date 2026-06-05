@@ -2575,7 +2575,7 @@ fn read_part_relationships<R: Read + Seek>(
   source_path: &str,
   by_path: &HashMap<Box<str>, PartId>,
 ) -> Result<RelationshipSet, SdkError> {
-  let Some(bytes) = read_relationship_bytes(archive, path)? else {
+  let Some(bytes) = read_relationship_bytes_with_lowercase_filename_fallback(archive, path)? else {
     return Ok(RelationshipSet::default());
   };
   Ok(match Relationships::from_bytes(&bytes) {
@@ -2598,6 +2598,34 @@ fn read_relationship_bytes<R: Read + Seek>(
   let mut bytes = Vec::with_capacity(entry.size() as usize);
   entry.read_to_end(&mut bytes)?;
   Ok(Some(bytes))
+}
+
+fn read_relationship_bytes_with_lowercase_filename_fallback<R: Read + Seek>(
+  archive: &mut zip::ZipArchive<R>,
+  path: &str,
+) -> Result<Option<Vec<u8>>, SdkError> {
+  if let Some(bytes) = read_relationship_bytes(archive, path)? {
+    return Ok(Some(bytes));
+  }
+
+  let Some(fallback_path) = lowercase_zip_filename(path) else {
+    return Ok(None);
+  };
+  read_relationship_bytes(archive, &fallback_path)
+}
+
+fn lowercase_zip_filename(path: &str) -> Option<String> {
+  let (parent_path, file_name) = path.rsplit_once('/')?;
+  let lower_file_name = file_name.to_ascii_lowercase();
+  if file_name == lower_file_name {
+    return None;
+  }
+
+  let mut fallback = String::with_capacity(path.len());
+  fallback.push_str(parent_path);
+  fallback.push('/');
+  fallback.push_str(&lower_file_name);
+  Some(fallback)
 }
 
 fn relationship_info(
@@ -2711,5 +2739,96 @@ mod tests {
       relationship.target_kind(),
       RelationshipTargetKind::InternalPart
     );
+  }
+
+  #[test]
+  fn storage_reads_part_relationships_with_lowercase_filename_fallback() {
+    let mut buffer = Cursor::new(Vec::new());
+    {
+      let mut zip = zip::ZipWriter::new(&mut buffer);
+      let options = zip::write::SimpleFileOptions::default();
+
+      zip.start_file("[Content_Types].xml", options).unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/Sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+</Types>"#,
+      )
+      .unwrap();
+
+      zip.add_directory("_rels", options).unwrap();
+      zip.start_file("_rels/.rels", options).unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>"#,
+      )
+      .unwrap();
+
+      zip.add_directory("xl/_rels", options).unwrap();
+      zip
+        .start_file("xl/_rels/workbook.xml.rels", options)
+        .unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/Sheet1.xml"/>
+</Relationships>"#,
+      )
+      .unwrap();
+
+      zip.add_directory("xl/worksheets/_rels", options).unwrap();
+      zip
+        .start_file("xl/worksheets/_rels/sheet1.xml.rels", options)
+        .unwrap();
+      zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>"#,
+      )
+      .unwrap();
+
+      zip.add_directory("xl", options).unwrap();
+      zip.start_file("xl/workbook.xml", options).unwrap();
+      zip.write_all(br#"<workbook/>"#).unwrap();
+      zip.add_directory("xl/worksheets", options).unwrap();
+      zip.start_file("xl/worksheets/Sheet1.xml", options).unwrap();
+      zip.write_all(br#"<worksheet/>"#).unwrap();
+      zip.add_directory("xl/drawings", options).unwrap();
+      zip.start_file("xl/drawings/drawing1.xml", options).unwrap();
+      zip.write_all(br#"<xdr:wsDr xmlns:xdr="xdr"/>"#).unwrap();
+      zip.finish().unwrap();
+    }
+
+    buffer.set_position(0);
+    let storage = SdkPackageStorage::open(buffer, PackageOpenMode::Lazy).unwrap();
+    let sheet_part_id = storage
+      .package_relationships()
+      .get("rId1")
+      .and_then(RelationshipInfo::target_part_id)
+      .and_then(|workbook_part_id| storage.relationships(workbook_part_id))
+      .and_then(|relationships| relationships.get("rId1"))
+      .and_then(RelationshipInfo::target_part_id)
+      .unwrap();
+    let drawing_relationship = storage
+      .relationships(sheet_part_id)
+      .unwrap()
+      .get("rId1")
+      .unwrap();
+
+    assert_eq!(
+      drawing_relationship.target_kind(),
+      RelationshipTargetKind::InternalPart
+    );
+    let drawing_part = storage
+      .part(drawing_relationship.target_part_id().unwrap())
+      .unwrap();
+    assert_eq!(drawing_part.path(), "xl/drawings/drawing1.xml");
   }
 }

@@ -1459,22 +1459,20 @@ fn table_model(
   env: &mut TableModelEnv<'_>,
   model_context: TableModelContext,
 ) -> Table {
-  let properties = table.table_properties.as_ref();
+  let properties = table.table_properties.as_deref();
   let table_style_id = properties
-    .table_style
-    .as_ref()
+    .and_then(|properties| properties.table_style.as_ref())
     .map(|style| style.val.as_str());
   let table_style = env.styles.table_style(table_style_id);
   let table_look = properties
-    .table_look
-    .as_ref()
+    .and_then(|properties| properties.table_look.as_ref())
     .map(table_look_model)
     .unwrap_or_default();
   let style_cell_margins = table_style.cell_margins.unwrap_or_default();
-  let direct_cell_margins = properties.table_cell_margin_default.is_some();
+  let direct_cell_margins =
+    properties.is_some_and(|properties| properties.table_cell_margin_default.is_some());
   let cell_margins = properties
-    .table_cell_margin_default
-    .as_deref()
+    .and_then(|properties| properties.table_cell_margin_default.as_deref())
     .map(|margins| table_cell_margin_default_with_base(margins, style_cell_margins))
     .unwrap_or(style_cell_margins);
   let rows = table
@@ -1512,8 +1510,7 @@ fn table_model(
   };
   let starts_after_last_rendered_page_break = table_starts_after_last_rendered_page_break(&rows);
   let placement = properties
-    .table_position_properties
-    .as_ref()
+    .and_then(|properties| properties.table_position_properties.as_ref())
     .map(table_position_placement);
   let split_allowed = placement.is_some();
   let following_text_flow = placement.is_some()
@@ -1530,22 +1527,18 @@ fn table_model(
       .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
       .collect(),
     preferred_width_pt: properties
-      .table_width
-      .as_ref()
+      .and_then(|properties| properties.table_width.as_ref())
       .and_then(table_width_to_points),
     preferred_width_pct: properties
-      .table_width
-      .as_ref()
+      .and_then(|properties| properties.table_width.as_ref())
       .and_then(table_width_to_percent),
     indent_left_pt: properties
-      .table_indentation
-      .as_ref()
+      .and_then(|properties| properties.table_indentation.as_ref())
       .and_then(table_indentation_to_points)
       .or(table_style.indent_left_pt)
       .unwrap_or(0.0),
     alignment: properties
-      .table_justification
-      .as_ref()
+      .and_then(|properties| properties.table_justification.as_ref())
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
@@ -1555,13 +1548,11 @@ fn table_model(
     explicit_no_repeat_header,
     starts_after_last_rendered_page_break,
     borders: properties
-      .table_borders
-      .as_deref()
+      .and_then(|properties| properties.table_borders.as_deref())
       .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
       .or(table_style.table_borders),
     cell_spacing_pt: properties
-      .table_cell_spacing
-      .as_ref()
+      .and_then(|properties| properties.table_cell_spacing.as_ref())
       .and_then(table_cell_spacing_to_points)
       .or(table_style.cell_spacing_pt)
       .unwrap_or(0.0),
@@ -2536,7 +2527,7 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
       let hanging = indentation
         .hanging
         .as_ref()
-        .and_then(twips_measure_to_points)
+        .and_then(signed_twips_measure_to_points)
         .unwrap_or(0.0);
       format.first_line_indent_pt = first_line - hanging;
     }

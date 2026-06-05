@@ -1530,7 +1530,15 @@ pub struct SeriesLayoutProperties {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the AxisId Class.
-pub type AxisId = crate::simple_type::UInt32Value;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "cx:axisId")]
+pub struct AxisId {
+  /// Axis ID
+  #[sdk(attr(qname = ":val"))]
+  pub val: Option<crate::simple_type::UInt32Value>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::UInt32Value>,
+}
 /// Defines the PlotSurface Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cx:plotSurface")]
@@ -1586,7 +1594,7 @@ pub struct Series {
   #[sdk(child(qname = "cx:layoutPr"))]
   pub series_layout_properties: Option<std::boxed::Box<SeriesLayoutProperties>>,
   /// Defines the AxisId Class.
-  #[sdk(text_child(simple_type = "UInt32Value", qname = "cx:axisId"))]
+  #[sdk(child(qname = "cx:axisId"))]
   pub axis_id: Vec<AxisId>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "cx:extLst"))]

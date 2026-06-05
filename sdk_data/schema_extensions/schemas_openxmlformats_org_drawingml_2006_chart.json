@@ -33,6 +33,18 @@
       ]
     },
     {
+      "ClassName": "DataDisplayOptions16",
+      "Attributes": [
+        {
+          "QName": ":uri",
+          "PropertyName": "Uri",
+          "PropertyComments": "Uniform Resource Identifier",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
+    },
+    {
       "ClassName": "Area3DChartExtension",
       "HaveXmlnsFields": true
     },

@@ -4762,7 +4762,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub hanging: Option<crate::simple_type::TwipsMeasureValue>,
+  pub hanging: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Indentation Removed From First Line in Character Units
   #[sdk(attr(qname = "w:hangingChars"))]
   pub hanging_chars: Option<crate::simple_type::Int32Value>,
@@ -4949,7 +4949,7 @@ pub struct ParagraphPropertiesChange {
   pub id: crate::simple_type::StringValue,
   /// Previous Paragraph Properties
   #[sdk(child(qname = "w:pPr"))]
-  pub paragraph_properties_extended: std::boxed::Box<ParagraphPropertiesExtended>,
+  pub paragraph_properties_extended: Option<std::boxed::Box<ParagraphPropertiesExtended>>,
 }
 /// Header Reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7874,7 +7874,7 @@ pub struct Table {
   pub table_choice1: Vec<TableChoice>,
   /// Table Properties.
   #[sdk(child(qname = "w:tblPr"))]
-  pub table_properties: std::boxed::Box<TableProperties>,
+  pub table_properties: Option<std::boxed::Box<TableProperties>>,
   /// Table Grid.
   #[sdk(child(qname = "w:tblGrid"))]
   pub table_grid: Option<std::boxed::Box<TableGrid>>,
@@ -8250,7 +8250,8 @@ pub struct TableCell {
             child(variant = MoveToRun, qname = "w:moveTo"),
             child(variant = ContentPart, qname = "w:contentPart"),
             child(variant = RunConflictInsertion, qname = "w14:conflictIns"),
-            child(variant = RunConflictDeletion, qname = "w14:conflictDel")
+            child(variant = RunConflictDeletion, qname = "w14:conflictDel"),
+            child(variant = Break, qname = "w:br")
         )
     )]
   pub table_cell_choice: Vec<TableCellChoice>,
@@ -10714,6 +10715,12 @@ pub struct PreviousTableProperties {
   /// Defines the BiDiVisual Class.
   #[sdk(child(qname = "w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
+  /// Defines the TableStyleRowBandSize Class.
+  #[sdk(child(qname = "w:tblStyleRowBandSize"))]
+  pub table_style_row_band_size: Option<TableStyleRowBandSize>,
+  /// Defines the TableStyleColumnBandSize Class.
+  #[sdk(child(qname = "w:tblStyleColBandSize"))]
+  pub table_style_column_band_size: Option<TableStyleColumnBandSize>,
   /// Defines the TableWidth Class.
   #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
@@ -12641,6 +12648,12 @@ pub struct TableProperties {
   /// Defines the BiDiVisual Class.
   #[sdk(child(qname = "w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
+  /// Defines the TableStyleRowBandSize Class.
+  #[sdk(child(qname = "w:tblStyleRowBandSize"))]
+  pub table_style_row_band_size: Option<TableStyleRowBandSize>,
+  /// Defines the TableStyleColumnBandSize Class.
+  #[sdk(child(qname = "w:tblStyleColBandSize"))]
+  pub table_style_column_band_size: Option<TableStyleColumnBandSize>,
   /// Defines the TableWidth Class.
   #[sdk(child(qname = "w:tblW"))]
   pub table_width: Option<TableWidth>,
@@ -13844,6 +13857,9 @@ pub struct StyleParagraphProperties {
   /// Defines the OutlineLevel Class.
   #[sdk(child(qname = "w:outlineLvl"))]
   pub outline_level: Option<OutlineLevel>,
+  /// Paragraph Mark Run Properties.
+  #[sdk(child(qname = "w:rPr"))]
+  pub paragraph_mark_run_properties: Option<std::boxed::Box<ParagraphMarkRunProperties>>,
   /// Defines the ParagraphPropertiesChange Class.
   #[sdk(child(qname = "w:pPrChange"))]
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
@@ -15665,7 +15681,7 @@ pub struct MailMerge {
   pub link_to_query: Option<LinkToQuery>,
   /// Data Source Type
   #[sdk(child(qname = "w:dataType"))]
-  pub data_type: std::boxed::Box<DataType>,
+  pub data_type: Option<DataType>,
   /// Data Source Connection String
   #[sdk(child(qname = "w:connectString"))]
   pub connect_string: Option<ConnectString>,
@@ -18294,6 +18310,8 @@ pub enum TableCellChoice {
   RunConflictInsertion(std::boxed::Box<crate::schemas::w14::RunConflictInsertion>),
   /// Defines the RunConflictDeletion Class.
   RunConflictDeletion(std::boxed::Box<crate::schemas::w14::RunConflictDeletion>),
+  /// Out-of-place break in table cell.
+  Break(std::boxed::Box<Break>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum CustomXmlCellChoice {

@@ -196,6 +196,13 @@
     },
     {
       "ClassName": "NumberingSymbolRunProperties",
+      "Children": [
+        {
+          "Name": "w:CT_Fonts/w:rFonts",
+          "PropertyName": "RunFonts",
+          "Repeated": true
+        }
+      ],
       "AddChildren": [
         {
           "Name": "w14:CT_Glow/w14:glow",

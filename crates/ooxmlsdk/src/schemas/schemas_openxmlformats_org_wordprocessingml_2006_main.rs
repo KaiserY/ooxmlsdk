@@ -13496,7 +13496,7 @@ pub struct PreviousParagraphProperties {
 pub struct NumberingSymbolRunProperties {
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:rFonts"))]
-  pub run_fonts: Option<RunFonts>,
+  pub run_fonts: Vec<RunFonts>,
   /// Defines the Bold Class.
   #[sdk(child(qname = "w:b"))]
   pub bold: Option<Bold>,

@@ -14,6 +14,7 @@ use crate::sdk_data::sdk_data_model::Schema;
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaExtensions {
   pub enums: Vec<SchemaEnumExtension>,
+  pub add_types: Vec<SchemaTypeAddTypeExtension>,
   pub types: Vec<SchemaTypeExtension>,
   pub choice_enums: Vec<SchemaChoiceEnumExtension>,
 }
@@ -58,6 +59,31 @@ pub struct SchemaTypeExtension {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAddTypeExtension {
+  pub name: String,
+  pub class_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub summary: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub version: Option<String>,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub base_class: String,
+  pub kind: crate::sdk_data::sdk_data_model::SchemaTypeKind,
+  pub composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind,
+  pub xml_header: crate::sdk_data::sdk_data_model::SchemaTypeXmlHeader,
+  pub api_kind: crate::sdk_data::sdk_data_model::SchemaTypeApiKind,
+  pub have_xmlns_fields: bool,
+  pub have_xml_other_attrs: bool,
+  pub have_xml_other_children: bool,
+  pub have_direct_xml_other_children: bool,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub text_value_type: String,
+  pub attributes: Vec<SchemaTypeAttributeExtension>,
+  pub children: Vec<SchemaTypeNewChildExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeAttributeExtension {
   pub q_name: String,
   pub property_name: String,
@@ -77,6 +103,20 @@ pub struct SchemaTypeChildExtension {
   pub repeated: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_name: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeNewChildExtension {
+  pub name: String,
+  pub property_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub property_comments: String,
+  pub kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
+  pub optional: bool,
+  pub repeated: bool,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub initial_version: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -220,6 +260,10 @@ pub fn apply_schema_extensions(
       }
     }
 
+    for extension in &extensions.add_types {
+      add_schema_type(module_name, schema, extension)?;
+    }
+
     for extension in &extensions.types {
       let Some(schema_type) = schema
         .types
@@ -348,6 +392,102 @@ pub fn apply_schema_extensions(
       }
     }
   }
+
+  Ok(())
+}
+
+fn add_schema_type(
+  module_name: &str,
+  schema: &mut Schema,
+  extension: &SchemaTypeAddTypeExtension,
+) -> Result<()> {
+  if extension.name.is_empty() || extension.class_name.is_empty() {
+    return Err(format!("schema extension add type {module_name} has incomplete type").into());
+  }
+  if schema
+    .types
+    .iter()
+    .any(|schema_type| schema_type.name == extension.name)
+  {
+    return Err(
+      format!(
+        "schema extension add type {}.{} already has element {}",
+        module_name, extension.class_name, extension.name
+      )
+      .into(),
+    );
+  }
+  if schema
+    .types
+    .iter()
+    .any(|schema_type| schema_type.class_name == extension.class_name)
+  {
+    return Err(
+      format!(
+        "schema extension add type {}.{} already exists",
+        module_name, extension.class_name
+      )
+      .into(),
+    );
+  }
+
+  let mut attributes = Vec::with_capacity(extension.attributes.len());
+  for attr in &extension.attributes {
+    if attr.q_name.is_empty() || attr.property_name.is_empty() || attr.override_type.is_empty() {
+      return Err(
+        format!(
+          "schema extension add type {}.{} has incomplete attribute",
+          module_name, extension.class_name
+        )
+        .into(),
+      );
+    }
+    attributes.push(crate::sdk_data::sdk_data_model::SchemaTypeAttribute {
+      q_name: attr.q_name.clone(),
+      property_name: attr.property_name.clone(),
+      r#type: attr.override_type.clone(),
+      property_comments: attr.property_comments.clone(),
+      required: !attr.optional.unwrap_or(false),
+      ..Default::default()
+    });
+  }
+
+  let children = extension
+    .children
+    .iter()
+    .map(|child| crate::sdk_data::sdk_data_model::SchemaTypeChild {
+      name: child.name.clone(),
+      property_name: child.property_name.clone(),
+      property_comments: child.property_comments.clone(),
+      kind: child.kind,
+      optional: child.optional,
+      repeated: child.repeated,
+      initial_version: child.initial_version.clone(),
+      ..Default::default()
+    })
+    .collect();
+
+  schema
+    .types
+    .push(crate::sdk_data::sdk_data_model::SchemaType {
+      name: extension.name.clone(),
+      class_name: extension.class_name.clone(),
+      summary: extension.summary.clone(),
+      version: extension.version.clone(),
+      base_class: extension.base_class.clone(),
+      kind: extension.kind,
+      composite_kind: extension.composite_kind,
+      xml_header: extension.xml_header,
+      have_xmlns_fields: extension.have_xmlns_fields,
+      have_xml_other_attrs: extension.have_xml_other_attrs,
+      have_xml_other_children: extension.have_xml_other_children,
+      have_direct_xml_other_children: extension.have_direct_xml_other_children,
+      text_value_type: extension.text_value_type.clone(),
+      api_kind: extension.api_kind.clone(),
+      attributes,
+      children,
+      ..Default::default()
+    });
 
   Ok(())
 }
@@ -693,6 +833,44 @@ mod tests {
 
     assert!(schemas[0].types[0].children[0].optional);
     assert!(schemas[0].types[0].have_direct_xml_other_children);
+  }
+
+  #[test]
+  fn applies_add_type_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        add_types: vec![SchemaTypeAddTypeExtension {
+          name: "t:CT_Added/t:added".to_string(),
+          class_name: "Added".to_string(),
+          summary: "Added type.".to_string(),
+          base_class: "OpenXmlLeafElement".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          api_kind: crate::sdk_data::sdk_data_model::SchemaTypeApiKind::Struct,
+          attributes: vec![SchemaTypeAttributeExtension {
+            q_name: "t:value".to_string(),
+            property_name: "Value".to_string(),
+            override_type: "StringValue".to_string(),
+            optional: Some(true),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    let added = &schemas[0].types[0];
+    assert_eq!(added.name, "t:CT_Added/t:added");
+    assert_eq!(added.class_name, "Added");
+    assert_eq!(added.attributes[0].q_name, "t:value");
+    assert_eq!(added.attributes[0].property_name, "Value");
   }
 
   #[test]

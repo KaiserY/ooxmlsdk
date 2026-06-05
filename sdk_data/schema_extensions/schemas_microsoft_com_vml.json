@@ -1,5 +1,36 @@
 {
+  "AddTypes": [
+    {
+      "Name": "v:CT_Wrap/v:wrap",
+      "ClassName": "VmlTextWrap",
+      "Summary": "VML namespace text wrapping.",
+      "BaseClass": "OpenXmlLeafElement",
+      "Kind": "Leaf",
+      "ApiKind": "Struct",
+      "Attributes": [
+        {
+          "QName": "v:type",
+          "PropertyName": "Type",
+          "PropertyComments": "Wrapping type",
+          "Optional": true,
+          "OverrideType": "EnumValue<DocumentFormat.OpenXml.Vml.Wordprocessing.WrapValues>"
+        }
+      ]
+    }
+  ],
   "Types": [
+    {
+      "ClassName": "Fill",
+      "Attributes": [
+        {
+          "QName": ":detectmouseclick",
+          "PropertyName": "VmlDetectMouseClick",
+          "PropertyComments": "VML detect mouse click compatibility attribute.",
+          "Optional": true,
+          "OverrideType": "TrueFalseValue"
+        }
+      ]
+    },
     {
       "ClassName": "Group",
       "HaveXmlOtherAttrs": true
@@ -23,6 +54,19 @@
     {
       "ClassName": "Shapetype",
       "HaveXmlOtherAttrs": true
+    }
+  ],
+  "ChoiceEnums": [
+    {
+      "RustName": "RectangleChoice",
+      "AddVariants": [
+        {
+          "RustName": "VmlTextWrap",
+          "QName": "v:wrap",
+          "Docs": "VML namespace text wrapping used by LibreOffice fixtures.",
+          "PayloadRustType": "VmlTextWrap"
+        }
+      ]
     }
   ]
 }

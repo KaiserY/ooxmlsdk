@@ -318,6 +318,9 @@ pub struct Fill {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: Option<crate::simple_type::StringValue>,
+  /// VML detect mouse click compatibility attribute.
+  #[sdk(attr(qname = ":detectmouseclick"))]
+  pub vml_detect_mouse_click: Option<crate::simple_type::TrueFalseValue>,
   /// Shape Fill Extended Properties.
   #[sdk(child(qname = "o:fill"))]
   pub fill_extended_properties: Option<crate::schemas::o::FillExtendedProperties>,
@@ -2522,7 +2525,8 @@ pub struct Rectangle {
             child(variant = LeftBorder, qname = "w10:borderleft"),
             child(variant = RightBorder, qname = "w10:borderright"),
             child(variant = ClientData, qname = "xvml:ClientData"),
-            child(variant = TextData, qname = "pvml:textdata")
+            child(variant = TextData, qname = "pvml:textdata"),
+            child(variant = VmlTextWrap, qname = "v:wrap")
         )
     )]
   pub rectangle_choice: Vec<RectangleChoice>,
@@ -2756,6 +2760,14 @@ pub struct Formula {
   /// Equation
   #[sdk(attr(qname = ":eqn"))]
   pub equation: Option<crate::simple_type::StringValue>,
+}
+/// VML namespace text wrapping.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "v:wrap")]
+pub struct VmlTextWrap {
+  /// Wrapping type
+  #[sdk(attr(qname = "v:type"))]
+  pub r#type: Option<crate::schemas::w10::WrapValues>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextBoxChoice {
@@ -3179,6 +3191,8 @@ pub enum RectangleChoice {
   RightBorder(std::boxed::Box<crate::schemas::w10::RightBorder>),
   ClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   TextData(std::boxed::Box<crate::schemas::pvml::TextData>),
+  /// VML namespace text wrapping used by LibreOffice fixtures.
+  VmlTextWrap(std::boxed::Box<VmlTextWrap>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum RoundRectangleChoice {

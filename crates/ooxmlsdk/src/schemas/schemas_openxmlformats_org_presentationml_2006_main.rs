@@ -1003,6 +1003,7 @@ pub struct OleObject {
 pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
   pub server_zoom: Option<crate::simple_type::DrawingmlPercentageValue>,
@@ -1089,6 +1090,7 @@ pub struct Presentation {
 pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
@@ -1114,6 +1116,7 @@ pub struct PresentationProperties {
 pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1146,6 +1149,7 @@ pub struct Slide {
 pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
@@ -1191,6 +1195,7 @@ pub struct SlideLayout {
 pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
@@ -1320,6 +1325,7 @@ pub struct TagList {
 pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]
   #[sdk(string_format(kind = "token"))]

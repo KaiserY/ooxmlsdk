@@ -23,15 +23,25 @@
       ]
     },
     {
+      "ClassName": "Presentation",
+      "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "PresentationProperties",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "Shape",
       "HaveXmlnsFields": true
     },
     {
       "ClassName": "Slide",
+      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "SlideLayout",
+      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -44,6 +54,7 @@
     },
     {
       "ClassName": "SlideMaster",
+      "HaveXmlOtherAttrs": true,
       "HaveDirectXmlOtherChildren": true
     },
     {
@@ -61,6 +72,10 @@
     {
       "ClassName": "Transition",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ViewProperties",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "TitleStyle",

@@ -1131,7 +1131,7 @@ pub struct AreaChartSeries {
 pub struct PieChartSeries {
   /// Index
   #[sdk(child(qname = "c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Option<Index>,
   /// Order
   #[sdk(child(qname = "c:order"))]
   pub order: std::boxed::Box<Order>,
@@ -2378,7 +2378,7 @@ pub struct Area3DChart {
 pub struct LineChart {
   /// Grouping
   #[sdk(child(qname = "c:grouping"))]
-  pub grouping: std::boxed::Box<Grouping>,
+  pub grouping: Option<Grouping>,
   /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:varyColors"))]
   pub vary_colors: Option<VaryColors>,

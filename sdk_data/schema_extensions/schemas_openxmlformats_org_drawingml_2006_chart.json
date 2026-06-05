@@ -210,6 +210,15 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "LineChart",
+      "Children": [
+        {
+          "PropertyName": "Grouping",
+          "Optional": true
+        }
+      ]
+    },
+    {
       "ClassName": "LineSerExtension",
       "HaveXmlnsFields": true
     },
@@ -248,6 +257,15 @@
     {
       "ClassName": "PieChartExtensionList",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PieChartSeries",
+      "Children": [
+        {
+          "PropertyName": "Index",
+          "Optional": true
+        }
+      ]
     },
     {
       "ClassName": "PieSerExtension",

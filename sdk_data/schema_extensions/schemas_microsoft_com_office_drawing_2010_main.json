@@ -28,6 +28,10 @@
     {
       "ClassName": "UseLocalDpi",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "CompatExtension",
+      "HaveXmlnsFields": true
     }
   ]
 }

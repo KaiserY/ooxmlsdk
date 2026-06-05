@@ -2848,7 +2848,14 @@ pub struct Text {
 /// Cell Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:v")]
-pub struct CellValue(pub XstringType);
+pub struct CellValue {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::StringValue>,
+}
 /// Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:formula")]
@@ -2984,6 +2991,7 @@ pub struct DataBinding {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:connection")]
 pub struct Connection {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -8060,6 +8068,7 @@ pub struct WorkbookView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:definedName")]
 pub struct DefinedName {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defined Name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,

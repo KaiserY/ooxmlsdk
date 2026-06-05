@@ -107,6 +107,10 @@
       ]
     },
     {
+      "ClassName": "CellValue",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "NumberingFormat",
       "HaveXmlOtherAttrs": true
     },
@@ -209,6 +213,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Connection",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "ExternalLink",
       "HaveXmlOtherAttrs": true
     },
@@ -299,6 +307,10 @@
     {
       "ClassName": "Drawing",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DefinedName",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "DifferentialFormats",

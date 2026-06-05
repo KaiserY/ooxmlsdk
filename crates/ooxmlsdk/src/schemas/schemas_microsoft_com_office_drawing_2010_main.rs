@@ -19,6 +19,7 @@ pub struct CameraTool {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a14:compatExt")]
 pub struct CompatExtension {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// spid
   #[sdk(attr(qname = ":spid"))]
   pub shape_id: Option<crate::simple_type::StringValue>,

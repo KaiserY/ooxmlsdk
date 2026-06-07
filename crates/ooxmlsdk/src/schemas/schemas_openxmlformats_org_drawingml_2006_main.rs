@@ -6060,6 +6060,7 @@ pub struct FillRectangle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:srcRect")]
 pub struct SourceRectangle {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
   pub left: Option<crate::simple_type::DrawingmlPercentageValue>,

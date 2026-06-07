@@ -10,6 +10,7 @@
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the NamedSheetView Class.
   #[sdk(child(qname = "xnsv:namedSheetView"))]
   pub named_sheet_view: Vec<NamedSheetView>,

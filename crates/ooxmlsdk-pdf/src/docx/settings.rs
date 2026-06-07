@@ -8,7 +8,7 @@ pub(super) fn compatibility_mode(
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
     .and_then(|settings| {
-      settings.compatibility.as_ref().and_then(|compat| {
+      settings.compatibility.iter().find_map(|compat| {
         compat
           .compatibility_setting
           .iter()
@@ -31,8 +31,8 @@ pub(super) fn no_column_balance(
     .and_then(|settings| {
       settings
         .compatibility
-        .as_ref()
-        .and_then(|compat| compat.no_column_balance.as_ref())
+        .iter()
+        .find_map(|compat| compat.no_column_balance.as_ref())
         .map(|value| on_off_only_value(value.val))
     })
     .unwrap_or(false)
@@ -48,8 +48,8 @@ pub(super) fn split_page_break_and_paragraph_mark(
     .and_then(|settings| {
       settings
         .compatibility
-        .as_ref()
-        .and_then(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
+        .iter()
+        .find_map(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
     .unwrap_or(false)

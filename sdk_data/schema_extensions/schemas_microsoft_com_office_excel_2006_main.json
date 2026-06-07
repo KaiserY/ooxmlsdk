@@ -2,7 +2,10 @@
   "Types": [
     {
       "ClassName": "Macrosheet",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "ExtraXmlns": [
+        "x"
+      ]
     }
   ]
 }

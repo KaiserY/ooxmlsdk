@@ -680,7 +680,7 @@ pub enum RangePermissionEditingGroupValues {
   #[sdk(rename = "current")]
   Current,
 }
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum FontTypeHintValues {
   #[sdk(rename = "default")]
   #[default]
@@ -689,6 +689,8 @@ pub enum FontTypeHintValues {
   EastAsia,
   #[sdk(rename = "cs")]
   ComplexScript,
+  #[sdk(other)]
+  OtherVariant(Box<str>),
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ThemeFontValues {
@@ -4540,6 +4542,9 @@ pub struct FrameProperties {
   /// Lock Frame Anchor to Paragraph
   #[sdk(attr(qname = "w:anchorLock"))]
   pub anchor_lock: Option<crate::simple_type::OnOffValue>,
+  /// Frame Fill Color
+  #[sdk(attr(qname = ":fillcolor"))]
+  pub fill_color: Option<crate::simple_type::StringValue>,
 }
 /// Defines the NumberingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5136,7 +5141,7 @@ pub struct FieldChar {
   pub dirty: Option<crate::simple_type::OnOffValue>,
   #[sdk(
         choice(
-            text_child(variant = FieldData, qname = "w:fldData"),
+            child(variant = FieldData, qname = "w:fldData"),
             child(variant = FormFieldData, qname = "w:ffData"),
             child(variant = NumberingChange, qname = "w:numberingChange")
         )
@@ -5320,6 +5325,7 @@ pub struct DefaultTableStyle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:rFonts")]
 pub struct RunFonts {
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Font Content Type
   #[sdk(attr(qname = "w:hint"))]
   pub hint: Option<FontTypeHintValues>,
@@ -5366,7 +5372,7 @@ pub struct Color {
     min = 3u32,
     max = 3u32,
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: Option<crate::simple_type::StringValue>,
   /// Run Content Theme Color
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
@@ -6635,7 +6641,7 @@ pub struct SimpleFieldRuby {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data.
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
+  #[sdk(child(qname = "w:fldData"))]
   pub field_data: Option<FieldData>,
   #[sdk(
         choice(
@@ -8502,7 +8508,7 @@ pub struct SimpleField {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data
-  #[sdk(text_child(simple_type = "Base64BinaryValue", qname = "w:fldData"))]
+  #[sdk(child(qname = "w:fldData"))]
   pub field_data: Option<FieldData>,
   #[sdk(
         choice(
@@ -10403,7 +10409,7 @@ pub struct Settings {
   pub endnote_document_wide_properties: Option<std::boxed::Box<EndnoteDocumentWideProperties>>,
   /// Compatibility Settings.
   #[sdk(child(qname = "w:compat"))]
-  pub compatibility: Option<std::boxed::Box<Compatibility>>,
+  pub compatibility: Vec<Compatibility>,
   /// Document Variables.
   #[sdk(child(qname = "w:docVars"))]
   pub document_variables: Option<DocumentVariables>,
@@ -11422,7 +11428,15 @@ pub struct SectionProperties {
   pub section_properties_change: Option<std::boxed::Box<SectionPropertiesChange>>,
 }
 /// Custom Field Data.
-pub type FieldData = crate::simple_type::Base64BinaryValue;
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:fldData")]
+pub struct FieldData {
+  /// Content Contains Significant Whitespace
+  #[sdk(attr(qname = "xml:space"))]
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
+  #[sdk(text)]
+  pub xml_content: Option<crate::simple_type::Base64BinaryValue>,
+}
 /// Form Field Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:ffData")]
@@ -11619,7 +11633,7 @@ pub struct Column {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub width: Option<crate::simple_type::TwipsMeasureValue>,
+  pub width: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Space Before Following Column
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -11629,7 +11643,7 @@ pub struct Column {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub space: Option<crate::simple_type::TwipsMeasureValue>,
+  pub space: Option<crate::simple_type::SignedTwipsMeasureValue>,
 }
 /// Revision Information for Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12695,6 +12709,7 @@ pub struct TableProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:tblGrid")]
 pub struct TableGrid {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Grid Column Definition.
   #[sdk(child(qname = "w:gridCol"))]
   pub grid_column: Vec<GridColumn>,
@@ -13136,6 +13151,7 @@ pub struct ParagraphPropertiesBaseStyle {
 pub struct RunPropertiesDefault {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Run Properties
   #[sdk(child(qname = "w:rPr"))]
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
@@ -13144,6 +13160,7 @@ pub struct RunPropertiesDefault {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pPrDefault")]
 pub struct ParagraphPropertiesDefault {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Paragraph Properties
   #[sdk(child(qname = "w:pPr"))]
   pub paragraph_properties_base_style: Option<std::boxed::Box<ParagraphPropertiesBaseStyle>>,
@@ -13494,6 +13511,7 @@ pub struct PreviousParagraphProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:rPr")]
 pub struct NumberingSymbolRunProperties {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:rFonts"))]
   pub run_fonts: Vec<RunFonts>,
@@ -13566,6 +13584,9 @@ pub struct NumberingSymbolRunProperties {
   /// Defines the FontSizeComplexScript Class.
   #[sdk(child(qname = "w:szCs"))]
   pub font_size_complex_script: Option<FontSizeComplexScript>,
+  /// Defines the Highlight Class.
+  #[sdk(child(qname = "w:highlight"))]
+  pub highlight: Option<Highlight>,
   /// Defines the Underline Class.
   #[sdk(child(qname = "w:u"))]
   pub underline: Option<Underline>,
@@ -13767,6 +13788,7 @@ pub struct NumberingInstance {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:pPr")]
 pub struct StyleParagraphProperties {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Defines the KeepNext Class.
   #[sdk(child(qname = "w:keepNext"))]
   pub keep_next: Option<KeepNext>,
@@ -14055,6 +14077,27 @@ pub struct StyleRunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
+  /// Defines the Glow Class.
+  #[sdk(child(qname = "w14:glow"))]
+  pub w14_glow: Option<std::boxed::Box<crate::schemas::w14::Glow>>,
+  /// Defines the Shadow Class.
+  #[sdk(child(qname = "w14:shadow"))]
+  pub w14_shadow: Option<std::boxed::Box<crate::schemas::w14::Shadow>>,
+  /// Defines the Reflection Class.
+  #[sdk(child(qname = "w14:reflection"))]
+  pub w14_reflection: Option<crate::schemas::w14::Reflection>,
+  /// Defines the TextOutlineEffect Class.
+  #[sdk(child(qname = "w14:textOutline"))]
+  pub w14_text_outline_effect: Option<std::boxed::Box<crate::schemas::w14::TextOutlineEffect>>,
+  /// Defines the FillTextEffect Class.
+  #[sdk(child(qname = "w14:textFill"))]
+  pub w14_fill_text_effect: Option<std::boxed::Box<crate::schemas::w14::FillTextEffect>>,
+  /// Defines the Scene3D Class.
+  #[sdk(child(qname = "w14:scene3d"))]
+  pub w14_scene3_d: Option<std::boxed::Box<crate::schemas::w14::Scene3D>>,
+  /// Defines the Properties3D Class.
+  #[sdk(child(qname = "w14:props3d"))]
+  pub w14_properties3_d: Option<std::boxed::Box<crate::schemas::w14::Properties3D>>,
   /// Defines the RunPropertiesChange Class.
   #[sdk(child(qname = "w:rPrChange"))]
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
@@ -14084,6 +14127,9 @@ pub struct StyleTableProperties {
   /// Defines the Shading Class.
   #[sdk(child(qname = "w:shd"))]
   pub shading: Option<Shading>,
+  /// Table Layout.
+  #[sdk(child(qname = "w:tblLayout"))]
+  pub table_layout: Option<TableLayout>,
   /// Defines the TableCellMarginDefault Class.
   #[sdk(child(qname = "w:tblCellMar"))]
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
@@ -16510,7 +16556,7 @@ pub enum PictureChoice {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FieldCharChoice {
   /// Custom Field Data.
-  FieldData(FieldData),
+  FieldData(std::boxed::Box<FieldData>),
   /// Form Field Properties.
   FormFieldData(std::boxed::Box<FormFieldData>),
   /// Previous Paragraph Numbering Properties.

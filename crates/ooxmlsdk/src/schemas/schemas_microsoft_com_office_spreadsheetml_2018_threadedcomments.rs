@@ -6,33 +6,33 @@
 
 /// Defines the PersonList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:personList")]
+#[sdk(no_prefix, qname = "xltc:personList")]
 pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Person Class.
-  #[sdk(child(qname = "xltc:person"))]
+  #[sdk(child(no_prefix, qname = "xltc:person"))]
   pub person: Vec<Person>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xltc:extLst"))]
+  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedComments Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:ThreadedComments")]
+#[sdk(no_prefix, qname = "xltc:ThreadedComments")]
 pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ThreadedComment Class.
-  #[sdk(child(qname = "xltc:threadedComment"))]
+  #[sdk(child(no_prefix, qname = "xltc:threadedComment"))]
   pub threaded_comment: Vec<ThreadedComment>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xltc:extLst"))]
+  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Person Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:person")]
+#[sdk(no_prefix, qname = "xltc:person")]
 pub struct Person {
   /// displayName
   #[sdk(attr(qname = ":displayName"))]
@@ -49,12 +49,12 @@ pub struct Person {
   #[sdk(attr(qname = ":providerId"))]
   pub provider_id: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xltc:extLst"))]
+  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:extLst")]
+#[sdk(no_prefix, qname = "xltc:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -62,7 +62,7 @@ pub struct ExtensionList {
 }
 /// Defines the ThreadedComment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:threadedComment")]
+#[sdk(no_prefix, qname = "xltc:threadedComment")]
 pub struct ThreadedComment {
   /// ref
   #[sdk(attr(qname = ":ref"))]
@@ -89,30 +89,30 @@ pub struct ThreadedComment {
   #[sdk(attr(qname = ":done"))]
   pub done: Option<crate::simple_type::BooleanValue>,
   /// Defines the ThreadedCommentText Class.
-  #[sdk(child(qname = "xltc:text"))]
+  #[sdk(child(no_prefix, qname = "xltc:text"))]
   pub threaded_comment_text: Option<ThreadedCommentText>,
   /// Defines the ThreadedCommentMentions Class.
-  #[sdk(child(qname = "xltc:mentions"))]
+  #[sdk(child(no_prefix, qname = "xltc:mentions"))]
   pub threaded_comment_mentions: Option<ThreadedCommentMentions>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xltc:extLst"))]
+  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedCommentText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:text")]
+#[sdk(no_prefix, qname = "xltc:text")]
 pub struct ThreadedCommentText(pub crate::schemas::x::XstringType);
 /// Defines the ThreadedCommentMentions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:mentions")]
+#[sdk(no_prefix, qname = "xltc:mentions")]
 pub struct ThreadedCommentMentions {
   /// Defines the Mention Class.
-  #[sdk(child(qname = "xltc:mention"))]
+  #[sdk(child(no_prefix, qname = "xltc:mention"))]
   pub mention: Vec<Mention>,
 }
 /// Defines the Mention Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xltc:mention")]
+#[sdk(no_prefix, qname = "xltc:mention")]
 pub struct Mention {
   /// mentionpersonId
   #[sdk(attr(qname = ":mentionpersonId"))]

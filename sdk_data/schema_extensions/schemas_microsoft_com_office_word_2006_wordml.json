@@ -1,6 +1,10 @@
 {
   "Types": [
     {
+      "ClassName": "VbaSuppData",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "KeyMapEntry",
       "HaveXmlOtherAttrs": true
     }

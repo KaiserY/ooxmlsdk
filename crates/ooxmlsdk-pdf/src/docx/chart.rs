@@ -145,12 +145,17 @@ fn chart_label_color(chart_space: &c::ChartSpace, theme_colors: &ThemeColors) ->
       labels
         .data_label
         .iter()
-        .find_map(|label| match label.data_label_choice.as_ref()? {
-          c::DataLabelChoice::Sequence(sequence) => sequence
-            .text_properties
-            .as_deref()
-            .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
-          c::DataLabelChoice::Delete(_) => None,
+        .find_map(|label| {
+          label
+            .data_label_choice
+            .iter()
+            .find_map(|choice| match choice {
+              c::DataLabelChoice::Sequence(sequence) => sequence
+                .text_properties
+                .as_deref()
+                .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
+              c::DataLabelChoice::Delete(_) => None,
+            })
         })
         .or_else(|| match labels.data_labels_choice.as_ref()? {
           c::DataLabelsChoice::Sequence(sequence) => sequence

@@ -6,17 +6,17 @@
 
 /// Custom File Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "op:Properties")]
+#[sdk(no_prefix, qname = "op:Properties")]
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Custom File Property.
-  #[sdk(child(qname = "op:property"))]
+  #[sdk(child(no_prefix, qname = "op:property"))]
   pub custom_document_property: Vec<CustomDocumentProperty>,
 }
 /// Custom File Property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "op:property")]
+#[sdk(no_prefix, qname = "op:property")]
 pub struct CustomDocumentProperty {
   /// Format ID
   #[sdk(attr(qname = ":fmtid"))]

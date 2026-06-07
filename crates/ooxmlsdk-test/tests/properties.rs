@@ -30,7 +30,13 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
       .unwrap_or_default(),
     ""
   );
-  assert_eq!(parsed.creator.as_deref(), Some("Thomas Barnekow"));
+  assert_eq!(
+    parsed
+      .creator
+      .as_ref()
+      .and_then(|creator| creator.xml_content.as_deref()),
+    Some("Thomas Barnekow")
+  );
   assert_eq!(parsed.last_modified_by.as_deref(), Some("Thomas Barnekow"));
   assert_eq!(parsed.revision.as_deref(), Some("1"));
   assert_eq!(
@@ -56,12 +62,18 @@ fn core_properties_round_trip_from_hello_world_doc_props_test() {
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   let serialized = trim_xml_declaration(&serialized);
-  assert!(serialized.starts_with("<cp:coreProperties"));
+  assert!(serialized.starts_with("<coreProperties"));
   assert!(serialized.contains("<dc:creator"));
   assert!(serialized.contains(">Thomas Barnekow</dc:creator>"));
-  assert!(serialized.contains("<cp:lastModifiedBy"));
-  assert!(serialized.contains(">Thomas Barnekow</cp:lastModifiedBy>"));
-  assert_eq!(reparsed.creator.as_deref(), Some("Thomas Barnekow"));
+  assert!(serialized.contains("<lastModifiedBy"));
+  assert!(serialized.contains(">Thomas Barnekow</lastModifiedBy>"));
+  assert_eq!(
+    reparsed
+      .creator
+      .as_ref()
+      .and_then(|creator| creator.xml_content.as_deref()),
+    Some("Thomas Barnekow")
+  );
 }
 
 #[test]
@@ -75,7 +87,13 @@ fn core_properties_round_trip_from_more_doc_props_test() {
 
   assert_eq!(serialized, serialized_twice);
 
-  assert_eq!(parsed.creator.as_deref(), Some("Eric White"));
+  assert_eq!(
+    parsed
+      .creator
+      .as_ref()
+      .and_then(|creator| creator.xml_content.as_deref()),
+    Some("Eric White")
+  );
   assert_eq!(parsed.last_modified_by.as_deref(), Some("Eric White"));
   assert_eq!(parsed.revision.as_deref(), Some("6"));
   assert_eq!(
@@ -101,12 +119,18 @@ fn core_properties_round_trip_from_more_doc_props_test() {
     Some(XsiTypeValue::DctermsW3cdtf)
   ));
   let serialized = trim_xml_declaration(&serialized);
-  assert!(serialized.starts_with("<cp:coreProperties"));
+  assert!(serialized.starts_with("<coreProperties"));
   assert!(serialized.contains("<dc:creator"));
   assert!(serialized.contains(">Eric White</dc:creator>"));
-  assert!(serialized.contains("<cp:lastModifiedBy"));
-  assert!(serialized.contains(">Eric White</cp:lastModifiedBy>"));
-  assert_eq!(reparsed.creator.as_deref(), Some("Eric White"));
+  assert!(serialized.contains("<lastModifiedBy"));
+  assert!(serialized.contains(">Eric White</lastModifiedBy>"));
+  assert_eq!(
+    reparsed
+      .creator
+      .as_ref()
+      .and_then(|creator| creator.xml_content.as_deref()),
+    Some("Eric White")
+  );
 }
 
 #[test]
@@ -198,7 +222,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
   };
   assert!(value.as_bool());
   let serialized = trim_xml_declaration(&serialized);
-  assert!(serialized.starts_with("<op:Properties"));
+  assert!(serialized.starts_with("<Properties"));
   assert!(serialized.contains("fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\""));
   assert!(serialized.contains("pid=\"2\""));
   assert!(serialized.contains("name=\"crap\""));

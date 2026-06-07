@@ -841,6 +841,7 @@ fn build_type_decl(
         have_xml_other_attrs: schema_type.have_xml_other_attrs,
         have_xml_other_children,
         compact_xml_other_children,
+        extra_xmlns: schema_type.extra_xmlns.clone(),
       },
       members,
     },

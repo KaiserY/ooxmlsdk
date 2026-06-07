@@ -18,6 +18,7 @@ pub struct Taskpanes {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wetp:webextensionref")]
 pub struct WebExtensionPartReference {
+  pub xmlns: Vec<crate::common::XmlNamespace>,
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,

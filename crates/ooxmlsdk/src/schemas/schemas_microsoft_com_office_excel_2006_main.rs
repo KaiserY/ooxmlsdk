@@ -6,7 +6,7 @@
 
 /// Defines the Macrosheet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xne:macrosheet")]
+#[sdk(extra_xmlns("x"), qname = "xne:macrosheet")]
 pub struct Macrosheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,

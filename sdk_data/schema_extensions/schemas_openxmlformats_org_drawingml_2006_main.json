@@ -157,6 +157,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "SourceRectangle",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Stretch",
       "HaveXmlnsFields": true
     },

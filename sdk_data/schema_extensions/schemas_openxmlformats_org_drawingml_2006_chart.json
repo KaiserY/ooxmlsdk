@@ -3,6 +3,10 @@
     {
       "RustName": "ChartSpaceChoice",
       "AddXmlAny": true
+    },
+    {
+      "RustName": "DataLabelChoice",
+      "Repeated": true
     }
   ],
   "Types": [
@@ -183,6 +187,10 @@
     {
       "ClassName": "DLblsExtensionList",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "DataLabels",
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "DataDisplayOptions16",

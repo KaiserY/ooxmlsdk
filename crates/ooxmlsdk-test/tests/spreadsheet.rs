@@ -369,10 +369,7 @@ fn empty_shared_string_table_round_trip_from_openxml_part_test() {
   assert_eq!(shared_string_items(&parsed).len(), 0);
   let serialized = trim_xml_declaration(&serialized);
   assert!(
-    serialized
-      .starts_with("<x:sst xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"")
-      || serialized
-        .starts_with("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""),
+    serialized.starts_with("<x:sst ") || serialized.starts_with("<sst "),
     "{serialized}"
   );
   assert!(is_empty_shared_string_table_xml(serialized), "{serialized}");

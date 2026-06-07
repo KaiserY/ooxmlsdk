@@ -171,6 +171,10 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "QueryTable",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "QueryTableExtension",
       "HaveXmlnsFields": true
     },
@@ -331,6 +335,10 @@
     {
       "ClassName": "Fills",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Filters",
+      "HaveXmlnsFields": true
     },
     {
       "ClassName": "Fonts",

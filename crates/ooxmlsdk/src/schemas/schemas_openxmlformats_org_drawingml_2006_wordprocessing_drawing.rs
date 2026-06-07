@@ -224,7 +224,7 @@ pub struct Anchor {
   pub simple_pos: Option<crate::simple_type::BooleanValue>,
   /// Relative Z-Ordering Position
   #[sdk(attr(qname = ":relativeHeight"))]
-  pub relative_height: crate::simple_type::UInt32Value,
+  pub relative_height: Option<crate::simple_type::UInt32Value>,
   /// Display Behind Document Text
   #[sdk(attr(qname = ":behindDoc"))]
   pub behind_doc: crate::simple_type::BooleanValue,
@@ -322,12 +322,10 @@ pub struct LineTo {
 pub struct SimplePosition {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub x: crate::simple_type::Int64Value,
+  pub x: crate::simple_type::CoordinateValue,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub y: crate::simple_type::Int64Value,
+  pub y: crate::simple_type::CoordinateValue,
 }
 /// Object Extents Including Effects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -992,6 +992,7 @@ pub struct LineChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:dLbls")]
 pub struct DataLabels {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// Data Label.
   #[sdk(child(qname = "c:dLbl"))]
   pub data_label: Vec<DataLabel>,
@@ -2312,7 +2313,7 @@ pub struct DataLabel {
             )
         )
     )]
-  pub data_label_choice: Option<DataLabelChoice>,
+  pub data_label_choice: Vec<DataLabelChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:extLst"))]
   pub d_lbl_extension_list: Option<DLblExtensionList>,

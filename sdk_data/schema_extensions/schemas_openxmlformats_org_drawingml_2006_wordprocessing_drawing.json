@@ -8,6 +8,12 @@
     {
       "ClassName": "Anchor",
       "HaveDirectXmlOtherChildren": true,
+      "Attributes": [
+        {
+          "QName": ":relativeHeight",
+          "Optional": true
+        }
+      ],
       "Children": [
         {
           "PropertyName": "SimplePosition",
@@ -27,6 +33,23 @@
         }
       ],
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "SimplePosition",
+      "Attributes": [
+        {
+          "QName": ":x",
+          "PropertyName": "X",
+          "PropertyComments": "X-Axis Coordinate",
+          "OverrideType": "CoordinateValue"
+        },
+        {
+          "QName": ":y",
+          "PropertyName": "Y",
+          "PropertyComments": "Y-Axis Coordinate",
+          "OverrideType": "CoordinateValue"
+        }
+      ]
     }
   ]
 }

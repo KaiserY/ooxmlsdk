@@ -936,7 +936,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
         column
           .width
           .as_ref()
-          .and_then(twips_measure_to_points)
+          .and_then(signed_twips_measure_to_points)
           .filter(|width| width.is_finite() && *width > 0.0)
       })
       .collect::<Vec<_>>();
@@ -949,7 +949,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
           column
             .space
             .as_ref()
-            .and_then(twips_measure_to_points)
+            .and_then(signed_twips_measure_to_points)
             .filter(|gap| gap.is_finite() && *gap >= 0.0)
             .unwrap_or(gap_pt)
         })
@@ -4832,11 +4832,11 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .map(|_| None)
       .unwrap_or_else(|| vertical_position.and_then(vertical_position_alignment)),
     horizontal_offset_pt: simple_position
-      .map(|position| units::emu_to_points(position.x))
+      .map(|position| units::emu_to_points(position.x.to_emu()))
       .or_else(|| horizontal_position.and_then(horizontal_position_offset))
       .unwrap_or(0.0),
     vertical_offset_pt: simple_position
-      .map(|position| units::emu_to_points(position.y))
+      .map(|position| units::emu_to_points(position.y.to_emu()))
       .or_else(|| vertical_position.and_then(vertical_position_offset))
       .unwrap_or(0.0),
     wrap: anchor
@@ -4852,7 +4852,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     behind_text: anchor.behind_doc.as_bool(),
     layout_in_cell,
     allow_overlap: anchor.allow_overlap.as_bool(),
-    relative_height: anchor.relative_height,
+    relative_height: anchor.relative_height.unwrap_or_default(),
     relative_width_to: anchor
       .relative_width
       .as_ref()
@@ -11169,21 +11169,21 @@ theme_color_choice_value!(
 
 pub(super) fn resolve_run_color(color: &w::Color, theme_colors: &ThemeColors) -> Option<RgbColor> {
   if color.theme_shade.is_some()
-    && let Some(resolved) = parse_hex_color(&color.val)
+    && let Some(resolved) = color.val.as_deref().and_then(parse_hex_color)
   {
     return Some(resolved);
   }
 
   let has_theme_transform = color.theme_tint.is_some() || color.theme_shade.is_some();
 
-  if !has_theme_transform && let Some(resolved) = parse_hex_color(&color.val) {
+  if !has_theme_transform && let Some(resolved) = color.val.as_deref().and_then(parse_hex_color) {
     return Some(resolved);
   }
 
   let mut resolved = color
     .theme_color
     .and_then(|value| theme_colors.resolve_wordprocessing(value))
-    .or_else(|| parse_hex_color(&color.val))?;
+    .or_else(|| color.val.as_deref().and_then(parse_hex_color))?;
 
   if let Some(tint) = color.theme_tint.as_deref() {
     resolved = apply_word_tint(resolved, tint);
@@ -12618,7 +12618,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => run_properties_run_fonts(properties),
       Self::Style(properties) => properties.run_fonts.as_ref(),
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
-      Self::Numbering(properties) => properties.run_fonts.as_ref(),
+      Self::Numbering(properties) => properties.run_fonts.first(),
       Self::ParagraphMark(properties) => paragraph_mark_run_properties_run_fonts(properties),
     }
   }
@@ -12995,6 +12995,10 @@ mod tests {
     TwipsMeasureValue::Twips(value as u64)
   }
 
+  fn signed_twips(value: i64) -> SignedTwipsMeasureValue {
+    SignedTwipsMeasureValue::Twips(value)
+  }
+
   fn measurement(value: i32) -> MeasurementOrPercentValue {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value.into()),
@@ -13218,7 +13222,7 @@ mod tests {
           run_properties_base_style: Some(Box::new(w::RunPropertiesBaseStyle {
             bold: Some(w::Bold { val: None }),
             color: Some(w::Color {
-              val: "FFFFFF".into(),
+              val: Some("FFFFFF".into()),
               ..Default::default()
             }),
             ..Default::default()
@@ -13664,7 +13668,7 @@ mod tests {
               val: Some(false.into()),
             })),
             w::RunPropertiesChoice::Color(Box::new(w::Color {
-              val: "0000FF".into(),
+              val: Some("0000FF".into()),
               ..Default::default()
             })),
           ],
@@ -14266,11 +14270,11 @@ mod tests {
         equal_width: Some(false.into()),
         column: vec![
           w::Column {
-            width: Some(twips(1440)),
-            space: Some(twips(720)),
+            width: Some(signed_twips(1440)),
+            space: Some(signed_twips(720)),
           },
           w::Column {
-            width: Some(twips(2880)),
+            width: Some(signed_twips(2880)),
             ..Default::default()
           },
         ],

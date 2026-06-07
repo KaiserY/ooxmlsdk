@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
-  MemberDecl, SchemaModuleDecl, TypeKind, TypeRefDecl, VariantDecl, VariantWireDecl,
+  Cardinality, FieldWireDecl, MemberDecl, SchemaModuleDecl, TypeKind, TypeRefDecl, VariantDecl,
+  VariantWireDecl,
 };
 use crate::sdk_data::sdk_data_model::Schema;
 
@@ -52,6 +53,8 @@ pub struct SchemaTypeExtension {
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub extra_xmlns: Vec<String>,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
   pub add_children: Vec<SchemaTypeAddChildExtension>,
@@ -144,6 +147,7 @@ pub struct SchemaTypeAddChildExtension {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaChoiceEnumExtension {
   pub rust_name: String,
+  pub repeated: Option<bool>,
   #[serde(skip_serializing_if = "is_false")]
   pub add_xml_any: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -318,6 +322,11 @@ pub fn apply_schema_extensions(
       }
       if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
         schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
+      }
+      for prefix in &extension.extra_xmlns {
+        if !schema_type.extra_xmlns.contains(prefix) {
+          schema_type.extra_xmlns.push(prefix.clone());
+        }
       }
 
       for attr_extension in &extension.attributes {
@@ -511,11 +520,36 @@ pub fn apply_codegen_ir_schema_extensions(
     return Ok(());
   };
 
-  for choice_extension in &extensions.choice_enums {
+  for type_extension in &extensions.types {
+    if type_extension.extra_xmlns.is_empty() {
+      continue;
+    }
     let Some(type_decl) = ir
       .types
       .iter_mut()
-      .find(|type_decl| type_decl.rust_name == choice_extension.rust_name)
+      .find(|type_decl| type_decl.rust_name == type_extension.class_name)
+    else {
+      return Err(
+        format!(
+          "schema extension type {}.{} not found",
+          module_name, type_extension.class_name
+        )
+        .into(),
+      );
+    };
+
+    for prefix in &type_extension.extra_xmlns {
+      if !type_decl.support.extra_xmlns.contains(prefix) {
+        type_decl.support.extra_xmlns.push(prefix.clone());
+      }
+    }
+  }
+
+  for choice_extension in &extensions.choice_enums {
+    let Some(type_index) = ir
+      .types
+      .iter()
+      .position(|type_decl| type_decl.rust_name == choice_extension.rust_name)
     else {
       return Err(
         format!(
@@ -526,15 +560,26 @@ pub fn apply_codegen_ir_schema_extensions(
       );
     };
 
-    if type_decl.kind != TypeKind::ChoiceEnum {
+    if ir.types[type_index].kind != TypeKind::ChoiceEnum {
       return Err(
         format!(
           "schema extension choice enum {}.{} targets {:?}",
-          module_name, choice_extension.rust_name, type_decl.kind
+          module_name, choice_extension.rust_name, ir.types[type_index].kind
         )
         .into(),
       );
     }
+
+    if let Some(repeated) = choice_extension.repeated {
+      apply_choice_enum_repeated(
+        module_name,
+        ir,
+        choice_extension.rust_name.as_str(),
+        repeated,
+      )?;
+    }
+
+    let type_decl = &mut ir.types[type_index];
 
     if choice_extension.add_xml_any {
       add_xml_any_choice_variant(type_decl);
@@ -603,6 +648,45 @@ pub fn apply_codegen_ir_schema_extensions(
   }
 
   Ok(())
+}
+
+fn apply_choice_enum_repeated(
+  module_name: &str,
+  ir: &mut SchemaModuleDecl,
+  choice_rust_name: &str,
+  repeated: bool,
+) -> Result<()> {
+  let mut changed = false;
+  let cardinality = if repeated {
+    Cardinality::Many
+  } else {
+    Cardinality::Optional
+  };
+
+  for type_decl in &mut ir.types {
+    if type_decl.kind == TypeKind::ChoiceEnum {
+      continue;
+    }
+
+    for member in &mut type_decl.members {
+      let MemberDecl::Field(field) = member else {
+        continue;
+      };
+      if field.wire == FieldWireDecl::Choice && field.type_ref.rust_type == choice_rust_name {
+        field.cardinality = cardinality;
+        changed = true;
+      }
+    }
+  }
+
+  if changed {
+    Ok(())
+  } else {
+    Err(
+      format!("schema extension choice enum {module_name}.{choice_rust_name} has no choice field")
+        .into(),
+    )
+  }
 }
 
 fn add_xml_any_choice_variant(type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl) {
@@ -757,7 +841,9 @@ fn find_child_mut<'a>(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_code::codegen_ir::{SchemaModuleDecl, TypeDecl};
+  use crate::sdk_code::codegen_ir::{
+    Cardinality, FieldDecl, FieldWireDecl, SchemaModuleDecl, TypeDecl,
+  };
   use crate::sdk_data::sdk_data_model::{
     SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
   };
@@ -1319,6 +1405,7 @@ mod tests {
       SchemaExtensions {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "ControlPropertiesChoice".to_string(),
+          repeated: None,
           add_xml_any: false,
           add_variants: vec![SchemaChoiceVariantExtension {
             rust_name: "DrawingRunProperties".to_string(),
@@ -1398,5 +1485,64 @@ mod tests {
     assert_eq!(variant.wire, VariantWireDecl::Any);
     assert_eq!(variant.payload.rust_type, "std::boxed::Box<[u8]>");
     assert!(variant.payload.module_path.is_none());
+  }
+
+  #[test]
+  fn applies_choice_enum_repeated_extension_to_choice_fields() {
+    let mut ir = SchemaModuleDecl {
+      module_name: "test_schema".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "DataLabel".to_string(),
+          kind: TypeKind::ElementStruct,
+          members: vec![MemberDecl::Field(FieldDecl {
+            rust_name: "data_label_choice".to_string(),
+            wire: FieldWireDecl::Choice,
+            cardinality: Cardinality::Optional,
+            type_ref: TypeRefDecl {
+              rust_type: "DataLabelChoice".to_string(),
+              module_path: None,
+            },
+            ..Default::default()
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "DataLabelChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(VariantDecl {
+            rust_name: "Delete".to_string(),
+            wire: VariantWireDecl::Child {
+              qnames: vec!["c:CT_Boolean/c:delete".to_string()],
+            },
+            payload: TypeRefDecl {
+              rust_type: "Delete".to_string(),
+              module_path: None,
+            },
+            ..Default::default()
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        choice_enums: vec![SchemaChoiceEnumExtension {
+          rust_name: "DataLabelChoice".to_string(),
+          repeated: Some(true),
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_codegen_ir_schema_extensions("test_schema", &mut ir, &extensions).unwrap();
+
+    let MemberDecl::Field(field) = &ir.types[0].members[0] else {
+      panic!("expected field");
+    };
+    assert_eq!(field.cardinality, Cardinality::Many);
   }
 }

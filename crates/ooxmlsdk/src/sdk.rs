@@ -526,7 +526,7 @@ pub trait SdkType: Sized {
     ))
   }
 
-  fn write_inner<W: std::io::Write>(&self, _writer: &mut W) -> Result<(), std::io::Error> {
+  fn write_inner<W: std::io::Write>(&self, _writer: &mut W) -> Result<bool, std::io::Error> {
     Err(std::io::Error::other(
       "SdkType does not support XML writing",
     ))

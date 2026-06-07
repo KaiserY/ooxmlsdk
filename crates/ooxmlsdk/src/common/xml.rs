@@ -1,7 +1,7 @@
 use quick_xml::{
   Decoder, Reader,
   escape::unescape,
-  events::{BytesRef, BytesText, Event, attributes::Attribute},
+  events::{BytesCData, BytesRef, BytesText, Event, attributes::Attribute},
 };
 use std::io::BufRead;
 
@@ -660,6 +660,30 @@ where
 }
 
 #[inline]
+pub(crate) fn parse_text_child_value<T>(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<T, SdkError>
+where
+  T: std::str::FromStr,
+{
+  match value.parse::<T>() {
+    Ok(value) => Ok(value),
+    Err(_) => {
+      let trimmed = value.trim_matches([' ', '\t', '\n', '\r']);
+      if trimmed.len() == value.len() {
+        return Err(invalid_field_value(ty, field, value));
+      }
+
+      trimmed
+        .parse::<T>()
+        .map_err(|_| invalid_field_value(ty, field, value))
+    }
+  }
+}
+
+#[inline]
 pub(crate) fn parse_list_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -697,6 +721,21 @@ fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]
 pub(crate) fn push_xml_text(
   value: &mut Option<String>,
   text: BytesText<'_>,
+) -> Result<(), SdkError> {
+  let text = text.xml10_content()?;
+  if let Some(value) = value {
+    value.push_str(text.as_ref());
+  } else {
+    *value = Some(text.into_owned());
+  }
+
+  Ok(())
+}
+
+#[inline]
+pub(crate) fn push_xml_cdata(
+  value: &mut Option<String>,
+  text: BytesCData<'_>,
 ) -> Result<(), SdkError> {
   let text = text.xml10_content()?;
   if let Some(value) = value {

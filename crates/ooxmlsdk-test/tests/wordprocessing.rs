@@ -425,7 +425,7 @@ fn document_round_trip_from_openxml_reader_test() {
     parsed
       .xmlns
       .iter()
-      .all(|declaration| !xml_namespace_prefix_matches(declaration, b"w"))
+      .any(|declaration| xml_namespace_prefix_matches(declaration, b"w"))
   );
   assert!(!serialized.starts_with("<?xml"));
   assert!(

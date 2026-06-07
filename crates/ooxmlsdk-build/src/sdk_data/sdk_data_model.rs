@@ -102,6 +102,8 @@ pub struct SchemaType {
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
   pub have_direct_xml_other_children: bool,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub extra_xmlns: Vec<String>,
   pub text_value_type: String,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,

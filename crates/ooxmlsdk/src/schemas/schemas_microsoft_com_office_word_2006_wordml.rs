@@ -37,6 +37,7 @@ pub struct Mcds {
 pub struct VbaSuppData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the DocEvents Class.
   #[sdk(child(qname = "wne:docEvents"))]
   pub doc_events: Option<DocEvents>,

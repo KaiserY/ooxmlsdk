@@ -9,6 +9,12 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "DifferentialType",
+      "ExtraXmlns": [
+        "x"
+      ]
+    },
+    {
       "ClassName": "DataValidations",
       "HaveXmlnsFields": true
     },

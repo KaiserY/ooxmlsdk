@@ -356,6 +356,18 @@ where
 }
 
 #[inline]
+pub(crate) fn parse_text_child_value<T>(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<T, SdkError>
+where
+  T: std::str::FromStr,
+{
+  xml::parse_text_child_value(value, ty, field)
+}
+
+#[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
   actual == canonical
@@ -438,6 +450,14 @@ pub(crate) fn push_xml_text(
   text: quick_xml::events::BytesText<'_>,
 ) -> Result<(), SdkError> {
   xml::push_xml_text(value, text)
+}
+
+#[inline]
+pub(crate) fn push_xml_cdata(
+  value: &mut Option<String>,
+  text: quick_xml::events::BytesCData<'_>,
+) -> Result<(), SdkError> {
+  xml::push_xml_cdata(value, text)
 }
 
 #[inline]

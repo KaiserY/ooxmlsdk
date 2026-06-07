@@ -661,7 +661,13 @@ fn push_bubble_size_texts(texts: &mut Vec<String>, values: &c::BubbleSize) {
 
 fn push_data_label_texts(texts: &mut Vec<String>, data_labels: &c::DataLabels) {
   for label in &data_labels.data_label {
-    if let Some(c::DataLabelChoice::Sequence(sequence)) = label.data_label_choice.as_ref()
+    if let Some(sequence) = label
+      .data_label_choice
+      .iter()
+      .find_map(|choice| match choice {
+        c::DataLabelChoice::Sequence(sequence) => Some(sequence.as_ref()),
+        _ => None,
+      })
       && let Some(chart_text) = sequence.chart_text.as_deref()
     {
       push_chart_text(texts, chart_text);
@@ -696,10 +702,13 @@ fn push_series_data_label_value_texts(
     _ => None,
   };
   for label in &data_labels.data_label {
-    let label_sequence = match label.data_label_choice.as_ref() {
-      Some(c::DataLabelChoice::Sequence(sequence)) => Some(sequence.as_ref()),
-      _ => None,
-    };
+    let label_sequence = label
+      .data_label_choice
+      .iter()
+      .find_map(|choice| match choice {
+        c::DataLabelChoice::Sequence(sequence) => Some(sequence.as_ref()),
+        _ => None,
+      });
     let show_category = label_sequence
       .and_then(|sequence| sequence.show_category_name.as_ref())
       .and_then(|show| show.val)

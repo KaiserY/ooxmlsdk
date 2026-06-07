@@ -119,11 +119,16 @@ pub struct SystemSupportDecl {
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
   pub compact_xml_other_children: bool,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub extra_xmlns: Vec<String>,
 }
 
 impl SystemSupportDecl {
   pub fn has_extra_support_fields(&self) -> bool {
-    self.have_xmlns_fields || self.have_xml_other_attrs || self.have_xml_other_children
+    self.have_xmlns_fields
+      || self.have_xml_other_attrs
+      || self.have_xml_other_children
+      || !self.extra_xmlns.is_empty()
   }
 }
 
@@ -339,6 +344,7 @@ mod tests {
           have_xml_other_attrs: true,
           have_xml_other_children: true,
           compact_xml_other_children: false,
+          extra_xmlns: Vec::new(),
         },
         members: vec![
           MemberDecl::Field(FieldDecl {

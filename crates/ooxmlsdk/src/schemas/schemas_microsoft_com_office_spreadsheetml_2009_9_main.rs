@@ -695,7 +695,7 @@ pub struct SourceConnection {
 }
 /// Defines the DatastoreItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:datastoreItem")]
+#[sdk(no_prefix, qname = "x14:datastoreItem")]
 pub struct DatastoreItem {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -708,7 +708,7 @@ pub struct DatastoreItem {
 }
 /// Defines the FormControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:formControlPr")]
+#[sdk(no_prefix, qname = "x14:formControlPr")]
 pub struct FormControlProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -819,7 +819,7 @@ pub struct FormControlProperties {
 }
 /// Defines the Slicers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicers")]
+#[sdk(no_prefix, qname = "x14:slicers")]
 pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -829,7 +829,7 @@ pub struct Slicers {
 }
 /// Defines the SlicerCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerCacheDefinition")]
+#[sdk(no_prefix, qname = "x14:slicerCacheDefinition")]
 pub struct SlicerCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -1626,7 +1626,7 @@ pub struct IconSet {
 }
 /// Defines the DifferentialType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:dxf")]
+#[sdk(extra_xmlns("x"), qname = "x14:dxf")]
 pub struct DifferentialType {
   /// Font Properties
   #[sdk(child(qname = "x:font"))]

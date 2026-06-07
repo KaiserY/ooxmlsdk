@@ -5,6 +5,10 @@
       "HaveDirectXmlOtherChildren": true
     },
     {
+      "ClassName": "Creator",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "Created",
       "HaveXmlnsFields": true
     },

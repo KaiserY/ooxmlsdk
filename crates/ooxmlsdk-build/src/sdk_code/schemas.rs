@@ -726,6 +726,21 @@ pub(crate) fn schema_choice_variant_name_from_qname(qname: &str) -> String {
   }
 }
 
+fn no_prefix_sdk_attr_from_qname(module_prefix: &str, qname: &str) -> TokenStream {
+  if !matches!(module_prefix, "ap" | "cp" | "op" | "x" | "xltc" | "pct") {
+    return quote! {};
+  }
+  let element_qname = schema_qname_element_name(qname);
+  let Some((prefix, _)) = element_qname.split_once(':') else {
+    return quote! {};
+  };
+  if prefix == module_prefix {
+    quote! { no_prefix, }
+  } else {
+    quote! {}
+  }
+}
+
 pub(crate) fn schema_choice_variant_name_from_field_name(field_name: &str) -> String {
   field_name
     .strip_prefix("r#")
@@ -1542,16 +1557,38 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       VersionCfgContext::new(true)
     };
     let type_sdk_version_markers = sdk_version_markers(schema_type_version);
-    let sdk_type_attrs = if let Some(qname) = &type_decl.xml_qname {
-      let qname = sdk_element_qname(qname);
-      let is_root_element = type_decl.support.xml_header != XmlHeaderMode::None;
-      let default_ns = if is_root_element && matches!(ir.prefix.as_str(), "x" | "pct") {
-        quote! { default_ns, }
+    let sdk_type_attrs = if let Some(raw_qname) = &type_decl.xml_qname {
+      let qname = sdk_element_qname(raw_qname);
+      let no_prefix = no_prefix_sdk_attr_from_qname(&ir.prefix, raw_qname);
+      let no_prefix = if no_prefix.is_empty()
+        && ir.prefix == "x14"
+        && type_decl.support.xml_header != XmlHeaderMode::None
+      {
+        let element_qname = schema_qname_element_name(raw_qname);
+        if element_qname
+          .split_once(':')
+          .is_some_and(|(prefix, _)| prefix == ir.prefix)
+        {
+          quote! { no_prefix, }
+        } else {
+          quote! {}
+        }
       } else {
+        no_prefix
+      };
+      let extra_xmlns = if type_decl.support.extra_xmlns.is_empty() {
         quote! {}
+      } else {
+        let prefixes = type_decl
+          .support
+          .extra_xmlns
+          .iter()
+          .map(|prefix| proc_macro2::Literal::string(prefix))
+          .collect::<Vec<_>>();
+        quote! { extra_xmlns(#(#prefixes),*), }
       };
       quote! {
-        #[sdk(#(#type_sdk_version_markers,)* #default_ns qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns qname = #qname)]
       }
     } else {
       quote! {}
@@ -3871,16 +3908,22 @@ fn choice_sequence_child_metadata_tokens(
 
   Ok(match &field.wire {
     FieldWireDecl::Child { qname } => {
+      let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
       let qname = choice_metadata_qname(qname);
       if empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph).is_some() {
-        Some(quote! { empty_child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(
+          quote! { empty_child(#variant_attr #field_attr #ty_attr #no_prefix_attr qname = #qname) },
+        )
       } else if is_any_children_alias_type_ref(module, &field.type_ref, type_graph) {
-        Some(quote! { any_child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(
+          quote! { any_child(#variant_attr #field_attr #ty_attr #no_prefix_attr qname = #qname) },
+        )
       } else {
-        Some(quote! { child(#variant_attr #field_attr #ty_attr qname = #qname) })
+        Some(quote! { child(#variant_attr #field_attr #ty_attr #no_prefix_attr qname = #qname) })
       }
     }
     FieldWireDecl::TextChild { qname } => {
+      let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
       let simple_type_attr = if include_field_name {
         quote! {}
       } else {
@@ -3888,7 +3931,7 @@ fn choice_sequence_child_metadata_tokens(
       };
       let qname = choice_metadata_qname(qname);
       Some(
-        quote! { text_child(#variant_attr #field_attr #ty_attr #simple_type_attr qname = #qname) },
+        quote! { text_child(#variant_attr #field_attr #ty_attr #simple_type_attr #no_prefix_attr qname = #qname) },
       )
     }
     _ => None,
@@ -3915,9 +3958,10 @@ fn choice_variant_metadata_tokens(
       qnames
         .iter()
         .map(|qname| {
+          let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
           let simple_type_attr = xml_schema_float_simple_type_sdk_attr_from_qname(qname);
           let qname = choice_metadata_qname(qname);
-          quote! { text_child(variant = #variant_ident, #simple_type_attr qname = #qname) }
+          quote! { text_child(variant = #variant_ident, #simple_type_attr #no_prefix_attr qname = #qname) }
         })
         .collect(),
     ),
@@ -3937,8 +3981,9 @@ fn choice_variant_metadata_tokens(
         qnames
           .iter()
           .map(|qname| {
+            let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
             let qname = choice_metadata_qname(qname);
-            quote! { #item_name(variant = #variant_ident, qname = #qname) }
+            quote! { #item_name(variant = #variant_ident, #no_prefix_attr qname = #qname) }
           })
           .collect(),
       )
@@ -4066,22 +4111,26 @@ fn gen_direct_child_fields_from_decl_with_context(
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
+        let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
         let qname = sdk_element_qname(qname);
-        quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+        quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* #no_prefix_attr qname = #qname))] }
       }
       FieldWireDecl::Child { qname } if is_any_children_alias => {
+        let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
         let qname = sdk_element_qname(qname);
-        quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+        quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* #no_prefix_attr qname = #qname))] }
       }
       FieldWireDecl::Child { qname } => {
+        let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
         let qname = sdk_element_qname(qname);
-        quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
+        quote! { #[sdk(child(#(#field_sdk_version_markers,)* #no_prefix_attr qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
         let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        let no_prefix_attr = no_prefix_sdk_attr_from_qname(&module.prefix, qname);
         let qname = sdk_element_qname(qname);
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr #no_prefix_attr qname = #qname))] }
       }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };

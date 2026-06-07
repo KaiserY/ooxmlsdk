@@ -125,6 +125,7 @@ struct SdkAttrField {
 struct SdkChildField {
   ident: Ident,
   qname: String,
+  no_prefix: bool,
   ty: Type,
   optional: bool,
   repeated: bool,
@@ -134,6 +135,7 @@ struct SdkChildField {
 struct SdkEmptyChildField {
   ident: Ident,
   qname: String,
+  no_prefix: bool,
   optional: bool,
   repeated: bool,
 }
@@ -142,6 +144,7 @@ struct SdkEmptyChildField {
 struct SdkTextChildField {
   ident: Ident,
   qname: String,
+  no_prefix: bool,
   simple_type: Option<String>,
   ty: Type,
   optional: bool,
@@ -153,6 +156,7 @@ struct SdkTextChildField {
 struct SdkAnyChildField {
   ident: Ident,
   qname: String,
+  no_prefix: bool,
   optional: bool,
   repeated: bool,
 }
@@ -194,17 +198,21 @@ enum SdkTypeFieldKind {
   },
   Child {
     qname: String,
+    no_prefix: bool,
   },
   EmptyChild {
     qname: String,
+    no_prefix: bool,
   },
   TextChild {
     qname: String,
+    no_prefix: bool,
     simple_type: Option<String>,
     list: bool,
   },
   AnyChild {
     qname: String,
+    no_prefix: bool,
   },
   Choice,
   Any,
@@ -353,20 +361,24 @@ enum SdkTypeChoiceItem {
     variant: Ident,
     ty: Option<Type>,
     qname: String,
+    no_prefix: bool,
   },
   EmptyChild {
     variant: Ident,
     qname: String,
+    no_prefix: bool,
   },
   TextChild {
     variant: Ident,
     ty: Option<Type>,
     simple_type: Option<String>,
     qname: String,
+    no_prefix: bool,
   },
   AnyChild {
     variant: Ident,
     qname: String,
+    no_prefix: bool,
   },
   Sequence {
     variant: Ident,
@@ -387,6 +399,7 @@ struct SdkTypeChoiceSequenceChild {
   ty: Option<Type>,
   simple_type: Option<String>,
   qname: String,
+  no_prefix: bool,
 }
 
 #[derive(Clone)]
@@ -564,7 +577,7 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   Ok(None)
 }
 
-fn parse_sdk_default_ns(attrs: &[Attribute]) -> syn::Result<bool> {
+fn parse_sdk_no_prefix(attrs: &[Attribute]) -> syn::Result<bool> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -573,13 +586,63 @@ fn parse_sdk_default_ns(attrs: &[Attribute]) -> syn::Result<bool> {
       attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
     for meta in metas {
       if let Meta::Path(path) = meta
-        && path.is_ident("default_ns")
+        && (path.is_ident("no_prefix") || path.is_ident("default_ns"))
       {
         return Ok(true);
       }
     }
   }
   Ok(false)
+}
+
+enum ExtraXmlnsArg {
+  Ident(Ident),
+  Lit(LitStr),
+}
+
+impl Parse for ExtraXmlnsArg {
+  fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+    if input.peek(LitStr) {
+      return input.parse().map(Self::Lit);
+    }
+    input.parse().map(Self::Ident)
+  }
+}
+
+impl ExtraXmlnsArg {
+  fn value(self) -> String {
+    match self {
+      Self::Ident(ident) => ident.to_string(),
+      Self::Lit(lit) => lit.value(),
+    }
+  }
+}
+
+fn parse_sdk_extra_xmlns(attrs: &[Attribute]) -> syn::Result<Vec<String>> {
+  let mut prefixes = Vec::new();
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      let Meta::List(meta) = meta else {
+        continue;
+      };
+      if !meta.path.is_ident("extra_xmlns") {
+        continue;
+      }
+      let args = meta.parse_args_with(Punctuated::<ExtraXmlnsArg, Token![,]>::parse_terminated)?;
+      for arg in args {
+        let prefix = arg.value();
+        if !prefixes.contains(&prefix) {
+          prefixes.push(prefix);
+        }
+      }
+    }
+  }
+  Ok(prefixes)
 }
 
 fn parse_sdk_stack_parser(attrs: &[Attribute]) -> syn::Result<Option<SdkStackParserAttrs>> {
@@ -684,10 +747,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("child") => {
           let mut qname = None;
+          let mut no_prefix = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("no_prefix") {
+              no_prefix = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -697,17 +764,21 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           let qname =
             qname.ok_or_else(|| syn::Error::new_spanned(&meta.path, "sdk child requires qname"))?;
-          kind = Some(SdkTypeFieldKind::Child { qname });
+          kind = Some(SdkTypeFieldKind::Child { qname, no_prefix });
         }
         Meta::Path(path) if path.is_ident("child") => {
           return Err(syn::Error::new_spanned(path, "sdk child requires qname"));
         }
         Meta::List(meta) if meta.path.is_ident("empty_child") => {
           let mut qname = None;
+          let mut no_prefix = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("no_prefix") {
+              no_prefix = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -717,16 +788,21 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::EmptyChild {
             qname: qname.unwrap_or_default(),
+            no_prefix,
           });
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
+          let mut no_prefix = false;
           let mut simple_type = None;
           let mut list = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("no_prefix") {
+              no_prefix = true;
               Ok(())
             } else if nested.path.is_ident("simple_type") {
               let value: LitStr = nested.value()?.parse()?;
@@ -743,16 +819,21 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::TextChild {
             qname: qname.unwrap_or_default(),
+            no_prefix,
             simple_type,
             list,
           });
         }
         Meta::List(meta) if meta.path.is_ident("any_child") => {
           let mut qname = None;
+          let mut no_prefix = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("no_prefix") {
+              no_prefix = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -762,6 +843,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::AnyChild {
             qname: qname.unwrap_or_default(),
+            no_prefix,
           });
         }
         Meta::Path(path) if path.is_ident("text") => {
@@ -840,10 +922,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let mut ty = None;
               let mut simple_type = None;
               let mut qname = None;
+              let mut no_prefix = false;
               nested.parse_nested_meta(|choice_child| {
                 if choice_child.path.is_ident("qname") {
                   let value: LitStr = choice_child.value()?.parse()?;
                   qname = Some(value.value());
+                  Ok(())
+                } else if choice_child.path.is_ident("no_prefix") {
+                  no_prefix = true;
                   Ok(())
                 } else if choice_child.path.is_ident("variant") {
                   variant = Some(choice_child.value()?.parse()?);
@@ -868,18 +954,32 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                 syn::Error::new_spanned(&nested.path, "sdk choice child requires variant")
               })?;
               if nested.path.is_ident("child") {
-                choice_items.push(SdkTypeChoiceItem::Child { variant, ty, qname });
+                choice_items.push(SdkTypeChoiceItem::Child {
+                  variant,
+                  ty,
+                  qname,
+                  no_prefix,
+                });
               } else if nested.path.is_ident("empty_child") {
-                choice_items.push(SdkTypeChoiceItem::EmptyChild { variant, qname });
+                choice_items.push(SdkTypeChoiceItem::EmptyChild {
+                  variant,
+                  qname,
+                  no_prefix,
+                });
               } else if nested.path.is_ident("text_child") {
                 choice_items.push(SdkTypeChoiceItem::TextChild {
                   variant,
                   ty,
                   simple_type,
                   qname,
+                  no_prefix,
                 });
               } else {
-                choice_items.push(SdkTypeChoiceItem::AnyChild { variant, qname });
+                choice_items.push(SdkTypeChoiceItem::AnyChild {
+                  variant,
+                  qname,
+                  no_prefix,
+                });
               }
               Ok(())
             } else if nested.path.is_ident("sequence") {
@@ -911,10 +1011,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                   let mut ty = None;
                   let mut simple_type = None;
                   let mut qname = None;
+                  let mut no_prefix = false;
                   sequence.parse_nested_meta(|sequence_child| {
                     if sequence_child.path.is_ident("qname") {
                       let value: LitStr = sequence_child.value()?.parse()?;
                       qname = Some(value.value());
+                      Ok(())
+                    } else if sequence_child.path.is_ident("no_prefix") {
+                      no_prefix = true;
                       Ok(())
                     } else if sequence_child.path.is_ident("field") {
                       field = Some(sequence_child.value()?.parse()?);
@@ -941,6 +1045,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
                     ty,
                     simple_type,
                     qname,
+                    no_prefix,
                   });
                   Ok(())
                 } else if is_sdk_version_marker_path(&sequence.path) {
@@ -1354,20 +1459,21 @@ fn parse_qname_info(qname: &str) -> QNameInfo {
   }
 }
 
-fn qname_write_prefix(prefix: &str) -> &str {
-  if namespaces::uses_default_namespace(prefix) {
-    ""
-  } else {
-    prefix
-  }
+fn qname_write_prefix(prefix: &str, no_prefix: bool) -> &str {
+  if no_prefix { "" } else { prefix }
 }
 
-fn write_tag_literal_tokens(qname: &str, open: &str, close: &str) -> proc_macro2::TokenStream {
+fn write_tag_literal_tokens(
+  qname: &str,
+  open: &str,
+  close: &str,
+  no_prefix: bool,
+) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
-  let write_prefix = qname_write_prefix(&tag_prefix);
+  let write_prefix = qname_write_prefix(&tag_prefix, no_prefix);
   let tag = if write_prefix.is_empty() {
     format!("{open}{local_name}{close}")
   } else {
@@ -1377,20 +1483,20 @@ fn write_tag_literal_tokens(qname: &str, open: &str, close: &str) -> proc_macro2
   quote! { writer.write_all(#tag_lit)?; }
 }
 
-fn write_start_tag_open_tokens(qname: &str) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "<", "")
+fn write_start_tag_open_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", "", no_prefix)
 }
 
-fn write_start_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "<", ">")
+fn write_start_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", ">", no_prefix)
 }
 
-fn write_empty_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "<", " />")
+fn write_empty_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", " />", no_prefix)
 }
 
-fn write_end_tag_tokens(qname: &str) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "</", ">")
+fn write_end_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "</", ">", no_prefix)
 }
 
 fn is_xmlns_field(ident: &Ident) -> bool {

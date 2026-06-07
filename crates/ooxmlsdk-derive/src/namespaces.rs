@@ -181,7 +181,3 @@ pub(crate) fn uri_by_prefix(prefix: &str) -> Option<&'static str> {
     _ => None,
   }
 }
-#[inline]
-pub(crate) fn uses_default_namespace(prefix: &str) -> bool {
-  matches!(prefix, "x" | "pct")
-}

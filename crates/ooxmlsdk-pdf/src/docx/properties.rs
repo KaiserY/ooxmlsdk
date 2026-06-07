@@ -123,7 +123,12 @@ pub(super) fn merge_run_style(
     style.complex_font_size_pt = Some((size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
   }
   if let Some(color) = properties.color() {
-    if matches!(&properties, RunProps::Numbering(_)) && color.val.eq_ignore_ascii_case("auto") {
+    if matches!(&properties, RunProps::Numbering(_))
+      && color
+        .val
+        .as_deref()
+        .is_some_and(|value| value.eq_ignore_ascii_case("auto"))
+    {
       style.color = super::RgbColor {
         r: 255,
         g: 255,

@@ -70,7 +70,7 @@ pub fn gen_derive_namespace_code<P: AsRef<Path>>(sdk_data_dir: P, out_dir: P) ->
     out_dir_path: out_dir.as_ref(),
     include_known_namespace: false,
     include_uri_by_prefix: true,
-    include_default_namespace_style: true,
+    include_default_namespace_style: false,
   })
 }
 

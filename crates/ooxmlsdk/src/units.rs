@@ -876,7 +876,13 @@ impl MeasurementOrPercentValue {
       parse_percent_string_bytes(value)
         .map(|value| Self::DecimalNumberOrPercent(DecimalNumberOrPercentValue::Percent(value)))
     } else {
-      parse_universal_measure_bytes(value).map(Self::UniversalMeasure)
+      parse_universal_measure_bytes(value)
+        .map(Self::UniversalMeasure)
+        .or_else(|_| {
+          parse_bare_twips_decimal_bytes(value, true).map(|value| {
+            Self::DecimalNumberOrPercent(DecimalNumberOrPercentValue::DecimalNumber(value))
+          })
+        })
     }
   }
 
@@ -1672,6 +1678,18 @@ mod tests {
     assert_eq!(
       SignedTwipsMeasureValue::from_bytes(b"-1133.8582677165355"),
       Ok(SignedTwipsMeasureValue::Twips(-1134))
+    );
+    assert_eq!(
+      MeasurementOrPercentValue::from_bytes(b"108.0"),
+      Ok(MeasurementOrPercentValue::DecimalNumberOrPercent(
+        DecimalNumberOrPercentValue::DecimalNumber(108)
+      ))
+    );
+    assert_eq!(
+      MeasurementOrPercentValue::from_bytes(b"2256.5"),
+      Ok(MeasurementOrPercentValue::DecimalNumberOrPercent(
+        DecimalNumberOrPercentValue::DecimalNumber(2257)
+      ))
     );
     assert_eq!(
       TwipsMeasureValue::from_bytes(b"-1.5"),

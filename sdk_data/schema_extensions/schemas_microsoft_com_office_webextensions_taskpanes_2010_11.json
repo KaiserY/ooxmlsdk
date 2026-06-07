@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "WebExtensionPartReference",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

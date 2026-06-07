@@ -360,7 +360,7 @@ pub struct SignatureLine {
   #[sdk(attr(qname = "o:suggestedsigneremail"))]
   pub suggested_signer_email: Option<crate::simple_type::StringValue>,
   /// Instructions for Signing
-  #[sdk(attr(qname = ":signinginstructions"))]
+  #[sdk(attr(match_local_name, qname = ":signinginstructions"))]
   pub signing_instructions: Option<crate::simple_type::StringValue>,
   /// Additional Signature Information
   #[sdk(attr(qname = ":addlxml"))]

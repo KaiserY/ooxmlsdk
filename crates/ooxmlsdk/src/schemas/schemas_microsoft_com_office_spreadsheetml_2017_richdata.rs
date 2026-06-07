@@ -38,7 +38,7 @@ pub enum RichValueValueType {
 }
 /// Defines the RichValueBlock Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:rvb")]
+#[sdk(no_prefix, qname = "xlrd:rvb")]
 pub struct RichValueBlock {
   /// i
   #[sdk(attr(qname = ":i"))]
@@ -46,7 +46,7 @@ pub struct RichValueBlock {
 }
 /// Defines the RichValueData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:rvData")]
+#[sdk(no_prefix, qname = "xlrd:rvData")]
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -54,15 +54,15 @@ pub struct RichValueData {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValue Class.
-  #[sdk(child(qname = "xlrd:rv"))]
+  #[sdk(child(no_prefix, qname = "xlrd:rv"))]
   pub rich_value: Vec<RichValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xlrd:extLst"))]
+  #[sdk(child(no_prefix, qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueStructures Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:rvStructures")]
+#[sdk(no_prefix, qname = "xlrd:rvStructures")]
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -70,29 +70,29 @@ pub struct RichValueStructures {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValueStructure Class.
-  #[sdk(child(qname = "xlrd:s"))]
+  #[sdk(child(no_prefix, qname = "xlrd:s"))]
   pub rich_value_structure: Vec<RichValueStructure>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(qname = "xlrd:extLst"))]
+  #[sdk(child(no_prefix, qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:rv")]
+#[sdk(no_prefix, qname = "xlrd:rv")]
 pub struct RichValue {
   /// s
   #[sdk(attr(qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the RichValueFallback Class.
-  #[sdk(child(qname = "xlrd:fb"))]
+  #[sdk(child(no_prefix, qname = "xlrd:fb"))]
   pub rich_value_fallback: Option<RichValueFallback>,
   /// Defines the Value Class.
-  #[sdk(text_child(simple_type = "StringValue", qname = "xlrd:v"))]
+  #[sdk(text_child(simple_type = "StringValue", no_prefix, qname = "xlrd:v"))]
   pub value: Vec<Value>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:extLst")]
+#[sdk(no_prefix, qname = "xlrd:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -100,7 +100,7 @@ pub struct ExtensionList {
 }
 /// Defines the RichValueFallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:fb")]
+#[sdk(no_prefix, qname = "xlrd:fb")]
 pub struct RichValueFallback {
   /// t
   #[sdk(attr(qname = ":t"))]
@@ -112,18 +112,18 @@ pub struct RichValueFallback {
 pub type Value = crate::simple_type::StringValue;
 /// Defines the RichValueStructure Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:s")]
+#[sdk(no_prefix, qname = "xlrd:s")]
 pub struct RichValueStructure {
   /// t
   #[sdk(attr(qname = ":t"))]
   pub t: crate::simple_type::StringValue,
   /// Defines the Key Class.
-  #[sdk(child(qname = "xlrd:k"))]
+  #[sdk(child(no_prefix, qname = "xlrd:k"))]
   pub key: Vec<Key>,
 }
 /// Defines the Key Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd:k")]
+#[sdk(no_prefix, qname = "xlrd:k")]
 pub struct Key {
   /// n
   #[sdk(attr(qname = ":n"))]

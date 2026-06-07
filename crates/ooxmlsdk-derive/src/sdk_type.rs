@@ -58,26 +58,6 @@ fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
   Some(local_name)
 }
 
-fn needs_canonical_xmlns_prefix_for_qname(qname: &str) -> bool {
-  matches!(
-    parse_qname_info(qname).tag_prefix.as_str(),
-    "x14" | "xne" | "w10"
-  )
-}
-
-fn choice_item_needs_canonical_xmlns_prefix(item: &SdkTypeChoiceItem) -> bool {
-  match item {
-    SdkTypeChoiceItem::Child { qname, .. }
-    | SdkTypeChoiceItem::EmptyChild { qname, .. }
-    | SdkTypeChoiceItem::TextChild { qname, .. }
-    | SdkTypeChoiceItem::AnyChild { qname, .. } => needs_canonical_xmlns_prefix_for_qname(qname),
-    SdkTypeChoiceItem::Sequence { children, .. } => children
-      .iter()
-      .any(|child| needs_canonical_xmlns_prefix_for_qname(&child.qname)),
-    SdkTypeChoiceItem::Any { .. } | SdkTypeChoiceItem::Text { .. } => false,
-  }
-}
-
 fn extra_xmlns_ident(prefix: &str) -> Ident {
   let mut ident = String::from("has_extra_xmlns");
   for byte in prefix.bytes() {
@@ -89,6 +69,40 @@ fn extra_xmlns_ident(prefix: &str) -> Ident {
     }
   }
   Ident::new(&ident, Span::call_site())
+}
+
+fn canonical_namespace_prefix_tokens(
+  prefix_pairs: &[String],
+) -> syn::Result<proc_macro2::TokenStream> {
+  if prefix_pairs.is_empty() {
+    return Ok(quote! {});
+  }
+
+  let mut arms = Vec::new();
+  for prefix_pair in prefix_pairs {
+    let Some((from_prefix, to_prefix)) = prefix_pair.split_once(':') else {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        format!("canonical_namespace_prefix expects from:to, got {prefix_pair}"),
+      ));
+    };
+    if from_prefix.is_empty() || to_prefix.is_empty() {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        format!("canonical_namespace_prefix expects non-empty from:to, got {prefix_pair}"),
+      ));
+    }
+    let from_lit = LitByteStr::new(from_prefix.as_bytes(), Span::call_site());
+    let to_lit = LitByteStr::new(to_prefix.as_bytes(), Span::call_site());
+    arms.push(quote! { #from_lit => #to_lit, });
+  }
+
+  Ok(quote! {
+    let declaration_prefix = match declaration_prefix {
+      #(#arms)*
+      _ => declaration_prefix,
+    };
+  })
 }
 
 fn extra_xmlns_tokens(
@@ -425,7 +439,7 @@ fn stack_parser_choice_write_step_tokens(
         let write_ty = ty.clone().unwrap_or_else(|| syn::parse_quote! { _ });
         quote! {
           #start_tag_open
-          if !<#write_ty as crate::sdk::SdkType>::write_inner(value.as_ref(), writer)? {
+          if !<#write_ty as crate::sdk::SdkType>::write_inner(value.as_ref(), writer, #no_prefix)? {
             #end_tag
           }
           None
@@ -778,31 +792,31 @@ fn stack_parser_shared_table_tokens(
           }
           __OoxmlsdkRecursiveTableWriteTask::TableProperties(value) => {
             writer.write_all(b"<w:tblPr")?;
-            if !crate::sdk::SdkType::write_inner(value, writer)? {
+            if !crate::sdk::SdkType::write_inner(value, writer, false)? {
               writer.write_all(b"</w:tblPr>")?;
             }
           }
           __OoxmlsdkRecursiveTableWriteTask::TableGrid(value) => {
             writer.write_all(b"<w:tblGrid")?;
-            if !crate::sdk::SdkType::write_inner(value, writer)? {
+            if !crate::sdk::SdkType::write_inner(value, writer, false)? {
               writer.write_all(b"</w:tblGrid>")?;
             }
           }
           __OoxmlsdkRecursiveTableWriteTask::TablePropertyExceptions(value) => {
             writer.write_all(b"<w:tblPrEx")?;
-            if !crate::sdk::SdkType::write_inner(value, writer)? {
+            if !crate::sdk::SdkType::write_inner(value, writer, false)? {
               writer.write_all(b"</w:tblPrEx>")?;
             }
           }
           __OoxmlsdkRecursiveTableWriteTask::TableRowProperties(value) => {
             writer.write_all(b"<w:trPr")?;
-            if !crate::sdk::SdkType::write_inner(value, writer)? {
+            if !crate::sdk::SdkType::write_inner(value, writer, false)? {
               writer.write_all(b"</w:trPr>")?;
             }
           }
           __OoxmlsdkRecursiveTableWriteTask::TableCellProperties(value) => {
             writer.write_all(b"<w:tcPr")?;
-            if !crate::sdk::SdkType::write_inner(value, writer)? {
+            if !crate::sdk::SdkType::write_inner(value, writer, false)? {
               writer.write_all(b"</w:tcPr>")?;
             }
           }
@@ -1228,11 +1242,17 @@ fn write_typed_child_tokens(
   qname: &str,
   no_prefix: bool,
 ) -> proc_macro2::TokenStream {
-  let start_tag_open = write_start_tag_open_tokens(qname, no_prefix);
-  let end_tag = write_end_tag_tokens(qname, no_prefix);
+  let child_no_prefix = if no_prefix {
+    quote! { no_prefix }
+  } else {
+    quote! { false }
+  };
+  let start_tag_open =
+    write_start_tag_open_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
+  let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
   quote! {
     #start_tag_open
-    if !<#child_ty as crate::sdk::SdkType>::write_inner(#value, writer)? {
+    if !<#child_ty as crate::sdk::SdkType>::write_inner(#value, writer, #child_no_prefix)? {
       #end_tag
     }
   }
@@ -1299,7 +1319,12 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::EmptyChild => {
-      let empty_tag = write_empty_tag_tokens(qname, no_prefix);
+      let child_no_prefix = if no_prefix {
+        quote! { no_prefix }
+      } else {
+        quote! { false }
+      };
+      let empty_tag = write_empty_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
       let write_empty = quote! {
         #empty_tag
       };
@@ -1320,8 +1345,14 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::TextChild => {
-      let start_tag = write_start_tag_tokens(qname, no_prefix);
-      let end_tag = write_end_tag_tokens(qname, no_prefix);
+      let child_no_prefix = if no_prefix {
+        quote! { no_prefix }
+      } else {
+        quote! { false }
+      };
+      let start_tag =
+        write_start_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
+      let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
       let write_value = |expr: proc_macro2::TokenStream| {
         let content =
           write_text_value_content_tokens(expr, &child_ty, child.simple_type.as_deref(), qname);
@@ -1374,12 +1405,19 @@ fn build_choice_write_tokens(
       } => {
         let _ = ty;
         let value_expr = quote! { value.as_ref() };
-        let start_tag_open = write_start_tag_open_tokens(qname, *no_prefix);
-        let end_tag = write_end_tag_tokens(qname, *no_prefix);
+        let child_no_prefix = if *no_prefix {
+          quote! { no_prefix }
+        } else {
+          quote! { false }
+        };
+        let start_tag_open =
+          write_start_tag_open_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix.clone());
+        let end_tag =
+          write_end_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix.clone());
         arms.push(quote! {
           #choice_ty::#variant(value) => {
             #start_tag_open
-            if !crate::sdk::SdkType::write_inner(#value_expr, writer)? {
+            if !crate::sdk::SdkType::write_inner(#value_expr, writer, #child_no_prefix)? {
               #end_tag
             }
           }
@@ -1390,7 +1428,13 @@ fn build_choice_write_tokens(
         qname,
         no_prefix,
       } => {
-        let empty_tag = write_empty_tag_tokens(qname, *no_prefix);
+        let child_no_prefix = if *no_prefix {
+          quote! { no_prefix }
+        } else {
+          quote! { false }
+        };
+        let empty_tag =
+          write_empty_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix);
         arms.push(quote! {
           #choice_ty::#variant => {
             #empty_tag
@@ -1404,8 +1448,14 @@ fn build_choice_write_tokens(
         qname,
         no_prefix,
       } => {
-        let start_tag = write_start_tag_tokens(qname, *no_prefix);
-        let end_tag = write_end_tag_tokens(qname, *no_prefix);
+        let child_no_prefix = if *no_prefix {
+          quote! { no_prefix }
+        } else {
+          quote! { false }
+        };
+        let start_tag =
+          write_start_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix.clone());
+        let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix);
         let content = if let Some(payload_ty) = ty.clone().or_else(|| {
           simple_type
             .as_deref()
@@ -1435,8 +1485,14 @@ fn build_choice_write_tokens(
         qname,
         no_prefix,
       } => {
-        let start_tag = write_start_tag_tokens(qname, *no_prefix);
-        let end_tag = write_end_tag_tokens(qname, *no_prefix);
+        let child_no_prefix = if *no_prefix {
+          quote! { no_prefix }
+        } else {
+          quote! { false }
+        };
+        let start_tag =
+          write_start_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix.clone());
+        let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, *no_prefix, child_no_prefix);
         arms.push(quote! {
           #choice_ty::#variant(value) => {
             #start_tag
@@ -1486,8 +1542,15 @@ fn build_choice_write_tokens(
             SdkTypeChoiceSequenceChildKind::TextChild => {
               let payload_ty = payload_ty.unwrap_or_else(|| syn::parse_quote! { _ });
               let child_ty = box_inner_type(&payload_ty).unwrap_or(payload_ty);
-              let start_tag = write_start_tag_tokens(qname, no_prefix);
-              let end_tag = write_end_tag_tokens(qname, no_prefix);
+              let child_no_prefix = if no_prefix {
+                quote! { no_prefix }
+              } else {
+                quote! { false }
+              };
+              let start_tag =
+                write_start_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
+              let end_tag =
+                write_end_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
               let content = write_text_value_content_tokens(
                 value_expr,
                 &child_ty,
@@ -1503,7 +1566,14 @@ fn build_choice_write_tokens(
             SdkTypeChoiceSequenceChildKind::AnyChild => {
               build_any_child_write_tokens_for_value(value_expr, qname, no_prefix, false, false)
             }
-            SdkTypeChoiceSequenceChildKind::EmptyChild => write_empty_tag_tokens(qname, no_prefix),
+            SdkTypeChoiceSequenceChildKind::EmptyChild => {
+              let child_no_prefix = if no_prefix {
+                quote! { no_prefix }
+              } else {
+                quote! { false }
+              };
+              write_empty_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix)
+            }
           };
           arms.push(quote! {
             #choice_ty::#variant(value) => {
@@ -1513,7 +1583,7 @@ fn build_choice_write_tokens(
         } else {
           arms.push(quote! {
             #choice_ty::#variant(value) => {
-              let _ = crate::sdk::SdkType::write_inner(value.as_ref(), writer)?;
+              let _ = crate::sdk::SdkType::write_inner(value.as_ref(), writer, no_prefix)?;
             }
           });
         }
@@ -1801,8 +1871,10 @@ fn expand_tuple_wrapper(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
+        no_prefix: bool,
       ) -> Result<bool, std::io::Error> {
-        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer)
+        let _ = no_prefix;
+        <#inner_ty as crate::sdk::SdkType>::write_inner(&self.0, writer, no_prefix)
       }
     }
 
@@ -1892,7 +1964,7 @@ fn expand_tuple_wrapper(
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
         #start_tag_open
-        if !<Self as crate::sdk::SdkType>::write_inner(self, writer)? {
+        if !<Self as crate::sdk::SdkType>::write_inner(self, writer, #no_prefix)? {
           #end_tag
         }
         Ok(())
@@ -2643,6 +2715,54 @@ fn push_flat_choice_mode_arms(
   io_visit_tokens.push(flat_choice_arm_tokens(targets, io_body, true));
 }
 
+fn flat_choice_conflict_arm_tokens(
+  local_target: proc_macro2::TokenStream,
+  schema_tag_prefix: &str,
+  qname_bodies: Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+  visit: bool,
+) -> proc_macro2::TokenStream {
+  let terminal = if visit {
+    quote! { return Ok(true); }
+  } else {
+    quote! { continue; }
+  };
+  let Some((first_qname, _, _)) = qname_bodies.first() else {
+    return quote! {};
+  };
+  let default_qname = qname_bodies
+    .iter()
+    .find(|(qname, _, _)| parse_qname_info(qname).tag_prefix == schema_tag_prefix)
+    .map(|(qname, _, _)| qname.as_str())
+    .unwrap_or(first_qname.as_str());
+  let default_body = qname_bodies
+    .iter()
+    .find(|(qname, _, _)| qname.as_str() == default_qname)
+    .map(|(_, _, body)| body)
+    .expect("default qname body");
+  let qname_arms = qname_bodies
+    .iter()
+    .filter(|(qname, _, _)| qname.as_str() != default_qname)
+    .map(|(_, qname, body)| {
+      quote! {
+        #qname => {
+          #body
+          #terminal
+        }
+      }
+    });
+  quote! {
+    #local_target => {
+      match e.name().into_inner() {
+        #( #qname_arms )*
+        _ => {
+          #default_body
+          #terminal
+        }
+      }
+    }
+  }
+}
+
 fn flat_choice_wildcard_arm_tokens(
   body: proc_macro2::TokenStream,
   visit: bool,
@@ -2847,8 +2967,14 @@ fn build_text_child_write_tokens(
     unwrap_wrapped_type(field_ty)
   };
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-    let start_tag = write_start_tag_tokens(qname, no_prefix);
-    let end_tag = write_end_tag_tokens(qname, no_prefix);
+    let child_no_prefix = if no_prefix {
+      quote! { no_prefix }
+    } else {
+      quote! { false }
+    };
+    let start_tag =
+      write_start_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
+    let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
     let value_write_tokens = if list {
       quote! {
         crate::common::write_list_text_content_value(writer, #value_expr.as_slice())?;
@@ -2905,7 +3031,12 @@ fn build_empty_child_write_tokens(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let empty_tag = write_empty_tag_tokens(qname, no_prefix);
+  let child_no_prefix = if no_prefix {
+    quote! { no_prefix }
+  } else {
+    quote! { false }
+  };
+  let empty_tag = write_empty_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
   let write_tokens = quote! {
     #empty_tag
   };
@@ -3055,8 +3186,14 @@ fn build_any_child_write_tokens_for_value(
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let start_tag = write_start_tag_tokens(qname, no_prefix);
-  let end_tag = write_end_tag_tokens(qname, no_prefix);
+  let child_no_prefix = if no_prefix {
+    quote! { no_prefix }
+  } else {
+    quote! { false }
+  };
+  let start_tag =
+    write_start_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix.clone());
+  let end_tag = write_end_tag_runtime_no_prefix_tokens(qname, no_prefix, child_no_prefix);
   let write_value_tokens = quote! {
     #start_tag
     for value in value {
@@ -3934,7 +4071,9 @@ fn expand_helper_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
+        no_prefix: bool,
       ) -> Result<bool, std::io::Error> {
+        let _ = no_prefix;
         #write_inner_body
       }
     }
@@ -3989,6 +4128,9 @@ fn expand_named_struct(
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
   let (extra_xmlns_init_tokens, extra_xmlns_mark_tokens, extra_xmlns_write_tokens) =
     extra_xmlns_tokens(&extra_xmlns)?;
+  let canonical_namespace_prefixes = parse_sdk_canonical_namespace_prefixes(&input.attrs)?;
+  let canonical_namespace_prefix_tokens =
+    canonical_namespace_prefix_tokens(&canonical_namespace_prefixes)?;
   let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
   let stack_parser = parse_sdk_stack_parser(&input.attrs)?;
@@ -4059,6 +4201,8 @@ fn expand_named_struct(
         name,
         simple_type,
         list,
+        match_local_name,
+        empty_as_none,
       } => attr_fields.push(SdkAttrField {
         ident: field_ident.clone(),
         name,
@@ -4066,6 +4210,8 @@ fn expand_named_struct(
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         list,
+        match_local_name,
+        empty_as_none,
         validators: parsed_attrs.validators,
       }),
       SdkTypeFieldKind::Child { qname, no_prefix } => child_fields.push(SdkChildField {
@@ -4145,30 +4291,7 @@ fn expand_named_struct(
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
-  let needs_canonical_xmlns_prefix = !extra_xmlns.is_empty()
-    || needs_canonical_xmlns_prefix_for_qname(schema_qname)
-    || child_fields
-      .iter()
-      .any(|field| needs_canonical_xmlns_prefix_for_qname(&field.qname))
-    || empty_child_fields
-      .iter()
-      .any(|field| needs_canonical_xmlns_prefix_for_qname(&field.qname))
-    || text_child_fields
-      .iter()
-      .any(|field| needs_canonical_xmlns_prefix_for_qname(&field.qname))
-    || any_child_fields
-      .iter()
-      .any(|field| needs_canonical_xmlns_prefix_for_qname(&field.qname))
-    || choice_fields.iter().any(|field| {
-      field
-        .items
-        .iter()
-        .any(choice_item_needs_canonical_xmlns_prefix)
-        || field
-          .specific_qnames
-          .iter()
-          .any(|qname| needs_canonical_xmlns_prefix_for_qname(qname))
-    });
+  let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
   let use_local_name_child_dispatch = should_use_local_name_child_dispatch(
     schema_qname,
     child_fields
@@ -4245,7 +4368,12 @@ fn expand_named_struct(
   for field in &attr_fields {
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
+    let QNameInfo { local_name, .. } = parse_qname_info(&field.name);
     let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
+    let local_name_bytes_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+    let local_name_suffix = format!(":{local_name}");
+    let local_name_suffix_bytes_lit =
+      LitByteStr::new(local_name_suffix.as_bytes(), Span::call_site());
     let value_ty = if field.list {
       vec_inner_type(&unwrap_option_type(&field.ty)).ok_or_else(|| {
         syn::Error::new_spanned(&field.ty, "#[sdk(attr(..., list))] requires Vec<T>")
@@ -4282,20 +4410,42 @@ fn expand_named_struct(
     } else {
       quote! { crate::common::parse_attr_value::<#value_ty>(&attr, decoder, stringify!(#ident), #name_lit)? }
     };
+    let assign_attr_tokens = if field.empty_as_none {
+      quote! {
+        if !attr.value.as_ref().is_empty() {
+          #field_ident = Some(#parser);
+        }
+      }
+    } else {
+      quote! {
+        #field_ident = Some(#parser);
+      }
+    };
+    let attr_local_fallback_parse_tokens = if field.match_local_name && !local_name.is_empty() {
+      quote! {
+        key if key == #local_name_bytes_lit || key.ends_with(#local_name_suffix_bytes_lit) => {
+          #assign_attr_tokens
+        }
+      }
+    } else {
+      quote! {}
+    };
     if field.optional {
       attr_decl_tokens.push(quote! { let mut #field_ident = None; });
       attr_parse_tokens.push(quote! {
         #name_bytes_lit => {
-          #field_ident = Some(#parser);
+          #assign_attr_tokens
         }
+        #attr_local_fallback_parse_tokens
       });
       attr_init_tokens.push(quote! { #field_ident });
     } else {
       attr_decl_tokens.push(quote! { let mut #field_ident = None; });
       attr_parse_tokens.push(quote! {
         #name_bytes_lit => {
-          #field_ident = Some(#parser);
+          #assign_attr_tokens
         }
+        #attr_local_fallback_parse_tokens
       });
       attr_finish_tokens.push(quote! {
         #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
@@ -4994,6 +5144,42 @@ fn expand_named_struct(
             == 1usize
         }));
     if flatten_choice_items {
+      let use_flat_choice_local_name_dispatch = child_fields.is_empty()
+        && empty_child_fields.is_empty()
+        && text_child_fields.is_empty()
+        && any_child_fields.is_empty()
+        && any_fields.is_empty()
+        && !field_accepts_any
+        && !field
+          .items
+          .iter()
+          .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }));
+      let mut flat_choice_local_name_counts = std::collections::HashMap::<String, usize>::new();
+      if use_flat_choice_local_name_dispatch {
+        for qname in &specific_qnames {
+          let QNameInfo { local_name, .. } = parse_qname_info(qname);
+          *flat_choice_local_name_counts
+            .entry(local_name)
+            .or_insert(0usize) += 1usize;
+        }
+      }
+      let mut flat_choice_conflict_tokens_borrowed = std::collections::BTreeMap::<
+        String,
+        Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+      >::new();
+      let mut flat_choice_conflict_tokens_io = std::collections::BTreeMap::<
+        String,
+        Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+      >::new();
+      let mut flat_choice_conflict_visit_tokens_borrowed = std::collections::BTreeMap::<
+        String,
+        Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+      >::new();
+      let mut flat_choice_conflict_visit_tokens_io = std::collections::BTreeMap::<
+        String,
+        Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+      >::new();
+      let flat_choice_schema_tag_prefix = parse_qname_info(schema_qname).tag_prefix;
       let flat_choice_local_name_fallback_qnames = local_name_fallback_qnames(&specific_qnames);
       let flat_choice_match_targets = |qnames: &[String]| {
         let mut seen = std::collections::HashSet::new();
@@ -5004,6 +5190,11 @@ fn expand_named_struct(
             tag_prefix,
             local_name,
           } = parse_qname_info(qname);
+          if use_flat_choice_local_name_dispatch {
+            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+            targets.push(quote! { #local_name_lit });
+            continue;
+          }
           if !tag_prefix.is_empty() {
             let prefixed = format!("{tag_prefix}:{local_name}");
             if seen.insert(prefixed.clone()) {
@@ -5021,202 +5212,268 @@ fn expand_named_struct(
 
         targets
       };
-      for item in &field.items {
-        match item {
-          SdkTypeChoiceItem::Child { variant, qname, .. } => {
-            let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(parsed_choice); }
-            } else {
-              quote! { #field_ident = Some(parsed_choice); }
-            };
-            let borrowed_body = quote! {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
-                ));
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            let io_body = quote! {
-                let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
-                  <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
-                ));
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_mode_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              &targets,
-              borrowed_body,
-              io_body,
+      {
+        let mut queue_flat_choice_parse = |qname: &str,
+                                           borrowed_body: proc_macro2::TokenStream,
+                                           io_body: proc_macro2::TokenStream|
+         -> Option<(
+          Vec<proc_macro2::TokenStream>,
+          proc_macro2::TokenStream,
+          proc_macro2::TokenStream,
+        )> {
+          let QNameInfo {
+            tag_prefix,
+            local_name,
+          } = parse_qname_info(qname);
+          if use_flat_choice_local_name_dispatch
+            && flat_choice_local_name_counts
+              .get(&local_name)
+              .copied()
+              .unwrap_or_default()
+              > 1usize
+          {
+            let tag_qname_lit = LitByteStr::new(
+              format!("{tag_prefix}:{local_name}").as_bytes(),
+              Span::call_site(),
             );
+            flat_choice_conflict_tokens_borrowed
+              .entry(local_name.clone())
+              .or_default()
+              .push((
+                qname.to_string(),
+                quote! { #tag_qname_lit },
+                borrowed_body.clone(),
+              ));
+            flat_choice_conflict_tokens_io
+              .entry(local_name.clone())
+              .or_default()
+              .push((
+                qname.to_string(),
+                quote! { #tag_qname_lit },
+                io_body.clone(),
+              ));
+            flat_choice_conflict_visit_tokens_borrowed
+              .entry(local_name.clone())
+              .or_default()
+              .push((qname.to_string(), quote! { #tag_qname_lit }, borrowed_body));
+            flat_choice_conflict_visit_tokens_io
+              .entry(local_name)
+              .or_default()
+              .push((qname.to_string(), quote! { #tag_qname_lit }, io_body));
+            None
+          } else {
+            let targets = flat_choice_match_targets(std::slice::from_ref(&qname.to_string()));
+            Some((targets, borrowed_body, io_body))
           }
-          SdkTypeChoiceItem::EmptyChild { variant, qname, .. } => {
-            let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let skip_tokens_borrowed = build_empty_child_skip_tokens(
-              ident,
-              qname,
-              DeserializeMode::Borrowed,
-              &xml_reader_ident,
-            );
-            let skip_tokens_io =
-              build_empty_child_skip_tokens(ident, qname, DeserializeMode::Io, &xml_reader_ident);
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::#variant); }
-            } else {
-              quote! { #field_ident = Some(#choice_ty::#variant); }
-            };
-            let borrowed_body = quote! {
-                #skip_tokens_borrowed
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            let io_body = quote! {
-                #skip_tokens_io
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_mode_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              &targets,
-              borrowed_body,
-              io_body,
-            );
-          }
-          SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
-            let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let parsed_tokens = quote! {
-              let parsed_child = if next_empty {
-                crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
+        };
+        for item in &field.items {
+          match item {
+            SdkTypeChoiceItem::Child { variant, qname, .. } => {
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(parsed_choice); }
               } else {
-                let value = xml_reader.read_text(e.name())?;
-                crate::common::parse_text_child_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
+                quote! { #field_ident = Some(parsed_choice); }
               };
-            };
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::#variant(parsed_child)); }
-            } else {
-              quote! { #field_ident = Some(#choice_ty::#variant(parsed_child)); }
-            };
-            let body = quote! {
-                #parsed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_mode_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              &targets,
-              body.clone(),
-              body,
-            );
-          }
-          SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
-            let targets = flat_choice_match_targets(std::slice::from_ref(qname));
-            let parsed_borrowed_tokens =
-              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Borrowed);
-            let parsed_io_tokens =
-              build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Io);
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
-            } else {
-              quote! { #field_ident = Some(#choice_ty::#variant(parsed_child.into())); }
-            };
-            let borrowed_body = quote! {
-                #parsed_borrowed_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            let io_body = quote! {
-                #parsed_io_tokens
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_mode_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              &targets,
-              borrowed_body,
-              io_body,
-            );
-          }
-          SdkTypeChoiceItem::Sequence { variant, children } => {
-            let occupied_qnames = field
-              .items
-              .iter()
-              .filter_map(|item| match item {
-                SdkTypeChoiceItem::Child { qname, .. }
-                | SdkTypeChoiceItem::EmptyChild { qname, .. }
-                | SdkTypeChoiceItem::TextChild { qname, .. }
-                | SdkTypeChoiceItem::AnyChild { qname, .. } => Some(qname),
-                SdkTypeChoiceItem::Sequence { .. }
-                | SdkTypeChoiceItem::Any { .. }
-                | SdkTypeChoiceItem::Text { .. } => None,
-              })
-              .collect::<Vec<_>>();
-            let sequence_qnames = children
-              .iter()
-              .filter(|child| !occupied_qnames.contains(&&child.qname))
-              .map(|child| child.qname.clone())
-              .collect::<Vec<_>>();
-            if sequence_qnames.is_empty() {
-              continue;
+              let borrowed_body = quote! {
+                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
+                    <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
+                  ));
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              let io_body = quote! {
+                  let parsed_choice = #choice_ty::#variant(std::boxed::Box::new(
+                    <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
+                  ));
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              if let Some((targets, borrowed_body, io_body)) =
+                queue_flat_choice_parse(qname, borrowed_body, io_body)
+              {
+                push_flat_choice_mode_arms(
+                  &mut flat_choice_match_tokens_borrowed,
+                  &mut flat_choice_match_tokens_io,
+                  &mut flat_choice_visit_match_tokens_borrowed,
+                  &mut flat_choice_visit_match_tokens_io,
+                  &targets,
+                  borrowed_body,
+                  io_body,
+                );
+              }
             }
-            let targets = flat_choice_match_targets(&sequence_qnames);
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
-            } else {
-              quote! { #field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
-            };
-            let named_sequence = children
-              .iter()
-              .all(|child| child.field.is_some() && child.ty.is_some());
-            if named_sequence {
-              let field_decls = children
+            SdkTypeChoiceItem::EmptyChild { variant, qname, .. } => {
+              let skip_tokens_borrowed = build_empty_child_skip_tokens(
+                ident,
+                qname,
+                DeserializeMode::Borrowed,
+                &xml_reader_ident,
+              );
+              let skip_tokens_io =
+                build_empty_child_skip_tokens(ident, qname, DeserializeMode::Io, &xml_reader_ident);
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(#choice_ty::#variant); }
+              } else {
+                quote! { #field_ident = Some(#choice_ty::#variant); }
+              };
+              let borrowed_body = quote! {
+                  #skip_tokens_borrowed
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              let io_body = quote! {
+                  #skip_tokens_io
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              if let Some((targets, borrowed_body, io_body)) =
+                queue_flat_choice_parse(qname, borrowed_body, io_body)
+              {
+                push_flat_choice_mode_arms(
+                  &mut flat_choice_match_tokens_borrowed,
+                  &mut flat_choice_match_tokens_io,
+                  &mut flat_choice_visit_match_tokens_borrowed,
+                  &mut flat_choice_visit_match_tokens_io,
+                  &targets,
+                  borrowed_body,
+                  io_body,
+                );
+              }
+            }
+            SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
+              let parsed_tokens = quote! {
+                let parsed_child = if next_empty {
+                  crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
+                } else {
+                  let value = xml_reader.read_text(e.name())?;
+                  crate::common::parse_text_child_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
+                };
+              };
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(#choice_ty::#variant(parsed_child)); }
+              } else {
+                quote! { #field_ident = Some(#choice_ty::#variant(parsed_child)); }
+              };
+              let body = quote! {
+                  #parsed_tokens
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              if let Some((targets, borrowed_body, io_body)) =
+                queue_flat_choice_parse(qname, body.clone(), body)
+              {
+                push_flat_choice_mode_arms(
+                  &mut flat_choice_match_tokens_borrowed,
+                  &mut flat_choice_match_tokens_io,
+                  &mut flat_choice_visit_match_tokens_borrowed,
+                  &mut flat_choice_visit_match_tokens_io,
+                  &targets,
+                  borrowed_body,
+                  io_body,
+                );
+              }
+            }
+            SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
+              let parsed_borrowed_tokens =
+                build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Borrowed);
+              let parsed_io_tokens =
+                build_choice_any_child_parse_tokens(ident, qname, DeserializeMode::Io);
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
+              } else {
+                quote! { #field_ident = Some(#choice_ty::#variant(parsed_child.into())); }
+              };
+              let borrowed_body = quote! {
+                  #parsed_borrowed_tokens
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              let io_body = quote! {
+                  #parsed_io_tokens
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              if let Some((targets, borrowed_body, io_body)) =
+                queue_flat_choice_parse(qname, borrowed_body, io_body)
+              {
+                push_flat_choice_mode_arms(
+                  &mut flat_choice_match_tokens_borrowed,
+                  &mut flat_choice_match_tokens_io,
+                  &mut flat_choice_visit_match_tokens_borrowed,
+                  &mut flat_choice_visit_match_tokens_io,
+                  &targets,
+                  borrowed_body,
+                  io_body,
+                );
+              }
+            }
+            SdkTypeChoiceItem::Sequence { variant, children } => {
+              let occupied_qnames = field
+                .items
                 .iter()
-                .map(|child| {
-                  let field_ident = child.field.as_ref().expect("sequence field");
-                  let field_ty = child.ty.as_ref().expect("sequence field ty");
-                  if is_option_type(field_ty) {
-                    quote! { let mut #field_ident: #field_ty = None; }
-                  } else {
-                    quote! { let mut #field_ident: Option<#field_ty> = None; }
-                  }
+                .filter_map(|item| match item {
+                  SdkTypeChoiceItem::Child { qname, .. }
+                  | SdkTypeChoiceItem::EmptyChild { qname, .. }
+                  | SdkTypeChoiceItem::TextChild { qname, .. }
+                  | SdkTypeChoiceItem::AnyChild { qname, .. } => Some(qname),
+                  SdkTypeChoiceItem::Sequence { .. }
+                  | SdkTypeChoiceItem::Any { .. }
+                  | SdkTypeChoiceItem::Text { .. } => None,
                 })
                 .collect::<Vec<_>>();
-              let final_fields = children
+              let sequence_qnames = children
                 .iter()
-                .map(|child| {
-                  let field_ident = child.field.as_ref().expect("sequence field");
-                  let field_ty = child.ty.as_ref().expect("sequence field ty");
-                  if is_option_type(field_ty) {
-                    quote! {}
-                  } else {
-                    quote! {
-                      let #field_ident = #field_ident.ok_or_else(|| {
-                        crate::common::missing_field(stringify!(#ident), stringify!(#field_ident))
-                      })?;
+                .filter(|child| !occupied_qnames.contains(&&child.qname))
+                .map(|child| child.qname.clone())
+                .collect::<Vec<_>>();
+              if sequence_qnames.is_empty() {
+                continue;
+              }
+              let targets = flat_choice_match_targets(&sequence_qnames);
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
+              } else {
+                quote! { #field_ident = Some(#choice_ty::#variant(std::boxed::Box::new(parsed_child))); }
+              };
+              let named_sequence = children
+                .iter()
+                .all(|child| child.field.is_some() && child.ty.is_some());
+              if named_sequence {
+                let field_decls = children
+                  .iter()
+                  .map(|child| {
+                    let field_ident = child.field.as_ref().expect("sequence field");
+                    let field_ty = child.ty.as_ref().expect("sequence field ty");
+                    if is_option_type(field_ty) {
+                      quote! { let mut #field_ident: #field_ty = None; }
+                    } else {
+                      quote! { let mut #field_ident: Option<#field_ty> = None; }
                     }
-                  }
-                })
-                .collect::<Vec<_>>();
-              let variant_fields = children
-                .iter()
-                .map(|child| child.field.as_ref().expect("sequence field"))
-                .collect::<Vec<_>>();
-              let build_sequence_child_arms = |mode: DeserializeMode| {
-                let read_inner_ident = mode.deserialize_inner_ident();
-                children
+                  })
+                  .collect::<Vec<_>>();
+                let final_fields = children
+                  .iter()
+                  .map(|child| {
+                    let field_ident = child.field.as_ref().expect("sequence field");
+                    let field_ty = child.ty.as_ref().expect("sequence field ty");
+                    if is_option_type(field_ty) {
+                      quote! {}
+                    } else {
+                      quote! {
+                        let #field_ident = #field_ident.ok_or_else(|| {
+                          crate::common::missing_field(stringify!(#ident), stringify!(#field_ident))
+                        })?;
+                      }
+                    }
+                  })
+                  .collect::<Vec<_>>();
+                let variant_fields = children
+                  .iter()
+                  .map(|child| child.field.as_ref().expect("sequence field"))
+                  .collect::<Vec<_>>();
+                let build_sequence_child_arms = |mode: DeserializeMode| {
+                  let read_inner_ident = mode.deserialize_inner_ident();
+                  children
                   .iter()
                   .map(|child| {
                     let field_ident = child.field.as_ref().expect("sequence field");
@@ -5271,94 +5528,120 @@ fn expand_named_struct(
                     }
                   })
                   .collect::<Vec<_>>()
-              };
-              let borrowed_child_arms = build_sequence_child_arms(DeserializeMode::Borrowed);
-              let io_child_arms = build_sequence_child_arms(DeserializeMode::Io);
-              let assign_named_tokens = if field.repeated {
-                quote! { #field_ident.push(parsed_choice); }
-              } else {
-                quote! { #field_ident = Some(parsed_choice); }
-              };
-              let borrowed_sequence_tokens = quote! {
-                #( #field_decls )*
-                let mut pending_event = Some((e, next_empty));
-                loop {
-                  if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.name().into_inner();
-                    match event_name {
-                      #( #borrowed_child_arms )*
-                      _ => {
-                        xml_reader.unread(if next_empty {
-                          quick_xml::events::Event::Empty(e)
-                        } else {
-                          quick_xml::events::Event::Start(e)
-                        })?;
-                        break;
+                };
+                let borrowed_child_arms = build_sequence_child_arms(DeserializeMode::Borrowed);
+                let io_child_arms = build_sequence_child_arms(DeserializeMode::Io);
+                let assign_named_tokens = if field.repeated {
+                  quote! { #field_ident.push(parsed_choice); }
+                } else {
+                  quote! { #field_ident = Some(parsed_choice); }
+                };
+                let match_event_name_tokens = if use_flat_choice_local_name_dispatch {
+                  quote! { e.local_name().into_inner() }
+                } else {
+                  quote! { e.name().into_inner() }
+                };
+                let borrowed_sequence_tokens = quote! {
+                  #( #field_decls )*
+                  let mut pending_event = Some((e, next_empty));
+                  loop {
+                    if let Some((e, next_empty)) = pending_event.take() {
+                      let event_name = #match_event_name_tokens;
+                      match event_name {
+                        #( #borrowed_child_arms )*
+                        _ => {
+                          xml_reader.unread(if next_empty {
+                            quick_xml::events::Event::Empty(e)
+                          } else {
+                            quick_xml::events::Event::Start(e)
+                          })?;
+                          break;
+                        }
                       }
                     }
-                  }
-                  match xml_reader.next_tag_event()? {
-                    crate::common::SliceTagEvent::Start(e, next_empty) => {
-                      pending_event = Some((e, next_empty));
-                    }
-                    crate::common::SliceTagEvent::End(e) => {
-                      xml_reader.unread(quick_xml::events::Event::End(e))?;
-                      break;
-                    }
-                    crate::common::SliceTagEvent::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    crate::common::SliceTagEvent::Decl(_)
-                    | crate::common::SliceTagEvent::Other => {}
-                  }
-                }
-                #( #final_fields )*
-                let parsed_choice = #choice_ty::#variant { #( #variant_fields ),* };
-              };
-              let io_sequence_tokens = quote! {
-                #( #field_decls )*
-                let mut pending_event = Some((e, next_empty));
-                loop {
-                  if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.name().into_inner();
-                    match event_name {
-                      #( #io_child_arms )*
-                      _ => {
-                        xml_reader.unread(if next_empty {
-                          quick_xml::events::Event::Empty(e)
-                        } else {
-                          quick_xml::events::Event::Start(e)
-                        })?;
+                    match xml_reader.next_tag_event()? {
+                      crate::common::SliceTagEvent::Start(e, next_empty) => {
+                        pending_event = Some((e, next_empty));
+                      }
+                      crate::common::SliceTagEvent::End(e) => {
+                        xml_reader.unread(quick_xml::events::Event::End(e))?;
                         break;
                       }
+                      crate::common::SliceTagEvent::Eof => {
+                        return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                      }
+                      crate::common::SliceTagEvent::Decl(_)
+                      | crate::common::SliceTagEvent::Other => {}
                     }
                   }
-                  match xml_reader.next_tag_event()? {
-                    crate::common::IoTagEvent::Start(e, next_empty) => {
-                      pending_event = Some((e, next_empty));
+                  #( #final_fields )*
+                  let parsed_choice = #choice_ty::#variant { #( #variant_fields ),* };
+                };
+                let io_sequence_tokens = quote! {
+                  #( #field_decls )*
+                  let mut pending_event = Some((e, next_empty));
+                  loop {
+                    if let Some((e, next_empty)) = pending_event.take() {
+                      let event_name = #match_event_name_tokens;
+                      match event_name {
+                        #( #io_child_arms )*
+                        _ => {
+                          xml_reader.unread(if next_empty {
+                            quick_xml::events::Event::Empty(e)
+                          } else {
+                            quick_xml::events::Event::Start(e)
+                          })?;
+                          break;
+                        }
+                      }
                     }
-                    crate::common::IoTagEvent::End(e) => {
-                      xml_reader.unread(quick_xml::events::Event::End(e))?;
-                      break;
+                    match xml_reader.next_tag_event()? {
+                      crate::common::IoTagEvent::Start(e, next_empty) => {
+                        pending_event = Some((e, next_empty));
+                      }
+                      crate::common::IoTagEvent::End(e) => {
+                        xml_reader.unread(quick_xml::events::Event::End(e))?;
+                        break;
+                      }
+                      crate::common::IoTagEvent::Eof => {
+                        return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                      }
+                      crate::common::IoTagEvent::Decl(_)
+                      | crate::common::IoTagEvent::Other => {}
                     }
-                    crate::common::IoTagEvent::Eof => {
-                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
-                    }
-                    crate::common::IoTagEvent::Decl(_)
-                    | crate::common::IoTagEvent::Other => {}
                   }
-                }
-                #( #final_fields )*
-                let parsed_choice = #choice_ty::#variant { #( #variant_fields ),* };
-              };
+                  #( #final_fields )*
+                  let parsed_choice = #choice_ty::#variant { #( #variant_fields ),* };
+                };
+                let borrowed_body = quote! {
+                    #borrowed_sequence_tokens
+                    #assign_named_tokens
+                    #xml_child_slot_assign
+                };
+                let io_body = quote! {
+                    #io_sequence_tokens
+                    #assign_named_tokens
+                    #xml_child_slot_assign
+                };
+                push_flat_choice_mode_arms(
+                  &mut flat_choice_match_tokens_borrowed,
+                  &mut flat_choice_match_tokens_io,
+                  &mut flat_choice_visit_match_tokens_borrowed,
+                  &mut flat_choice_visit_match_tokens_io,
+                  &targets,
+                  borrowed_body,
+                  io_body,
+                );
+                continue;
+              }
               let borrowed_body = quote! {
-                  #borrowed_sequence_tokens
-                  #assign_named_tokens
+                  let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
+                  #assign_tokens
                   #xml_child_slot_assign
               };
               let io_body = quote! {
-                  #io_sequence_tokens
-                  #assign_named_tokens
+                  let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
+                  #assign_tokens
                   #xml_child_slot_assign
               };
               push_flat_choice_mode_arms(
@@ -5370,64 +5653,80 @@ fn expand_named_struct(
                 borrowed_body,
                 io_body,
               );
-              continue;
             }
-            let borrowed_body = quote! {
-                let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            let io_body = quote! {
-                let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_mode_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              &targets,
-              borrowed_body,
-              io_body,
-            );
+            SdkTypeChoiceItem::Any { variant } => {
+              flat_choice_has_wildcard = true;
+              let assign_tokens = if field.repeated {
+                quote! { #field_ident.push(#choice_ty::#variant(xml)); }
+              } else {
+                quote! { #field_ident = Some(#choice_ty::#variant(xml)); }
+              };
+              let borrowed_body = quote! {
+                  let xml = if next_empty {
+                    crate::common::read_raw_empty_xml_borrowed_bytes(e)?
+                  } else {
+                    crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
+                  };
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              let io_body = quote! {
+                  let xml = if next_empty {
+                    crate::common::read_raw_empty_xml_io_bytes(e)?
+                  } else {
+                    crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
+                  };
+                  #assign_tokens
+                  #xml_child_slot_assign
+              };
+              push_flat_choice_wildcard_arms(
+                &mut flat_choice_match_tokens_borrowed,
+                &mut flat_choice_match_tokens_io,
+                &mut flat_choice_visit_match_tokens_borrowed,
+                &mut flat_choice_visit_match_tokens_io,
+                borrowed_body,
+                io_body,
+              );
+            }
+            SdkTypeChoiceItem::Text { .. } => {}
           }
-          SdkTypeChoiceItem::Any { variant } => {
-            flat_choice_has_wildcard = true;
-            let assign_tokens = if field.repeated {
-              quote! { #field_ident.push(#choice_ty::#variant(xml)); }
-            } else {
-              quote! { #field_ident = Some(#choice_ty::#variant(xml)); }
-            };
-            let borrowed_body = quote! {
-                let xml = if next_empty {
-                  crate::common::read_raw_empty_xml_borrowed_bytes(e)?
-                } else {
-                  crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
-                };
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            let io_body = quote! {
-                let xml = if next_empty {
-                  crate::common::read_raw_empty_xml_io_bytes(e)?
-                } else {
-                  crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
-                };
-                #assign_tokens
-                #xml_child_slot_assign
-            };
-            push_flat_choice_wildcard_arms(
-              &mut flat_choice_match_tokens_borrowed,
-              &mut flat_choice_match_tokens_io,
-              &mut flat_choice_visit_match_tokens_borrowed,
-              &mut flat_choice_visit_match_tokens_io,
-              borrowed_body,
-              io_body,
-            );
-          }
-          SdkTypeChoiceItem::Text { .. } => {}
         }
+      }
+      for (local_name, qname_bodies) in flat_choice_conflict_tokens_borrowed {
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        flat_choice_match_tokens_borrowed.push(flat_choice_conflict_arm_tokens(
+          quote! { #local_name_lit },
+          &flat_choice_schema_tag_prefix,
+          qname_bodies,
+          false,
+        ));
+      }
+      for (local_name, qname_bodies) in flat_choice_conflict_tokens_io {
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        flat_choice_match_tokens_io.push(flat_choice_conflict_arm_tokens(
+          quote! { #local_name_lit },
+          &flat_choice_schema_tag_prefix,
+          qname_bodies,
+          false,
+        ));
+      }
+      for (local_name, qname_bodies) in flat_choice_conflict_visit_tokens_borrowed {
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        flat_choice_visit_match_tokens_borrowed.push(flat_choice_conflict_arm_tokens(
+          quote! { #local_name_lit },
+          &flat_choice_schema_tag_prefix,
+          qname_bodies,
+          true,
+        ));
+      }
+      for (local_name, qname_bodies) in flat_choice_conflict_visit_tokens_io {
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        flat_choice_visit_match_tokens_io.push(flat_choice_conflict_arm_tokens(
+          quote! { #local_name_lit },
+          &flat_choice_schema_tag_prefix,
+          qname_bodies,
+          true,
+        ));
       }
     }
     let mut grouped_choice_items = false;
@@ -6023,6 +6322,11 @@ fn expand_named_struct(
     && !has_text_child_dispatch
     && has_any_choice_dispatch
     && !has_non_any_choice_dispatch;
+  let pure_named_choice_dispatch = !has_child_dispatch
+    && has_choice_dispatch
+    && !has_any_dispatch
+    && !has_text_child_dispatch
+    && !has_any_choice_dispatch;
   let unmatched_child_tokens_borrowed = if pure_any_dispatch || has_any_choice_dispatch {
     quote! {}
   } else {
@@ -6682,7 +6986,7 @@ fn expand_named_struct(
       || !pure_any_choice_dispatch);
   let child_event_name_tokens = if !needs_child_event_name {
     quote! {}
-  } else if use_local_name_child_dispatch {
+  } else if use_local_name_child_dispatch || pure_named_choice_dispatch {
     quote! {
       let event_name = e.local_name().into_inner();
     }
@@ -6829,8 +7133,7 @@ fn expand_named_struct(
             has_default_xmlns = true;
             crate::common::write_xmlns_attr(writer, None, declaration_uri)?;
           } else {
-            let declaration_prefix =
-              crate::common::canonical_xmlns_prefix_bytes(declaration_prefix, declaration_uri);
+            #canonical_namespace_prefix_tokens
             #extra_xmlns_mark_tokens
             crate::common::write_xmlns_attr(writer, Some(declaration_prefix), declaration_uri)?;
           }
@@ -6848,8 +7151,7 @@ fn expand_named_struct(
           if declaration_prefix.is_empty() {
             crate::common::write_xmlns_attr(writer, None, declaration_uri)?;
           } else {
-            let declaration_prefix =
-              crate::common::canonical_xmlns_prefix_bytes(declaration_prefix, declaration_uri);
+            #canonical_namespace_prefix_tokens
             #extra_xmlns_mark_tokens
             crate::common::write_xmlns_attr(writer, Some(declaration_prefix), declaration_uri)?;
           }
@@ -7104,7 +7406,7 @@ fn expand_named_struct(
       ) -> Result<(), std::io::Error> {
         #xml_header_tokens
         #start_tag_open
-        if !<Self as crate::sdk::SdkType>::write_inner(self, writer)? {
+        if !<Self as crate::sdk::SdkType>::write_inner(self, writer, #no_prefix)? {
           #end_tag
         }
         Ok(())
@@ -7274,7 +7576,9 @@ fn expand_named_struct(
       fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
+        no_prefix: bool,
       ) -> Result<bool, std::io::Error> {
+        let _ = no_prefix;
         #write_inner_body
       }
     }

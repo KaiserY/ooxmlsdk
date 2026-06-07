@@ -11,6 +11,12 @@
   ],
   "Types": [
     {
+      "ClassName": "ChartSpace",
+      "ExtraXmlns": [
+        "c"
+      ]
+    },
+    {
       "ClassName": "AxisId",
       "OverrideBaseClass": "OpenXmlLeafElement",
       "Attributes": [

@@ -175,16 +175,6 @@ fn split_raw_namespace(raw: &[u8]) -> (&[u8], &[u8]) {
   }
 }
 
-#[inline]
-pub(crate) fn canonical_xmlns_prefix_bytes<'a>(prefix: &'a [u8], uri: &[u8]) -> &'a [u8] {
-  match uri {
-    b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" => b"x14",
-    b"http://schemas.microsoft.com/office/excel/2006/main" => b"xne",
-    b"urn:schemas-microsoft-com:office:word" => b"w10",
-    _ => prefix,
-  }
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct XmlOtherAttr(Box<[u8]>);
 

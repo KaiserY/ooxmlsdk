@@ -257,6 +257,10 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Revisions",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "Users",
       "HaveXmlOtherAttrs": true
     },
@@ -318,7 +322,8 @@
     },
     {
       "ClassName": "DataValidation",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "HaveDirectXmlOtherChildren": true
     },
     {
       "ClassName": "Drawing",

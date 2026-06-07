@@ -104,6 +104,8 @@ pub struct SchemaType {
   pub have_direct_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub canonical_namespace_prefixes: Vec<String>,
   pub text_value_type: String,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
@@ -162,6 +164,8 @@ pub struct SchemaTypeAttribute {
   #[serde(default)]
   pub validators: Vec<SchemaTypeAttributeValidator>,
   pub bit: Option<u32>,
+  pub match_local_name: bool,
+  pub empty_as_none: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

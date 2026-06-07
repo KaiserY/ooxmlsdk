@@ -2,7 +2,10 @@
   "Types": [
     {
       "ClassName": "ConditionalFormatting",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "CanonicalNamespacePrefixes": [
+        "xm:xne"
+      ]
     },
     {
       "ClassName": "ConditionalFormattingValueObject",
@@ -16,7 +19,14 @@
     },
     {
       "ClassName": "DataValidations",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "CanonicalNamespacePrefixes": [
+        "xm:xne"
+      ]
+    },
+    {
+      "ClassName": "DataValidation",
+      "HaveXmlOtherAttrs": true
     },
     {
       "ClassName": "PivotTableDefinition",
@@ -24,7 +34,22 @@
     },
     {
       "ClassName": "SparklineGroups",
-      "HaveXmlnsFields": true
+      "HaveXmlnsFields": true,
+      "CanonicalNamespacePrefixes": [
+        "xm:xne"
+      ]
+    },
+    {
+      "ClassName": "SparklineGroup",
+      "Attributes": [
+        {
+          "QName": "xr2:uid",
+          "PropertyName": "Uid",
+          "PropertyComments": "Sparkline Group Unique ID",
+          "Optional": true,
+          "OverrideType": "StringValue"
+        }
+      ]
     }
   ]
 }

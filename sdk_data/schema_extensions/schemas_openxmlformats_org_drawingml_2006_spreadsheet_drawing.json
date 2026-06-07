@@ -1,6 +1,12 @@
 {
   "Types": [
     {
+      "ClassName": "WorksheetDrawing",
+      "ExtraXmlns": [
+        "xdr"
+      ]
+    },
+    {
       "ClassName": "Picture",
       "Children": [
         {

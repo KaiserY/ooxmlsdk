@@ -5,6 +5,10 @@
       "HasOtherVariant": true
     },
     {
+      "Name": "CompatSettingNameValues",
+      "HasOtherVariant": true
+    },
+    {
       "Name": "LevelJustificationValues",
       "AddFacets": [
         {
@@ -33,6 +37,30 @@
       ]
     },
     {
+      "Name": "LevelSuffixValues",
+      "AddFacets": [
+        {
+          "Name": "Tab",
+          "Value": "tab",
+          "Aliases": [
+            "Tab"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "MultiLevelValues",
+      "AddFacets": [
+        {
+          "Name": "SingleLevel",
+          "Value": "singleLevel",
+          "Aliases": [
+            "SingleLevel"
+          ]
+        }
+      ]
+    },
+    {
       "Name": "HeaderFooterValues",
       "AddFacets": [
         {
@@ -47,6 +75,24 @@
     {
       "Name": "FontTypeHintValues",
       "HasOtherVariant": true
+    }
+  ],
+  "AddTypes": [
+    {
+      "Name": "w:CT_UnsignedDecimalNumber/w:tabIndex",
+      "ClassName": "TabIndex",
+      "Summary": "Structured Document Tag Tab Index.",
+      "BaseClass": "UnsignedDecimalNumberType",
+      "Kind": "Leaf",
+      "ApiKind": "Struct",
+      "Attributes": [
+        {
+          "QName": "w:val",
+          "PropertyName": "Val",
+          "PropertyComments": "Decimal Number Value",
+          "OverrideType": "Int32Value"
+        }
+      ]
     }
   ],
   "Types": [
@@ -73,6 +119,15 @@
     },
     {
       "ClassName": "Color",
+      "Attributes": [
+        {
+          "PropertyName": "Val",
+          "Optional": true
+        }
+      ]
+    },
+    {
+      "ClassName": "Shading",
       "Attributes": [
         {
           "PropertyName": "Val",
@@ -108,7 +163,10 @@
     },
     {
       "ClassName": "Document",
-      "HaveXmlOtherAttrs": true
+      "HaveXmlOtherAttrs": true,
+      "CanonicalNamespacePrefixes": [
+        "ns2:r"
+      ]
     },
     {
       "ClassName": "DocGrid",
@@ -123,6 +181,10 @@
       "ClassName": "Indentation",
       "Attributes": [
         {
+          "PropertyName": "Left",
+          "MatchLocalName": true
+        },
+        {
           "PropertyName": "Hanging",
           "OverrideType": "SignedTwipsMeasureValue"
         }
@@ -135,6 +197,15 @@
     {
       "ClassName": "FooterReference",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "HeaderFooterReferenceType",
+      "Attributes": [
+        {
+          "PropertyName": "Id",
+          "MatchLocalName": true
+        }
+      ]
     },
     {
       "ClassName": "Drawing",
@@ -237,6 +308,28 @@
           "PropertyComments": "Defines the TableStyleColumnBandSize Class.",
           "Optional": true,
           "AfterPropertyName": "TableStyleRowBandSize"
+        }
+      ]
+    },
+    {
+      "ClassName": "TablePositionProperties",
+      "Attributes": [
+        {
+          "PropertyName": "TablePositionXAlignment",
+          "EmptyAsNone": true
+        },
+        {
+          "PropertyName": "TablePositionYAlignment",
+          "EmptyAsNone": true
+        }
+      ]
+    },
+    {
+      "ClassName": "DocumentProtection",
+      "Attributes": [
+        {
+          "PropertyName": "CryptographicAlgorithmSid",
+          "EmptyAsNone": true
         }
       ]
     },
@@ -646,6 +739,17 @@
     {
       "RustName": "RunChoice",
       "AddXmlAny": true
+    },
+    {
+      "RustName": "SdtPropertiesChoice",
+      "AddVariants": [
+        {
+          "RustName": "TabIndex",
+          "QName": "w:tabIndex",
+          "Docs": "Structured Document Tag Tab Index.",
+          "PayloadRustType": "TabIndex"
+        }
+      ]
     },
     {
       "RustName": "TableCellChoice",

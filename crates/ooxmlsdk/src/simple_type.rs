@@ -81,6 +81,8 @@ pub enum OnOffValue {
   One,
   #[sdk(rename = "0")]
   Zero,
+  #[sdk(rename = "")]
+  Empty,
 }
 
 impl OnOffValue {
@@ -91,7 +93,7 @@ impl OnOffValue {
 
   #[inline]
   pub const fn as_bool(self) -> bool {
-    matches!(self, Self::True | Self::On | Self::One)
+    matches!(self, Self::True | Self::On | Self::One | Self::Empty)
   }
 }
 

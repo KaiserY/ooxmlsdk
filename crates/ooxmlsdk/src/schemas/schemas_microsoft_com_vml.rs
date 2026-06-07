@@ -579,7 +579,7 @@ pub struct ImageData {
 }
 /// Shape Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "v:shape")]
+#[sdk(canonical_namespace_prefix("wvml:w10"), qname = "v:shape")]
 pub struct Shape {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Unique Identifier
@@ -777,7 +777,8 @@ pub struct Shape {
             child(variant = ClientData, qname = "xvml:ClientData"),
             child(variant = TextData, qname = "pvml:textdata"),
             child(variant = Ink, qname = "o:ink"),
-            empty_child(variant = InkAnnotationFlag, qname = "pvml:iscomment")
+            empty_child(variant = InkAnnotationFlag, qname = "pvml:iscomment"),
+            child(variant = VmlTextWrap, qname = "v:wrap")
         )
     )]
   pub shape_choice: Vec<ShapeChoice>,
@@ -2813,6 +2814,8 @@ pub enum ShapeChoice {
   Ink(std::boxed::Box<crate::schemas::o::Ink>),
   /// Ink Annotation Flag.
   InkAnnotationFlag,
+  /// VML namespace text wrapping used by LibreOffice fixtures.
+  VmlTextWrap(std::boxed::Box<VmlTextWrap>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShapetypeChoice {

@@ -576,7 +576,7 @@ pub struct TextCharacterPropertiesType {
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::Int32Value>,
+  pub baseline: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,

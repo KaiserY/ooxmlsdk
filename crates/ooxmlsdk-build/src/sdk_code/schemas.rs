@@ -727,7 +727,10 @@ pub(crate) fn schema_choice_variant_name_from_qname(qname: &str) -> String {
 }
 
 fn no_prefix_sdk_attr_from_qname(module_prefix: &str, qname: &str) -> TokenStream {
-  if !matches!(module_prefix, "ap" | "cp" | "op" | "x" | "xltc" | "pct") {
+  if !matches!(
+    module_prefix,
+    "ap" | "cp" | "op" | "x" | "xltc" | "xlrd" | "xlrd2" | "xnsv" | "pct"
+  ) {
     return quote! {};
   }
   let element_qname = schema_qname_element_name(qname);
@@ -1587,8 +1590,20 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .collect::<Vec<_>>();
         quote! { extra_xmlns(#(#prefixes),*), }
       };
+      let canonical_namespace_prefix = if type_decl.support.canonical_namespace_prefixes.is_empty()
+      {
+        quote! {}
+      } else {
+        let prefixes = type_decl
+          .support
+          .canonical_namespace_prefixes
+          .iter()
+          .map(|prefix| proc_macro2::Literal::string(prefix))
+          .collect::<Vec<_>>();
+        quote! { canonical_namespace_prefix(#(#prefixes),*), }
+      };
       quote! {
-        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* #no_prefix #extra_xmlns #canonical_namespace_prefix qname = #qname)]
       }
     } else {
       quote! {}
@@ -3412,7 +3427,14 @@ fn gen_attr_from_decl(
   version_cfg: VersionCfgContext,
   type_graph: &TypeContainmentGraph,
 ) -> Result<TokenStream> {
-  let FieldWireDecl::Attribute { qname, bit, list } = &attr.wire else {
+  let FieldWireDecl::Attribute {
+    qname,
+    bit,
+    list,
+    match_local_name,
+    empty_as_none,
+  } = &attr.wire
+  else {
     return Err(format!("expected attribute field, got {:?}", attr.wire).into());
   };
   let attr_name_ident: Ident = parse_str(&attr.rust_name)?;
@@ -3427,8 +3449,10 @@ fn gen_attr_from_decl(
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
   let attr_sdk_version_markers = sdk_version_markers(&attr.version);
   let list_attr = list.then_some(quote! { list, });
+  let match_local_name_attr = match_local_name.then_some(quote! { match_local_name, });
+  let empty_as_none_attr = empty_as_none.then_some(quote! { empty_as_none, });
   let sdk_attr_attrs = quote! {
-    #[sdk(attr(#(#attr_sdk_version_markers,)* #list_attr qname = #qname))]
+    #[sdk(attr(#(#attr_sdk_version_markers,)* #list_attr #match_local_name_attr #empty_as_none_attr qname = #qname))]
   };
   let validator_attrs: Vec<TokenStream> = attr
     .validators
@@ -6753,6 +6777,8 @@ mod tests {
               qname: ":val".to_string(),
               bit: None,
               list: false,
+              match_local_name: false,
+              empty_as_none: false,
             },
             type_ref: TypeRefDecl {
               rust_type: "StringValue".to_string(),
@@ -7359,6 +7385,8 @@ mod tests {
         qname: ":creationId".to_string(),
         bit: None,
         list: false,
+        match_local_name: false,
+        empty_as_none: false,
       },
       cardinality: Cardinality::Optional,
       type_ref: TypeRefDecl {

@@ -842,6 +842,7 @@ fn build_type_decl(
         have_xml_other_children,
         compact_xml_other_children,
         extra_xmlns: schema_type.extra_xmlns.clone(),
+        canonical_namespace_prefixes: schema_type.canonical_namespace_prefixes.clone(),
       },
       members,
     },
@@ -1744,6 +1745,8 @@ fn build_attr_member_decl(
       qname: attr.q_name.clone(),
       bit: attr.bit,
       list: matches!(attr_type_kind, AttrTypeKind::List),
+      match_local_name: attr.match_local_name,
+      empty_as_none: attr.empty_as_none,
     },
     cardinality: if attr.required {
       Cardinality::One
@@ -4391,6 +4394,8 @@ mod tests {
         qname: ":val".to_string(),
         bit: Some(7),
         list: false,
+        match_local_name: false,
+        empty_as_none: false,
       }
     );
     assert_eq!(field.cardinality, Cardinality::Optional);

@@ -930,7 +930,7 @@ pub enum FrameLayoutValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum LevelSuffixValues {
-  #[sdk(rename = "tab")]
+  #[sdk(rename = "tab", alias = "Tab")]
   #[default]
   Tab,
   #[sdk(rename = "space")]
@@ -940,7 +940,7 @@ pub enum LevelSuffixValues {
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum MultiLevelValues {
-  #[sdk(rename = "singleLevel")]
+  #[sdk(rename = "singleLevel", alias = "SingleLevel")]
   #[default]
   SingleLevel,
   #[sdk(rename = "multilevel")]
@@ -2028,7 +2028,7 @@ pub enum ObjectUpdateMode {
   #[sdk(rename = "onCall")]
   OnCall,
 }
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum CompatSettingNameValues {
   #[sdk(rename = "compatibilityMode")]
   #[default]
@@ -2047,6 +2047,8 @@ pub enum CompatSettingNameValues {
   AllowHyphenationAtTrackBottom,
   #[sdk(rename = "allowTextAfterFloatingTableBreak")]
   AllowTextAfterFloatingTableBreak,
+  #[sdk(other)]
+  OtherVariant(Box<str>),
 }
 /// Table Cell Insertion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4593,7 +4595,7 @@ pub struct ParagraphBorders {
 pub struct Shading {
   /// Shading Pattern
   #[sdk(attr(qname = "w:val"))]
-  pub val: ShadingPatternValues,
+  pub val: Option<ShadingPatternValues>,
   /// Shading Pattern Color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
@@ -4707,7 +4709,7 @@ pub struct SpacingBetweenLines {
 #[sdk(qname = "w:ind")]
 pub struct Indentation {
   /// Left Indentation
-  #[sdk(attr(qname = "w:left"))]
+  #[sdk(attr(match_local_name, qname = "w:left"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -4965,7 +4967,7 @@ pub struct HeaderReference {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(match_local_name, qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Footer Reference.
@@ -4977,7 +4979,7 @@ pub struct FooterReference {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(match_local_name, qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Break.
@@ -9507,14 +9509,14 @@ pub struct TablePositionProperties {
   #[sdk(attr(qname = "w:horzAnchor"))]
   pub horizontal_anchor: Option<HorizontalAnchorValues>,
   /// Relative Horizontal Alignment From Anchor
-  #[sdk(attr(qname = "w:tblpXSpec"))]
+  #[sdk(attr(empty_as_none, qname = "w:tblpXSpec"))]
   pub table_position_x_alignment: Option<HorizontalAlignmentValues>,
   /// Absolute Horizontal Distance From Anchor
   #[sdk(attr(qname = "w:tblpX"))]
   #[sdk(number_range(range = -31680..= 31680))]
   pub table_position_x: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Relative Vertical Alignment from Anchor
-  #[sdk(attr(qname = "w:tblpYSpec"))]
+  #[sdk(attr(empty_as_none, qname = "w:tblpYSpec"))]
   pub table_position_y_alignment: Option<VerticalAlignmentValues>,
   /// Absolute Vertical Distance From Anchor
   #[sdk(attr(qname = "w:tblpY"))]
@@ -10570,7 +10572,7 @@ pub struct Styles {
 }
 /// Document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:document")]
+#[sdk(canonical_namespace_prefix("ns2:r"), qname = "w:document")]
 pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
@@ -12018,7 +12020,8 @@ pub struct SdtProperties {
             empty_child(
                 variant = SdtRepeatedSectionItem,
                 qname = "w15:repeatingSectionItem"
-            )
+            ),
+            child(variant = TabIndex, qname = "w:tabIndex")
         )
     )]
   pub sdt_properties_choice: Vec<SdtPropertiesChoice>,
@@ -15811,7 +15814,7 @@ pub struct DocumentProtection {
   #[sdk(attr(qname = "w:cryptAlgorithmType"))]
   pub cryptographic_algorithm_type: Option<CryptAlgorithmValues>,
   /// Cryptographic Hashing Algorithm
-  #[sdk(attr(qname = "w:cryptAlgorithmSid"))]
+  #[sdk(attr(empty_as_none, qname = "w:cryptAlgorithmSid"))]
   pub cryptographic_algorithm_sid: Option<crate::simple_type::Int32Value>,
   /// Iterations to Run Hashing Algorithm
   #[sdk(attr(qname = "w:cryptSpinCount"))]
@@ -16489,6 +16492,14 @@ pub struct LevelOverride {
   /// Numbering Level Override Definition
   #[sdk(child(qname = "w:lvl"))]
   pub level: Option<std::boxed::Box<Level>>,
+}
+/// Structured Document Tag Tab Index.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:tabIndex")]
+pub struct TabIndex {
+  /// Decimal Number Value
+  #[sdk(attr(qname = "w:val"))]
+  pub val: crate::simple_type::Int32Value,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum EmbeddedObjectChoice {
@@ -19863,6 +19874,8 @@ pub enum SdtPropertiesChoice {
   SdtRepeatedSection(std::boxed::Box<crate::schemas::w15::SdtRepeatedSection>),
   /// Defines the SdtRepeatedSectionItem Class.
   SdtRepeatedSectionItem,
+  /// Structured Document Tag Tab Index.
+  TabIndex(std::boxed::Box<TabIndex>),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum SdtContentBlockChoice {

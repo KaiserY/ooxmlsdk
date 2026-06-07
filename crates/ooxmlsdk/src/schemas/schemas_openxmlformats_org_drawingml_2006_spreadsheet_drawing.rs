@@ -236,7 +236,7 @@ pub struct ContentPart {
 }
 /// Worksheet Drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:wsDr")]
+#[sdk(extra_xmlns("xdr"), qname = "xdr:wsDr")]
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,

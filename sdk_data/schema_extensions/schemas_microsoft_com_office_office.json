@@ -11,6 +11,15 @@
     {
       "ClassName": "ShapeIdMap",
       "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SignatureLine",
+      "Attributes": [
+        {
+          "PropertyName": "SigningInstructions",
+          "MatchLocalName": true
+        }
+      ]
     }
   ]
 }

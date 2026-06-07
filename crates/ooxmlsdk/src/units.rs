@@ -676,6 +676,8 @@ impl DrawingmlPercentageValue {
       Ok(Self::Decimal(value))
     } else if value.last() == Some(&b'%') {
       parse_percent_string_bytes(value).map(Self::PercentString)
+    } else if value.contains(&b'.') {
+      parse_bare_drawingml_percentage_decimal_bytes(value).map(Self::Decimal)
     } else {
       Err(UnitParseError::InvalidUnit)
     }
@@ -1372,6 +1374,39 @@ fn parse_bare_twips_decimal_bytes(
   parse_decimal_scaled_to_i64_bytes(value, 1, allow_negative, None)
 }
 
+#[inline]
+fn parse_bare_drawingml_percentage_decimal_bytes(
+  value: &[u8],
+) -> Result<DrawingmlPercentValue, UnitParseError> {
+  if value.is_empty() {
+    return Err(UnitParseError::Empty);
+  }
+
+  let (negative, digits) = match value[0] {
+    b'-' => (true, &value[1..]),
+    b'+' => return Err(UnitParseError::InvalidNumber),
+    _ => (false, value),
+  };
+
+  let Some(dot_index) = digits.iter().position(|byte| *byte == b'.') else {
+    return Err(UnitParseError::InvalidNumber);
+  };
+  if dot_index == 0 || dot_index + 1 == digits.len() {
+    return Err(UnitParseError::InvalidNumber);
+  }
+
+  let integer = try_parse_i32_bytes(&digits[..dot_index]).ok_or(UnitParseError::InvalidNumber)?;
+  if !digits[dot_index + 1..].iter().all(u8::is_ascii_digit) {
+    return Err(UnitParseError::InvalidNumber);
+  }
+
+  if negative {
+    integer.checked_neg().ok_or(UnitParseError::Overflow)
+  } else {
+    Ok(integer)
+  }
+}
+
 #[inline(always)]
 fn try_parse_u64_bytes(value: &[u8]) -> Option<u64> {
   let digits = match value {
@@ -1648,6 +1683,10 @@ mod tests {
     assert_eq!(
       DrawingmlPercentageValue::from_bytes(b"50%"),
       Ok(DrawingmlPercentageValue::PercentString(50_000))
+    );
+    assert_eq!(
+      DrawingmlPercentageValue::from_bytes(b"4912.16291820521"),
+      Ok(DrawingmlPercentageValue::Decimal(4_912))
     );
     assert_eq!(
       TextPointValue::from_bytes(b"1200"),

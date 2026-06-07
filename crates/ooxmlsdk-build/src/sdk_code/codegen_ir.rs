@@ -121,6 +121,8 @@ pub struct SystemSupportDecl {
   pub compact_xml_other_children: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub canonical_namespace_prefixes: Vec<String>,
 }
 
 impl SystemSupportDecl {
@@ -129,6 +131,7 @@ impl SystemSupportDecl {
       || self.have_xml_other_attrs
       || self.have_xml_other_children
       || !self.extra_xmlns.is_empty()
+      || !self.canonical_namespace_prefixes.is_empty()
   }
 }
 
@@ -169,6 +172,10 @@ pub enum FieldWireDecl {
     bit: Option<u32>,
     #[serde(default)]
     list: bool,
+    #[serde(default)]
+    match_local_name: bool,
+    #[serde(default)]
+    empty_as_none: bool,
   },
   Child {
     #[serde(rename = "QName")]
@@ -345,6 +352,7 @@ mod tests {
           have_xml_other_children: true,
           compact_xml_other_children: false,
           extra_xmlns: Vec::new(),
+          canonical_namespace_prefixes: Vec::new(),
         },
         members: vec![
           MemberDecl::Field(FieldDecl {
@@ -355,6 +363,8 @@ mod tests {
               qname: "ex:id".to_string(),
               bit: Some(1),
               list: false,
+              match_local_name: false,
+              empty_as_none: false,
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {

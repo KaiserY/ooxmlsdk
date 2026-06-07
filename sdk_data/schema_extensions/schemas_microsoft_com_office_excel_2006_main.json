@@ -5,6 +5,9 @@
       "HaveXmlOtherAttrs": true,
       "ExtraXmlns": [
         "x"
+      ],
+      "CanonicalNamespacePrefixes": [
+        "xm:xne"
       ]
     }
   ]

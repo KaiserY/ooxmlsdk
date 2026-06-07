@@ -55,6 +55,8 @@ pub struct SchemaTypeExtension {
   pub have_direct_xml_other_children: Option<bool>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub extra_xmlns: Vec<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub canonical_namespace_prefixes: Vec<String>,
   pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
   pub add_children: Vec<SchemaTypeAddChildExtension>,
@@ -93,6 +95,8 @@ pub struct SchemaTypeAttributeExtension {
   #[serde(skip_serializing_if = "String::is_empty")]
   pub property_comments: String,
   pub optional: Option<bool>,
+  pub match_local_name: Option<bool>,
+  pub empty_as_none: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_type: String,
 }
@@ -328,6 +332,13 @@ pub fn apply_schema_extensions(
           schema_type.extra_xmlns.push(prefix.clone());
         }
       }
+      for prefix in &extension.canonical_namespace_prefixes {
+        if !schema_type.canonical_namespace_prefixes.contains(prefix) {
+          schema_type
+            .canonical_namespace_prefixes
+            .push(prefix.clone());
+        }
+      }
 
       for attr_extension in &extension.attributes {
         let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
@@ -356,6 +367,8 @@ pub fn apply_schema_extensions(
               r#type: attr_extension.override_type.clone(),
               property_comments: attr_extension.property_comments.clone(),
               required: !attr_extension.optional.unwrap_or(false),
+              match_local_name: attr_extension.match_local_name.unwrap_or(false),
+              empty_as_none: attr_extension.empty_as_none.unwrap_or(false),
               ..Default::default()
             });
           continue;
@@ -363,6 +376,12 @@ pub fn apply_schema_extensions(
 
         if !attr_extension.override_type.is_empty() {
           attr.r#type = attr_extension.override_type.clone();
+        }
+        if let Some(match_local_name) = attr_extension.match_local_name {
+          attr.match_local_name = match_local_name;
+        }
+        if let Some(empty_as_none) = attr_extension.empty_as_none {
+          attr.empty_as_none = empty_as_none;
         }
         if let Some(optional) = attr_extension.optional {
           attr.required = !optional;
@@ -521,7 +540,9 @@ pub fn apply_codegen_ir_schema_extensions(
   };
 
   for type_extension in &extensions.types {
-    if type_extension.extra_xmlns.is_empty() {
+    if type_extension.extra_xmlns.is_empty()
+      && type_extension.canonical_namespace_prefixes.is_empty()
+    {
       continue;
     }
     let Some(type_decl) = ir
@@ -541,6 +562,18 @@ pub fn apply_codegen_ir_schema_extensions(
     for prefix in &type_extension.extra_xmlns {
       if !type_decl.support.extra_xmlns.contains(prefix) {
         type_decl.support.extra_xmlns.push(prefix.clone());
+      }
+    }
+    for prefix in &type_extension.canonical_namespace_prefixes {
+      if !type_decl
+        .support
+        .canonical_namespace_prefixes
+        .contains(prefix)
+      {
+        type_decl
+          .support
+          .canonical_namespace_prefixes
+          .push(prefix.clone());
       }
     }
   }
@@ -1266,6 +1299,8 @@ mod tests {
             property_name: "Val".to_string(),
             property_comments: "Integer Value".to_string(),
             optional: Some(false),
+            match_local_name: None,
+            empty_as_none: None,
             override_type: "Int32Value".to_string(),
           }],
           ..Default::default()

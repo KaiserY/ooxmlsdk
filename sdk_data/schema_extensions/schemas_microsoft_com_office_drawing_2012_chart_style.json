@@ -1,0 +1,13 @@
+{
+  "Types": [
+    {
+      "ClassName": "TextCharacterPropertiesType",
+      "Attributes": [
+        {
+          "PropertyName": "Baseline",
+          "OverrideType": "DrawingmlPercentageValue"
+        }
+      ]
+    }
+  ]
+}

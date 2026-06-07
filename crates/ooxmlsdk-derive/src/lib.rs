@@ -118,6 +118,8 @@ struct SdkAttrField {
   ty: Type,
   optional: bool,
   list: bool,
+  match_local_name: bool,
+  empty_as_none: bool,
   validators: Vec<SdkFieldValidator>,
 }
 
@@ -195,6 +197,8 @@ enum SdkTypeFieldKind {
     name: String,
     simple_type: Option<String>,
     list: bool,
+    match_local_name: bool,
+    empty_as_none: bool,
   },
   Child {
     qname: String,
@@ -645,6 +649,33 @@ fn parse_sdk_extra_xmlns(attrs: &[Attribute]) -> syn::Result<Vec<String>> {
   Ok(prefixes)
 }
 
+fn parse_sdk_canonical_namespace_prefixes(attrs: &[Attribute]) -> syn::Result<Vec<String>> {
+  let mut prefixes = Vec::new();
+  for attr in attrs {
+    if !attr.path().is_ident("sdk") {
+      continue;
+    }
+    let metas =
+      attr.parse_args_with(syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in metas {
+      let Meta::List(meta) = meta else {
+        continue;
+      };
+      if !meta.path.is_ident("canonical_namespace_prefix") {
+        continue;
+      }
+      let args = meta.parse_args_with(Punctuated::<ExtraXmlnsArg, Token![,]>::parse_terminated)?;
+      for arg in args {
+        let prefix = arg.value();
+        if !prefixes.contains(&prefix) {
+          prefixes.push(prefix);
+        }
+      }
+    }
+  }
+  Ok(prefixes)
+}
+
 fn parse_sdk_stack_parser(attrs: &[Attribute]) -> syn::Result<Option<SdkStackParserAttrs>> {
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
@@ -708,6 +739,8 @@ fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
   let mut attr_list = false;
+  let mut attr_match_local_name = false;
+  let mut attr_empty_as_none = false;
   let mut attr_simple_type = None;
   let mut kind = None;
   let mut choice_accepts_text = None;
@@ -737,6 +770,12 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               Ok(())
             } else if nested.path.is_ident("list") {
               attr_list = true;
+              Ok(())
+            } else if nested.path.is_ident("match_local_name") {
+              attr_match_local_name = true;
+              Ok(())
+            } else if nested.path.is_ident("empty_as_none") {
+              attr_empty_as_none = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -1362,6 +1401,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
       name: attr_name.unwrap_or_default(),
       simple_type: attr_simple_type,
       list: attr_list,
+      match_local_name: attr_match_local_name,
+      empty_as_none: attr_empty_as_none,
     });
   }
 
@@ -1487,12 +1528,68 @@ fn write_start_tag_open_tokens(qname: &str, no_prefix: bool) -> proc_macro2::Tok
   write_tag_literal_tokens(qname, "<", "", no_prefix)
 }
 
-fn write_start_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "<", ">", no_prefix)
+fn write_tag_runtime_no_prefix_tokens(
+  qname: &str,
+  open: &str,
+  close: &str,
+  no_prefix: bool,
+  no_prefix_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if !no_prefix {
+    return write_tag_literal_tokens(qname, open, close, false);
+  }
+
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let prefixed_tag = if tag_prefix.is_empty() {
+    format!("{open}{local_name}{close}")
+  } else {
+    format!("{open}{tag_prefix}:{local_name}{close}")
+  };
+  let unprefixed_tag = format!("{open}{local_name}{close}");
+  let prefixed_tag_lit = LitByteStr::new(prefixed_tag.as_bytes(), Span::call_site());
+  let unprefixed_tag_lit = LitByteStr::new(unprefixed_tag.as_bytes(), Span::call_site());
+  quote! {
+    if #no_prefix_expr {
+      writer.write_all(#unprefixed_tag_lit)?;
+    } else {
+      writer.write_all(#prefixed_tag_lit)?;
+    }
+  }
 }
 
-fn write_empty_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
-  write_tag_literal_tokens(qname, "<", " />", no_prefix)
+fn write_start_tag_open_runtime_no_prefix_tokens(
+  qname: &str,
+  no_prefix: bool,
+  no_prefix_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  write_tag_runtime_no_prefix_tokens(qname, "<", "", no_prefix, no_prefix_expr)
+}
+
+fn write_start_tag_runtime_no_prefix_tokens(
+  qname: &str,
+  no_prefix: bool,
+  no_prefix_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  write_tag_runtime_no_prefix_tokens(qname, "<", ">", no_prefix, no_prefix_expr)
+}
+
+fn write_empty_tag_runtime_no_prefix_tokens(
+  qname: &str,
+  no_prefix: bool,
+  no_prefix_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  write_tag_runtime_no_prefix_tokens(qname, "<", " />", no_prefix, no_prefix_expr)
+}
+
+fn write_end_tag_runtime_no_prefix_tokens(
+  qname: &str,
+  no_prefix: bool,
+  no_prefix_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  write_tag_runtime_no_prefix_tokens(qname, "</", ">", no_prefix, no_prefix_expr)
 }
 
 fn write_end_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {

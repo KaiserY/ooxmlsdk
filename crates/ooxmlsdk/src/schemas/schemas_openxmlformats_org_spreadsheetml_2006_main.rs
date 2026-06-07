@@ -2168,6 +2168,7 @@ pub struct Headers {
 pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
+  pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   #[sdk(
         choice(
             child(variant = RevisionRowColumn, no_prefix, qname = "x:rrc"),
@@ -6593,6 +6594,7 @@ pub struct MergeCell {
 #[sdk(no_prefix, qname = "x:dataValidation")]
 pub struct DataValidation {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<DataValidationValues>,

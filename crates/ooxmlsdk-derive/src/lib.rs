@@ -1528,68 +1528,12 @@ fn write_start_tag_open_tokens(qname: &str, no_prefix: bool) -> proc_macro2::Tok
   write_tag_literal_tokens(qname, "<", "", no_prefix)
 }
 
-fn write_tag_runtime_no_prefix_tokens(
-  qname: &str,
-  open: &str,
-  close: &str,
-  no_prefix: bool,
-  no_prefix_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  if !no_prefix {
-    return write_tag_literal_tokens(qname, open, close, false);
-  }
-
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let prefixed_tag = if tag_prefix.is_empty() {
-    format!("{open}{local_name}{close}")
-  } else {
-    format!("{open}{tag_prefix}:{local_name}{close}")
-  };
-  let unprefixed_tag = format!("{open}{local_name}{close}");
-  let prefixed_tag_lit = LitByteStr::new(prefixed_tag.as_bytes(), Span::call_site());
-  let unprefixed_tag_lit = LitByteStr::new(unprefixed_tag.as_bytes(), Span::call_site());
-  quote! {
-    if #no_prefix_expr {
-      writer.write_all(#unprefixed_tag_lit)?;
-    } else {
-      writer.write_all(#prefixed_tag_lit)?;
-    }
-  }
+fn write_start_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", ">", no_prefix)
 }
 
-fn write_start_tag_open_runtime_no_prefix_tokens(
-  qname: &str,
-  no_prefix: bool,
-  no_prefix_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  write_tag_runtime_no_prefix_tokens(qname, "<", "", no_prefix, no_prefix_expr)
-}
-
-fn write_start_tag_runtime_no_prefix_tokens(
-  qname: &str,
-  no_prefix: bool,
-  no_prefix_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  write_tag_runtime_no_prefix_tokens(qname, "<", ">", no_prefix, no_prefix_expr)
-}
-
-fn write_empty_tag_runtime_no_prefix_tokens(
-  qname: &str,
-  no_prefix: bool,
-  no_prefix_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  write_tag_runtime_no_prefix_tokens(qname, "<", " />", no_prefix, no_prefix_expr)
-}
-
-fn write_end_tag_runtime_no_prefix_tokens(
-  qname: &str,
-  no_prefix: bool,
-  no_prefix_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  write_tag_runtime_no_prefix_tokens(qname, "</", ">", no_prefix, no_prefix_expr)
+fn write_empty_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {
+  write_tag_literal_tokens(qname, "<", " />", no_prefix)
 }
 
 fn write_end_tag_tokens(qname: &str, no_prefix: bool) -> proc_macro2::TokenStream {

@@ -25,6 +25,7 @@ sdk_data/schemas
 sdk_data/namespaces.json
 sdk_data/package_schemas
 
-.codex
+.codex/
+.agents/
 tmp/
 

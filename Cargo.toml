@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.9.1"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["KaiserY"]
@@ -23,12 +23,12 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.9.1", path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { version = "0.9.1", path = "crates/ooxmlsdk-build" }
-ooxmlsdk-derive = { version = "0.9.1", path = "crates/ooxmlsdk-derive" }
-ooxmlsdk-pdf = { version = "0.9.1", path = "crates/ooxmlsdk-pdf" }
-ooxmlsdk-pdf-test = { version = "0.9.1", path = "crates/ooxmlsdk-pdf-test" }
-ooxmlsdk-test = { version = "0.9.1", path = "crates/ooxmlsdk-test" }
+ooxmlsdk = { version = "0.10.0", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.10.0", path = "crates/ooxmlsdk-build" }
+ooxmlsdk-derive = { version = "0.10.0", path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-pdf = { version = "0.10.0", path = "crates/ooxmlsdk-pdf" }
+ooxmlsdk-pdf-test = { version = "0.10.0", path = "crates/ooxmlsdk-pdf-test" }
+ooxmlsdk-test = { version = "0.10.0", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.40.1"
 regex = "1.12.3"
@@ -45,7 +45,7 @@ thiserror = "2.0.18"
 criterion = "0.8.2"
 crc32fast = "1.5.0"
 flate2 = "1.1.9"
-lopdf = "0.40.0"
+lopdf = "0.41.0"
 pdfium-render = "0.9.1"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"

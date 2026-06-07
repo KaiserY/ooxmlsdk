@@ -15,22 +15,28 @@ The runtime crate exposes a small public feature surface:
 - `mce`: enables Markup Compatibility and Extensibility processing and depends on `parts`
 - `validators`: enables optional validator APIs
 
-The always-available modules in the crate root are:
-
-- `common`
-- `namespaces`
-- `schemas`
-- `sdk`
-- `simple_type`
-- `units`
-
-Feature-gated modules are:
-
-- `parts` behind `parts`
-- `validator` behind `validators`
-
 The minimum supported Rust version is 1.88, and the workspace uses the Rust
 2024 edition.
+
+## Documentation
+
+Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmlsdk).
+
+Guides and examples are maintained separately in [KaiserY/ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
+
+For background on Open XML package concepts, file format structure, WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility, the Microsoft Learn documentation remains the upstream conceptual reference. This crate follows many of the same package and schema concepts while exposing Rust-native generated types and feature flags.
+
+## Round-Trip Coverage
+
+Corpus-scale round-trip data is tracked in [KaiserY/ooxmlsdk-test-suite](https://github.com/KaiserY/ooxmlsdk-test-suite). Latest recorded results:
+
+| Corpus | Files | Round-trip candidates | Open-only | Invalid | Result |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Apache POI | 677 | 602 | 11 | 64 | 677 passed / 0 failed |
+| LibreOffice | 3368 | 3335 | 7 | 26 | 3368 passed / 0 failed |
+| Open-XML-SDK | 884 | 874 | 6 | 4 | 884 passed / 0 failed |
+
+Last run: 2026-06-07.
 
 ## Version Coverage
 
@@ -46,32 +52,13 @@ Common build shapes:
 
 The generated runtime includes Office 2010, 2013, 2016, 2019, 2021, Microsoft 365-era extensions, and newer upstream namespace revisions currently present in the checked-in metadata. In practice this covers later DrawingML and chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked by Open XML SDK metadata.
 
-## Documentation
-
-Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmlsdk).
-
-Guides and examples are maintained separately in [KaiserY/ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
-
-For background on Open XML package concepts, file format structure, WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility, the Microsoft Learn documentation remains the upstream conceptual reference. This crate follows many of the same package and schema concepts while exposing Rust-native generated types and feature flags.
-
-## Round-Trip Coverage
-
-Corpus-scale round-trip data is tracked in [KaiserY/ooxmlsdk-test-suite](https://github.com/KaiserY/ooxmlsdk-test-suite). Latest recorded results:
-
-| Corpus | Files | Result |
-| --- | ---: | --- |
-| Apache POI | 677 | 649 passed / 28 failed |
-| LibreOffice | 3368 | 3051 passed / 317 failed |
-| Open-XML-SDK | 884 | 884 passed / 0 failed |
-
-Last run: 2026-06-04.
-
 ## Package API
 
 The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx` files. The intended public surface follows upstream Open XML SDK concepts:
 
 - open and create packages with constructors such as `new`, `new_with_settings`, `new_from_file`, and `new_from_file_with_settings`
 - save packages with `save`
+- create custom parts with `add_new_part_with_content_type_and_path` when the caller needs an explicit package path and content type
 - inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
 - traverse typed related parts with helpers such as `related_parts_of_type`, `related_part_of_type`, and relationship-type-specific variants when the relationship id is needed alongside the typed part
 - access well-known child parts through typed methods such as `main_document_part`, `workbook_part`, `presentation_part`, `worksheet_parts`, `font_table_part`, and chart-related part accessors

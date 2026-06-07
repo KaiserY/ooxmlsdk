@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+## 0.10.0
+
+### Breaking Changes
+
+- Removed the generated XML body writer from the public `SdkType` trait. Generated schema types now use inherent `pub(crate)` XML write helpers, so normal package and generated-schema users should continue using the public read/write APIs, while custom low-level `SdkType` implementations that called or implemented `write_inner` need to move off that internal hook.
+
+### Added
+
+- Added `add_new_part_with_content_type_and_path` for package code that needs to create a part with an explicit content type and package path.
+- Added missing `w14` numbering run-property children and additional schema-extension coverage for real-world WordprocessingML, SpreadsheetML, DrawingML, chart, VML, OPC, and Office extension markup.
+- Added more focused extension metadata for namespace declarations, choice variants, optional and repeated children, unknown attributes, unknown children, prefix canonicalization, local-name attribute matching, and empty-as-none compatibility parsing.
+
+### Changed
+
+- Regenerated schema metadata and runtime output for the 0.10.0 release while keeping generated XML write paths direct and static.
+- Reworked generated no-prefix XML writing so prefixed and no-prefix bodies are selected at compile time instead of passing a runtime boolean through `write_inner`.
+- Improved namespace and raw relationship round trips for non-canonical prefixes, Office extension namespaces, spreadsheet extension roots, raw relationship ids, and compatibility-preserved XML.
+- Updated the workspace crate versions to `0.10.0`.
+- Updated `lopdf` to `0.41.0`.
+
+### Fixed
+
+- Fixed the remaining recorded corpus round-trip failures across the Apache POI, LibreOffice, and Open-XML-SDK fixture sets.
+- Fixed additional schema gaps found by corpus fixtures, including missing choice variants, repeated choice children, optional children, namespace attributes, direct unknown children, other attributes, and compatibility-only children.
+- Fixed generated parsing and writing for several real-world OOXML compatibility cases, including spreadsheet filters and named sheet views, sparklines and spill metadata, chart data labels and extension lists, WordprocessingML structured document tags, run properties, table borders, table positioning, VML shape children, Strict/core properties, and package manifest edge cases.
+- Fixed compatibility handling for namespace aliases and canonical prefixes used by upstream producers, including cases where input prefixes differ from the canonical generated write prefix.
+- Fixed round-trip comparison rules for upstream-compatible lossy or normalized behavior where LibreOffice preserves the same effective document state but rewrites child order, duplicate properties, empty properties, or equivalent lexical forms.
+
+### Performance
+
+- Removed runtime no-prefix branching from generated XML body writers by generating separate no-prefix helper bodies only for types that need them.
+- Kept child and choice XML write dispatch static in generated code, avoiding extra helper layers on normal prefixed write paths.
+
+### Testing
+
+- Updated external round-trip corpus status: Apache POI `677 passed / 0 failed`, LibreOffice `3368 passed / 0 failed`, and Open-XML-SDK `884 passed / 0 failed`.
+- Tracked corpus classifications in the README: Apache POI `602` round-trip candidates, `11` open-only, `64` invalid; LibreOffice `3335` round-trip candidates, `7` open-only, `26` invalid; Open-XML-SDK `874` round-trip candidates, `6` open-only, `4` invalid.
+- Validated the release with generator regeneration, formatting, workspace tests, clippy, macro expansion checks, and the external round-trip suite.
+
+### Documentation
+
+- Updated the README round-trip coverage table with candidate, open-only, invalid, and zero-failure corpus counts.
+- Reordered the README introduction so docs.rs, guide documentation, MSRV, and corpus status are easier to find before the API overview.
+
 ## 0.9.0
 
 ### Breaking Changes

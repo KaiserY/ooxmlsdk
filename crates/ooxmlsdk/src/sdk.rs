@@ -525,16 +525,6 @@ pub trait SdkType: Sized {
       "SdkType does not support IO deserialization".to_string(),
     ))
   }
-
-  fn write_inner<W: std::io::Write>(
-    &self,
-    _writer: &mut W,
-    _no_prefix: bool,
-  ) -> Result<bool, std::io::Error> {
-    Err(std::io::Error::other(
-      "SdkType does not support XML writing",
-    ))
-  }
 }
 
 #[cfg(feature = "mce")]

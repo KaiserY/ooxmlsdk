@@ -506,6 +506,36 @@ pub trait SdkEnum: Sized {
 }
 
 pub trait SdkType: Sized {
+  fn from_bytes(_bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+    Err(crate::common::SdkError::CommonError(
+      "SdkType does not support borrowed deserialization".to_string(),
+    ))
+  }
+
+  fn from_reader<R: std::io::BufRead>(_reader: R) -> Result<Self, crate::common::SdkError> {
+    Err(crate::common::SdkError::CommonError(
+      "SdkType does not support IO deserialization".to_string(),
+    ))
+  }
+
+  fn write_to<W: std::io::Write>(&self, _writer: &mut W) -> Result<(), std::io::Error> {
+    Err(std::io::Error::new(
+      std::io::ErrorKind::Unsupported,
+      "SdkType does not support root serialization",
+    ))
+  }
+
+  fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
+    let mut writer = Vec::with_capacity(32);
+    self.write_to(&mut writer)?;
+    Ok(writer)
+  }
+
+  fn to_xml(&self) -> Result<String, crate::common::SdkError> {
+    String::from_utf8(self.to_bytes()?)
+      .map_err(|err| crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}")))
+  }
+
   fn read_borrowed_inner<'de>(
     _xml_reader: &mut crate::common::SliceReader<'de>,
     _start: quick_xml::events::BytesStart<'de>,

@@ -31,6 +31,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk::simple_type::{
   DrawingmlPercentageValue, MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
 };

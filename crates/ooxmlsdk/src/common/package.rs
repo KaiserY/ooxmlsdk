@@ -710,7 +710,9 @@ impl RelationshipSet {
     if let Some(bytes) = &self.raw_bytes {
       return Ok(Cow::Borrowed(bytes));
     }
-    Ok(Cow::Owned(self.to_relationships().to_bytes()?))
+    Ok(Cow::Owned(crate::sdk::SdkType::to_bytes(
+      &self.to_relationships(),
+    )?))
   }
 
   #[inline]
@@ -718,7 +720,7 @@ impl RelationshipSet {
     if let Some(bytes) = &self.raw_bytes {
       writer.write_all(bytes)?;
     } else {
-      writer.write_all(&self.to_relationships().to_bytes()?)?;
+      writer.write_all(&crate::sdk::SdkType::to_bytes(&self.to_relationships())?)?;
     }
     Ok(())
   }
@@ -2102,7 +2104,9 @@ fn relationships_from_flat_opc_part(
   source_path: &str,
   by_path: &HashMap<Box<str>, PartId>,
 ) -> Result<RelationshipSet, SdkError> {
-  let relationships = bytes.map(Relationships::from_bytes).transpose()?;
+  let relationships = bytes
+    .map(<Relationships as crate::sdk::SdkType>::from_bytes)
+    .transpose()?;
   Ok(RelationshipSet::from_relationships(
     relationships,
     source_path,
@@ -2525,7 +2529,7 @@ fn read_content_types<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Resul
   let mut entry = archive.by_name("[Content_Types].xml")?;
   let mut bytes = Vec::with_capacity(entry.size() as usize);
   entry.read_to_end(&mut bytes)?;
-  Types::from_bytes(&bytes)
+  <Types as crate::sdk::SdkType>::from_bytes(&bytes)
 }
 
 fn read_raw_parts<R: Read + Seek>(
@@ -2566,7 +2570,7 @@ fn read_relationships<R: Read + Seek>(
   let Some(bytes) = read_relationship_bytes(archive, path)? else {
     return Ok(None);
   };
-  Relationships::from_bytes(&bytes).map(Some)
+  <Relationships as crate::sdk::SdkType>::from_bytes(&bytes).map(Some)
 }
 
 fn read_part_relationships<R: Read + Seek>(
@@ -2578,12 +2582,14 @@ fn read_part_relationships<R: Read + Seek>(
   let Some(bytes) = read_relationship_bytes_with_lowercase_filename_fallback(archive, path)? else {
     return Ok(RelationshipSet::default());
   };
-  Ok(match Relationships::from_bytes(&bytes) {
-    Ok(relationships) => {
-      RelationshipSet::from_relationships(Some(relationships), source_path, by_path)
-    }
-    Err(_) => RelationshipSet::from_raw_bytes(bytes.into_boxed_slice()),
-  })
+  Ok(
+    match <Relationships as crate::sdk::SdkType>::from_bytes(&bytes) {
+      Ok(relationships) => {
+        RelationshipSet::from_relationships(Some(relationships), source_path, by_path)
+      }
+      Err(_) => RelationshipSet::from_raw_bytes(bytes.into_boxed_slice()),
+    },
+  )
 }
 
 fn read_relationship_bytes<R: Read + Seek>(

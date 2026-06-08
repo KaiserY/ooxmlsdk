@@ -8,6 +8,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props
   Variant, VariantChoice,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_extended_properties::Properties as ExtendedProperties;
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 #[test]

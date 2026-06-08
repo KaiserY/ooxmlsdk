@@ -4,6 +4,7 @@ use ooxmlsdk::schemas::schemas_microsoft_com_vml::Shape;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::{
   Variant, VariantChoice,
 };
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk::simple_type::{
   Base64BinaryValue, BooleanValue, ByteValue, DateTimeValue, DecimalValue, DoubleValue,
   HexBinaryValue, HexBinaryValueExt, Int16Value, Int32Value, Int64Value, IntegerValue, OnOffValue,

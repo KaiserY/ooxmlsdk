@@ -7,6 +7,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   SdtBlock, SdtPropertiesChoice,
 };
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk::simple_type::TwipsMeasureValue;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 

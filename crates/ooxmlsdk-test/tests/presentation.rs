@@ -3,6 +3,7 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2013_main_command::R
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   NonVisualDrawingProperties, Presentation, SlideSize,
 };
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures};
 
 #[test]

@@ -1,4 +1,5 @@
 use ooxmlsdk::schemas::{m, schemas_microsoft_com_office_drawing_2010_main as a14};
+use ooxmlsdk::sdk::SdkType;
 
 pub(crate) fn text_math_text(math: &a14::TextMath) -> String {
   text_math_fragments_text(

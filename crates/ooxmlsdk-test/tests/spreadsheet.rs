@@ -11,6 +11,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workb
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk::simple_type::BooleanValue;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 

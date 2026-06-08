@@ -1875,6 +1875,39 @@ fn expand_tuple_wrapper(
         <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, start, empty).map(Self)
       }
 
+      fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
+        let (start, empty) = crate::common::read_root_start_borrowed_no_header(
+          &mut xml_reader,
+          stringify!(#ident),
+          #tag_qname_lit,
+          #local_name_lit,
+          #root_namespace_uri_tokens,
+        )?;
+        <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
+      }
+
+      fn from_reader<R: std::io::BufRead>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_reader_inner(reader)?;
+        let (start, empty) = crate::common::read_root_start_io_no_header(
+          &mut xml_reader,
+          stringify!(#ident),
+          #tag_qname_lit,
+          #local_name_lit,
+          #root_namespace_uri_tokens,
+        )?;
+        <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
+      }
+
+      fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
+        #start_tag_open
+        if !#write_inner_root_call {
+          #end_tag
+        }
+        Ok(())
+      }
     }
 
     #[cfg(feature = "validators")]
@@ -1935,52 +1968,6 @@ fn expand_tuple_wrapper(
     }
 
     impl #impl_generics #ident #type_generics #where_clause {
-      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
-        let (start, empty) = crate::common::read_root_start_borrowed_no_header(
-          &mut xml_reader,
-          stringify!(#ident),
-          #tag_qname_lit,
-          #local_name_lit,
-          #root_namespace_uri_tokens,
-        )?;
-        <Self as crate::sdk::SdkType>::read_borrowed_inner(&mut xml_reader, start, empty)
-      }
-
-      pub fn from_reader<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        let (start, empty) = crate::common::read_root_start_io_no_header(
-          &mut xml_reader,
-          stringify!(#ident),
-          #tag_qname_lit,
-          #local_name_lit,
-          #root_namespace_uri_tokens,
-        )?;
-        <Self as crate::sdk::SdkType>::read_io_inner(&mut xml_reader, start, empty)
-      }
-
-      pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
-        #start_tag_open
-        if !#write_inner_root_call {
-          #end_tag
-        }
-        Ok(())
-      }
-
-      pub fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        let mut writer = Vec::with_capacity(32);
-        self.write_to(&mut writer)?;
-        Ok(writer)
-      }
-
-      pub fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-        String::from_utf8(self.to_bytes()?).map_err(|err| {
-          crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
-        })
-      }
-
       pub(crate) fn write_inner<W: std::io::Write>(
         &self,
         writer: &mut W,
@@ -1998,7 +1985,7 @@ fn expand_tuple_wrapper(
 
     impl #impl_generics ::std::fmt::Display for #ident #type_generics #where_clause {
       fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(&self.to_xml().map_err(|_| ::std::fmt::Error)?)
+        f.write_str(&<Self as crate::sdk::SdkType>::to_xml(self).map_err(|_| ::std::fmt::Error)?)
       }
     }
   })
@@ -7447,19 +7434,19 @@ fn expand_named_struct(
     quote! {}
   } else {
     quote! {
-      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+      fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
         #root_read_borrowed_tokens
       }
 
-      pub fn from_reader<R: std::io::BufRead>(
+      fn from_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         let mut xml_reader = crate::common::from_reader_inner(reader)?;
         #root_read_io_tokens
       }
 
-      pub fn write_to<W: std::io::Write>(
+      fn write_to<W: std::io::Write>(
         &self,
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
@@ -7470,18 +7457,6 @@ fn expand_named_struct(
         }
         Ok(())
       }
-
-      pub fn to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        let mut writer = Vec::with_capacity(32);
-        self.write_to(&mut writer)?;
-        Ok(writer)
-      }
-
-      pub fn to_xml(&self) -> Result<String, crate::common::SdkError> {
-        String::from_utf8(self.to_bytes()?).map_err(|err| {
-          crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
-        })
-      }
     }
   };
   let public_root_display_tokens = if local_name.is_empty() {
@@ -7490,7 +7465,7 @@ fn expand_named_struct(
     quote! {
       impl #impl_generics ::std::fmt::Display for #ident #type_generics #where_clause {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-          f.write_str(&self.to_xml().map_err(|_| ::std::fmt::Error)?)
+          f.write_str(&<Self as crate::sdk::SdkType>::to_xml(self).map_err(|_| ::std::fmt::Error)?)
         }
       }
     }
@@ -7669,6 +7644,7 @@ fn expand_named_struct(
         })
       }
 
+      #public_root_methods_tokens
     }
 
     impl #impl_generics #ident #type_generics #where_clause {
@@ -7714,10 +7690,6 @@ fn expand_named_struct(
     }
 
     #public_root_from_str_tokens
-
-    impl #impl_generics #ident #type_generics #where_clause {
-      #public_root_methods_tokens
-    }
 
     #public_root_display_tokens
   })

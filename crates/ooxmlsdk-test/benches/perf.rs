@@ -6,6 +6,7 @@ use ooxmlsdk::parts::{
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::Presentation;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document;
+use ooxmlsdk::sdk::SdkType;
 use ooxmlsdk_test::fixtures::{
   self, PRESENTATION_PRESENTATION_XML, SPREADSHEET_WORKBOOK_XML,
   WORDPROCESSING_DOCUMENT_HELLO_WORLD_XML,

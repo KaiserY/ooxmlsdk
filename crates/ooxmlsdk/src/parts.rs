@@ -1465,7 +1465,7 @@ where
   let mut entry_set = std::collections::HashSet::<String>::new();
   let storage = crate::sdk::SdkPackage::storage(package);
   zip.start_file("[Content_Types].xml", options)?;
-  zip.write_all(&storage.content_types().to_bytes()?)?;
+  zip.write_all(&crate::sdk::SdkType::to_bytes(storage.content_types())?)?;
   let package_relationships = storage.package_relationships();
   if !package_relationships.is_empty() {
     if entry_set.insert("_rels".to_string()) {

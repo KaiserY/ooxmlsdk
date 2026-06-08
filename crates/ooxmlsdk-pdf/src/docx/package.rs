@@ -14,7 +14,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_chart as c,
   schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
 };
-use ooxmlsdk::sdk::{RelatedPart, SdkPart};
+use ooxmlsdk::sdk::{RelatedPart, SdkPart, SdkType};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {

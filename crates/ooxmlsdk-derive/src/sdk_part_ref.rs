@@ -244,7 +244,7 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     let variant_ident = &variant.ident;
     quote! {
       #( #attrs )*
-      Self::#variant_ident(root) => Ok(root.to_bytes()?),
+      Self::#variant_ident(root) => Ok(crate::sdk::SdkType::to_bytes(root.as_ref())?),
     }
   });
   let root_clear_arms = root_variants.clone().map(|(variant, _)| {
@@ -291,9 +291,9 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         let bytes = part.data().bytes();
         #chart_raw_fallback
         let root = if let Some(bytes) = crate::common::decode_utf16_xml_bytes(bytes)? {
-          <#root_ty>::from_reader(std::io::Cursor::new(bytes))?
+          <#root_ty as crate::sdk::SdkType>::from_reader(std::io::Cursor::new(bytes))?
         } else {
-          <#root_ty>::from_bytes(bytes)?
+          <#root_ty as crate::sdk::SdkType>::from_bytes(bytes)?
         };
         #[cfg(feature = "mce")]
         let mut root = root;

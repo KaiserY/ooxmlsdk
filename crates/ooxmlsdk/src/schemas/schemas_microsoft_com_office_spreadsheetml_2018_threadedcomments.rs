@@ -11,10 +11,10 @@ pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Person Class.
-  #[sdk(child(no_prefix, qname = "xltc:person"))]
+  #[sdk(child(qname = "xltc:person"))]
   pub person: Vec<Person>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
+  #[sdk(child(qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedComments Class.
@@ -24,10 +24,10 @@ pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the ThreadedComment Class.
-  #[sdk(child(no_prefix, qname = "xltc:threadedComment"))]
+  #[sdk(child(qname = "xltc:threadedComment"))]
   pub threaded_comment: Vec<ThreadedComment>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
+  #[sdk(child(qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Person Class.
@@ -49,7 +49,7 @@ pub struct Person {
   #[sdk(attr(qname = ":providerId"))]
   pub provider_id: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
+  #[sdk(child(qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
@@ -89,13 +89,13 @@ pub struct ThreadedComment {
   #[sdk(attr(qname = ":done"))]
   pub done: Option<crate::simple_type::BooleanValue>,
   /// Defines the ThreadedCommentText Class.
-  #[sdk(child(no_prefix, qname = "xltc:text"))]
+  #[sdk(child(qname = "xltc:text"))]
   pub threaded_comment_text: Option<ThreadedCommentText>,
   /// Defines the ThreadedCommentMentions Class.
-  #[sdk(child(no_prefix, qname = "xltc:mentions"))]
+  #[sdk(child(qname = "xltc:mentions"))]
   pub threaded_comment_mentions: Option<ThreadedCommentMentions>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xltc:extLst"))]
+  #[sdk(child(qname = "xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ThreadedCommentText Class.
@@ -107,7 +107,7 @@ pub struct ThreadedCommentText(pub crate::schemas::x::XstringType);
 #[sdk(no_prefix, qname = "xltc:mentions")]
 pub struct ThreadedCommentMentions {
   /// Defines the Mention Class.
-  #[sdk(child(no_prefix, qname = "xltc:mention"))]
+  #[sdk(child(qname = "xltc:mention"))]
   pub mention: Vec<Mention>,
 }
 /// Defines the Mention Class.

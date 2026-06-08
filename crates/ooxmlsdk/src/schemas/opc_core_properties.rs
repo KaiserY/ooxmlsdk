@@ -18,10 +18,10 @@ pub struct CoreProperties {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_children: Vec<(usize, std::boxed::Box<[u8]>)>,
   /// cp:category
-  #[sdk(text_child(no_prefix, qname = "cp:category"))]
+  #[sdk(text_child(qname = "cp:category"))]
   pub category: Option<Category>,
   /// cp:contentStatus
-  #[sdk(text_child(no_prefix, qname = "cp:contentStatus"))]
+  #[sdk(text_child(qname = "cp:contentStatus"))]
   pub content_status: Option<ContentStatus>,
   /// dcterms:created
   #[sdk(child(qname = "dcterms:created"))]
@@ -36,22 +36,22 @@ pub struct CoreProperties {
   #[sdk(text_child(qname = "dc:identifier"))]
   pub identifier: Option<Identifier>,
   /// cp:keywords
-  #[sdk(child(no_prefix, qname = "cp:keywords"))]
+  #[sdk(child(qname = "cp:keywords"))]
   pub keywords: Option<Keywords>,
   /// dc:language
   #[sdk(child(qname = "dc:language"))]
   pub language: Option<Language>,
   /// cp:lastModifiedBy
-  #[sdk(text_child(no_prefix, qname = "cp:lastModifiedBy"))]
+  #[sdk(text_child(qname = "cp:lastModifiedBy"))]
   pub last_modified_by: Option<LastModifiedBy>,
   /// cp:lastPrinted
-  #[sdk(text_child(no_prefix, qname = "cp:lastPrinted"))]
+  #[sdk(text_child(qname = "cp:lastPrinted"))]
   pub last_printed: Option<LastPrinted>,
   /// dcterms:modified
   #[sdk(child(qname = "dcterms:modified"))]
   pub modified: Option<Modified>,
   /// cp:revision
-  #[sdk(text_child(no_prefix, qname = "cp:revision"))]
+  #[sdk(text_child(qname = "cp:revision"))]
   pub revision: Option<Revision>,
   /// dc:subject
   #[sdk(child(qname = "dc:subject"))]
@@ -60,7 +60,7 @@ pub struct CoreProperties {
   #[sdk(text_child(qname = "dc:title"))]
   pub title: Option<Title>,
   /// cp:version
-  #[sdk(text_child(no_prefix, qname = "cp:version"))]
+  #[sdk(text_child(qname = "cp:version"))]
   pub version: Option<Version>,
 }
 /// cp:category
@@ -137,7 +137,7 @@ pub struct Keywords {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
   /// cp:value
-  #[sdk(child(no_prefix, qname = "cp:value"))]
+  #[sdk(child(qname = "cp:value"))]
   pub value: Vec<Keyword>,
 }
 /// Keyword.

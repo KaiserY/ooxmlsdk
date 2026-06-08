@@ -310,7 +310,7 @@ pub enum ObjectTypeValues {
 }
 /// Defines the ConditionalFormattings Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:conditionalFormattings")]
+#[sdk(no_prefix, qname = "x14:conditionalFormattings")]
 pub struct ConditionalFormattings {
   /// Defines the ConditionalFormatting Class.
   #[sdk(child(qname = "x14:conditionalFormatting"))]
@@ -318,7 +318,11 @@ pub struct ConditionalFormattings {
 }
 /// Defines the DataValidations Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("xm:xne"), qname = "x14:dataValidations")]
+#[sdk(
+  no_prefix,
+  canonical_namespace_prefix("xm:xne"),
+  qname = "x14:dataValidations"
+)]
 pub struct DataValidations {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// disablePrompts
@@ -339,7 +343,11 @@ pub struct DataValidations {
 }
 /// Defines the SparklineGroups Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(canonical_namespace_prefix("xm:xne"), qname = "x14:sparklineGroups")]
+#[sdk(
+  no_prefix,
+  canonical_namespace_prefix("xm:xne"),
+  qname = "x14:sparklineGroups"
+)]
 pub struct SparklineGroups {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// Defines the SparklineGroup Class.
@@ -348,7 +356,7 @@ pub struct SparklineGroups {
 }
 /// Defines the SlicerList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerList")]
+#[sdk(no_prefix, qname = "x14:slicerList")]
 pub struct SlicerList {
   /// Defines the SlicerRef Class.
   #[sdk(child(qname = "x14:slicer"))]
@@ -356,7 +364,7 @@ pub struct SlicerList {
 }
 /// Defines the ProtectedRanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:protectedRanges")]
+#[sdk(no_prefix, qname = "x14:protectedRanges")]
 pub struct ProtectedRanges {
   /// Defines the ProtectedRange Class.
   #[sdk(child(qname = "x14:protectedRange"))]
@@ -364,7 +372,7 @@ pub struct ProtectedRanges {
 }
 /// Defines the IgnoredErrors Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:ignoredErrors")]
+#[sdk(no_prefix, qname = "x14:ignoredErrors")]
 pub struct IgnoredErrors {
   /// Defines the IgnoredError Class.
   #[sdk(child(qname = "x14:ignoredError"))]
@@ -375,7 +383,7 @@ pub struct IgnoredErrors {
 }
 /// Defines the DefinedNames Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:definedNames")]
+#[sdk(no_prefix, qname = "x14:definedNames")]
 pub struct DefinedNames {
   /// Defines the DefinedName Class.
   #[sdk(child(qname = "x14:definedName"))]
@@ -383,7 +391,7 @@ pub struct DefinedNames {
 }
 /// Defines the PivotCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotCaches")]
+#[sdk(no_prefix, qname = "x14:pivotCaches")]
 pub struct PivotCaches {
   /// PivotCache.
   #[sdk(child(qname = "x:pivotCache"))]
@@ -391,7 +399,7 @@ pub struct PivotCaches {
 }
 /// Defines the SlicerCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerCaches")]
+#[sdk(no_prefix, qname = "x14:slicerCaches")]
 pub struct SlicerCaches {
   /// Defines the SlicerCache Class.
   #[sdk(child(qname = "x14:slicerCache"))]
@@ -399,7 +407,7 @@ pub struct SlicerCaches {
 }
 /// Defines the WorkbookProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:workbookPr")]
+#[sdk(no_prefix, qname = "x14:workbookPr")]
 pub struct WorkbookProperties {
   /// defaultImageDpi
   #[sdk(attr(qname = ":defaultImageDpi"))]
@@ -413,7 +421,7 @@ pub struct WorkbookProperties {
 }
 /// Defines the CalculatedMember Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:calculatedMember")]
+#[sdk(no_prefix, qname = "x14:calculatedMember")]
 pub struct CalculatedMember {
   /// displayFolder
   #[sdk(attr(qname = ":displayFolder"))]
@@ -436,7 +444,7 @@ pub struct CalculatedMember {
 }
 /// Defines the CacheHierarchy Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:cacheHierarchy")]
+#[sdk(no_prefix, qname = "x14:cacheHierarchy")]
 pub struct CacheHierarchy {
   /// flattenHierarchies
   #[sdk(attr(qname = ":flattenHierarchies"))]
@@ -456,7 +464,7 @@ pub struct CacheHierarchy {
 }
 /// Defines the DataField Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:dataField")]
+#[sdk(no_prefix, qname = "x14:dataField")]
 pub struct DataField {
   /// pivotShowAs
   #[sdk(attr(qname = ":pivotShowAs"))]
@@ -470,7 +478,7 @@ pub struct DataField {
 }
 /// Defines the PivotField Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotField")]
+#[sdk(no_prefix, qname = "x14:pivotField")]
 pub struct PivotField {
   /// fillDownLabels
   #[sdk(attr(qname = ":fillDownLabels"))]
@@ -481,7 +489,7 @@ pub struct PivotField {
 }
 /// Defines the PivotTableDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotTableDefinition")]
+#[sdk(no_prefix, qname = "x14:pivotTableDefinition")]
 pub struct PivotTableDefinition {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   /// fillDownLabelsDefault
@@ -526,7 +534,7 @@ pub struct PivotTableDefinition {
 }
 /// Defines the PivotCacheDefinition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotCacheDefinition")]
+#[sdk(no_prefix, qname = "x14:pivotCacheDefinition")]
 pub struct PivotCacheDefinition {
   /// slicerData
   #[sdk(attr(qname = ":slicerData"))]
@@ -546,7 +554,7 @@ pub struct PivotCacheDefinition {
 }
 /// Defines the Connection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:connection")]
+#[sdk(no_prefix, qname = "x14:connection")]
 pub struct Connection {
   /// culture
   #[sdk(attr(qname = ":culture"))]
@@ -560,7 +568,7 @@ pub struct Connection {
 }
 /// Defines the Table Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:table")]
+#[sdk(no_prefix, qname = "x14:table")]
 pub struct Table {
   /// altText
   #[sdk(attr(qname = ":altText"))]
@@ -571,7 +579,7 @@ pub struct Table {
 }
 /// Defines the SlicerStyles Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerStyles")]
+#[sdk(no_prefix, qname = "x14:slicerStyles")]
 pub struct SlicerStyles {
   /// defaultSlicerStyle
   #[sdk(attr(qname = ":defaultSlicerStyle"))]
@@ -582,7 +590,7 @@ pub struct SlicerStyles {
 }
 /// Defines the DifferentialFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:dxfs")]
+#[sdk(no_prefix, qname = "x14:dxfs")]
 pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
@@ -593,7 +601,7 @@ pub struct DifferentialFormats {
 }
 /// Defines the OleItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:oleItem")]
+#[sdk(no_prefix, qname = "x14:oleItem")]
 pub struct OleItem {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -613,7 +621,7 @@ pub struct OleItem {
 }
 /// Defines the PivotHierarchy Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotHierarchy")]
+#[sdk(no_prefix, qname = "x14:pivotHierarchy")]
 pub struct PivotHierarchy {
   /// ignore
   #[sdk(attr(qname = ":ignore"))]
@@ -621,7 +629,7 @@ pub struct PivotHierarchy {
 }
 /// Defines the CacheField Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:cacheField")]
+#[sdk(no_prefix, qname = "x14:cacheField")]
 pub struct CacheField {
   /// ignore
   #[sdk(attr(qname = ":ignore"))]
@@ -631,7 +639,7 @@ pub struct CacheField {
 pub type Id = crate::simple_type::StringValue;
 /// Defines the IconFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:iconFilter")]
+#[sdk(no_prefix, qname = "x14:iconFilter")]
 pub struct IconFilter {
   /// iconSet
   #[sdk(attr(qname = ":iconSet"))]
@@ -642,7 +650,7 @@ pub struct IconFilter {
 }
 /// Defines the Filter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:filter")]
+#[sdk(no_prefix, qname = "x14:filter")]
 pub struct Filter {
   /// val
   #[sdk(attr(qname = ":val"))]
@@ -650,7 +658,7 @@ pub struct Filter {
 }
 /// Defines the CustomFilters Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:customFilters")]
+#[sdk(no_prefix, qname = "x14:customFilters")]
 pub struct CustomFilters {
   /// and
   #[sdk(attr(qname = ":and"))]
@@ -661,7 +669,7 @@ pub struct CustomFilters {
 }
 /// Defines the SortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:sortCondition")]
+#[sdk(no_prefix, qname = "x14:sortCondition")]
 pub struct SortCondition {
   /// descending
   #[sdk(attr(qname = ":descending"))]
@@ -687,7 +695,7 @@ pub struct SortCondition {
 }
 /// Defines the SourceConnection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:sourceConnection")]
+#[sdk(no_prefix, qname = "x14:sourceConnection")]
 pub struct SourceConnection {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -852,6 +860,7 @@ pub struct SlicerCacheDefinition {
 /// Defines the ConditionalFormatting Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(
+  no_prefix,
   canonical_namespace_prefix("xm:xne"),
   qname = "x14:conditionalFormatting"
 )]
@@ -872,7 +881,7 @@ pub struct ConditionalFormatting {
 }
 /// Defines the ConditionalFormattingRule Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:cfRule")]
+#[sdk(no_prefix, qname = "x14:cfRule")]
 pub struct ConditionalFormattingRule {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -939,7 +948,7 @@ pub struct ConditionalFormattingRule {
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:extLst")]
+#[sdk(no_prefix, qname = "x14:extLst")]
 pub struct ExtensionList {
   /// Extension.
   #[sdk(child(qname = "x:ext"))]
@@ -947,7 +956,7 @@ pub struct ExtensionList {
 }
 /// Defines the DataValidation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:dataValidation")]
+#[sdk(no_prefix, qname = "x14:dataValidation")]
 pub struct DataValidation {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// type
@@ -998,7 +1007,7 @@ pub struct DataValidation {
 }
 /// Defines the DataValidationForumla1 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:formula1")]
+#[sdk(no_prefix, qname = "x14:formula1")]
 pub struct DataValidationForumla1 {
   /// Defines the Formula Class.
   #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
@@ -1006,7 +1015,7 @@ pub struct DataValidationForumla1 {
 }
 /// Defines the DataValidationForumla2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:formula2")]
+#[sdk(no_prefix, qname = "x14:formula2")]
 pub struct DataValidationForumla2 {
   /// Defines the Formula Class.
   #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
@@ -1014,7 +1023,7 @@ pub struct DataValidationForumla2 {
 }
 /// Defines the SparklineGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:sparklineGroup")]
+#[sdk(no_prefix, qname = "x14:sparklineGroup")]
 pub struct SparklineGroup {
   /// manualMax
   #[sdk(attr(qname = ":manualMax"))]
@@ -1103,7 +1112,7 @@ pub struct SparklineGroup {
 }
 /// Defines the SeriesColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorSeries")]
+#[sdk(no_prefix, qname = "x14:colorSeries")]
 pub struct SeriesColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1124,7 +1133,7 @@ pub struct SeriesColor {
 }
 /// Defines the NegativeColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorNegative")]
+#[sdk(no_prefix, qname = "x14:colorNegative")]
 pub struct NegativeColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1145,7 +1154,7 @@ pub struct NegativeColor {
 }
 /// Defines the AxisColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorAxis")]
+#[sdk(no_prefix, qname = "x14:colorAxis")]
 pub struct AxisColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1166,7 +1175,7 @@ pub struct AxisColor {
 }
 /// Defines the MarkersColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorMarkers")]
+#[sdk(no_prefix, qname = "x14:colorMarkers")]
 pub struct MarkersColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1187,7 +1196,7 @@ pub struct MarkersColor {
 }
 /// Defines the FirstMarkerColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorFirst")]
+#[sdk(no_prefix, qname = "x14:colorFirst")]
 pub struct FirstMarkerColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1208,7 +1217,7 @@ pub struct FirstMarkerColor {
 }
 /// Defines the LastMarkerColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorLast")]
+#[sdk(no_prefix, qname = "x14:colorLast")]
 pub struct LastMarkerColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1229,7 +1238,7 @@ pub struct LastMarkerColor {
 }
 /// Defines the HighMarkerColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorHigh")]
+#[sdk(no_prefix, qname = "x14:colorHigh")]
 pub struct HighMarkerColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1250,7 +1259,7 @@ pub struct HighMarkerColor {
 }
 /// Defines the LowMarkerColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorLow")]
+#[sdk(no_prefix, qname = "x14:colorLow")]
 pub struct LowMarkerColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1271,7 +1280,7 @@ pub struct LowMarkerColor {
 }
 /// Defines the Color Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:color")]
+#[sdk(no_prefix, qname = "x14:color")]
 pub struct Color {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1292,7 +1301,7 @@ pub struct Color {
 }
 /// Defines the FillColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:fillColor")]
+#[sdk(no_prefix, qname = "x14:fillColor")]
 pub struct FillColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1313,7 +1322,7 @@ pub struct FillColor {
 }
 /// Defines the BorderColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:borderColor")]
+#[sdk(no_prefix, qname = "x14:borderColor")]
 pub struct BorderColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1334,7 +1343,7 @@ pub struct BorderColor {
 }
 /// Defines the NegativeFillColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:negativeFillColor")]
+#[sdk(no_prefix, qname = "x14:negativeFillColor")]
 pub struct NegativeFillColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1355,7 +1364,7 @@ pub struct NegativeFillColor {
 }
 /// Defines the NegativeBorderColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:negativeBorderColor")]
+#[sdk(no_prefix, qname = "x14:negativeBorderColor")]
 pub struct NegativeBorderColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1376,7 +1385,7 @@ pub struct NegativeBorderColor {
 }
 /// Defines the BarAxisColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:axisColor")]
+#[sdk(no_prefix, qname = "x14:axisColor")]
 pub struct BarAxisColor {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
@@ -1397,7 +1406,7 @@ pub struct BarAxisColor {
 }
 /// Defines the Sparklines Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:sparklines")]
+#[sdk(no_prefix, qname = "x14:sparklines")]
 pub struct Sparklines {
   /// Defines the Sparkline Class.
   #[sdk(child(qname = "x14:sparkline"))]
@@ -1405,7 +1414,7 @@ pub struct Sparklines {
 }
 /// Defines the Sparkline Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:sparkline")]
+#[sdk(no_prefix, qname = "x14:sparkline")]
 pub struct Sparkline {
   /// Defines the Formula Class.
   #[sdk(text_child(simple_type = "StringValue", qname = "xne:f"))]
@@ -1416,7 +1425,7 @@ pub struct Sparkline {
 }
 /// Defines the SlicerRef Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicer")]
+#[sdk(no_prefix, qname = "x14:slicer")]
 pub struct SlicerRef {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -1424,7 +1433,7 @@ pub struct SlicerRef {
 }
 /// Defines the SlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerCache")]
+#[sdk(no_prefix, qname = "x14:slicerCache")]
 pub struct SlicerCache {
   /// id
   #[sdk(attr(qname = "r:id"))]
@@ -1432,7 +1441,7 @@ pub struct SlicerCache {
 }
 /// Defines the DefinedName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:definedName")]
+#[sdk(no_prefix, qname = "x14:definedName")]
 pub struct DefinedName {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -1443,7 +1452,7 @@ pub struct DefinedName {
 }
 /// Defines the ArgumentDescriptions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:argumentDescriptions")]
+#[sdk(no_prefix, qname = "x14:argumentDescriptions")]
 pub struct ArgumentDescriptions {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -1454,7 +1463,7 @@ pub struct ArgumentDescriptions {
 }
 /// Defines the ArgumentDescription Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:argumentDescription")]
+#[sdk(no_prefix, qname = "x14:argumentDescription")]
 pub struct ArgumentDescription {
   /// index
   #[sdk(attr(qname = ":index"))]
@@ -1464,7 +1473,7 @@ pub struct ArgumentDescription {
 }
 /// Defines the TupleSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:tupleSet")]
+#[sdk(no_prefix, qname = "x14:tupleSet")]
 pub struct TupleSet {
   /// rowCount
   #[sdk(attr(qname = ":rowCount"))]
@@ -1481,7 +1490,7 @@ pub struct TupleSet {
 }
 /// Defines the TupleSetHeaders Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:headers")]
+#[sdk(no_prefix, qname = "x14:headers")]
 pub struct TupleSetHeaders {
   /// Defines the TupleSetHeader Class.
   #[sdk(child(qname = "x14:header"))]
@@ -1489,7 +1498,7 @@ pub struct TupleSetHeaders {
 }
 /// Defines the TupleSetRows Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:rows")]
+#[sdk(no_prefix, qname = "x14:rows")]
 pub struct TupleSetRows {
   /// Defines the TupleSetRow Class.
   #[sdk(child(qname = "x14:row"))]
@@ -1497,7 +1506,7 @@ pub struct TupleSetRows {
 }
 /// Defines the TupleSetHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:header")]
+#[sdk(no_prefix, qname = "x14:header")]
 pub struct TupleSetHeader {
   /// uniqueName
   #[sdk(attr(qname = ":uniqueName"))]
@@ -1508,7 +1517,7 @@ pub struct TupleSetHeader {
 }
 /// Defines the TupleSetRow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:row")]
+#[sdk(no_prefix, qname = "x14:row")]
 pub struct TupleSetRow {
   /// Defines the TupleSetRowItem Class.
   #[sdk(child(qname = "x14:rowItem"))]
@@ -1516,7 +1525,7 @@ pub struct TupleSetRow {
 }
 /// Defines the TupleSetRowItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:rowItem")]
+#[sdk(no_prefix, qname = "x14:rowItem")]
 pub struct TupleSetRowItem {
   /// u
   #[sdk(attr(qname = ":u"))]
@@ -1527,7 +1536,7 @@ pub struct TupleSetRowItem {
 }
 /// Defines the SetLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:setLevel")]
+#[sdk(no_prefix, qname = "x14:setLevel")]
 pub struct SetLevel {
   /// hierarchy
   #[sdk(attr(qname = ":hierarchy"))]
@@ -1535,7 +1544,7 @@ pub struct SetLevel {
 }
 /// Defines the SetLevels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:setLevels")]
+#[sdk(no_prefix, qname = "x14:setLevels")]
 pub struct SetLevels {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -1546,7 +1555,7 @@ pub struct SetLevels {
 }
 /// Defines the ColorScale Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:colorScale")]
+#[sdk(no_prefix, qname = "x14:colorScale")]
 pub struct ColorScale {
   /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(qname = "x14:cfvo"))]
@@ -1557,7 +1566,7 @@ pub struct ColorScale {
 }
 /// Defines the DataBar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:dataBar")]
+#[sdk(no_prefix, qname = "x14:dataBar")]
 pub struct DataBar {
   /// minLength
   #[sdk(attr(qname = ":minLength"))]
@@ -1607,7 +1616,7 @@ pub struct DataBar {
 }
 /// Defines the IconSet Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:iconSet")]
+#[sdk(no_prefix, qname = "x14:iconSet")]
 pub struct IconSet {
   /// iconSet
   #[sdk(attr(qname = ":iconSet"))]
@@ -1633,7 +1642,7 @@ pub struct IconSet {
 }
 /// Defines the DifferentialType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(extra_xmlns("x"), qname = "x14:dxf")]
+#[sdk(no_prefix, extra_xmlns("x"), qname = "x14:dxf")]
 pub struct DifferentialType {
   /// Font Properties
   #[sdk(child(qname = "x:font"))]
@@ -1659,7 +1668,7 @@ pub struct DifferentialType {
 }
 /// Defines the ConditionalFormattingValueObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:cfvo")]
+#[sdk(no_prefix, qname = "x14:cfvo")]
 pub struct ConditionalFormattingValueObject {
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// type
@@ -1677,7 +1686,7 @@ pub struct ConditionalFormattingValueObject {
 }
 /// Defines the ConditionalFormattingIcon Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:cfIcon")]
+#[sdk(no_prefix, qname = "x14:cfIcon")]
 pub struct ConditionalFormattingIcon {
   /// iconSet
   #[sdk(attr(qname = ":iconSet"))]
@@ -1688,7 +1697,7 @@ pub struct ConditionalFormattingIcon {
 }
 /// Defines the PivotEdits Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotEdits")]
+#[sdk(no_prefix, qname = "x14:pivotEdits")]
 pub struct PivotEdits {
   /// Defines the PivotEdit Class.
   #[sdk(child(qname = "x14:pivotEdit"))]
@@ -1696,7 +1705,7 @@ pub struct PivotEdits {
 }
 /// Defines the PivotChanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotChanges")]
+#[sdk(no_prefix, qname = "x14:pivotChanges")]
 pub struct PivotChanges {
   /// Defines the PivotChange Class.
   #[sdk(child(qname = "x14:pivotChange"))]
@@ -1704,7 +1713,7 @@ pub struct PivotChanges {
 }
 /// Defines the ConditionalFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:conditionalFormats")]
+#[sdk(no_prefix, qname = "x14:conditionalFormats")]
 pub struct ConditionalFormats {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -1715,7 +1724,7 @@ pub struct ConditionalFormats {
 }
 /// Defines the CalculatedMembers Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:calculatedMembers")]
+#[sdk(no_prefix, qname = "x14:calculatedMembers")]
 pub struct CalculatedMembers {
   /// Calculated Members Count
   #[sdk(attr(qname = ":count"))]
@@ -1726,7 +1735,7 @@ pub struct CalculatedMembers {
 }
 /// Defines the PivotEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotEdit")]
+#[sdk(no_prefix, qname = "x14:pivotEdit")]
 pub struct PivotEdit {
   /// Defines the PivotUserEdit Class.
   #[sdk(child(qname = "x14:userEdit"))]
@@ -1743,7 +1752,7 @@ pub struct PivotEdit {
 }
 /// Defines the PivotUserEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:userEdit")]
+#[sdk(no_prefix, qname = "x14:userEdit")]
 pub struct PivotUserEdit {
   #[sdk(
         choice(
@@ -1755,7 +1764,7 @@ pub struct PivotUserEdit {
 }
 /// Defines the TupleItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:tupleItems")]
+#[sdk(no_prefix, qname = "x14:tupleItems")]
 pub struct TupleItems {
   /// Defines the Xstring Class.
   #[sdk(text_child(simple_type = "StringValue", qname = "x14:tupleItem"))]
@@ -1763,7 +1772,7 @@ pub struct TupleItems {
 }
 /// Defines the PivotArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotArea")]
+#[sdk(no_prefix, qname = "x14:pivotArea")]
 pub struct PivotArea {
   /// Field Index
   #[sdk(attr(qname = ":field"))]
@@ -1810,7 +1819,7 @@ pub struct PivotArea {
 }
 /// Defines the PivotChange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotChange")]
+#[sdk(no_prefix, qname = "x14:pivotChange")]
 pub struct PivotChange {
   /// allocationMethod
   #[sdk(attr(qname = ":allocationMethod"))]
@@ -1830,7 +1839,7 @@ pub struct PivotChange {
 }
 /// Defines the PivotEditValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:editValue")]
+#[sdk(no_prefix, qname = "x14:editValue")]
 pub struct PivotEditValue {
   /// valueType
   #[sdk(attr(qname = ":valueType"))]
@@ -1842,7 +1851,7 @@ pub struct PivotEditValue {
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the SlicerStyleElements Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerStyleElements")]
+#[sdk(no_prefix, qname = "x14:slicerStyleElements")]
 pub struct SlicerStyleElements {
   /// Defines the SlicerStyleElement Class.
   #[sdk(child(qname = "x14:slicerStyleElement"))]
@@ -1850,7 +1859,7 @@ pub struct SlicerStyleElements {
 }
 /// Defines the DdeValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:values")]
+#[sdk(no_prefix, qname = "x14:values")]
 pub struct DdeValues {
   /// Rows
   #[sdk(attr(qname = ":rows"))]
@@ -1864,7 +1873,7 @@ pub struct DdeValues {
 }
 /// Defines the ConditionalFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:conditionalFormat")]
+#[sdk(no_prefix, qname = "x14:conditionalFormat")]
 pub struct ConditionalFormat {
   /// scope
   #[sdk(attr(qname = ":scope"))]
@@ -1889,7 +1898,7 @@ pub struct ConditionalFormat {
 }
 /// Defines the PivotAreas Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotAreas")]
+#[sdk(no_prefix, qname = "x14:pivotAreas")]
 pub struct PivotAreas {
   /// Pivot Area Count
   #[sdk(attr(qname = ":count"))]
@@ -1900,7 +1909,7 @@ pub struct PivotAreas {
 }
 /// Defines the SlicerStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerStyle")]
+#[sdk(no_prefix, qname = "x14:slicerStyle")]
 pub struct SlicerStyle {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -1911,7 +1920,7 @@ pub struct SlicerStyle {
 }
 /// Defines the SlicerStyleElement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicerStyleElement")]
+#[sdk(no_prefix, qname = "x14:slicerStyleElement")]
 pub struct SlicerStyleElement {
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -1922,7 +1931,7 @@ pub struct SlicerStyleElement {
 }
 /// Defines the IgnoredError Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:ignoredError")]
+#[sdk(no_prefix, qname = "x14:ignoredError")]
 pub struct IgnoredError {
   /// evalError
   #[sdk(attr(qname = ":evalError"))]
@@ -1957,7 +1966,7 @@ pub struct IgnoredError {
 }
 /// Defines the ProtectedRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:protectedRange")]
+#[sdk(no_prefix, qname = "x14:protectedRange")]
 pub struct ProtectedRange {
   /// password
   #[sdk(attr(qname = ":password"))]
@@ -1987,7 +1996,7 @@ pub struct ProtectedRange {
 }
 /// Defines the CustomFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:customFilter")]
+#[sdk(no_prefix, qname = "x14:customFilter")]
 pub struct CustomFilter {
   /// operator
   #[sdk(attr(qname = ":operator"))]
@@ -1998,7 +2007,7 @@ pub struct CustomFilter {
 }
 /// Defines the ListItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:item")]
+#[sdk(no_prefix, qname = "x14:item")]
 pub struct ListItem {
   /// val
   #[sdk(attr(qname = ":val"))]
@@ -2006,7 +2015,7 @@ pub struct ListItem {
 }
 /// Defines the ListItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:itemLst")]
+#[sdk(no_prefix, qname = "x14:itemLst")]
 pub struct ListItems {
   /// Defines the ListItem Class.
   #[sdk(child(qname = "x14:item"))]
@@ -2017,7 +2026,7 @@ pub struct ListItems {
 }
 /// Defines the Slicer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:slicer")]
+#[sdk(no_prefix, qname = "x14:slicer")]
 pub struct Slicer {
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -2055,7 +2064,7 @@ pub struct Slicer {
 }
 /// Defines the OlapSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:olap")]
+#[sdk(no_prefix, qname = "x14:olap")]
 pub struct OlapSlicerCache {
   /// pivotCacheId
   #[sdk(attr(qname = ":pivotCacheId"))]
@@ -2072,7 +2081,7 @@ pub struct OlapSlicerCache {
 }
 /// Defines the TabularSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:tabular")]
+#[sdk(no_prefix, qname = "x14:tabular")]
 pub struct TabularSlicerCache {
   /// pivotCacheId
   #[sdk(attr(qname = ":pivotCacheId"))]
@@ -2098,7 +2107,7 @@ pub struct TabularSlicerCache {
 }
 /// Defines the SlicerCachePivotTable Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotTable")]
+#[sdk(no_prefix, qname = "x14:pivotTable")]
 pub struct SlicerCachePivotTable {
   /// tabId
   #[sdk(attr(qname = ":tabId"))]
@@ -2109,7 +2118,7 @@ pub struct SlicerCachePivotTable {
 }
 /// Defines the OlapSlicerCacheItemParent Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:p")]
+#[sdk(no_prefix, qname = "x14:p")]
 pub struct OlapSlicerCacheItemParent {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2117,7 +2126,7 @@ pub struct OlapSlicerCacheItemParent {
 }
 /// Defines the OlapSlicerCacheItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:i")]
+#[sdk(no_prefix, qname = "x14:i")]
 pub struct OlapSlicerCacheItem {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2134,7 +2143,7 @@ pub struct OlapSlicerCacheItem {
 }
 /// Defines the OlapSlicerCacheRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:range")]
+#[sdk(no_prefix, qname = "x14:range")]
 pub struct OlapSlicerCacheRange {
   /// startItem
   #[sdk(attr(qname = ":startItem"))]
@@ -2145,7 +2154,7 @@ pub struct OlapSlicerCacheRange {
 }
 /// Defines the OlapSlicerCacheRanges Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:ranges")]
+#[sdk(no_prefix, qname = "x14:ranges")]
 pub struct OlapSlicerCacheRanges {
   /// Defines the OlapSlicerCacheRange Class.
   #[sdk(child(qname = "x14:range"))]
@@ -2153,7 +2162,7 @@ pub struct OlapSlicerCacheRanges {
 }
 /// Defines the OlapSlicerCacheLevelData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:level")]
+#[sdk(no_prefix, qname = "x14:level")]
 pub struct OlapSlicerCacheLevelData {
   /// uniqueName
   #[sdk(attr(qname = ":uniqueName"))]
@@ -2176,7 +2185,7 @@ pub struct OlapSlicerCacheLevelData {
 }
 /// Defines the OlapSlicerCacheLevelsData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:levels")]
+#[sdk(no_prefix, qname = "x14:levels")]
 pub struct OlapSlicerCacheLevelsData {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2187,7 +2196,7 @@ pub struct OlapSlicerCacheLevelsData {
 }
 /// Defines the OlapSlicerCacheSelections Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:selections")]
+#[sdk(no_prefix, qname = "x14:selections")]
 pub struct OlapSlicerCacheSelections {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2198,7 +2207,7 @@ pub struct OlapSlicerCacheSelections {
 }
 /// Defines the OlapSlicerCacheSelection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:selection")]
+#[sdk(no_prefix, qname = "x14:selection")]
 pub struct OlapSlicerCacheSelection {
   /// n
   #[sdk(attr(qname = ":n"))]
@@ -2209,7 +2218,7 @@ pub struct OlapSlicerCacheSelection {
 }
 /// Defines the TabularSlicerCacheItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:items")]
+#[sdk(no_prefix, qname = "x14:items")]
 pub struct TabularSlicerCacheItems {
   /// count
   #[sdk(attr(qname = ":count"))]
@@ -2220,7 +2229,7 @@ pub struct TabularSlicerCacheItems {
 }
 /// Defines the TabularSlicerCacheItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:i")]
+#[sdk(no_prefix, qname = "x14:i")]
 pub struct TabularSlicerCacheItem {
   /// x
   #[sdk(attr(qname = ":x"))]
@@ -2234,7 +2243,7 @@ pub struct TabularSlicerCacheItem {
 }
 /// Defines the SlicerCachePivotTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:pivotTables")]
+#[sdk(no_prefix, qname = "x14:pivotTables")]
 pub struct SlicerCachePivotTables {
   /// Defines the SlicerCachePivotTable Class.
   #[sdk(child(qname = "x14:pivotTable"))]
@@ -2242,7 +2251,7 @@ pub struct SlicerCachePivotTables {
 }
 /// Defines the SlicerCacheData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:data")]
+#[sdk(no_prefix, qname = "x14:data")]
 pub struct SlicerCacheData {
   #[sdk(
         choice(
@@ -2254,7 +2263,7 @@ pub struct SlicerCacheData {
 }
 /// Defines the SlicerCacheDefinitionExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:extLst")]
+#[sdk(no_prefix, qname = "x14:extLst")]
 pub struct SlicerCacheDefinitionExtensionList {
   /// Defines the SlicerCacheDefinitionExtension Class.
   #[sdk(child(qname = "x:ext"))]

@@ -12,8 +12,8 @@ pub struct Types {
   pub xml_header: crate::common::XmlHeaderType,
   #[sdk(
         choice(
-            child(variant = Default, no_prefix, qname = "pct:Default"),
-            child(variant = Override, no_prefix, qname = "pct:Override")
+            child(variant = Default, qname = "pct:Default"),
+            child(variant = Override, qname = "pct:Override")
         )
     )]
   pub types_choice: Vec<TypesChoice>,

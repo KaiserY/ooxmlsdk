@@ -70,11 +70,11 @@ pub enum RichFormatPropertyType {
 pub struct RichFilterColumn {
   #[sdk(
         choice(
-            child(variant = RichFilters, no_prefix, qname = "xlrd2:filters"),
-            child(variant = RichTop10, no_prefix, qname = "xlrd2:top10"),
-            child(variant = CustomRichFilters, no_prefix, qname = "xlrd2:customFilters"),
-            child(variant = DynamicRichFilter, no_prefix, qname = "xlrd2:dynamicFilter"),
-            child(variant = ExtensionList, no_prefix, qname = "xlrd2:extLst")
+            child(variant = RichFilters, qname = "xlrd2:filters"),
+            child(variant = RichTop10, qname = "xlrd2:top10"),
+            child(variant = CustomRichFilters, qname = "xlrd2:customFilters"),
+            child(variant = DynamicRichFilter, qname = "xlrd2:dynamicFilter"),
+            child(variant = ExtensionList, qname = "xlrd2:extLst")
         )
     )]
   pub rich_filter_column_choice: Option<RichFilterColumnChoice>,
@@ -115,10 +115,10 @@ pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the SupportingPropertyBagArrayData Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:spbArrays"))]
+  #[sdk(child(qname = "xlrd2:spbArrays"))]
   pub supporting_property_bag_array_data: Option<std::boxed::Box<SupportingPropertyBagArrayData>>,
   /// Defines the SupportingPropertyBagData Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:spbData"))]
+  #[sdk(child(qname = "xlrd2:spbData"))]
   pub supporting_property_bag_data: std::boxed::Box<SupportingPropertyBagData>,
 }
 /// Defines the SupportingPropertyBagStructures Class.
@@ -131,10 +131,10 @@ pub struct SupportingPropertyBagStructures {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagStructure Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:s"))]
+  #[sdk(child(qname = "xlrd2:s"))]
   pub supporting_property_bag_structure: Vec<SupportingPropertyBagStructure>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ArrayData Class.
@@ -147,10 +147,10 @@ pub struct ArrayData {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the Array Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:a"))]
+  #[sdk(child(qname = "xlrd2:a"))]
   pub array: Vec<Array>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichStylesheet Class.
@@ -160,16 +160,16 @@ pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Defines the Dxfs Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:dxfs"))]
+  #[sdk(child(qname = "xlrd2:dxfs"))]
   pub dxfs: Option<Dxfs>,
   /// Defines the RichFormatProperties Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:richProperties"))]
+  #[sdk(child(qname = "xlrd2:richProperties"))]
   pub rich_format_properties: Option<RichFormatProperties>,
   /// Defines the RichStyles Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:richStyles"))]
+  #[sdk(child(qname = "xlrd2:richStyles"))]
   pub rich_styles: Option<RichStyles>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueTypesInfo Class.
@@ -180,13 +180,13 @@ pub struct RichValueTypesInfo {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the RichValueGlobalType Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:global"))]
+  #[sdk(child(qname = "xlrd2:global"))]
   pub rich_value_global_type: Option<std::boxed::Box<RichValueGlobalType>>,
   /// Defines the RichValueTypes Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:types"))]
+  #[sdk(child(qname = "xlrd2:types"))]
   pub rich_value_types: Option<RichValueTypes>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichFilters Class.
@@ -194,13 +194,13 @@ pub struct RichValueTypesInfo {
 #[sdk(no_prefix, qname = "xlrd2:filters")]
 pub struct RichFilters {
   /// Defines the RichFilter Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:filter"))]
+  #[sdk(child(qname = "xlrd2:filter"))]
   pub rich_filter: Vec<RichFilter>,
   /// Defines the RichDateGroupItem Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:dateGroupItem"))]
+  #[sdk(child(qname = "xlrd2:dateGroupItem"))]
   pub rich_date_group_item: Vec<RichDateGroupItem>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichTop10 Class.
@@ -232,8 +232,8 @@ pub struct CustomRichFilters {
   pub and: Option<crate::simple_type::BooleanValue>,
   #[sdk(
         choice(
-            child(variant = CustomRichFilter, no_prefix, qname = "xlrd2:customFilter"),
-            child(variant = ExtensionList, no_prefix, qname = "xlrd2:extLst")
+            child(variant = CustomRichFilter, qname = "xlrd2:customFilter"),
+            child(variant = ExtensionList, qname = "xlrd2:extLst")
         )
     )]
   pub custom_rich_filters_choice: Vec<CustomRichFiltersChoice>,
@@ -337,10 +337,10 @@ pub struct SupportingPropertyBagArrayData {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagArray Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:a"))]
+  #[sdk(child(qname = "xlrd2:a"))]
   pub supporting_property_bag_array: Vec<SupportingPropertyBagArray>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SupportingPropertyBagData Class.
@@ -351,10 +351,10 @@ pub struct SupportingPropertyBagData {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBag Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:spb"))]
+  #[sdk(child(qname = "xlrd2:spb"))]
   pub supporting_property_bag: Vec<SupportingPropertyBag>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SupportingPropertyBag Class.
@@ -365,7 +365,7 @@ pub struct SupportingPropertyBag {
   #[sdk(attr(qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagValue Class.
-  #[sdk(text_child(simple_type = "StringValue", no_prefix, qname = "xlrd2:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xlrd2:v"))]
   pub supporting_property_bag_value: Vec<SupportingPropertyBagValue>,
 }
 /// Defines the SupportingPropertyBagValue Class.
@@ -375,7 +375,7 @@ pub type SupportingPropertyBagValue = crate::simple_type::StringValue;
 #[sdk(no_prefix, qname = "xlrd2:s")]
 pub struct SupportingPropertyBagStructure {
   /// Defines the SupportingPropertyBagKey Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:k"))]
+  #[sdk(child(qname = "xlrd2:k"))]
   pub supporting_property_bag_key: Vec<SupportingPropertyBagKey>,
 }
 /// Defines the SupportingPropertyBagKey Class.
@@ -397,7 +397,7 @@ pub struct SupportingPropertyBagArray {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagArrayValue Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:v"))]
+  #[sdk(child(qname = "xlrd2:v"))]
   pub supporting_property_bag_array_value: Vec<SupportingPropertyBagArrayValue>,
 }
 /// Defines the SupportingPropertyBagArrayValue Class.
@@ -421,7 +421,7 @@ pub struct Array {
   #[sdk(attr(qname = ":c"))]
   pub c: Option<crate::simple_type::UInt32Value>,
   /// Defines the ArrayValue Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:v"))]
+  #[sdk(child(qname = "xlrd2:v"))]
   pub array_value: Vec<ArrayValue>,
 }
 /// Defines the ArrayValue Class.
@@ -450,7 +450,7 @@ pub struct Dxfs {
 #[sdk(no_prefix, qname = "xlrd2:richProperties")]
 pub struct RichFormatProperties {
   /// Defines the RichFormatProperty Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:rPr"))]
+  #[sdk(child(qname = "xlrd2:rPr"))]
   pub rich_format_property: Vec<RichFormatProperty>,
 }
 /// Defines the RichStyles Class.
@@ -458,7 +458,7 @@ pub struct RichFormatProperties {
 #[sdk(no_prefix, qname = "xlrd2:richStyles")]
 pub struct RichStyles {
   /// Defines the RichStyle Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:rSty"))]
+  #[sdk(child(qname = "xlrd2:rSty"))]
   pub rich_style: Vec<RichStyle>,
 }
 /// Defines the RichFormatProperty Class.
@@ -480,7 +480,7 @@ pub struct RichStyle {
   #[sdk(attr(qname = ":dxfid"))]
   pub dxfid: Option<crate::simple_type::UInt32Value>,
   /// Defines the RichStylePropertyValue Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:rpv"))]
+  #[sdk(child(qname = "xlrd2:rpv"))]
   pub rich_style_property_value: Vec<RichStylePropertyValue>,
 }
 /// Defines the RichStylePropertyValue Class.
@@ -498,10 +498,10 @@ pub struct RichStylePropertyValue {
 #[sdk(no_prefix, qname = "xlrd2:global")]
 pub struct RichValueGlobalType {
   /// Defines the RichValueTypeKeyFlags Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:keyFlags"))]
+  #[sdk(child(qname = "xlrd2:keyFlags"))]
   pub rich_value_type_key_flags: Option<RichValueTypeKeyFlags>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueTypes Class.
@@ -509,7 +509,7 @@ pub struct RichValueGlobalType {
 #[sdk(no_prefix, qname = "xlrd2:types")]
 pub struct RichValueTypes {
   /// Defines the RichValueType Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:type"))]
+  #[sdk(child(qname = "xlrd2:type"))]
   pub rich_value_type: Vec<RichValueType>,
 }
 /// Defines the RichValueType Class.
@@ -520,10 +520,10 @@ pub struct RichValueType {
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// Defines the RichValueTypeKeyFlags Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:keyFlags"))]
+  #[sdk(child(qname = "xlrd2:keyFlags"))]
   pub rich_value_type_key_flags: Option<RichValueTypeKeyFlags>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:extLst"))]
+  #[sdk(child(qname = "xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueTypeKeyFlags Class.
@@ -531,7 +531,7 @@ pub struct RichValueType {
 #[sdk(no_prefix, qname = "xlrd2:keyFlags")]
 pub struct RichValueTypeKeyFlags {
   /// Defines the RichValueTypeReservedKey Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:key"))]
+  #[sdk(child(qname = "xlrd2:key"))]
   pub rich_value_type_reserved_key: Vec<RichValueTypeReservedKey>,
 }
 /// Defines the RichValueTypeReservedKey Class.
@@ -542,7 +542,7 @@ pub struct RichValueTypeReservedKey {
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// Defines the RichValueTypeReservedKeyFlag Class.
-  #[sdk(child(no_prefix, qname = "xlrd2:flag"))]
+  #[sdk(child(qname = "xlrd2:flag"))]
   pub rich_value_type_reserved_key_flag: Vec<RichValueTypeReservedKeyFlag>,
 }
 /// Defines the RichValueTypeReservedKeyFlag Class.

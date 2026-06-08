@@ -58,6 +58,14 @@ fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
   Some(local_name)
 }
 
+fn child_uses_parent_default_namespace(
+  qname: &str,
+  parent_tag_prefix: &str,
+  parent_no_prefix: bool,
+) -> bool {
+  parent_no_prefix && parse_qname_info(qname).tag_prefix == parent_tag_prefix
+}
+
 fn extra_xmlns_ident(prefix: &str) -> Ident {
   let mut ident = String::from("has_extra_xmlns");
   for byte in prefix.bytes() {
@@ -417,17 +425,11 @@ fn stack_parser_choice_write_step_tokens(
     let choice_ty = unwrap_option_vec_type(&field.ty);
     let mut arms = Vec::new();
     for item in &field.items {
-      let SdkTypeChoiceItem::Child {
-        variant,
-        ty,
-        qname,
-        no_prefix,
-      } = item
-      else {
+      let SdkTypeChoiceItem::Child { variant, ty, qname } = item else {
         continue;
       };
-      let start_tag_open = write_start_tag_open_tokens(qname, *no_prefix);
-      let end_tag = write_end_tag_tokens(qname, *no_prefix);
+      let start_tag_open = write_start_tag_open_tokens(qname, false);
+      let end_tag = write_end_tag_tokens(qname, false);
       let body = if let Some(task_tokens) =
         recursive_table_write_task_tokens(ident, &field.ident, variant)
       {
@@ -1240,10 +1242,11 @@ fn write_typed_child_tokens(
   child_ty: &syn::Type,
   value: proc_macro2::TokenStream,
   qname: &str,
-  no_prefix: bool,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
 ) -> proc_macro2::TokenStream {
-  let child_no_prefix = no_prefix && parent_no_prefix;
+  let child_no_prefix =
+    child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
   let start_tag_open = write_start_tag_open_tokens(qname, child_no_prefix);
   let end_tag = write_end_tag_tokens(qname, child_no_prefix);
   let write_inner_call = if child_no_prefix {
@@ -1286,6 +1289,7 @@ fn write_text_value_content_tokens(
 fn choice_sequence_child_write_tokens(
   child: &SdkTypeChoiceSequenceChild,
   value_expr: proc_macro2::TokenStream,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let Some(field_ty) = child.ty.as_ref() else {
@@ -1299,21 +1303,20 @@ fn choice_sequence_child_write_tokens(
   let payload_ty = unwrap_option_vec_type(field_ty);
   let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
   let qname = &child.qname;
-  let no_prefix = child.no_prefix;
   let tokens = match child.kind {
     SdkTypeChoiceSequenceChildKind::Child => {
       let child_write = write_typed_child_tokens(
         &child_ty,
         quote! { child },
         qname,
-        no_prefix,
+        parent_tag_prefix,
         parent_no_prefix,
       );
       let value_write = write_typed_child_tokens(
         &child_ty,
         value_expr.clone(),
         qname,
-        no_prefix,
+        parent_tag_prefix,
         parent_no_prefix,
       );
       if repeated {
@@ -1333,7 +1336,8 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::EmptyChild => {
-      let child_no_prefix = no_prefix && parent_no_prefix;
+      let child_no_prefix =
+        child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
       let empty_tag = write_empty_tag_tokens(qname, child_no_prefix);
       let write_empty = quote! {
         #empty_tag
@@ -1355,7 +1359,8 @@ fn choice_sequence_child_write_tokens(
       }
     }
     SdkTypeChoiceSequenceChildKind::TextChild => {
-      let child_no_prefix = no_prefix && parent_no_prefix;
+      let child_no_prefix =
+        child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
       let start_tag = write_start_tag_tokens(qname, child_no_prefix);
       let end_tag = write_end_tag_tokens(qname, child_no_prefix);
       let write_value = |expr: proc_macro2::TokenStream| {
@@ -1388,7 +1393,7 @@ fn choice_sequence_child_write_tokens(
     SdkTypeChoiceSequenceChildKind::AnyChild => build_any_child_write_tokens_for_value(
       value_expr,
       qname,
-      no_prefix,
+      parent_tag_prefix,
       parent_no_prefix,
       repeated,
       optional,
@@ -1403,19 +1408,16 @@ fn build_choice_write_tokens(
   field_ident: &Ident,
   repeated: bool,
   optional: bool,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
 ) -> syn::Result<proc_macro2::TokenStream> {
   let mut arms = Vec::new();
   for item in items {
     match item {
-      SdkTypeChoiceItem::Child {
-        variant,
-        ty,
-        qname,
-        no_prefix,
-      } => {
+      SdkTypeChoiceItem::Child { variant, ty, qname } => {
         let _ = ty;
-        let child_no_prefix = *no_prefix && parent_no_prefix;
+        let child_no_prefix =
+          child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let start_tag_open = write_start_tag_open_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let write_inner_call = if child_no_prefix {
@@ -1432,12 +1434,9 @@ fn build_choice_write_tokens(
           }
         });
       }
-      SdkTypeChoiceItem::EmptyChild {
-        variant,
-        qname,
-        no_prefix,
-      } => {
-        let child_no_prefix = *no_prefix && parent_no_prefix;
+      SdkTypeChoiceItem::EmptyChild { variant, qname } => {
+        let child_no_prefix =
+          child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let empty_tag = write_empty_tag_tokens(qname, child_no_prefix);
         arms.push(quote! {
           #choice_ty::#variant => {
@@ -1450,9 +1449,9 @@ fn build_choice_write_tokens(
         ty,
         simple_type,
         qname,
-        no_prefix,
       } => {
-        let child_no_prefix = *no_prefix && parent_no_prefix;
+        let child_no_prefix =
+          child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let start_tag = write_start_tag_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         let content = if let Some(payload_ty) = ty.clone().or_else(|| {
@@ -1479,12 +1478,9 @@ fn build_choice_write_tokens(
           }
         });
       }
-      SdkTypeChoiceItem::AnyChild {
-        variant,
-        qname,
-        no_prefix,
-      } => {
-        let child_no_prefix = *no_prefix && parent_no_prefix;
+      SdkTypeChoiceItem::AnyChild { variant, qname } => {
+        let child_no_prefix =
+          child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
         let start_tag = write_start_tag_tokens(qname, child_no_prefix);
         let end_tag = write_end_tag_tokens(qname, child_no_prefix);
         arms.push(quote! {
@@ -1507,7 +1503,12 @@ fn build_choice_write_tokens(
             .iter()
             .map(|child| {
               let field = child.field.as_ref().expect("sequence field");
-              choice_sequence_child_write_tokens(child, quote! { #field }, parent_no_prefix)
+              choice_sequence_child_write_tokens(
+                child,
+                quote! { #field },
+                parent_tag_prefix,
+                parent_no_prefix,
+              )
             })
             .collect::<syn::Result<Vec<_>>>()?;
           arms.push(quote! {
@@ -1518,7 +1519,6 @@ fn build_choice_write_tokens(
         } else if children.len() == 1 {
           let child = &children[0];
           let qname = &child.qname;
-          let no_prefix = child.no_prefix;
           let payload_ty = child.ty.as_ref().map(unwrap_option_vec_type);
           let value_expr = quote! { value.as_ref() };
           let write_tokens = match child.kind {
@@ -1531,12 +1531,19 @@ fn build_choice_write_tokens(
                     .clone()
                     .unwrap_or_else(|| syn::parse_quote! { _ })
                 });
-              write_typed_child_tokens(&child_ty, value_expr, qname, no_prefix, parent_no_prefix)
+              write_typed_child_tokens(
+                &child_ty,
+                value_expr,
+                qname,
+                parent_tag_prefix,
+                parent_no_prefix,
+              )
             }
             SdkTypeChoiceSequenceChildKind::TextChild => {
               let payload_ty = payload_ty.unwrap_or_else(|| syn::parse_quote! { _ });
               let child_ty = box_inner_type(&payload_ty).unwrap_or(payload_ty);
-              let child_no_prefix = no_prefix && parent_no_prefix;
+              let child_no_prefix =
+                child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
               let start_tag = write_start_tag_tokens(qname, child_no_prefix);
               let end_tag = write_end_tag_tokens(qname, child_no_prefix);
               let content = write_text_value_content_tokens(
@@ -1554,13 +1561,14 @@ fn build_choice_write_tokens(
             SdkTypeChoiceSequenceChildKind::AnyChild => build_any_child_write_tokens_for_value(
               value_expr,
               qname,
-              no_prefix,
+              parent_tag_prefix,
               parent_no_prefix,
               false,
               false,
             ),
             SdkTypeChoiceSequenceChildKind::EmptyChild => {
-              let child_no_prefix = no_prefix && parent_no_prefix;
+              let child_no_prefix =
+                child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
               write_empty_tag_tokens(qname, child_no_prefix)
             }
           };
@@ -2946,7 +2954,7 @@ fn build_text_child_parse_arm(
 
 struct TextChildWriteSpec<'a> {
   qname: &'a str,
-  no_prefix: bool,
+  parent_tag_prefix: &'a str,
   parent_no_prefix: bool,
   simple_type: Option<&'a str>,
   repeated: bool,
@@ -2961,7 +2969,7 @@ fn build_text_child_write_tokens(
 ) -> proc_macro2::TokenStream {
   let TextChildWriteSpec {
     qname,
-    no_prefix,
+    parent_tag_prefix,
     parent_no_prefix,
     simple_type,
     repeated,
@@ -2974,7 +2982,8 @@ fn build_text_child_write_tokens(
     unwrap_wrapped_type(field_ty)
   };
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-    let child_no_prefix = no_prefix && parent_no_prefix;
+    let child_no_prefix =
+      child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
     let start_tag = write_start_tag_tokens(qname, child_no_prefix);
     let end_tag = write_end_tag_tokens(qname, child_no_prefix);
     let value_write_tokens = if list {
@@ -3029,12 +3038,13 @@ fn build_text_child_write_tokens(
 fn build_empty_child_write_tokens(
   field_ident: &Ident,
   qname: &str,
-  no_prefix: bool,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let child_no_prefix = no_prefix && parent_no_prefix;
+  let child_no_prefix =
+    child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
   let empty_tag = write_empty_tag_tokens(qname, child_no_prefix);
   let write_tokens = quote! {
     #empty_tag
@@ -3165,7 +3175,7 @@ fn build_any_child_parse_arm(
 fn build_any_child_write_tokens(
   field_ident: &Ident,
   qname: &str,
-  no_prefix: bool,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
   repeated: bool,
   optional: bool,
@@ -3173,7 +3183,7 @@ fn build_any_child_write_tokens(
   build_any_child_write_tokens_for_value(
     quote! { &self.#field_ident },
     qname,
-    no_prefix,
+    parent_tag_prefix,
     parent_no_prefix,
     repeated,
     optional,
@@ -3183,12 +3193,13 @@ fn build_any_child_write_tokens(
 fn build_any_child_write_tokens_for_value(
   value_expr: proc_macro2::TokenStream,
   qname: &str,
-  no_prefix: bool,
+  parent_tag_prefix: &str,
   parent_no_prefix: bool,
   repeated: bool,
   optional: bool,
 ) -> proc_macro2::TokenStream {
-  let child_no_prefix = no_prefix && parent_no_prefix;
+  let child_no_prefix =
+    child_uses_parent_default_namespace(qname, parent_tag_prefix, parent_no_prefix);
   let start_tag = write_start_tag_tokens(qname, child_no_prefix);
   let end_tag = write_end_tag_tokens(qname, child_no_prefix);
   let write_value_tokens = quote! {
@@ -3412,46 +3423,35 @@ fn expand_helper_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
     match parsed_attrs.kind {
-      Some(SdkTypeFieldKind::Child {
-        qname, no_prefix, ..
-      }) => child_fields.push(SdkChildField {
+      Some(SdkTypeFieldKind::Child { qname }) => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::EmptyChild {
-        qname, no_prefix, ..
-      }) => empty_child_fields.push(SdkEmptyChildField {
+      Some(SdkTypeFieldKind::EmptyChild { qname }) => empty_child_fields.push(SdkEmptyChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
       Some(SdkTypeFieldKind::TextChild {
         qname,
-        no_prefix,
         simple_type,
         list,
       }) => text_child_fields.push(SdkTextChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         simple_type,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: !list && contains_vec_type(&field.ty),
         list,
       }),
-      Some(SdkTypeFieldKind::AnyChild {
-        qname, no_prefix, ..
-      }) => any_child_fields.push(SdkAnyChildField {
+      Some(SdkTypeFieldKind::AnyChild { qname }) => any_child_fields.push(SdkAnyChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
@@ -3562,13 +3562,8 @@ fn expand_helper_struct(
     child_init_tokens.push(init_tokens);
 
     if field.repeated {
-      let child_write_call = write_typed_child_tokens(
-        &child_ty,
-        quote! { child },
-        &field.qname,
-        field.no_prefix,
-        false,
-      );
+      let child_write_call =
+        write_typed_child_tokens(&child_ty, quote! { child }, &field.qname, "", false);
       child_write_tokens.push(quote! {
         for child in &self.#field_ident {
           #child_write_call
@@ -3581,13 +3576,8 @@ fn expand_helper_struct(
       });
     } else {
       if field.optional {
-        let child_write_call = write_typed_child_tokens(
-          &child_ty,
-          quote! { child },
-          &field.qname,
-          field.no_prefix,
-          false,
-        );
+        let child_write_call =
+          write_typed_child_tokens(&child_ty, quote! { child }, &field.qname, "", false);
         child_write_tokens.push(quote! {
           if let Some(child) = &self.#field_ident {
             #child_write_call
@@ -3603,7 +3593,7 @@ fn expand_helper_struct(
           &child_ty,
           quote! { &self.#field_ident },
           &field.qname,
-          field.no_prefix,
+          "",
           false,
         );
         child_write_tokens.push(quote! {
@@ -3639,6 +3629,7 @@ fn expand_helper_struct(
         field_ident,
         true,
         false,
+        "",
         false,
       )?);
       choice_validate_tokens.push(build_choice_validate_tokens(
@@ -3656,6 +3647,7 @@ fn expand_helper_struct(
           field_ident,
           false,
           true,
+          "",
           false,
         )?);
         choice_validate_tokens.push(build_choice_validate_tokens(
@@ -3672,6 +3664,7 @@ fn expand_helper_struct(
           field_ident,
           false,
           false,
+          "",
           false,
         )?);
         choice_validate_tokens.push(build_choice_validate_tokens(
@@ -3696,7 +3689,7 @@ fn expand_helper_struct(
       &field.ty,
       TextChildWriteSpec {
         qname: &field.qname,
-        no_prefix: field.no_prefix,
+        parent_tag_prefix: "",
         parent_no_prefix: false,
         simple_type: field.simple_type.as_deref(),
         repeated: field.repeated,
@@ -3747,7 +3740,7 @@ fn expand_helper_struct(
     child_write_tokens.push(build_any_child_write_tokens(
       field_ident,
       &field.qname,
-      field.no_prefix,
+      "",
       false,
       field.repeated,
       field.optional,
@@ -3862,22 +3855,15 @@ fn expand_helper_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
     match parsed_attrs.kind {
-      Some(SdkTypeFieldKind::Child {
-        qname, no_prefix, ..
-      }) => {
+      Some(SdkTypeFieldKind::Child { qname, .. }) => {
         let repeated = contains_vec_type(&field.ty);
         let optional = is_option_type(&field.ty);
         let payload_ty = unwrap_option_vec_type(&field.ty);
         let child_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
         let child_write_call =
-          write_typed_child_tokens(&child_ty, quote! { child }, &qname, no_prefix, false);
-        let self_write_call = write_typed_child_tokens(
-          &child_ty,
-          quote! { &self.#field_ident },
-          &qname,
-          no_prefix,
-          false,
-        );
+          write_typed_child_tokens(&child_ty, quote! { child }, &qname, "", false);
+        let self_write_call =
+          write_typed_child_tokens(&child_ty, quote! { &self.#field_ident }, &qname, "", false);
         if repeated {
           ordered_write_tokens.push(quote! {
             for child in &self.#field_ident {
@@ -3898,9 +3884,9 @@ fn expand_helper_struct(
       }
       Some(SdkTypeFieldKind::TextChild {
         qname,
-        no_prefix,
         simple_type,
         list,
+        ..
       }) => {
         let repeated = !list && contains_vec_type(&field.ty);
         ordered_write_tokens.push(build_text_child_write_tokens(
@@ -3908,7 +3894,7 @@ fn expand_helper_struct(
           &field.ty,
           TextChildWriteSpec {
             qname: &qname,
-            no_prefix,
+            parent_tag_prefix: "",
             parent_no_prefix: false,
             simple_type: simple_type.as_deref(),
             repeated,
@@ -3917,21 +3903,21 @@ fn expand_helper_struct(
           },
         ));
       }
-      Some(SdkTypeFieldKind::AnyChild { qname, no_prefix }) => {
+      Some(SdkTypeFieldKind::AnyChild { qname, .. }) => {
         ordered_write_tokens.push(build_any_child_write_tokens(
           field_ident,
           &qname,
-          no_prefix,
+          "",
           false,
           contains_vec_type(&field.ty),
           is_option_type(&field.ty),
         ));
       }
-      Some(SdkTypeFieldKind::EmptyChild { qname, no_prefix }) => {
+      Some(SdkTypeFieldKind::EmptyChild { qname, .. }) => {
         ordered_write_tokens.push(build_empty_child_write_tokens(
           field_ident,
           &qname,
-          no_prefix,
+          "",
           false,
           contains_vec_type(&field.ty),
           is_option_type(&field.ty),
@@ -3945,6 +3931,7 @@ fn expand_helper_struct(
           field_ident,
           contains_vec_type(&field.ty),
           is_option_type(&field.ty),
+          "",
           false,
         )?);
       }
@@ -4236,42 +4223,35 @@ fn expand_named_struct(
         empty_as_none,
         validators: parsed_attrs.validators,
       }),
-      SdkTypeFieldKind::Child { qname, no_prefix } => child_fields.push(SdkChildField {
+      SdkTypeFieldKind::Child { qname } => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      SdkTypeFieldKind::EmptyChild { qname, no_prefix } => {
-        empty_child_fields.push(SdkEmptyChildField {
-          ident: field_ident.clone(),
-          qname,
-          no_prefix,
-          optional: is_option_type(&field.ty),
-          repeated: contains_vec_type(&field.ty),
-        })
-      }
+      SdkTypeFieldKind::EmptyChild { qname } => empty_child_fields.push(SdkEmptyChildField {
+        ident: field_ident.clone(),
+        qname,
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
       SdkTypeFieldKind::TextChild {
         qname,
-        no_prefix,
         simple_type,
         list,
       } => text_child_fields.push(SdkTextChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         simple_type,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: !list && contains_vec_type(&field.ty),
         list,
       }),
-      SdkTypeFieldKind::AnyChild { qname, no_prefix } => any_child_fields.push(SdkAnyChildField {
+      SdkTypeFieldKind::AnyChild { qname } => any_child_fields.push(SdkAnyChildField {
         ident: field_ident.clone(),
         qname,
-        no_prefix,
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
@@ -4815,18 +4795,13 @@ fn expand_named_struct(
         quote! { #tag_qname_lit }
       }
     };
-    let child_write_call = write_typed_child_tokens(
-      &child_ty,
-      quote! { child },
-      &field.qname,
-      field.no_prefix,
-      false,
-    );
+    let child_write_call =
+      write_typed_child_tokens(&child_ty, quote! { child }, &field.qname, "", false);
     let self_write_call = write_typed_child_tokens(
       &child_ty,
       quote! { &self.#field_ident },
       &field.qname,
-      field.no_prefix,
+      "",
       false,
     );
     let build_match = |mode: DeserializeMode| {
@@ -4940,7 +4915,7 @@ fn expand_named_struct(
     child_write_tokens.push(build_empty_child_write_tokens(
       field_ident,
       &field.qname,
-      field.no_prefix,
+      "",
       false,
       field.repeated,
       field.optional,
@@ -4968,7 +4943,7 @@ fn expand_named_struct(
       &field.ty,
       TextChildWriteSpec {
         qname: &field.qname,
-        no_prefix: field.no_prefix,
+        parent_tag_prefix: "",
         parent_no_prefix: false,
         simple_type: field.simple_type.as_deref(),
         repeated: field.repeated,
@@ -5024,7 +4999,7 @@ fn expand_named_struct(
     child_write_tokens.push(build_any_child_write_tokens(
       field_ident,
       &field.qname,
-      field.no_prefix,
+      "",
       false,
       field.repeated,
       field.optional,
@@ -6203,6 +6178,7 @@ fn expand_named_struct(
         field_ident,
         true,
         false,
+        "",
         false,
       )?);
       choice_validate_tokens.push(build_choice_validate_tokens(
@@ -6221,6 +6197,7 @@ fn expand_named_struct(
           field_ident,
           false,
           true,
+          "",
           false,
         )?);
         choice_validate_tokens.push(build_choice_validate_tokens(
@@ -6237,6 +6214,7 @@ fn expand_named_struct(
           field_ident,
           false,
           false,
+          "",
           false,
         )?);
         choice_validate_tokens.push(build_choice_validate_tokens(
@@ -6702,9 +6680,7 @@ fn expand_named_struct(
           });
         }
         match field_kind {
-          SdkTypeFieldKind::Child {
-            qname, no_prefix, ..
-          } => {
+          SdkTypeFieldKind::Child { qname, .. } => {
             let repeated = contains_vec_type(field_ty);
             let optional = is_option_type(field_ty);
             let payload_ty = unwrap_option_vec_type(field_ty);
@@ -6713,14 +6689,14 @@ fn expand_named_struct(
               &child_ty,
               quote! { child },
               qname,
-              *no_prefix,
+              &tag_prefix,
               parent_no_prefix,
             );
             let self_write_call = write_typed_child_tokens(
               &child_ty,
               quote! { &self.#field_ident },
               qname,
-              *no_prefix,
+              &tag_prefix,
               parent_no_prefix,
             );
             if repeated {
@@ -6743,9 +6719,9 @@ fn expand_named_struct(
           }
           SdkTypeFieldKind::TextChild {
             qname,
-            no_prefix,
             simple_type,
             list,
+            ..
           } => {
             let repeated = !list && contains_vec_type(field_ty);
             ordered_write_tokens.push(build_text_child_write_tokens(
@@ -6753,7 +6729,7 @@ fn expand_named_struct(
               field_ty,
               TextChildWriteSpec {
                 qname,
-                no_prefix: *no_prefix,
+                parent_tag_prefix: &tag_prefix,
                 parent_no_prefix,
                 simple_type: simple_type.as_deref(),
                 repeated,
@@ -6762,21 +6738,21 @@ fn expand_named_struct(
               },
             ));
           }
-          SdkTypeFieldKind::AnyChild { qname, no_prefix } => {
+          SdkTypeFieldKind::AnyChild { qname, .. } => {
             ordered_write_tokens.push(build_any_child_write_tokens(
               field_ident,
               qname,
-              *no_prefix,
+              &tag_prefix,
               parent_no_prefix,
               contains_vec_type(field_ty),
               is_option_type(field_ty),
             ));
           }
-          SdkTypeFieldKind::EmptyChild { qname, no_prefix } => {
+          SdkTypeFieldKind::EmptyChild { qname, .. } => {
             ordered_write_tokens.push(build_empty_child_write_tokens(
               field_ident,
               qname,
-              *no_prefix,
+              &tag_prefix,
               parent_no_prefix,
               contains_vec_type(field_ty),
               is_option_type(field_ty),
@@ -6792,6 +6768,7 @@ fn expand_named_struct(
               field_ident,
               repeated,
               optional,
+              &tag_prefix,
               parent_no_prefix,
             )?);
           }

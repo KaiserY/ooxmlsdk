@@ -11,7 +11,7 @@ pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub xml_header: crate::common::XmlHeaderType,
   /// Custom File Property.
-  #[sdk(child(no_prefix, qname = "op:property"))]
+  #[sdk(child(qname = "op:property"))]
   pub custom_document_property: Vec<CustomDocumentProperty>,
 }
 /// Custom File Property.

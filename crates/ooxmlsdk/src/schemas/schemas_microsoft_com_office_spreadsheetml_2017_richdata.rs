@@ -54,10 +54,10 @@ pub struct RichValueData {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValue Class.
-  #[sdk(child(no_prefix, qname = "xlrd:rv"))]
+  #[sdk(child(qname = "xlrd:rv"))]
   pub rich_value: Vec<RichValue>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd:extLst"))]
+  #[sdk(child(qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValueStructures Class.
@@ -70,10 +70,10 @@ pub struct RichValueStructures {
   #[sdk(attr(qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// Defines the RichValueStructure Class.
-  #[sdk(child(no_prefix, qname = "xlrd:s"))]
+  #[sdk(child(qname = "xlrd:s"))]
   pub rich_value_structure: Vec<RichValueStructure>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xlrd:extLst"))]
+  #[sdk(child(qname = "xlrd:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RichValue Class.
@@ -84,10 +84,10 @@ pub struct RichValue {
   #[sdk(attr(qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the RichValueFallback Class.
-  #[sdk(child(no_prefix, qname = "xlrd:fb"))]
+  #[sdk(child(qname = "xlrd:fb"))]
   pub rich_value_fallback: Option<RichValueFallback>,
   /// Defines the Value Class.
-  #[sdk(text_child(simple_type = "StringValue", no_prefix, qname = "xlrd:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xlrd:v"))]
   pub value: Vec<Value>,
 }
 /// Defines the ExtensionList Class.
@@ -118,7 +118,7 @@ pub struct RichValueStructure {
   #[sdk(attr(qname = ":t"))]
   pub t: crate::simple_type::StringValue,
   /// Defines the Key Class.
-  #[sdk(child(no_prefix, qname = "xlrd:k"))]
+  #[sdk(child(qname = "xlrd:k"))]
   pub key: Vec<Key>,
 }
 /// Defines the Key Class.

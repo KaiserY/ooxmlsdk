@@ -12,10 +12,10 @@ pub struct NamedSheetViews {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<crate::common::XmlOtherAttr>,
   /// Defines the NamedSheetView Class.
-  #[sdk(child(no_prefix, qname = "xnsv:namedSheetView"))]
+  #[sdk(child(qname = "xnsv:namedSheetView"))]
   pub named_sheet_view: Vec<NamedSheetView>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xnsv:extLst"))]
+  #[sdk(child(qname = "xnsv:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the NamedSheetView Class.
@@ -31,10 +31,10 @@ pub struct NamedSheetView {
   #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the NsvFilter Class.
-  #[sdk(child(no_prefix, qname = "xnsv:nsvFilter"))]
+  #[sdk(child(qname = "xnsv:nsvFilter"))]
   pub nsv_filter: Vec<NsvFilter>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xnsv:extLst"))]
+  #[sdk(child(qname = "xnsv:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
@@ -61,13 +61,13 @@ pub struct NsvFilter {
   #[sdk(attr(qname = ":tableId"))]
   pub table_id: Option<crate::simple_type::UInt32Value>,
   /// Defines the ColumnFilter Class.
-  #[sdk(child(no_prefix, qname = "xnsv:columnFilter"))]
+  #[sdk(child(qname = "xnsv:columnFilter"))]
   pub column_filter: Vec<ColumnFilter>,
   /// Defines the SortRules Class.
-  #[sdk(child(no_prefix, qname = "xnsv:sortRules"))]
+  #[sdk(child(qname = "xnsv:sortRules"))]
   pub sort_rules: Option<std::boxed::Box<SortRules>>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xnsv:extLst"))]
+  #[sdk(child(qname = "xnsv:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ColumnFilter Class.
@@ -83,13 +83,13 @@ pub struct ColumnFilter {
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(no_prefix, qname = "xnsv:dxf"))]
+  #[sdk(child(qname = "xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// Defines the FilterColumn Class.
-  #[sdk(child(no_prefix, qname = "xnsv:filter"))]
+  #[sdk(child(qname = "xnsv:filter"))]
   pub filter_column: Vec<FilterColumn>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xnsv:extLst"))]
+  #[sdk(child(qname = "xnsv:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SortRules Class.
@@ -103,10 +103,10 @@ pub struct SortRules {
   #[sdk(attr(qname = ":caseSensitive"))]
   pub case_sensitive: Option<crate::simple_type::BooleanValue>,
   /// Defines the SortRule Class.
-  #[sdk(child(no_prefix, qname = "xnsv:sortRule"))]
+  #[sdk(child(qname = "xnsv:sortRule"))]
   pub sort_rule: Vec<SortRule>,
   /// Defines the ExtensionList Class.
-  #[sdk(child(no_prefix, qname = "xnsv:extLst"))]
+  #[sdk(child(qname = "xnsv:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the DifferentialFormatType Class.
@@ -176,16 +176,12 @@ pub struct SortRule {
   #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the DifferentialFormatType Class.
-  #[sdk(child(no_prefix, qname = "xnsv:dxf"))]
+  #[sdk(child(qname = "xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   #[sdk(
         choice(
-            child(variant = SortCondition, no_prefix, qname = "xnsv:sortCondition"),
-            child(
-                variant = RichSortCondition,
-                no_prefix,
-                qname = "xnsv:richSortCondition"
-            )
+            child(variant = SortCondition, qname = "xnsv:sortCondition"),
+            child(variant = RichSortCondition, qname = "xnsv:richSortCondition")
         )
     )]
   pub sort_rule_choice: Option<SortRuleChoice>,

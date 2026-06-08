@@ -6905,6 +6905,7 @@ pub struct Run {
                 variant = LastRenderedPageBreak,
                 qname = "w:lastRenderedPageBreak"
             ),
+            child(variant = SymbolCharExt, qname = "w16se:sym"),
             any
         )
     )]
@@ -17094,6 +17095,8 @@ pub enum RunChoice {
   PositionalTab(std::boxed::Box<PositionalTab>),
   /// Position of Last Calculated Page Break.
   LastRenderedPageBreak,
+  /// Extended Symbol Character.
+  SymbolCharExt(std::boxed::Box<SymbolChar>),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }

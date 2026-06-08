@@ -1,0 +1,11 @@
+{
+  "Types": [
+    {
+      "ClassName": "LegacyDrawing",
+      "HaveXmlnsFields": true,
+      "CanonicalNamespacePrefixes": [
+        "com:comp"
+      ]
+    }
+  ]
+}

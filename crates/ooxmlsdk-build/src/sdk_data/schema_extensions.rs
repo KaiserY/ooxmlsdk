@@ -614,10 +614,6 @@ pub fn apply_codegen_ir_schema_extensions(
 
     let type_decl = &mut ir.types[type_index];
 
-    if choice_extension.add_xml_any {
-      add_xml_any_choice_variant(type_decl);
-    }
-
     for variant_extension in &choice_extension.add_variants {
       if variant_extension.rust_name.is_empty()
         || variant_extension.q_name.is_empty()
@@ -677,6 +673,10 @@ pub fn apply_codegen_ir_schema_extensions(
             .then(|| variant_extension.payload_module_path.clone()),
         },
       }));
+    }
+
+    if choice_extension.add_xml_any {
+      add_xml_any_choice_variant(type_decl);
     }
   }
 

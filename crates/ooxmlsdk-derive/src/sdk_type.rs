@@ -50,14 +50,6 @@ impl DeserializeMode {
   }
 }
 
-fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
-  let QNameInfo { local_name, .. } = parse_qname_info(qname);
-  if local_name.is_empty() {
-    return None;
-  }
-  Some(local_name)
-}
-
 fn child_uses_parent_default_namespace(
   qname: &str,
   parent_tag_prefix: &str,
@@ -154,147 +146,6 @@ fn extra_xmlns_tokens(
     quote! { #( #mark_tokens )* },
     quote! { #( #write_tokens )* },
   ))
-}
-
-fn has_unique_local_name_dispatch<I>(qnames: I) -> bool
-where
-  I: IntoIterator,
-  I::Item: AsRef<str>,
-{
-  let mut seen = std::collections::HashSet::new();
-  let mut any = false;
-  for qname in qnames {
-    any = true;
-    let Some(local_name) = dispatch_field_qname_local_name(qname.as_ref()) else {
-      return false;
-    };
-    if !seen.insert(local_name) {
-      return false;
-    }
-  }
-  any
-}
-
-fn local_name_fallback_qnames<I>(qnames: I) -> std::collections::HashSet<String>
-where
-  I: IntoIterator,
-  I::Item: AsRef<str>,
-{
-  let mut local_name_qnames = std::collections::HashMap::<String, Vec<String>>::new();
-  for qname in qnames {
-    let qname = qname.as_ref();
-    let QNameInfo { local_name, .. } = parse_qname_info(qname);
-    let qnames = local_name_qnames.entry(local_name).or_default();
-    if !qnames.iter().any(|existing| existing == qname) {
-      qnames.push(qname.to_string());
-    }
-  }
-
-  local_name_qnames
-    .into_values()
-    .filter_map(|qnames| {
-      if qnames.len() == 1 {
-        return qnames.into_iter().next();
-      }
-
-      let base_qnames = qnames
-        .into_iter()
-        .filter(|qname| {
-          let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
-          !tag_prefix.as_bytes().last().is_some_and(u8::is_ascii_digit)
-        })
-        .collect::<Vec<_>>();
-
-      if base_qnames.len() == 1 {
-        base_qnames.into_iter().next()
-      } else {
-        None
-      }
-    })
-    .collect()
-}
-
-fn should_use_local_name_child_dispatch(
-  _schema_qname: &str,
-  child_qnames: impl IntoIterator<Item = String>,
-  _has_choice_dispatch: bool,
-  has_any_dispatch: bool,
-  _has_xml_other_children_dispatch: bool,
-) -> bool {
-  if has_any_dispatch {
-    return false;
-  }
-
-  has_unique_local_name_dispatch(child_qnames)
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn local_name_child_dispatch_allows_any_prefix_when_unambiguous() {
-    assert!(should_use_local_name_child_dispatch(
-      "w:CT_DocVars/w:docVars",
-      ["w:CT_DocVar/w:docVar".to_string()],
-      false,
-      false,
-      false,
-    ));
-  }
-
-  #[test]
-  fn local_name_child_dispatch_rejects_same_parent_conflicts() {
-    assert!(!should_use_local_name_child_dispatch(
-      "w:CT_SomeParent/w:parent",
-      [
-        "w:CT_OnOff/w:shadow".to_string(),
-        "w14:CT_Shadow/w14:shadow".to_string(),
-      ],
-      false,
-      false,
-      false,
-    ));
-  }
-
-  #[test]
-  fn local_name_child_dispatch_allows_xml_other_children_when_unambiguous() {
-    assert!(should_use_local_name_child_dispatch(
-      "w:CT_RPrList/w:rPr",
-      ["w:CT_OnOff/w:shadow".to_string()],
-      false,
-      false,
-      true,
-    ));
-  }
-
-  #[test]
-  fn local_name_child_dispatch_allows_choice_when_unambiguous() {
-    assert!(should_use_local_name_child_dispatch(
-      "v:CT_Shape/v:shape",
-      [
-        "v:CT_ImageData/v:imagedata".to_string(),
-        "w10:CT_Border/w10:bordertop".to_string(),
-      ],
-      true,
-      false,
-      false,
-    ));
-  }
-
-  #[test]
-  fn local_name_child_dispatch_rejects_choice_local_name_conflicts() {
-    assert!(!should_use_local_name_child_dispatch(
-      "v:CT_Shape/v:shape",
-      [
-        "w10:CT_Border/w10:bordertop".to_string(),
-        "wvml:CT_Border/wvml:bordertop".to_string(),
-      ],
-      true,
-      false,
-      false,
-    ));
-  }
 }
 
 fn qname_match_targets(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
@@ -1133,7 +984,7 @@ fn stack_parser_child_step_tokens(
         e: quick_xml::events::BytesStart<'de>,
         next_empty: bool,
       ) -> Result<Option<__OoxmlsdkRecursiveTableFrame>, crate::common::SdkError> {
-        Ok(match e.name().into_inner() {
+        Ok(match e.local_name().into_inner() {
           #( #arms )*
           event_name => {
             return Err(crate::common::unexpected_tag(
@@ -1153,16 +1004,7 @@ fn qname_match_target_keys(qnames: &[String]) -> Vec<String> {
   let mut targets = Vec::new();
 
   for qname in qnames {
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(qname);
-    if !tag_prefix.is_empty() {
-      let prefixed = format!("{tag_prefix}:{local_name}");
-      if seen.insert(prefixed.clone()) {
-        targets.push(prefixed);
-      }
-    }
+    let QNameInfo { local_name, .. } = parse_qname_info(qname);
     if seen.insert(local_name.clone()) {
       targets.push(local_name);
     }
@@ -1171,10 +1013,140 @@ fn qname_match_target_keys(qnames: &[String]) -> Vec<String> {
   targets
 }
 
+fn qname_match_key(qname: &str) -> String {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  if tag_prefix.is_empty() {
+    local_name
+  } else {
+    format!("{tag_prefix}:{local_name}")
+  }
+}
+
 #[derive(Clone)]
 struct GroupedChoiceAttempt {
   condition: Option<proc_macro2::TokenStream>,
   tokens: proc_macro2::TokenStream,
+}
+
+#[derive(Clone)]
+struct LocalNameDispatchArm {
+  qname: String,
+  tokens: proc_macro2::TokenStream,
+}
+
+fn push_local_name_dispatch_arm(
+  grouped: &mut std::collections::BTreeMap<String, Vec<LocalNameDispatchArm>>,
+  qname: &str,
+  tokens: proc_macro2::TokenStream,
+) {
+  let QNameInfo { local_name, .. } = parse_qname_info(qname);
+  grouped
+    .entry(local_name)
+    .or_default()
+    .push(LocalNameDispatchArm {
+      qname: qname.to_string(),
+      tokens,
+    });
+}
+
+fn local_name_dispatch_arms(
+  grouped: &std::collections::BTreeMap<String, Vec<LocalNameDispatchArm>>,
+  default_tag_prefix: &str,
+  fallback_tokens: Option<&proc_macro2::TokenStream>,
+) -> Vec<proc_macro2::TokenStream> {
+  grouped
+    .iter()
+    .map(|(local_name, arms)| {
+      let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+      let Some(first_arm) = arms.first() else {
+        return quote! {};
+      };
+      if let Some(fallback_tokens) = fallback_tokens {
+        let mut seen_qnames = std::collections::HashSet::new();
+        let qname_arms = arms.iter().filter_map(|arm| {
+          let qname = qname_match_key(&arm.qname);
+          if !seen_qnames.insert(qname.clone()) {
+            return None;
+          }
+          let qname_lit = LitByteStr::new(qname.as_bytes(), Span::call_site());
+          let tokens = &arm.tokens;
+          Some(quote! {
+            #qname_lit => {
+              #tokens
+            }
+          })
+        });
+        return quote! {
+          #local_name_lit => {
+            match e.name().into_inner() {
+              #( #qname_arms )*
+              _ => {
+                #fallback_tokens
+              }
+            }
+          }
+        };
+      }
+
+      if arms.len() == 1 {
+        let tokens = &first_arm.tokens;
+        return quote! {
+          #local_name_lit => {
+            #tokens
+          }
+        };
+      }
+
+      let default_arm = arms
+        .iter()
+        .find(|arm| parse_qname_info(&arm.qname).tag_prefix == default_tag_prefix)
+        .unwrap_or(first_arm);
+      let default_qname = &default_arm.qname;
+      let mut seen_qnames = std::collections::HashSet::new();
+      let qname_arms = arms.iter().filter_map(|arm| {
+        if &arm.qname == default_qname {
+          return None;
+        }
+        let qname = qname_match_key(&arm.qname);
+        if !seen_qnames.insert(qname.clone()) {
+          return None;
+        }
+        let qname_lit = LitByteStr::new(qname.as_bytes(), Span::call_site());
+        let tokens = &arm.tokens;
+        Some(quote! {
+          #qname_lit => {
+            #tokens
+          }
+        })
+      });
+      let default_tokens = &default_arm.tokens;
+      quote! {
+        #local_name_lit => {
+          match e.name().into_inner() {
+            #( #qname_arms )*
+            _ => {
+              #default_tokens
+            }
+          }
+        }
+      }
+    })
+    .collect()
+}
+
+fn extend_local_name_dispatch_arms(
+  target: &mut std::collections::BTreeMap<String, Vec<LocalNameDispatchArm>>,
+  source: &std::collections::BTreeMap<String, Vec<LocalNameDispatchArm>>,
+) {
+  for (local_name, arms) in source {
+    target
+      .entry(local_name.clone())
+      .or_default()
+      .extend(arms.clone());
+  }
 }
 
 fn build_grouped_choice_match_tokens(
@@ -2437,7 +2409,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
             match child_reader.next()? {
               quick_xml::events::Event::Start(e) => {
                 let next_empty = false;
-                let event_name = e.name().into_inner();
+                let event_name = e.local_name().into_inner();
                 break match event_name {
                   #( #parse_replacement_arms )*
                   _ => None,
@@ -2445,7 +2417,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
               }
               quick_xml::events::Event::Empty(e) => {
                 let next_empty = true;
-                let event_name = e.name().into_inner();
+                let event_name = e.local_name().into_inner();
                 break match event_name {
                   #( #parse_replacement_arms )*
                   _ => None,
@@ -2845,34 +2817,9 @@ fn number_range_f64_literal(value: &str) -> proc_macro2::TokenStream {
     .unwrap_or_else(|_| quote! { #value.parse::<f64>().expect("numeric validator bound") })
 }
 
-fn text_child_match_target(qname: &str) -> proc_macro2::TokenStream {
-  text_child_match_target_with_local_name_dispatch(qname, false)
-}
-
-fn text_child_match_target_with_local_name_dispatch(
-  qname: &str,
-  use_local_name_dispatch: bool,
-) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
-  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  if use_local_name_dispatch || tag_prefix.is_empty() {
-    quote! { #local_name_lit }
-  } else {
-    let tag_qname_lit = LitByteStr::new(
-      format!("{tag_prefix}:{local_name}").as_bytes(),
-      Span::call_site(),
-    );
-    quote! { #tag_qname_lit | #local_name_lit }
-  }
-}
-
 struct TextChildParseArmOptions {
   repeated: bool,
   as_result: bool,
-  use_local_name_dispatch: bool,
   list: bool,
 }
 
@@ -3087,17 +3034,14 @@ fn write_simple_union_attr_tokens(
   }
 }
 
-fn build_text_child_parse_arm(
+fn build_text_child_parse_body(
   owner_ident: &Ident,
   field_ident: &Ident,
-  qname: &str,
   simple_type: Option<&str>,
   field_ty: &Type,
   xml_child_slot_assign: proc_macro2::TokenStream,
   options: TextChildParseArmOptions,
 ) -> proc_macro2::TokenStream {
-  let target =
-    text_child_match_target_with_local_name_dispatch(qname, options.use_local_name_dispatch);
   let value_ty = if options.list {
     vec_inner_type(&unwrap_option_type(field_ty))
       .unwrap_or_else(|| unwrap_option_vec_type(field_ty))
@@ -3163,17 +3107,15 @@ fn build_text_child_parse_arm(
   };
 
   quote! {
-    #target => {
-      let parsed_child = if next_empty {
-        #empty_value_tokens
-      } else {
-        let text = xml_reader.read_text(e.name())?;
-        #parse_from_text_tokens
-      };
-      #assign_tokens
-      #xml_child_slot_assign
-      #finish_tokens
-    },
+    let parsed_child = if next_empty {
+      #empty_value_tokens
+    } else {
+      let text = xml_reader.read_text(e.name())?;
+      #parse_from_text_tokens
+    };
+    #assign_tokens
+    #xml_child_slot_assign
+    #finish_tokens
   }
 }
 
@@ -3310,7 +3252,7 @@ fn build_empty_child_skip_tokens(
       loop {
         match #reader_ident.next_tag_event()? {
           #next_tag_event::Start(e, _) => {
-            let event_name = e.name().into_inner();
+            let event_name = e.local_name().into_inner();
             return Err(crate::common::unexpected_tag(
               stringify!(#owner_ident),
               "empty child",
@@ -3332,7 +3274,7 @@ fn build_empty_child_skip_tokens(
   }
 }
 
-fn build_any_child_parse_arm(
+fn build_any_child_parse_body(
   owner_ident: &Ident,
   field_ident: &Ident,
   qname: &str,
@@ -3345,7 +3287,6 @@ fn build_any_child_parse_arm(
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
-  let target = text_child_match_target(qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   let tag_qname_lit = LitByteStr::new(
     format!("{tag_prefix}:{local_name}").as_bytes(),
@@ -3365,35 +3306,33 @@ fn build_any_child_parse_arm(
   };
 
   quote! {
-    #target => {
-      let mut parsed_child = Vec::new();
-      if !next_empty {
-        loop {
-          match xml_reader.next()? {
-            quick_xml::events::Event::Start(e) => {
-              let xml = #read_raw_element_xml(xml_reader, e)?;
-              parsed_child.push(xml);
-            }
-            quick_xml::events::Event::Empty(e) => {
-              let xml = #read_raw_empty_xml(e)?;
-              parsed_child.push(xml);
-            }
-            quick_xml::events::Event::End(end) => {
-              if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
-                break;
-              }
-            }
-            quick_xml::events::Event::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
-            }
-            _ => {}
+    let mut parsed_child = Vec::new();
+    if !next_empty {
+      loop {
+        match xml_reader.next()? {
+          quick_xml::events::Event::Start(e) => {
+            let xml = #read_raw_element_xml(xml_reader, e)?;
+            parsed_child.push(xml);
           }
+          quick_xml::events::Event::Empty(e) => {
+            let xml = #read_raw_empty_xml(e)?;
+            parsed_child.push(xml);
+          }
+          quick_xml::events::Event::End(end) => {
+            if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
+          }
+          _ => {}
         }
       }
-      #assign_tokens
-      #xml_child_slot_assign
-      #finish_tokens
-    },
+    }
+    #assign_tokens
+    #xml_child_slot_assign
+    #finish_tokens
   }
 }
 
@@ -3712,10 +3651,10 @@ fn expand_helper_struct(
   }
 
   let mut child_decl_tokens = Vec::new();
-  let mut direct_child_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut child_parse_tokens_borrowed = Vec::new();
-  let mut child_parse_tokens_io = Vec::new();
+  let mut child_match_tokens_borrowed =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
+  let mut child_match_tokens_io =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
   let mut child_visit_parse_tokens_borrowed = Vec::new();
   let mut child_visit_parse_tokens_io = Vec::new();
   let mut child_write_tokens = Vec::new();
@@ -3724,11 +3663,6 @@ fn expand_helper_struct(
   for field in &child_fields {
     let field_ident = &field.ident;
     let xml_child_slot_assign = quote! { __ooxmlsdk_seen_child = true; };
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(&field.qname);
-    let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
     let payload_ty = unwrap_option_vec_type(&field.ty);
     let child_ty = if let Some(inner_ty) = box_inner_type(&payload_ty) {
       inner_ty
@@ -3750,34 +3684,21 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let target = if tag_prefix.is_empty() {
-      quote! { #local_name_lit }
-    } else {
-      let tag_qname_lit = LitByteStr::new(
-        format!("{tag_prefix}:{local_name}").as_bytes(),
-        Span::call_site(),
-      );
-      quote! { #tag_qname_lit | #local_name_lit }
-    };
-    let build_match = |mode: DeserializeMode| {
+    let build_body = |mode: DeserializeMode| {
       let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
       if field.repeated {
         quote! {
-          #target => {
-            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
-            #field_ident.push(#parsed_child_expr);
-            #xml_child_slot_assign
-            continue;
-          },
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          #field_ident.push(#parsed_child_expr);
+          #xml_child_slot_assign
+          continue;
         }
       } else {
         quote! {
-          #target => {
-            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
-            #field_ident = Some(#parsed_child_expr);
-            #xml_child_slot_assign
-            continue;
-          },
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          #field_ident = Some(#parsed_child_expr);
+          #xml_child_slot_assign
+          continue;
         }
       }
     };
@@ -3829,10 +3750,15 @@ fn expand_helper_struct(
         });
       }
     }
-    push_mode_pair(
-      &mut direct_child_match_tokens_borrowed,
-      &mut direct_child_match_tokens_io,
-      build_match,
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      build_body(DeserializeMode::Borrowed),
+    );
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_io,
+      &field.qname,
+      build_body(DeserializeMode::Io),
     );
   }
 
@@ -3922,38 +3848,38 @@ fn expand_helper_struct(
         list: field.list,
       },
     ));
-    let parse_arm = build_text_child_parse_arm(
+    let parse_body = build_text_child_parse_body(
       ident,
       field_ident,
-      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       quote! { __ooxmlsdk_seen_child = true; },
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: false,
-        use_local_name_dispatch: false,
         list: field.list,
       },
     );
-    child_parse_tokens_borrowed.push(parse_arm.clone());
-    child_parse_tokens_io.push(parse_arm);
-    let visit_parse_arm = build_text_child_parse_arm(
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      parse_body.clone(),
+    );
+    push_local_name_dispatch_arm(&mut child_match_tokens_io, &field.qname, parse_body);
+    let visit_parse_body = build_text_child_parse_body(
       ident,
       field_ident,
-      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       quote! { __ooxmlsdk_seen_child = true; },
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: true,
-        use_local_name_dispatch: false,
         list: field.list,
       },
     );
-    child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
-    child_visit_parse_tokens_io.push(visit_parse_arm);
+    child_visit_parse_tokens_borrowed.push(visit_parse_body.clone());
+    child_visit_parse_tokens_io.push(visit_parse_body);
   }
 
   for field in &any_child_fields {
@@ -3970,42 +3896,60 @@ fn expand_helper_struct(
       field.repeated,
       field.optional,
     ));
-    push_mode_pair(
-      &mut child_parse_tokens_borrowed,
-      &mut child_parse_tokens_io,
-      |mode| {
-        build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &field.qname,
-          field.repeated,
-          false,
-          mode,
-          quote! { __ooxmlsdk_seen_child = true; },
-        )
-      },
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      build_any_child_parse_body(
+        ident,
+        field_ident,
+        &field.qname,
+        field.repeated,
+        false,
+        DeserializeMode::Borrowed,
+        quote! { __ooxmlsdk_seen_child = true; },
+      ),
     );
-    push_mode_pair(
-      &mut child_visit_parse_tokens_borrowed,
-      &mut child_visit_parse_tokens_io,
-      |mode| {
-        build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &field.qname,
-          field.repeated,
-          true,
-          mode,
-          quote! { __ooxmlsdk_seen_child = true; },
-        )
-      },
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_io,
+      &field.qname,
+      build_any_child_parse_body(
+        ident,
+        field_ident,
+        &field.qname,
+        field.repeated,
+        false,
+        DeserializeMode::Io,
+        quote! { __ooxmlsdk_seen_child = true; },
+      ),
     );
+    child_visit_parse_tokens_borrowed.push(build_any_child_parse_body(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Borrowed,
+      quote! { __ooxmlsdk_seen_child = true; },
+    ));
+    child_visit_parse_tokens_io.push(build_any_child_parse_body(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Io,
+      quote! { __ooxmlsdk_seen_child = true; },
+    ));
   }
 
+  let default_dispatch_prefix = String::new();
+  let child_match_tokens_borrowed =
+    local_name_dispatch_arms(&child_match_tokens_borrowed, &default_dispatch_prefix, None);
+  let child_match_tokens_io =
+    local_name_dispatch_arms(&child_match_tokens_io, &default_dispatch_prefix, None);
   let main_dispatch_tokens_borrowed = quote! {
     let matched = match event_name {
-      #( #direct_child_match_tokens_borrowed )*
-      #( #child_parse_tokens_borrowed )*
+      #( #child_match_tokens_borrowed )*
       _ => false,
     };
     if matched {
@@ -4014,8 +3958,7 @@ fn expand_helper_struct(
   };
   let main_dispatch_tokens_io = quote! {
     let matched = match event_name {
-      #( #direct_child_match_tokens_io )*
-      #( #child_parse_tokens_io )*
+      #( #child_match_tokens_io )*
       _ => false,
     };
     if matched {
@@ -4182,7 +4125,7 @@ fn expand_helper_struct(
 
       loop {
         if let Some((e, next_empty)) = pending_event.take() {
-          let event_name = e.name().into_inner();
+          let event_name = e.local_name().into_inner();
           #main_dispatch_tokens_borrowed
           #unmatched_child_tokens_borrowed
         }
@@ -4191,14 +4134,14 @@ fn expand_helper_struct(
           quick_xml::events::Event::Start(e) => {
             let e = e.into_owned();
             let next_empty = false;
-            let event_name = e.name().into_inner();
+            let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
           quick_xml::events::Event::Empty(e) => {
             let e = e.into_owned();
             let next_empty = true;
-            let event_name = e.name().into_inner();
+            let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
@@ -4255,7 +4198,7 @@ fn expand_helper_struct(
 
         loop {
           if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.name().into_inner();
+            let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -4275,7 +4218,7 @@ fn expand_helper_struct(
           };
 
           if let Some((e, next_empty)) = next_event {
-            let event_name = e.name().into_inner();
+            let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -4504,45 +4447,8 @@ fn expand_named_struct(
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
   let needs_canonical_xmlns_prefix = !canonical_namespace_prefixes.is_empty();
-  let use_local_name_child_dispatch = should_use_local_name_child_dispatch(
-    schema_qname,
-    child_fields
-      .iter()
-      .map(|field| field.qname.clone())
-      .chain(empty_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(text_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(any_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(
-        choice_fields
-          .iter()
-          .flat_map(|field| field.specific_qnames.iter().cloned()),
-      ),
-    !choice_fields.is_empty(),
-    !any_fields.is_empty()
-      || choice_fields.iter().any(|field| {
-        field.accepts_any.unwrap_or(false)
-          || field
-            .items
-            .iter()
-            .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }))
-      }),
-    has_xml_other_children_field,
-  );
   let end_name_matches = quote! { e.name() == __end_qname };
   let end_qname_decl = quote! { let __end_qname = e.name(); };
-  let child_local_name_fallback_qnames = local_name_fallback_qnames(
-    child_fields
-      .iter()
-      .map(|field| field.qname.clone())
-      .chain(empty_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(text_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(any_child_fields.iter().map(|field| field.qname.clone()))
-      .chain(
-        choice_fields
-          .iter()
-          .flat_map(|field| field.specific_qnames.iter().cloned()),
-      ),
-  );
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
@@ -4948,11 +4854,11 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
-  let mut direct_child_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut direct_child_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
+  let mut child_match_tokens_borrowed =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
+  let mut child_match_tokens_io =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
   let mut child_decl_tokens = Vec::new();
-  let mut child_parse_tokens_borrowed = Vec::new();
-  let mut child_parse_tokens_io = Vec::new();
   let mut child_visit_parse_tokens_borrowed = Vec::new();
   let mut child_visit_parse_tokens_io = Vec::new();
   let mut child_write_tokens = Vec::new();
@@ -4966,11 +4872,6 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(&field.qname);
-    let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
     let payload_ty = unwrap_option_vec_type(&field.ty);
     let child_ty = if let Some(inner_ty) = box_inner_type(&payload_ty) {
       inner_ty
@@ -4992,19 +4893,6 @@ fn expand_named_struct(
     } else {
       quote! { parsed_child }
     };
-    let target = if use_local_name_child_dispatch || tag_prefix.is_empty() {
-      quote! { #local_name_lit }
-    } else {
-      let tag_qname_lit = LitByteStr::new(
-        format!("{tag_prefix}:{local_name}").as_bytes(),
-        Span::call_site(),
-      );
-      if child_local_name_fallback_qnames.contains(&field.qname) {
-        quote! { #tag_qname_lit | #local_name_lit }
-      } else {
-        quote! { #tag_qname_lit }
-      }
-    };
     let child_write_call =
       write_typed_child_tokens(&child_ty, quote! { child }, &field.qname, "", false);
     let self_write_call = write_typed_child_tokens(
@@ -5014,25 +4902,21 @@ fn expand_named_struct(
       "",
       false,
     );
-    let build_match = |mode: DeserializeMode| {
+    let build_body = |mode: DeserializeMode| {
       let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
       if field.repeated {
         quote! {
-          #target => {
-            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
-            #field_ident.push(#parsed_child_expr);
-            #xml_child_slot_assign
-            continue;
-          },
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          #field_ident.push(#parsed_child_expr);
+          #xml_child_slot_assign
+          continue;
         }
       } else {
         quote! {
-          #target => {
-            let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
-            #field_ident = Some(#parsed_child_expr);
-            #xml_child_slot_assign
-            continue;
-          },
+          let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
+          #field_ident = Some(#parsed_child_expr);
+          #xml_child_slot_assign
+          continue;
         }
       }
     };
@@ -5073,10 +4957,15 @@ fn expand_named_struct(
         });
       }
     }
-    push_mode_pair(
-      &mut direct_child_match_tokens_borrowed,
-      &mut direct_child_match_tokens_io,
-      build_match,
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      build_body(DeserializeMode::Borrowed),
+    );
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_io,
+      &field.qname,
+      build_body(DeserializeMode::Io),
     );
   }
 
@@ -5087,21 +4976,7 @@ fn expand_named_struct(
       .copied()
       .unwrap_or_default();
     let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
-    let QNameInfo {
-      tag_prefix,
-      local_name,
-    } = parse_qname_info(&field.qname);
-    let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-    let target = if use_local_name_child_dispatch || tag_prefix.is_empty() {
-      quote! { #local_name_lit }
-    } else {
-      let tag_qname_lit = LitByteStr::new(
-        format!("{tag_prefix}:{local_name}").as_bytes(),
-        Span::call_site(),
-      );
-      quote! { #tag_qname_lit | #local_name_lit }
-    };
-    let build_match = |reader_ident: &Ident, mode: DeserializeMode| {
+    let build_body = |reader_ident: &Ident, mode: DeserializeMode| {
       let skip_tokens = build_empty_child_skip_tokens(ident, &field.qname, mode, reader_ident);
       let assign_tokens = if field.repeated {
         quote! { #field_ident.push(()); }
@@ -5109,12 +4984,10 @@ fn expand_named_struct(
         quote! { #field_ident = Some(()); }
       };
       quote! {
-        #target => {
-          #skip_tokens
-          #assign_tokens
-          #xml_child_slot_assign
-          continue;
-        },
+        #skip_tokens
+        #assign_tokens
+        #xml_child_slot_assign
+        continue;
       }
     };
 
@@ -5130,10 +5003,15 @@ fn expand_named_struct(
       field.repeated,
       field.optional,
     ));
-    push_mode_pair(
-      &mut direct_child_match_tokens_borrowed,
-      &mut direct_child_match_tokens_io,
-      |mode| build_match(&xml_reader_ident, mode),
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      build_body(&xml_reader_ident, DeserializeMode::Borrowed),
+    );
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_io,
+      &field.qname,
+      build_body(&xml_reader_ident, DeserializeMode::Io),
     );
   }
 
@@ -5161,38 +5039,38 @@ fn expand_named_struct(
         list: field.list,
       },
     ));
-    let parse_arm = build_text_child_parse_arm(
+    let parse_body = build_text_child_parse_body(
       ident,
       field_ident,
-      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       xml_child_slot_assign.clone(),
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: false,
-        use_local_name_dispatch: use_local_name_child_dispatch,
         list: field.list,
       },
     );
-    child_parse_tokens_borrowed.push(parse_arm.clone());
-    child_parse_tokens_io.push(parse_arm);
-    let visit_parse_arm = build_text_child_parse_arm(
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      parse_body.clone(),
+    );
+    push_local_name_dispatch_arm(&mut child_match_tokens_io, &field.qname, parse_body);
+    let visit_parse_body = build_text_child_parse_body(
       ident,
       field_ident,
-      &field.qname,
       field.simple_type.as_deref(),
       &field.ty,
       xml_child_slot_assign,
       TextChildParseArmOptions {
         repeated: field.repeated,
         as_result: true,
-        use_local_name_dispatch: use_local_name_child_dispatch,
         list: field.list,
       },
     );
-    child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
-    child_visit_parse_tokens_io.push(visit_parse_arm);
+    child_visit_parse_tokens_borrowed.push(visit_parse_body.clone());
+    child_visit_parse_tokens_io.push(visit_parse_body);
   }
 
   for field in &any_child_fields {
@@ -5214,36 +5092,50 @@ fn expand_named_struct(
       field.repeated,
       field.optional,
     ));
-    push_mode_pair(
-      &mut child_parse_tokens_borrowed,
-      &mut child_parse_tokens_io,
-      |mode| {
-        build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &field.qname,
-          field.repeated,
-          false,
-          mode,
-          xml_child_slot_assign.clone(),
-        )
-      },
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_borrowed,
+      &field.qname,
+      build_any_child_parse_body(
+        ident,
+        field_ident,
+        &field.qname,
+        field.repeated,
+        false,
+        DeserializeMode::Borrowed,
+        xml_child_slot_assign.clone(),
+      ),
     );
-    push_mode_pair(
-      &mut child_visit_parse_tokens_borrowed,
-      &mut child_visit_parse_tokens_io,
-      |mode| {
-        build_any_child_parse_arm(
-          ident,
-          field_ident,
-          &field.qname,
-          field.repeated,
-          true,
-          mode,
-          xml_child_slot_assign.clone(),
-        )
-      },
+    push_local_name_dispatch_arm(
+      &mut child_match_tokens_io,
+      &field.qname,
+      build_any_child_parse_body(
+        ident,
+        field_ident,
+        &field.qname,
+        field.repeated,
+        false,
+        DeserializeMode::Io,
+        xml_child_slot_assign.clone(),
+      ),
     );
+    child_visit_parse_tokens_borrowed.push(build_any_child_parse_body(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Borrowed,
+      xml_child_slot_assign.clone(),
+    ));
+    child_visit_parse_tokens_io.push(build_any_child_parse_body(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Io,
+      xml_child_slot_assign,
+    ));
   }
 
   let mut choice_decl_tokens = Vec::new();
@@ -5253,6 +5145,14 @@ fn expand_named_struct(
   let mut choice_validate_tokens = Vec::new();
   let mut flat_choice_match_tokens_borrowed = Vec::new();
   let mut flat_choice_match_tokens_io = Vec::new();
+  let mut flat_choice_fallback_match_tokens_borrowed = Vec::new();
+  let mut flat_choice_fallback_match_tokens_io = Vec::new();
+  let mut choice_any_fallback_tokens_borrowed = None;
+  let mut choice_any_fallback_tokens_io = None;
+  let mut choice_match_tokens_borrowed =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
+  let mut choice_match_tokens_io =
+    std::collections::BTreeMap::<String, Vec<LocalNameDispatchArm>>::new();
   let mut flat_choice_visit_match_tokens_borrowed = Vec::new();
   let mut flat_choice_visit_match_tokens_io = Vec::new();
   let mut flat_choice_has_wildcard = false;
@@ -5360,24 +5260,12 @@ fn expand_named_struct(
             == 1usize
         }));
     if flatten_choice_items {
-      let use_flat_choice_local_name_dispatch = child_fields.is_empty()
-        && empty_child_fields.is_empty()
-        && text_child_fields.is_empty()
-        && any_child_fields.is_empty()
-        && any_fields.is_empty()
-        && !field_accepts_any
-        && !field
-          .items
-          .iter()
-          .any(|item| matches!(item, SdkTypeChoiceItem::Any { .. }));
       let mut flat_choice_local_name_counts = std::collections::HashMap::<String, usize>::new();
-      if use_flat_choice_local_name_dispatch {
-        for qname in &specific_qnames {
-          let QNameInfo { local_name, .. } = parse_qname_info(qname);
-          *flat_choice_local_name_counts
-            .entry(local_name)
-            .or_insert(0usize) += 1usize;
-        }
+      for qname in &specific_qnames {
+        let QNameInfo { local_name, .. } = parse_qname_info(qname);
+        *flat_choice_local_name_counts
+          .entry(local_name)
+          .or_insert(0usize) += 1usize;
       }
       let mut flat_choice_conflict_tokens_borrowed = std::collections::BTreeMap::<
         String,
@@ -5396,31 +5284,13 @@ fn expand_named_struct(
         Vec<(String, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
       >::new();
       let flat_choice_schema_tag_prefix = parse_qname_info(schema_qname).tag_prefix;
-      let flat_choice_local_name_fallback_qnames = local_name_fallback_qnames(&specific_qnames);
       let flat_choice_match_targets = |qnames: &[String]| {
         let mut seen = std::collections::HashSet::new();
         let mut targets = Vec::new();
 
         for qname in qnames {
-          let QNameInfo {
-            tag_prefix,
-            local_name,
-          } = parse_qname_info(qname);
-          if use_flat_choice_local_name_dispatch {
-            let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-            targets.push(quote! { #local_name_lit });
-            continue;
-          }
-          if !tag_prefix.is_empty() {
-            let prefixed = format!("{tag_prefix}:{local_name}");
-            if seen.insert(prefixed.clone()) {
-              let tag_qname_lit = LitByteStr::new(prefixed.as_bytes(), Span::call_site());
-              targets.push(quote! { #tag_qname_lit });
-            }
-          }
-          if flat_choice_local_name_fallback_qnames.contains(qname)
-            && seen.insert(local_name.to_string())
-          {
+          let QNameInfo { local_name, .. } = parse_qname_info(qname);
+          if seen.insert(local_name.to_string()) {
             let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
             targets.push(quote! { #local_name_lit });
           }
@@ -5429,6 +5299,27 @@ fn expand_named_struct(
         targets
       };
       {
+        let mut queue_choice_dispatch_parse =
+          |qname: &str,
+           borrowed_body: proc_macro2::TokenStream,
+           io_body: proc_macro2::TokenStream| {
+            push_local_name_dispatch_arm(
+              &mut choice_match_tokens_borrowed,
+              qname,
+              quote! {
+                #borrowed_body
+                continue;
+              },
+            );
+            push_local_name_dispatch_arm(
+              &mut choice_match_tokens_io,
+              qname,
+              quote! {
+                #io_body
+                continue;
+              },
+            );
+          };
         let mut queue_flat_choice_parse = |qname: &str,
                                            borrowed_body: proc_macro2::TokenStream,
                                            io_body: proc_macro2::TokenStream|
@@ -5441,12 +5332,11 @@ fn expand_named_struct(
             tag_prefix,
             local_name,
           } = parse_qname_info(qname);
-          if use_flat_choice_local_name_dispatch
-            && flat_choice_local_name_counts
-              .get(&local_name)
-              .copied()
-              .unwrap_or_default()
-              > 1usize
+          if flat_choice_local_name_counts
+            .get(&local_name)
+            .copied()
+            .unwrap_or_default()
+            > 1usize
           {
             let tag_qname_lit = LitByteStr::new(
               format!("{tag_prefix}:{local_name}").as_bytes(),
@@ -5492,6 +5382,7 @@ fn expand_named_struct(
             &xml_child_slot_assign,
             &xml_reader_ident,
           ) {
+            queue_choice_dispatch_parse(qname, borrowed_body.clone(), io_body.clone());
             if let Some((targets, borrowed_body, io_body)) =
               queue_flat_choice_parse(qname, borrowed_body, io_body)
             {
@@ -5637,11 +5528,7 @@ fn expand_named_struct(
                 } else {
                   quote! { #field_ident = Some(parsed_choice); }
                 };
-                let match_event_name_tokens = if use_flat_choice_local_name_dispatch {
-                  quote! { e.local_name().into_inner() }
-                } else {
-                  quote! { e.name().into_inner() }
-                };
+                let match_event_name_tokens = quote! { e.local_name().into_inner() };
                 let borrowed_sequence_tokens = quote! {
                   #( #field_decls )*
                   let mut pending_event = Some((e, next_empty));
@@ -5724,6 +5611,9 @@ fn expand_named_struct(
                     #assign_named_tokens
                     #xml_child_slot_assign
                 };
+                for qname in &sequence_qnames {
+                  queue_choice_dispatch_parse(qname, borrowed_body.clone(), io_body.clone());
+                }
                 push_flat_choice_mode_arms(
                   &mut flat_choice_match_tokens_borrowed,
                   &mut flat_choice_match_tokens_io,
@@ -5745,6 +5635,9 @@ fn expand_named_struct(
                   #assign_tokens
                   #xml_child_slot_assign
               };
+              for qname in &sequence_qnames {
+                queue_choice_dispatch_parse(qname, borrowed_body.clone(), io_body.clone());
+              }
               push_flat_choice_mode_arms(
                 &mut flat_choice_match_tokens_borrowed,
                 &mut flat_choice_match_tokens_io,
@@ -5780,6 +5673,14 @@ fn expand_named_struct(
                   #assign_tokens
                   #xml_child_slot_assign
               };
+              choice_any_fallback_tokens_borrowed = Some(quote! {
+                #borrowed_body
+                continue;
+              });
+              choice_any_fallback_tokens_io = Some(quote! {
+                #io_body
+                continue;
+              });
               push_flat_choice_wildcard_arms(
                 &mut flat_choice_match_tokens_borrowed,
                 &mut flat_choice_match_tokens_io,
@@ -5836,25 +5737,13 @@ fn expand_named_struct(
     }
     let mut grouped_choice_items = false;
     if !flatten_choice_items && !field.items.is_empty() && !field_accepts_any {
-      let grouped_choice_local_name_fallback_qnames = local_name_fallback_qnames(&specific_qnames);
       let grouped_choice_match_target_keys = |qnames: &[String]| {
         let mut seen = std::collections::HashSet::new();
         let mut targets = Vec::new();
 
         for qname in qnames {
-          let QNameInfo {
-            tag_prefix,
-            local_name,
-          } = parse_qname_info(qname);
-          if !tag_prefix.is_empty() {
-            let prefixed = format!("{tag_prefix}:{local_name}");
-            if seen.insert(prefixed.clone()) {
-              targets.push(prefixed);
-            }
-          }
-          if grouped_choice_local_name_fallback_qnames.contains(qname)
-            && seen.insert(local_name.to_string())
-          {
+          let QNameInfo { local_name, .. } = parse_qname_info(qname);
+          if seen.insert(local_name.to_string()) {
             targets.push(local_name);
           }
         }
@@ -6058,7 +5947,7 @@ fn expand_named_struct(
                 let mut pending_event = Some((e, next_empty));
                 loop {
                   if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.name().into_inner();
+                    let event_name = e.local_name().into_inner();
                     match event_name {
                       #( #borrowed_child_arms )*
                       _ => {
@@ -6094,7 +5983,7 @@ fn expand_named_struct(
                 let mut pending_event = Some((e, next_empty));
                 loop {
                   if let Some((e, next_empty)) = pending_event.take() {
-                    let event_name = e.name().into_inner();
+                    let event_name = e.local_name().into_inner();
                     match event_name {
                       #( #io_child_arms )*
                       _ => {
@@ -6232,14 +6121,14 @@ fn expand_named_struct(
       choice_text_parse_tokens.push(build_text_block(quote! { &text_value }));
     }
   }
-  flat_choice_match_tokens_borrowed.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_match_tokens_borrowed,
-    false,
-  ));
-  flat_choice_match_tokens_io.extend(build_grouped_choice_match_tokens(
-    &grouped_choice_match_tokens_io,
-    false,
-  ));
+  let grouped_choice_match_tokens_borrowed =
+    build_grouped_choice_match_tokens(&grouped_choice_match_tokens_borrowed, false);
+  let grouped_choice_match_tokens_io =
+    build_grouped_choice_match_tokens(&grouped_choice_match_tokens_io, false);
+  flat_choice_fallback_match_tokens_borrowed.extend(grouped_choice_match_tokens_borrowed.clone());
+  flat_choice_fallback_match_tokens_io.extend(grouped_choice_match_tokens_io.clone());
+  flat_choice_match_tokens_borrowed.extend(grouped_choice_match_tokens_borrowed);
+  flat_choice_match_tokens_io.extend(grouped_choice_match_tokens_io);
   flat_choice_visit_match_tokens_borrowed.extend(build_grouped_choice_match_tokens(
     &grouped_choice_visit_match_tokens_borrowed,
     true,
@@ -6312,6 +6201,28 @@ fn expand_named_struct(
   } else {
     quote! {}
   };
+  let mut child_choice_match_tokens_borrowed = child_match_tokens_borrowed.clone();
+  extend_local_name_dispatch_arms(
+    &mut child_choice_match_tokens_borrowed,
+    &choice_match_tokens_borrowed,
+  );
+  let mut child_choice_match_tokens_io = child_match_tokens_io.clone();
+  extend_local_name_dispatch_arms(&mut child_choice_match_tokens_io, &choice_match_tokens_io);
+  let default_dispatch_prefix = parse_qname_info(schema_qname).tag_prefix;
+  let child_match_tokens_borrowed =
+    local_name_dispatch_arms(&child_match_tokens_borrowed, &default_dispatch_prefix, None);
+  let child_match_tokens_io =
+    local_name_dispatch_arms(&child_match_tokens_io, &default_dispatch_prefix, None);
+  let child_choice_match_tokens_borrowed = local_name_dispatch_arms(
+    &child_choice_match_tokens_borrowed,
+    &default_dispatch_prefix,
+    choice_any_fallback_tokens_borrowed.as_ref(),
+  );
+  let child_choice_match_tokens_io = local_name_dispatch_arms(
+    &child_choice_match_tokens_io,
+    &default_dispatch_prefix,
+    choice_any_fallback_tokens_io.as_ref(),
+  );
 
   let has_child_dispatch = !child_fields.is_empty()
     || !empty_child_fields.is_empty()
@@ -6338,11 +6249,6 @@ fn expand_named_struct(
     && !has_text_child_dispatch
     && has_any_choice_dispatch
     && !has_non_any_choice_dispatch;
-  let pure_named_choice_dispatch = !has_child_dispatch
-    && has_choice_dispatch
-    && !has_any_dispatch
-    && !has_text_child_dispatch
-    && !has_any_choice_dispatch;
   let unmatched_child_tokens_borrowed = if pure_any_dispatch || has_any_choice_dispatch {
     quote! {}
   } else {
@@ -6363,48 +6269,6 @@ fn expand_named_struct(
       compact_xml_other_children,
     )
   };
-  let flat_choice_dispatch_tokens_borrowed = if flat_choice_match_tokens_borrowed.is_empty() {
-    quote! {}
-  } else {
-    let event_name_tokens = if pure_any_choice_dispatch {
-      quote! { let event_name = e.name().into_inner(); }
-    } else {
-      quote! {}
-    };
-    let fallback_tokens = if flat_choice_has_wildcard {
-      quote! {}
-    } else {
-      quote! { _ => {} }
-    };
-    quote! {
-      #event_name_tokens
-      match event_name {
-        #( #flat_choice_match_tokens_borrowed )*
-        #fallback_tokens
-      }
-    }
-  };
-  let flat_choice_dispatch_tokens_io = if flat_choice_match_tokens_io.is_empty() {
-    quote! {}
-  } else {
-    let event_name_tokens = if pure_any_choice_dispatch {
-      quote! { let event_name = e.name().into_inner(); }
-    } else {
-      quote! {}
-    };
-    let fallback_tokens = if flat_choice_has_wildcard {
-      quote! {}
-    } else {
-      quote! { _ => {} }
-    };
-    quote! {
-      #event_name_tokens
-      match event_name {
-        #( #flat_choice_match_tokens_io )*
-        #fallback_tokens
-      }
-    }
-  };
   let choice_fallback_tokens = if flat_choice_has_wildcard {
     quote! {}
   } else {
@@ -6418,18 +6282,22 @@ fn expand_named_struct(
     } else if pure_any_dispatch {
       pure_any_parse_tokens_borrowed
     } else if !has_child_dispatch && !has_any_dispatch {
-      if flat_choice_has_wildcard {
-        flat_choice_dispatch_tokens_borrowed.clone()
-      } else {
-        quote! {
-          #flat_choice_dispatch_tokens_borrowed
+      quote! {
+        match event_name {
+          #( #child_choice_match_tokens_borrowed )*
+          #choice_fallback_tokens
         }
       }
     } else if !has_child_dispatch {
       quote! {
-        #flat_choice_dispatch_tokens_borrowed
-        let mut matched = false;
-        #( #any_parse_tokens_borrowed )*
+        let matched = match event_name {
+          #( #child_choice_match_tokens_borrowed )*
+          _ => {
+            let mut matched = false;
+            #( #any_parse_tokens_borrowed )*
+            matched
+          }
+        };
         if matched {
           continue;
         }
@@ -6437,15 +6305,14 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #( #direct_child_match_tokens_borrowed )*
+          #( #child_match_tokens_borrowed )*
           _ => {}
         }
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_borrowed )*
-          #( #child_parse_tokens_borrowed )*
+          #( #child_match_tokens_borrowed )*
           _ => false,
         };
         if matched {
@@ -6455,17 +6322,16 @@ fn expand_named_struct(
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #( #direct_child_match_tokens_borrowed )*
-          #( #flat_choice_match_tokens_borrowed )*
+          #( #child_choice_match_tokens_borrowed )*
+          #( #flat_choice_fallback_match_tokens_borrowed )*
           #choice_fallback_tokens
         }
       }
     } else if !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_borrowed )*
-          #( #flat_choice_match_tokens_borrowed )*
-          #( #child_parse_tokens_borrowed )*
+          #( #child_choice_match_tokens_borrowed )*
+          #( #flat_choice_fallback_match_tokens_borrowed )*
           _ => false,
         };
         if matched {
@@ -6475,9 +6341,8 @@ fn expand_named_struct(
     } else {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_borrowed )*
-          #( #flat_choice_match_tokens_borrowed )*
-          #( #child_parse_tokens_borrowed )*
+          #( #child_choice_match_tokens_borrowed )*
+          #( #flat_choice_fallback_match_tokens_borrowed )*
           _ => {
             let mut matched = false;
             #( #any_parse_tokens_borrowed )*
@@ -6495,18 +6360,22 @@ fn expand_named_struct(
     } else if pure_any_dispatch {
       pure_any_parse_tokens_io
     } else if !has_child_dispatch && !has_any_dispatch {
-      if flat_choice_has_wildcard {
-        flat_choice_dispatch_tokens_io.clone()
-      } else {
-        quote! {
-          #flat_choice_dispatch_tokens_io
+      quote! {
+        match event_name {
+          #( #child_choice_match_tokens_io )*
+          #choice_fallback_tokens
         }
       }
     } else if !has_child_dispatch {
       quote! {
-        #flat_choice_dispatch_tokens_io
-        let mut matched = false;
-        #( #any_parse_tokens_io )*
+        let matched = match event_name {
+          #( #child_choice_match_tokens_io )*
+          _ => {
+            let mut matched = false;
+            #( #any_parse_tokens_io )*
+            matched
+          }
+        };
         if matched {
           continue;
         }
@@ -6514,15 +6383,14 @@ fn expand_named_struct(
     } else if !has_choice_dispatch && !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #( #direct_child_match_tokens_io )*
+          #( #child_match_tokens_io )*
           _ => {}
         }
       }
     } else if !has_choice_dispatch && !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_io )*
-          #( #child_parse_tokens_io )*
+          #( #child_match_tokens_io )*
           _ => false,
         };
         if matched {
@@ -6532,17 +6400,16 @@ fn expand_named_struct(
     } else if !has_any_dispatch && !has_text_child_dispatch {
       quote! {
         match event_name {
-          #( #direct_child_match_tokens_io )*
-          #( #flat_choice_match_tokens_io )*
+          #( #child_choice_match_tokens_io )*
+          #( #flat_choice_fallback_match_tokens_io )*
           #choice_fallback_tokens
         }
       }
     } else if !has_any_dispatch {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_io )*
-          #( #flat_choice_match_tokens_io )*
-          #( #child_parse_tokens_io )*
+          #( #child_choice_match_tokens_io )*
+          #( #flat_choice_fallback_match_tokens_io )*
           _ => false,
         };
         if matched {
@@ -6552,9 +6419,8 @@ fn expand_named_struct(
     } else {
       quote! {
         let matched = match event_name {
-          #( #direct_child_match_tokens_io )*
-          #( #flat_choice_match_tokens_io )*
-          #( #child_parse_tokens_io )*
+          #( #child_choice_match_tokens_io )*
+          #( #flat_choice_fallback_match_tokens_io )*
           _ => {
             let mut matched = false;
             #( #any_parse_tokens_io )*
@@ -7025,13 +6891,9 @@ fn expand_named_struct(
       || !pure_any_choice_dispatch);
   let child_event_name_tokens = if !needs_child_event_name {
     quote! {}
-  } else if use_local_name_child_dispatch || pure_named_choice_dispatch {
-    quote! {
-      let event_name = e.local_name().into_inner();
-    }
   } else {
     quote! {
-      let event_name = e.name().into_inner();
+      let event_name = e.local_name().into_inner();
     }
   };
   let borrowed_children_text_loop_tokens = quote! {

@@ -738,6 +738,14 @@
     },
     {
       "RustName": "RunChoice",
+      "AddVariants": [
+        {
+          "RustName": "SymbolCharExt",
+          "QName": "w16se:sym",
+          "Docs": "Extended Symbol Character.",
+          "PayloadRustType": "SymbolChar"
+        }
+      ],
       "AddXmlAny": true
     },
     {

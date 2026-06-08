@@ -35,7 +35,7 @@ pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, decode_utf16_xml_bytes,
-  from_bytes_inner, from_reader_inner, from_str_inner, parse_decimal_number_or_percent_attr,
+  from_bytes_inner, from_reader_inner, parse_decimal_number_or_percent_attr,
   parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
   read_raw_element_xml_borrowed, read_raw_element_xml_borrowed_bytes, read_raw_element_xml_io,
   read_raw_element_xml_io_bytes, read_raw_empty_xml_borrowed, read_raw_empty_xml_borrowed_bytes,
@@ -505,7 +505,7 @@ mod tests {
     xml: &str,
     f: impl FnOnce(Attribute<'_>, Decoder) -> Result<T, SdkError>,
   ) -> Result<T, SdkError> {
-    let mut reader = from_str_inner(xml)?;
+    let mut reader = from_bytes_inner(xml.as_bytes())?;
     let event = reader.next()?;
     let e = match event {
       Event::Start(e) | Event::Empty(e) => e,

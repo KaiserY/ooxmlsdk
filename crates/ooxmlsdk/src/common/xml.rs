@@ -325,13 +325,6 @@ fn find_ascii_ignore_case(haystack: &str, needle: &str) -> Option<usize> {
     .position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
-#[inline]
-pub(crate) fn from_str_inner(s: &str) -> Result<SliceReader<'_>, SdkError> {
-  let mut xml_reader = Reader::from_str(s);
-  xml_reader.config_mut().check_end_names = false;
-  Ok(SliceReader::new(xml_reader))
-}
-
 #[inline(always)]
 pub(crate) fn attr_raw_value<'a>(attr: &'a Attribute<'a>) -> Option<&'a [u8]> {
   let value = attr.value.as_ref();

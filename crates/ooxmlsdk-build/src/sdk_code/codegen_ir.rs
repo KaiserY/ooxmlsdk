@@ -216,7 +216,10 @@ pub enum VariantWireDecl {
     #[serde(rename = "QNames")]
     qnames: Vec<String>,
   },
-  Any,
+  Any {
+    #[serde(rename = "QNames")]
+    qnames: Vec<String>,
+  },
   #[default]
   Text,
 }
@@ -384,7 +387,7 @@ mod tests {
             rust_name: "UnknownXml".to_string(),
             docs: String::new(),
             version: "Office2007".to_string(),
-            wire: VariantWireDecl::Any,
+            wire: VariantWireDecl::Any { qnames: Vec::new() },
             payload: TypeRefDecl {
               rust_type: "std::boxed::Box<[u8]>".to_string(),
               module_path: None,

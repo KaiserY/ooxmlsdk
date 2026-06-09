@@ -14,6 +14,14 @@
       ]
     }
   ],
+  "ChoiceEnums": [
+    {
+      "RustName": "GraphicDataChoice",
+      "AddXmlAny": [
+        "wp:wsp"
+      ]
+    }
+  ],
   "Types": [
     {
       "ClassName": "Blip",

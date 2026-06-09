@@ -2,7 +2,7 @@
   "ChoiceEnums": [
     {
       "RustName": "ChartSpaceChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "DataLabelChoice",

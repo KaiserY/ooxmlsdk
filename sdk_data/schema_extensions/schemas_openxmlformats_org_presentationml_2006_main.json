@@ -93,11 +93,11 @@
   "ChoiceEnums": [
     {
       "RustName": "ShapeTreeChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "GroupShapeChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     }
   ]
 }

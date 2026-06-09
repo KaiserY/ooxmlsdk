@@ -80,7 +80,7 @@ fn variant_qname_prefix_from_decl(variant: &VariantDecl) -> Option<&str> {
     VariantWireDecl::Child { qnames }
     | VariantWireDecl::Sequence { qnames }
     | VariantWireDecl::TextChild { qnames } => qnames.first()?,
-    VariantWireDecl::Any | VariantWireDecl::Text => return None,
+    VariantWireDecl::Any { .. } | VariantWireDecl::Text => return None,
   };
   schema_choice_variant_qname_prefix(qname)
 }
@@ -475,7 +475,7 @@ fn inlineable_anonymous_choice_wrapper_payload_variants(
       VariantWireDecl::Child { .. }
       | VariantWireDecl::Sequence { .. }
       | VariantWireDecl::TextChild { .. } => {}
-      VariantWireDecl::Any | VariantWireDecl::Text => return None,
+      VariantWireDecl::Any { .. } | VariantWireDecl::Text => return None,
     }
     variants.push(variant);
   }
@@ -611,7 +611,7 @@ fn inlineable_choice_payload_variants<'a>(
       }
       VariantWireDecl::Sequence { .. }
       | VariantWireDecl::TextChild { .. }
-      | VariantWireDecl::Any
+      | VariantWireDecl::Any { .. }
       | VariantWireDecl::Text => return None,
     }
     variants.push(variant);
@@ -640,7 +640,7 @@ fn variant_child_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
     VariantWireDecl::Child { qnames } => Some(qnames),
     VariantWireDecl::Sequence { .. }
     | VariantWireDecl::TextChild { .. }
-    | VariantWireDecl::Any
+    | VariantWireDecl::Any { .. }
     | VariantWireDecl::Text => None,
   }
 }
@@ -650,7 +650,7 @@ fn variant_start_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
     VariantWireDecl::Child { qnames }
     | VariantWireDecl::Sequence { qnames }
     | VariantWireDecl::TextChild { qnames } => Some(qnames),
-    VariantWireDecl::Any | VariantWireDecl::Text => None,
+    VariantWireDecl::Any { .. } | VariantWireDecl::Text => None,
   }
 }
 
@@ -920,7 +920,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
       rust_name: "XmlAny".to_string(),
       docs: "Unknown XML child.".to_string(),
       version: String::new(),
-      wire: VariantWireDecl::Any,
+      wire: VariantWireDecl::Any { qnames: Vec::new() },
       payload: TypeRefDecl {
         rust_type: "std::boxed::Box<[u8]>".to_string(),
         module_path: None,
@@ -2401,7 +2401,9 @@ fn build_simple_one_choice_variant_decl(
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
-    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => VariantWireDecl::Any,
+    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => {
+      VariantWireDecl::Any { qnames: Vec::new() }
+    }
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild if variant.name.is_empty() => {
       VariantWireDecl::Text
     }
@@ -2601,7 +2603,9 @@ fn build_one_sequence_choice_variant_decl(
   let effective_kind = effective_child_kind_from_name(variant.name, variant.kind, context);
 
   let wire = match effective_kind {
-    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => VariantWireDecl::Any,
+    crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => {
+      VariantWireDecl::Any { qnames: Vec::new() }
+    }
     crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild if variant.name.is_empty() => {
       VariantWireDecl::Text
     }

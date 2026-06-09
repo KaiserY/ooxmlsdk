@@ -152,8 +152,8 @@ pub struct SchemaTypeAddChildExtension {
 pub struct SchemaChoiceEnumExtension {
   pub rust_name: String,
   pub repeated: Option<bool>,
-  #[serde(skip_serializing_if = "is_false")]
-  pub add_xml_any: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub add_xml_any: Option<Vec<String>>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub add_variants: Vec<SchemaChoiceVariantExtension>,
 }
@@ -171,10 +171,6 @@ pub struct SchemaChoiceVariantExtension {
   pub payload_rust_type: String,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub payload_module_path: String,
-}
-
-fn is_false(value: &bool) -> bool {
-  !*value
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -660,23 +656,31 @@ pub fn apply_codegen_ir_schema_extensions(
         );
       }
 
-      type_decl.members.push(MemberDecl::Variant(VariantDecl {
-        rust_name: variant_extension.rust_name.clone(),
-        docs: variant_extension.docs.clone(),
-        version: variant_extension.version.clone(),
-        wire: VariantWireDecl::Child {
-          qnames: vec![variant_extension.q_name.clone()],
-        },
-        payload: TypeRefDecl {
-          rust_type: variant_extension.payload_rust_type.clone(),
-          module_path: (!variant_extension.payload_module_path.is_empty())
-            .then(|| variant_extension.payload_module_path.clone()),
-        },
-      }));
+      let insert_index = type_decl
+        .members
+        .iter()
+        .position(|member| matches!(member, MemberDecl::Variant(variant) if matches!(variant.wire, VariantWireDecl::Any { .. })))
+        .unwrap_or(type_decl.members.len());
+      type_decl.members.insert(
+        insert_index,
+        MemberDecl::Variant(VariantDecl {
+          rust_name: variant_extension.rust_name.clone(),
+          docs: variant_extension.docs.clone(),
+          version: variant_extension.version.clone(),
+          wire: VariantWireDecl::Child {
+            qnames: vec![variant_extension.q_name.clone()],
+          },
+          payload: TypeRefDecl {
+            rust_type: variant_extension.payload_rust_type.clone(),
+            module_path: (!variant_extension.payload_module_path.is_empty())
+              .then(|| variant_extension.payload_module_path.clone()),
+          },
+        }),
+      );
     }
 
-    if choice_extension.add_xml_any {
-      add_xml_any_choice_variant(type_decl);
+    if let Some(qnames) = &choice_extension.add_xml_any {
+      add_xml_any_choice_variant(type_decl, qnames.clone());
     }
   }
 
@@ -722,13 +726,17 @@ fn apply_choice_enum_repeated(
   }
 }
 
-fn add_xml_any_choice_variant(type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl) {
-  if type_decl.members.iter().any(|member| {
-    matches!(
-      member,
-      MemberDecl::Variant(variant) if variant.rust_name == "XmlAny"
-    )
+fn add_xml_any_choice_variant(
+  type_decl: &mut crate::sdk_code::codegen_ir::TypeDecl,
+  qnames: Vec<String>,
+) {
+  if let Some(existing) = type_decl.members.iter_mut().find_map(|member| {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
+    (variant.rust_name == "XmlAny").then_some(variant)
   }) {
+    existing.wire = VariantWireDecl::Any { qnames };
     return;
   }
 
@@ -736,7 +744,7 @@ fn add_xml_any_choice_variant(type_decl: &mut crate::sdk_code::codegen_ir::TypeD
     rust_name: "XmlAny".to_string(),
     docs: "Unknown XML child.".to_string(),
     version: String::new(),
-    wire: VariantWireDecl::Any,
+    wire: VariantWireDecl::Any { qnames },
     payload: TypeRefDecl {
       rust_type: "std::boxed::Box<[u8]>".to_string(),
       module_path: None,
@@ -749,7 +757,7 @@ fn variant_wire_qnames(wire: &VariantWireDecl) -> Option<&[String]> {
     VariantWireDecl::Child { qnames }
     | VariantWireDecl::Sequence { qnames }
     | VariantWireDecl::TextChild { qnames } => Some(qnames),
-    VariantWireDecl::Any | VariantWireDecl::Text => None,
+    VariantWireDecl::Any { .. } | VariantWireDecl::Text => None,
   }
 }
 
@@ -1441,7 +1449,7 @@ mod tests {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "ControlPropertiesChoice".to_string(),
           repeated: None,
-          add_xml_any: false,
+          add_xml_any: None,
           add_variants: vec![SchemaChoiceVariantExtension {
             rust_name: "DrawingRunProperties".to_string(),
             q_name: "a:CT_TextCharacterProperties/a:rPr".to_string(),
@@ -1502,7 +1510,7 @@ mod tests {
       SchemaExtensions {
         choice_enums: vec![SchemaChoiceEnumExtension {
           rust_name: "RunChoice".to_string(),
-          add_xml_any: true,
+          add_xml_any: Some(Vec::new()),
           ..Default::default()
         }],
         ..Default::default()
@@ -1517,7 +1525,7 @@ mod tests {
       panic!("expected variant");
     };
     assert_eq!(variant.rust_name, "XmlAny");
-    assert_eq!(variant.wire, VariantWireDecl::Any);
+    assert_eq!(variant.wire, VariantWireDecl::Any { qnames: Vec::new() });
     assert_eq!(variant.payload.rust_type, "std::boxed::Box<[u8]>");
     assert!(variant.payload.module_path.is_none());
   }

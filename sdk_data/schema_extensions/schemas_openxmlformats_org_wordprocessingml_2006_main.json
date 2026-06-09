@@ -730,11 +730,11 @@
   "ChoiceEnums": [
     {
       "RustName": "BodyChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "ParagraphChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "RunChoice",
@@ -746,7 +746,7 @@
           "PayloadRustType": "SymbolChar"
         }
       ],
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "SdtPropertiesChoice",

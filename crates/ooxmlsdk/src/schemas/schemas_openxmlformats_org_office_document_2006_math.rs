@@ -205,6 +205,7 @@ pub struct Run {
                 qname = "w:lastRenderedPageBreak"
             ),
             child(variant = MText, qname = "m:t"),
+            child(variant = DrawingRunProperties, qname = "a:rPr"),
             any
         )
     )]
@@ -2435,6 +2436,7 @@ pub enum RunChoice {
   LastRenderedPageBreak,
   /// Text.
   MText(std::boxed::Box<Text>),
+  DrawingRunProperties(std::boxed::Box<crate::schemas::a::RunProperties>),
   /// Unknown XML child.
   XmlAny(std::boxed::Box<[u8]>),
 }

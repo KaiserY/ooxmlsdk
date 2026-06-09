@@ -3,7 +3,7 @@ use proc_macro2::{Group, Ident as TokenIdent, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use syn::{Attribute, Ident, Type, Variant, parse_str, parse2};
+use syn::{Attribute, Ident, LitStr, Type, Variant, parse_str, parse2};
 
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
@@ -234,7 +234,7 @@ impl TypeContainmentGraph {
             }
             MemberDecl::Variant(variant) => {
               let target = match &variant.wire {
-                crate::sdk_code::codegen_ir::VariantWireDecl::Any
+                crate::sdk_code::codegen_ir::VariantWireDecl::Any { .. }
                 | crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
                   schema_type_key_from_ref(module, &variant.payload)
                 }
@@ -385,7 +385,7 @@ impl RecursiveSccGraph {
               let target = match &variant.wire {
                 VariantWireDecl::Child { .. }
                 | VariantWireDecl::Sequence { .. }
-                | VariantWireDecl::Any
+                | VariantWireDecl::Any { .. }
                 | VariantWireDecl::Text => schema_type_key_from_ref(module, &variant.payload),
                 VariantWireDecl::TextChild { .. } => {
                   if is_value_like_type_ref(module, &variant.payload, type_graph) {
@@ -2411,7 +2411,17 @@ fn gen_choice_type_decl(
   };
   let mut variants = Vec::new();
 
-  for member in &type_decl.members {
+  for member in type_decl
+    .members
+    .iter()
+    .filter(|member| !matches!(member, MemberDecl::Variant(variant) if matches!(variant.wire, VariantWireDecl::Any { .. })))
+    .chain(
+      type_decl
+        .members
+        .iter()
+        .filter(|member| matches!(member, MemberDecl::Variant(variant) if matches!(variant.wire, VariantWireDecl::Any { .. }))),
+    )
+  {
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
@@ -2762,7 +2772,7 @@ fn gen_choice_variant_tokens(
   );
 
   match &variant.wire {
-    crate::sdk_code::codegen_ir::VariantWireDecl::Any => {
+    crate::sdk_code::codegen_ir::VariantWireDecl::Any { .. } => {
       let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
       Ok(vec![quote! {
         #prefix_attrs
@@ -2933,7 +2943,7 @@ fn choice_variant_rendered_names(
   _module: &SchemaModuleDecl,
 ) -> Option<Vec<String>> {
   match &variant.wire {
-    crate::sdk_code::codegen_ir::VariantWireDecl::Any
+    crate::sdk_code::codegen_ir::VariantWireDecl::Any { .. }
     | crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
     | crate::sdk_code::codegen_ir::VariantWireDecl::Text
     | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. }
@@ -3820,9 +3830,9 @@ fn choice_type_accepts_any(module: &SchemaModuleDecl, rust_type: &str) -> bool {
       .map(|type_decl| match type_decl.kind {
         TypeKind::ChoiceEnum => type_decl.members.iter().any(|member| match member {
           MemberDecl::Variant(VariantDecl {
-            wire: VariantWireDecl::Any,
+            wire: VariantWireDecl::Any { qnames },
             ..
-          }) => true,
+          }) => qnames.is_empty(),
           MemberDecl::Variant(VariantDecl {
             wire: VariantWireDecl::Child { .. },
             payload,
@@ -3954,7 +3964,13 @@ fn choice_variant_metadata_tokens(
   let variant_ident: Ident =
     parse_str(&escape_upper_camel_case(rendered_variant_name.to_string()))?;
   match &variant.wire {
-    VariantWireDecl::Any => Ok(vec![quote! { any }]),
+    VariantWireDecl::Any { qnames } if qnames.is_empty() => Ok(vec![quote! { any }]),
+    VariantWireDecl::Any { qnames } => {
+      let qnames = qnames
+        .iter()
+        .map(|qname| LitStr::new(qname, Span::call_site()));
+      Ok(vec![quote! { any(qnames = [#(#qnames),*]) }])
+    }
     VariantWireDecl::Text => Ok(vec![quote! { text }]),
     VariantWireDecl::TextChild { qnames } => Ok(
       qnames

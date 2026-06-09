@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-  Attribute, Data, DataEnum, DeriveInput, Expr, ExprLit, ExprRange, ExprUnary, Fields, Ident, Lit,
-  LitByteStr, LitStr, Meta, RangeLimits, Token, Type, TypePath, UnOp, bracketed,
+  Attribute, Data, DataEnum, DeriveInput, Expr, ExprArray, ExprLit, ExprRange, ExprUnary, Fields,
+  Ident, Lit, LitByteStr, LitStr, Meta, RangeLimits, Token, Type, TypePath, UnOp, bracketed,
   parse::{Parse, ParseStream},
   parse_macro_input, parse_str,
   punctuated::Punctuated,
@@ -378,6 +378,7 @@ enum SdkTypeChoiceItem {
   },
   Any {
     variant: Ident,
+    qnames: Vec<String>,
   },
   Text {
     variant: Ident,
@@ -899,25 +900,40 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               }
               Ok(())
             } else if nested.path.is_ident("any") {
-              accepts_any = true;
               if nested.input.is_empty() {
+                accepts_any = true;
                 choice_items.push(SdkTypeChoiceItem::Any {
                   variant: Ident::new("XmlAny", Span::call_site()),
+                  qnames: Vec::new(),
                 });
               } else {
                 let mut variant = None;
+                let mut qnames = Vec::new();
                 nested.parse_nested_meta(|any| {
                   if any.path.is_ident("variant") {
                     variant = Some(any.value()?.parse()?);
+                    Ok(())
+                  } else if any.path.is_ident("qnames") {
+                    let values: ExprArray = any.value()?.parse()?;
+                    for value in values.elems {
+                      let Expr::Lit(ExprLit {
+                        lit: Lit::Str(value),
+                        ..
+                      }) = value
+                      else {
+                        return Err(any.error("sdk choice any qnames must be string literals"));
+                      };
+                      qnames.push(value.value());
+                    }
                     Ok(())
                   } else {
                     Err(any.error("unsupported sdk choice any attribute"))
                   }
                 })?;
-                let variant = variant.ok_or_else(|| {
-                  syn::Error::new_spanned(&nested.path, "sdk choice any requires variant")
-                })?;
-                choice_items.push(SdkTypeChoiceItem::Any { variant });
+                let variant = variant.unwrap_or_else(|| Ident::new("XmlAny", Span::call_site()));
+                accepts_any = true;
+                choice_qnames.extend(qnames.iter().cloned());
+                choice_items.push(SdkTypeChoiceItem::Any { variant, qnames });
               }
               Ok(())
             } else if nested.path.is_ident("qname") {

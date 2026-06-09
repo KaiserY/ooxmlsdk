@@ -19,11 +19,11 @@
   "ChoiceEnums": [
     {
       "RustName": "TwoCellAnchorChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     },
     {
       "RustName": "WorksheetDrawingChoice",
-      "AddXmlAny": true
+      "AddXmlAny": []
     }
   ]
 }

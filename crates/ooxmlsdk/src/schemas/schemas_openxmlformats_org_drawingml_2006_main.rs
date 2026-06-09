@@ -5499,7 +5499,7 @@ pub struct GraphicData {
             child(variant = WebExtension, qname = "we:webextension"),
             child(variant = WebExtensionReference, qname = "we:webextensionref"),
             child(variant = TimeSlicer, qname = "tsle:timeslicer"),
-            any
+            any(qnames = ["wp:wsp"])
         )
     )]
   pub graphic_data_choice: Vec<GraphicDataChoice>,

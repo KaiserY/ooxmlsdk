@@ -1710,7 +1710,7 @@ mod tests {
   }
 
   #[test]
-  fn pdfexport_fixture_tdf156685_mce_processing_rewrites_run_alternate_content() {
+  fn pdfexport_fixture_tdf156685_handles_run_alternate_content_xml_any() {
     let path = fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice/tdf156685.docx");
     let settings = OpenSettings {
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
@@ -1721,37 +1721,70 @@ mod tests {
     };
     let mut package =
       WordprocessingDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
-    let root = package
-      .main_document_part()
-      .unwrap()
-      .root_element(&mut package)
-      .unwrap();
 
     let mut drawing_count = 0usize;
     let mut pict_count = 0usize;
     let mut xml_any_count = 0usize;
+    let mut alternate_content_xml_any_count = 0usize;
 
-    for choice in &root.body.as_ref().unwrap().body_choice {
-      let w::BodyChoice::Paragraph(paragraph) = choice else {
-        continue;
-      };
-      for choice in &paragraph.paragraph_choice {
-        let w::ParagraphChoice::WRun(run) = choice else {
+    {
+      let root = package
+        .main_document_part()
+        .unwrap()
+        .root_element(&mut package)
+        .unwrap();
+
+      for choice in &root.body.as_ref().unwrap().body_choice {
+        let w::BodyChoice::Paragraph(paragraph) = choice else {
           continue;
         };
-        for choice in &run.run_choice {
-          match choice {
-            w::RunChoice::Drawing(_) => drawing_count += 1,
-            w::RunChoice::Picture(_) => pict_count += 1,
-            w::RunChoice::XmlAny(_) => xml_any_count += 1,
-            _ => {}
+        for choice in &paragraph.paragraph_choice {
+          let w::ParagraphChoice::WRun(run) = choice else {
+            continue;
+          };
+          for choice in &run.run_choice {
+            match choice {
+              w::RunChoice::Drawing(_) => drawing_count += 1,
+              w::RunChoice::Picture(_) => pict_count += 1,
+              w::RunChoice::XmlAny(xml) => {
+                xml_any_count += 1;
+                if xml
+                  .windows(b"AlternateContent".len())
+                  .any(|window| window == b"AlternateContent")
+                {
+                  alternate_content_xml_any_count += 1;
+                }
+              }
+              _ => {}
+            }
           }
         }
       }
     }
 
-    assert_eq!(xml_any_count, 0);
-    assert!(drawing_count + pict_count > 0);
+    assert_eq!(xml_any_count, 2);
+    assert_eq!(alternate_content_xml_any_count, 2);
+    assert_eq!(drawing_count + pict_count, 0);
+
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let inline_shape_count = doc
+      .blocks
+      .iter()
+      .chain(doc.sections.iter().flat_map(|section| &section.blocks))
+      .filter_map(|block| match block {
+        crate::docx::Block::Paragraph(paragraph) => Some(paragraph),
+        _ => None,
+      })
+      .flat_map(|paragraph| &paragraph.inlines)
+      .filter(|inline| {
+        matches!(
+          inline,
+          crate::docx::InlineItem::Image(_) | crate::docx::InlineItem::Shape(_)
+        )
+      })
+      .count();
+
+    assert!(inline_shape_count > 0);
   }
 
   #[test]

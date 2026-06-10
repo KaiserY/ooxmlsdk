@@ -1922,19 +1922,13 @@ fn sdk_type_from_str_impl_tokens(
 
 fn root_read_tokens(
   ident: &Ident,
-  tag_qname_lit: &LitByteStr,
   local_name_lit: &LitByteStr,
-  root_namespace_uri_tokens: &proc_macro2::TokenStream,
   has_xml_header_field: bool,
   mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
-  let read_start = match (mode, has_xml_header_field) {
-    (DeserializeMode::Borrowed, true) => quote! { crate::common::read_root_start_borrowed },
-    (DeserializeMode::Borrowed, false) => {
-      quote! { crate::common::read_root_start_borrowed_no_header }
-    }
-    (DeserializeMode::Io, true) => quote! { crate::common::read_root_start_io },
-    (DeserializeMode::Io, false) => quote! { crate::common::read_root_start_io_no_header },
+  let read_start = match mode {
+    DeserializeMode::Borrowed => quote! { crate::common::read_root_start_borrowed },
+    DeserializeMode::Io => quote! { crate::common::read_root_start_io },
   };
   let read_inner = match mode {
     DeserializeMode::Borrowed => quote! { <Self as crate::sdk::SdkType>::read_borrowed_inner },
@@ -1945,9 +1939,7 @@ fn root_read_tokens(
       let (start, empty, xml_header_state) = #read_start(
         &mut xml_reader,
         stringify!(#ident),
-        #tag_qname_lit,
         #local_name_lit,
-        #root_namespace_uri_tokens,
       )?;
       let mut value = #read_inner(&mut xml_reader, start, empty)?;
       value.xml_header = xml_header_state;
@@ -1955,12 +1947,10 @@ fn root_read_tokens(
     }
   } else {
     quote! {
-      let (start, empty) = #read_start(
+      let (start, empty, _) = #read_start(
         &mut xml_reader,
         stringify!(#ident),
-        #tag_qname_lit,
         #local_name_lit,
-        #root_namespace_uri_tokens,
       )?;
       #read_inner(&mut xml_reader, start, empty)
     }
@@ -2074,7 +2064,7 @@ fn choice_item_parse_bodies<'a>(
         let parsed_child = if next_empty {
           crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
         } else {
-          let value = xml_reader.read_text(e.name())?;
+          let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
           crate::common::parse_text_child_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
         };
       };
@@ -2127,10 +2117,7 @@ fn expand_tuple_wrapper(
     .first()
     .ok_or_else(|| syn::Error::new_spanned(fields, "tuple wrapper missing inner field"))?
     .ty;
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(schema_qname);
+  let QNameInfo { local_name, .. } = parse_qname_info(schema_qname);
   if local_name.is_empty() {
     return Err(syn::Error::new_spanned(
       input,
@@ -2138,21 +2125,7 @@ fn expand_tuple_wrapper(
     ));
   }
 
-  let tag_qname = if tag_prefix.is_empty() {
-    local_name.clone()
-  } else {
-    format!("{tag_prefix}:{local_name}")
-  };
-  let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let root_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
-  let root_namespace_uri_tokens = match root_namespace_uri {
-    Some(uri) => {
-      let uri_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
-      quote! { Some(#uri_lit) }
-    }
-    None => quote! { None },
-  };
   let no_prefix = parse_sdk_no_prefix(&input.attrs)?;
   let start_tag_open = write_start_tag_open_tokens(schema_qname, no_prefix);
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
@@ -2161,22 +2134,9 @@ fn expand_tuple_wrapper(
   } else {
     quote! { self.write_inner(writer)? }
   };
-  let root_read_borrowed_tokens = root_read_tokens(
-    ident,
-    &tag_qname_lit,
-    &local_name_lit,
-    &root_namespace_uri_tokens,
-    false,
-    DeserializeMode::Borrowed,
-  );
-  let root_read_io_tokens = root_read_tokens(
-    ident,
-    &tag_qname_lit,
-    &local_name_lit,
-    &root_namespace_uri_tokens,
-    false,
-    DeserializeMode::Io,
-  );
+  let root_read_borrowed_tokens =
+    root_read_tokens(ident, &local_name_lit, false, DeserializeMode::Borrowed);
+  let root_read_io_tokens = root_read_tokens(ident, &local_name_lit, false, DeserializeMode::Io);
   let root_methods_tokens = sdk_type_root_methods_tokens(
     &root_read_borrowed_tokens,
     &root_read_io_tokens,
@@ -2399,7 +2359,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
             let parsed_child = if next_empty {
               crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
             } else {
-              let value = child_reader.read_text(e.name())?;
+              let value = child_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
               crate::common::parse_text_child_value::<_>(
                 value.as_ref(),
                 stringify!(#ident),
@@ -3048,11 +3008,11 @@ fn build_text_child_parse_body(
   } else if let Some(kind) = simple_union_kind {
     let parse_tokens = parse_simple_union_value_tokens(kind, quote! { value });
     quote! {{
-      let value = text.into_owned();
+      let value = text;
       #parse_tokens
     }}
   } else if is_string_like_effective_type(&value_ty, simple_type) {
-    quote! { text.into_owned() }
+    quote! { text }
   } else {
     quote! {{
       crate::common::parse_text_child_value::<#value_ty>(
@@ -3098,7 +3058,7 @@ fn build_text_child_parse_body(
     let parsed_child = if next_empty {
       #empty_value_tokens
     } else {
-      let text = xml_reader.read_text(e.name())?;
+      let text = xml_reader.read_text(e.name(), stringify!(#owner_ident), stringify!(#field_ident))?;
       #parse_from_text_tokens
     };
     #assign_tokens
@@ -4116,12 +4076,6 @@ fn expand_named_struct(
     tag_prefix,
     local_name,
   } = parse_qname_info(schema_qname);
-  let tag_qname = if tag_prefix.is_empty() {
-    local_name.clone()
-  } else {
-    format!("{tag_prefix}:{local_name}")
-  };
-  let tag_qname_lit = LitByteStr::new(tag_qname.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   let no_prefix = parse_sdk_no_prefix(&input.attrs)?;
   let extra_xmlns = parse_sdk_extra_xmlns(&input.attrs)?;
@@ -4134,13 +4088,6 @@ fn expand_named_struct(
   let end_tag = write_end_tag_tokens(schema_qname, no_prefix);
   let stack_parser = parse_sdk_stack_parser(&input.attrs)?;
   let fixed_namespace_uri = namespaces::uri_by_prefix(&tag_prefix);
-  let root_namespace_uri_tokens = match fixed_namespace_uri {
-    Some(uri) => {
-      let uri_lit = LitByteStr::new(uri.as_bytes(), Span::call_site());
-      quote! { Some(#uri_lit) }
-    }
-    None => quote! { None },
-  };
   let mut attr_fields = Vec::new();
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
@@ -5333,7 +5280,7 @@ fn expand_named_struct(
                             let parsed_value = if next_empty {
                               crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
                             } else {
-                              let value = xml_reader.read_text(e.name())?;
+                              let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
                               crate::common::parse_text_child_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
                             };
                             #field_ident = Some(parsed_value);
@@ -5752,7 +5699,7 @@ fn expand_named_struct(
                           let parsed_value = if next_empty {
                             crate::common::parse_value::<#value_ty>("", stringify!(#ident), stringify!(#field_ident))?
                           } else {
-                            let value = xml_reader.read_text(e.name())?;
+                            let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#field_ident))?;
                             crate::common::parse_text_child_value::<#value_ty>(value.as_ref(), stringify!(#ident), stringify!(#field_ident))?
                           };
                           #field_ident = Some(parsed_value);
@@ -6330,16 +6277,14 @@ fn expand_named_struct(
   let text_read_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
     quote! {
-      quick_xml::events::Event::Text(t) => {
-        crate::common::push_xml_text(&mut #field_ident, t)?;
-      }
-      quick_xml::events::Event::CData(t) => {
-        crate::common::push_xml_cdata(&mut #field_ident, t)?;
-      }
-      quick_xml::events::Event::GeneralRef(t) => {
-        crate::common::push_xml_general_ref(
+      event @ (
+        quick_xml::events::Event::Text(_)
+        | quick_xml::events::Event::CData(_)
+        | quick_xml::events::Event::GeneralRef(_)
+      ) => {
+        xml_reader.drain_text_field_from_event(
           &mut #field_ident,
-          t,
+          event,
           stringify!(#ident),
           stringify!(#field_ident),
         )?;
@@ -6350,26 +6295,15 @@ fn expand_named_struct(
       quote! {}
     } else {
       quote! {
-        quick_xml::events::Event::Text(t) => {
+        event @ (
+          quick_xml::events::Event::Text(_)
+          | quick_xml::events::Event::CData(_)
+          | quick_xml::events::Event::GeneralRef(_)
+        ) => {
           let mut text_value = None;
-          crate::common::push_xml_text(&mut text_value, t)?;
-          if let Some(text_value) = text_value {
-            let mut handled_text = false;
-            #( #choice_text_parse_tokens )*
-            if !handled_text && !text_value.trim().is_empty() {
-              return Err(crate::common::unexpected_tag(
-                stringify!(#ident),
-                "known child",
-                b"#text",
-              ));
-            }
-          }
-        }
-        quick_xml::events::Event::GeneralRef(t) => {
-          let mut text_value = None;
-          crate::common::push_xml_general_ref(
+          xml_reader.drain_text_field_from_event(
             &mut text_value,
-            t,
+            event,
             stringify!(#ident),
             "#text",
           )?;
@@ -7058,17 +6992,13 @@ fn expand_named_struct(
   };
   let root_read_borrowed_tokens = root_read_tokens(
     ident,
-    &tag_qname_lit,
     &local_name_lit,
-    &root_namespace_uri_tokens,
     has_xml_header_field,
     DeserializeMode::Borrowed,
   );
   let root_read_io_tokens = root_read_tokens(
     ident,
-    &tag_qname_lit,
     &local_name_lit,
-    &root_namespace_uri_tokens,
     has_xml_header_field,
     DeserializeMode::Io,
   );

@@ -39,8 +39,7 @@ pub(crate) use xml::{
   parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
   read_raw_element_xml_borrowed_bytes, read_raw_element_xml_io_bytes,
   read_raw_empty_xml_borrowed_bytes, read_raw_empty_xml_io_bytes, read_root_start_borrowed,
-  read_root_start_borrowed_no_header, read_root_start_io, read_root_start_io_no_header,
-  root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
+  read_root_start_io, root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
   write_decimal_number_or_percent_attr, write_escaped_content_str, write_escaped_content_text,
   write_escaped_text, write_list_attr_value, write_list_text_content_value,
   write_measurement_or_percent_attr, write_signed_twips_measure_attr, write_twips_measure_attr,
@@ -431,32 +430,6 @@ pub(crate) fn package_main_part_path_matches(
     && actual_stem.starts_with(descriptor_path_prefix)
     && actual_stem.as_bytes()[descriptor_path_prefix.len()] == b'/'
     && &actual_stem[descriptor_path_prefix.len() + 1..] == descriptor_target_name
-}
-
-#[inline]
-pub(crate) fn push_xml_text(
-  value: &mut Option<String>,
-  text: quick_xml::events::BytesText<'_>,
-) -> Result<(), SdkError> {
-  xml::push_xml_text(value, text)
-}
-
-#[inline]
-pub(crate) fn push_xml_cdata(
-  value: &mut Option<String>,
-  text: quick_xml::events::BytesCData<'_>,
-) -> Result<(), SdkError> {
-  xml::push_xml_cdata(value, text)
-}
-
-#[inline]
-pub(crate) fn push_xml_general_ref(
-  value: &mut Option<String>,
-  text: quick_xml::events::BytesRef<'_>,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<(), SdkError> {
-  xml::push_xml_general_ref(value, text, ty, field)
 }
 
 #[inline]

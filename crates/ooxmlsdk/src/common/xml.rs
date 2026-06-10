@@ -1,7 +1,7 @@
 use quick_xml::{
   Decoder, Reader,
   escape::unescape,
-  events::{BytesCData, BytesRef, BytesText, Event, attributes::Attribute},
+  events::{Event, attributes::Attribute},
 };
 use std::io::BufRead;
 
@@ -67,14 +67,55 @@ impl<R: BufRead> IoReader<R> {
   pub fn read_text(
     &mut self,
     end: quick_xml::name::QName<'_>,
-  ) -> Result<std::borrow::Cow<'_, str>, SdkError> {
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<String, SdkError> {
     self.current = None;
     self.buf.clear();
-    let text = self
-      .reader
-      .read_text_into(end, &mut self.buf)?
-      .xml10_content()?;
-    unescape_text(text)
+    let mut value = None;
+    loop {
+      match self.next()? {
+        event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
+          append_xml_text_event(&mut value, event, ty, field)?;
+        }
+        Event::End(e) if e.name() == end => {
+          return Ok(value.unwrap_or_default());
+        }
+        Event::Start(e) | Event::Empty(e) => {
+          return Err(unexpected_tag(
+            ty,
+            "text content",
+            e.local_name().into_inner(),
+          ));
+        }
+        Event::Eof => return Err(unexpected_eof(ty)),
+        _ => {}
+      }
+    }
+  }
+
+  #[inline]
+  pub fn drain_text_field_from_event(
+    &mut self,
+    value: &mut Option<String>,
+    first: Event<'static>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<(), SdkError> {
+    self.current = None;
+    let mut event = first;
+    loop {
+      match event {
+        Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
+          append_xml_text_event(value, event, ty, field)?;
+        }
+        event => {
+          self.pending = Some(event);
+          return Ok(());
+        }
+      }
+      event = self.next()?;
+    }
   }
 
   #[inline]
@@ -158,9 +199,52 @@ impl<'de> SliceReader<'de> {
   pub fn read_text(
     &mut self,
     end: quick_xml::name::QName<'_>,
-  ) -> Result<std::borrow::Cow<'de, str>, SdkError> {
-    let text = self.reader.read_text(end)?.xml10_content()?;
-    unescape_text(text)
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<String, SdkError> {
+    let mut value = None;
+    loop {
+      match self.next()? {
+        event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
+          append_xml_text_event(&mut value, event, ty, field)?;
+        }
+        Event::End(e) if e.name() == end => {
+          return Ok(value.unwrap_or_default());
+        }
+        Event::Start(e) | Event::Empty(e) => {
+          return Err(unexpected_tag(
+            ty,
+            "text content",
+            e.local_name().into_inner(),
+          ));
+        }
+        Event::Eof => return Err(unexpected_eof(ty)),
+        _ => {}
+      }
+    }
+  }
+
+  #[inline]
+  pub fn drain_text_field_from_event(
+    &mut self,
+    value: &mut Option<String>,
+    first: Event<'de>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<(), SdkError> {
+    let mut event = first;
+    loop {
+      match event {
+        Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
+          append_xml_text_event(value, event, ty, field)?;
+        }
+        event => {
+          self.pending = Some(event);
+          return Ok(());
+        }
+      }
+      event = self.next()?;
+    }
   }
 
   #[inline]
@@ -710,66 +794,32 @@ fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]
   invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
 }
 
-#[inline]
-pub(crate) fn push_xml_text(
+fn append_xml_text_event(
   value: &mut Option<String>,
-  text: BytesText<'_>,
-) -> Result<(), SdkError> {
-  let text = text.xml10_content()?;
-  if let Some(value) = value {
-    value.push_str(text.as_ref());
-  } else {
-    *value = Some(text.into_owned());
-  }
-
-  Ok(())
-}
-
-#[inline]
-pub(crate) fn push_xml_cdata(
-  value: &mut Option<String>,
-  text: BytesCData<'_>,
-) -> Result<(), SdkError> {
-  let text = text.xml10_content()?;
-  if let Some(value) = value {
-    value.push_str(text.as_ref());
-  } else {
-    *value = Some(text.into_owned());
-  }
-
-  Ok(())
-}
-
-#[inline]
-pub(crate) fn push_xml_general_ref(
-  value: &mut Option<String>,
-  text: BytesRef<'_>,
+  event: Event<'_>,
   ty: &'static str,
   field: &'static str,
 ) -> Result<(), SdkError> {
-  let entity = text.xml10_content()?;
-  let entity = resolve_general_ref_entity(entity.as_ref())
-    .ok_or_else(|| invalid_field_value(ty, field, entity.to_string()))?;
-
-  if let Some(value) = value {
-    value.push_str(entity.as_ref());
-  } else {
-    *value = Some(entity.into_owned());
+  match event {
+    Event::Text(text) => append_cow_text(value, text.xml10_content()?),
+    Event::CData(text) => append_cow_text(value, text.xml10_content()?),
+    Event::GeneralRef(text) => {
+      let entity = text.xml10_content()?;
+      let entity = resolve_general_ref_entity(entity.as_ref())
+        .ok_or_else(|| invalid_field_value(ty, field, entity.to_string()))?;
+      append_cow_text(value, entity);
+    }
+    _ => unreachable!("append_xml_text_event expects text-like XML events"),
   }
-
   Ok(())
 }
 
 #[inline]
-fn unescape_text<'a>(
-  text: std::borrow::Cow<'a, str>,
-) -> Result<std::borrow::Cow<'a, str>, SdkError> {
-  match text {
-    std::borrow::Cow::Borrowed(text) => Ok(unescape(text)?),
-    std::borrow::Cow::Owned(text) => match unescape(&text)? {
-      std::borrow::Cow::Borrowed(_) => Ok(std::borrow::Cow::Owned(text)),
-      std::borrow::Cow::Owned(text) => Ok(std::borrow::Cow::Owned(text)),
-    },
+fn append_cow_text(value: &mut Option<String>, text: std::borrow::Cow<'_, str>) {
+  if let Some(value) = value {
+    value.push_str(text.as_ref());
+  } else {
+    *value = Some(text.into_owned());
   }
 }
 
@@ -1275,9 +1325,7 @@ fn qname_in(name: &[u8], expected: &[&[u8]]) -> bool {
 pub(crate) fn read_root_start_borrowed<'de>(
   reader: &mut SliceReader<'de>,
   owner: &'static str,
-  tag_qname: &'static [u8],
   local_name: &'static [u8],
-  namespace_uri: Option<&'static [u8]>,
 ) -> Result<
   (
     quick_xml::events::BytesStart<'de>,
@@ -1297,7 +1345,7 @@ pub(crate) fn read_root_start_borrowed<'de>(
         };
       }
       SliceTagEvent::Start(e, empty) => {
-        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
+        if e.local_name().into_inner() == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1312,9 +1360,7 @@ pub(crate) fn read_root_start_borrowed<'de>(
 pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   reader: &mut IoReader<R>,
   owner: &'static str,
-  tag_qname: &'static [u8],
   local_name: &'static [u8],
-  namespace_uri: Option<&'static [u8]>,
 ) -> Result<
   (
     quick_xml::events::BytesStart<'static>,
@@ -1334,7 +1380,7 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
         };
       }
       IoTagEvent::Start(e, empty) => {
-        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
+        if e.local_name().into_inner() == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
@@ -1343,60 +1389,6 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
       IoTagEvent::End(_) | IoTagEvent::Other => {}
     }
   }
-}
-
-#[inline]
-pub(crate) fn read_root_start_borrowed_no_header<'de>(
-  reader: &mut SliceReader<'de>,
-  owner: &'static str,
-  tag_qname: &'static [u8],
-  local_name: &'static [u8],
-  namespace_uri: Option<&'static [u8]>,
-) -> Result<(quick_xml::events::BytesStart<'de>, bool), SdkError> {
-  loop {
-    match reader.next_tag_event()? {
-      SliceTagEvent::Start(e, empty) => {
-        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
-          return Ok((e, empty));
-        }
-        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
-      }
-      SliceTagEvent::Eof => return Err(unexpected_eof(owner)),
-      SliceTagEvent::Decl(_) | SliceTagEvent::End(_) | SliceTagEvent::Other => {}
-    }
-  }
-}
-
-#[inline]
-pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
-  reader: &mut IoReader<R>,
-  owner: &'static str,
-  tag_qname: &'static [u8],
-  local_name: &'static [u8],
-  namespace_uri: Option<&'static [u8]>,
-) -> Result<(quick_xml::events::BytesStart<'static>, bool), SdkError> {
-  loop {
-    match reader.next_tag_event()? {
-      IoTagEvent::Start(e, empty) => {
-        if root_start_matches(&e, tag_qname, local_name, namespace_uri)? {
-          return Ok((e, empty));
-        }
-        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
-      }
-      IoTagEvent::Eof => return Err(unexpected_eof(owner)),
-      IoTagEvent::Decl(_) | IoTagEvent::End(_) | IoTagEvent::Other => {}
-    }
-  }
-}
-
-#[inline]
-fn root_start_matches(
-  start: &quick_xml::events::BytesStart<'_>,
-  _tag_qname: &[u8],
-  local_name: &[u8],
-  _namespace_uri: Option<&[u8]>,
-) -> Result<bool, SdkError> {
-  Ok(start.local_name().into_inner() == local_name)
 }
 
 pub(crate) fn root_element_matches_namespace_local(

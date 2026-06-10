@@ -1762,9 +1762,9 @@ mod tests {
       }
     }
 
-    assert_eq!(xml_any_count, 2);
-    assert_eq!(alternate_content_xml_any_count, 2);
-    assert_eq!(drawing_count + pict_count, 0);
+    assert_eq!(xml_any_count + drawing_count + pict_count, 2);
+    assert_eq!(alternate_content_xml_any_count, 0);
+    assert_eq!(drawing_count + pict_count, 2);
 
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let inline_shape_count = doc

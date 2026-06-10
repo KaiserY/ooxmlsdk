@@ -46,8 +46,7 @@ fn doc_sample_part(file_name: &str, part_name: &str) -> String {
 fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
   let serialized = trim_xml_declaration(serialized);
   assert!(
-    serialized == format!("<x:v>{expected_value}</x:v>")
-      || serialized == format!("<v>{expected_value}</v>"),
+    contains_x_start(serialized, "v") && contains_x_end_text(serialized, expected_value, "v"),
     "{serialized}"
   );
 }

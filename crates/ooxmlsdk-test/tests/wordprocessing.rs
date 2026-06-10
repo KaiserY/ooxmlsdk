@@ -1256,7 +1256,10 @@ fn text_round_trip_from_openxml_element_test() {
     assert_stable_roundtrip::<Text>(fixtures::WORDPROCESSING_TEXT_XML);
 
   assert_eq!(parsed.xml_content.as_deref(), Some("Run Text."));
-  assert_eq!(serialized, "<w:t>Run Text.</w:t>");
+  assert_eq!(
+    serialized,
+    r#"<w:t xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">Run Text.</w:t>"#
+  );
   assert_eq!(reparsed.xml_content.as_deref(), Some("Run Text."));
 }
 

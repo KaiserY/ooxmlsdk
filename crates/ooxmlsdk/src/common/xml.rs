@@ -852,14 +852,6 @@ pub(crate) fn read_raw_empty_xml_borrowed_bytes<'de>(
 }
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_borrowed<'de>(
-  start: quick_xml::events::BytesStart<'de>,
-) -> Result<String, SdkError> {
-  String::from_utf8(read_raw_empty_xml_borrowed_bytes(start)?.into_vec())
-    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
-}
-
-#[inline]
 pub(crate) fn read_raw_element_xml_borrowed_bytes<'de>(
   xml_reader: &mut SliceReader<'de>,
   start: quick_xml::events::BytesStart<'de>,
@@ -881,15 +873,6 @@ pub(crate) fn read_raw_element_xml_borrowed_bytes<'de>(
   xml.extend_from_slice(end_name);
   xml.push(b'>');
   Ok(xml.into_boxed_slice())
-}
-
-#[inline]
-pub(crate) fn read_raw_element_xml_borrowed<'de>(
-  xml_reader: &mut SliceReader<'de>,
-  start: quick_xml::events::BytesStart<'de>,
-) -> Result<String, SdkError> {
-  String::from_utf8(read_raw_element_xml_borrowed_bytes(xml_reader, start)?.into_vec())
-    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
 #[cfg(feature = "flat-opc")]
@@ -944,14 +927,6 @@ pub(crate) fn read_raw_empty_xml_io_bytes(
 }
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_io(
-  start: quick_xml::events::BytesStart<'static>,
-) -> Result<String, SdkError> {
-  String::from_utf8(read_raw_empty_xml_io_bytes(start)?.into_vec())
-    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
-}
-
-#[inline]
 pub(crate) fn read_raw_element_xml_io_bytes<R: BufRead>(
   xml_reader: &mut IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
@@ -975,15 +950,6 @@ pub(crate) fn read_raw_element_xml_io_bytes<R: BufRead>(
   xml.extend_from_slice(end_name);
   xml.push(b'>');
   Ok(xml.into_boxed_slice())
-}
-
-#[inline]
-pub(crate) fn read_raw_element_xml_io<R: BufRead>(
-  xml_reader: &mut IoReader<R>,
-  start: quick_xml::events::BytesStart<'static>,
-) -> Result<String, SdkError> {
-  String::from_utf8(read_raw_element_xml_io_bytes(xml_reader, start)?.into_vec())
-    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
 }
 
 #[cfg(feature = "mce")]

@@ -31,12 +31,6 @@ pub trait XmlRead<'xml> {
 
   fn decoder(&self) -> Decoder;
 
-  fn read_inner<T: crate::sdk::SdkType>(
-    &mut self,
-    start: quick_xml::events::BytesStart<'xml>,
-    empty: bool,
-  ) -> Result<T, SdkError>;
-
   fn read_text(
     &mut self,
     end: quick_xml::name::QName<'_>,
@@ -216,15 +210,6 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   }
 
   #[inline]
-  fn read_inner<T: crate::sdk::SdkType>(
-    &mut self,
-    start: quick_xml::events::BytesStart<'static>,
-    empty: bool,
-  ) -> Result<T, SdkError> {
-    T::read_inner(self, start, empty)
-  }
-
-  #[inline]
   fn read_text(
     &mut self,
     end: quick_xml::name::QName<'_>,
@@ -397,15 +382,6 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
   #[inline]
   fn decoder(&self) -> Decoder {
     SliceReader::decoder(self)
-  }
-
-  #[inline]
-  fn read_inner<T: crate::sdk::SdkType>(
-    &mut self,
-    start: quick_xml::events::BytesStart<'de>,
-    empty: bool,
-  ) -> Result<T, SdkError> {
-    T::read_inner(self, start, empty)
   }
 
   #[inline]

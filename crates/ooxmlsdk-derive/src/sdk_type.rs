@@ -864,6 +864,7 @@ fn stack_parser_child_step_tokens(
     let field_ident = &field.ident;
     let value_ty = stack_child_value_type(&field.ty, field.optional, field.repeated);
     let (read_ty, parsed_expr) = stack_child_read_type_and_expr(&value_ty);
+    let read_child_tokens = sdk_type_read_inner_value_tokens(Some(&read_ty), quote! { xml_reader });
     let assign_tokens = if field.repeated {
       quote! { self.#field_ident.push(#parsed_expr); }
     } else if field.optional {
@@ -875,7 +876,7 @@ fn stack_parser_child_step_tokens(
       &mut arms,
       &field.qname,
       quote! {
-        let parsed_child = crate::common::XmlRead::read_inner::<#read_ty>(xml_reader, e, next_empty)?;
+        let parsed_child = #read_child_tokens;
         #assign_tokens
         None
       },
@@ -905,7 +906,7 @@ fn stack_parser_child_step_tokens(
         );
         continue;
       }
-      let read_ty = ty.clone().unwrap_or_else(|| syn::parse_quote! { _ });
+      let read_child_tokens = sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { xml_reader });
       let assign_tokens = if field.repeated {
         quote! {
           self.#field_ident.push(#choice_ty::#variant(std::boxed::Box::new(parsed_child)));
@@ -919,7 +920,7 @@ fn stack_parser_child_step_tokens(
         &mut arms,
         qname,
         quote! {
-          let parsed_child = crate::common::XmlRead::read_inner::<#read_ty>(xml_reader, e, next_empty)?;
+          let parsed_child = #read_child_tokens;
           #assign_tokens
           None
         },
@@ -1986,15 +1987,18 @@ fn choice_item_parse_bodies<'a>(
   xml_child_slot_assign: &proc_macro2::TokenStream,
 ) -> Option<(&'a str, proc_macro2::TokenStream, proc_macro2::TokenStream)> {
   match item {
-    SdkTypeChoiceItem::Child { variant, qname, .. } => {
+    SdkTypeChoiceItem::Child {
+      variant, ty, qname, ..
+    } => {
+      let read_child_tokens = sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { xml_reader });
       let borrowed_choice = quote! {
         #choice_ty::#variant(std::boxed::Box::new(
-          crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?
+          #read_child_tokens
         ))
       };
       let io_choice = quote! {
         #choice_ty::#variant(std::boxed::Box::new(
-          crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?
+          #read_child_tokens
         ))
       };
       let borrowed_assign_tokens = if repeated {
@@ -2059,7 +2063,8 @@ fn choice_item_parse_bodies<'a>(
       Some((qname.as_str(), body.clone(), body))
     }
     SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
-      let parsed_tokens = build_choice_any_child_parse_tokens();
+      let parsed_tokens =
+        build_choice_any_child_parse_tokens(ident, qname, quote! { xml_reader });
       let assign_tokens = if repeated {
         quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
       } else {
@@ -2138,7 +2143,7 @@ fn expand_tuple_wrapper(
         start: quick_xml::events::BytesStart<'xml>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        crate::common::XmlRead::read_inner::<#inner_ty>(xml_reader, start, empty).map(Self)
+        <#inner_ty as crate::sdk::SdkType>::read_inner(xml_reader, start, empty).map(Self)
       }
 
       #root_methods_tokens
@@ -2304,12 +2309,16 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
   let mut parse_replacement_arms = Vec::new();
   for item in &field.items {
     match item {
-      SdkTypeChoiceItem::Child { variant, qname, .. } => {
+      SdkTypeChoiceItem::Child {
+        variant, ty, qname, ..
+      } => {
         let targets = qname_match_targets(std::slice::from_ref(qname));
+        let read_child_tokens =
+          sdk_type_read_inner_value_tokens(ty.as_ref(), quote! { &mut child_reader });
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
             Some(#choice_ty::#variant(std::boxed::Box::new(
-              crate::common::XmlRead::read_inner::<_>(&mut child_reader, e, next_empty)?
+              #read_child_tokens
             )))
           }
         });
@@ -2342,9 +2351,11 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
       }
       SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
         let targets = qname_match_targets(std::slice::from_ref(qname));
+        let parsed_tokens =
+          build_choice_any_child_parse_tokens(ident, qname, quote! { &mut child_reader });
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
-            let parsed_child = Vec::new();
+            #parsed_tokens
             Some(#choice_ty::#variant(parsed_child.into()))
           }
         });
@@ -2904,7 +2915,18 @@ fn sdk_type_read_inner_call_tokens(
   child_ty: &Type,
   _mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
-  quote! { crate::common::XmlRead::read_inner::<#child_ty> }
+  quote! { <#child_ty as crate::sdk::SdkType>::read_inner }
+}
+
+fn sdk_type_read_inner_value_tokens(
+  child_ty: Option<&Type>,
+  xml_reader: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  if let Some(child_ty) = child_ty {
+    quote! { <#child_ty as crate::sdk::SdkType>::read_inner(#xml_reader, e, next_empty)? }
+  } else {
+    quote! { crate::sdk::SdkType::read_inner(#xml_reader, e, next_empty)? }
+  }
 }
 
 fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::TokenStream {
@@ -3265,9 +3287,51 @@ fn build_any_child_parse_tokens(
   }
 }
 
-fn build_choice_any_child_parse_tokens() -> proc_macro2::TokenStream {
+fn build_choice_any_child_parse_tokens(
+  owner_ident: &Ident,
+  qname: &str,
+  xml_reader: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let tag_qname_lit = LitByteStr::new(
+    format!("{tag_prefix}:{local_name}").as_bytes(),
+    Span::call_site(),
+  );
   quote! {
-    let parsed_child = Vec::new();
+    let mut parsed_child = Vec::new();
+    if !next_empty {
+      loop {
+        match (#xml_reader).next()? {
+          quick_xml::events::Event::Start(e) => {
+            let xml = crate::common::XmlRead::read_raw_element_xml_bytes(#xml_reader, e)?;
+            let xml = String::from_utf8(xml.into_vec()).map_err(|err| {
+              crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
+            })?;
+            parsed_child.push(xml);
+          }
+          quick_xml::events::Event::Empty(e) => {
+            let xml = crate::common::XmlRead::read_raw_empty_xml_bytes(#xml_reader, e)?;
+            let xml = String::from_utf8(xml.into_vec()).map_err(|err| {
+              crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
+            })?;
+            parsed_child.push(xml);
+          }
+          quick_xml::events::Event::End(end) => {
+            if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+              break;
+            }
+          }
+          quick_xml::events::Event::Eof => {
+            return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
+          }
+          _ => {}
+        }
+      }
+    }
   }
 }
 
@@ -5309,12 +5373,12 @@ fn expand_named_struct(
                 continue;
               }
               let borrowed_body = quote! {
-                  let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
+                  let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
                   #assign_tokens
                   #xml_child_slot_assign
               };
               let io_body = quote! {
-                  let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
+                  let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
                   #assign_tokens
                   #xml_child_slot_assign
               };
@@ -5723,12 +5787,12 @@ fn expand_named_struct(
               continue;
             }
             let borrowed_parse = quote! {
-              let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
+              let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
               #assign_tokens
               #xml_child_slot_assign
             };
             let io_parse = quote! {
-              let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
+              let parsed_child = crate::sdk::SdkType::read_inner(xml_reader, e, next_empty)?;
               #assign_tokens
               #xml_child_slot_assign
             };

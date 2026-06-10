@@ -1,4 +1,4 @@
-# Open XML SDK for Rust
+# OOXML SDK for Rust
 
 [![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
 [![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
@@ -22,13 +22,13 @@ The minimum supported Rust version is 1.88, and the workspace uses the Rust
 
 Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmlsdk).
 
-Guides and examples are maintained separately in [KaiserY/ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
+Guides and examples are maintained separately in [ooxmlsdk-doc](https://github.com/KaiserY/ooxmlsdk-doc). That documentation follows the shape of the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk), but rewrites the material for this Rust crate, Rust naming, Cargo features, generated schema types, and Rust package APIs.
 
 For background on Open XML package concepts, file format structure, WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility, the Microsoft Learn documentation remains the upstream conceptual reference. This crate follows many of the same package and schema concepts while exposing Rust-native generated types and feature flags.
 
 ## Round-Trip Coverage
 
-Corpus-scale round-trip data is tracked in [KaiserY/ooxmlsdk-test-suite](https://github.com/KaiserY/ooxmlsdk-test-suite). Latest recorded results:
+Corpus-scale round-trip data is tracked in [ooxmlsdk-test-suite](https://github.com/KaiserY/ooxmlsdk-test-suite). Latest recorded results:
 
 | Corpus | Files | Round-trip candidates | Open-only | Invalid | Result |
 | --- | ---: | ---: | ---: | ---: | --- |

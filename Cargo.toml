@@ -17,8 +17,8 @@ authors = ["KaiserY"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KaiserY/ooxmlsdk"
 documentation = "https://docs.rs/ooxmlsdk"
-description = "Open XML SDK for Rust"
-keywords = ["xml", "office", "docx", "pptx", "xlsx"]
+description = "OOXML SDK for Rust"
+keywords = ["openxml", "office", "docx", "pptx", "xlsx"]
 categories = ["parser-implementations"]
 readme = "README.md"
 
@@ -31,7 +31,7 @@ ooxmlsdk-pdf-test = { version = "0.10.1", path = "crates/ooxmlsdk-pdf-test" }
 ooxmlsdk-test = { version = "0.10.1", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.40.1"
-regex = "1.12.3"
+regex = "1.12.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_derive = "1.0.228"
 serde_json = "1.0.150"

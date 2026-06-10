@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.10.1
+
+### Changed
+
+- Refactored generated `SdkType` reader generation so nested structs, tuple wrappers, and choice variants all use a single `SdkType::read_inner` dispatch path.
+- Removed `XmlRead::read_inner` from the public read trait and the now-redundant runtime forwarding implementations.
+- Consolidated `AnyChild` parsing generation in MCE branches to share clearer end-tag and empty-element handling.
+- Updated crate metadata branding (`Open XML` -> `OOXML`) and dependency alignment (`regex` -> `1.12.4`) for the 0.10.1 workspace.
+
+### Fixed
+
+- Simplified parser code paths around `AnyChild` payload collection to avoid incomplete or over-collected raw XML buffers in empty-child and mixed-content cases.
+- Reduced generated-structure churn from the `SdkType`/`XmlRead` refactor while preserving compatibility behavior.
+
 ## 0.10.0
 
 ### Breaking Changes

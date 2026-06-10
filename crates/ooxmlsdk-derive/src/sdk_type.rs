@@ -9,22 +9,8 @@ enum DeserializeMode {
 impl DeserializeMode {
   fn deserialize_inner_ident(self) -> Ident {
     match self {
-      Self::Borrowed => Ident::new("read_borrowed_inner", Span::call_site()),
-      Self::Io => Ident::new("read_io_inner", Span::call_site()),
-    }
-  }
-
-  fn read_raw_empty_xml_bytes_fn(self) -> proc_macro2::TokenStream {
-    match self {
-      Self::Borrowed => quote! { crate::common::read_raw_empty_xml_borrowed_bytes },
-      Self::Io => quote! { crate::common::read_raw_empty_xml_io_bytes },
-    }
-  }
-
-  fn read_raw_element_xml_bytes_fn(self) -> proc_macro2::TokenStream {
-    match self {
-      Self::Borrowed => quote! { crate::common::read_raw_element_xml_borrowed_bytes },
-      Self::Io => quote! { crate::common::read_raw_element_xml_io_bytes },
+      Self::Borrowed => Ident::new("read_inner", Span::call_site()),
+      Self::Io => Ident::new("read_inner", Span::call_site()),
     }
   }
 }
@@ -157,13 +143,13 @@ fn recursive_table_frame_tokens(
   ) {
     ("Table", "table_choice2", "TableRow") => Some(quote! {
       __OoxmlsdkRecursiveTableFrame::TableRow {
-        value: TableRow::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        value: TableRow::__ooxmlsdk_read_inner_default(xml_reader, e, true)?,
         attach: __OoxmlsdkRecursiveTableAttach::TableChoice2TableRow,
       }
     }),
     ("TableRow", "table_row_choice", "TableCell") => Some(quote! {
       __OoxmlsdkRecursiveTableFrame::TableCell {
-        value: TableCell::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        value: TableCell::__ooxmlsdk_read_inner_default(xml_reader, e, true)?,
         attach: __OoxmlsdkRecursiveTableAttach::TableRowChoiceTableCell,
       }
     }),
@@ -321,9 +307,9 @@ fn stack_parser_shared_table_tokens(
       },
     }
 
-    fn __ooxmlsdk_read_recursive_table_as_table_borrowed<'de>(
-      xml_reader: &mut crate::common::SliceReader<'de>,
-      e: quick_xml::events::BytesStart<'de>,
+    fn __ooxmlsdk_read_recursive_table_as_table_borrowed<'xml, R: crate::common::XmlRead<'xml>>(
+      xml_reader: &mut R,
+      e: quick_xml::events::BytesStart<'xml>,
       empty_tag: bool,
     ) -> Result<Table, crate::common::SdkError> {
       let _ = e;
@@ -331,44 +317,44 @@ fn stack_parser_shared_table_tokens(
         value: Table::default(),
         attach: __OoxmlsdkRecursiveTableAttach::Root,
       };
-      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+      match __ooxmlsdk_read_recursive_table(xml_reader, frame, empty_tag)? {
         __OoxmlsdkRecursiveTableFrame::Table { value, .. } => Ok(value),
         _ => unreachable!("recursive table parser returned wrong root frame"),
       }
     }
 
-    fn __ooxmlsdk_read_recursive_table_as_table_row_borrowed<'de>(
-      xml_reader: &mut crate::common::SliceReader<'de>,
-      e: quick_xml::events::BytesStart<'de>,
+    fn __ooxmlsdk_read_recursive_table_as_table_row_borrowed<'xml, R: crate::common::XmlRead<'xml>>(
+      xml_reader: &mut R,
+      e: quick_xml::events::BytesStart<'xml>,
       empty_tag: bool,
     ) -> Result<TableRow, crate::common::SdkError> {
       let frame = __OoxmlsdkRecursiveTableFrame::TableRow {
-        value: TableRow::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        value: TableRow::__ooxmlsdk_read_inner_default(xml_reader, e, true)?,
         attach: __OoxmlsdkRecursiveTableAttach::Root,
       };
-      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+      match __ooxmlsdk_read_recursive_table(xml_reader, frame, empty_tag)? {
         __OoxmlsdkRecursiveTableFrame::TableRow { value, .. } => Ok(value),
         _ => unreachable!("recursive table parser returned wrong root frame"),
       }
     }
 
-    fn __ooxmlsdk_read_recursive_table_as_table_cell_borrowed<'de>(
-      xml_reader: &mut crate::common::SliceReader<'de>,
-      e: quick_xml::events::BytesStart<'de>,
+    fn __ooxmlsdk_read_recursive_table_as_table_cell_borrowed<'xml, R: crate::common::XmlRead<'xml>>(
+      xml_reader: &mut R,
+      e: quick_xml::events::BytesStart<'xml>,
       empty_tag: bool,
     ) -> Result<TableCell, crate::common::SdkError> {
       let frame = __OoxmlsdkRecursiveTableFrame::TableCell {
-        value: TableCell::__ooxmlsdk_read_borrowed_inner_default(xml_reader, e, true)?,
+        value: TableCell::__ooxmlsdk_read_inner_default(xml_reader, e, true)?,
         attach: __OoxmlsdkRecursiveTableAttach::Root,
       };
-      match __ooxmlsdk_read_recursive_table_borrowed(xml_reader, frame, empty_tag)? {
+      match __ooxmlsdk_read_recursive_table(xml_reader, frame, empty_tag)? {
         __OoxmlsdkRecursiveTableFrame::TableCell { value, .. } => Ok(value),
         _ => unreachable!("recursive table parser returned wrong root frame"),
       }
     }
 
-    fn __ooxmlsdk_read_recursive_table_borrowed<'de>(
-      xml_reader: &mut crate::common::SliceReader<'de>,
+    fn __ooxmlsdk_read_recursive_table<'xml, R: crate::common::XmlRead<'xml>>(
+      xml_reader: &mut R,
       initial_frame: __OoxmlsdkRecursiveTableFrame,
       empty_tag: bool,
     ) -> Result<__OoxmlsdkRecursiveTableFrame, crate::common::SdkError> {
@@ -379,7 +365,7 @@ fn stack_parser_shared_table_tokens(
       let mut stack = vec![initial_frame];
       loop {
         match xml_reader.next_tag_event()? {
-          crate::common::SliceTagEvent::Start(e, next_empty) => {
+          crate::common::TagEvent::Start(e, next_empty) => {
             let next_frame = {
               let top = stack
                 .last_mut()
@@ -419,7 +405,7 @@ fn stack_parser_shared_table_tokens(
               }
             }
           }
-          crate::common::SliceTagEvent::End(e) => {
+          crate::common::TagEvent::End(e) => {
             let matches_top = match stack
               .last()
               .expect("recursive table parser stack should not be empty")
@@ -443,10 +429,10 @@ fn stack_parser_shared_table_tokens(
               }
             }
           }
-          crate::common::SliceTagEvent::Eof => {
+          crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof("recursive table"));
           }
-          crate::common::SliceTagEvent::Decl(_) | crate::common::SliceTagEvent::Other => {}
+          crate::common::TagEvent::Decl(_) | crate::common::TagEvent::Other => {}
         }
       }
     }
@@ -889,11 +875,7 @@ fn stack_parser_child_step_tokens(
       &mut arms,
       &field.qname,
       quote! {
-        let parsed_child = <#read_ty as crate::sdk::SdkType>::read_borrowed_inner(
-          xml_reader,
-          e,
-          next_empty,
-        )?;
+        let parsed_child = crate::common::XmlRead::read_inner::<#read_ty>(xml_reader, e, next_empty)?;
         #assign_tokens
         None
       },
@@ -937,11 +919,7 @@ fn stack_parser_child_step_tokens(
         &mut arms,
         qname,
         quote! {
-          let parsed_child = <#read_ty as crate::sdk::SdkType>::read_borrowed_inner(
-            xml_reader,
-            e,
-            next_empty,
-          )?;
+          let parsed_child = crate::common::XmlRead::read_inner::<#read_ty>(xml_reader, e, next_empty)?;
           #assign_tokens
           None
         },
@@ -959,10 +937,10 @@ fn stack_parser_child_step_tokens(
 
   quote! {
     impl #ident {
-      fn #child_borrowed_ident<'de>(
+      fn #child_borrowed_ident<'xml, R: crate::common::XmlRead<'xml>>(
         &mut self,
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        e: quick_xml::events::BytesStart<'de>,
+        xml_reader: &mut R,
+        e: quick_xml::events::BytesStart<'xml>,
         next_empty: bool,
       ) -> Result<Option<__OoxmlsdkRecursiveTableFrame>, crate::common::SdkError> {
         Ok(match e.local_name().into_inner() {
@@ -1931,8 +1909,8 @@ fn root_read_tokens(
     DeserializeMode::Io => quote! { crate::common::read_root_start_io },
   };
   let read_inner = match mode {
-    DeserializeMode::Borrowed => quote! { <Self as crate::sdk::SdkType>::read_borrowed_inner },
-    DeserializeMode::Io => quote! { <Self as crate::sdk::SdkType>::read_io_inner },
+    DeserializeMode::Borrowed => quote! { <Self as crate::sdk::SdkType>::read_inner },
+    DeserializeMode::Io => quote! { <Self as crate::sdk::SdkType>::read_inner },
   };
   if has_xml_header_field {
     quote! {
@@ -2011,12 +1989,12 @@ fn choice_item_parse_bodies<'a>(
     SdkTypeChoiceItem::Child { variant, qname, .. } => {
       let borrowed_choice = quote! {
         #choice_ty::#variant(std::boxed::Box::new(
-          <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?
+          crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?
         ))
       };
       let io_choice = quote! {
         #choice_ty::#variant(std::boxed::Box::new(
-          <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?
+          crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?
         ))
       };
       let borrowed_assign_tokens = if repeated {
@@ -2155,20 +2133,12 @@ fn expand_tuple_wrapper(
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed_inner<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        start: quick_xml::events::BytesStart<'de>,
+      fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
+        xml_reader: &mut R,
+        start: quick_xml::events::BytesStart<'xml>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, start, empty).map(Self)
-      }
-
-      fn read_io_inner<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        start: quick_xml::events::BytesStart<'static>,
-        empty: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        <#inner_ty as crate::sdk::SdkType>::read_io_inner(xml_reader, start, empty).map(Self)
+        crate::common::XmlRead::read_inner::<#inner_ty>(xml_reader, start, empty).map(Self)
       }
 
       #root_methods_tokens
@@ -2339,7 +2309,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
             Some(#choice_ty::#variant(std::boxed::Box::new(
-              <_ as crate::sdk::SdkType>::read_borrowed_inner(&mut child_reader, e, next_empty)?
+              crate::common::XmlRead::read_inner::<_>(&mut child_reader, e, next_empty)?
             )))
           }
         });
@@ -2932,16 +2902,9 @@ fn push_flat_choice_wildcard_arms(
 
 fn sdk_type_read_inner_call_tokens(
   child_ty: &Type,
-  mode: DeserializeMode,
+  _mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
-  match mode {
-    DeserializeMode::Borrowed => {
-      quote! { <#child_ty as crate::sdk::SdkType>::read_borrowed_inner }
-    }
-    DeserializeMode::Io => {
-      quote! { <#child_ty as crate::sdk::SdkType>::read_io_inner }
-    }
-  }
+  quote! { crate::common::XmlRead::read_inner::<#child_ty> }
 }
 
 fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::TokenStream {
@@ -3271,14 +3234,12 @@ fn build_any_child_parse_tokens(
   field_ident: &Ident,
   field_ty: &Type,
   repeated: bool,
-  mode: DeserializeMode,
+  _mode: DeserializeMode,
   as_result: bool,
   xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   let field_item_ty = unwrap_option_vec_type(field_ty);
   debug_assert!(is_box_u8_slice_type(&field_item_ty));
-  let read_raw_empty_xml = mode.read_raw_empty_xml_bytes_fn();
-  let read_raw_element_xml = mode.read_raw_element_xml_bytes_fn();
   let assign = if repeated {
     quote! { #field_ident.push(xml); }
   } else {
@@ -3293,9 +3254,9 @@ fn build_any_child_parse_tokens(
   quote! {
     if !matched {
       let xml = if next_empty {
-        #read_raw_empty_xml(e)?
+        crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
       } else {
-        #read_raw_element_xml(xml_reader, e)?
+        crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
       };
       #assign
       #xml_child_slot_assign
@@ -3314,12 +3275,10 @@ fn build_pure_any_child_parse_tokens(
   field_ident: &Ident,
   field_ty: &Type,
   repeated: bool,
-  mode: DeserializeMode,
+  _mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
   let field_item_ty = unwrap_option_vec_type(field_ty);
   debug_assert!(is_box_u8_slice_type(&field_item_ty));
-  let read_raw_empty_xml = mode.read_raw_empty_xml_bytes_fn();
-  let read_raw_element_xml = mode.read_raw_element_xml_bytes_fn();
   let assign = if repeated {
     quote! { #field_ident.push(xml); }
   } else {
@@ -3328,9 +3287,9 @@ fn build_pure_any_child_parse_tokens(
 
   quote! {
     let xml = if next_empty {
-      #read_raw_empty_xml(e)?
+      crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
     } else {
-      #read_raw_element_xml(xml_reader, e)?
+      crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
     };
     #assign
     continue;
@@ -3339,19 +3298,17 @@ fn build_pure_any_child_parse_tokens(
 
 fn build_unmatched_child_tokens(
   owner_ident: &Ident,
-  mode: DeserializeMode,
+  _mode: DeserializeMode,
   has_xml_other_children_field: bool,
   compact_xml_other_children: bool,
 ) -> proc_macro2::TokenStream {
   if has_xml_other_children_field {
-    let read_raw_empty_xml = mode.read_raw_empty_xml_bytes_fn();
-    let read_raw_element_xml = mode.read_raw_element_xml_bytes_fn();
     if compact_xml_other_children {
       return quote! {
         let xml = if next_empty {
-          #read_raw_empty_xml(e)?
+          crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
         } else {
-          #read_raw_element_xml(xml_reader, e)?
+          crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
         };
         xml_other_children.push(xml);
         continue;
@@ -3359,9 +3316,9 @@ fn build_unmatched_child_tokens(
     }
     return quote! {
       let xml = if next_empty {
-        #read_raw_empty_xml(e)?
+        crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
       } else {
-        #read_raw_element_xml(xml_reader, e)?
+        crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
       };
       xml_other_children.push((__xml_child_slot, xml));
       continue;
@@ -3753,7 +3710,7 @@ fn expand_helper_struct(
       continue;
     }
   };
-  let main_dispatch_tokens_io = quote! {
+  let _main_dispatch_tokens_io = quote! {
     let matched = match event_name {
       #( #child_match_tokens_io )*
       _ => false,
@@ -3778,7 +3735,7 @@ fn expand_helper_struct(
       event_name,
     ));
   };
-  let unmatched_child_tokens_io = quote! {
+  let _unmatched_child_tokens_io = quote! {
     if __ooxmlsdk_seen_child {
       let _ = event_name;
       xml_reader.unread(if next_empty {
@@ -3907,7 +3864,7 @@ fn expand_helper_struct(
     }
   }
   let stack_parser = None::<SdkStackParserAttrs>;
-  let read_borrowed_inner_body = if let Some(stack_parser) = &stack_parser {
+  let read_inner_body = if let Some(stack_parser) = &stack_parser {
     let read_borrowed = &stack_parser.read_borrowed;
     quote! {
       #read_borrowed(xml_reader, start, empty)
@@ -3929,14 +3886,12 @@ fn expand_helper_struct(
 
         match xml_reader.next()? {
           quick_xml::events::Event::Start(e) => {
-            let e = e.into_owned();
             let next_empty = false;
             let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
           quick_xml::events::Event::Empty(e) => {
-            let e = e.into_owned();
             let next_empty = true;
             let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
@@ -3974,57 +3929,12 @@ fn expand_helper_struct(
     #( #mce_choice_impl_tokens )*
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed_inner<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        start: quick_xml::events::BytesStart<'de>,
+      fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
+        xml_reader: &mut R,
+        start: quick_xml::events::BytesStart<'xml>,
         empty: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        #read_borrowed_inner_body
-      }
-
-      fn read_io_inner<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        start: quick_xml::events::BytesStart<'static>,
-        empty: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut pending_event = Some((start, empty));
-
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        let mut __ooxmlsdk_seen_child = false;
-
-        loop {
-          if let Some((e, next_empty)) = pending_event.take() {
-            let event_name = e.local_name().into_inner();
-            #main_dispatch_tokens_io
-            #unmatched_child_tokens_io
-          }
-
-          let next_event = match xml_reader.next_tag_event()? {
-            crate::common::IoTagEvent::Start(e, next_empty) => Some((e, next_empty)),
-            crate::common::IoTagEvent::End(e) => {
-              if __ooxmlsdk_seen_child {
-                xml_reader.unread(quick_xml::events::Event::End(e))?;
-              }
-              break;
-            }
-            crate::common::IoTagEvent::Eof => {
-              return Err(crate::common::unexpected_eof(stringify!(#ident)));
-            }
-            crate::common::IoTagEvent::Decl(_) | crate::common::IoTagEvent::Other => None,
-          };
-
-          if let Some((e, next_empty)) = next_event {
-            let event_name = e.local_name().into_inner();
-            #main_dispatch_tokens_io
-            #unmatched_child_tokens_io
-          }
-        }
-
-        Ok(Self {
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-        })
+        #read_inner_body
       }
 
     }
@@ -5321,18 +5231,18 @@ fn expand_named_struct(
                       }
                     }
                     match xml_reader.next_tag_event()? {
-                      crate::common::SliceTagEvent::Start(e, next_empty) => {
+                      crate::common::TagEvent::Start(e, next_empty) => {
                         pending_event = Some((e, next_empty));
                       }
-                      crate::common::SliceTagEvent::End(e) => {
+                      crate::common::TagEvent::End(e) => {
                         xml_reader.unread(quick_xml::events::Event::End(e))?;
                         break;
                       }
-                      crate::common::SliceTagEvent::Eof => {
+                      crate::common::TagEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::SliceTagEvent::Decl(_)
-                      | crate::common::SliceTagEvent::Other => {}
+                      crate::common::TagEvent::Decl(_)
+                      | crate::common::TagEvent::Other => {}
                     }
                   }
                   #( #final_fields )*
@@ -5357,18 +5267,18 @@ fn expand_named_struct(
                       }
                     }
                     match xml_reader.next_tag_event()? {
-                      crate::common::IoTagEvent::Start(e, next_empty) => {
+                      crate::common::TagEvent::Start(e, next_empty) => {
                         pending_event = Some((e, next_empty));
                       }
-                      crate::common::IoTagEvent::End(e) => {
+                      crate::common::TagEvent::End(e) => {
                         xml_reader.unread(quick_xml::events::Event::End(e))?;
                         break;
                       }
-                      crate::common::IoTagEvent::Eof => {
+                      crate::common::TagEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::IoTagEvent::Decl(_)
-                      | crate::common::IoTagEvent::Other => {}
+                      crate::common::TagEvent::Decl(_)
+                      | crate::common::TagEvent::Other => {}
                     }
                   }
                   #( #final_fields )*
@@ -5399,12 +5309,12 @@ fn expand_named_struct(
                 continue;
               }
               let borrowed_body = quote! {
-                  let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
+                  let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
                   #assign_tokens
                   #xml_child_slot_assign
               };
               let io_body = quote! {
-                  let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
+                  let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
                   #assign_tokens
                   #xml_child_slot_assign
               };
@@ -5429,18 +5339,18 @@ fn expand_named_struct(
               };
               let borrowed_body = quote! {
                   let xml = if next_empty {
-                    crate::common::read_raw_empty_xml_borrowed_bytes(e)?
+                    crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
                   } else {
-                    crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
+                    crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
                   };
                   #assign_tokens
                   #xml_child_slot_assign
               };
               let io_body = quote! {
                   let xml = if next_empty {
-                    crate::common::read_raw_empty_xml_io_bytes(e)?
+                    crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
                   } else {
-                    crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
+                    crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
                   };
                   #assign_tokens
                   #xml_child_slot_assign
@@ -5739,18 +5649,18 @@ fn expand_named_struct(
                     }
                   }
                   match xml_reader.next_tag_event()? {
-                    crate::common::SliceTagEvent::Start(e, next_empty) => {
+                    crate::common::TagEvent::Start(e, next_empty) => {
                       pending_event = Some((e, next_empty));
                     }
-                    crate::common::SliceTagEvent::End(e) => {
+                    crate::common::TagEvent::End(e) => {
                       xml_reader.unread(quick_xml::events::Event::End(e))?;
                       break;
                     }
-                    crate::common::SliceTagEvent::Eof => {
+                    crate::common::TagEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::SliceTagEvent::Decl(_)
-                    | crate::common::SliceTagEvent::Other => {}
+                    crate::common::TagEvent::Decl(_)
+                    | crate::common::TagEvent::Other => {}
                   }
                 }
                 #( #final_fields )*
@@ -5775,18 +5685,18 @@ fn expand_named_struct(
                     }
                   }
                   match xml_reader.next_tag_event()? {
-                    crate::common::IoTagEvent::Start(e, next_empty) => {
+                    crate::common::TagEvent::Start(e, next_empty) => {
                       pending_event = Some((e, next_empty));
                     }
-                    crate::common::IoTagEvent::End(e) => {
+                    crate::common::TagEvent::End(e) => {
                       xml_reader.unread(quick_xml::events::Event::End(e))?;
                       break;
                     }
-                    crate::common::IoTagEvent::Eof => {
+                    crate::common::TagEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::IoTagEvent::Decl(_)
-                    | crate::common::IoTagEvent::Other => {}
+                    crate::common::TagEvent::Decl(_)
+                    | crate::common::TagEvent::Other => {}
                   }
                 }
                 #( #final_fields )*
@@ -5813,12 +5723,12 @@ fn expand_named_struct(
               continue;
             }
             let borrowed_parse = quote! {
-              let parsed_child = <_ as crate::sdk::SdkType>::read_borrowed_inner(xml_reader, e, next_empty)?;
+              let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
               #assign_tokens
               #xml_child_slot_assign
             };
             let io_parse = quote! {
-              let parsed_child = <_ as crate::sdk::SdkType>::read_io_inner(xml_reader, e, next_empty)?;
+              let parsed_child = crate::common::XmlRead::read_inner::<_>(xml_reader, e, next_empty)?;
               #assign_tokens
               #xml_child_slot_assign
             };
@@ -5847,18 +5757,18 @@ fn expand_named_struct(
             };
             let borrowed_parse = quote! {
               let xml = if next_empty {
-                crate::common::read_raw_empty_xml_borrowed_bytes(e)?
+                crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
               } else {
-                crate::common::read_raw_element_xml_borrowed_bytes(xml_reader, e)?
+                crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
               };
               #assign_tokens
               #xml_child_slot_assign
             };
             let io_parse = quote! {
               let xml = if next_empty {
-                crate::common::read_raw_empty_xml_io_bytes(e)?
+                crate::common::XmlRead::read_raw_empty_xml_bytes(xml_reader, e)?
               } else {
-                crate::common::read_raw_element_xml_io_bytes(xml_reader, e)?
+                crate::common::XmlRead::read_raw_element_xml_bytes(xml_reader, e)?
               };
               #assign_tokens
               #xml_child_slot_assign
@@ -6672,7 +6582,7 @@ fn expand_named_struct(
   };
   let tag_decl_tokens_borrowed = if has_xml_header_field {
     quote! {
-      crate::common::SliceTagEvent::Decl(standalone) => {
+      crate::common::TagEvent::Decl(standalone) => {
         xml_header_state = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
@@ -6682,12 +6592,12 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      crate::common::SliceTagEvent::Decl(_) => {},
+      crate::common::TagEvent::Decl(_) => {},
     }
   };
   let tag_decl_tokens_io = if has_xml_header_field {
     quote! {
-      crate::common::IoTagEvent::Decl(standalone) => {
+      crate::common::TagEvent::Decl(standalone) => {
         xml_header_state = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
@@ -6697,7 +6607,7 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      crate::common::IoTagEvent::Decl(_) => {},
+      crate::common::TagEvent::Decl(_) => {},
     }
   };
   let raw_xml_other_children_only = has_xml_other_children_field
@@ -6749,20 +6659,20 @@ fn expand_named_struct(
       loop {
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_borrowed
-          crate::common::SliceTagEvent::Start(e, next_empty) => {
+          crate::common::TagEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
-          crate::common::SliceTagEvent::End(e) => {
+          crate::common::TagEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          crate::common::SliceTagEvent::Eof => {
+          crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
-          crate::common::SliceTagEvent::Other => {}
+          crate::common::TagEvent::Other => {}
         }
       }
     }
@@ -6810,25 +6720,25 @@ fn expand_named_struct(
       loop {
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_io
-          crate::common::IoTagEvent::Start(e, next_empty) => {
+          crate::common::TagEvent::Start(e, next_empty) => {
             #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
-          crate::common::IoTagEvent::End(e) => {
+          crate::common::TagEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          crate::common::IoTagEvent::Eof => {
+          crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
-          crate::common::IoTagEvent::Other => {}
+          crate::common::TagEvent::Other => {}
         }
       }
     }
   };
-  let io_children_loop_tokens = if text_field.is_some() || choice_accepts_text {
+  let _io_children_loop_tokens = if text_field.is_some() || choice_accepts_text {
     io_children_text_loop_tokens.clone()
   } else {
     io_children_tag_loop_tokens.clone()
@@ -7077,7 +6987,7 @@ fn expand_named_struct(
       }
     }
   };
-  let default_read_borrowed_inner_body = quote! {
+  let default_read_inner_body = quote! {
     #xml_header_decl_tokens
     #end_qname_decl
     #( #attr_decl_tokens )*
@@ -7103,15 +7013,15 @@ fn expand_named_struct(
       #xml_other_children_init_tokens
     })
   };
-  let default_read_borrowed_inner_helper = if stack_parser.is_some() {
+  let default_read_inner_helper = if stack_parser.is_some() {
     quote! {
       impl #impl_generics #ident #type_generics #where_clause {
-        fn __ooxmlsdk_read_borrowed_inner_default<'de>(
-          xml_reader: &mut crate::common::SliceReader<'de>,
-          e: quick_xml::events::BytesStart<'de>,
+        fn __ooxmlsdk_read_inner_default<'xml, R: crate::common::XmlRead<'xml>>(
+          xml_reader: &mut R,
+          e: quick_xml::events::BytesStart<'xml>,
           empty_tag: bool,
         ) -> Result<Self, crate::common::SdkError> {
-          #default_read_borrowed_inner_body
+          #default_read_inner_body
         }
       }
     }
@@ -7133,13 +7043,13 @@ fn expand_named_struct(
     &xml_other_attrs_write_tokens,
     &ordered_field_specs,
   );
-  let read_borrowed_inner_body = if let Some(stack_parser) = &stack_parser {
+  let read_inner_body = if let Some(stack_parser) = &stack_parser {
     let read_borrowed = &stack_parser.read_borrowed;
     quote! {
       #read_borrowed(xml_reader, e, empty_tag)
     }
   } else {
-    default_read_borrowed_inner_body.clone()
+    default_read_inner_body.clone()
   };
   let write_inner_body = write_inner_body_tokens(
     ident,
@@ -7176,49 +7086,18 @@ fn expand_named_struct(
   Ok(quote! {
     #( #mce_choice_impl_tokens )*
     #stack_parser_shared_table_helper
-    #default_read_borrowed_inner_helper
+    #default_read_inner_helper
     #stack_parser_child_step_helper
     #stack_parser_choice_write_step_helpers
     #stack_parser_write_body_helper
 
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn read_borrowed_inner<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        e: quick_xml::events::BytesStart<'de>,
+      fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
+        xml_reader: &mut R,
+        e: quick_xml::events::BytesStart<'xml>,
         empty_tag: bool,
       ) -> Result<Self, crate::common::SdkError> {
-        #read_borrowed_inner_body
-      }
-
-      fn read_io_inner<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        e: quick_xml::events::BytesStart<'static>,
-        empty_tag: bool,
-      ) -> Result<Self, crate::common::SdkError> {
-        #xml_header_decl_tokens
-        #end_qname_decl
-        #( #attr_decl_tokens )*
-        #namespace_attr_parse_tokens
-        #( #child_decl_tokens )*
-        #( #choice_decl_tokens )*
-        #( #any_decl_tokens )*
-        #xml_other_children_decl_tokens
-        #text_decl_tokens
-
-        #io_children_loop_tokens
-
-        Ok(Self {
-          #( #attr_init_tokens, )*
-          #( #child_init_tokens, )*
-          #( #choice_init_tokens, )*
-          #( #any_init_tokens, )*
-          #text_finish_tokens
-          #( #attr_finish_tokens, )*
-          #special_namespace_init_tokens
-          #xml_header_init_tokens
-          #xml_other_attrs_init_tokens
-          #xml_other_children_init_tokens
-        })
+        #read_inner_body
       }
 
       #public_root_methods_tokens

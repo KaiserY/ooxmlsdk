@@ -536,23 +536,13 @@ pub trait SdkType: Sized {
       .map_err(|err| crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}")))
   }
 
-  fn read_borrowed_inner<'de>(
-    _xml_reader: &mut crate::common::SliceReader<'de>,
-    _start: quick_xml::events::BytesStart<'de>,
+  fn read_inner<'xml, R: crate::common::XmlRead<'xml>>(
+    _xml_reader: &mut R,
+    _start: quick_xml::events::BytesStart<'xml>,
     _empty: bool,
   ) -> Result<Self, crate::common::SdkError> {
     Err(crate::common::SdkError::CommonError(
-      "SdkType does not support borrowed deserialization".to_string(),
-    ))
-  }
-
-  fn read_io_inner<R: std::io::BufRead>(
-    _xml_reader: &mut crate::common::IoReader<R>,
-    _start: quick_xml::events::BytesStart<'static>,
-    _empty: bool,
-  ) -> Result<Self, crate::common::SdkError> {
-    Err(crate::common::SdkError::CommonError(
-      "SdkType does not support IO deserialization".to_string(),
+      "SdkType does not support deserialization".to_string(),
     ))
   }
 }

@@ -14,20 +14,53 @@ pub struct IoReader<R: BufRead> {
   pending: Option<Event<'static>>,
 }
 
-pub(crate) enum IoTagEvent {
-  Start(quick_xml::events::BytesStart<'static>, bool),
-  End(quick_xml::events::BytesEnd<'static>),
+pub enum TagEvent<'xml> {
+  Start(quick_xml::events::BytesStart<'xml>, bool),
+  End(quick_xml::events::BytesEnd<'xml>),
   Decl(bool),
   Eof,
   Other,
 }
 
-pub enum SliceTagEvent<'de> {
-  Start(quick_xml::events::BytesStart<'de>, bool),
-  End(quick_xml::events::BytesEnd<'de>),
-  Decl(bool),
-  Eof,
-  Other,
+pub trait XmlRead<'xml> {
+  fn next(&mut self) -> Result<Event<'xml>, SdkError>;
+
+  fn next_tag_event(&mut self) -> Result<TagEvent<'xml>, SdkError>;
+
+  fn unread(&mut self, event: Event<'xml>) -> Result<(), SdkError>;
+
+  fn decoder(&self) -> Decoder;
+
+  fn read_inner<T: crate::sdk::SdkType>(
+    &mut self,
+    start: quick_xml::events::BytesStart<'xml>,
+    empty: bool,
+  ) -> Result<T, SdkError>;
+
+  fn read_text(
+    &mut self,
+    end: quick_xml::name::QName<'_>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<String, SdkError>;
+
+  fn drain_text_field_from_event(
+    &mut self,
+    value: &mut Option<String>,
+    first: Event<'xml>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<(), SdkError>;
+
+  fn read_raw_empty_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'xml>,
+  ) -> Result<Box<[u8]>, SdkError>;
+
+  fn read_raw_element_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'xml>,
+  ) -> Result<Box<[u8]>, SdkError>;
 }
 
 impl<R: BufRead> IoReader<R> {
@@ -49,18 +82,6 @@ impl<R: BufRead> IoReader<R> {
 
     self.buf.clear();
     Ok(self.reader.read_event_into(&mut self.buf)?.into_owned())
-  }
-
-  #[inline]
-  pub fn next_borrowed(&mut self) -> Result<Event<'_>, SdkError> {
-    self.current = None;
-    if let Some(event) = self.pending.take() {
-      self.current = Some(event);
-      return Ok(self.current.as_ref().expect("current event").borrow());
-    }
-
-    self.buf.clear();
-    Ok(self.reader.read_event_into(&mut self.buf)?)
   }
 
   #[inline]
@@ -119,7 +140,7 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub(crate) fn next_tag_event(&mut self) -> Result<IoTagEvent, SdkError> {
+  pub fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
     self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(Self::tag_event_from_owned(event));
@@ -127,15 +148,15 @@ impl<R: BufRead> IoReader<R> {
 
     self.buf.clear();
     Ok(match self.reader.read_event_into(&mut self.buf)? {
-      Event::Start(e) => IoTagEvent::Start(e.into_owned(), false),
-      Event::Empty(e) => IoTagEvent::Start(e.into_owned(), true),
-      Event::End(e) => IoTagEvent::End(e.into_owned()),
-      Event::Decl(e) => IoTagEvent::Decl(matches!(
+      Event::Start(e) => TagEvent::Start(e.into_owned(), false),
+      Event::Empty(e) => TagEvent::Start(e.into_owned(), true),
+      Event::End(e) => TagEvent::End(e.into_owned()),
+      Event::Decl(e) => TagEvent::Decl(matches!(
         e.standalone(),
         Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
       )),
-      Event::Eof => IoTagEvent::Eof,
-      _ => IoTagEvent::Other,
+      Event::Eof => TagEvent::Eof,
+      _ => TagEvent::Other,
     })
   }
 
@@ -158,18 +179,86 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  fn tag_event_from_owned(event: Event<'static>) -> IoTagEvent {
+  fn tag_event_from_owned(event: Event<'static>) -> TagEvent<'static> {
     match event {
-      Event::Start(e) => IoTagEvent::Start(e, false),
-      Event::Empty(e) => IoTagEvent::Start(e, true),
-      Event::End(e) => IoTagEvent::End(e),
-      Event::Decl(e) => IoTagEvent::Decl(matches!(
+      Event::Start(e) => TagEvent::Start(e, false),
+      Event::Empty(e) => TagEvent::Start(e, true),
+      Event::End(e) => TagEvent::End(e),
+      Event::Decl(e) => TagEvent::Decl(matches!(
         e.standalone(),
         Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
       )),
-      Event::Eof => IoTagEvent::Eof,
-      _ => IoTagEvent::Other,
+      Event::Eof => TagEvent::Eof,
+      _ => TagEvent::Other,
     }
+  }
+}
+
+impl<R: BufRead> XmlRead<'static> for IoReader<R> {
+  #[inline]
+  fn next(&mut self) -> Result<Event<'static>, SdkError> {
+    IoReader::next(self)
+  }
+
+  #[inline]
+  fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
+    IoReader::next_tag_event(self)
+  }
+
+  #[inline]
+  fn unread(&mut self, event: Event<'static>) -> Result<(), SdkError> {
+    IoReader::unread(self, event)
+  }
+
+  #[inline]
+  fn decoder(&self) -> Decoder {
+    IoReader::decoder(self)
+  }
+
+  #[inline]
+  fn read_inner<T: crate::sdk::SdkType>(
+    &mut self,
+    start: quick_xml::events::BytesStart<'static>,
+    empty: bool,
+  ) -> Result<T, SdkError> {
+    T::read_inner(self, start, empty)
+  }
+
+  #[inline]
+  fn read_text(
+    &mut self,
+    end: quick_xml::name::QName<'_>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<String, SdkError> {
+    IoReader::read_text(self, end, ty, field)
+  }
+
+  #[inline]
+  fn drain_text_field_from_event(
+    &mut self,
+    value: &mut Option<String>,
+    first: Event<'static>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<(), SdkError> {
+    IoReader::drain_text_field_from_event(self, value, first, ty, field)
+  }
+
+  #[inline]
+  fn read_raw_empty_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'static>,
+  ) -> Result<Box<[u8]>, SdkError> {
+    read_raw_empty_xml_io_bytes(start)
+  }
+
+  #[inline]
+  fn read_raw_element_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'static>,
+  ) -> Result<Box<[u8]>, SdkError> {
+    read_raw_element_xml_io_bytes(self, start)
   }
 }
 
@@ -248,7 +337,7 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
-  pub fn next_tag_event(&mut self) -> Result<SliceTagEvent<'de>, SdkError> {
+  pub fn next_tag_event(&mut self) -> Result<TagEvent<'de>, SdkError> {
     if let Some(event) = self.pending.take() {
       return Ok(Self::tag_event_from_event(event));
     }
@@ -274,18 +363,86 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
-  fn tag_event_from_event(event: Event<'de>) -> SliceTagEvent<'de> {
+  fn tag_event_from_event(event: Event<'de>) -> TagEvent<'de> {
     match event {
-      Event::Start(e) => SliceTagEvent::Start(e, false),
-      Event::Empty(e) => SliceTagEvent::Start(e, true),
-      Event::End(e) => SliceTagEvent::End(e),
-      Event::Decl(e) => SliceTagEvent::Decl(matches!(
+      Event::Start(e) => TagEvent::Start(e, false),
+      Event::Empty(e) => TagEvent::Start(e, true),
+      Event::End(e) => TagEvent::End(e),
+      Event::Decl(e) => TagEvent::Decl(matches!(
         e.standalone(),
         Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
       )),
-      Event::Eof => SliceTagEvent::Eof,
-      _ => SliceTagEvent::Other,
+      Event::Eof => TagEvent::Eof,
+      _ => TagEvent::Other,
     }
+  }
+}
+
+impl<'de> XmlRead<'de> for SliceReader<'de> {
+  #[inline]
+  fn next(&mut self) -> Result<Event<'de>, SdkError> {
+    SliceReader::next(self)
+  }
+
+  #[inline]
+  fn next_tag_event(&mut self) -> Result<TagEvent<'de>, SdkError> {
+    SliceReader::next_tag_event(self)
+  }
+
+  #[inline]
+  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+    SliceReader::unread(self, event)
+  }
+
+  #[inline]
+  fn decoder(&self) -> Decoder {
+    SliceReader::decoder(self)
+  }
+
+  #[inline]
+  fn read_inner<T: crate::sdk::SdkType>(
+    &mut self,
+    start: quick_xml::events::BytesStart<'de>,
+    empty: bool,
+  ) -> Result<T, SdkError> {
+    T::read_inner(self, start, empty)
+  }
+
+  #[inline]
+  fn read_text(
+    &mut self,
+    end: quick_xml::name::QName<'_>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<String, SdkError> {
+    SliceReader::read_text(self, end, ty, field)
+  }
+
+  #[inline]
+  fn drain_text_field_from_event(
+    &mut self,
+    value: &mut Option<String>,
+    first: Event<'de>,
+    ty: &'static str,
+    field: &'static str,
+  ) -> Result<(), SdkError> {
+    SliceReader::drain_text_field_from_event(self, value, first, ty, field)
+  }
+
+  #[inline]
+  fn read_raw_empty_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'de>,
+  ) -> Result<Box<[u8]>, SdkError> {
+    read_raw_empty_xml_borrowed_bytes(start)
+  }
+
+  #[inline]
+  fn read_raw_element_xml_bytes(
+    &mut self,
+    start: quick_xml::events::BytesStart<'de>,
+  ) -> Result<Box<[u8]>, SdkError> {
+    read_raw_element_xml_borrowed_bytes(self, start)
   }
 }
 
@@ -1337,21 +1494,21 @@ pub(crate) fn read_root_start_borrowed<'de>(
   let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      SliceTagEvent::Decl(standalone) => {
+      TagEvent::Decl(standalone) => {
         xml_header = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
           crate::common::XmlHeaderType::Plain
         };
       }
-      SliceTagEvent::Start(e, empty) => {
+      TagEvent::Start(e, empty) => {
         if e.local_name().into_inner() == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
-      SliceTagEvent::Eof => return Err(unexpected_eof(owner)),
-      SliceTagEvent::End(_) | SliceTagEvent::Other => {}
+      TagEvent::Eof => return Err(unexpected_eof(owner)),
+      TagEvent::End(_) | TagEvent::Other => {}
     }
   }
 }
@@ -1372,21 +1529,21 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
   let mut xml_header = crate::common::XmlHeaderType::None;
   loop {
     match reader.next_tag_event()? {
-      IoTagEvent::Decl(standalone) => {
+      TagEvent::Decl(standalone) => {
         xml_header = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
           crate::common::XmlHeaderType::Plain
         };
       }
-      IoTagEvent::Start(e, empty) => {
+      TagEvent::Start(e, empty) => {
         if e.local_name().into_inner() == local_name {
           return Ok((e, empty, xml_header));
         }
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
-      IoTagEvent::Eof => return Err(unexpected_eof(owner)),
-      IoTagEvent::End(_) | IoTagEvent::Other => {}
+      TagEvent::Eof => return Err(unexpected_eof(owner)),
+      TagEvent::End(_) | TagEvent::Other => {}
     }
   }
 }

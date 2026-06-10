@@ -34,11 +34,9 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, decode_utf16_xml_bytes,
-  from_bytes_inner, from_reader_inner, parse_decimal_number_or_percent_attr,
-  parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
-  read_raw_element_xml_borrowed_bytes, read_raw_element_xml_io_bytes,
-  read_raw_empty_xml_borrowed_bytes, read_raw_empty_xml_io_bytes, read_root_start_borrowed,
+  TagEvent, XmlRead, decode_attr_value, decode_utf16_xml_bytes, from_bytes_inner,
+  from_reader_inner, parse_decimal_number_or_percent_attr, parse_measurement_or_percent_attr,
+  parse_signed_twips_measure_attr, parse_twips_measure_attr, read_root_start_borrowed,
   read_root_start_io, root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
   write_decimal_number_or_percent_attr, write_escaped_content_str, write_escaped_content_text,
   write_escaped_text, write_list_attr_value, write_list_text_content_value,

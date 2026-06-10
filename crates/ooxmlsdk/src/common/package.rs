@@ -2121,9 +2121,7 @@ fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart
 
   loop {
     match xml_reader.next_tag_event()? {
-      super::IoTagEvent::Start(start, empty_tag)
-        if qname_matches(start.name().as_ref(), b"part") =>
-      {
+      super::TagEvent::Start(start, empty_tag) if qname_matches(start.name().as_ref(), b"part") => {
         if empty_tag {
           return Err(SdkError::CommonError(
             "Flat OPC part must contain xmlData or binaryData".to_string(),
@@ -2131,7 +2129,7 @@ fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart
         }
         parts.push(read_flat_opc_part(&mut xml_reader, start)?);
       }
-      super::IoTagEvent::Eof => break,
+      super::TagEvent::Eof => break,
       _ => {}
     }
   }
@@ -2141,7 +2139,7 @@ fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart
 
 #[cfg(feature = "flat-opc")]
 fn read_flat_opc_part<R: std::io::BufRead>(
-  xml_reader: &mut super::IoReader<R>,
+  xml_reader: &mut super::xml::IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
 ) -> Result<FlatOpcPart, SdkError> {
   let decoder = xml_reader.decoder();
@@ -2166,24 +2164,24 @@ fn read_flat_opc_part<R: std::io::BufRead>(
 
   loop {
     match xml_reader.next_tag_event()? {
-      super::IoTagEvent::Start(start, empty_tag)
+      super::TagEvent::Start(start, empty_tag)
         if qname_matches(start.name().as_ref(), b"xmlData") =>
       {
         bytes = Some(read_flat_opc_xml_data(xml_reader, empty_tag)?);
       }
-      super::IoTagEvent::Start(start, empty_tag)
+      super::TagEvent::Start(start, empty_tag)
         if qname_matches(start.name().as_ref(), b"binaryData") =>
       {
         bytes = Some(read_flat_opc_binary_data(xml_reader, empty_tag)?);
       }
-      super::IoTagEvent::Start(_, true) => {}
-      super::IoTagEvent::Start(_, false) => {
+      super::TagEvent::Start(_, true) => {}
+      super::TagEvent::Start(_, false) => {
         return Err(SdkError::CommonError(
           "unsupported Flat OPC part child element".to_string(),
         ));
       }
-      super::IoTagEvent::End(end) if qname_matches(end.name().as_ref(), b"part") => break,
-      super::IoTagEvent::Eof => return Err(unexpected_eof("Flat OPC part")),
+      super::TagEvent::End(end) if qname_matches(end.name().as_ref(), b"part") => break,
+      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC part")),
       _ => {}
     }
   }
@@ -2201,7 +2199,7 @@ fn read_flat_opc_part<R: std::io::BufRead>(
 
 #[cfg(feature = "flat-opc")]
 fn read_flat_opc_xml_data<R: std::io::BufRead>(
-  xml_reader: &mut super::IoReader<R>,
+  xml_reader: &mut super::xml::IoReader<R>,
   empty_tag: bool,
 ) -> Result<Vec<u8>, SdkError> {
   if empty_tag {
@@ -2213,11 +2211,11 @@ fn read_flat_opc_xml_data<R: std::io::BufRead>(
   let mut bytes = None;
   loop {
     match xml_reader.next_tag_event()? {
-      super::IoTagEvent::Start(start, empty_tag) => {
+      super::TagEvent::Start(start, empty_tag) => {
         bytes = Some(super::read_outer_xml_io(xml_reader, start, empty_tag)?.into_bytes());
       }
-      super::IoTagEvent::End(end) if qname_matches(end.name().as_ref(), b"xmlData") => break,
-      super::IoTagEvent::Eof => return Err(unexpected_eof("Flat OPC xmlData")),
+      super::TagEvent::End(end) if qname_matches(end.name().as_ref(), b"xmlData") => break,
+      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC xmlData")),
       _ => {}
     }
   }
@@ -2229,7 +2227,7 @@ fn read_flat_opc_xml_data<R: std::io::BufRead>(
 
 #[cfg(feature = "flat-opc")]
 fn read_flat_opc_binary_data<R: std::io::BufRead>(
-  xml_reader: &mut super::IoReader<R>,
+  xml_reader: &mut super::xml::IoReader<R>,
   empty_tag: bool,
 ) -> Result<Vec<u8>, SdkError> {
   if empty_tag {
@@ -2300,10 +2298,10 @@ fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
   let mut xml_reader = super::from_bytes_inner(bytes)?;
   loop {
     match xml_reader.next_tag_event()? {
-      super::SliceTagEvent::Start(start, empty_tag) => {
+      super::TagEvent::Start(start, empty_tag) => {
         return Ok(super::read_outer_xml_borrowed(&mut xml_reader, start, empty_tag)?.into_bytes());
       }
-      super::SliceTagEvent::Eof => return Err(unexpected_eof("Flat OPC XML part")),
+      super::TagEvent::Eof => return Err(unexpected_eof("Flat OPC XML part")),
       _ => {}
     }
   }

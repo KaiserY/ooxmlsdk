@@ -10,7 +10,6 @@ use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
   buf: Vec<u8>,
-  current: Option<Event<'static>>,
   pending: Option<Event<'static>>,
 }
 
@@ -55,6 +54,22 @@ pub trait XmlRead<'xml> {
     &mut self,
     start: quick_xml::events::BytesStart<'xml>,
   ) -> Result<Box<[u8]>, SdkError>;
+
+  #[inline]
+  fn read_raw_empty_xml_string(
+    &mut self,
+    start: quick_xml::events::BytesStart<'xml>,
+  ) -> Result<String, SdkError> {
+    raw_xml_bytes_to_string(self.read_raw_empty_xml_bytes(start)?)
+  }
+
+  #[inline]
+  fn read_raw_element_xml_string(
+    &mut self,
+    start: quick_xml::events::BytesStart<'xml>,
+  ) -> Result<String, SdkError> {
+    raw_xml_bytes_to_string(self.read_raw_element_xml_bytes(start)?)
+  }
 }
 
 impl<R: BufRead> IoReader<R> {
@@ -62,14 +77,12 @@ impl<R: BufRead> IoReader<R> {
     Self {
       reader,
       buf: Vec::new(),
-      current: None,
       pending: None,
     }
   }
 
   #[inline]
   pub fn next(&mut self) -> Result<Event<'static>, SdkError> {
-    self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(event);
     }
@@ -85,28 +98,7 @@ impl<R: BufRead> IoReader<R> {
     ty: &'static str,
     field: &'static str,
   ) -> Result<String, SdkError> {
-    self.current = None;
-    self.buf.clear();
-    let mut value = None;
-    loop {
-      match self.next()? {
-        event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
-          append_xml_text_event(&mut value, event, ty, field)?;
-        }
-        Event::End(e) if e.name() == end => {
-          return Ok(value.unwrap_or_default());
-        }
-        Event::Start(e) | Event::Empty(e) => {
-          return Err(unexpected_tag(
-            ty,
-            "text content",
-            e.local_name().into_inner(),
-          ));
-        }
-        Event::Eof => return Err(unexpected_eof(ty)),
-        _ => {}
-      }
-    }
+    read_text_events(self, end, ty, field)
   }
 
   #[inline]
@@ -117,7 +109,6 @@ impl<R: BufRead> IoReader<R> {
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError> {
-    self.current = None;
     let mut event = first;
     loop {
       match event {
@@ -135,7 +126,6 @@ impl<R: BufRead> IoReader<R> {
 
   #[inline]
   pub fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
-    self.current = None;
     if let Some(event) = self.pending.take() {
       return Ok(Self::tag_event_from_owned(event));
     }
@@ -156,7 +146,6 @@ impl<R: BufRead> IoReader<R> {
 
   #[inline]
   pub fn unread(&mut self, event: Event<'static>) -> Result<(), SdkError> {
-    self.current = None;
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
         "xml reader unread buffer already occupied".to_string(),
@@ -276,26 +265,7 @@ impl<'de> SliceReader<'de> {
     ty: &'static str,
     field: &'static str,
   ) -> Result<String, SdkError> {
-    let mut value = None;
-    loop {
-      match self.next()? {
-        event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
-          append_xml_text_event(&mut value, event, ty, field)?;
-        }
-        Event::End(e) if e.name() == end => {
-          return Ok(value.unwrap_or_default());
-        }
-        Event::Start(e) | Event::Empty(e) => {
-          return Err(unexpected_tag(
-            ty,
-            "text content",
-            e.local_name().into_inner(),
-          ));
-        }
-        Event::Eof => return Err(unexpected_eof(ty)),
-        _ => {}
-      }
-    }
+    read_text_events(self, end, ty, field)
   }
 
   #[inline]
@@ -410,7 +380,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     &mut self,
     start: quick_xml::events::BytesStart<'de>,
   ) -> Result<Box<[u8]>, SdkError> {
-    read_raw_empty_xml_borrowed_bytes(start)
+    read_raw_empty_xml_borrowed_bytes(self, start)
   }
 
   #[inline]
@@ -927,6 +897,35 @@ fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]
   invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
 }
 
+#[inline]
+fn read_text_events<'xml, R: XmlRead<'xml>>(
+  xml_reader: &mut R,
+  end: quick_xml::name::QName<'_>,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<String, SdkError> {
+  let mut value = None;
+  loop {
+    match xml_reader.next()? {
+      event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
+        append_xml_text_event(&mut value, event, ty, field)?;
+      }
+      Event::End(e) if e.name() == end => {
+        return Ok(value.unwrap_or_default());
+      }
+      Event::Start(e) | Event::Empty(e) => {
+        return Err(unexpected_tag(
+          ty,
+          "text content",
+          e.local_name().into_inner(),
+        ));
+      }
+      Event::Eof => return Err(unexpected_eof(ty)),
+      _ => {}
+    }
+  }
+}
+
 fn append_xml_text_event(
   value: &mut Option<String>,
   event: Event<'_>,
@@ -1023,15 +1022,47 @@ const RAW_EMPTY_XML_EXTRA_LEN: usize = 3;
 const RAW_ELEMENT_XML_EXTRA_LEN: usize = 5;
 
 #[inline]
-pub(crate) fn read_raw_empty_xml_borrowed_bytes<'de>(
-  start: quick_xml::events::BytesStart<'de>,
-) -> Result<Box<[u8]>, SdkError> {
+fn raw_xml_bytes_to_string(xml: Box<[u8]>) -> Result<String, SdkError> {
+  String::from_utf8(xml.into_vec())
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml: {err}")))
+}
+
+#[inline]
+fn read_raw_empty_xml_start_bytes(
+  start: quick_xml::events::BytesStart<'_>,
+) -> Box<[u8]> {
   let start: &[u8] = start.as_ref();
   let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
   xml.push(b'<');
   xml.extend_from_slice(start);
   xml.extend_from_slice(b"/>");
-  Ok(xml.into_boxed_slice())
+  xml.into_boxed_slice()
+}
+
+#[inline]
+fn build_raw_element_xml_bytes(
+  start: &[u8],
+  inner: &[u8],
+  end_name: &[u8],
+) -> Box<[u8]> {
+  let mut xml =
+    Vec::with_capacity(start.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN);
+  xml.push(b'<');
+  xml.extend_from_slice(start);
+  xml.push(b'>');
+  xml.extend_from_slice(inner);
+  xml.extend_from_slice(b"</");
+  xml.extend_from_slice(end_name);
+  xml.push(b'>');
+  xml.into_boxed_slice()
+}
+
+#[inline]
+pub(crate) fn read_raw_empty_xml_borrowed_bytes<'de>(
+  _xml_reader: &mut SliceReader<'de>,
+  start: quick_xml::events::BytesStart<'de>,
+) -> Result<Box<[u8]>, SdkError> {
+  Ok(read_raw_empty_xml_start_bytes(start))
 }
 
 #[inline]
@@ -1042,20 +1073,11 @@ pub(crate) fn read_raw_element_xml_borrowed_bytes<'de>(
   let start_bytes: &[u8] = start.as_ref();
   let end_name = start.name();
   let inner = xml_reader.reader.read_text(end_name)?;
-  let inner: &[u8] = inner.as_ref();
-  let end_name = end_name.as_ref();
-
-  let mut xml = Vec::with_capacity(
-    start_bytes.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN,
-  );
-  xml.push(b'<');
-  xml.extend_from_slice(start_bytes);
-  xml.push(b'>');
-  xml.extend_from_slice(inner);
-  xml.extend_from_slice(b"</");
-  xml.extend_from_slice(end_name);
-  xml.push(b'>');
-  Ok(xml.into_boxed_slice())
+  Ok(build_raw_element_xml_bytes(
+    start_bytes,
+    inner.as_ref(),
+    end_name.as_ref(),
+  ))
 }
 
 #[cfg(feature = "flat-opc")]
@@ -1101,12 +1123,7 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 pub(crate) fn read_raw_empty_xml_io_bytes(
   start: quick_xml::events::BytesStart<'static>,
 ) -> Result<Box<[u8]>, SdkError> {
-  let start: &[u8] = start.as_ref();
-  let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
-  xml.push(b'<');
-  xml.extend_from_slice(start);
-  xml.extend_from_slice(b"/>");
-  Ok(xml.into_boxed_slice())
+  Ok(read_raw_empty_xml_start_bytes(start))
 }
 
 #[inline]
@@ -1114,25 +1131,16 @@ pub(crate) fn read_raw_element_xml_io_bytes<R: BufRead>(
   xml_reader: &mut IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
 ) -> Result<Box<[u8]>, SdkError> {
-  let start_bytes: &[u8] = start.as_ref();
   let end_name = start.name();
+  let start_bytes: &[u8] = start.as_ref();
   let inner = xml_reader
     .reader
     .read_text_into(end_name, &mut xml_reader.buf)?;
-  let inner: &[u8] = inner.as_ref();
-  let end_name = end_name.as_ref();
-
-  let mut xml = Vec::with_capacity(
-    start_bytes.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN,
-  );
-  xml.push(b'<');
-  xml.extend_from_slice(start_bytes);
-  xml.push(b'>');
-  xml.extend_from_slice(inner);
-  xml.extend_from_slice(b"</");
-  xml.extend_from_slice(end_name);
-  xml.push(b'>');
-  Ok(xml.into_boxed_slice())
+  Ok(build_raw_element_xml_bytes(
+    start_bytes,
+    inner.as_ref(),
+    end_name.as_ref(),
+  ))
 }
 
 #[cfg(feature = "mce")]
@@ -1190,8 +1198,8 @@ pub(crate) fn mce_choice_replacement_child_bytes(
             Event::Empty(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
               fallback = Some(Vec::new());
             }
-            Event::Start(_) => {
-              skip_element(&mut reader)?;
+            Event::Start(e) => {
+              skip_element(&mut reader, e.name())?;
             }
             Event::End(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
               return Ok(Some(fallback.unwrap_or_default()));
@@ -1243,26 +1251,25 @@ fn mce_unknown_element_replacement_bytes(
     if empty_tag {
       return Ok(Some(Vec::new()));
     }
-    let end_name = start.name().as_ref().to_vec();
-    return read_mce_container_children_bytes(reader, &[end_name.as_slice()]).map(Some);
+    return read_mce_container_children_qname_bytes(reader, start.name()).map(Some);
   }
 
   if is_ignorable {
     if !empty_tag {
-      skip_element(reader)?;
+      skip_element(reader, start.name())?;
     }
     return Ok(Some(Vec::new()));
   }
 
   if !qname.contains(&b':') {
     if !empty_tag {
-      skip_element(reader)?;
+      skip_element(reader, start.name())?;
     }
     return Ok(None);
   }
 
   if !empty_tag {
-    skip_element(reader)?;
+    skip_element(reader, start.name())?;
   }
   Ok(None)
 }
@@ -1289,34 +1296,44 @@ fn read_mce_container_children_bytes(
 }
 
 #[cfg(feature = "mce")]
+fn read_mce_container_children_qname_bytes(
+  reader: &mut Reader<&[u8]>,
+  end_name: quick_xml::name::QName<'_>,
+) -> Result<Vec<Box<[u8]>>, SdkError> {
+  let mut children = Vec::new();
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) => {
+        children.push(read_outer_xml_from_str_reader_bytes(reader, e, false)?);
+      }
+      Event::Empty(e) => {
+        children.push(read_outer_xml_from_str_reader_bytes(reader, e, true)?);
+      }
+      Event::End(e) if e.name() == end_name => return Ok(children),
+      Event::Eof => return Err(unexpected_eof("mce choice/fallback")),
+      _ => {}
+    }
+  }
+}
+
+#[cfg(feature = "mce")]
 fn read_outer_xml_from_str_reader_bytes(
   reader: &mut Reader<&[u8]>,
   start: quick_xml::events::BytesStart<'_>,
   empty_tag: bool,
 ) -> Result<Box<[u8]>, SdkError> {
-  let mut writer = quick_xml::Writer::new(std::io::Cursor::new(Vec::new()));
   if empty_tag {
-    writer.write_event(Event::Empty(start))?;
-    return Ok(writer.into_inner().into_inner().into_boxed_slice());
+    return Ok(read_raw_empty_xml_start_bytes(start));
   }
 
-  writer.write_event(Event::Start(start))?;
-  let mut depth = 1usize;
-  loop {
-    let event = reader.read_event()?;
-    match &event {
-      Event::Start(_) => depth += 1,
-      Event::End(_) => depth -= 1,
-      Event::Eof => return Err(unexpected_eof("mce selected child")),
-      _ => {}
-    }
-    writer.write_event(event)?;
-    if depth == 0 {
-      break;
-    }
-  }
-
-  Ok(writer.into_inner().into_inner().into_boxed_slice())
+  let start_bytes = start.as_ref();
+  let end_name = start.name();
+  let inner = reader.read_text(end_name)?;
+  Ok(build_raw_element_xml_bytes(
+    start_bytes,
+    inner.as_ref(),
+    end_name.as_ref(),
+  ))
 }
 
 #[cfg(feature = "mce")]
@@ -1328,21 +1345,12 @@ fn qname_prefix(qname: &[u8]) -> Option<&[u8]> {
 }
 
 #[cfg(feature = "mce")]
-fn skip_element(reader: &mut Reader<&[u8]>) -> Result<(), SdkError> {
-  let mut depth = 1usize;
-  loop {
-    match reader.read_event()? {
-      Event::Start(_) => depth += 1,
-      Event::End(_) => {
-        depth -= 1;
-        if depth == 0 {
-          return Ok(());
-        }
-      }
-      Event::Eof => return Err(unexpected_eof("mce skipped element")),
-      _ => {}
-    }
-  }
+fn skip_element(
+  reader: &mut Reader<&[u8]>,
+  name: quick_xml::name::QName<'_>,
+) -> Result<(), SdkError> {
+  reader.read_to_end(name)?;
+  Ok(())
 }
 
 #[cfg(feature = "mce")]

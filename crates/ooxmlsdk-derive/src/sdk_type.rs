@@ -2063,8 +2063,7 @@ fn choice_item_parse_bodies<'a>(
       Some((qname.as_str(), body.clone(), body))
     }
     SdkTypeChoiceItem::AnyChild { variant, qname, .. } => {
-      let parsed_tokens =
-        build_choice_any_child_parse_tokens(ident, qname, quote! { xml_reader });
+      let parsed_tokens = build_choice_any_child_parse_tokens(ident, qname, quote! { xml_reader });
       let assign_tokens = if repeated {
         quote! { #field_ident.push(#choice_ty::#variant(parsed_child.into())); }
       } else {
@@ -3292,36 +3291,23 @@ fn build_choice_any_child_parse_tokens(
   qname: &str,
   xml_reader: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  let QNameInfo {
-    tag_prefix,
-    local_name,
-  } = parse_qname_info(qname);
+  let QNameInfo { local_name, .. } = parse_qname_info(qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  let tag_qname_lit = LitByteStr::new(
-    format!("{tag_prefix}:{local_name}").as_bytes(),
-    Span::call_site(),
-  );
   quote! {
     let mut parsed_child = Vec::new();
     if !next_empty {
       loop {
         match (#xml_reader).next()? {
           quick_xml::events::Event::Start(e) => {
-            let xml = crate::common::XmlRead::read_raw_element_xml_bytes(#xml_reader, e)?;
-            let xml = String::from_utf8(xml.into_vec()).map_err(|err| {
-              crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
-            })?;
+            let xml = crate::common::XmlRead::read_raw_element_xml_string(#xml_reader, e)?;
             parsed_child.push(xml);
           }
           quick_xml::events::Event::Empty(e) => {
-            let xml = crate::common::XmlRead::read_raw_empty_xml_bytes(#xml_reader, e)?;
-            let xml = String::from_utf8(xml.into_vec()).map_err(|err| {
-              crate::common::SdkError::CommonError(format!("invalid utf-8 xml: {err}"))
-            })?;
+            let xml = crate::common::XmlRead::read_raw_empty_xml_string(#xml_reader, e)?;
             parsed_child.push(xml);
           }
           quick_xml::events::Event::End(end) => {
-            if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+            if end.local_name().into_inner() == #local_name_lit {
               break;
             }
           }

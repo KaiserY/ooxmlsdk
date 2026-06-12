@@ -132,6 +132,17 @@ The crate does not own:
 - OOXML package read/write
 - generated schema modeling
 
+Import adapters must use `ooxmlsdk`'s typed package and generated schema APIs as
+their primary input. Do not parse raw XML for fields that generated `w::*`,
+`a::*`, `p::*`, `x::*`, or typed part traversal already expose. Raw XML is only
+acceptable for currently unmodeled extension payloads that need structural
+preservation or explicit unsupported records.
+
+Existing `ooxmlsdk-pdf` layout/import code is migration evidence, not the input
+contract. New layout code should read from typed `WordprocessingDocument`,
+`SpreadsheetDocument`, `PresentationDocument`, their parts, and generated schema
+roots, then produce layout-owned imported views.
+
 ## 4. Engine Split
 
 Use one crate with shared substrate and separate application engines:
@@ -144,17 +155,17 @@ ooxmlsdk-layout
     style
     display
     debug
-  writer
+  docx
     import
     model
     frame
     engine
-  calc
+  xlsx
     import
     model
     print
     engine
-  impress
+  pptx
     import
     model
     shape
@@ -163,6 +174,9 @@ ooxmlsdk-layout
 
 Do not force DOCX, XLSX, and PPTX into a single core algorithm. They share
 geometry, text, fonts, and display primitives, but not layout semantics.
+Use OOXML-family names (`docx`, `xlsx`, `pptx`) for crate modules and public
+types. Use LibreOffice Writer/Calc/Impress names in comments, tests, and source
+maps when identifying the upstream concept being ported.
 
 ## 5. Dependency Direction
 
@@ -183,6 +197,51 @@ pipeline value-aware.
 Do not express the module graph as a single strict chain. Formula and fonts are
 different support layers: formula prepares spreadsheet values, while fonts
 provide metrics and shaping for all layout engines.
+
+The dependency on `ooxmlsdk` is intentional and should be used deeply enough to
+avoid duplicate OOXML models. Layout import may define Writer/Calc/Impress
+views, but those views should preserve links to typed source concepts and avoid
+copying every string or byte payload by default.
+
+## 5.1 Ownership And Borrowing
+
+Use a borrowed import/view model first:
+
+```text
+DocxDocument<'doc>
+XlsxWorkbook<'doc>
+PptxPresentation<'doc>
+```
+
+The lifetime represents data borrowed from parsed `ooxmlsdk` package parts,
+generated schema structs, formula value models, font requests, and media/font
+resources.
+
+Use `Cow<'doc, str>` or `Cow<'doc, [u8]>` for:
+
+- paragraph/run text and field display text
+- style ids, numbering ids represented as strings, relationship ids, and
+  bookmark/hyperlink targets
+- sheet names, cell references, defined-name text, formula display text, header
+  and footer text
+- image, embedded object, and font bytes when the source can be borrowed
+- debug labels and display-list text when they come directly from import data
+
+Use owned values for:
+
+- computed line text after case mapping, field expansion, number formatting, or
+  shared-formula translation
+- generated debug dump strings
+- normalized resource keys that must outlive the source document
+- display documents explicitly converted to owned output
+
+Keep copyable data as plain fields: enums, booleans, addresses, indexes, i32/u32
+values, unit wrappers, colors, geometry, transforms, and layout flags should not
+use `Cow`.
+
+Layout should provide an explicit owned conversion for consumers that need to
+hold output after the source package is dropped. Do not make eager cloning the
+default import behavior.
 
 ## 6. Common Layer
 
@@ -223,9 +282,10 @@ PDF-specific concepts such as PDF object ids, annotations dictionaries,
 ToUnicode CMaps, PDF/A policy, and tagged PDF structure remain in
 `ooxmlsdk-pdf`.
 
-## 7. Writer Engine
+## 7. DOCX Engine
 
-The Writer engine is for DOCX and Writer-like flow documents.
+The DOCX engine is for WordprocessingML flow documents. Its behavior should be
+calibrated against LibreOffice Writer.
 
 ### 7.1 LO Source Map
 
@@ -248,10 +308,10 @@ The Writer engine is for DOCX and Writer-like flow documents.
 
 ### 7.2 Model Shape
 
-Use a Writer-like imported model:
+Use a Writer-like imported model with OOXML-facing names:
 
 ```text
-WriterDocument
+DocxDocument
   settings
   styles
   numbering
@@ -260,7 +320,7 @@ WriterDocument
 ```
 
 ```text
-WriterSection
+DocxSection
   break_kind
   page_desc
   columns
@@ -270,7 +330,7 @@ WriterSection
 ```
 
 ```text
-WriterBlock
+DocxBlock
   Paragraph
   Table
   FloatingFrame
@@ -281,19 +341,20 @@ WriterBlock
 The engine should produce a frame tree close to Writer concepts:
 
 ```text
-RootFrame
-  PageFrame
-    HeaderFrame
-    BodyFrame
-      SectionFrame
-      ColumnFrame
-      TextFrame
-      TableFrame
-        RowFrame
-        CellFrame
-      FlyFrame
-    FooterFrame
-    FootnoteFrame
+DocxFrameTree
+  Root
+    Page
+      Header
+      Body
+        Section
+        Column
+        Text
+        Table
+          Row
+          Cell
+        Fly
+      Footer
+      Footnote
 ```
 
 Follows and splits are first-class:
@@ -317,9 +378,10 @@ FrameFollow
 - Model footnote reservation and continuation as layout state, not PDF state.
 - Produce a layout debug dump before producing a display list.
 
-## 8. Calc Engine
+## 8. XLSX Engine
 
-The Calc engine is for XLSX sheet print layout.
+The XLSX engine is for SpreadsheetML sheet print layout. Its behavior should be
+calibrated against LibreOffice Calc.
 
 ### 8.1 LO Source Map
 
@@ -337,10 +399,10 @@ The Calc engine is for XLSX sheet print layout.
 
 ### 8.2 Input Boundary
 
-Calc layout consumes a value-aware workbook:
+XLSX layout consumes a value-aware workbook:
 
 ```text
-CalcWorkbook
+XlsxWorkbook
   sheets
   styles
   page_styles
@@ -351,11 +413,16 @@ CalcWorkbook
 The value provider should come from `ooxmlsdk-formula` for formula cells and
 from import/style code for constants and formatted display strings.
 
-Calc layout must not parse or evaluate formulas.
+XLSX layout must not parse or evaluate formulas.
+
+XLSX import should still use generated SpreadsheetML types for worksheet
+structure, page settings, columns, rows, merges, hyperlinks, drawings, tables,
+and relationships. The formula crate supplies values and formula state; it does
+not replace typed sheet import.
 
 ### 8.3 Responsibilities
 
-The Calc engine owns:
+The XLSX engine owns:
 
 - sheet print order
 - visible sheet selection
@@ -374,9 +441,28 @@ The Calc engine owns:
 Formula values, number formatting, and stale-cache policy are inputs, not print
 layout algorithms.
 
-## 9. Impress Engine
+The engine should expose print output before lowering to the common display
+list:
 
-The Impress engine is for PPTX fixed-page slide layout.
+```text
+XlsxPrintPlan
+  printed_sheets
+
+XlsxPrintPage
+  sheet_range
+  paper_bounds
+  content_bounds
+  cell_fragments
+  drawing_fragments
+```
+
+This mirrors Calc's split between sheet data/import and `ScPrintFunc` /
+`ScOutputData` visible output.
+
+## 9. PPTX Engine
+
+The PPTX engine is for PresentationML fixed-page slide layout. Its behavior
+should be calibrated against LibreOffice Impress.
 
 ### 9.1 LO Source Map
 
@@ -395,7 +481,7 @@ The Impress engine is for PPTX fixed-page slide layout.
 
 ### 9.2 Responsibilities
 
-The Impress engine owns:
+The PPTX engine owns:
 
 - slide size
 - slide order and visibility
@@ -411,6 +497,28 @@ The Impress engine owns:
 
 PPTX is fixed-page drawing layout. Do not route it through the Writer flow
 engine.
+
+The PPTX model must keep non-text drawing objects structured enough for later
+renderers and tests:
+
+```text
+PptxShape
+  Shape
+  Group
+  Picture
+  Media
+  GraphicFrame
+  Table
+  Chart
+  Diagram
+  OleObject
+  Connector
+```
+
+Tables should have row/cell geometry and text bodies as first-class model data,
+not be flattened immediately to painted rectangles. Chart, diagram, media, and
+OLE objects may initially be placeholders, but they should remain typed
+placeholders with relationship ids instead of generic unsupported strings.
 
 ## 10. Display List Boundary
 
@@ -447,6 +555,17 @@ Other consumers must be kept realistic during design:
 
 If a display primitive only works for PDF, redesign it as a neutral primitive
 or move it to the PDF backend.
+
+Display-list data may retain borrowed text and bytes through `Cow` while it is
+owned by the layout session. PDF, SVG, raster, and debug consumers should accept
+that borrowed display document. If a backend needs a `'static` artifact, it must
+request or build an owned display document explicitly.
+
+Text display primitives should prefer font-shaped runs from `ooxmlsdk-fonts`.
+They may carry borrowed source text for accessibility/debugging and shaped glyph
+collections by `Cow<'doc, [ShapedGlyph]>` when runs are split or trimmed without
+reshaping. PDF must consume the same resolved font ids and glyph runs instead
+of re-resolving text.
 
 ## 11. Debug Dump Boundary
 

@@ -1,0 +1,23 @@
+[package]
+name = "ooxmlsdk-layout"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Office layout trees, page trees, display lists, and debug dumps for ooxmlsdk"
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[features]
+default = ["xlsx-formula"]
+xlsx-formula = ["dep:ooxmlsdk-formula"]
+
+[dependencies]
+ooxmlsdk = { workspace = true, features = ["parts"] }
+ooxmlsdk-fonts = { workspace = true }
+ooxmlsdk-formula = { workspace = true, optional = true }
+thiserror = { workspace = true }

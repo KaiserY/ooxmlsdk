@@ -1,0 +1,26 @@
+[package]
+name = "ooxmlsdk-fonts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+description = "Shared font resolution, metrics, shaping, and usage support for ooxmlsdk"
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[features]
+default = []
+ooxml = ["dep:ooxmlsdk"]
+
+[dependencies]
+fontdb = { workspace = true }
+ooxmlsdk = { workspace = true, features = ["parts"], optional = true }
+rustybuzz = { workspace = true }
+thiserror = { workspace = true }
+ttf-parser = { workspace = true }
+unicode-bidi = { workspace = true }
+unicode-script = { workspace = true }

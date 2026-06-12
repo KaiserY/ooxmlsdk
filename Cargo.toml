@@ -4,6 +4,9 @@ members = [
   "crates/ooxmlsdk",
   "crates/ooxmlsdk-build",
   "crates/ooxmlsdk-derive",
+  "crates/ooxmlsdk-fonts",
+  "crates/ooxmlsdk-formula",
+  "crates/ooxmlsdk-layout",
   "crates/ooxmlsdk-pdf",
   "crates/ooxmlsdk-pdf-test",
   "crates/ooxmlsdk-test",
@@ -26,6 +29,9 @@ readme = "README.md"
 ooxmlsdk = { path = "crates/ooxmlsdk", default-features = false }
 ooxmlsdk-build = { path = "crates/ooxmlsdk-build" }
 ooxmlsdk-derive = { path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-fonts = { path = "crates/ooxmlsdk-fonts" }
+ooxmlsdk-formula = { path = "crates/ooxmlsdk-formula" }
+ooxmlsdk-layout = { path = "crates/ooxmlsdk-layout" }
 ooxmlsdk-pdf = { path = "crates/ooxmlsdk-pdf" }
 ooxmlsdk-pdf-test = { path = "crates/ooxmlsdk-pdf-test" }
 ooxmlsdk-test = { path = "crates/ooxmlsdk-test" }

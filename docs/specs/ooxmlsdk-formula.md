@@ -70,6 +70,20 @@ Do not parse raw XML when generated schema types expose the data. Raw XML is
 only acceptable for currently unmodeled extension payloads that must be
 preserved structurally.
 
+The first-class import path must be typed package and schema traversal:
+
+```text
+SpreadsheetDocument
+  -> WorkbookPart
+  -> WorksheetPart / SharedStringTablePart / WorkbookStylesPart
+  -> generated x::* SpreadsheetML structs
+  -> WorkbookValueModel
+```
+
+Do not build formula state from `ooxmlsdk-pdf`'s current Calc structs as the
+primary input. That code is useful migration evidence, but the formula crate
+must read the same typed `ooxmlsdk` data that non-PDF consumers use.
+
 ### 2.3 Typst Reference
 
 Typst is not a formula engine reference. Use it only for Rust implementation
@@ -140,18 +154,38 @@ ooxmlsdk-layout  -> ooxmlsdk-formula
 Downstream crates may consume formula results, but dependency direction must
 never point back from formula to layout, fonts, or PDF.
 
+The public constructors should make the typed boundary visible, for example by
+accepting a `SpreadsheetDocument`, workbook parts, worksheet parts, or borrowed
+generated SpreadsheetML roots. Helper constructors for tests may accept already
+extracted typed roots, but should not introduce a separate XML parser.
+
 ## 6. Public Model Shape
 
 The public model should be Calc-shaped rather than XML-shaped:
 
 ```text
 WorkbookValueModel
+  identity
   sheets
   defined_names
   shared_formula_groups
   calc_chain
   external_references
   calculation_settings
+```
+
+```text
+WorkbookIdentity
+  workbook_name
+  sheets
+  date_system
+  reference_style
+
+WorksheetIdentity
+  id
+  name
+  relationship_id
+  visible
 ```
 
 ```text
@@ -188,6 +222,31 @@ FormulaState
 The model must distinguish formula text, cached value, evaluated value, and
 display text. Losing that distinction makes layout and round-trip behavior
 incorrect.
+
+Calculation settings should preserve Calc/Excel state even before a full
+evaluator exists:
+
+- calculation mode
+- 1900 vs 1904 date system
+- A1 vs R1C1 reference style
+- full-calc-on-load and force-full-calc flags
+- iteration enabled/count/delta
+- full precision flag
+
+### 6.1 Ownership Model
+
+Use borrowed data where it naturally comes from parsed `ooxmlsdk` structs:
+
+- formula text, cell references, defined-name text, sheet names, relationship
+  ids, and cached string values may be `Cow<'doc, str>`
+- parsed addresses, ranges, workbook ids, formula kind, state flags, and error
+  identities should be compact copyable Rust types
+- evaluated values and display strings may be owned when they are computed,
+  normalized, translated shared formulas, or number-formatted output
+
+The model should be able to operate as a borrowed view over a parsed workbook
+for layout/export, with an explicit conversion path to an owned model when a
+consumer needs to keep formula state after the source package is dropped.
 
 ## 7. Value Provider API
 

@@ -1252,6 +1252,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "ooxmlsdk-fonts"
+version = "0.10.2"
+dependencies = [
+ "fontdb",
+ "ooxmlsdk",
+ "rustybuzz",
+ "thiserror",
+ "ttf-parser",
+ "unicode-bidi",
+ "unicode-script",
+]
+
+[[package]]
+name = "ooxmlsdk-formula"
+version = "0.10.2"
+dependencies = [
+ "ooxmlsdk",
+ "thiserror",
+]
+
+[[package]]
+name = "ooxmlsdk-layout"
+version = "0.10.2"
+dependencies = [
+ "ooxmlsdk",
+ "ooxmlsdk-fonts",
+ "ooxmlsdk-formula",
+ "thiserror",
+]
+
+[[package]]
 name = "ooxmlsdk-pdf"
 version = "0.10.2"
 dependencies = [

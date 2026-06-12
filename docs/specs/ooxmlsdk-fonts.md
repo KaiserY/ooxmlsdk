@@ -141,6 +141,13 @@ features:
 
 Do not make PDF or layout dependencies part of the font crate.
 
+When the optional OOXML feature exists, keep it as an adapter layer. Generated
+`ooxmlsdk` types may be used to extract embedded font bytes, theme font
+information, and Office font request fields, but the core registry, resolver,
+metrics, and shaping model must remain independent of generated schema structs.
+This keeps font behavior reusable by layout, PDF, SVG, raster preview, and test
+tools.
+
 ## 6. Public Model Shape
 
 Core request:
@@ -171,6 +178,37 @@ ResolvedFont
   synthetic_italic
   metrics
 ```
+
+Registry and matching:
+
+```text
+FontRegistry
+  sources
+  faces
+  book
+
+FontBook
+  face_infos
+  family_aliases
+  substitution_rules
+
+FontFaceInfo
+  font_id
+  family_names
+  postscript_name
+  style_name
+  weight
+  slant
+  stretch
+  pitch
+  coverage
+  flags
+```
+
+This follows the LO physical-font collection idea and Typst's `FontBook`
+pattern: discovery records all available faces first, then resolution chooses a
+face from that book. Do not let shaping or PDF embedding be the only place that
+knows which faces exist.
 
 Shaping:
 
@@ -209,6 +247,21 @@ FontUsage
 
 `font_id` must be stable within a layout/render session so the PDF backend can
 embed the same face that layout used for measurement.
+
+String and byte ownership should be explicit:
+
+- font family names, style names, language tags, and source identifiers may use
+  `Cow<'a, str>` at API boundaries that can borrow from layout or typed OOXML
+  adapters
+- in-memory font data should use shared bytes such as `Arc<[u8]>` or an
+  equivalent cheap-clone byte buffer once registered
+- shaped glyph collections may use `Cow<'a, [ShapedGlyph]>` when reused by
+  layout operations such as trimming, splitting, or display-list lowering
+- numeric metrics, glyph ids, enum-like properties, and unit values should stay
+  plain copyable fields
+
+Do not force callers to allocate owned strings just to request, resolve, or
+shape text.
 
 ## 7. Font Source Model
 

@@ -23,6 +23,11 @@ pub enum Fill<'doc> {
   None,
   Solid(Color),
   Theme(Cow<'doc, str>),
+  Gradient(GradientFill<'doc>),
+  Image {
+    relationship_id: Option<Cow<'doc, str>>,
+    tile: bool,
+  },
   Pattern {
     foreground: Color,
     background: Color,
@@ -33,4 +38,18 @@ impl Default for Fill<'_> {
   fn default() -> Self {
     Self::None
   }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GradientFill<'doc> {
+  pub stops: Vec<GradientStop<'doc>>,
+  pub angle_degrees: Option<f32>,
+  pub path: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GradientStop<'doc> {
+  pub position: f32,
+  pub color: Color,
+  pub scheme: Option<Cow<'doc, str>>,
 }

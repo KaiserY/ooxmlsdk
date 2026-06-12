@@ -13,6 +13,7 @@ pub struct PptxPresentation<'doc> {
   pub layouts: Vec<PptxLayout<'doc>>,
   pub theme: PptxTheme<'doc>,
   pub resources: PptxResources<'doc>,
+  pub shows: Vec<CustomShow<'doc>>,
 }
 
 impl<'doc> PptxPresentation<'doc> {
@@ -28,6 +29,8 @@ pub struct PptxSlide<'doc> {
   pub hidden: bool,
   pub layout_ref: Option<Cow<'doc, str>>,
   pub background: Option<SlideBackground<'doc>>,
+  pub transition: Option<SlideTransition<'doc>>,
+  pub timing: Option<TimingTree<'doc>>,
   pub shapes: Vec<PptxShape<'doc>>,
   pub notes: Option<PptxNotes<'doc>>,
 }
@@ -58,10 +61,14 @@ pub struct PptxShape<'doc> {
   pub kind: PptxShapeKind<'doc>,
   pub transform: Transform,
   pub geometry: Option<Cow<'doc, str>>,
+  pub custom_geometry: Option<CustomGeometry<'doc>>,
   pub fill: Fill<'doc>,
   pub line: Option<Stroke<'doc>>,
+  pub effects: Vec<ShapeEffect<'doc>>,
   pub text_body: Option<TextBody<'doc>>,
   pub placeholder: Option<Placeholder<'doc>>,
+  pub hidden: bool,
+  pub decorative: bool,
   pub children: Vec<PptxShape<'doc>>,
 }
 
@@ -73,13 +80,41 @@ impl Default for PptxShape<'_> {
       kind: PptxShapeKind::Shape,
       transform: Transform::default(),
       geometry: None,
+      custom_geometry: None,
       fill: Fill::None,
       line: None,
+      effects: Vec::new(),
       text_body: None,
       placeholder: None,
+      hidden: false,
+      decorative: false,
       children: Vec::new(),
     }
   }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CustomGeometry<'doc> {
+  pub preset: Option<Cow<'doc, str>>,
+  pub adjustments: Vec<(Cow<'doc, str>, f32)>,
+  pub text_rect: Option<crate::common::Rect>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ShapeEffect<'doc> {
+  Shadow {
+    color: crate::common::Color,
+    blur: crate::common::Pt,
+    distance: crate::common::Pt,
+    direction_degrees: f32,
+  },
+  Glow {
+    color: crate::common::Color,
+    radius: crate::common::Pt,
+  },
+  Reflection,
+  SoftEdge(crate::common::Pt),
+  Unsupported(Cow<'doc, str>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -132,6 +167,8 @@ pub struct TextBodyProperties {
   pub rotation_degrees: f32,
   pub columns: Option<u16>,
   pub autofit: TextAutofit,
+  pub vertical: TextVerticalMode,
+  pub wrap: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -150,6 +187,16 @@ pub enum TextAutofit {
   None,
   Normal,
   Shape,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextVerticalMode {
+  #[default]
+  Horizontal,
+  Vertical,
+  Vertical270,
+  WordArtVertical,
+  MongolianVertical,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -177,6 +224,15 @@ pub struct TextParagraphStyle<'doc> {
   pub alignment: TextAlignment,
   pub bullet: Option<TextBullet<'doc>>,
   pub default_run_style: TextRunStyle<'doc>,
+  pub line_spacing: Option<TextSpacing>,
+  pub space_before: Option<TextSpacing>,
+  pub space_after: Option<TextSpacing>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TextSpacing {
+  Points(crate::common::Pt),
+  Percent(f32),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -278,6 +334,8 @@ pub struct PptxTheme<'doc> {
   pub name: Option<Cow<'doc, str>>,
   pub color_scheme: Vec<(Cow<'doc, str>, crate::common::Color)>,
   pub font_scheme: Vec<(Cow<'doc, str>, Cow<'doc, str>)>,
+  pub fill_styles: Vec<Fill<'doc>>,
+  pub line_styles: Vec<Stroke<'doc>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -298,4 +356,30 @@ pub struct PptxBinaryResource<'doc> {
   pub relationship_id: Option<Cow<'doc, str>>,
   pub content_type: Cow<'doc, str>,
   pub bytes: Cow<'doc, [u8]>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CustomShow<'doc> {
+  pub name: Cow<'doc, str>,
+  pub slide_relationship_ids: Vec<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlideTransition<'doc> {
+  pub kind: Cow<'doc, str>,
+  pub duration_ms: Option<u32>,
+  pub advance_after_ms: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TimingTree<'doc> {
+  pub nodes: Vec<TimingNode<'doc>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimingNode<'doc> {
+  pub id: Option<u32>,
+  pub target_shape_id: Option<u32>,
+  pub kind: Cow<'doc, str>,
+  pub children: Vec<TimingNode<'doc>>,
 }

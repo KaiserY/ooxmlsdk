@@ -7,9 +7,11 @@ use crate::common::{Color, Fill, Point, Rect, Stroke, Transform};
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LayoutDocument<'doc> {
   pub engine_kind: LayoutEngineKind,
+  pub options: LayoutOptions,
   pub pages: Vec<DisplayPage<'doc>>,
   pub frames: Vec<FrameRecord<'doc>>,
   pub debug_records: Vec<crate::common::DebugRecord<'doc>>,
+  pub unsupported: Vec<UnsupportedLayoutFeature<'doc>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -18,6 +20,13 @@ pub enum LayoutEngineKind {
   Docx,
   Xlsx,
   Pptx,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LayoutOptions {
+  pub collect_debug: bool,
+  pub approximate_unsupported: bool,
+  pub preserve_source_links: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -33,6 +42,7 @@ pub struct DisplayDocument<'doc> {
 pub struct DisplayPage<'doc> {
   pub name: Option<Cow<'doc, str>>,
   pub bounds: Rect,
+  pub background: Option<Fill<'doc>>,
   pub items: Vec<DisplayItem<'doc>>,
 }
 
@@ -56,6 +66,7 @@ pub struct TextRun<'doc> {
   pub origin: Point,
   pub font_id: Option<FontId>,
   pub color: Color,
+  pub source: Option<DisplaySource<'doc>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -64,14 +75,24 @@ pub struct GlyphRun<'doc> {
   pub origin: Point,
   pub glyphs: Cow<'doc, [ShapedGlyph]>,
   pub color: Color,
+  pub source: Option<DisplaySource<'doc>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImageItem<'doc> {
   pub bounds: Rect,
+  pub crop: Option<ImageCrop>,
   pub content_type: Cow<'doc, str>,
   pub bytes: Cow<'doc, [u8]>,
   pub relationship_id: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ImageCrop {
+  pub left: f32,
+  pub top: f32,
+  pub right: f32,
+  pub bottom: f32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -144,3 +165,26 @@ pub struct FrameRecord<'doc> {
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct FrameId(pub u32);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisplaySource<'doc> {
+  pub engine: LayoutEngineKind,
+  pub path: Vec<usize>,
+  pub relationship_id: Option<Cow<'doc, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnsupportedLayoutFeature<'doc> {
+  pub owner: Cow<'doc, str>,
+  pub feature: Cow<'doc, str>,
+  pub fallback: UnsupportedFallback,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum UnsupportedFallback {
+  #[default]
+  Omitted,
+  Approximated,
+  Placeholder,
+  PreservedForLater,
+}

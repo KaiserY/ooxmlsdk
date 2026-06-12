@@ -28,6 +28,22 @@ pub struct DocxSettings {
   pub compatibility_mode: Option<u16>,
   pub even_and_odd_headers: bool,
   pub split_page_break_and_paragraph_mark: bool,
+  pub hyphenation: HyphenationSettings,
+  pub document_grid: Option<DocumentGrid>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct HyphenationSettings {
+  pub enabled: bool,
+  pub zone: Pt,
+  pub consecutive_limit: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DocumentGrid {
+  pub line_pitch: Pt,
+  pub char_space: Option<Pt>,
+  pub snap_to_chars: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -183,6 +199,14 @@ pub struct DocxParagraph<'doc> {
   pub format: ParagraphFormat<'doc>,
   pub style_ref: Option<Cow<'doc, str>>,
   pub list_label: Option<Cow<'doc, str>>,
+  pub outline_level: Option<u8>,
+  pub bookmarks: Vec<Bookmark<'doc>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Bookmark<'doc> {
+  pub id: Cow<'doc, str>,
+  pub name: Cow<'doc, str>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -190,11 +214,24 @@ pub enum InlineItem<'doc> {
   Text(DocxTextRun<'doc>),
   Field(FieldRun<'doc>),
   InlineShape(InlineShape<'doc>),
+  BookmarkStart(Bookmark<'doc>),
+  BookmarkEnd(Cow<'doc, str>),
+  CommentRangeStart(Cow<'doc, str>),
+  CommentRangeEnd(Cow<'doc, str>),
+  HyperlinkStart(Hyperlink<'doc>),
+  HyperlinkEnd,
   FootnoteReference(i64),
   EndnoteReference(i64),
   PageBreak,
   ColumnBreak,
   LastRenderedPageBreak,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hyperlink<'doc> {
+  pub relationship_id: Option<Cow<'doc, str>>,
+  pub anchor: Option<Cow<'doc, str>>,
+  pub tooltip: Option<Cow<'doc, str>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -213,10 +250,14 @@ pub struct FieldRun<'doc> {
 pub struct TextStyle<'doc> {
   pub font: FontRequest<'doc>,
   pub color: crate::common::Color,
+  pub highlight: Option<crate::common::Color>,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
   pub strikeout: bool,
+  pub small_caps: bool,
+  pub all_caps: bool,
+  pub character_spacing: Pt,
   pub baseline_shift: Pt,
 }
 
@@ -230,6 +271,43 @@ pub struct ParagraphFormat<'doc> {
   pub keep_together: bool,
   pub widow_control: bool,
   pub page_break_before: bool,
+  pub tabs: Vec<TabStop>,
+  pub text_direction: TextDirection,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TabStop {
+  pub position: Pt,
+  pub alignment: TabAlignment,
+  pub leader: TabLeader,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TabAlignment {
+  #[default]
+  Left,
+  Center,
+  Right,
+  Decimal,
+  Bar,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TabLeader {
+  #[default]
+  None,
+  Dot,
+  Hyphen,
+  Underscore,
+  MiddleDot,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextDirection {
+  #[default]
+  LeftToRightTopToBottom,
+  TopToBottomRightToLeft,
+  BottomToTopLeftToRight,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -265,6 +343,8 @@ pub struct DocxTable<'doc> {
   pub alignment: TableAlignment,
   pub borders: TableBorders<'doc>,
   pub split_allowed: bool,
+  pub floating: Option<FloatingPlacement<'doc>>,
+  pub cell_spacing: Pt,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -445,6 +525,15 @@ pub enum DocxTextPortion<'doc> {
   Text(DocxTextRun<'doc>),
   Field(FieldRun<'doc>),
   Tab,
+  Numbering(Cow<'doc, str>),
+  Bullet(Cow<'doc, str>),
+  SoftHyphen,
+  Hidden,
+  Bookmark,
+  Comment,
+  ControlChar,
+  Combined,
+  Ruby,
   Break,
   Footnote,
   Fly,

@@ -30,6 +30,11 @@ pub struct XlsxSheet<'doc> {
   pub metrics: SheetMetrics<'doc>,
   pub rows: Vec<XlsxRow<'doc>>,
   pub drawings: Vec<XlsxDrawing<'doc>>,
+  pub tables: Vec<XlsxTable<'doc>>,
+  pub auto_filter: Option<AutoFilter<'doc>>,
+  pub conditions: Vec<ConditionalFormat<'doc>>,
+  pub notes: Vec<XlsxNote<'doc>>,
+  pub protected_ranges: Vec<ProtectedRange<'doc>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -91,6 +96,20 @@ pub struct SheetMetrics<'doc> {
   pub print_ranges: Vec<CellRange>,
   pub repeated_rows: Vec<CellRange>,
   pub repeated_columns: Vec<CellRange>,
+  pub viewport: SheetViewport,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SheetViewport {
+  pub active_cell: Option<CellAddress>,
+  pub top_left_cell: Option<CellAddress>,
+  pub frozen_panes: Option<FrozenPane>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrozenPane {
+  pub split_column: u32,
+  pub split_row: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -147,6 +166,34 @@ pub struct XlsxCell<'doc> {
   pub display_text: Cow<'doc, str>,
   pub rich_text_runs: Vec<XlsxRichTextRun<'doc>>,
   pub formula_state: Option<XlsxFormulaState>,
+  pub horizontal_alignment: CellHorizontalAlignment,
+  pub vertical_alignment: CellVerticalAlignment,
+  pub wrap_text: bool,
+  pub shrink_to_fit: bool,
+  pub rotation_degrees: Option<i16>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CellHorizontalAlignment {
+  #[default]
+  General,
+  Left,
+  Center,
+  Right,
+  Fill,
+  Justify,
+  CenterContinuous,
+  Distributed,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CellVerticalAlignment {
+  Top,
+  Center,
+  #[default]
+  Bottom,
+  Justify,
+  Distributed,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -196,6 +243,17 @@ pub struct CellFormat<'doc> {
   pub text_style: XlsxTextStyle<'doc>,
   pub fill: Fill<'doc>,
   pub borders: CellBorders<'doc>,
+  pub alignment: CellAlignment,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CellAlignment {
+  pub horizontal: CellHorizontalAlignment,
+  pub vertical: CellVerticalAlignment,
+  pub wrap_text: bool,
+  pub shrink_to_fit: bool,
+  pub indent: u8,
+  pub rotation_degrees: Option<i16>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -257,6 +315,59 @@ pub enum DrawingAnchorKind {
   TwoCell,
   OneCell,
   Absolute,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct XlsxTable<'doc> {
+  pub name: Cow<'doc, str>,
+  pub display_name: Cow<'doc, str>,
+  pub range: CellRange,
+  pub style_name: Option<Cow<'doc, str>>,
+  pub show_header_row: bool,
+  pub show_totals_row: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AutoFilter<'doc> {
+  pub range: CellRange,
+  pub filters: Vec<FilterColumn<'doc>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FilterColumn<'doc> {
+  pub column_id: u32,
+  pub values: Vec<Cow<'doc, str>>,
+  pub hidden_button: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConditionalFormat<'doc> {
+  pub ranges: Vec<CellRange>,
+  pub priority: u32,
+  pub kind: ConditionalFormatKind<'doc>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConditionalFormatKind<'doc> {
+  Expression(Cow<'doc, str>),
+  CellIs(Cow<'doc, str>),
+  ColorScale,
+  DataBar,
+  IconSet,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct XlsxNote<'doc> {
+  pub cell: CellAddress,
+  pub author: Option<Cow<'doc, str>>,
+  pub text: Cow<'doc, str>,
+  pub visible: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProtectedRange<'doc> {
+  pub name: Option<Cow<'doc, str>>,
+  pub range: CellRange,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -8,6 +8,7 @@ pub enum FormulaValue<'a> {
   Error(FormulaErrorValue),
   Blank,
   Matrix(Vec<Vec<FormulaValue<'a>>>),
+  Reference(crate::QualifiedRange<'a>),
 }
 
 impl Default for FormulaValue<'_> {
@@ -37,4 +38,5 @@ pub struct DisplayValue<'a> {
   pub source_value: FormulaValue<'a>,
   pub number_format_id: Option<u32>,
   pub stale: bool,
+  pub error_text: Option<Cow<'a, str>>,
 }

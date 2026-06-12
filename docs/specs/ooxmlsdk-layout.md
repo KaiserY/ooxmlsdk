@@ -199,8 +199,8 @@ different support layers: formula prepares spreadsheet values, while fonts
 provide metrics and shaping for all layout engines.
 
 The dependency on `ooxmlsdk` is intentional and should be used deeply enough to
-avoid duplicate OOXML models. Layout import may define Writer/Calc/Impress
-views, but those views should preserve links to typed source concepts and avoid
+avoid duplicate OOXML models. Layout import may define DOCX/XLSX/PPTX views,
+but those views should preserve links to typed source concepts and avoid
 copying every string or byte payload by default.
 
 ## 5.1 Ownership And Borrowing
@@ -282,6 +282,14 @@ PDF-specific concepts such as PDF object ids, annotations dictionaries,
 ToUnicode CMaps, PDF/A policy, and tagged PDF structure remain in
 `ooxmlsdk-pdf`.
 
+The common display model should still be rich enough for non-PDF renderers:
+
+- fills may be solid, theme, gradient, image, or pattern fills
+- images carry crop information and relationship/resource identity
+- display items can carry source paths back to engine-specific model nodes
+- pages may carry a neutral background fill
+- accessibility and outline hints remain neutral records, not PDF structures
+
 ## 7. DOCX Engine
 
 The DOCX engine is for WordprocessingML flow documents. Its behavior should be
@@ -317,6 +325,8 @@ DocxDocument
   numbering
   resources
   sections
+  notes
+  comments
 ```
 
 ```text
@@ -335,6 +345,15 @@ DocxBlock
   Table
   FloatingFrame
 ```
+
+DOCX paragraph and inline state should preserve:
+
+- bookmarks, hyperlinks, comments, footnote/endnote references, and field runs
+- tabs, paragraph direction, document grid, hyphenation settings, and outline
+  levels
+- character spacing, caps/small-caps, highlight, underline/strikeout, and
+  baseline shifts
+- anchored-object reference kind, alignment, offsets, and wrap mode
 
 ### 7.3 Frame Tree
 
@@ -365,6 +384,33 @@ FrameFollow
   follow_frame
   reason
   split_cursor
+```
+
+Text line output should expose portions close to Writer's line formatter:
+
+```text
+DocxTextLine
+  text_range
+  bounds
+  baseline
+  portions
+
+DocxTextPortion
+  Text
+  Field
+  Tab
+  Numbering
+  Bullet
+  SoftHyphen
+  Hidden
+  Bookmark
+  Comment
+  ControlChar
+  Combined
+  Ruby
+  Break
+  Footnote
+  Fly
 ```
 
 ### 7.4 Algorithm Principles
@@ -407,6 +453,7 @@ XlsxWorkbook
   styles
   page_styles
   drawings
+  print_plan
   value_provider
 ```
 
@@ -436,6 +483,8 @@ The XLSX engine owns:
 - gridlines and cell borders
 - header/footer placement
 - drawing anchors relative to cells
+- filters, tables, conditional-format visible effects, sheet protection ranges,
+  and freeze/split pane view state when they affect printed output
 - comments/notes if printable
 
 Formula values, number formatting, and stale-cache policy are inputs, not print
@@ -458,6 +507,12 @@ XlsxPrintPage
 
 This mirrors Calc's split between sheet data/import and `ScPrintFunc` /
 `ScOutputData` visible output.
+
+Cell layout state should preserve alignment, text rotation, wrapping,
+shrink-to-fit, row/column hidden state, merged ranges, and rich text runs. Notes,
+tables, filters, conditional formats, and protected ranges are layout inputs
+when they affect visible output or debug dumps; formula evaluation remains in
+`ooxmlsdk-formula`.
 
 ## 9. PPTX Engine
 
@@ -489,6 +544,8 @@ The PPTX engine owns:
 - placeholder resolution
 - shape tree order
 - group transforms
+- slide background, transitions, custom shows, and timing tree records when
+  imported
 - DrawingML text body layout
 - bodyPr insets, columns, anchors, text rotation
 - table cell text and borders
@@ -519,6 +576,12 @@ Tables should have row/cell geometry and text bodies as first-class model data,
 not be flattened immediately to painted rectangles. Chart, diagram, media, and
 OLE objects may initially be placeholders, but they should remain typed
 placeholders with relationship ids instead of generic unsupported strings.
+
+DrawingML shape state should preserve custom geometry, adjustment values, fill,
+line, effects, hidden/decorative flags, placeholder source, theme style
+references, text body properties, paragraph spacing, bullet kinds, and text
+vertical mode. Rendering may be incomplete, but the model should not discard
+this information during import.
 
 ## 10. Display List Boundary
 
@@ -572,7 +635,7 @@ of re-resolving text.
 The crate should provide LO-style debug dumps early. This is essential because
 many LO tests assert layout, not PDF.
 
-Writer dump should expose:
+DOCX dump should expose Writer-calibrated state:
 
 - page count
 - frame tree
@@ -585,7 +648,7 @@ Writer dump should expose:
 - follow chains
 - footnote/header/footer frames
 
-Calc dump should expose:
+XLSX dump should expose Calc-calibrated state:
 
 - printed sheet pages
 - print ranges
@@ -595,7 +658,7 @@ Calc dump should expose:
 - drawing anchors
 - header/footer slots
 
-Impress dump should expose:
+PPTX dump should expose Impress-calibrated state:
 
 - slide pages
 - shape tree
@@ -607,7 +670,7 @@ Impress dump should expose:
 
 ## 12. Testing Strategy
 
-### 12.1 Writer Tests
+### 12.1 DOCX Tests
 
 Use LO layout-level tests first:
 
@@ -623,7 +686,7 @@ Many rows currently listed as PDF projections in
 `docs/tests/ooxmlsdk-pdf-test/libreoffice/UPSTREAM_TEST_MATRIX.md` should move
 to layout tests when this crate exists.
 
-### 12.2 Calc Tests
+### 12.2 XLSX Tests
 
 Use Calc import/model tests only when they affect printed layout. Keep pure
 model tests outside layout.
@@ -638,7 +701,7 @@ Good layout candidates:
 - drawing-anchor output
 - formatted cell display text
 
-### 12.3 Impress Tests
+### 12.3 PPTX Tests
 
 Use PPTX tests where the asserted behavior is visible layout or fixed-page
 object structure:
@@ -661,7 +724,7 @@ Pure export XML round-trip tests stay outside layout.
 - debug dump infrastructure
 - `ooxmlsdk-fonts` integration
 
-### Stage 2: Writer Minimal Core
+### Stage 2: DOCX Minimal Core
 
 - sections/pages
 - paragraphs
@@ -670,7 +733,7 @@ Pure export XML round-trip tests stay outside layout.
 - frame tree
 - debug dump tests
 
-### Stage 3: Writer Tables and Follows
+### Stage 3: DOCX Tables and Follows
 
 - table frame tree
 - row/cell geometry
@@ -678,7 +741,7 @@ Pure export XML round-trip tests stay outside layout.
 - repeated headers
 - border conflict records
 
-### Stage 4: Writer Flys and Notes
+### Stage 4: DOCX Flys and Notes
 
 - anchored objects
 - wrap influence
@@ -686,14 +749,14 @@ Pure export XML round-trip tests stay outside layout.
 - footnotes/endnotes
 - reflow/move backward
 
-### Stage 5: Calc Print Core
+### Stage 5: XLSX Print Core
 
 - workbook/sheet print model
 - value-provider integration
 - row/column/page geometry
 - merged cells and page breaks
 
-### Stage 6: Impress Fixed Pages
+### Stage 6: PPTX Fixed Pages
 
 - slide pages
 - shape tree

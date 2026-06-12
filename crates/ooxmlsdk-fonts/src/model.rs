@@ -19,6 +19,8 @@ pub struct FontBook<'a> {
   pub faces: Vec<FontFaceInfo<'a>>,
   pub family_aliases: Vec<FontFamilyAlias<'a>>,
   pub substitutions: Vec<FontSubstitutionRule<'a>>,
+  pub fallback_chains: Vec<FontFallbackChain<'a>>,
+  pub fallback_cache: Vec<GlyphFallbackCacheEntry<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,6 +35,8 @@ pub struct FontFaceInfo<'a> {
   pub pitch: FontPitch,
   pub coverage: FontCoverage,
   pub flags: FontFlags,
+  pub axes: Vec<VariationAxis<'a>>,
+  pub features: Vec<OpenTypeFeature<'a>>,
   pub face_index: u32,
 }
 
@@ -62,6 +66,45 @@ pub struct FontSubstitutionRule<'a> {
   pub requested_family: Cow<'a, str>,
   pub substitute_family: Cow<'a, str>,
   pub reason: FontSubstitutionReason,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FontFallbackChain<'a> {
+  pub script: Option<TextScript>,
+  pub language: Option<Cow<'a, str>>,
+  pub families: Vec<Cow<'a, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GlyphFallbackCacheEntry<'a> {
+  pub codepoint: u32,
+  pub request: FontRequestKey<'a>,
+  pub fallback_font_id: Option<FontId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FontRequestKey<'a> {
+  pub family: Option<Cow<'a, str>>,
+  pub weight: Option<FontWeight>,
+  pub slant: Option<FontSlant>,
+  pub stretch: Option<FontStretch>,
+  pub script: Option<TextScript>,
+  pub language: Option<Cow<'a, str>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VariationAxis<'a> {
+  pub tag: Cow<'a, str>,
+  pub name: Option<Cow<'a, str>>,
+  pub min: f32,
+  pub default: f32,
+  pub max: f32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OpenTypeFeature<'a> {
+  pub tag: Cow<'a, str>,
+  pub enabled_by_default: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -112,11 +155,17 @@ pub struct FontRequest<'a> {
   pub theme_family: Option<ThemeFontKind>,
   pub bold: bool,
   pub italic: bool,
+  pub weight: Option<FontWeight>,
+  pub slant: Option<FontSlant>,
+  pub stretch: Option<FontStretch>,
   pub size_pt: FontSize,
   pub script: Option<TextScript>,
   pub language: Option<Cow<'a, str>>,
+  pub region: Option<Cow<'a, str>>,
   pub charset: Option<FontCharset>,
   pub pitch: Option<FontPitch>,
+  pub variations: Vec<VariationValue<'a>>,
+  pub features: Vec<FeatureValue<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -128,8 +177,49 @@ pub struct ResolvedFont<'a> {
   pub face_index: u32,
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
+  pub variation_values: Vec<VariationValue<'a>>,
   pub metrics: FontMetrics,
   pub substitution: Option<FontSubstitution<'a>>,
+  pub match_diagnostics: FontMatchDiagnostics<'a>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FontMatchDiagnostics<'a> {
+  pub candidates: Vec<FontMatchCandidate<'a>>,
+  pub fallback_level: Option<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FontMatchCandidate<'a> {
+  pub font_id: FontId,
+  pub family: Cow<'a, str>,
+  pub score: i32,
+  pub rejected: bool,
+  pub reason: Option<FontMatchReason>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FontMatchReason {
+  Family,
+  StyleName,
+  Pitch,
+  Weight,
+  Slant,
+  Stretch,
+  Coverage,
+  SourcePriority,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VariationValue<'a> {
+  pub tag: Cow<'a, str>,
+  pub value: f32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FeatureValue<'a> {
+  pub tag: Cow<'a, str>,
+  pub value: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -153,6 +243,7 @@ pub enum FontSubstitutionReason {
 pub struct FontMetrics {
   pub vertical: VerticalMetrics,
   pub decoration: DecorationMetrics,
+  pub script: ScriptMetrics,
   pub em_size: f32,
 }
 
@@ -161,6 +252,7 @@ impl Default for FontMetrics {
     Self {
       vertical: VerticalMetrics::default(),
       decoration: DecorationMetrics::default(),
+      script: ScriptMetrics::default(),
       em_size: 1.0,
     }
   }
@@ -170,9 +262,14 @@ impl Default for FontMetrics {
 pub struct VerticalMetrics {
   pub ascent_pt: f32,
   pub descent_pt: f32,
+  pub internal_leading_pt: f32,
+  pub external_leading_pt: f32,
   pub line_gap_pt: f32,
   pub ink_height_pt: f32,
   pub baseline_offset_pt: f32,
+  pub hanging_baseline_pt: f32,
+  pub cjk_horizontal_advance_pt: f32,
+  pub cjk_vertical_advance_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -181,6 +278,15 @@ pub struct DecorationMetrics {
   pub underline_thickness_pt: f32,
   pub strikeout_offset_pt: f32,
   pub strikeout_thickness_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ScriptMetrics {
+  pub superscript_scale: f32,
+  pub subscript_scale: f32,
+  pub superscript_offset_pt: f32,
+  pub subscript_offset_pt: f32,
+  pub small_caps_scale: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -195,6 +301,7 @@ pub struct ShapedRun<'a> {
   pub language: Option<Cow<'a, str>>,
   pub safe_breaks: Vec<usize>,
   pub approximate: bool,
+  pub decorations: Vec<TextDecoration>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -206,6 +313,18 @@ pub struct ShapedGlyph {
   pub y_advance_pt: f32,
   pub x_offset_pt: f32,
   pub y_offset_pt: f32,
+  pub safe_to_break: bool,
+  pub source_char: Option<char>,
+  pub justifiable: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextDecoration {
+  Underline,
+  DoubleUnderline,
+  Strikeout,
+  Overline,
+  WaveUnderline,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -214,6 +333,16 @@ pub struct FontUsage {
   pub glyph_ids: BTreeSet<u32>,
   pub unicode_ranges: Vec<Range<u32>>,
   pub needs_embedding: bool,
+  pub subset_policy: FontSubsetPolicy,
+  pub color_glyph_usage: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FontSubsetPolicy {
+  #[default]
+  Subset,
+  EmbedFull,
+  DoNotEmbed,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

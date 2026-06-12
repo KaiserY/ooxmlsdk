@@ -19,7 +19,7 @@ The intended XLSX pipeline is:
 ```text
 ooxmlsdk
   -> ooxmlsdk-formula
-  -> ooxmlsdk-layout::calc
+  -> ooxmlsdk-layout::xlsx
   -> ooxmlsdk-pdf
 ```
 
@@ -169,7 +169,10 @@ WorkbookValueModel
   sheets
   defined_names
   shared_formula_groups
+  array_formula_groups
+  data_tables
   calc_chain
+  dependency_graph
   external_references
   calculation_settings
 ```
@@ -198,6 +201,8 @@ FormulaCell
   evaluated_value
   formula_state
   number_format_context
+  dirty
+  volatile
 ```
 
 ```text
@@ -233,6 +238,31 @@ evaluator exists:
 - iteration enabled/count/delta
 - full precision flag
 
+Parsed formula state should be rich enough for later evaluator work without
+changing the public model:
+
+```text
+ParsedFormula
+  source
+  tokens
+  ast
+  dependencies
+  unsupported
+```
+
+Tokens should preserve Calc-like structure:
+
+- literals, references, names, functions, operators
+- array open/close and separators
+- opcode-like markers for cells, areas, external references, functions, names,
+  matrices, and missing arguments
+
+References must preserve absolute/relative row and column flags, whole-row and
+whole-column references, sheet identity, and external placeholders. Dependency
+graph edges should be structured separately from formula text so stale,
+volatile, unsupported, and external states can be inspected without evaluating
+the workbook.
+
 ### 6.1 Ownership Model
 
 Use borrowed data where it naturally comes from parsed `ooxmlsdk` structs:
@@ -261,7 +291,7 @@ CellValueProvider
   formula_state(sheet, cell)
 ```
 
-`ooxmlsdk-layout::calc` should consume this API to obtain printable cell text.
+`ooxmlsdk-layout::xlsx` should consume this API to obtain printable cell text.
 It should not inspect formula tokens or parse formula expressions.
 
 ## 8. Import Stages

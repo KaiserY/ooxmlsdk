@@ -158,11 +158,17 @@ FontRequest
   theme_family
   bold
   italic
+  weight
+  slant
+  stretch
   size_pt
   script
   language
+  region
   charset
   pitch
+  variations
+  features
 ```
 
 Resolution:
@@ -191,6 +197,7 @@ FontBook
   face_infos
   family_aliases
   substitution_rules
+  fallback_chains
 
 FontFaceInfo
   font_id
@@ -203,6 +210,8 @@ FontFaceInfo
   pitch
   coverage
   flags
+  axes
+  features
 ```
 
 This follows the LO physical-font collection idea and Typst's `FontBook`
@@ -220,6 +229,9 @@ ShapedRun
   advance_pt
   direction
   script
+  language
+  safe_breaks
+  decorations
 ```
 
 Glyph:
@@ -233,6 +245,9 @@ ShapedGlyph
   y_advance_pt
   x_offset_pt
   y_offset_pt
+  safe_to_break
+  source_char
+  justifiable
 ```
 
 Usage for output:
@@ -243,6 +258,8 @@ FontUsage
   glyph_ids
   unicode_ranges
   needs_embedding
+  subset_policy
+  color_glyph_usage
 ```
 
 `font_id` must be stable within a layout/render session so the PDF backend can
@@ -262,6 +279,16 @@ String and byte ownership should be explicit:
 
 Do not force callers to allocate owned strings just to request, resolve, or
 shape text.
+
+The model must be ready for OpenType and VCL-level behavior even before those
+branches are implemented:
+
+- variable font axes and selected variation values
+- OpenType feature tags and explicit feature values
+- script/language fallback chains
+- color glyph availability and usage
+- subset policy for PDF/SVG/raster consumers
+- safe break points and justifiability from shaping
 
 ## 7. Font Source Model
 

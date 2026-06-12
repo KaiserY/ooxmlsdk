@@ -556,43 +556,46 @@ fn cell_value_record<'doc>(
         .always_calculate_array
         .is_some_and(|value| value.as_bool())
   });
-  let formula = cell.cell_formula.as_ref().map(|formula| FormulaCell {
-    address,
-    formula_kind: formula_kind(formula),
-    formula_text: Cow::Owned(formula.xml_content.clone().unwrap_or_default()),
-    reference: formula
-      .reference
-      .as_deref()
-      .and_then(|reference| QualifiedRange::parse_a1(sheet, reference).ok())
-      .map(|reference| reference.range),
-    input1: formula
-      .r1
-      .as_deref()
-      .and_then(|reference| qualified_range(sheet, reference)),
-    input2: formula
-      .r2
-      .as_deref()
-      .and_then(|reference| qualified_range(sheet, reference)),
-    data_table_row: formula.data_table_row.is_some_and(|value| value.as_bool()),
-    data_table2d: formula.data_table2_d.is_some_and(|value| value.as_bool()),
-    input1_deleted: formula.input1_deleted.is_some_and(|value| value.as_bool()),
-    input2_deleted: formula.input2_deleted.is_some_and(|value| value.as_bool()),
-    assigns_value_to_name: formula.bx.is_some_and(|value| value.as_bool()),
-    parsed_formula: None,
-    cached_value: Some(raw_value.clone()).filter(|value| !matches!(value, FormulaValue::Blank)),
-    evaluated_value: None,
-    formula_state: if dirty {
-      FormulaState::Stale
-    } else {
-      FormulaState::CachedOnly
-    },
-    number_format_context: cell.style_index.map(|index| NumberFormatContext {
-      format_id: Some(index),
-      format_code: None,
-      locale: None,
-    }),
-    dirty,
-    volatile: false,
+  let formula = cell.cell_formula.as_ref().map(|formula| {
+    let formula_text: Cow<'doc, str> = Cow::Owned(formula.xml_content.clone().unwrap_or_default());
+    FormulaCell {
+      address,
+      formula_kind: formula_kind(formula),
+      formula_text: formula_text.clone(),
+      reference: formula
+        .reference
+        .as_deref()
+        .and_then(|reference| QualifiedRange::parse_a1(sheet, reference).ok())
+        .map(|reference| reference.range),
+      input1: formula
+        .r1
+        .as_deref()
+        .and_then(|reference| qualified_range(sheet, reference)),
+      input2: formula
+        .r2
+        .as_deref()
+        .and_then(|reference| qualified_range(sheet, reference)),
+      data_table_row: formula.data_table_row.is_some_and(|value| value.as_bool()),
+      data_table2d: formula.data_table2_d.is_some_and(|value| value.as_bool()),
+      input1_deleted: formula.input1_deleted.is_some_and(|value| value.as_bool()),
+      input2_deleted: formula.input2_deleted.is_some_and(|value| value.as_bool()),
+      assigns_value_to_name: formula.bx.is_some_and(|value| value.as_bool()),
+      parsed_formula: Some(parse_formula(sheet, formula_text.clone())),
+      cached_value: Some(raw_value.clone()).filter(|value| !matches!(value, FormulaValue::Blank)),
+      evaluated_value: None,
+      formula_state: if dirty {
+        FormulaState::Stale
+      } else {
+        FormulaState::CachedOnly
+      },
+      number_format_context: cell.style_index.map(|index| NumberFormatContext {
+        format_id: Some(index),
+        format_code: None,
+        locale: None,
+      }),
+      dirty,
+      volatile: false,
+    }
   });
   let display_value = Some(DisplayValue {
     text: Cow::Owned(cell_display_text(cell, shared_strings)),
@@ -878,7 +881,12 @@ fn dependency_graph<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> DependencyGra
         cell: *address,
       };
       graph.nodes.push(node);
-      for dependency in formula_dependencies(sheet.id, &formula.formula_text) {
+      let dependencies = formula
+        .parsed_formula
+        .as_ref()
+        .map(|parsed| parsed.dependencies.clone())
+        .unwrap_or_else(|| formula_dependencies(sheet.id, &formula.formula_text));
+      for dependency in dependencies {
         graph.edges.push(DependencyEdge {
           from: node,
           to: dependency,
@@ -894,47 +902,250 @@ fn formula_dependencies<'doc>(
   sheet: SheetId,
   formula_text: &Cow<'doc, str>,
 ) -> Vec<FormulaDependency<'doc>> {
+  parse_formula(sheet, Cow::Owned(formula_text.to_string())).dependencies
+}
+
+fn parse_formula<'doc>(sheet: SheetId, source: Cow<'doc, str>) -> ParsedFormula<'doc> {
+  let mut tokens = Vec::new();
   let mut dependencies = Vec::new();
-  for token in formula_text
-    .split(|ch: char| {
-      !(ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.'))
-    })
-    .map(trim_formula_token)
-    .filter(|token| !token.is_empty())
-  {
-    if token.contains(':') {
-      if let Ok(range) = QualifiedRange::parse_a1(sheet, token) {
-        dependencies.push(FormulaDependency::Range(range));
+  let mut unsupported = Vec::new();
+  let text = source.as_ref().strip_prefix('=').unwrap_or(source.as_ref());
+  let mut index = 0usize;
+
+  while index < text.len() {
+    let Some(ch) = text[index..].chars().next() else {
+      break;
+    };
+    if ch.is_whitespace() {
+      index += ch.len_utf8();
+      continue;
+    }
+    if ch == '"' {
+      let (value, next) = parse_formula_string(text, index);
+      tokens.push(FormulaToken::Literal(FormulaValue::String(Cow::Owned(
+        value,
+      ))));
+      index = next;
+      continue;
+    }
+    if ch.is_ascii_digit()
+      || (ch == '.'
+        && text[index + ch.len_utf8()..].starts_with(|next: char| next.is_ascii_digit()))
+    {
+      let (value, next) = parse_formula_number(text, index);
+      tokens.push(FormulaToken::Literal(FormulaValue::Number(value)));
+      index = next;
+      continue;
+    }
+    if let Some((operator, next)) = parse_formula_operator(text, index) {
+      tokens.push(FormulaToken::Operator(operator));
+      index = next;
+      continue;
+    }
+
+    match ch {
+      '{' => {
+        tokens.push(FormulaToken::ArrayOpen);
+        index += ch.len_utf8();
       }
-    } else if let Ok(address) = QualifiedAddress::parse_a1(sheet, token) {
-      if address.sheet_name.is_some() {
-        dependencies.push(FormulaDependency::Range(QualifiedRange {
-          sheet,
-          sheet_name: address.sheet_name,
-          range: CellRange {
-            start: address.cell,
-            end: address.cell,
-          },
-          start_flags: address.flags,
-          end_flags: address.flags,
-        }));
-      } else {
-        dependencies.push(FormulaDependency::Cell {
-          sheet,
-          address: address.cell,
+      '}' => {
+        tokens.push(FormulaToken::ArrayClose);
+        index += ch.len_utf8();
+      }
+      ',' => {
+        tokens.push(FormulaToken::Separator(FormulaSeparator::Argument));
+        index += ch.len_utf8();
+      }
+      ';' => {
+        tokens.push(FormulaToken::Separator(FormulaSeparator::Row));
+        index += ch.len_utf8();
+      }
+      '(' | ')' => {
+        index += ch.len_utf8();
+      }
+      _ if is_formula_word_char(ch) => {
+        let (word, next) = parse_formula_word(text, index);
+        let next_non_space = text[next..].chars().find(|ch| !ch.is_whitespace());
+        if next_non_space == Some('(') && QualifiedAddress::parse_a1(sheet, word).is_err() {
+          tokens.push(FormulaToken::Function(Cow::Owned(word.to_string())));
+        } else if let Some(range) = parse_formula_range(sheet, word) {
+          dependencies.push(dependency_from_range(sheet, &range));
+          tokens.push(FormulaToken::Reference(range));
+        } else if is_formula_error_literal(word) {
+          tokens.push(FormulaToken::Literal(FormulaValue::Error(error_value(
+            word,
+          ))));
+        } else {
+          dependencies.push(FormulaDependency::Name(Cow::Owned(word.to_string())));
+          tokens.push(FormulaToken::Name(Cow::Owned(word.to_string())));
+        }
+        index = next;
+      }
+      _ => {
+        let feature = ch.to_string();
+        unsupported.push(UnsupportedFormulaFeature {
+          feature: Cow::Owned(feature.clone()),
+          reason: Cow::Borrowed("unrecognized formula character"),
         });
+        tokens.push(FormulaToken::Unsupported(Cow::Owned(feature)));
+        index += ch.len_utf8();
       }
     }
   }
-  dependencies
+
+  ParsedFormula {
+    source,
+    tokens,
+    ast: None,
+    dependencies,
+    unsupported,
+  }
+}
+
+fn parse_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRange<'doc>> {
+  QualifiedRange::parse_a1(sheet, token).ok().or_else(|| {
+    QualifiedAddress::parse_a1(sheet, token)
+      .ok()
+      .map(|address| QualifiedRange {
+        sheet,
+        sheet_name: address.sheet_name,
+        range: CellRange {
+          start: address.cell,
+          end: address.cell,
+        },
+        start_flags: address.flags,
+        end_flags: address.flags,
+      })
+  })
+}
+
+fn dependency_from_range<'doc>(
+  sheet: SheetId,
+  range: &QualifiedRange<'doc>,
+) -> FormulaDependency<'doc> {
+  if range.sheet_name.is_none() && range.range.start == range.range.end {
+    FormulaDependency::Cell {
+      sheet,
+      address: range.range.start,
+    }
+  } else {
+    FormulaDependency::Range(range.clone())
+  }
+}
+
+fn parse_formula_string(value: &str, start: usize) -> (String, usize) {
+  let mut parsed = String::new();
+  let mut index = start + 1;
+  while index < value.len() {
+    let Some(ch) = value[index..].chars().next() else {
+      break;
+    };
+    index += ch.len_utf8();
+    if ch == '"' {
+      if value[index..].starts_with('"') {
+        parsed.push('"');
+        index += 1;
+      } else {
+        break;
+      }
+    } else {
+      parsed.push(ch);
+    }
+  }
+  (parsed, index)
+}
+
+fn parse_formula_number(value: &str, start: usize) -> (f64, usize) {
+  let mut index = start;
+  let mut previous_was_exponent = false;
+  while index < value.len() {
+    let Some(ch) = value[index..].chars().next() else {
+      break;
+    };
+    if ch.is_ascii_digit() || ch == '.' || matches!(ch, 'E' | 'e') {
+      previous_was_exponent = matches!(ch, 'E' | 'e');
+      index += ch.len_utf8();
+    } else if matches!(ch, '+' | '-') && previous_was_exponent {
+      previous_was_exponent = false;
+      index += ch.len_utf8();
+    } else {
+      break;
+    }
+  }
+  (
+    value[start..index].parse::<f64>().unwrap_or_default(),
+    index,
+  )
+}
+
+fn parse_formula_operator(value: &str, start: usize) -> Option<(FormulaOperator, usize)> {
+  let rest = &value[start..];
+  let (operator, width) = if rest.starts_with("<>") {
+    (FormulaOperator::NotEqual, 2)
+  } else if rest.starts_with("<=") {
+    (FormulaOperator::LessOrEqual, 2)
+  } else if rest.starts_with(">=") {
+    (FormulaOperator::GreaterOrEqual, 2)
+  } else {
+    match rest.chars().next()? {
+      '+' => (FormulaOperator::Add, 1),
+      '-' => (FormulaOperator::Subtract, 1),
+      '*' => (FormulaOperator::Multiply, 1),
+      '/' => (FormulaOperator::Divide, 1),
+      '^' => (FormulaOperator::Power, 1),
+      '&' => (FormulaOperator::Concat, 1),
+      '=' => (FormulaOperator::Equal, 1),
+      '<' => (FormulaOperator::Less, 1),
+      '>' => (FormulaOperator::Greater, 1),
+      '%' => (FormulaOperator::Percent, 1),
+      _ => return None,
+    }
+  };
+  Some((operator, start + width))
+}
+
+fn parse_formula_word(value: &str, start: usize) -> (&str, usize) {
+  let mut index = start;
+  let mut quoted = false;
+  while index < value.len() {
+    let Some(ch) = value[index..].chars().next() else {
+      break;
+    };
+    if ch == '\'' {
+      quoted = !quoted;
+      index += ch.len_utf8();
+      continue;
+    }
+    if !quoted && !is_formula_word_char(ch) {
+      break;
+    }
+    index += ch.len_utf8();
+  }
+  (&value[start..index], index)
+}
+
+fn is_formula_word_char(ch: char) -> bool {
+  ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_')
+}
+
+fn is_formula_error_literal(value: &str) -> bool {
+  matches!(
+    value,
+    "#NULL!"
+      | "#DIV/0!"
+      | "#VALUE!"
+      | "#REF!"
+      | "#NAME?"
+      | "#NUM!"
+      | "#N/A"
+      | "#GETTING_DATA"
+      | "#SPILL!"
+      | "#CALC!"
+  )
 }
 
 fn qualified_range<'doc>(sheet: SheetId, reference: &str) -> Option<QualifiedRange<'doc>> {
   QualifiedRange::parse_a1(sheet, reference).ok()
-}
-
-fn trim_formula_token(value: &str) -> &str {
-  value.trim_matches(|ch: char| matches!(ch, ',' | ';' | '(' | ')' | '{' | '}' | '[' | ']'))
 }
 
 fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
@@ -1371,6 +1582,88 @@ mod tests {
     assert_eq!(graph.edges.len(), 2);
     assert!(matches!(graph.edges[0].to, FormulaDependency::Range(_)));
     assert!(matches!(graph.edges[1].to, FormulaDependency::Cell { .. }));
+  }
+
+  #[test]
+  fn parses_formula_tokens_without_evaluating() {
+    let parsed = parse_formula(SheetId(3), Cow::Borrowed("SUM(B1:C2)+D4*2"));
+
+    assert!(matches!(parsed.tokens[0], FormulaToken::Function(_)));
+    assert!(
+      parsed
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::Reference(_)))
+    );
+    assert!(
+      parsed
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::Literal(FormulaValue::Number(2.0))))
+    );
+    assert_eq!(parsed.dependencies.len(), 2);
+    assert!(matches!(
+      parsed.dependencies[0],
+      FormulaDependency::Range(_)
+    ));
+    assert!(matches!(
+      parsed.dependencies[1],
+      FormulaDependency::Cell {
+        address: CellAddress { column: 3, row: 3 },
+        ..
+      }
+    ));
+    assert!(parsed.ast.is_none());
+  }
+
+  #[test]
+  fn imports_parsed_formula_state_for_formula_cells() {
+    let identity = WorksheetIdentity {
+      id: SheetId(1),
+      name: Cow::Borrowed("Sheet1"),
+      relationship_id: Some(Cow::Borrowed("rId1")),
+      visible: true,
+    };
+    let worksheet = x::Worksheet {
+      sheet_data: Box::new(x::SheetData {
+        row: vec![x::Row {
+          row_index: Some(1),
+          cell: vec![x::Cell {
+            cell_reference: Some("A1".to_string()),
+            cell_formula: Some(x::CellFormula {
+              xml_content: Some("NOW()+B1".to_string()),
+              ..x::CellFormula::default()
+            }),
+            cell_value: Some(x::CellValue {
+              xml_content: Some("1".to_string()),
+              ..x::CellValue::default()
+            }),
+            ..x::Cell::default()
+          }],
+          ..x::Row::default()
+        }],
+      }),
+      ..x::Worksheet::default()
+    };
+
+    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let formula = sheet
+      .cells
+      .get(&CellAddress { column: 0, row: 0 })
+      .unwrap()
+      .formula
+      .as_ref()
+      .unwrap();
+    let parsed = formula.parsed_formula.as_ref().unwrap();
+
+    assert!(!formula.volatile);
+    assert!(
+      parsed
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::Function(name) if name.as_ref() == "NOW"))
+    );
+    assert_eq!(parsed.dependencies.len(), 1);
   }
 
   #[test]

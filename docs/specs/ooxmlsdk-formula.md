@@ -55,6 +55,31 @@ Use these files to preserve Calc concepts: formula cells, token arrays,
 address grammar, cached results, dependency state, recalculation policy, and
 error propagation.
 
+### 2.1.1 Development Discipline
+
+Every formula change must start from both local evidence sources before code is
+written:
+
+1. current Rust code in `crates/ooxmlsdk-formula/` and its layout/PDF/test
+   consumers
+2. matching LibreOffice Calc code under `../core/sc/`
+
+Do not implement behavior from memory, spreadsheet folklore, or convenient
+heuristics. In particular:
+
+- do not add another A1/range parser when `QualifiedAddress` or
+  `QualifiedRange` can be extended
+- do not hard-code volatile, external, macro, unsupported, or function-family
+  lists unless the list is translated from LO formula metadata or checked-in
+  OOXML data
+- do not invent magic numbers for limits, grammar widths, date systems, cache
+  states, or recalculation policy; reuse existing constants/types or cite the
+  LO/OOXML source path next to the value
+- do not silently approximate formula semantics; preserve unsupported or
+  partial features as structured metadata until LO-backed behavior is mapped
+- when LO behavior is not yet identified, leave conservative fields unset or
+  defaulted instead of writing guessed fallback logic
+
 ### 2.2 OOXML Input Reference
 
 Use this repository's generated `ooxmlsdk` types and existing specifications:
@@ -474,6 +499,21 @@ Printed-output assertions belong in `ooxmlsdk-layout` or `ooxmlsdk-pdf`.
 
 Use a repeated three-pass loop before implementing each formula area:
 
+0. Existing-code preflight
+   - inspect `crates/ooxmlsdk-formula` for existing parsers, address/value
+     types, dependency records, and workbook import helpers before adding new
+     code
+   - inspect downstream callers such as `ooxmlsdk-layout::xlsx` to find
+     duplicated formula/address logic that should move back into this crate
+   - prefer extending shared types such as `QualifiedAddress`,
+     `QualifiedRange`, `WorkbookValueModel`, and `CellValueProvider` over
+     introducing parallel helpers
+   - record why an existing API is insufficient before adding a new parser,
+     model, or evaluator entry point
+   - inspect the corresponding LO files in `../core/sc/` during the same pass;
+     every new constant, fallback list, function classification, or parse
+     shortcut must have an LO/OOXML source or remain unsupported
+
 1. LO pass
    - identify the Calc owner files
    - name the Calc concepts being ported
@@ -495,6 +535,25 @@ Repeat the loop after tests fail or reveal a missing Calc concept.
 
 Start with a cache-preserving typed import path. Do not begin with a full
 evaluator.
+
+### 14.0 Next Broad Development Focus
+
+The next formula step should make parsed formula state useful without trying to
+complete the full Calc interpreter:
+
+- build a shared token/dependency skeleton from formula text during typed cell
+  import
+- preserve references, functions, operators, literals, names, arrays, and
+  unsupported fragments in `ParsedFormula`
+- keep `QualifiedAddress` and `QualifiedRange` as the only A1 parser surface
+  used by layout and formula internals
+- collect defined-name and external-reference placeholders structurally, even
+  before resolution/evaluation is complete
+- keep cached values as the printable result unless a supported evaluator path
+  explicitly computes a value
+
+This stage should support the XLSX print core by making formulas inspectable
+and dependency-aware while still avoiding speculative function semantics.
 
 ### 14.1 Workbook And Sheet Identity Import
 

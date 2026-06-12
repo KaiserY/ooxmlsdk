@@ -2,7 +2,9 @@ use std::borrow::Cow;
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::x;
-use ooxmlsdk_formula::CellValueProvider;
+use ooxmlsdk_formula::{
+  BuiltInName, CellValueProvider, QualifiedRange as FormulaQualifiedRange, SheetId,
+};
 
 use crate::common::{Fill, Insets, Point, Pt, Rect, Size, Stroke, Twips};
 
@@ -51,6 +53,9 @@ impl<'doc> XlsxWorkbook<'doc> {
         .and_then(|part| part.root_element(document).ok());
       sheets.push(import_sheet(index, sheet, worksheet, value_model));
     }
+    if let Some(value_model) = value_model {
+      apply_defined_names_to_sheets(&mut sheets, value_model);
+    }
 
     Self {
       sheets,
@@ -94,11 +99,121 @@ fn import_sheet<'doc>(
           row_position,
           row,
           value_model,
-          ooxmlsdk_formula::SheetId(index as u32),
+          formula_sheet_id(index, sheet, value_model),
         )
       })
       .collect(),
     ..XlsxSheet::default()
+  }
+}
+
+fn formula_sheet_id<'doc>(
+  index: usize,
+  sheet: &x::Sheet,
+  value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
+) -> SheetId {
+  value_model
+    .and_then(|model| model.identity.sheets.get(index))
+    .map(|identity| identity.id)
+    .unwrap_or(SheetId(sheet.sheet_id))
+}
+
+fn apply_defined_names_to_sheets<'doc>(
+  sheets: &mut [XlsxSheet<'doc>],
+  value_model: &ooxmlsdk_formula::WorkbookValueModel<'doc>,
+) {
+  for defined_name in &value_model.defined_names {
+    let Some(built_in) = defined_name.built_in else {
+      continue;
+    };
+    if !matches!(built_in, BuiltInName::PrintArea | BuiltInName::PrintTitles) {
+      continue;
+    }
+    for range_text in split_defined_name_ranges(&defined_name.formula_text) {
+      let sheet_hint = defined_name.sheet.unwrap_or_default();
+      let Ok(range) = FormulaQualifiedRange::parse_a1(sheet_hint, range_text) else {
+        continue;
+      };
+      let Some(sheet_index) = defined_range_sheet_index(sheets, defined_name.sheet, &range) else {
+        continue;
+      };
+      let whole_rows = range.start_flags.whole_row && range.end_flags.whole_row;
+      let whole_columns = range.start_flags.whole_column && range.end_flags.whole_column;
+      let range = layout_cell_range(range.range);
+      let metrics = &mut sheets[sheet_index].metrics;
+      match built_in {
+        BuiltInName::PrintArea => metrics.print_ranges.push(range),
+        BuiltInName::PrintTitles => {
+          if whole_rows {
+            metrics.repeated_rows.push(range);
+          } else if whole_columns {
+            metrics.repeated_columns.push(range);
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+}
+
+fn split_defined_name_ranges(value: &str) -> Vec<&str> {
+  let value = value.trim().trim_start_matches('=');
+  let mut quoted = false;
+  let mut start = 0;
+  let mut ranges = Vec::new();
+  let mut chars = value.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      ',' if !quoted => {
+        push_defined_name_range(&mut ranges, &value[start..index]);
+        start = index + ch.len_utf8();
+      }
+      _ => {}
+    }
+  }
+  push_defined_name_range(&mut ranges, &value[start..]);
+  ranges
+}
+
+fn push_defined_name_range<'a>(ranges: &mut Vec<&'a str>, value: &'a str) {
+  let value = value.trim();
+  if !value.is_empty() {
+    ranges.push(value);
+  }
+}
+
+fn defined_range_sheet_index(
+  sheets: &[XlsxSheet<'_>],
+  local_sheet: Option<SheetId>,
+  range: &FormulaQualifiedRange<'_>,
+) -> Option<usize> {
+  if let Some(sheet_name) = &range.sheet_name {
+    return sheets
+      .iter()
+      .position(|sheet| sheet.name.as_ref() == sheet_name.0.as_ref());
+  }
+  local_sheet
+    .map(|sheet| sheet.0 as usize)
+    .filter(|index| *index < sheets.len())
+}
+
+fn layout_cell_range(range: ooxmlsdk_formula::CellRange) -> CellRange {
+  CellRange {
+    start: CellAddress {
+      column: range.start.column,
+      row: range.start.row,
+    },
+    end: CellAddress {
+      column: range.end.column,
+      row: range.end.row,
+    },
   }
 }
 
@@ -1137,6 +1252,62 @@ mod tests {
         start: CellAddress { column: 0, row: 0 },
         end: CellAddress { column: 1, row: 0 }
       })
+    );
+  }
+
+  #[test]
+  fn applies_formula_defined_names_to_sheet_print_metrics() {
+    let mut sheets = vec![XlsxSheet {
+      name: Cow::Borrowed("Q1, North"),
+      ..XlsxSheet::default()
+    }];
+    let value_model = ooxmlsdk_formula::WorkbookValueModel {
+      defined_names: vec![
+        ooxmlsdk_formula::DefinedName {
+          name: Cow::Borrowed("_xlnm.Print_Area"),
+          sheet: Some(SheetId(0)),
+          formula_text: Cow::Borrowed("'Q1, North'!$B$2:$D$5"),
+          hidden: false,
+          built_in: Some(BuiltInName::PrintArea),
+        },
+        ooxmlsdk_formula::DefinedName {
+          name: Cow::Borrowed("_xlnm.Print_Titles"),
+          sheet: Some(SheetId(0)),
+          formula_text: Cow::Borrowed("'Q1, North'!$1:$2,'Q1, North'!$A:$C"),
+          hidden: false,
+          built_in: Some(BuiltInName::PrintTitles),
+        },
+      ],
+      ..ooxmlsdk_formula::WorkbookValueModel::default()
+    };
+
+    apply_defined_names_to_sheets(&mut sheets, &value_model);
+
+    let expected_repeated_rows = layout_cell_range(
+      FormulaQualifiedRange::parse_a1(SheetId(0), "$1:$2")
+        .unwrap()
+        .range,
+    );
+    let expected_repeated_columns = layout_cell_range(
+      FormulaQualifiedRange::parse_a1(SheetId(0), "$A:$C")
+        .unwrap()
+        .range,
+    );
+
+    assert_eq!(
+      sheets[0].metrics.print_ranges,
+      vec![CellRange {
+        start: CellAddress { column: 1, row: 1 },
+        end: CellAddress { column: 3, row: 4 }
+      }]
+    );
+    assert_eq!(
+      sheets[0].metrics.repeated_rows,
+      vec![expected_repeated_rows]
+    );
+    assert_eq!(
+      sheets[0].metrics.repeated_columns,
+      vec![expected_repeated_columns]
     );
   }
 

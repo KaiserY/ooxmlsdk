@@ -2,9 +2,13 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::ops::Range;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use rustybuzz::{Face as BuzzFace, UnicodeBuffer};
+use rustybuzz::{
+  Direction as BuzzDirection, Face as BuzzFace, Language as BuzzLanguage, Script as BuzzScript,
+  UnicodeBuffer, script,
+};
 use ttf_parser::Face as TtfFace;
 
 use crate::{FontError, Result};
@@ -68,9 +72,14 @@ impl<'a> FontRegistry<'a> {
     match &resolved.source {
       FontSource::Memory { data, .. }
       | FontSource::EmbeddedOoxml { data, .. }
-      | FontSource::TestFixture { data, .. } => {
-        resolved.shape_with_ttf_bytes(text, data.as_ref(), request.size_pt, direction)
-      }
+      | FontSource::TestFixture { data, .. } => resolved.shape_with_ttf_bytes(
+        text,
+        data.as_ref(),
+        request.size_pt,
+        direction,
+        request.script,
+        request.language.clone(),
+      ),
       FontSource::System | FontSource::Path(_) => Ok(resolved.shape_approximate(
         text,
         request.size_pt,
@@ -491,12 +500,26 @@ impl<'a> ResolvedFont<'a> {
     data: &[u8],
     size: FontSize,
     direction: TextDirection,
+    script: Option<TextScript>,
+    language: Option<Cow<'a, str>>,
   ) -> Result<ShapedRun<'a>> {
     let text = text.into();
     let face = BuzzFace::from_slice(data, self.face_index).ok_or(FontError::InvalidFace)?;
     let units_per_em = face.units_per_em() as f32;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text.as_ref());
+    if let Some(direction) = buzz_direction(direction) {
+      buffer.set_direction(direction);
+    }
+    if let Some(script) = script.and_then(buzz_script) {
+      buffer.set_script(script);
+    }
+    if let Some(language) = language
+      .as_deref()
+      .and_then(|language| BuzzLanguage::from_str(language).ok())
+    {
+      buffer.set_language(language);
+    }
     let output = rustybuzz::shape(&face, &[], buffer);
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
@@ -541,8 +564,8 @@ impl<'a> ResolvedFont<'a> {
       glyphs: Cow::Owned(glyphs),
       advance_pt,
       direction,
-      script: None,
-      language: None,
+      script,
+      language,
       safe_breaks,
       approximate: false,
       decorations: Vec::new(),
@@ -1152,6 +1175,34 @@ fn font_stretch_from_ttf(width: u16) -> FontStretch {
   }
 }
 
+fn buzz_direction(direction: TextDirection) -> Option<BuzzDirection> {
+  match direction {
+    TextDirection::LeftToRight => Some(BuzzDirection::LeftToRight),
+    TextDirection::RightToLeft => Some(BuzzDirection::RightToLeft),
+    TextDirection::TopToBottom => Some(BuzzDirection::TopToBottom),
+    TextDirection::BottomToTop => Some(BuzzDirection::BottomToTop),
+    TextDirection::Mixed => None,
+  }
+}
+
+fn buzz_script(script: TextScript) -> Option<BuzzScript> {
+  match script {
+    TextScript::Common => Some(script::COMMON),
+    TextScript::Latin => Some(script::LATIN),
+    TextScript::Cyrillic => Some(script::CYRILLIC),
+    TextScript::Greek => Some(script::GREEK),
+    TextScript::Han => Some(script::HAN),
+    TextScript::Hiragana => Some(script::HIRAGANA),
+    TextScript::Katakana => Some(script::KATAKANA),
+    TextScript::Hangul => Some(script::HANGUL),
+    TextScript::Arabic => Some(script::ARABIC),
+    TextScript::Hebrew => Some(script::HEBREW),
+    TextScript::Devanagari => Some(script::DEVANAGARI),
+    TextScript::Thai => Some(script::THAI),
+    TextScript::Other => None,
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -1263,5 +1314,15 @@ mod tests {
     assert_eq!(shaped.glyphs[0].text_range, 0..1);
     assert_eq!(shaped.glyphs[0].x_advance_pt, 0.0);
     assert_eq!(shaped.safe_breaks, vec![2]);
+  }
+
+  #[test]
+  fn maps_ooxml_text_context_to_rustybuzz_context() {
+    assert_eq!(
+      buzz_direction(TextDirection::RightToLeft),
+      Some(BuzzDirection::RightToLeft)
+    );
+    assert_eq!(buzz_script(TextScript::Arabic), Some(script::ARABIC));
+    assert_eq!(buzz_script(TextScript::Other), None);
   }
 }

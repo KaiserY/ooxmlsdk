@@ -47,6 +47,31 @@ Use these sources to model font metrics, fallback, decoration metrics,
 substitution, and the distinction between measuring text and embedding fonts in
 an output format.
 
+### 2.1.1 Development Discipline
+
+Every font change must start from both local evidence sources before code is
+written:
+
+1. current Rust code in `crates/ooxmlsdk-fonts/`, layout consumers, and PDF
+   consumers
+2. matching LibreOffice VCL/EditEngine/Writer/Calc code under `../core/`
+
+Do not implement font behavior from memory, host-machine observation, or
+convenient heuristics. In particular:
+
+- do not add layout-local width estimates or font fallback paths when
+  `FontRegistry`, `FontBook`, `ResolvedFont`, or `ShapedRun` can be extended
+- do not invent ascent/descent, line-gap, underline, script, language, or
+  fallback constants; read them from font data, existing Rust fields, or
+  LO/VCL source-backed rules
+- do not assume a host font exists or use host output as the source of truth
+  for deterministic tests
+- do not add script/language/direction guesses unless they come from document
+  input, LO script detection behavior, or a clearly cited Unicode/HarfBuzz
+  mapping
+- when LO behavior is not yet mapped, report approximate/fallback state in the
+  model rather than hiding it behind guessed metrics
+
 ### 2.2 Typst Reference
 
 Typst is a Rust implementation reference for shaping and PDF coordination.
@@ -429,6 +454,19 @@ Reference tests should use:
 
 Use this loop before implementing each font feature:
 
+0. Existing-code preflight
+   - inspect `FontRegistry`, `FontBook`, `FontFaceInfo`, `ResolvedFont`,
+     `ShapedRun`, and current fallback paths before adding new font logic
+   - check layout and PDF consumers for duplicated measurement or fallback
+     logic that should move into `ooxmlsdk-fonts`
+   - prefer extending the shared shaping/coverage/substitution APIs over
+     adding document-engine-local text width helpers
+   - record whether new behavior is a LO/VCL concept, a Typst-inspired Rust
+     data-flow choice, or an explicit temporary fallback
+   - inspect the corresponding LO files in `../core/vcl/`, `../core/editeng/`,
+     `../core/sw/`, or `../core/sc/` during the same pass; every new metric,
+     fallback, score, or script/language rule must be source-backed
+
 1. LO pass
    - identify VCL/EditEngine/Writer/Calc owner behavior
    - record the source file path
@@ -507,6 +545,20 @@ Scope:
 
 Done when layout can measure and shape text through `ooxmlsdk-fonts` without
 calling PDF code.
+
+### 15.3.1 Next Broad Development Focus
+
+The next font step should close the gap between basic rustybuzz calls and
+LO/VCL-style layout measurement:
+
+- pass direction, script, and language into the shaping buffer instead of only
+  storing them on the result
+- derive cmap coverage beyond BMP-only scans
+- split runs at script/language/direction and glyph-fallback boundaries
+- expose diagnostics for approximate shaping, fallback shaping, and missing
+  glyph coverage so layout tests can detect unsupported behavior
+- remove any document-engine-local text width helper by moving the shared
+  behavior into `ooxmlsdk-fonts`
 
 ### 15.4 Current Implementation Checkpoint
 

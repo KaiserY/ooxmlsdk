@@ -51,6 +51,31 @@ layout models.
 | Shared drawing/text | `../core/drawinglayer/`, `../core/svx/`, `../core/editeng/` |
 | Shared output/font | `../core/vcl/` |
 
+### 2.1.1 Development Discipline
+
+Every layout change must start from both local evidence sources before code is
+written:
+
+1. current Rust code in `crates/ooxmlsdk-layout/` plus related
+   `ooxmlsdk-formula`, `ooxmlsdk-fonts`, PDF, and test consumers
+2. matching LibreOffice owner code under `../core/` for Writer, Calc, Impress,
+   DrawingML, EditEngine, and VCL behavior
+
+Do not implement layout behavior from memory, visual intuition, or convenient
+heuristics. In particular:
+
+- do not create layout-local formula/address parsers; extend
+  `ooxmlsdk-formula` types and consume their structured output
+- do not create layout-local font measurement or fallback logic; extend
+  `ooxmlsdk-fonts` and keep layout/PDF on the same shaping path
+- do not invent magic numbers for line height, default font size, table row
+  height, page geometry, print scaling, anchor offsets, or shape text insets;
+  cite the exact LO/OOXML source path or keep the field unset/defaulted
+- do not write temporary "looks plausible" fallback behavior that affects page
+  breaks, printed ranges, glyph positions, or shape bounds
+- when only a skeleton is implemented, preserve explicit source data and
+  produce conservative zero/default geometry instead of guessed dimensions
+
 ### 2.2 Typst Reference
 
 Typst is a Rust architecture reference, not an Office behavior reference.
@@ -829,6 +854,22 @@ parity is a later consumer check.
 
 Run this loop for each new feature area:
 
+0. Existing-code preflight
+   - inspect the current `docx`, `xlsx`, `pptx`, and `common` modules before
+     adding new import, geometry, parser, or display structures
+   - reuse `ooxmlsdk-formula` for SpreadsheetML references and values; do not
+     create layout-local A1 parsers, formula caches, or dependency models
+   - reuse `ooxmlsdk-fonts` for text measurement and shaping; do not add
+     renderer-specific width estimates to layout unless they are explicit,
+     LO-sourced fallback behavior
+   - search for existing unit conversions and constants before adding numeric
+     defaults, and attach LO/OOXML source paths to any fallback that remains
+   - record in the change summary which existing APIs were reused or extended
+   - inspect the matching LO owner files in `../core/sw/`, `../core/sc/`,
+     `../core/sd/`, `../core/oox/`, `../core/editeng/`, or `../core/vcl/`
+     during the same pass; every new geometry default, line metric, repeated
+     range rule, shape rule, or print-layout shortcut must be source-backed
+
 1. LO design pass
    - identify the application owner: Writer, Calc, or Impress
    - list exact source files
@@ -852,6 +893,44 @@ Repeat after implementation review. If the design starts copying
 Start layout logic by proving each engine can import typed `ooxmlsdk` input and
 emit inspectable layout/debug state. PDF integration remains out of scope until
 these outputs stabilize.
+
+### 15.0 Next Broad Development Focus
+
+The next implementation cycle should advance four large areas together while
+keeping shared ownership boundaries intact:
+
+1. XLSX Calc print core
+   - expand `XlsxWorkbook` typed import into a Calc-like print model
+   - keep values and references supplied by `ooxmlsdk-formula`
+   - port row/column twips geometry, print ranges, repeats, page breaks,
+     fit-to-page, merged-cell bounds, hidden row/column handling, and
+     header/footer placement from `../core/sc/source/ui/view/printfun.cxx`,
+     `../core/sc/source/ui/view/output.cxx`, and
+     `../core/sc/source/filter/oox/worksheetfragment.cxx`
+
+2. Shared text/font shaping pipeline
+   - route DOCX/XLSX/PPTX text measurement through `ooxmlsdk-fonts`
+   - avoid local width heuristics except explicit LO-sourced fallback states
+   - keep shaped glyph runs reusable by PDF/SVG/raster consumers
+
+3. DOCX Writer frame and flow skeleton
+   - move from typed import records toward Writer-like pages, body frames,
+     paragraphs, line boxes, table frames, headers/footers, notes, and anchored
+     objects
+   - use `../core/sw/source/core/layout/`,
+     `../core/sw/source/core/text/itrform2.cxx`, and
+     `../core/sw/source/writerfilter/dmapper/` as the owner sources
+
+4. PPTX fixed-page shape and text layout
+   - expand slide display construction from typed shape-tree records
+   - port placeholder inheritance, text body properties, paragraph/run style
+     cascade, basic preset geometry, picture/graphic-frame bounds, and text
+     autofit from `../core/oox/source/drawingml/`,
+     `../core/oox/source/ppt/`, and `../core/sd/`
+
+Before implementing any item, run the calibration loop below. In particular,
+search existing modules first and extend shared APIs instead of adding a second
+parser, formatter, unit converter, font measurer, or geometry model.
 
 ### 15.1 Shared Layout Substrate
 

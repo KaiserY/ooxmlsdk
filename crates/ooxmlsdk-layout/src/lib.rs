@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use common::{
   DebugCell, DebugFrame, DebugPage, DebugRecord, DebugShape, DebugTextLine, DisplayDocument,
   DisplayPage, FrameId, FrameRecord, LayoutDocument, LayoutEngineKind, LayoutOptions, Point, Pt,
-  Rect, Size, TextRun,
+  Rect, RectItem, Size, TextRun,
 };
 
 pub use error::{LayoutError, Result};
@@ -26,32 +26,69 @@ pub fn layout_docx_model<'doc>(
   for (section_index, section) in document.sections.iter().enumerate() {
     let bounds = page_bounds(section.page_desc.page_size);
     push_page(&mut layout, None, bounds);
-    let frame_id = push_frame(
-      &mut layout,
-      None,
-      Cow::Borrowed("docx:section"),
-      body_bounds(bounds, section.page_desc.margins),
-    );
+    let body_rect = body_bounds(bounds, section.page_desc.margins);
+    let frame_id = push_frame(&mut layout, None, Cow::Borrowed("docx:section"), body_rect);
+    let mut block_y = body_rect.origin.y.0;
     for (block_index, block) in section.body_blocks.iter().enumerate() {
       match block {
         docx::DocxBlock::Paragraph(paragraph) => {
           let text = paragraph_text(paragraph);
+          let line_height = docx_paragraph_line_height(paragraph);
+          let line_bounds = Rect {
+            origin: Point {
+              x: Pt(body_rect.origin.x.0 + paragraph.format.margins.left.0),
+              y: Pt(block_y),
+            },
+            size: Size {
+              width: Pt(
+                (body_rect.size.width.0
+                  - paragraph.format.margins.left.0
+                  - paragraph.format.margins.right.0)
+                  .max(0.0),
+              ),
+              height: line_height,
+            },
+          };
           layout
             .debug_records
             .push(DebugRecord::TextLine(DebugTextLine {
               frame: frame_id,
               index: block_index,
               text,
-              bounds: Rect::default(),
+              bounds: line_bounds,
             }));
+          if let Some(text) = docx_paragraph_visible_text(paragraph) {
+            layout.pages[section_index]
+              .items
+              .push(common::DisplayItem::Text(TextRun {
+                text,
+                origin: line_bounds.origin,
+                font_id: None,
+                color: common::Color::default(),
+                source: None,
+              }));
+          }
+          block_y += line_height.0;
         }
-        docx::DocxBlock::Table(_) => layout.debug_records.push(DebugRecord::Frame(DebugFrame {
-          id: FrameId(layout.frames.len() as u32),
-          parent: Some(frame_id),
-          kind: Cow::Borrowed("docx:table"),
-          bounds: Rect::default(),
-          print_bounds: Rect::default(),
-        })),
+        docx::DocxBlock::Table(table) => {
+          let table_bounds = Rect {
+            origin: Point {
+              x: body_rect.origin.x,
+              y: Pt(block_y),
+            },
+            size: Size {
+              width: body_rect.size.width,
+              height: docx_table_height(table),
+            },
+          };
+          push_frame(
+            &mut layout,
+            Some(frame_id),
+            Cow::Borrowed("docx:table"),
+            table_bounds,
+          );
+          block_y += table_bounds.size.height.0;
+        }
         docx::DocxBlock::FloatingFrame(frame) => {
           layout.debug_records.push(DebugRecord::Shape(DebugShape {
             page_index: section_index,
@@ -181,6 +218,41 @@ fn paragraph_text<'doc>(paragraph: &docx::DocxParagraph<'doc>) -> Cow<'doc, str>
   Cow::Owned(text)
 }
 
+fn docx_paragraph_visible_text<'doc>(
+  paragraph: &docx::DocxParagraph<'doc>,
+) -> Option<Cow<'doc, str>> {
+  let text = paragraph_text(paragraph);
+  (!text.is_empty()).then_some(text)
+}
+
+fn docx_paragraph_line_height(paragraph: &docx::DocxParagraph<'_>) -> Pt {
+  if let Some(value) = paragraph.format.line_height.value {
+    return value;
+  }
+  paragraph
+    .inlines
+    .iter()
+    .filter_map(|inline| match inline {
+      docx::InlineItem::Text(run) if run.style.font.size_pt.0 > 0.0 => {
+        Some(run.style.font.size_pt.0)
+      }
+      _ => None,
+    })
+    .max_by(f32::total_cmp)
+    .map(Pt)
+    .unwrap_or_default()
+}
+
+fn docx_table_height(table: &docx::DocxTable<'_>) -> Pt {
+  let height = table
+    .rows
+    .iter()
+    .filter_map(|row| row.height)
+    .map(|height| height.0)
+    .sum::<f32>();
+  Pt(height)
+}
+
 fn push_pptx_shape_debug<'doc>(
   layout: &mut LayoutDocument<'doc>,
   page_index: usize,
@@ -193,6 +265,15 @@ fn push_pptx_shape_debug<'doc>(
     kind: pptx_shape_kind(shape),
     bounds: shape.transform_bounds(),
   }));
+  if matches!(shape.kind, pptx::PptxShapeKind::Shape) {
+    layout.pages[page_index]
+      .items
+      .push(common::DisplayItem::Rect(RectItem {
+        bounds: shape.transform_bounds(),
+        fill: shape.fill.clone(),
+        stroke: shape.line.clone(),
+      }));
+  }
   if let Some(text_body) = &shape.text_body {
     let text = text_body
       .paragraphs
@@ -297,13 +378,19 @@ mod tests {
   fn docx_layout_emits_page_frame_and_text_debug_records() {
     let document = docx::DocxDocument {
       sections: vec![docx::DocxSection {
-        body_blocks: vec![docx::DocxBlock::Paragraph(docx::DocxParagraph {
-          inlines: vec![docx::InlineItem::Text(docx::DocxTextRun {
-            text: Cow::Borrowed("Hello"),
-            ..docx::DocxTextRun::default()
-          })],
-          ..docx::DocxParagraph::default()
-        })],
+        body_blocks: vec![
+          docx::DocxBlock::Paragraph(docx::DocxParagraph {
+            inlines: vec![docx::InlineItem::Text(docx::DocxTextRun {
+              text: Cow::Borrowed("Hello"),
+              ..docx::DocxTextRun::default()
+            })],
+            ..docx::DocxParagraph::default()
+          }),
+          docx::DocxBlock::Table(docx::DocxTable {
+            rows: vec![docx::DocxTableRow::default()],
+            ..docx::DocxTable::default()
+          }),
+        ],
         ..docx::DocxSection::default()
       }],
       ..docx::DocxDocument::default()
@@ -319,6 +406,13 @@ mod tests {
         .iter()
         .any(|record| matches!(record, DebugRecord::TextLine(line) if line.text == "Hello"))
     );
+    assert!(layout.pages.first().is_some_and(|page| {
+      page
+        .items
+        .iter()
+        .any(|item| matches!(item, common::DisplayItem::Text(text) if text.text == "Hello"))
+    }));
+    assert!(layout.frames.iter().any(|frame| frame.kind == "docx:table"));
   }
 
   #[test]
@@ -374,5 +468,11 @@ mod tests {
         .iter()
         .any(|record| matches!(record, DebugRecord::Shape(shape) if shape.kind == "pptx:shape"))
     );
+    assert!(layout.pages.first().is_some_and(|page| {
+      page
+        .items
+        .iter()
+        .any(|item| matches!(item, common::DisplayItem::Rect(_)))
+    }));
   }
 }

@@ -10,4 +10,6 @@ pub enum FormulaError {
   InvalidFormula(String),
   #[error("formula feature is not supported: {0}")]
   Unsupported(String),
+  #[error("OOXML package error: {0}")]
+  Package(String),
 }

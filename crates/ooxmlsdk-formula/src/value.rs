@@ -1,20 +1,15 @@
 use std::borrow::Cow;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum FormulaValue<'a> {
   Number(f64),
   String(Cow<'a, str>),
   Boolean(bool),
   Error(FormulaErrorValue),
+  #[default]
   Blank,
   Matrix(Vec<Vec<FormulaValue<'a>>>),
   Reference(crate::QualifiedRange<'a>),
-}
-
-impl Default for FormulaValue<'_> {
-  fn default() -> Self {
-    Self::Blank
-  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

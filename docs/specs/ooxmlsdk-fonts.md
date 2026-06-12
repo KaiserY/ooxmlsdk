@@ -435,3 +435,65 @@ Use this loop before implementing each font feature:
    - reject any path where PDF re-resolves a different font
 
 Repeat when a fixture reveals a substitution or fallback difference.
+
+## 15. Logic Kickoff Plan
+
+Start implementation with the shared path that every renderer will need:
+
+### 15.1 Deterministic Font Registry
+
+Reference:
+
+- `../core/vcl/source/font/PhysicalFontCollection.cxx`
+- `../core/vcl/source/font/PhysicalFontFace.cxx`
+- `../typst/crates/typst-library/src/text/font/book.rs`
+
+Scope:
+
+- register path and in-memory sources
+- parse face metadata, family names, style names, weight, slant, stretch, pitch,
+  coverage, variation axes, and feature tags
+- build `FontBook` family indexes and aliases
+- keep system-font discovery optional for tests; fixture fonts must be enough
+  to run deterministic assertions
+
+Done when tests can construct a registry from fixed font bytes and inspect the
+same face metadata independent of host fonts.
+
+### 15.2 Face Matching And Substitution
+
+Reference:
+
+- `../core/vcl/source/font/PhysicalFontFace.cxx`
+- `../core/vcl/source/font/PhysicalFontCollection.cxx`
+- `../core/vcl/source/font/DirectFontSubstitution.cxx`
+
+Scope:
+
+- match requested family, style name, pitch, weight, slant, and stretch
+- record candidate scores and rejection reasons in `FontMatchDiagnostics`
+- apply aliases and substitution rules before last-resort fallback
+- record synthetic bold/italic explicitly
+
+Done when tests can assert requested family, resolved family, substitution
+reason, fallback level, and candidate diagnostics.
+
+### 15.3 Metrics And Shaping
+
+Reference:
+
+- `../core/vcl/source/font/fontmetric.cxx`
+- `../core/vcl/source/gdi/`
+- `../typst/crates/typst-layout/src/inline/shaping.rs`
+- existing `crates/ooxmlsdk-pdf/src/text_metrics.rs` as migration evidence
+
+Scope:
+
+- compute vertical, decoration, script, and fallback metrics
+- split runs by script/language/direction where needed
+- shape with rustybuzz and preserve clusters, source ranges, safe breaks,
+  offsets, advances, and justifiability
+- apply glyph fallback without changing layout's measuring font silently
+
+Done when layout can measure and shape text through `ooxmlsdk-fonts` without
+calling PDF code.

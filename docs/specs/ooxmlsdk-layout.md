@@ -715,6 +715,37 @@ object structure:
 
 Pure export XML round-trip tests stay outside layout.
 
+### 12.4 LibreOffice Coverage Gate
+
+Before `ooxmlsdk-pdf` is wired to this crate, port the layout-level subset of
+`ooxmlsdk-pdf-test` LibreOffice coverage into `../ooxmlsdk-test-suite/` as
+layout/debug tests. The current PDF suite contains many source-backed LO
+regressions whose assertions are really about imported layout state:
+
+- DOCX line, page, table, header/footer, floating object, field, redline, and
+  drawing placement
+- XLSX row/column metrics, page setup, print ranges, visible sheet/cell text,
+  drawing anchors, filters, tables, and pivot/table display output
+- PPTX slide/master/layout resolution, placeholder inheritance, text-body
+  geometry, grouped shape transforms, tables, SmartArt, and theme-derived
+  drawing output
+
+Treat the existing PDF projection as evidence, not as the primary contract.
+Each ported test should assert the earliest stable layout/debug representation
+that corresponds to the LibreOffice behavior. PDF text/path/image/raster checks
+remain useful only after the same behavior is already covered below the renderer
+boundary.
+
+The acceptance gate for PDF migration is:
+
+- LO-derived layout/debug fixtures exist for the feature area
+- expected values come from LO assertions, layout dumps, rendered metafile/
+  bitmap evidence, or fixture facts; never from current Rust PDF output
+- unsupported behavior is recorded structurally, so a test can fail on a
+  missing LO concept instead of passing through dropped output
+- a passing layout test suite is required before adding the corresponding PDF
+  adapter or renderer assertion
+
 ## 13. Development Stages
 
 ### Stage 1: Common Substrate
@@ -794,3 +825,115 @@ Run this loop for each new feature area:
 
 Repeat after implementation review. If the design starts copying
 `ooxmlsdk-pdf` module shape, restart from the LO source map.
+
+## 15. Logic Kickoff Plan
+
+Start layout logic by proving each engine can import typed `ooxmlsdk` input and
+emit inspectable layout/debug state. PDF integration remains out of scope until
+these outputs stabilize.
+
+### 15.1 Shared Layout Substrate
+
+Reference:
+
+- `../typst/crates/typst-layout/src/document.rs`
+- `../typst/crates/typst-layout/src/pages/`
+- `../typst/crates/typst-pdf/src/convert.rs` for consumer-boundary shape only
+
+Scope:
+
+- keep geometry, units, display items, source links, unsupported records, and
+  debug dump records independent of any renderer
+- add engine entry points that return `LayoutDocument` / `DisplayDocument`
+  without PDF objects
+- route all text measurement and shaping through `ooxmlsdk-fonts`
+
+Done when DOCX/XLSX/PPTX smoke imports can emit empty or minimal layout
+documents with stable debug records and no PDF dependency.
+
+### 15.2 DOCX Typed Import And Minimal Flow
+
+Reference:
+
+- `../core/sw/source/writerfilter/dmapper/`
+- `../core/sw/source/core/layout/pagechg.cxx`
+- `../core/sw/source/core/layout/pagedesc.cxx`
+- `../core/sw/source/core/text/itrform2.cxx`
+- `../core/sw/source/core/text/inftxt.hxx`
+
+Scope:
+
+- import settings, sections, page descriptions, headers/footers, paragraphs,
+  runs, fields, bookmarks, notes, tables, and inline/floating shapes from typed
+  `WordprocessingDocument`
+- build a minimal frame tree: root, pages, body, section, text frames, and line
+  records
+- line breaking may start conservative, but text metrics must come from
+  `ooxmlsdk-fonts`
+- expose LO-style debug records before lowering to display items
+
+Done when simple DOCX fixtures produce page count, frame tree, text line boxes,
+and display text without using `ooxmlsdk-pdf`.
+
+### 15.3 XLSX Typed Import And Print Plan
+
+Reference:
+
+- `../core/sc/source/filter/oox/workbookfragment.cxx`
+- `../core/sc/source/filter/oox/worksheetfragment.cxx`
+- `../core/sc/source/filter/oox/sheetdatacontext.cxx`
+- `../core/sc/source/ui/view/printfun.cxx`
+- `../core/sc/source/ui/view/output.cxx`
+
+Scope:
+
+- import workbook/sheet print state, page settings, rows, columns, cells,
+  merges, hyperlinks, tables, filters, notes, drawings, and visible styles from
+  typed `SpreadsheetDocument`
+- consume `ooxmlsdk-formula` only through value-provider/display-value APIs
+- compute row/column geometry, print ranges, repeated rows/columns, page
+  breaks, and `XlsxPrintPlan`
+- lower cells and drawings to neutral display/debug records
+
+Done when simple XLSX fixtures produce printed sheet pages, cell rectangles,
+formatted display text, and page-break debug records without formula parsing in
+layout.
+
+### 15.4 PPTX Typed Import And Fixed Pages
+
+Reference:
+
+- `../core/oox/source/ppt/pptimport.cxx`
+- `../core/oox/source/ppt/presentationfragmenthandler.cxx`
+- `../core/oox/source/ppt/slidefragmenthandler.cxx`
+- `../core/oox/source/ppt/slidepersist.cxx`
+- `../core/oox/source/drawingml/shape.cxx`
+- `../core/oox/source/drawingml/textbody.cxx`
+- `../core/oox/source/drawingml/textparagraphpropertiescontext.cxx`
+
+Scope:
+
+- import slide order, size, masters, layouts, themes, placeholders, backgrounds,
+  shape trees, group transforms, text bodies, tables, media/chart/diagram/OLE
+  placeholders, notes, transitions, and timing records from typed
+  `PresentationDocument`
+- resolve placeholder inheritance enough to expose source records in debug
+  output
+- produce fixed pages with shape order, bounds, text boxes, table boxes, and
+  display items
+
+Done when simple PPTX fixtures produce slide pages, shape-tree debug records,
+resolved placeholders, and basic text display without PDF.
+
+### 15.5 PDF Migration Gate
+
+Do not migrate `ooxmlsdk-pdf` until:
+
+- fonts can resolve and shape through `ooxmlsdk-fonts`
+- formula can provide cached/display values for XLSX layout
+- layout can produce display/debug output for at least one DOCX, XLSX, and PPTX
+  smoke fixture
+- the LO-derived layout-level subset of `ooxmlsdk-pdf-test` has been ported to
+  `../ooxmlsdk-test-suite/` and passes against `ooxmlsdk-layout`
+- unsupported features are recorded as structured records instead of being
+  silently dropped

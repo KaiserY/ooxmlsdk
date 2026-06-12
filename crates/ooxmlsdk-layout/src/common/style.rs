@@ -18,8 +18,9 @@ pub struct Stroke<'doc> {
   pub source_style_id: Option<Cow<'doc, str>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum Fill<'doc> {
+  #[default]
   None,
   Solid(Color),
   Theme(Cow<'doc, str>),
@@ -32,12 +33,6 @@ pub enum Fill<'doc> {
     foreground: Color,
     background: Color,
   },
-}
-
-impl Default for Fill<'_> {
-  fn default() -> Self {
-    Self::None
-  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

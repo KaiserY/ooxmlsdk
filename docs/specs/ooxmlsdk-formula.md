@@ -478,3 +478,84 @@ Use a repeated three-pass loop before implementing each formula area:
    - record unsupported behavior as structured state, not as guessed output
 
 Repeat the loop after tests fail or reveal a missing Calc concept.
+
+## 14. Logic Kickoff Plan
+
+Start with a cache-preserving typed import path. Do not begin with a full
+evaluator.
+
+### 14.1 Workbook And Sheet Identity Import
+
+Reference:
+
+- `../core/sc/source/filter/oox/workbookfragment.cxx`
+- `../core/sc/source/filter/oox/worksheetfragment.cxx`
+- `../core/sc/source/filter/oox/workbooksettings.cxx`
+- generated `ooxmlsdk` SpreadsheetML package parts and `x::*` schema types
+
+Scope:
+
+- import workbook sheet order, sheet names, visibility, relationship ids, date
+  system, reference style, and calculation settings
+- preserve external reference metadata without trying to resolve remote files
+- expose `WorkbookIdentity` and `WorksheetIdentity` before importing cell
+  values
+
+Done when tests can load a typed `SpreadsheetDocument` and inspect workbook
+identity without reading raw XML or touching layout.
+
+### 14.2 Cell And Formula Metadata Import
+
+Reference:
+
+- `../core/sc/source/filter/oox/sheetdatacontext.cxx`
+- `../core/sc/source/filter/oox/sheetdatabuffer.cxx`
+- `../core/sc/source/filter/oox/formulabuffer.cxx`
+- existing `crates/ooxmlsdk-pdf/src/xlsx/formula.rs` as migration evidence
+
+Scope:
+
+- import constants, cached values, formula text, formula kind, shared formula
+  ids, array ranges, data table flags, dirty/stale flags, and cell type metadata
+- preserve cached/evaluated/display distinctions
+- expand shared formulas only enough to expose dependent records and addresses
+- mark unsupported or external formulas explicitly instead of inventing values
+
+Done when cache-first XLSX fixtures expose the printable cell text and formula
+state needed by `ooxmlsdk-layout::xlsx`.
+
+### 14.3 Address, Name, And Dependency Skeleton
+
+Reference:
+
+- `../core/sc/source/core/tool/compiler.cxx`
+- `../core/sc/source/filter/oox/defnamesbuffer.cxx`
+- `../core/sc/source/filter/oox/addressconverter.cxx`
+
+Scope:
+
+- parse A1 addresses/ranges with absolute/relative flags
+- preserve workbook and sheet-local defined names
+- create dependency graph edges for cells, ranges, defined names, externals,
+  and volatile placeholders
+- keep parser failures as structured unsupported records
+
+Done when dependency graph tests can assert edges separately from formula
+evaluation.
+
+### 14.4 Minimal Evaluator Gate
+
+Reference:
+
+- `../core/sc/source/core/tool/interpr*.cxx`
+- `../core/sc/source/core/inc/interpre.hxx`
+- `../core/sc/source/core/tool/calcconfig.cxx`
+
+Scope:
+
+- only after import/dependency tests pass, implement arithmetic, comparison,
+  concatenation, boolean conversion, simple aggregates, and error propagation
+- never let evaluator work block layout from consuming cached values
+
+Done when simple evaluator fixtures pass while unsupported functions still
+produce structured state.

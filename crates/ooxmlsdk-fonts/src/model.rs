@@ -4,6 +4,10 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use ttf_parser::Face as TtfFace;
+
+use crate::{FontError, Result};
+
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct FontId(pub Arc<str>);
 
@@ -14,6 +18,46 @@ pub struct FontRegistry<'a> {
   pub book: FontBook<'a>,
 }
 
+impl<'a> FontRegistry<'a> {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn register_face(&mut self, source: FontSource<'a>, face: FontFaceInfo<'a>) {
+    self.sources.push(source.clone());
+    self.faces.push(RegisteredFontFace {
+      source,
+      family_names: face.family_names.clone(),
+      style_name: face.style_name.clone(),
+      weight: face.weight,
+      slant: face.slant,
+      stretch: face.stretch,
+      pitch: face.pitch,
+      charset: None,
+      face_index: face.face_index,
+      origin_priority: 0,
+    });
+    self.book.faces.push(face);
+  }
+
+  pub fn register_memory_font(
+    &mut self,
+    id: impl Into<Cow<'a, str>>,
+    data: impl Into<Cow<'a, [u8]>>,
+  ) -> Result<FontId> {
+    let id = id.into();
+    let data = data.into();
+    let face = FontFaceInfo::from_ttf_bytes(id.as_ref(), data.as_ref(), 0)?;
+    let font_id = face.font_id.clone();
+    self.register_face(FontSource::Memory { id, data }, face);
+    Ok(font_id)
+  }
+
+  pub fn resolve(&self, request: &FontRequest<'a>) -> Result<ResolvedFont<'a>> {
+    self.book.resolve(request, &self.faces)
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FontBook<'a> {
   pub faces: Vec<FontFaceInfo<'a>>,
@@ -21,6 +65,136 @@ pub struct FontBook<'a> {
   pub substitutions: Vec<FontSubstitutionRule<'a>>,
   pub fallback_chains: Vec<FontFallbackChain<'a>>,
   pub fallback_cache: Vec<GlyphFallbackCacheEntry<'a>>,
+}
+
+impl<'a> FontBook<'a> {
+  pub fn resolve(
+    &self,
+    request: &FontRequest<'a>,
+    registered_faces: &[RegisteredFontFace<'a>],
+  ) -> Result<ResolvedFont<'a>> {
+    let requested_family = request.family.clone();
+    let aliased_family = request
+      .family
+      .as_ref()
+      .map(|family| Cow::Owned(resolve_family_alias(self, family).into_owned()));
+    let substituted_family = aliased_family
+      .as_ref()
+      .map(|family| substitute_family(self, family).into_owned());
+    let target_family = substituted_family
+      .as_deref()
+      .or(aliased_family.as_deref())
+      .or(requested_family.as_deref());
+
+    let mut candidates = Vec::new();
+    for face in &self.faces {
+      let family = primary_family(face);
+      let mut rejected = false;
+      let mut reason = None;
+
+      if let Some(target) = target_family {
+        if family_matches(face, target) {
+          reason = Some(FontMatchReason::Family);
+        } else {
+          rejected = true;
+          reason = Some(FontMatchReason::Family);
+        }
+      }
+
+      let requested_weight = requested_weight(request);
+      let requested_slant = requested_slant(request);
+      let requested_stretch = request.stretch.unwrap_or(FontStretch::Normal);
+      let slant_mismatch = face.slant != requested_slant;
+      let stretch_distance = stretch_distance(face.stretch, requested_stretch);
+      let weight_distance = weight_distance(face.weight, requested_weight);
+      let pitch_mismatch = request.pitch.is_some_and(|pitch| pitch != face.pitch);
+      if slant_mismatch && !rejected {
+        reason = Some(FontMatchReason::Slant);
+      }
+      if stretch_distance != 0 && !rejected && reason == Some(FontMatchReason::Family) {
+        reason = Some(FontMatchReason::Stretch);
+      }
+      if pitch_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
+        reason = Some(FontMatchReason::Pitch);
+      }
+
+      let rank = FontMatchRank {
+        rejected,
+        slant_mismatch,
+        stretch_distance,
+        weight_distance,
+        pitch_mismatch,
+      };
+      candidates.push((
+        rank,
+        FontMatchCandidate {
+          font_id: face.font_id.clone(),
+          family: family.into_owned().into(),
+          score: -rank.distance(),
+          rejected,
+          reason,
+        },
+      ));
+    }
+
+    candidates.sort_by(|left, right| {
+      left
+        .0
+        .cmp(&right.0)
+        .then_with(|| left.1.family.cmp(&right.1.family))
+    });
+    let candidates = candidates
+      .into_iter()
+      .map(|(_, candidate)| candidate)
+      .collect::<Vec<_>>();
+
+    let Some(winner) = candidates.iter().find(|candidate| !candidate.rejected) else {
+      return Err(FontError::NoMatch);
+    };
+    let Some(face) = self
+      .faces
+      .iter()
+      .find(|face| face.font_id == winner.font_id)
+    else {
+      return Err(FontError::NoMatch);
+    };
+    let registered = registered_faces.iter().find(|registered| {
+      registered.face_index == face.face_index && family_overlaps(registered, face)
+    });
+
+    let synthetic_bold =
+      request.bold && font_weight_number(face.weight) < font_weight_number(FontWeight::Bold);
+    let synthetic_italic = request.italic && face.slant == FontSlant::Upright;
+    let substitution = requested_family
+      .as_ref()
+      .zip(substituted_family.as_ref())
+      .and_then(|(requested, substituted)| {
+        (requested.as_ref() != substituted.as_str()).then(|| FontSubstitution {
+          requested_family: requested.clone(),
+          substituted_family: Cow::Owned(substituted.clone()),
+          reason: FontSubstitutionReason::Alias,
+        })
+      });
+
+    Ok(ResolvedFont {
+      font_id: face.font_id.clone(),
+      requested_family: request.family.clone(),
+      resolved_family: primary_family(face),
+      source: registered
+        .map(|face| face.source.clone())
+        .unwrap_or(FontSource::System),
+      face_index: face.face_index,
+      synthetic_bold,
+      synthetic_italic,
+      variation_values: request.variations.clone(),
+      metrics: FontMetrics::default(),
+      substitution,
+      match_diagnostics: FontMatchDiagnostics {
+        candidates,
+        fallback_level: None,
+      },
+    })
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -38,6 +212,74 @@ pub struct FontFaceInfo<'a> {
   pub axes: Vec<VariationAxis<'a>>,
   pub features: Vec<OpenTypeFeature<'a>>,
   pub face_index: u32,
+}
+
+impl<'a> FontFaceInfo<'a> {
+  pub fn synthetic(id: impl Into<Arc<str>>, family: impl Into<Cow<'a, str>>) -> Self {
+    Self {
+      font_id: FontId(id.into()),
+      family_names: vec![family.into()],
+      postscript_name: None,
+      style_name: None,
+      weight: FontWeight::Normal,
+      slant: FontSlant::Upright,
+      stretch: FontStretch::Normal,
+      pitch: FontPitch::Variable,
+      coverage: FontCoverage::default(),
+      flags: FontFlags::default(),
+      axes: Vec::new(),
+      features: Vec::new(),
+      face_index: 0,
+    }
+  }
+
+  pub fn from_ttf_bytes(id: &str, data: &[u8], face_index: u32) -> Result<Self> {
+    let face = TtfFace::parse(data, face_index).map_err(|_| FontError::InvalidFace)?;
+    let mut family_names = Vec::new();
+    let mut postscript_name = None;
+    let mut style_name = None;
+    for name in face.names() {
+      let Some(value) = name.to_string() else {
+        continue;
+      };
+      match name.name_id {
+        ttf_parser::name_id::FAMILY => push_unique_string(&mut family_names, value),
+        ttf_parser::name_id::TYPOGRAPHIC_FAMILY => push_unique_string(&mut family_names, value),
+        ttf_parser::name_id::POST_SCRIPT_NAME => postscript_name = Some(Cow::Owned(value)),
+        ttf_parser::name_id::SUBFAMILY => style_name = Some(Cow::Owned(value)),
+        _ => {}
+      }
+    }
+    if family_names.is_empty() {
+      family_names.push(Cow::Owned(id.to_string()));
+    }
+
+    let pitch = if face.is_monospaced() {
+      FontPitch::Fixed
+    } else {
+      FontPitch::Variable
+    };
+    let flags = FontFlags {
+      monospace: face.is_monospaced(),
+      ..FontFlags::default()
+    };
+
+    Ok(Self {
+      font_id: FontId(Arc::from(id)),
+      family_names,
+      postscript_name,
+      style_name,
+      weight: font_weight_from_ttf(face.weight().to_number()),
+      slant: font_slant_from_ttf(face.style()),
+      stretch: font_stretch_from_ttf(face.width().to_number()),
+      pitch,
+      coverage: FontCoverage::default(),
+      flags,
+      axes: Vec::new(),
+      features: Vec::new(),
+      face_index,
+    })
+  }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -196,6 +438,25 @@ pub struct FontMatchCandidate<'a> {
   pub score: i32,
   pub rejected: bool,
   pub reason: Option<FontMatchReason>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct FontMatchRank {
+  rejected: bool,
+  slant_mismatch: bool,
+  stretch_distance: i32,
+  weight_distance: i32,
+  pitch_mismatch: bool,
+}
+
+impl FontMatchRank {
+  fn distance(self) -> i32 {
+    i32::from(self.rejected)
+      + i32::from(self.slant_mismatch)
+      + i32::from(self.stretch_distance != 0)
+      + i32::from(self.weight_distance != 0)
+      + i32::from(self.pitch_mismatch)
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -449,4 +710,203 @@ pub enum TextScript {
   Devanagari,
   Thai,
   Other,
+}
+
+fn push_unique_string<'a>(values: &mut Vec<Cow<'a, str>>, value: String) {
+  if !values.iter().any(|existing| existing.as_ref() == value) {
+    values.push(Cow::Owned(value));
+  }
+}
+
+fn primary_family<'a>(face: &FontFaceInfo<'a>) -> Cow<'a, str> {
+  face
+    .family_names
+    .first()
+    .cloned()
+    .unwrap_or_else(|| Cow::Owned(face.font_id.0.to_string()))
+}
+
+fn normalize_family(value: &str) -> String {
+  value
+    .chars()
+    .filter(|ch| !ch.is_ascii_whitespace() && *ch != '-' && *ch != '_')
+    .flat_map(char::to_lowercase)
+    .collect()
+}
+
+fn family_matches(face: &FontFaceInfo<'_>, family: &str) -> bool {
+  let target = normalize_family(family);
+  face
+    .family_names
+    .iter()
+    .any(|candidate| normalize_family(candidate) == target)
+}
+
+fn family_overlaps(registered: &RegisteredFontFace<'_>, face: &FontFaceInfo<'_>) -> bool {
+  registered
+    .family_names
+    .iter()
+    .any(|registered| family_matches(face, registered))
+}
+
+fn resolve_family_alias<'a>(book: &FontBook<'a>, family: &Cow<'a, str>) -> Cow<'a, str> {
+  book
+    .family_aliases
+    .iter()
+    .find(|alias| normalize_family(&alias.from) == normalize_family(family))
+    .map(|alias| alias.to.clone())
+    .unwrap_or_else(|| family.clone())
+}
+
+fn substitute_family<'a>(book: &FontBook<'a>, family: &Cow<'a, str>) -> Cow<'a, str> {
+  book
+    .substitutions
+    .iter()
+    .find(|rule| normalize_family(&rule.requested_family) == normalize_family(family))
+    .map(|rule| rule.substitute_family.clone())
+    .unwrap_or_else(|| family.clone())
+}
+
+fn requested_weight(request: &FontRequest<'_>) -> FontWeight {
+  request.weight.unwrap_or(if request.bold {
+    FontWeight::Bold
+  } else {
+    FontWeight::Normal
+  })
+}
+
+fn requested_slant(request: &FontRequest<'_>) -> FontSlant {
+  request.slant.unwrap_or(if request.italic {
+    FontSlant::Italic
+  } else {
+    FontSlant::Upright
+  })
+}
+
+fn weight_distance(left: FontWeight, right: FontWeight) -> i32 {
+  (font_weight_number(left) - font_weight_number(right)).abs()
+}
+
+fn stretch_distance(left: FontStretch, right: FontStretch) -> i32 {
+  (font_stretch_number(left) - font_stretch_number(right)).abs()
+}
+
+fn font_weight_number(weight: FontWeight) -> i32 {
+  match weight {
+    FontWeight::Thin => 100,
+    FontWeight::ExtraLight => 200,
+    FontWeight::Light => 300,
+    FontWeight::Normal => 400,
+    FontWeight::Medium => 500,
+    FontWeight::SemiBold => 600,
+    FontWeight::Bold => 700,
+    FontWeight::ExtraBold => 800,
+    FontWeight::Black => 900,
+  }
+}
+
+fn font_stretch_number(stretch: FontStretch) -> i32 {
+  match stretch {
+    FontStretch::UltraCondensed => 1,
+    FontStretch::ExtraCondensed => 2,
+    FontStretch::Condensed => 3,
+    FontStretch::SemiCondensed => 4,
+    FontStretch::Normal => 5,
+    FontStretch::SemiExpanded => 6,
+    FontStretch::Expanded => 7,
+    FontStretch::ExtraExpanded => 8,
+    FontStretch::UltraExpanded => 9,
+  }
+}
+
+fn font_weight_from_ttf(weight: u16) -> FontWeight {
+  match weight {
+    0..=149 => FontWeight::Thin,
+    150..=249 => FontWeight::ExtraLight,
+    250..=349 => FontWeight::Light,
+    350..=449 => FontWeight::Normal,
+    450..=549 => FontWeight::Medium,
+    550..=649 => FontWeight::SemiBold,
+    650..=749 => FontWeight::Bold,
+    750..=849 => FontWeight::ExtraBold,
+    _ => FontWeight::Black,
+  }
+}
+
+fn font_slant_from_ttf(style: ttf_parser::Style) -> FontSlant {
+  match style {
+    ttf_parser::Style::Italic => FontSlant::Italic,
+    ttf_parser::Style::Oblique => FontSlant::Oblique,
+    ttf_parser::Style::Normal => FontSlant::Upright,
+  }
+}
+
+fn font_stretch_from_ttf(width: u16) -> FontStretch {
+  match width {
+    1 => FontStretch::UltraCondensed,
+    2 => FontStretch::ExtraCondensed,
+    3 => FontStretch::Condensed,
+    4 => FontStretch::SemiCondensed,
+    5 => FontStretch::Normal,
+    6 => FontStretch::SemiExpanded,
+    7 => FontStretch::Expanded,
+    8 => FontStretch::ExtraExpanded,
+    _ => FontStretch::UltraExpanded,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn resolves_exact_family_and_records_candidates() {
+    let mut registry = FontRegistry::new();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("regular", "Example"),
+    );
+    let mut bold = FontFaceInfo::synthetic("bold", "Example");
+    bold.weight = FontWeight::Bold;
+    registry.register_face(FontSource::System, bold);
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Example")),
+        bold: true,
+        ..FontRequest::default()
+      })
+      .unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("bold")));
+    assert_eq!(resolved.resolved_family, Cow::Borrowed("Example"));
+    assert!(!resolved.synthetic_bold);
+    assert_eq!(resolved.match_diagnostics.candidates.len(), 2);
+  }
+
+  #[test]
+  fn applies_alias_before_matching() {
+    let mut registry = FontRegistry::new();
+    registry.register_face(
+      FontSource::System,
+      FontFaceInfo::synthetic("liberation", "Liberation Serif"),
+    );
+    registry.book.family_aliases.push(FontFamilyAlias {
+      from: Cow::Borrowed("Times New Roman"),
+      to: Cow::Borrowed("Liberation Serif"),
+    });
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Times New Roman")),
+        ..FontRequest::default()
+      })
+      .unwrap();
+
+    assert_eq!(resolved.font_id, FontId(Arc::from("liberation")));
+    assert_eq!(
+      resolved.substitution.unwrap().reason,
+      FontSubstitutionReason::Alias
+    );
+  }
 }

@@ -1028,9 +1028,7 @@ fn raw_xml_bytes_to_string(xml: Box<[u8]>) -> Result<String, SdkError> {
 }
 
 #[inline]
-fn read_raw_empty_xml_start_bytes(
-  start: quick_xml::events::BytesStart<'_>,
-) -> Box<[u8]> {
+fn read_raw_empty_xml_start_bytes(start: quick_xml::events::BytesStart<'_>) -> Box<[u8]> {
   let start: &[u8] = start.as_ref();
   let mut xml = Vec::with_capacity(start.len() + RAW_EMPTY_XML_EXTRA_LEN);
   xml.push(b'<');
@@ -1040,11 +1038,7 @@ fn read_raw_empty_xml_start_bytes(
 }
 
 #[inline]
-fn build_raw_element_xml_bytes(
-  start: &[u8],
-  inner: &[u8],
-  end_name: &[u8],
-) -> Box<[u8]> {
+fn build_raw_element_xml_bytes(start: &[u8], inner: &[u8], end_name: &[u8]) -> Box<[u8]> {
   let mut xml =
     Vec::with_capacity(start.len() + inner.len() + end_name.len() + RAW_ELEMENT_XML_EXTRA_LEN);
   xml.push(b'<');

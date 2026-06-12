@@ -538,16 +538,8 @@ pub struct TextData {
         choice(
             sequence(
                 variant = Sequence,
-                child(
-                    field = formula,
-                    ty = "std :: boxed :: Box < Formula >",
-                    qname = "cx:f"
-                ),
-                text_child(
-                    field = v_xsdstring,
-                    ty = "Option < VXsdstring >",
-                    qname = "cx:v"
-                )
+                child(qname = "cx:f"),
+                text_child(qname = "cx:v")
             ),
             text_child(variant = VXsdstring, qname = "cx:v")
         )
@@ -2046,15 +2038,19 @@ pub enum DataChoice {
   /// Defines the StringDimension Class.
   StringDimension(std::boxed::Box<StringDimension>),
 }
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+pub struct TextDataChoiceSequence {
+  /// Defines the Formula Class.
+  #[sdk(child(qname = "cx:f"))]
+  pub formula: std::boxed::Box<Formula>,
+  /// Defines the VXsdstring Class.
+  #[sdk(text_child(simple_type = "StringValue", qname = "cx:v"))]
+  pub v_xsdstring: Option<VXsdstring>,
+}
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextDataChoice {
   /// Sequence of cx:f, cx:v
-  Sequence {
-    /// Defines the Formula Class.
-    formula: std::boxed::Box<Formula>,
-    /// Defines the VXsdstring Class.
-    v_xsdstring: Option<VXsdstring>,
-  },
+  Sequence(std::boxed::Box<TextDataChoiceSequence>),
   /// Defines the VXsdstring Class.
   VXsdstring(VXsdstring),
 }

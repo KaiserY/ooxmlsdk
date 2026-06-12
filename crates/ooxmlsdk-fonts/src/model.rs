@@ -4,6 +4,7 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use rustybuzz::{Face as BuzzFace, UnicodeBuffer};
 use ttf_parser::Face as TtfFace;
 
 use crate::{FontError, Result};
@@ -55,6 +56,29 @@ impl<'a> FontRegistry<'a> {
 
   pub fn resolve(&self, request: &FontRequest<'a>) -> Result<ResolvedFont<'a>> {
     self.book.resolve(request, &self.faces)
+  }
+
+  pub fn shape_text(
+    &self,
+    request: &FontRequest<'a>,
+    text: impl Into<Cow<'a, str>>,
+    direction: TextDirection,
+  ) -> Result<ShapedRun<'a>> {
+    let resolved = self.resolve(request)?;
+    match &resolved.source {
+      FontSource::Memory { data, .. }
+      | FontSource::EmbeddedOoxml { data, .. }
+      | FontSource::TestFixture { data, .. } => {
+        resolved.shape_with_ttf_bytes(text, data.as_ref(), request.size_pt, direction)
+      }
+      FontSource::System | FontSource::Path(_) => Ok(resolved.shape_approximate(
+        text,
+        request.size_pt,
+        direction,
+        request.script,
+        request.language.clone(),
+      )),
+    }
   }
 }
 
@@ -276,7 +300,7 @@ impl<'a> FontFaceInfo<'a> {
       slant: font_slant_from_ttf(face.style()),
       stretch: font_stretch_from_ttf(face.width().to_number()),
       pitch,
-      coverage: FontCoverage::default(),
+      coverage: font_coverage_from_ttf(&face),
       flags,
       axes: Vec::new(),
       features: Vec::new(),
@@ -459,6 +483,70 @@ impl<'a> ResolvedFont<'a> {
       approximate: true,
       decorations: Vec::new(),
     }
+  }
+
+  pub fn shape_with_ttf_bytes(
+    &self,
+    text: impl Into<Cow<'a, str>>,
+    data: &[u8],
+    size: FontSize,
+    direction: TextDirection,
+  ) -> Result<ShapedRun<'a>> {
+    let text = text.into();
+    let face = BuzzFace::from_slice(data, self.face_index).ok_or(FontError::InvalidFace)?;
+    let units_per_em = face.units_per_em() as f32;
+    let mut buffer = UnicodeBuffer::new();
+    buffer.push_str(text.as_ref());
+    let output = rustybuzz::shape(&face, &[], buffer);
+    let infos = output.glyph_infos();
+    let positions = output.glyph_positions();
+    let safe_breaks = text_safe_breaks(text.as_ref());
+    let glyphs = infos
+      .iter()
+      .zip(positions.iter())
+      .enumerate()
+      .map(|(index, (info, position))| {
+        let start = info.cluster as usize;
+        let end = infos
+          .get(index + 1)
+          .map(|next| next.cluster as usize)
+          .filter(|next| *next > start)
+          .unwrap_or_else(|| next_char_boundary(text.as_ref(), start));
+        ShapedGlyph {
+          glyph_id: info.glyph_id,
+          cluster: info.cluster,
+          text_range: start..end,
+          x_advance_pt: position.x_advance as f32 / units_per_em * size.0,
+          y_advance_pt: position.y_advance as f32 / units_per_em * size.0,
+          x_offset_pt: position.x_offset as f32 / units_per_em * size.0,
+          y_offset_pt: position.y_offset as f32 / units_per_em * size.0,
+          safe_to_break: text
+            .get(start..end)
+            .is_some_and(|cluster| cluster.chars().all(char::is_whitespace)),
+          source_char: text
+            .get(start..end)
+            .and_then(|cluster| cluster.chars().next()),
+          justifiable: text
+            .get(start..end)
+            .is_some_and(|cluster| cluster.chars().any(char::is_whitespace)),
+        }
+      })
+      .collect::<Vec<_>>();
+    let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
+
+    Ok(ShapedRun {
+      font_id: self.font_id.clone(),
+      text_range: 0..text.len(),
+      text,
+      glyphs: Cow::Owned(glyphs),
+      advance_pt,
+      direction,
+      script: None,
+      language: None,
+      safe_breaks,
+      approximate: false,
+      decorations: Vec::new(),
+    })
   }
 }
 
@@ -933,6 +1021,38 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
   }
 }
 
+fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
+  let mut ranges = Vec::new();
+  let mut range_start = None;
+  let mut last = 0u32;
+  for codepoint in 0..=0xFFFF {
+    let covered = char::from_u32(codepoint)
+      .and_then(|ch| face.glyph_index(ch))
+      .is_some();
+    match (range_start, covered) {
+      (None, true) => {
+        range_start = Some(codepoint);
+        last = codepoint;
+      }
+      (Some(_), true) => {
+        last = codepoint;
+      }
+      (Some(start), false) => {
+        ranges.push(start..last + 1);
+        range_start = None;
+      }
+      (None, false) => {}
+    }
+  }
+  if let Some(start) = range_start {
+    ranges.push(start..last + 1);
+  }
+  FontCoverage {
+    unicode_ranges: ranges,
+    scripts: BTreeSet::new(),
+  }
+}
+
 fn font_weight_number(weight: FontWeight) -> i32 {
   match weight {
     FontWeight::Thin => 100,
@@ -973,6 +1093,13 @@ fn text_safe_breaks(text: &str) -> Vec<usize> {
     .char_indices()
     .filter_map(|(index, ch)| ch.is_whitespace().then_some(index + ch.len_utf8()))
     .collect()
+}
+
+fn next_char_boundary(text: &str, start: usize) -> usize {
+  text
+    .get(start..)
+    .and_then(|tail| tail.char_indices().nth(1).map(|(offset, _)| start + offset))
+    .unwrap_or(text.len())
 }
 
 fn font_stretch_number(stretch: FontStretch) -> i32 {

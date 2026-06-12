@@ -7,7 +7,7 @@ use ooxmlsdk::schemas::x;
 
 use crate::{
   CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue, FormulaValue,
-  QualifiedRange, Result, SheetId,
+  QualifiedAddress, QualifiedRange, Result, SheetId,
 };
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -563,7 +563,8 @@ fn cell_value_record<'doc>(
     reference: formula
       .reference
       .as_deref()
-      .and_then(|reference| CellRange::parse_a1(reference).ok()),
+      .and_then(|reference| QualifiedRange::parse_a1(sheet, reference).ok())
+      .map(|reference| reference.range),
     input1: formula
       .r1
       .as_deref()
@@ -895,45 +896,41 @@ fn formula_dependencies<'doc>(
 ) -> Vec<FormulaDependency<'doc>> {
   let mut dependencies = Vec::new();
   for token in formula_text
-    .split(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'')))
+    .split(|ch: char| {
+      !(ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.'))
+    })
     .map(trim_formula_token)
     .filter(|token| !token.is_empty())
   {
     if token.contains(':') {
-      if let Ok(range) = CellRange::parse_a1(token) {
+      if let Ok(range) = QualifiedRange::parse_a1(sheet, token) {
+        dependencies.push(FormulaDependency::Range(range));
+      }
+    } else if let Ok(address) = QualifiedAddress::parse_a1(sheet, token) {
+      if address.sheet_name.is_some() {
         dependencies.push(FormulaDependency::Range(QualifiedRange {
           sheet,
-          sheet_name: None,
-          range,
-          start_flags: Default::default(),
-          end_flags: Default::default(),
+          sheet_name: address.sheet_name,
+          range: CellRange {
+            start: address.cell,
+            end: address.cell,
+          },
+          start_flags: address.flags,
+          end_flags: address.flags,
         }));
+      } else {
+        dependencies.push(FormulaDependency::Cell {
+          sheet,
+          address: address.cell,
+        });
       }
-    } else if let Ok(address) = CellAddress::parse_a1(token) {
-      dependencies.push(FormulaDependency::Cell { sheet, address });
     }
   }
   dependencies
 }
 
 fn qualified_range<'doc>(sheet: SheetId, reference: &str) -> Option<QualifiedRange<'doc>> {
-  CellRange::parse_a1(reference)
-    .ok()
-    .or_else(|| {
-      CellAddress::parse_a1(reference)
-        .ok()
-        .map(|address| CellRange {
-          start: address,
-          end: address,
-        })
-    })
-    .map(|range| QualifiedRange {
-      sheet,
-      sheet_name: None,
-      range,
-      start_flags: Default::default(),
-      end_flags: Default::default(),
-    })
+  QualifiedRange::parse_a1(sheet, reference).ok()
 }
 
 fn trim_formula_token(value: &str) -> &str {

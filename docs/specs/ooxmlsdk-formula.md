@@ -263,6 +263,18 @@ graph edges should be structured separately from formula text so stale,
 volatile, unsupported, and external states can be inspected without evaluating
 the workbook.
 
+The A1 parser is a shared SpreadsheetML service. Downstream layout code must
+not keep a second cell/range parser for worksheet geometry; it should convert
+from `QualifiedAddress` and `QualifiedRange` into layout-local address structs
+when needed. This keeps Calc dependency tracking, print ranges, merged ranges,
+view selections, and data-table references on one interpretation of quoted
+sheet names, absolute flags, and whole-row/whole-column ranges.
+
+For Excel/Calc sheet limits, use LO's `sc/inc/address.hxx` constants:
+`MAXCOL = 16383` and `MAXROW = 1048575` for normal XLSX sheets. Jumbo sheet
+limits should become explicit model state if they are later supported, not a
+silent replacement for standard XLSX bounds.
+
 ### 6.1 Ownership Model
 
 Use borrowed data where it naturally comes from parsed `ooxmlsdk` structs:

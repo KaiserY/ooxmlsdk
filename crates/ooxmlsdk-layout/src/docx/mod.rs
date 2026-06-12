@@ -1,9 +1,17 @@
 use std::borrow::Cow;
 
 use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
+use ooxmlsdk::schemas::w;
 use ooxmlsdk_fonts::FontRequest;
 
-use crate::common::{Fill, Insets, Pt, Rect, Stroke};
+use crate::common::{Fill, Insets, Pt, Rect, Size, Stroke, Twips};
+
+// Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx PageMar.
+const DEFAULT_PAGE_MARGIN_TWIPS: i32 = 1440;
+const DEFAULT_HEADER_FOOTER_TWIPS: i32 = 720;
+// OOXML/Word fallback page size in twips used when sectPr omits pgSz.
+const DEFAULT_PAGE_WIDTH_TWIPS: i32 = 11906;
+const DEFAULT_PAGE_HEIGHT_TWIPS: i32 = 16838;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DocxDocument<'doc> {
@@ -17,9 +25,335 @@ pub struct DocxDocument<'doc> {
 }
 
 impl<'doc> DocxDocument<'doc> {
-  pub fn from_wordprocessing_document(_document: &'doc WordprocessingDocument) -> Self {
-    Self::default()
+  pub fn from_wordprocessing_document(document: &'doc mut WordprocessingDocument) -> Self {
+    let Ok(main_part) = document.main_document_part() else {
+      return Self::default();
+    };
+    let main_part = main_part.clone();
+    let Ok(root) = main_part.root_element(document) else {
+      return Self::default();
+    };
+    import_document_root(root)
   }
+}
+
+fn import_document_root<'doc>(root: &w::Document) -> DocxDocument<'doc> {
+  let mut document = DocxDocument::default();
+  let Some(body) = root.body.as_deref() else {
+    return document;
+  };
+
+  let mut section = DocxSection {
+    page_desc: body
+      .section_properties
+      .as_deref()
+      .map(import_section_page_desc)
+      .unwrap_or_default(),
+    ..DocxSection::default()
+  };
+  for choice in &body.body_choice {
+    match choice {
+      w::BodyChoice::Paragraph(paragraph) => section
+        .body_blocks
+        .push(DocxBlock::Paragraph(import_paragraph(paragraph))),
+      w::BodyChoice::Table(table) => section
+        .body_blocks
+        .push(DocxBlock::Table(import_table(table))),
+      w::BodyChoice::AltChunk(_) => {
+        section
+          .body_blocks
+          .push(DocxBlock::FloatingFrame(FloatingFrame {
+            placement: FloatingPlacement::Inline,
+            wrap: WrapMode::None,
+            ..FloatingFrame::default()
+          }))
+      }
+      _ => {}
+    }
+  }
+  document.sections.push(section);
+  document
+}
+
+fn import_section_page_desc(properties: &w::SectionProperties) -> PageDesc {
+  let page_size = properties
+    .page_size
+    .as_ref()
+    .map(|page_size| Size {
+      width: Twips(
+        page_size
+          .width
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_WIDTH_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+      height: Twips(
+        page_size
+          .height
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_HEIGHT_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+    })
+    .unwrap_or(Size {
+      width: Twips(DEFAULT_PAGE_WIDTH_TWIPS).to_pt(),
+      height: Twips(DEFAULT_PAGE_HEIGHT_TWIPS).to_pt(),
+    });
+  let margins = properties
+    .page_margin
+    .as_ref()
+    .map(|margin| Insets {
+      top: Twips(
+        margin
+          .top
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_MARGIN_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+      right: Twips(
+        margin
+          .right
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_MARGIN_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+      bottom: Twips(
+        margin
+          .bottom
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_MARGIN_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+      left: Twips(
+        margin
+          .left
+          .map(|value| value.to_twips())
+          .unwrap_or(DEFAULT_PAGE_MARGIN_TWIPS as i64) as i32,
+      )
+      .to_pt(),
+    })
+    .unwrap_or(Insets {
+      top: Twips(DEFAULT_PAGE_MARGIN_TWIPS).to_pt(),
+      right: Twips(DEFAULT_PAGE_MARGIN_TWIPS).to_pt(),
+      bottom: Twips(DEFAULT_PAGE_MARGIN_TWIPS).to_pt(),
+      left: Twips(DEFAULT_PAGE_MARGIN_TWIPS).to_pt(),
+    });
+  PageDesc {
+    page_size,
+    margins,
+    header_distance: properties
+      .page_margin
+      .as_ref()
+      .and_then(|margin| margin.header)
+      .map(|value| Twips(value.to_twips() as i32).to_pt())
+      .unwrap_or_else(|| Twips(DEFAULT_HEADER_FOOTER_TWIPS).to_pt()),
+    footer_distance: properties
+      .page_margin
+      .as_ref()
+      .and_then(|margin| margin.footer)
+      .map(|value| Twips(value.to_twips() as i32).to_pt())
+      .unwrap_or_else(|| Twips(DEFAULT_HEADER_FOOTER_TWIPS).to_pt()),
+  }
+}
+
+fn import_paragraph<'doc>(paragraph: &w::Paragraph) -> DocxParagraph<'doc> {
+  let mut imported = DocxParagraph::default();
+  for choice in &paragraph.paragraph_choice {
+    match choice {
+      w::ParagraphChoice::WRun(run) => imported.inlines.extend(import_run(run)),
+      w::ParagraphChoice::SimpleField(field) => {
+        imported.inlines.push(InlineItem::Field(FieldRun {
+          instruction: Cow::Owned(field.instruction.clone()),
+          display_text: Cow::Owned(simple_field_text(field)),
+        }))
+      }
+      w::ParagraphChoice::Hyperlink(hyperlink) => {
+        imported.inlines.push(InlineItem::HyperlinkStart(Hyperlink {
+          relationship_id: hyperlink.id.clone().map(Cow::Owned),
+          anchor: hyperlink.anchor.clone().map(Cow::Owned),
+          tooltip: hyperlink.tooltip.clone().map(Cow::Owned),
+        }));
+        for child in &hyperlink.hyperlink_choice {
+          if let w::HyperlinkChoice::WRun(run) = child {
+            imported.inlines.extend(import_run(run));
+          }
+        }
+        imported.inlines.push(InlineItem::HyperlinkEnd);
+      }
+      w::ParagraphChoice::BookmarkStart(bookmark) => {
+        imported.inlines.push(InlineItem::BookmarkStart(Bookmark {
+          id: bookmark.id.to_string().into(),
+          name: Cow::Owned(bookmark.name.clone()),
+        }));
+      }
+      w::ParagraphChoice::BookmarkEnd(bookmark) => {
+        imported
+          .inlines
+          .push(InlineItem::BookmarkEnd(Cow::Owned(bookmark.id.to_string())));
+      }
+      w::ParagraphChoice::CommentRangeStart(comment) => {
+        imported
+          .inlines
+          .push(InlineItem::CommentRangeStart(Cow::Owned(
+            comment.id.to_string(),
+          )))
+      }
+      w::ParagraphChoice::CommentRangeEnd(comment) => {
+        imported
+          .inlines
+          .push(InlineItem::CommentRangeEnd(Cow::Owned(
+            comment.id.to_string(),
+          )))
+      }
+      _ => {}
+    }
+  }
+  imported
+}
+
+fn import_run<'doc>(run: &w::Run) -> Vec<InlineItem<'doc>> {
+  let style = run
+    .run_properties
+    .as_deref()
+    .map(import_run_style)
+    .unwrap_or_default();
+  let mut inlines = Vec::new();
+  for choice in &run.run_choice {
+    match choice {
+      w::RunChoice::Text(text) => inlines.push(InlineItem::Text(DocxTextRun {
+        text: Cow::Owned(text.0.xml_content.clone().unwrap_or_default()),
+        style: style.clone(),
+      })),
+      w::RunChoice::FieldCode(code) => inlines.push(InlineItem::Field(FieldRun {
+        instruction: Cow::Owned(code.xml_content.clone().unwrap_or_default()),
+        display_text: Cow::Borrowed(""),
+      })),
+      w::RunChoice::Break(break_value) => match break_value.r#type.unwrap_or_default() {
+        w::BreakValues::Page => inlines.push(InlineItem::PageBreak),
+        w::BreakValues::Column => inlines.push(InlineItem::ColumnBreak),
+        w::BreakValues::TextWrapping => inlines.push(InlineItem::Text(DocxTextRun {
+          text: Cow::Borrowed("\n"),
+          style: style.clone(),
+        })),
+      },
+      w::RunChoice::TabChar => inlines.push(InlineItem::Text(DocxTextRun {
+        text: Cow::Borrowed("\t"),
+        style: style.clone(),
+      })),
+      w::RunChoice::CarriageReturn => inlines.push(InlineItem::Text(DocxTextRun {
+        text: Cow::Borrowed("\n"),
+        style: style.clone(),
+      })),
+      w::RunChoice::FootnoteReference(reference) => {
+        inlines.push(InlineItem::FootnoteReference(reference.id as i64));
+      }
+      w::RunChoice::EndnoteReference(reference) => {
+        inlines.push(InlineItem::EndnoteReference(reference.id as i64));
+      }
+      w::RunChoice::LastRenderedPageBreak => inlines.push(InlineItem::LastRenderedPageBreak),
+      w::RunChoice::Drawing(_) | w::RunChoice::Picture(_) | w::RunChoice::EmbeddedObject(_) => {
+        inlines.push(InlineItem::InlineShape(InlineShape::default()));
+      }
+      _ => {}
+    }
+  }
+  inlines
+}
+
+fn import_run_style<'doc>(properties: &w::RunProperties) -> TextStyle<'doc> {
+  let mut style = TextStyle::default();
+  for choice in &properties.run_properties_choice {
+    match choice {
+      w::RunPropertiesChoice::RunFonts(fonts) => {
+        style.font.family = fonts
+          .ascii
+          .clone()
+          .or_else(|| fonts.high_ansi.clone())
+          .or_else(|| fonts.east_asia.clone())
+          .or_else(|| fonts.complex_script.clone())
+          .map(Cow::Owned);
+      }
+      w::RunPropertiesChoice::Bold(value) => {
+        style.bold = value.val.map(|value| value.as_bool()).unwrap_or(true);
+        style.font.bold = style.bold;
+      }
+      w::RunPropertiesChoice::Italic(value) => {
+        style.italic = value.val.map(|value| value.as_bool()).unwrap_or(true);
+        style.font.italic = style.italic;
+      }
+      w::RunPropertiesChoice::Underline(_) => style.underline = true,
+      w::RunPropertiesChoice::Strike(value) => {
+        style.strikeout = value.val.map(|value| value.as_bool()).unwrap_or(true);
+      }
+      w::RunPropertiesChoice::SmallCaps(value) => {
+        style.small_caps = value.val.map(|value| value.as_bool()).unwrap_or(true);
+      }
+      w::RunPropertiesChoice::Caps(value) => {
+        style.all_caps = value.val.map(|value| value.as_bool()).unwrap_or(true);
+      }
+      w::RunPropertiesChoice::FontSize(size) => {
+        style.font.size_pt = ooxmlsdk_fonts::FontSize(
+          size
+            .val
+            .parse::<f32>()
+            .map(|value| value / 2.0)
+            .unwrap_or(11.0),
+        );
+      }
+      _ => {}
+    }
+  }
+  style
+}
+
+fn simple_field_text(field: &w::SimpleField) -> String {
+  let mut text = String::new();
+  for choice in &field.simple_field_choice {
+    if let w::SimpleFieldChoice::WRun(run) = choice {
+      for inline in import_run(run) {
+        if let InlineItem::Text(run) = inline {
+          text.push_str(&run.text);
+        }
+      }
+    }
+  }
+  text
+}
+
+fn import_table<'doc>(table: &w::Table) -> DocxTable<'doc> {
+  let mut imported = DocxTable::default();
+  for choice in &table.table_choice2 {
+    if let w::TableChoice2::TableRow(row) = choice {
+      imported.rows.push(import_table_row(row));
+    }
+  }
+  imported
+}
+
+fn import_table_row<'doc>(row: &w::TableRow) -> DocxTableRow<'doc> {
+  let mut imported = DocxTableRow::default();
+  for choice in &row.table_row_choice {
+    if let w::TableRowChoice::TableCell(cell) = choice {
+      imported.cells.push(import_table_cell(cell));
+    }
+  }
+  imported
+}
+
+fn import_table_cell<'doc>(cell: &w::TableCell) -> DocxTableCell<'doc> {
+  let mut imported = DocxTableCell::default();
+  for choice in &cell.table_cell_choice {
+    match choice {
+      w::TableCellChoice::Paragraph(paragraph) => imported
+        .blocks
+        .push(DocxBlock::Paragraph(import_paragraph(paragraph))),
+      w::TableCellChoice::Table(table) => {
+        imported.blocks.push(DocxBlock::Table(import_table(table)))
+      }
+      _ => {}
+    }
+  }
+  imported
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

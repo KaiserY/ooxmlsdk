@@ -1,9 +1,20 @@
 use std::borrow::Cow;
 
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
+use ooxmlsdk::schemas::{a, p};
+use ooxmlsdk::sdk::SdkPart;
 use ooxmlsdk_fonts::FontRequest;
 
-use crate::common::{Fill, Insets, Stroke, Transform};
+use crate::common::{Emu, Fill, Insets, Stroke, Transform};
+
+// Source: ECMA-376 DrawingML uses 914400 EMU per inch and 60000 angle units per degree.
+const EMU_PER_INCH: i64 = 914_400;
+const DEFAULT_SLIDE_WIDTH_EMU: i64 = 10 * EMU_PER_INCH;
+const DEFAULT_SLIDE_HEIGHT_EMU: i64 = 7 * EMU_PER_INCH + EMU_PER_INCH / 2;
+const DRAWINGML_ANGLE_UNITS_PER_DEGREE: f32 = 60_000.0;
+// Source: LibreOffice oox WpsContext/text-body import defaults use 254/127 hmm.
+const DEFAULT_TEXT_LEFT_RIGHT_INSET_EMU: i64 = 91_440;
+const DEFAULT_TEXT_TOP_BOTTOM_INSET_EMU: i64 = 45_720;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PptxPresentation<'doc> {
@@ -17,8 +28,315 @@ pub struct PptxPresentation<'doc> {
 }
 
 impl<'doc> PptxPresentation<'doc> {
-  pub fn from_presentation_document(_document: &'doc PresentationDocument) -> Self {
-    Self::default()
+  pub fn from_presentation_document(document: &'doc mut PresentationDocument) -> Self {
+    let Ok(presentation_part) = document.presentation_part() else {
+      return Self::default();
+    };
+    let presentation_part = presentation_part.clone();
+    let Ok(root) = presentation_part.root_element(document) else {
+      return Self::default();
+    };
+    let page_size = root
+      .slide_size
+      .as_ref()
+      .map(|size| crate::common::Size {
+        width: Emu(size.cx as i64).to_pt(),
+        height: Emu(size.cy as i64).to_pt(),
+      })
+      .unwrap_or(crate::common::Size {
+        width: Emu(DEFAULT_SLIDE_WIDTH_EMU).to_pt(),
+        height: Emu(DEFAULT_SLIDE_HEIGHT_EMU).to_pt(),
+      });
+    let _ = root;
+
+    let slide_parts = presentation_part.slide_parts(document).collect::<Vec<_>>();
+    let slides = slide_parts
+      .iter()
+      .filter_map(|part| {
+        part.root_element(document).ok().map(|slide| {
+          import_slide(
+            slide,
+            part.relationship_id().map(|id| Cow::Owned(id.to_owned())),
+          )
+        })
+      })
+      .collect();
+    Self {
+      page_size,
+      slides,
+      ..Self::default()
+    }
+  }
+}
+
+fn import_slide<'doc>(
+  slide: &p::Slide,
+  relationship_id: Option<Cow<'doc, str>>,
+) -> PptxSlide<'doc> {
+  PptxSlide {
+    relationship_id,
+    name: slide.common_slide_data.name.clone().map(Cow::Owned),
+    hidden: slide.show.is_some_and(|value| !value.as_bool()),
+    shapes: slide
+      .common_slide_data
+      .shape_tree
+      .shape_tree_choice
+      .iter()
+      .filter_map(import_shape_tree_choice)
+      .collect(),
+    ..PptxSlide::default()
+  }
+}
+
+fn import_shape_tree_choice<'doc>(choice: &p::ShapeTreeChoice) -> Option<PptxShape<'doc>> {
+  match choice {
+    p::ShapeTreeChoice::Shape(shape) => Some(import_shape(shape)),
+    p::ShapeTreeChoice::GroupShape(group) => Some(import_group_shape(group)),
+    p::ShapeTreeChoice::GraphicFrame(frame) => Some(import_graphic_frame(frame)),
+    p::ShapeTreeChoice::ConnectionShape(connection) => Some(import_connection_shape(connection)),
+    p::ShapeTreeChoice::Picture(picture) => Some(import_picture(picture)),
+    p::ShapeTreeChoice::ContentPart(_) | p::ShapeTreeChoice::XmlAny(_) => None,
+  }
+}
+
+fn import_group_shape_choice<'doc>(choice: &p::GroupShapeChoice) -> Option<PptxShape<'doc>> {
+  match choice {
+    p::GroupShapeChoice::Shape(shape) => Some(import_shape(shape)),
+    p::GroupShapeChoice::GroupShape(group) => Some(import_group_shape(group)),
+    p::GroupShapeChoice::GraphicFrame(frame) => Some(import_graphic_frame(frame)),
+    p::GroupShapeChoice::ConnectionShape(connection) => Some(import_connection_shape(connection)),
+    p::GroupShapeChoice::Picture(picture) => Some(import_picture(picture)),
+    p::GroupShapeChoice::ContentPart(_) | p::GroupShapeChoice::XmlAny(_) => None,
+  }
+}
+
+fn import_shape<'doc>(shape: &p::Shape) -> PptxShape<'doc> {
+  let non_visual = &shape
+    .non_visual_shape_properties
+    .non_visual_drawing_properties;
+  PptxShape {
+    id: Some(non_visual.id),
+    name: Some(Cow::Owned(non_visual.name.clone())),
+    kind: PptxShapeKind::Shape,
+    transform: transform_from_shape_properties(&shape.shape_properties),
+    geometry: shape_geometry(&shape.shape_properties),
+    text_body: shape.text_body.as_deref().map(import_text_body),
+    placeholder: shape
+      .non_visual_shape_properties
+      .application_non_visual_drawing_properties
+      .placeholder_shape
+      .as_deref()
+      .map(import_placeholder),
+    hidden: non_visual.hidden.is_some_and(|value| value.as_bool()),
+    decorative: non_visual.description.as_deref() == Some(""),
+    ..PptxShape::default()
+  }
+}
+
+fn import_group_shape<'doc>(group: &p::GroupShape) -> PptxShape<'doc> {
+  let non_visual = &group
+    .non_visual_group_shape_properties
+    .non_visual_drawing_properties;
+  PptxShape {
+    id: Some(non_visual.id),
+    name: Some(Cow::Owned(non_visual.name.clone())),
+    kind: PptxShapeKind::Group,
+    children: group
+      .group_shape_choice
+      .iter()
+      .filter_map(import_group_shape_choice)
+      .collect(),
+    hidden: non_visual.hidden.is_some_and(|value| value.as_bool()),
+    ..PptxShape::default()
+  }
+}
+
+fn import_picture<'doc>(picture: &p::Picture) -> PptxShape<'doc> {
+  let non_visual = &picture
+    .non_visual_picture_properties
+    .non_visual_drawing_properties;
+  PptxShape {
+    id: Some(non_visual.id),
+    name: Some(Cow::Owned(non_visual.name.clone())),
+    kind: PptxShapeKind::Picture {
+      relationship_id: picture
+        .blip_fill
+        .as_deref()
+        .and_then(|fill| fill.blip.as_deref())
+        .and_then(|blip| blip.embed.clone().or_else(|| blip.link.clone()))
+        .map(Cow::Owned),
+    },
+    transform: transform_from_shape_properties(&picture.shape_properties),
+    hidden: non_visual.hidden.is_some_and(|value| value.as_bool()),
+    ..PptxShape::default()
+  }
+}
+
+fn import_graphic_frame<'doc>(frame: &p::GraphicFrame) -> PptxShape<'doc> {
+  let non_visual = &frame
+    .non_visual_graphic_frame_properties
+    .non_visual_drawing_properties;
+  PptxShape {
+    id: Some(non_visual.id),
+    name: Some(Cow::Owned(non_visual.name.clone())),
+    kind: PptxShapeKind::GraphicFrame {
+      uri: Some(Cow::Owned(frame.graphic.graphic_data.uri.clone())),
+    },
+    transform: transform_from_pml_transform(&frame.transform),
+    hidden: non_visual.hidden.is_some_and(|value| value.as_bool()),
+    ..PptxShape::default()
+  }
+}
+
+fn import_connection_shape<'doc>(connection: &p::ConnectionShape) -> PptxShape<'doc> {
+  let non_visual = &connection
+    .non_visual_connection_shape_properties
+    .non_visual_drawing_properties;
+  PptxShape {
+    id: Some(non_visual.id),
+    name: Some(Cow::Owned(non_visual.name.clone())),
+    kind: PptxShapeKind::Connector,
+    transform: transform_from_shape_properties(&connection.shape_properties),
+    hidden: non_visual.hidden.is_some_and(|value| value.as_bool()),
+    ..PptxShape::default()
+  }
+}
+
+fn transform_from_shape_properties(properties: &p::ShapeProperties) -> Transform {
+  properties
+    .transform2_d
+    .as_deref()
+    .map(transform_from_dml_transform)
+    .unwrap_or_default()
+}
+
+fn transform_from_dml_transform(transform: &a::Transform2D) -> Transform {
+  Transform {
+    dx: transform
+      .offset
+      .as_ref()
+      .map(|offset| Emu(offset.x.to_emu()).to_pt())
+      .unwrap_or_default(),
+    dy: transform
+      .offset
+      .as_ref()
+      .map(|offset| Emu(offset.y.to_emu()).to_pt())
+      .unwrap_or_default(),
+    ..Transform::default()
+  }
+}
+
+fn transform_from_pml_transform(transform: &p::Transform) -> Transform {
+  Transform {
+    dx: transform
+      .offset
+      .as_ref()
+      .map(|offset| Emu(offset.x.to_emu()).to_pt())
+      .unwrap_or_default(),
+    dy: transform
+      .offset
+      .as_ref()
+      .map(|offset| Emu(offset.y.to_emu()).to_pt())
+      .unwrap_or_default(),
+    ..Transform::default()
+  }
+}
+
+fn shape_geometry<'doc>(properties: &p::ShapeProperties) -> Option<Cow<'doc, str>> {
+  match &properties.shape_properties_choice1 {
+    Some(p::ShapePropertiesChoice::PresetGeometry(geometry)) => {
+      Some(Cow::Owned(format!("{:?}", geometry.preset)))
+    }
+    Some(p::ShapePropertiesChoice::CustomGeometry(_)) => Some(Cow::Borrowed("custom")),
+    None => None,
+  }
+}
+
+fn import_placeholder<'doc>(placeholder: &p::PlaceholderShape) -> Placeholder<'doc> {
+  Placeholder {
+    kind: match placeholder.r#type.unwrap_or_default() {
+      p::PlaceholderValues::Title => PlaceholderKind::Title,
+      p::PlaceholderValues::CenteredTitle => PlaceholderKind::CenteredTitle,
+      p::PlaceholderValues::SubTitle => PlaceholderKind::Subtitle,
+      p::PlaceholderValues::DateAndTime => PlaceholderKind::Date,
+      p::PlaceholderValues::Footer => PlaceholderKind::Footer,
+      p::PlaceholderValues::SlideNumber => PlaceholderKind::SlideNumber,
+      p::PlaceholderValues::Chart => PlaceholderKind::Chart,
+      p::PlaceholderValues::Table => PlaceholderKind::Table,
+      p::PlaceholderValues::Picture => PlaceholderKind::Picture,
+      p::PlaceholderValues::Object
+      | p::PlaceholderValues::ClipArt
+      | p::PlaceholderValues::Diagram
+      | p::PlaceholderValues::Media
+      | p::PlaceholderValues::SlideImage
+      | p::PlaceholderValues::Header => PlaceholderKind::Object,
+      p::PlaceholderValues::Body => PlaceholderKind::Body,
+    },
+    index: placeholder.index,
+    source: None,
+  }
+}
+
+fn import_text_body<'doc>(body: &p::TextBody) -> TextBody<'doc> {
+  TextBody {
+    body_properties: import_text_body_properties(&body.body_properties),
+    paragraphs: body.paragraph.iter().map(import_text_paragraph).collect(),
+    ..TextBody::default()
+  }
+}
+
+fn import_text_body_properties(properties: &a::BodyProperties) -> TextBodyProperties {
+  TextBodyProperties {
+    insets: Insets {
+      top: properties
+        .top_inset
+        .map(|value| Emu(value.to_emu()).to_pt())
+        .unwrap_or_else(|| Emu(DEFAULT_TEXT_TOP_BOTTOM_INSET_EMU).to_pt()),
+      right: properties
+        .right_inset
+        .map(|value| Emu(value.to_emu()).to_pt())
+        .unwrap_or_else(|| Emu(DEFAULT_TEXT_LEFT_RIGHT_INSET_EMU).to_pt()),
+      bottom: properties
+        .bottom_inset
+        .map(|value| Emu(value.to_emu()).to_pt())
+        .unwrap_or_else(|| Emu(DEFAULT_TEXT_TOP_BOTTOM_INSET_EMU).to_pt()),
+      left: properties
+        .left_inset
+        .map(|value| Emu(value.to_emu()).to_pt())
+        .unwrap_or_else(|| Emu(DEFAULT_TEXT_LEFT_RIGHT_INSET_EMU).to_pt()),
+    },
+    rotation_degrees: properties
+      .rotation
+      .map(|value| value as f32 / DRAWINGML_ANGLE_UNITS_PER_DEGREE)
+      .unwrap_or(0.0),
+    columns: properties.column_count.map(|value| value as u16),
+    wrap: properties.wrap.is_some(),
+    ..TextBodyProperties::default()
+  }
+}
+
+fn import_text_paragraph<'doc>(paragraph: &a::Paragraph) -> TextParagraph<'doc> {
+  TextParagraph {
+    runs: paragraph
+      .paragraph_choice
+      .iter()
+      .filter_map(|choice| match choice {
+        a::ParagraphChoice::Run(run) => Some(TextRun {
+          text: Cow::Owned(run.text.clone()),
+          style: TextRunStyle::default(),
+        }),
+        a::ParagraphChoice::Field(field) => field.text.as_ref().map(|text| TextRun {
+          text: Cow::Owned(text.clone()),
+          style: TextRunStyle::default(),
+        }),
+        a::ParagraphChoice::Break(_) => Some(TextRun {
+          text: Cow::Borrowed("\n"),
+          style: TextRunStyle::default(),
+        }),
+        a::ParagraphChoice::TextMath(_) => None,
+      })
+      .collect(),
+    ..TextParagraph::default()
   }
 }
 

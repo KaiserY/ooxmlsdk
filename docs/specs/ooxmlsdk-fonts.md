@@ -347,7 +347,17 @@ source path in comments.
 ## 10. Shaping Policy
 
 Use `rustybuzz`/HarfBuzz-style shaping as the implementation basis. Keep the
-output format independent of `krilla`.
+buffer direction, script, and language explicit in the shaping API. A shaped
+run that comes from real font bytes should contain glyph ids, clusters,
+advances, offsets, and break metadata from the shaper. Approximate shaping is a
+fallback state and must remain marked as approximate.
+
+Coverage should be derived from the font's cmap data across the full Unicode
+range needed by the document, not only from BMP code points. Script/language
+fallback and run splitting should follow LO VCL/EditEngine behavior, with Typst
+used only as Rust data-flow guidance.
+
+Keep the output format independent of `krilla`.
 
 Shaping must preserve:
 

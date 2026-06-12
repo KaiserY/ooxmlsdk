@@ -13,46 +13,7 @@ pub struct CellAddress {
 
 impl CellAddress {
   pub fn parse_a1(value: &str) -> Result<Self> {
-    let trimmed = value.trim();
-    let cell = trimmed
-      .rsplit_once('!')
-      .map(|(_, cell)| cell)
-      .unwrap_or(trimmed)
-      .trim_matches('\'');
-    let mut column = 0u32;
-    let mut row = 0u32;
-    let mut saw_column = false;
-    let mut saw_row = false;
-
-    for ch in cell.chars().filter(|ch| *ch != '$') {
-      if ch.is_ascii_alphabetic() {
-        if saw_row {
-          return Err(FormulaError::InvalidAddress(value.to_string()));
-        }
-        saw_column = true;
-        column = column
-          .checked_mul(26)
-          .and_then(|base| base.checked_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1))
-          .ok_or_else(|| FormulaError::InvalidAddress(value.to_string()))?;
-      } else if ch.is_ascii_digit() {
-        saw_row = true;
-        row = row
-          .checked_mul(10)
-          .and_then(|base| base.checked_add(ch as u32 - '0' as u32))
-          .ok_or_else(|| FormulaError::InvalidAddress(value.to_string()))?;
-      } else {
-        return Err(FormulaError::InvalidAddress(value.to_string()));
-      }
-    }
-
-    if !saw_column || !saw_row || column == 0 || row == 0 {
-      return Err(FormulaError::InvalidAddress(value.to_string()));
-    }
-
-    Ok(Self {
-      column: column - 1,
-      row: row - 1,
-    })
+    Ok(QualifiedAddress::parse_a1(SheetId::default(), value)?.cell)
   }
 }
 
@@ -72,15 +33,7 @@ pub struct CellRange {
 
 impl CellRange {
   pub fn parse_a1(value: &str) -> Result<Self> {
-    let range = value
-      .rsplit_once('!')
-      .map(|(_, range)| range)
-      .unwrap_or(value);
-    let (start, end) = range.split_once(':').unwrap_or((range, range));
-    Ok(Self {
-      start: CellAddress::parse_a1(start)?,
-      end: CellAddress::parse_a1(end)?,
-    })
+    Ok(QualifiedRange::parse_a1(SheetId::default(), value)?.range)
   }
 }
 
@@ -95,6 +48,19 @@ pub struct QualifiedAddress<'a> {
   pub flags: AddressFlags,
 }
 
+impl<'a> QualifiedAddress<'a> {
+  pub fn parse_a1(sheet: SheetId, value: &str) -> Result<Self> {
+    let (sheet_name, cell) = split_sheet_name(value.trim());
+    let (cell, flags) = parse_cell_ref(cell.trim())?;
+    Ok(Self {
+      sheet,
+      sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(unquote_sheet_name(name)))),
+      cell,
+      flags,
+    })
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct QualifiedRange<'a> {
   pub sheet: SheetId,
@@ -102,6 +68,189 @@ pub struct QualifiedRange<'a> {
   pub range: CellRange,
   pub start_flags: AddressFlags,
   pub end_flags: AddressFlags,
+}
+
+impl<'a> QualifiedRange<'a> {
+  pub fn parse_a1(sheet: SheetId, value: &str) -> Result<Self> {
+    let (sheet_name, range_text) = split_sheet_name(value.trim());
+    let (start_text, end_text) = range_text
+      .split_once(':')
+      .unwrap_or((range_text, range_text));
+    let (start, start_flags, end, end_flags) =
+      parse_range_bounds(start_text.trim(), end_text.trim())?;
+    Ok(Self {
+      sheet,
+      sheet_name: sheet_name.map(|name| SheetName(Cow::Owned(unquote_sheet_name(name)))),
+      range: CellRange { start, end },
+      start_flags,
+      end_flags,
+    })
+  }
+}
+
+const EXCEL_MAX_COLUMN_ZERO_BASED: u32 = 16_383;
+const EXCEL_MAX_ROW_ZERO_BASED: u32 = 1_048_575;
+
+fn split_sheet_name(value: &str) -> (Option<&str>, &str) {
+  let mut quoted = false;
+  let mut last_bang = None;
+  let mut chars = value.char_indices().peekable();
+  while let Some((index, ch)) = chars.next() {
+    match ch {
+      '\'' => {
+        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+          chars.next();
+        } else {
+          quoted = !quoted;
+        }
+      }
+      '!' if !quoted => last_bang = Some(index),
+      _ => {}
+    }
+  }
+  last_bang
+    .map(|index| (Some(&value[..index]), &value[index + 1..]))
+    .unwrap_or((None, value))
+}
+
+fn unquote_sheet_name(value: &str) -> String {
+  let trimmed = value.trim();
+  if trimmed.len() >= 2 && trimmed.starts_with('\'') && trimmed.ends_with('\'') {
+    trimmed[1..trimmed.len() - 1].replace("''", "'")
+  } else {
+    trimmed.to_string()
+  }
+}
+
+fn parse_range_bounds(
+  start: &str,
+  end: &str,
+) -> Result<(CellAddress, AddressFlags, CellAddress, AddressFlags)> {
+  match (parse_cell_ref(start), parse_cell_ref(end)) {
+    (Ok((start, start_flags)), Ok((end, end_flags))) => Ok((start, start_flags, end, end_flags)),
+    _ => parse_whole_axis_range(start, end),
+  }
+}
+
+fn parse_whole_axis_range(
+  start: &str,
+  end: &str,
+) -> Result<(CellAddress, AddressFlags, CellAddress, AddressFlags)> {
+  if let (Some((start_col, start_abs)), Some((end_col, end_abs))) =
+    (parse_column_ref(start), parse_column_ref(end))
+  {
+    return Ok((
+      CellAddress {
+        column: start_col,
+        row: 0,
+      },
+      AddressFlags {
+        absolute_column: start_abs,
+        whole_column: true,
+        ..AddressFlags::default()
+      },
+      CellAddress {
+        column: end_col,
+        row: EXCEL_MAX_ROW_ZERO_BASED,
+      },
+      AddressFlags {
+        absolute_column: end_abs,
+        whole_column: true,
+        ..AddressFlags::default()
+      },
+    ));
+  }
+  if let (Some((start_row, start_abs)), Some((end_row, end_abs))) =
+    (parse_row_ref(start), parse_row_ref(end))
+  {
+    return Ok((
+      CellAddress {
+        column: 0,
+        row: start_row,
+      },
+      AddressFlags {
+        absolute_row: start_abs,
+        whole_row: true,
+        ..AddressFlags::default()
+      },
+      CellAddress {
+        column: EXCEL_MAX_COLUMN_ZERO_BASED,
+        row: end_row,
+      },
+      AddressFlags {
+        absolute_row: end_abs,
+        whole_row: true,
+        ..AddressFlags::default()
+      },
+    ));
+  }
+  Err(FormulaError::InvalidAddress(format!("{start}:{end}")))
+}
+
+fn parse_cell_ref(value: &str) -> Result<(CellAddress, AddressFlags)> {
+  let mut text = value.trim();
+  let mut flags = AddressFlags::default();
+  if let Some(rest) = text.strip_prefix('$') {
+    flags.absolute_column = true;
+    text = rest;
+  }
+
+  let split = text
+    .char_indices()
+    .find(|(_, ch)| !ch.is_ascii_alphabetic())
+    .map(|(index, _)| index)
+    .unwrap_or(text.len());
+  let (column_text, mut row_text) = text.split_at(split);
+  if let Some(rest) = row_text.strip_prefix('$') {
+    flags.absolute_row = true;
+    row_text = rest;
+  }
+  if column_text.is_empty() || row_text.is_empty() {
+    return Err(FormulaError::InvalidAddress(value.to_string()));
+  }
+  let column = parse_column_letters(column_text)
+    .ok_or_else(|| FormulaError::InvalidAddress(value.to_string()))?;
+  let row =
+    parse_row_digits(row_text).ok_or_else(|| FormulaError::InvalidAddress(value.to_string()))?;
+  Ok((CellAddress { column, row }, flags))
+}
+
+fn parse_column_ref(value: &str) -> Option<(u32, bool)> {
+  let (text, absolute) = value
+    .trim()
+    .strip_prefix('$')
+    .map(|text| (text, true))
+    .unwrap_or((value.trim(), false));
+  parse_column_letters(text).map(|column| (column, absolute))
+}
+
+fn parse_row_ref(value: &str) -> Option<(u32, bool)> {
+  let (text, absolute) = value
+    .trim()
+    .strip_prefix('$')
+    .map(|text| (text, true))
+    .unwrap_or((value.trim(), false));
+  parse_row_digits(text).map(|row| (row, absolute))
+}
+
+fn parse_column_letters(value: &str) -> Option<u32> {
+  if value.is_empty() || !value.chars().all(|ch| ch.is_ascii_alphabetic()) {
+    return None;
+  }
+  let mut column = 0u32;
+  for ch in value.chars() {
+    column = column
+      .checked_mul(26)?
+      .checked_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1)?;
+  }
+  column.checked_sub(1)
+}
+
+fn parse_row_digits(value: &str) -> Option<u32> {
+  if value.is_empty() || !value.chars().all(|ch| ch.is_ascii_digit()) {
+    return None;
+  }
+  value.parse::<u32>().ok()?.checked_sub(1)
 }
 
 #[cfg(test)]
@@ -132,5 +281,22 @@ mod tests {
         end: CellAddress { column: 3, row: 3 },
       }
     );
+  }
+
+  #[test]
+  fn parses_qualified_and_axis_ranges() {
+    let range = QualifiedRange::parse_a1(SheetId(7), "'Q1 Report'!$A:$C").unwrap();
+    assert_eq!(range.sheet, SheetId(7));
+    assert_eq!(range.sheet_name.unwrap().0, "Q1 Report");
+    assert_eq!(range.range.start.column, 0);
+    assert_eq!(range.range.end.column, 2);
+    assert!(range.start_flags.absolute_column);
+    assert!(range.start_flags.whole_column);
+
+    let rows = QualifiedRange::parse_a1(SheetId(1), "$2:$4").unwrap();
+    assert_eq!(rows.range.start.row, 1);
+    assert_eq!(rows.range.end.row, 3);
+    assert_eq!(rows.range.end.column, EXCEL_MAX_COLUMN_ZERO_BASED);
+    assert!(rows.end_flags.whole_row);
   }
 }

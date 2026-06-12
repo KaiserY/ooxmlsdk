@@ -1,8 +1,20 @@
 use std::borrow::Cow;
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
+use ooxmlsdk::schemas::x;
+use ooxmlsdk_formula::CellValueProvider;
 
-use crate::common::{Fill, Insets, Pt, Rect, Stroke};
+use crate::common::{Fill, Insets, Point, Pt, Rect, Size, Stroke, Twips};
+
+// Source: LibreOffice sc/inc/global.hxx STD_COL_WIDTH = convert(64pt, twip).
+const CALC_STANDARD_COLUMN_WIDTH_TWIPS: i32 = 1280;
+// OOXML sheetFormatPr defaultRowHeight is commonly 15pt; LO may derive this
+// from the standard row height when the attribute is absent.
+const DEFAULT_ROW_HEIGHT_PT: f64 = 15.0;
+const POINTS_PER_INCH: f64 = 72.0;
+// Source: LibreOffice sc/source/ui/view/printfun.cxx uses A4 as print fallback.
+const A4_PORTRAIT_WIDTH_PT: f32 = 595.2756;
+const A4_PORTRAIT_HEIGHT_PT: f32 = 841.8898;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct XlsxWorkbook<'doc> {
@@ -11,17 +23,362 @@ pub struct XlsxWorkbook<'doc> {
   pub page_styles: Vec<XlsxPageStyle<'doc>>,
   pub drawings: Vec<XlsxDrawing<'doc>>,
   pub print_plan: XlsxPrintPlan<'doc>,
-  #[cfg(feature = "xlsx-formula")]
   pub value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
 }
 
 impl<'doc> XlsxWorkbook<'doc> {
-  pub fn from_spreadsheet_document(_document: &'doc SpreadsheetDocument) -> Self {
-    Self::default()
+  pub fn from_spreadsheet_document(document: &'doc mut SpreadsheetDocument) -> Self {
+    Self::from_spreadsheet_document_with_values(document, None)
+  }
+
+  pub fn from_spreadsheet_document_with_values(
+    document: &'doc mut SpreadsheetDocument,
+    value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
+  ) -> Self {
+    let Ok(workbook_part) = document.workbook_part() else {
+      return Self::default();
+    };
+    let workbook_part = workbook_part.clone();
+    let Ok(workbook_root) = workbook_part.root_element(document) else {
+      return Self::default();
+    };
+    let sheet_identities = workbook_root.sheets.sheet.clone();
+    let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
+    let mut sheets = Vec::new();
+    for (index, sheet) in sheet_identities.iter().enumerate() {
+      let worksheet = worksheet_parts
+        .get(index)
+        .and_then(|part| part.root_element(document).ok());
+      sheets.push(import_sheet(index, sheet, worksheet, value_model));
+    }
+
+    Self {
+      sheets,
+      value_model,
+      ..Self::default()
+    }
   }
 
   pub fn build_print_plan(&self) -> XlsxPrintPlan<'doc> {
     build_print_plan(self)
+  }
+}
+
+fn import_sheet<'doc>(
+  index: usize,
+  sheet: &x::Sheet,
+  worksheet: Option<&x::Worksheet>,
+  value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
+) -> XlsxSheet<'doc> {
+  let Some(worksheet) = worksheet else {
+    return XlsxSheet {
+      workbook_index: index,
+      name: Cow::Owned(sheet.name.clone()),
+      state: sheet_state(sheet.state),
+      ..XlsxSheet::default()
+    };
+  };
+  XlsxSheet {
+    workbook_index: index,
+    name: Cow::Owned(sheet.name.clone()),
+    state: sheet_state(sheet.state),
+    page_setup: import_page_setup(worksheet),
+    metrics: import_sheet_metrics(worksheet),
+    rows: worksheet
+      .sheet_data
+      .row
+      .iter()
+      .enumerate()
+      .map(|(row_position, row)| {
+        import_row(
+          row_position,
+          row,
+          value_model,
+          ooxmlsdk_formula::SheetId(index as u32),
+        )
+      })
+      .collect(),
+    ..XlsxSheet::default()
+  }
+}
+
+fn sheet_state(value: Option<x::SheetStateValues>) -> SheetState {
+  match value.unwrap_or_default() {
+    x::SheetStateValues::Visible | x::SheetStateValues::Show => SheetState::Visible,
+    x::SheetStateValues::Hidden => SheetState::Hidden,
+    x::SheetStateValues::VeryHidden => SheetState::VeryHidden,
+  }
+}
+
+fn import_page_setup<'doc>(worksheet: &x::Worksheet) -> XlsxPageSetup<'doc> {
+  let mut setup = XlsxPageSetup::default();
+  if let Some(page_setup) = &worksheet.page_setup {
+    setup.paper_size = page_setup.paper_size;
+    setup.scale_percent = page_setup.scale.map(|value| value as u16);
+    setup.fit_to_width = page_setup.fit_to_width.map(|value| value as u16);
+    setup.fit_to_height = page_setup.fit_to_height.map(|value| value as u16);
+    setup.horizontal_dpi = page_setup.horizontal_dpi;
+    setup.vertical_dpi = page_setup.vertical_dpi;
+    setup.orientation = match page_setup.orientation.unwrap_or_default() {
+      x::OrientationValues::Landscape => PageOrientation::Landscape,
+      x::OrientationValues::Default | x::OrientationValues::Portrait => PageOrientation::Portrait,
+    };
+  }
+  if let Some(margins) = &worksheet.page_margins {
+    setup.margins = Insets {
+      top: Pt((margins.top * POINTS_PER_INCH) as f32),
+      right: Pt((margins.right * POINTS_PER_INCH) as f32),
+      bottom: Pt((margins.bottom * POINTS_PER_INCH) as f32),
+      left: Pt((margins.left * POINTS_PER_INCH) as f32),
+    };
+  }
+  if let Some(print_options) = &worksheet.print_options {
+    setup.print_options = PrintOptions {
+      grid_lines: print_options
+        .grid_lines
+        .is_some_and(|value| value.as_bool()),
+      headings: print_options.headings.is_some_and(|value| value.as_bool()),
+      horizontal_centered: print_options
+        .horizontal_centered
+        .is_some_and(|value| value.as_bool()),
+      vertical_centered: print_options
+        .vertical_centered
+        .is_some_and(|value| value.as_bool()),
+    };
+  }
+  if let Some(header_footer) = &worksheet.header_footer {
+    setup.header_footer = HeaderFooterText {
+      odd_header: header_footer
+        .odd_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+      odd_footer: header_footer
+        .odd_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+      even_header: header_footer
+        .even_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+      even_footer: header_footer
+        .even_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+      first_header: header_footer
+        .first_header
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+      first_footer: header_footer
+        .first_footer
+        .as_ref()
+        .and_then(|value| value.0.xml_content.clone())
+        .map(Cow::Owned),
+    };
+  }
+  setup
+}
+
+fn import_sheet_metrics<'doc>(worksheet: &x::Worksheet) -> SheetMetrics<'doc> {
+  let first_view = worksheet
+    .sheet_views
+    .as_deref()
+    .and_then(|views| views.sheet_view.first());
+  SheetMetrics {
+    dimension: worksheet
+      .sheet_dimension
+      .as_ref()
+      .map(|dimension| Cow::Owned(dimension.reference.clone())),
+    format: worksheet
+      .sheet_format_properties
+      .as_ref()
+      .map(import_sheet_format)
+      .unwrap_or_default(),
+    columns: worksheet
+      .columns
+      .iter()
+      .flat_map(|columns| columns.column.iter())
+      .map(import_column)
+      .collect(),
+    merged_ranges: worksheet
+      .merge_cells
+      .as_ref()
+      .into_iter()
+      .flat_map(|merges| merges.merge_cell.iter())
+      .filter_map(|merge| parse_layout_range(&merge.reference))
+      .collect(),
+    row_breaks: worksheet
+      .row_breaks
+      .as_ref()
+      .into_iter()
+      .flat_map(|breaks| breaks.r#break.iter())
+      .map(import_page_break)
+      .collect(),
+    column_breaks: worksheet
+      .column_breaks
+      .as_ref()
+      .into_iter()
+      .flat_map(|breaks| breaks.r#break.iter())
+      .map(import_page_break)
+      .collect(),
+    viewport: SheetViewport {
+      active_cell: first_view
+        .and_then(|view| view.selection.first())
+        .and_then(|selection| selection.active_cell.as_deref())
+        .and_then(parse_layout_address),
+      top_left_cell: first_view
+        .and_then(|view| view.top_left_cell.as_deref())
+        .and_then(parse_layout_address),
+      frozen_panes: first_view
+        .and_then(|view| view.pane.as_ref())
+        .and_then(|pane| {
+          Some(FrozenPane {
+            split_column: pane.horizontal_split? as u32,
+            split_row: pane.vertical_split? as u32,
+          })
+        }),
+    },
+    print_ranges: Vec::new(),
+    repeated_rows: Vec::new(),
+    repeated_columns: Vec::new(),
+    hyperlinks: Vec::new(),
+  }
+}
+
+fn import_sheet_format(format: &x::SheetFormatProperties) -> SheetFormat {
+  let mut default_row_height = if format.default_row_height > 0.0 {
+    format.default_row_height
+  } else {
+    DEFAULT_ROW_HEIGHT_PT
+  };
+  default_row_height -= default_row_height % 0.75;
+  SheetFormat {
+    base_column_width: format.base_column_width,
+    default_column_width: format.default_column_width,
+    default_row_height,
+    custom_height: format.custom_height.is_some_and(|value| value.as_bool()),
+    zero_height: format.zero_height.is_some_and(|value| value.as_bool()),
+  }
+}
+
+fn import_column(column: &x::Column) -> ColumnModel {
+  ColumnModel {
+    first: column.min.saturating_sub(1),
+    last: column.max.saturating_sub(1),
+    width: column.width,
+    style_index: column.style,
+    hidden: column.hidden.is_some_and(|value| value.as_bool()),
+    best_fit: column.best_fit.is_some_and(|value| value.as_bool()),
+    custom_width: column.custom_width.is_some_and(|value| value.as_bool()),
+    outline_level: column.outline_level.unwrap_or_default(),
+    collapsed: column.collapsed.is_some_and(|value| value.as_bool()),
+  }
+}
+
+fn import_page_break(value: &x::Break) -> PageBreak {
+  PageBreak {
+    id: value.id.unwrap_or_default(),
+    min: value.min.unwrap_or_default(),
+    max: value.max.unwrap_or_default(),
+    manual: value.manual_page_break.is_some_and(|value| value.as_bool()),
+    pivot: value
+      .pivot_table_page_break
+      .is_some_and(|value| value.as_bool()),
+  }
+}
+
+fn import_row<'doc>(
+  row_position: usize,
+  row: &x::Row,
+  value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
+  sheet_id: ooxmlsdk_formula::SheetId,
+) -> XlsxRow<'doc> {
+  let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+  let mut current_column = 0u32;
+  XlsxRow {
+    row_index: Some(row_index),
+    height: row.height,
+    custom_height: row.custom_height.is_some_and(|value| value.as_bool()),
+    style_index: row.style_index,
+    hidden: row.hidden.is_some_and(|value| value.as_bool()),
+    cells: row
+      .cell
+      .iter()
+      .map(|cell| {
+        let address = cell
+          .cell_reference
+          .as_deref()
+          .and_then(parse_layout_address)
+          .unwrap_or_else(|| {
+            let address = CellAddress {
+              column: current_column,
+              row: row_index.saturating_sub(1),
+            };
+            current_column = current_column.saturating_add(1);
+            address
+          });
+        current_column = address.column.saturating_add(1);
+        import_cell(cell, address, value_model, sheet_id)
+      })
+      .collect(),
+  }
+}
+
+fn import_cell<'doc>(
+  cell: &x::Cell,
+  address: CellAddress,
+  value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
+  sheet_id: ooxmlsdk_formula::SheetId,
+) -> XlsxCell<'doc> {
+  let formula_address = ooxmlsdk_formula::CellAddress {
+    column: address.column,
+    row: address.row,
+  };
+  let display = value_model
+    .and_then(|model| model.display_text(sheet_id, formula_address))
+    .map(|value| value.text)
+    .unwrap_or_else(|| {
+      Cow::Owned(
+        cell
+          .cell_value
+          .as_ref()
+          .and_then(|value| value.xml_content.clone())
+          .unwrap_or_default(),
+      )
+    });
+
+  XlsxCell {
+    reference: cell.cell_reference.clone().map(Cow::Owned),
+    address: Some(address),
+    style_index: cell.style_index,
+    data_type: cell.data_type.map(cell_data_type),
+    cached_value: cell
+      .cell_value
+      .as_ref()
+      .and_then(|value| value.xml_content.clone())
+      .map(Cow::Owned),
+    display_text: display,
+    formula_state: cell
+      .cell_formula
+      .as_ref()
+      .map(|_| XlsxFormulaState::CachedOnly),
+    ..XlsxCell::default()
+  }
+}
+
+fn cell_data_type(value: x::CellValues) -> CellDataType {
+  match value {
+    x::CellValues::Boolean => CellDataType::Boolean,
+    x::CellValues::Number => CellDataType::Number,
+    x::CellValues::Error => CellDataType::Error,
+    x::CellValues::SharedString => CellDataType::SharedString,
+    x::CellValues::String => CellDataType::String,
+    x::CellValues::InlineString => CellDataType::InlineString,
+    x::CellValues::Date => CellDataType::Date,
   }
 }
 
@@ -116,13 +473,25 @@ pub struct FrozenPane {
   pub split_row: u32,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SheetFormat {
   pub base_column_width: Option<u32>,
   pub default_column_width: Option<f64>,
   pub default_row_height: f64,
   pub custom_height: bool,
   pub zero_height: bool,
+}
+
+impl Default for SheetFormat {
+  fn default() -> Self {
+    Self {
+      base_column_width: None,
+      default_column_width: None,
+      default_row_height: DEFAULT_ROW_HEIGHT_PT,
+      custom_height: false,
+      zero_height: false,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -428,14 +797,15 @@ fn printed_sheet<'doc>(
   sheet: &XlsxSheet<'doc>,
 ) -> Option<XlsxPrintedSheet<'doc>> {
   let sheet_range = sheet_print_range(sheet)?;
+  let content_bounds = sheet_range_bounds(sheet, sheet_range);
   Some(XlsxPrintedSheet {
     sheet_index,
     sheet_name: sheet.name.clone(),
     pages: vec![XlsxPrintPage {
       page_index: 0,
       sheet_range,
-      paper_bounds: Rect::default(),
-      content_bounds: Rect::default(),
+      paper_bounds: paper_bounds(sheet),
+      content_bounds,
       cells: sheet_cell_fragments(sheet, sheet_range),
       drawings: sheet_drawing_fragments(sheet, sheet_range),
     }],
@@ -509,17 +879,24 @@ fn sheet_cell_fragments<'doc>(
       if !range_contains(sheet_range, address) {
         continue;
       }
+      let merged_range = sheet
+        .metrics
+        .merged_ranges
+        .iter()
+        .copied()
+        .find(|range| range_contains(*range, address));
       fragments.push(XlsxCellFragment {
         address,
-        bounds: Rect::default(),
+        bounds: sheet_range_bounds(
+          sheet,
+          merged_range.unwrap_or(CellRange {
+            start: address,
+            end: address,
+          }),
+        ),
         text: cell.display_text.clone(),
         style_index: cell.style_index,
-        merged_range: sheet
-          .metrics
-          .merged_ranges
-          .iter()
-          .copied()
-          .find(|range| range_contains(*range, address)),
+        merged_range,
       });
     }
   }
@@ -594,6 +971,98 @@ fn extend_range(range: &mut Option<CellRange>, address: CellAddress) {
 fn range_contains(range: CellRange, address: CellAddress) -> bool {
   (range.start.column..=range.end.column).contains(&address.column)
     && (range.start.row..=range.end.row).contains(&address.row)
+}
+
+fn parse_layout_address(value: &str) -> Option<CellAddress> {
+  ooxmlsdk_formula::QualifiedAddress::parse_a1(ooxmlsdk_formula::SheetId(0), value)
+    .ok()
+    .map(|address| CellAddress {
+      column: address.cell.column,
+      row: address.cell.row,
+    })
+}
+
+fn parse_layout_range(value: &str) -> Option<CellRange> {
+  let range =
+    ooxmlsdk_formula::QualifiedRange::parse_a1(ooxmlsdk_formula::SheetId(0), value).ok()?;
+  Some(CellRange {
+    start: CellAddress {
+      column: range.range.start.column,
+      row: range.range.start.row,
+    },
+    end: CellAddress {
+      column: range.range.end.column,
+      row: range.range.end.row,
+    },
+  })
+}
+
+fn paper_bounds(sheet: &XlsxSheet<'_>) -> Rect {
+  let (width, height) = match sheet.page_setup.orientation {
+    PageOrientation::Portrait => (A4_PORTRAIT_WIDTH_PT, A4_PORTRAIT_HEIGHT_PT),
+    PageOrientation::Landscape => (A4_PORTRAIT_HEIGHT_PT, A4_PORTRAIT_WIDTH_PT),
+  };
+  Rect {
+    origin: Point {
+      x: Pt(0.0),
+      y: Pt(0.0),
+    },
+    size: Size {
+      width: Pt(width),
+      height: Pt(height),
+    },
+  }
+}
+
+fn sheet_range_bounds(sheet: &XlsxSheet<'_>, range: CellRange) -> Rect {
+  let x = (0..range.start.column)
+    .map(|column| column_width_pt(sheet, column))
+    .sum::<f32>();
+  let y = (0..range.start.row)
+    .map(|row| row_height_pt(sheet, row))
+    .sum::<f32>();
+  let width = (range.start.column..=range.end.column)
+    .map(|column| column_width_pt(sheet, column))
+    .sum::<f32>();
+  let height = (range.start.row..=range.end.row)
+    .map(|row| row_height_pt(sheet, row))
+    .sum::<f32>();
+  Rect {
+    origin: Point { x: Pt(x), y: Pt(y) },
+    size: Size {
+      width: Pt(width),
+      height: Pt(height),
+    },
+  }
+}
+
+fn column_width_pt(sheet: &XlsxSheet<'_>, column: u32) -> f32 {
+  let width_twips = sheet
+    .metrics
+    .columns
+    .iter()
+    .find(|model| (model.first..=model.last).contains(&column))
+    .and_then(|model| model.width.or(sheet.metrics.format.default_column_width))
+    .map(excel_column_width_to_twips)
+    .unwrap_or(CALC_STANDARD_COLUMN_WIDTH_TWIPS);
+  Twips(width_twips).to_pt().0.max(0.0)
+}
+
+fn row_height_pt(sheet: &XlsxSheet<'_>, row: u32) -> f32 {
+  sheet
+    .rows
+    .iter()
+    .find(|model| model.row_index == Some(row + 1))
+    .and_then(|model| model.height)
+    .unwrap_or(sheet.metrics.format.default_row_height)
+    .max(0.0) as f32
+}
+
+fn excel_column_width_to_twips(width: f64) -> i32 {
+  // OOXML stores width in character units. LibreOffice's default geometry is
+  // twips-based; scale from the Calc standard width instead of using pixel
+  // guesses so print bounds stay in the same unit family as LO.
+  (width / 8.0 * CALC_STANDARD_COLUMN_WIDTH_TWIPS as f64).round() as i32
 }
 
 #[cfg(test)]

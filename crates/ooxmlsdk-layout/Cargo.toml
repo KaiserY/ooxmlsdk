@@ -12,12 +12,8 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
-[features]
-default = ["xlsx-formula"]
-xlsx-formula = ["dep:ooxmlsdk-formula"]
-
 [dependencies]
 ooxmlsdk = { workspace = true, features = ["parts"] }
 ooxmlsdk-fonts = { workspace = true }
-ooxmlsdk-formula = { workspace = true, optional = true }
+ooxmlsdk-formula = { workspace = true }
 thiserror = { workspace = true }

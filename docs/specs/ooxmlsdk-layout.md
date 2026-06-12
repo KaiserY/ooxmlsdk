@@ -190,9 +190,11 @@ ooxmlsdk-layout -> ooxmlsdk-formula
 
 `ooxmlsdk-layout` must not depend on `ooxmlsdk-pdf`.
 
-If the formula dependency becomes too heavy for DOCX/PPTX-only consumers, gate
-Calc formula integration behind a Cargo feature while keeping the intended XLSX
-pipeline value-aware.
+`ooxmlsdk-formula` is a direct dependency. The XLSX engine must use the shared
+formula/address/value model instead of defining a parallel A1 parser or cached
+value layer. DOCX and PPTX do not use formula behavior, but keeping the
+dependency direct avoids feature-dependent SpreadsheetML semantics during the
+current broad implementation phase.
 
 Do not express the module graph as a single strict chain. Formula and fonts are
 different support layers: formula prepares spreadsheet values, while fonts
@@ -461,6 +463,9 @@ The value provider should come from `ooxmlsdk-formula` for formula cells and
 from import/style code for constants and formatted display strings.
 
 XLSX layout must not parse or evaluate formulas.
+It may parse cell and range references only through `ooxmlsdk-formula` address
+types so sheet names, absolute flags, whole-row ranges, and whole-column ranges
+do not diverge from dependency graph semantics.
 
 XLSX import should still use generated SpreadsheetML types for worksheet
 structure, page settings, columns, rows, merges, hyperlinks, drawings, tables,
@@ -489,6 +494,22 @@ The XLSX engine owns:
 
 Formula values, number formatting, and stale-cache policy are inputs, not print
 layout algorithms.
+
+Calc geometry should stay in LibreOffice's twips-based unit family. Column and
+row sizes should be imported or derived as twips/points, not as ad hoc pixel or
+character-width guesses:
+
+- default column width follows LO `sc/inc/global.hxx` `STD_COL_WIDTH`
+  (`64pt`, `1280twips`) until style/font-derived column metrics are ported
+- explicit OOXML column character widths are converted into the Calc twips
+  model before page/fragment bounds are computed
+- default row height follows `sheetFormatPr@defaultRowHeight`; for MSO-style
+  imports LO rounds down to a `0.75pt` grid in
+  `sc/source/filter/oox/worksheetfragment.cxx`
+- if `sheetFormatPr` is absent, use the standard Excel/Calc `15pt` fallback
+  until style-font-derived `ScGlobal::nStdRowHeight` behavior is ported
+- paper bounds should prefer page style and paper size metadata; A4 is only a
+  Calc print fallback, matching LO's `ScPrintFunc` fallback path
 
 The engine should expose print output before lowering to the common display
 list:

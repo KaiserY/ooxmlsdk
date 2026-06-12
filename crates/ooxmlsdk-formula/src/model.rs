@@ -69,7 +69,6 @@ impl<'doc> WorkbookValueModel<'doc> {
       dependency_graph,
       identity,
       sheets,
-      ..Self::default()
     })
   }
 }
@@ -724,9 +723,7 @@ fn cell_value_record<'doc>(
       parsed_formula: Some(parsed_formula),
       cached_value: Some(raw_value.clone()).filter(|value| !matches!(value, FormulaValue::Blank)),
       evaluated_value: None,
-      formula_state: if volatile {
-        FormulaState::Stale
-      } else if dirty {
+      formula_state: if volatile || dirty {
         FormulaState::Stale
       } else {
         FormulaState::CachedOnly
@@ -1775,11 +1772,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScIfError().
       "IFERROR" | "IFNA" => {
         let value = self.evaluate(args.first()?)?;
-        let use_fallback = match (&value, upper.as_str()) {
-          (FormulaValue::Error(FormulaErrorValue::NA), "IFNA") => true,
-          (FormulaValue::Error(_), "IFERROR") => true,
-          _ => false,
-        };
+        let use_fallback = matches!(
+          (&value, upper.as_str()),
+          (FormulaValue::Error(FormulaErrorValue::NA), "IFNA")
+            | (FormulaValue::Error(_), "IFERROR")
+        );
         if use_fallback {
           self.evaluate(args.get(1)?)
         } else {
@@ -2270,7 +2267,7 @@ fn reference_style(value: x::ReferenceModeValues) -> ReferenceStyle {
   }
 }
 
-fn calc_chain<'doc>(
+fn calc_chain(
   document: &mut SpreadsheetDocument,
   workbook_part: &WorkbookPart,
 ) -> Result<Vec<CalcChainEntry>> {

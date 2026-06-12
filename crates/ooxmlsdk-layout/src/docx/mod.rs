@@ -610,6 +610,8 @@ impl<'doc> TextStyle<'doc> {
     LayoutFontRequest {
       base: self.font.clone(),
       families: (*self.font_families).clone(),
+      small_caps: self.small_caps,
+      character_spacing: self.character_spacing,
     }
   }
 }

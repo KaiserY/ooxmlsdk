@@ -6,11 +6,15 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use fontdb::{Database as FontDatabase, Source as FontDbSource};
+use icu_segmenter::GraphemeClusterSegmenter;
 use rustybuzz::{
   Direction as BuzzDirection, Face as BuzzFace, Feature as BuzzFeature, Language as BuzzLanguage,
   Script as BuzzScript, UnicodeBuffer, script,
 };
-use ttf_parser::{Face as TtfFace, Tag};
+use ttf_parser::{Face as TtfFace, GlyphId, Rect as TtfRect, Tag};
+use unicode_bidi::{Direction as BidiDirection, get_base_direction};
+use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 
 use crate::{FontError, Result};
 
@@ -29,6 +33,24 @@ impl<'a> FontRegistry<'a> {
     Self::default()
   }
 
+  pub fn with_default_policy() -> Self {
+    let mut registry = Self::new();
+    registry.add_default_office_policy();
+    registry
+  }
+
+  pub fn add_default_office_policy(&mut self) {
+    for (from, to) in DEFAULT_OFFICE_ALIASES {
+      self.book.family_aliases.push(FontFamilyAlias {
+        from: Cow::Borrowed(from),
+        to: Cow::Borrowed(to),
+      });
+    }
+    for chain in default_fallback_chains() {
+      self.book.fallback_chains.push(chain);
+    }
+  }
+
   pub fn register_face(&mut self, source: FontSource<'a>, face: FontFaceInfo<'a>) {
     self.sources.push(source.clone());
     self.faces.push(RegisteredFontFace {
@@ -44,6 +66,35 @@ impl<'a> FontRegistry<'a> {
       origin_priority: 0,
     });
     self.book.faces.push(face);
+  }
+
+  pub fn register_system_fonts(&mut self) -> Result<usize> {
+    let mut database = FontDatabase::new();
+    database.load_system_fonts();
+    let mut registered = 0usize;
+    for info in database.faces() {
+      let Some((data, face_index)) =
+        database.with_face_data(info.id, |data, face_index| (data.to_vec(), face_index))
+      else {
+        continue;
+      };
+      let id = format!("system:{}:{}", info.post_script_name, face_index);
+      let face = FontFaceInfo::from_fontdb_face_info(&id, info);
+      let source = match &info.source {
+        FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
+          id: Cow::Owned(id),
+          path: path.clone(),
+          data: Some(Cow::Owned(data)),
+        },
+        FontDbSource::Binary(_) => FontSource::Memory {
+          id: Cow::Owned(id),
+          data: Cow::Owned(data),
+        },
+      };
+      self.register_face(source, face);
+      registered += 1;
+    }
+    Ok(registered)
   }
 
   pub fn register_memory_font(
@@ -100,6 +151,32 @@ impl<'a> FontRegistry<'a> {
     Ok(font_id)
   }
 
+  pub fn register_office_fallback_path_fonts(&mut self, request: &FontRequest<'a>) -> usize {
+    let mut paths: Vec<&'static str> = Vec::new();
+    if let Some(family) = request.family.as_deref() {
+      paths.extend(office_fallback_font_paths(
+        family,
+        request.bold,
+        request.italic,
+      ));
+      paths.extend(generic_fallback_font_paths(request.bold, request.italic));
+    } else {
+      paths.extend(generic_fallback_font_paths(request.bold, request.italic));
+    }
+    let mut registered = 0usize;
+    for path in paths {
+      let path = Path::new(path);
+      if !path.exists() {
+        continue;
+      }
+      let id = format!("fallback-path:{}", path.display());
+      if self.register_path_font(id, path).is_ok() {
+        registered += 1;
+      }
+    }
+    registered
+  }
+
   fn register_ttf_source(&mut self, source: FontSource<'a>) -> Result<FontId> {
     let Some(id) = source.id() else {
       return Err(FontError::InvalidFace);
@@ -114,7 +191,27 @@ impl<'a> FontRegistry<'a> {
   }
 
   pub fn resolve(&self, request: &FontRequest<'a>) -> Result<ResolvedFont<'a>> {
-    self.book.resolve(request, &self.faces)
+    match self.book.resolve(request, &self.faces) {
+      Ok(resolved) => Ok(resolved),
+      Err(FontError::NoMatch) => {
+        for family in self.fallback_families(request) {
+          let mut fallback_request = request.clone();
+          fallback_request.family = Some(family);
+          if let Ok(mut resolved) = self.book.resolve(&fallback_request, &self.faces) {
+            if let Some(requested_family) = request.family.clone() {
+              resolved.substitution = Some(FontSubstitution {
+                requested_family,
+                substituted_family: resolved.resolved_family.clone(),
+                reason: FontSubstitutionReason::Alias,
+              });
+            }
+            return Ok(resolved);
+          }
+        }
+        Err(FontError::NoMatch)
+      }
+      Err(error) => Err(error),
+    }
   }
 
   pub fn face(&self, font_id: &FontId) -> Option<&FontFaceInfo<'a>> {
@@ -215,26 +312,78 @@ impl<'a> FontRegistry<'a> {
     text: impl Into<Cow<'a, str>>,
     direction: TextDirection,
   ) -> Result<Vec<ShapedRun<'a>>> {
+    self.shape_text_runs_with_options(
+      request,
+      text,
+      &ShapeOptions::from_request(request, direction),
+    )
+  }
+
+  pub fn shape_text_runs_with_options(
+    &self,
+    request: &FontRequest<'a>,
+    text: impl Into<Cow<'a, str>>,
+    options: &ShapeOptions<'a>,
+  ) -> Result<Vec<ShapedRun<'a>>> {
     let text = text.into();
+    if options.small_caps {
+      let mut runs = Vec::new();
+      for script_run in script_direction_runs(text.as_ref().to_owned(), options.size_pt, true) {
+        let mut segment_request = request.clone();
+        segment_request.size_pt = script_run.size_pt;
+        segment_request.script = Some(script_run.script);
+        let mut segment_options = options.clone();
+        segment_options.size_pt = script_run.size_pt;
+        segment_options.script = Some(script_run.script);
+        segment_options.direction = script_run.direction;
+        segment_options.small_caps = false;
+        let mut segment_runs =
+          self.shape_text_runs_inner(&segment_request, script_run.text, &segment_options)?;
+        for run in &mut segment_runs {
+          run.offset_text_range(script_run.text_range.start);
+        }
+        runs.extend(segment_runs);
+      }
+      return Ok(runs);
+    }
+    self.shape_text_runs_inner(request, text, options)
+  }
+
+  fn shape_text_runs_inner(
+    &self,
+    request: &FontRequest<'a>,
+    text: Cow<'a, str>,
+    options: &ShapeOptions<'a>,
+  ) -> Result<Vec<ShapedRun<'a>>> {
     let fonts = self.resolve_fallback_fonts(request, text.as_ref())?;
+    let parsed_faces = fonts
+      .iter()
+      .map(|font| {
+        self
+          .source_data_for_font_id(&font.resolved.font_id)
+          .and_then(|(data, face_index)| TtfFace::parse(data, face_index).ok())
+      })
+      .collect::<Vec<_>>();
 
     let mut runs = Vec::new();
     let mut start = 0usize;
     let mut active = None::<usize>;
-    for (index, ch) in text.char_indices() {
+    for cluster in grapheme_clusters(text.as_ref()) {
       let font_index = fonts
         .iter()
-        .position(|font| font.face.coverage.contains_char(ch))
+        .enumerate()
+        .position(|(index, font)| {
+          font_supports_text_cluster(font, parsed_faces[index].as_ref(), &text[cluster.clone()])
+        })
         .unwrap_or(0);
       if active.is_some_and(|active| active != font_index) {
         runs.push(self.shape_resolved_segment(
           &fonts[active.unwrap_or(0)],
           text.as_ref(),
-          start..index,
-          direction,
-          request,
+          start..cluster.start,
+          options,
         )?);
-        start = index;
+        start = cluster.start;
       }
       active = Some(font_index);
     }
@@ -243,8 +392,7 @@ impl<'a> FontRegistry<'a> {
         &fonts[active.unwrap_or(0)],
         text.as_ref(),
         start..text.len(),
-        direction,
-        request,
+        options,
       )?);
     }
     Ok(runs)
@@ -301,7 +449,9 @@ impl<'a> FontRegistry<'a> {
       if fonts
         .iter()
         .any(|font| font.resolved.font_id == face.font_id)
-        || !text.chars().any(|ch| face.coverage.contains_char(ch))
+        || !text
+          .chars()
+          .any(|ch| self.face_info_supports_char(face, ch))
       {
         continue;
       }
@@ -319,6 +469,14 @@ impl<'a> FontRegistry<'a> {
   fn fallback_families(&self, request: &FontRequest<'a>) -> Vec<Cow<'a, str>> {
     let mut families: Vec<Cow<'a, str>> = Vec::new();
     for chain in &self.book.fallback_chains {
+      if chain.requested_family.as_deref().is_some_and(|family| {
+        request
+          .family
+          .as_deref()
+          .is_none_or(|requested| normalize_family(requested) != normalize_family(family))
+      }) {
+        continue;
+      }
       if chain
         .script
         .is_some_and(|script| request.script.is_some_and(|requested| requested != script))
@@ -350,8 +508,7 @@ impl<'a> FontRegistry<'a> {
     font: &ResolvedFontWithFace<'a>,
     text: &str,
     range: Range<usize>,
-    direction: TextDirection,
-    request: &FontRequest<'a>,
+    options: &ShapeOptions<'a>,
   ) -> Result<ShapedRun<'a>> {
     let mut run = match &font.resolved.source {
       FontSource::Memory { data, .. }
@@ -362,14 +519,14 @@ impl<'a> FontRegistry<'a> {
       } => font.resolved.shape_with_ttf_bytes(
         Cow::Owned(text[range.clone()].to_owned()),
         data.as_ref(),
-        &ShapeOptions::from_request(request, direction),
+        options,
       )?,
       FontSource::System | FontSource::Path { data: None, .. } => font.resolved.shape_approximate(
         Cow::Owned(text[range.clone()].to_owned()),
-        request.size_pt,
-        direction,
-        request.script,
-        request.language.clone(),
+        options.size_pt,
+        options.direction,
+        options.script,
+        options.language.clone(),
       ),
     };
     run.offset_text_range(range.start);
@@ -383,6 +540,25 @@ impl<'a> FontRegistry<'a> {
       });
     }
     Ok(run)
+  }
+
+  fn face_info_supports_char(&self, face: &FontFaceInfo<'a>, ch: char) -> bool {
+    if face.coverage.contains_char(ch) {
+      return true;
+    }
+    self
+      .source_data_for_font_id(&face.font_id)
+      .and_then(|(data, face_index)| TtfFace::parse(data, face_index).ok())
+      .and_then(|parsed| parsed.glyph_index(ch))
+      .is_some()
+  }
+
+  fn source_data_for_font_id(&self, font_id: &FontId) -> Option<(&[u8], u32)> {
+    let registered = self
+      .faces
+      .iter()
+      .find(|registered| registered.font_id().as_ref() == Some(font_id))?;
+    Some((registered.source.data()?, registered.face_index))
   }
 
   fn resolved_from_face(
@@ -476,10 +652,23 @@ impl<'a> FontBook<'a> {
       let requested_weight = requested_weight(request);
       let requested_slant = requested_slant(request);
       let requested_stretch = request.stretch.unwrap_or(FontStretch::Normal);
+      let registered = registered_faces.iter().find(|registered| {
+        registered.face_index == face.face_index && family_overlaps(registered, face)
+      });
+      let charset_mismatch = request
+        .charset
+        .is_some_and(|charset| !font_charset_matches(charset, face, registered));
       let slant_mismatch = face.slant != requested_slant;
       let stretch_distance = stretch_distance(face.stretch, requested_stretch);
       let weight_distance = weight_distance(face.weight, requested_weight);
       let pitch_mismatch = request.pitch.is_some_and(|pitch| pitch != face.pitch);
+      if charset_mismatch && !rejected && reason == Some(FontMatchReason::Family) {
+        reason = Some(FontMatchReason::Charset);
+      }
+      if target_family.is_none() && charset_mismatch {
+        rejected = true;
+        reason = Some(FontMatchReason::Charset);
+      }
       if slant_mismatch && !rejected {
         reason = Some(FontMatchReason::Slant);
       }
@@ -492,6 +681,7 @@ impl<'a> FontBook<'a> {
 
       let rank = FontMatchRank {
         rejected,
+        charset_mismatch,
         slant_mismatch,
         stretch_distance,
         weight_distance,
@@ -592,6 +782,9 @@ pub struct FontFaceInfo<'a> {
   pub axes: Vec<VariationAxis<'a>>,
   pub features: Vec<OpenTypeFeature<'a>>,
   pub metrics: FontMetrics,
+  pub embedding: FontEmbeddingPolicy,
+  pub embedding_plan: FontEmbeddingPlan<'a>,
+  pub bounds: FontBounds,
   pub face_index: u32,
 }
 
@@ -611,6 +804,9 @@ impl<'a> FontFaceInfo<'a> {
       axes: Vec::new(),
       features: Vec::new(),
       metrics: FontMetrics::default(),
+      embedding: FontEmbeddingPolicy::default(),
+      embedding_plan: FontEmbeddingPlan::default(),
+      bounds: FontBounds::default(),
       face_index: 0,
     }
   }
@@ -643,6 +839,13 @@ impl<'a> FontFaceInfo<'a> {
     };
     let flags = FontFlags {
       monospace: face.is_monospaced(),
+      color_glyphs: face.tables().colr.is_some() || face.tables().sbix.is_some(),
+      vertical: face.tables().vhea.is_some() || face.tables().vmtx.is_some(),
+      graphite: has_table(&face, b"Silf") || has_table(&face, b"Feat") || has_table(&face, b"Sill"),
+      aat: face.tables().feat.is_some() || face.tables().morx.is_some(),
+      cff2: face.tables().cff2.is_some(),
+      variable: !face.variation_axes().is_empty(),
+      kashida_positions: face.tables().morx.is_none(),
       ..FontFlags::default()
     };
     let metrics = font_metrics_from_ttf(&face, 1.0);
@@ -658,11 +861,44 @@ impl<'a> FontFaceInfo<'a> {
       pitch,
       coverage: font_coverage_from_ttf(&face),
       flags,
-      axes: Vec::new(),
-      features: Vec::new(),
+      axes: variation_axes_from_ttf(&face),
+      features: opentype_features_from_ttf(&face),
       metrics,
+      embedding: font_embedding_policy_from_ttf(&face),
+      embedding_plan: font_embedding_plan_from_ttf(&face),
+      bounds: font_bounds_from_ttf(&face),
       face_index,
     })
+  }
+
+  fn from_fontdb_face_info(id: &str, info: &fontdb::FaceInfo) -> Self {
+    let mut face = Self::synthetic(id.to_string(), id.to_string());
+    face.family_names = info
+      .families
+      .iter()
+      .map(|(family, _)| Cow::Owned(family.clone()))
+      .collect();
+    if face.family_names.is_empty() {
+      face.family_names.push(Cow::Owned(id.to_string()));
+    }
+    face.postscript_name =
+      (!info.post_script_name.is_empty()).then(|| Cow::Owned(info.post_script_name.clone()));
+    face.style_name = Some(Cow::Owned(format!("{:?}", info.style)));
+    face.weight = font_weight_from_ttf(info.weight.0);
+    face.slant = match info.style {
+      fontdb::Style::Italic => FontSlant::Italic,
+      fontdb::Style::Oblique => FontSlant::Oblique,
+      fontdb::Style::Normal => FontSlant::Upright,
+    };
+    face.stretch = font_stretch_from_fontdb(info.stretch);
+    face.pitch = if info.monospaced {
+      FontPitch::Fixed
+    } else {
+      FontPitch::Variable
+    };
+    face.flags.monospace = info.monospaced;
+    face.face_index = info.index;
+    face
   }
 }
 
@@ -703,6 +939,11 @@ pub struct FontFlags {
   pub monospace: bool,
   pub color_glyphs: bool,
   pub vertical: bool,
+  pub graphite: bool,
+  pub aat: bool,
+  pub cff2: bool,
+  pub variable: bool,
+  pub kashida_positions: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -720,6 +961,7 @@ pub struct FontSubstitutionRule<'a> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FontFallbackChain<'a> {
+  pub requested_family: Option<Cow<'a, str>>,
   pub script: Option<TextScript>,
   pub language: Option<Cow<'a, str>>,
   pub families: Vec<Cow<'a, str>>,
@@ -890,12 +1132,87 @@ pub struct FontFaceData<'a> {
   pub data: Option<Cow<'a, [u8]>>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FontBounds {
+  pub global: Option<GlyphBounds>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GlyphBounds {
+  pub x_min_pt: f32,
+  pub y_min_pt: f32,
+  pub x_max_pt: f32,
+  pub y_max_pt: f32,
+}
+
+impl GlyphBounds {
+  pub fn scaled(self, size_pt: f32) -> Self {
+    Self {
+      x_min_pt: self.x_min_pt * size_pt,
+      y_min_pt: self.y_min_pt * size_pt,
+      x_max_pt: self.x_max_pt * size_pt,
+      y_max_pt: self.y_max_pt * size_pt,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FontEmbeddingPolicy {
+  pub subset_policy: FontSubsetPolicy,
+  pub installable: bool,
+  pub restricted: bool,
+}
+
+impl Default for FontEmbeddingPolicy {
+  fn default() -> Self {
+    Self {
+      subset_policy: FontSubsetPolicy::Subset,
+      installable: true,
+      restricted: false,
+    }
+  }
+}
+
+impl FontEmbeddingPolicy {
+  pub fn viewing_allowed(self) -> bool {
+    !self.restricted
+  }
+
+  pub fn editing_allowed(self) -> bool {
+    self.installable || self.subset_policy == FontSubsetPolicy::EmbedFull
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FontEmbeddingPlan<'a> {
+  pub keep_tables: Vec<Cow<'a, str>>,
+  pub downgrade_cff2: bool,
+  pub desubroutinize_cff: bool,
+  pub pin_variation_axes: bool,
+}
+
+impl<'a> Default for FontEmbeddingPlan<'a> {
+  fn default() -> Self {
+    Self {
+      keep_tables: DEFAULT_PDF_EMBED_TABLES
+        .iter()
+        .map(|table| Cow::Borrowed(*table))
+        .collect(),
+      downgrade_cff2: false,
+      desubroutinize_cff: false,
+      pin_variation_axes: false,
+    }
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ShapeOptions<'a> {
   pub size_pt: FontSize,
   pub direction: TextDirection,
   pub script: Option<TextScript>,
   pub language: Option<Cow<'a, str>>,
+  pub character_spacing_pt: f32,
+  pub small_caps: bool,
   pub features: Vec<FeatureValue<'a>>,
   pub variations: Vec<VariationValue<'a>>,
 }
@@ -907,6 +1224,8 @@ impl<'a> ShapeOptions<'a> {
       direction,
       script: request.script,
       language: request.language.clone(),
+      character_spacing_pt: 0.0,
+      small_caps: false,
       features: request.features.clone(),
       variations: request.variations.clone(),
     }
@@ -953,10 +1272,22 @@ impl<'a> ResolvedFont<'a> {
     options: &ShapeOptions<'a>,
   ) -> Result<ShapedRun<'a>> {
     let text = text.into();
+    let shaped_text = if options.small_caps {
+      Cow::Owned(text.to_uppercase())
+    } else {
+      Cow::Borrowed(text.as_ref())
+    };
+    let shape_size = if options.small_caps && text.chars().any(char::is_lowercase) {
+      FontSize(options.size_pt.0 * 0.8)
+    } else {
+      options.size_pt
+    };
     let face = BuzzFace::from_slice(data, self.face_index).ok_or(FontError::InvalidFace)?;
+    let ttf_face = TtfFace::parse(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
     let units_per_em = face.units_per_em() as f32;
     let mut buffer = UnicodeBuffer::new();
-    buffer.push_str(text.as_ref());
+    buffer.push_str(shaped_text.as_ref());
+    buffer.guess_segment_properties();
     if let Some(direction) = buzz_direction(options.direction) {
       buffer.set_direction(direction);
     }
@@ -975,34 +1306,35 @@ impl<'a> ResolvedFont<'a> {
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
     let safe_breaks = text_safe_breaks(text.as_ref());
+    let tracking = options.character_spacing_pt;
     let glyphs = infos
       .iter()
       .zip(positions.iter())
       .enumerate()
       .map(|(index, (info, position))| {
-        let start = info.cluster as usize;
-        let end = infos
-          .get(index + 1)
-          .map(|next| next.cluster as usize)
-          .filter(|next| *next > start)
-          .unwrap_or_else(|| next_char_boundary(text.as_ref(), start));
+        let text_range = glyph_text_range(shaped_text.as_ref(), infos, index);
+        let source_char = shaped_text
+          .get(text_range.clone())
+          .and_then(|cluster| cluster.chars().next());
+        let mut x_advance_pt = position.x_advance as f32 / units_per_em * shape_size.0;
+        if tracking.abs() > f32::EPSILON && index + 1 < infos.len() {
+          x_advance_pt += tracking;
+        }
         ShapedGlyph {
           glyph_id: info.glyph_id,
           cluster: info.cluster,
-          text_range: start..end,
-          x_advance_pt: position.x_advance as f32 / units_per_em * options.size_pt.0,
-          y_advance_pt: position.y_advance as f32 / units_per_em * options.size_pt.0,
-          x_offset_pt: position.x_offset as f32 / units_per_em * options.size_pt.0,
-          y_offset_pt: position.y_offset as f32 / units_per_em * options.size_pt.0,
-          safe_to_break: text
-            .get(start..end)
-            .is_some_and(|cluster| cluster.chars().all(char::is_whitespace)),
-          source_char: text
-            .get(start..end)
-            .and_then(|cluster| cluster.chars().next()),
-          justifiable: text
-            .get(start..end)
-            .is_some_and(|cluster| cluster.chars().any(char::is_whitespace)),
+          text_range,
+          x_advance_pt,
+          y_advance_pt: position.y_advance as f32 / units_per_em * shape_size.0,
+          x_offset_pt: position.x_offset as f32 / units_per_em * shape_size.0,
+          y_offset_pt: position.y_offset as f32 / units_per_em * shape_size.0,
+          safe_to_break: !info.unsafe_to_break(),
+          source_char,
+          justifiable: source_char.is_some_and(is_justifiable_char),
+          justification: source_char.map(glyph_justification).unwrap_or_default(),
+          bounds: ttf_face
+            .glyph_bounding_box(GlyphId(info.glyph_id as u16))
+            .map(|bounds| glyph_bounds_from_ttf_rect(bounds, units_per_em).scaled(shape_size.0)),
         }
       })
       .collect::<Vec<_>>();
@@ -1027,6 +1359,178 @@ impl<'a> ResolvedFont<'a> {
       diagnostics,
     })
   }
+
+  pub fn glyph_bounds(
+    &self,
+    data: &[u8],
+    glyph_id: u32,
+    size: FontSize,
+  ) -> Result<Option<GlyphBounds>> {
+    let face = TtfFace::parse(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
+    let units_per_em = f32::from(face.units_per_em());
+    Ok(
+      face
+        .glyph_bounding_box(GlyphId(glyph_id as u16))
+        .map(|bounds| glyph_bounds_from_ttf_rect(bounds, units_per_em).scaled(size.0)),
+    )
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FontScriptRun<'a> {
+  pub text: Cow<'a, str>,
+  pub text_range: Range<usize>,
+  pub script: TextScript,
+  pub direction: TextDirection,
+  pub size_pt: FontSize,
+}
+
+pub fn script_direction_runs<'a>(
+  text: impl Into<Cow<'a, str>>,
+  size_pt: FontSize,
+  small_caps: bool,
+) -> Vec<FontScriptRun<'a>> {
+  let text = text.into();
+  if small_caps {
+    return small_caps_script_direction_runs(text.as_ref(), size_pt);
+  }
+  script_direction_runs_for_segment(text.as_ref(), 0, size_pt, false)
+}
+
+fn small_caps_script_direction_runs<'a>(text: &str, size_pt: FontSize) -> Vec<FontScriptRun<'a>> {
+  let mut runs = Vec::new();
+  let mut start = 0usize;
+  let mut active_upper = None::<bool>;
+  for (index, ch) in text.char_indices() {
+    let is_upper = ch.is_uppercase() && !ch.is_lowercase();
+    if let Some(active) = active_upper
+      && active != is_upper
+    {
+      push_small_caps_case_run(text, start..index, active, size_pt, &mut runs);
+      start = index;
+    }
+    active_upper = Some(is_upper);
+  }
+  if start < text.len() {
+    push_small_caps_case_run(
+      text,
+      start..text.len(),
+      active_upper.unwrap_or(false),
+      size_pt,
+      &mut runs,
+    );
+  }
+  runs
+}
+
+fn push_small_caps_case_run<'a>(
+  source: &str,
+  range: Range<usize>,
+  upper_run: bool,
+  size_pt: FontSize,
+  runs: &mut Vec<FontScriptRun<'a>>,
+) {
+  let value = &source[range.clone()];
+  let mapped = if upper_run {
+    value.to_string()
+  } else {
+    value.to_uppercase()
+  };
+  let segment_size = if upper_run {
+    size_pt
+  } else {
+    FontSize(size_pt.0 * 0.8)
+  };
+  if mapped.len() != value.len() {
+    let script = value
+      .chars()
+      .next()
+      .map(|ch| text_script_from_unicode(ch.script(), TextScript::Other))
+      .unwrap_or(TextScript::Other);
+    runs.push(FontScriptRun {
+      text: Cow::Owned(mapped),
+      text_range: range,
+      script,
+      direction: text_direction_from_bidi(get_base_direction(value)),
+      size_pt: segment_size,
+    });
+    return;
+  }
+  runs.extend(script_direction_runs_for_segment(
+    &mapped,
+    range.start,
+    segment_size,
+    false,
+  ));
+}
+
+fn script_direction_runs_for_segment<'a>(
+  text: &str,
+  range_offset: usize,
+  size_pt: FontSize,
+  small_caps: bool,
+) -> Vec<FontScriptRun<'a>> {
+  let mut runs = Vec::new();
+  let mut start = 0usize;
+  let mut active = None::<TextScript>;
+  for (index, ch) in text.char_indices() {
+    let script = text_script_from_unicode(ch.script(), active.unwrap_or(TextScript::Other));
+    if let Some(active_script) = active
+      && script != active_script
+    {
+      push_script_direction_run(
+        text,
+        start..index,
+        active_script,
+        range_offset,
+        size_pt,
+        small_caps,
+        &mut runs,
+      );
+      start = index;
+    }
+    active = Some(script);
+  }
+  if start < text.len() {
+    push_script_direction_run(
+      text,
+      start..text.len(),
+      active.unwrap_or(TextScript::Other),
+      range_offset,
+      size_pt,
+      small_caps,
+      &mut runs,
+    );
+  }
+  runs
+}
+
+fn push_script_direction_run<'a>(
+  source: &str,
+  range: Range<usize>,
+  script: TextScript,
+  range_offset: usize,
+  size_pt: FontSize,
+  small_caps: bool,
+  runs: &mut Vec<FontScriptRun<'a>>,
+) {
+  let value = &source[range.clone()];
+  let has_lowercase = value.chars().any(char::is_lowercase);
+  runs.push(FontScriptRun {
+    text: if small_caps && has_lowercase {
+      Cow::Owned(value.to_uppercase())
+    } else {
+      Cow::Owned(value.to_string())
+    },
+    text_range: (range.start + range_offset)..(range.end + range_offset),
+    script,
+    direction: text_direction_from_bidi(get_base_direction(value)),
+    size_pt: if small_caps && has_lowercase {
+      FontSize(size_pt.0 * 0.8)
+    } else {
+      size_pt
+    },
+  });
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -1047,6 +1551,7 @@ pub struct FontMatchCandidate<'a> {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct FontMatchRank {
   rejected: bool,
+  charset_mismatch: bool,
   slant_mismatch: bool,
   stretch_distance: i32,
   weight_distance: i32,
@@ -1056,6 +1561,7 @@ struct FontMatchRank {
 impl FontMatchRank {
   fn distance(self) -> i32 {
     i32::from(self.rejected)
+      + i32::from(self.charset_mismatch)
       + i32::from(self.slant_mismatch)
       + i32::from(self.stretch_distance != 0)
       + i32::from(self.weight_distance != 0)
@@ -1067,6 +1573,7 @@ impl FontMatchRank {
 pub enum FontMatchReason {
   Family,
   StyleName,
+  Charset,
   Pitch,
   Weight,
   Slant,
@@ -1085,6 +1592,14 @@ pub struct VariationValue<'a> {
 pub struct FeatureValue<'a> {
   pub tag: Cow<'a, str>,
   pub value: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FeatureSetting<'a> {
+  pub tag: Cow<'a, str>,
+  pub value: u32,
+  pub start: u32,
+  pub end: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1278,6 +1793,16 @@ pub struct ShapedGlyph {
   pub safe_to_break: bool,
   pub source_char: Option<char>,
   pub justifiable: bool,
+  pub justification: GlyphJustification,
+  pub bounds: Option<GlyphBounds>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GlyphJustification {
+  pub space: bool,
+  pub cjk: bool,
+  pub cjk_punctuation: bool,
+  pub kashida: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1306,6 +1831,10 @@ pub struct FontUsageCollector {
 
 impl FontUsageCollector {
   pub fn record_run(&mut self, run: &ShapedRun<'_>) {
+    self.record_run_with_policy(run, FontEmbeddingPolicy::default());
+  }
+
+  pub fn record_run_with_policy(&mut self, run: &ShapedRun<'_>, policy: FontEmbeddingPolicy) {
     let usage = match self
       .usages
       .iter_mut()
@@ -1315,13 +1844,20 @@ impl FontUsageCollector {
       None => {
         self.usages.push(FontUsage {
           font_id: run.font_id.clone(),
-          needs_embedding: !run.approximate,
+          needs_embedding: !run.approximate && policy.subset_policy != FontSubsetPolicy::DoNotEmbed,
+          subset_policy: policy.subset_policy,
           ..FontUsage::default()
         });
         self.usages.last_mut().expect("usage was just pushed")
       }
     };
-    usage.needs_embedding |= !run.approximate;
+    usage.needs_embedding |=
+      !run.approximate && policy.subset_policy != FontSubsetPolicy::DoNotEmbed;
+    if policy.subset_policy == FontSubsetPolicy::DoNotEmbed {
+      usage.subset_policy = FontSubsetPolicy::DoNotEmbed;
+    } else if policy.subset_policy == FontSubsetPolicy::EmbedFull {
+      usage.subset_policy = FontSubsetPolicy::EmbedFull;
+    }
     for glyph in run.glyphs.iter() {
       usage.glyph_ids.insert(glyph.glyph_id);
       if let Some(ch) = glyph.source_char {
@@ -1333,6 +1869,16 @@ impl FontUsageCollector {
   pub fn record_runs<'a>(&mut self, runs: impl IntoIterator<Item = &'a ShapedRun<'a>>) {
     for run in runs {
       self.record_run(run);
+    }
+  }
+
+  pub fn record_runs_with_policy<'a>(
+    &mut self,
+    runs: impl IntoIterator<Item = &'a ShapedRun<'a>>,
+    policy: FontEmbeddingPolicy,
+  ) {
+    for run in runs {
+      self.record_run_with_policy(run, policy);
     }
   }
 }
@@ -1451,6 +1997,255 @@ pub enum TextScript {
   Other,
 }
 
+const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
+  ("Courier", "Courier New"),
+  ("TimesNewRomanPSMT", "Times New Roman"),
+  ("DINPro-Medium", "DINPro"),
+  ("Univers 45 Light", "Univers Light"),
+];
+
+const DEFAULT_PDF_EMBED_TABLES: &[&str] = &[
+  "head", "hhea", "hmtx", "loca", "maxp", "glyf", "CFF ", "post", "name", "OS/2", "cvt ", "fpgm",
+  "prep", "CFF2",
+];
+
+fn default_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
+  vec![
+    office_family_fallback("Calibri", &["Carlito", "Liberation Sans"]),
+    office_family_fallback("Calibri Light", &["Carlito", "Liberation Sans"]),
+    office_family_fallback("Cambria", &["Caladea", "Liberation Serif"]),
+    office_family_fallback("Times New Roman", &["Liberation Serif", "Nimbus Roman"]),
+    office_family_fallback(
+      "TimesNewRomanPSMT",
+      &["Times New Roman", "Liberation Serif", "Nimbus Roman"],
+    ),
+    office_family_fallback(
+      "Courier",
+      &["Courier New", "Liberation Mono", "DejaVu Sans Mono"],
+    ),
+    office_family_fallback("Arial", &["Liberation Sans", "Arimo"]),
+    office_family_fallback("Arial Black", &["Arial", "Liberation Sans"]),
+    office_family_fallback("Yu Gothic", &["Noto Sans CJK JP"]),
+    office_family_fallback("游ゴシック", &["Yu Gothic", "Noto Sans CJK JP"]),
+    office_family_fallback("BIZ UD明朝", &["BIZ UDMincho", "Noto Serif CJK JP"]),
+    office_family_fallback(
+      "BIZ UD明朝 Medium",
+      &["BIZ UDMincho Medium", "Noto Serif CJK JP"],
+    ),
+    office_family_fallback(
+      "BIZ UDMincho",
+      &["BIZ UDMincho Medium", "Noto Serif CJK JP"],
+    ),
+    office_family_fallback(
+      "BIZ UDMincho Medium",
+      &["BIZ UDMincho", "Noto Serif CJK JP"],
+    ),
+    FontFallbackChain {
+      requested_family: None,
+      script: Some(TextScript::Han),
+      language: None,
+      families: vec![
+        Cow::Borrowed("Noto Sans CJK JP"),
+        Cow::Borrowed("Noto Serif CJK JP"),
+      ],
+    },
+    FontFallbackChain {
+      requested_family: None,
+      script: Some(TextScript::Arabic),
+      language: None,
+      families: vec![Cow::Borrowed("Amiri"), Cow::Borrowed("Noto Naskh Arabic")],
+    },
+    FontFallbackChain {
+      requested_family: None,
+      script: None,
+      language: None,
+      families: vec![
+        Cow::Borrowed("DejaVu Sans"),
+        Cow::Borrowed("Liberation Sans"),
+        Cow::Borrowed("Noto Sans"),
+      ],
+    },
+  ]
+}
+
+fn office_family_fallback<'a>(
+  family: &'static str,
+  fallbacks: &[&'static str],
+) -> FontFallbackChain<'a> {
+  FontFallbackChain {
+    requested_family: Some(Cow::Borrowed(family)),
+    script: None,
+    language: None,
+    families: fallbacks
+      .iter()
+      .map(|family| Cow::Borrowed(*family))
+      .collect(),
+  }
+}
+
+pub fn office_fallback_font_paths(
+  family: &str,
+  bold: bool,
+  italic: bool,
+) -> &'static [&'static str] {
+  if family.eq_ignore_ascii_case("Calibri") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibriz.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-BoldItalic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibrib.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibrii.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibri.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("Calibri Light") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/Fonts/calibriz.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/Fonts/calibrili.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
+      ],
+      (false, false) => &["/usr/share/fonts/truetype/Fonts/calibril.ttf"],
+    };
+  }
+  if family.eq_ignore_ascii_case("Times New Roman") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesbi.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-BoldItalic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesbd.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("TimesNewRomanPSMT") {
+    return match italic {
+      true => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Italic.ttf",
+      ],
+      false => &[
+        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("Courier") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/courbi.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold_Italic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/courbd.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/couri.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/cour.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New.ttf",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("Arial Black") {
+    return match italic {
+      true => &[
+        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-BoldItalic.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+      ],
+      false => &[
+        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("Yu Gothic") || family.eq_ignore_ascii_case("游ゴシック") {
+    return match (bold, italic) {
+      (true, true) | (true, false) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothB.ttc",
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+      ],
+      (false, true) | (false, false) => &[
+        "/usr/share/fonts/truetype/Fonts/YuGothR.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      ],
+    };
+  }
+  if family.eq_ignore_ascii_case("BIZ UD明朝 Medium")
+    || family.eq_ignore_ascii_case("BIZ UD明朝")
+    || family.eq_ignore_ascii_case("BIZ UDMincho Medium")
+    || family.eq_ignore_ascii_case("BIZ UDMincho")
+  {
+    return &[
+      "/usr/share/fonts/truetype/Fonts/BIZ-UDMinchoM.ttc",
+      "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    ];
+  }
+  &[]
+}
+
+pub fn generic_fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static str] {
+  match (bold, italic) {
+    (true, true) => &[
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ],
+    (true, false) => &[
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ],
+    (false, true) => &[
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ],
+    (false, false) => &[
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+      "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+      "/usr/share/fonts/truetype/ubuntu/Ubuntu[wdth,wght].ttf",
+    ],
+  }
+}
+
 fn push_unique_string<'a>(values: &mut Vec<Cow<'a, str>>, value: String) {
   if !values.iter().any(|existing| existing.as_ref() == value) {
     values.push(Cow::Owned(value));
@@ -1474,11 +2269,13 @@ fn normalize_family(value: &str) -> String {
 }
 
 fn family_matches(face: &FontFaceInfo<'_>, family: &str) -> bool {
-  let target = normalize_family(family);
-  face
-    .family_names
-    .iter()
-    .any(|candidate| normalize_family(candidate) == target)
+  face.family_names.iter().any(|candidate| {
+    family_tokens(candidate).iter().any(|candidate| {
+      family_tokens(family)
+        .iter()
+        .any(|target| candidate == target)
+    })
+  })
 }
 
 fn family_overlaps(registered: &RegisteredFontFace<'_>, face: &FontFaceInfo<'_>) -> bool {
@@ -1486,6 +2283,172 @@ fn family_overlaps(registered: &RegisteredFontFace<'_>, face: &FontFaceInfo<'_>)
     .family_names
     .iter()
     .any(|registered| family_matches(face, registered))
+}
+
+fn family_tokens(value: &str) -> Vec<String> {
+  value
+    .split(';')
+    .map(str::trim)
+    .filter(|token| !token.is_empty())
+    .map(normalize_family)
+    .collect()
+}
+
+fn font_charset_matches(
+  charset: FontCharset,
+  face: &FontFaceInfo<'_>,
+  registered: Option<&RegisteredFontFace<'_>>,
+) -> bool {
+  registered.and_then(|face| face.charset) == Some(charset)
+    || (charset == FontCharset::Symbol && face.flags.symbolic)
+}
+
+fn font_supports_char(
+  font: &ResolvedFontWithFace<'_>,
+  parsed_face: Option<&TtfFace<'_>>,
+  ch: char,
+) -> bool {
+  font.face.coverage.contains_char(ch)
+    || parsed_face.and_then(|face| face.glyph_index(ch)).is_some()
+}
+
+fn font_supports_text_cluster(
+  font: &ResolvedFontWithFace<'_>,
+  parsed_face: Option<&TtfFace<'_>>,
+  text: &str,
+) -> bool {
+  !text.chars().any(is_private_use_char)
+    && text
+      .chars()
+      .all(|ch| font_supports_char(font, parsed_face, ch))
+}
+
+fn is_private_use_char(ch: char) -> bool {
+  matches!(
+    u32::from(ch),
+    0xE000..=0xF8FF | 0xF0000..=0xFFFFD | 0x100000..=0x10FFFD
+  )
+}
+
+fn grapheme_clusters(text: &str) -> Vec<Range<usize>> {
+  let mut breaks = GraphemeClusterSegmenter::new()
+    .segment_str(text)
+    .collect::<Vec<_>>();
+  if breaks.first().copied() != Some(0) {
+    breaks.insert(0, 0);
+  }
+  if breaks.last().copied() != Some(text.len()) {
+    breaks.push(text.len());
+  }
+  let mut clusters = Vec::new();
+  let mut index = 0usize;
+  while index + 1 < breaks.len() {
+    let start = breaks[index];
+    let mut end = breaks[index + 1];
+    if text.get(start..end) == Some("\u{202f}")
+      && index + 2 < breaks.len()
+      && text[breaks[index + 1]..breaks[index + 2]]
+        .chars()
+        .next()
+        .is_some_and(is_mongolian_char)
+    {
+      end = breaks[index + 2];
+      index += 1;
+    }
+    clusters.push(start..end);
+    index += 1;
+  }
+  clusters
+}
+
+fn is_mongolian_char(ch: char) -> bool {
+  ch.script() == UnicodeScriptValue::Mongolian
+}
+
+pub fn trim_font_name_features(font_name: &str) -> &str {
+  font_name
+    .split_once(':')
+    .map_or(font_name, |(name, _)| name)
+}
+
+pub fn parse_font_feature_settings<'a>(
+  font_name: &str,
+) -> (Vec<FeatureSetting<'a>>, Option<Cow<'a, str>>) {
+  let Some((_, raw_features)) = font_name.split_once(':') else {
+    return (Vec::new(), None);
+  };
+
+  let mut features = Vec::new();
+  let mut language = None;
+  for token in raw_features.split('&').filter(|token| !token.is_empty()) {
+    if let Some(value) = token.strip_prefix("lang=") {
+      language = Some(Cow::Owned(value.to_string()));
+      continue;
+    }
+    if let Ok(feature) = BuzzFeature::from_str(token) {
+      features.push(FeatureSetting {
+        tag: Cow::Owned(tag_to_string(feature.tag)),
+        value: feature.value,
+        start: feature.start,
+        end: feature.end,
+      });
+    }
+  }
+  (features, language)
+}
+
+pub fn parse_font_variations<'a>(value: &str) -> Vec<VariationValue<'a>> {
+  value
+    .split(',')
+    .filter_map(|token| parse_font_variation(token.trim()))
+    .collect()
+}
+
+pub fn format_font_variations(variations: &[VariationValue<'_>]) -> String {
+  variations
+    .iter()
+    .map(|variation| {
+      format!(
+        "\"{}\" {}",
+        variation.tag,
+        format_variation_value(variation.value)
+      )
+    })
+    .collect::<Vec<_>>()
+    .join(", ")
+}
+
+fn parse_font_variation<'a>(token: &str) -> Option<VariationValue<'a>> {
+  let mut chars = token.char_indices();
+  let (_, quote) = chars.next()?;
+  if quote != '"' && quote != '\'' {
+    return None;
+  }
+  let close = token[1..].find(quote)? + 1;
+  let tag = &token[1..close];
+  if tag.len() != 4
+    || !tag
+      .chars()
+      .all(|ch| ch.is_ascii_alphanumeric() || ch == ' ')
+  {
+    return None;
+  }
+  let value = token[close + quote.len_utf8()..]
+    .trim()
+    .parse::<f32>()
+    .ok()?;
+  Some(VariationValue {
+    tag: Cow::Owned(tag.to_string()),
+    value,
+  })
+}
+
+fn format_variation_value(value: f32) -> String {
+  if value.fract().abs() <= f32::EPSILON {
+    format!("{value:.0}")
+  } else {
+    value.to_string()
+  }
 }
 
 fn resolve_family_alias<'a>(book: &FontBook<'a>, family: &Cow<'a, str>) -> Cow<'a, str> {
@@ -1508,10 +2471,25 @@ fn find_substitution_rule<'a>(
 }
 
 fn requested_weight(request: &FontRequest<'_>) -> FontWeight {
-  request.weight.unwrap_or(if request.bold {
-    FontWeight::Bold
-  } else {
-    FontWeight::Normal
+  request.weight.unwrap_or_else(|| {
+    if request
+      .family
+      .as_deref()
+      .is_some_and(|family| family.eq_ignore_ascii_case("Arial Black"))
+    {
+      FontWeight::Black
+    } else if !request.bold
+      && request
+        .family
+        .as_deref()
+        .is_some_and(|family| family.eq_ignore_ascii_case("Calibri Light"))
+    {
+      FontWeight::Light
+    } else if request.bold {
+      FontWeight::Bold
+    } else {
+      FontWeight::Normal
+    }
   })
 }
 
@@ -1612,6 +2590,205 @@ fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
   }
 }
 
+fn font_embedding_policy_from_ttf(face: &TtfFace<'_>) -> FontEmbeddingPolicy {
+  match face.permissions() {
+    Some(ttf_parser::Permissions::Restricted) => FontEmbeddingPolicy {
+      subset_policy: FontSubsetPolicy::DoNotEmbed,
+      installable: false,
+      restricted: true,
+    },
+    Some(ttf_parser::Permissions::Installable) | None => FontEmbeddingPolicy::default(),
+    Some(ttf_parser::Permissions::PreviewAndPrint) => FontEmbeddingPolicy {
+      subset_policy: FontSubsetPolicy::Subset,
+      installable: false,
+      restricted: false,
+    },
+    Some(ttf_parser::Permissions::Editable) => FontEmbeddingPolicy {
+      subset_policy: FontSubsetPolicy::EmbedFull,
+      installable: false,
+      restricted: false,
+    },
+  }
+}
+
+fn font_embedding_plan_from_ttf<'a>(face: &TtfFace<'_>) -> FontEmbeddingPlan<'a> {
+  FontEmbeddingPlan {
+    keep_tables: DEFAULT_PDF_EMBED_TABLES
+      .iter()
+      .map(|table| Cow::Borrowed(*table))
+      .collect(),
+    downgrade_cff2: face.tables().cff2.is_some(),
+    desubroutinize_cff: face.tables().cff.is_some() || face.tables().cff2.is_some(),
+    pin_variation_axes: !face.variation_axes().is_empty(),
+  }
+}
+
+fn has_table(face: &TtfFace<'_>, tag: &[u8; 4]) -> bool {
+  face.raw_face().table(Tag::from_bytes(tag)).is_some()
+}
+
+fn font_bounds_from_ttf(face: &TtfFace<'_>) -> FontBounds {
+  let units_per_em = f32::from(face.units_per_em());
+  FontBounds {
+    global: Some(glyph_bounds_from_ttf_rect(
+      face.global_bounding_box(),
+      units_per_em,
+    )),
+  }
+}
+
+fn glyph_bounds_from_ttf_rect(bounds: TtfRect, units_per_em: f32) -> GlyphBounds {
+  GlyphBounds {
+    x_min_pt: f32::from(bounds.x_min) / units_per_em,
+    y_min_pt: f32::from(bounds.y_min) / units_per_em,
+    x_max_pt: f32::from(bounds.x_max) / units_per_em,
+    y_max_pt: f32::from(bounds.y_max) / units_per_em,
+  }
+}
+
+fn variation_axes_from_ttf<'a>(face: &TtfFace<'_>) -> Vec<VariationAxis<'a>> {
+  face
+    .variation_axes()
+    .into_iter()
+    .filter(|axis| !axis.hidden)
+    .map(|axis| VariationAxis {
+      tag: Cow::Owned(tag_to_string(axis.tag)),
+      name: ttf_name_by_id(face, axis.name_id).map(Cow::Owned),
+      min: axis.min_value,
+      default: axis.def_value,
+      max: axis.max_value,
+    })
+    .collect()
+}
+
+fn opentype_features_from_ttf<'a>(face: &TtfFace<'_>) -> Vec<OpenTypeFeature<'a>> {
+  let mut features = Vec::new();
+  if let Some(gsub) = face.tables().gsub {
+    for feature in gsub.features {
+      push_opentype_feature(&mut features, feature.tag);
+    }
+  }
+  if let Some(gpos) = face.tables().gpos {
+    for feature in gpos.features {
+      push_opentype_feature(&mut features, feature.tag);
+    }
+  }
+  if let Some(feat) = face.tables().feat {
+    for feature in feat.names {
+      push_named_feature(&mut features, format!("aat:{}", feature.feature));
+    }
+  }
+  if face.tables().morx.is_some() {
+    push_named_feature(&mut features, "aat:morx".to_string());
+  }
+  if has_table(face, b"Silf") {
+    push_named_feature(&mut features, "graphite:Silf".to_string());
+  }
+  if has_table(face, b"Feat") {
+    push_named_feature(&mut features, "graphite:Feat".to_string());
+  }
+  if has_table(face, b"Sill") {
+    push_named_feature(&mut features, "graphite:Sill".to_string());
+  }
+  features
+}
+
+fn push_opentype_feature<'a>(features: &mut Vec<OpenTypeFeature<'a>>, tag: Tag) {
+  let tag = tag_to_string(tag);
+  if !features.iter().any(|feature| feature.tag.as_ref() == tag) {
+    features.push(OpenTypeFeature {
+      tag: Cow::Owned(tag),
+      enabled_by_default: true,
+    });
+  }
+}
+
+fn push_named_feature<'a>(features: &mut Vec<OpenTypeFeature<'a>>, tag: String) {
+  if !features.iter().any(|feature| feature.tag.as_ref() == tag) {
+    features.push(OpenTypeFeature {
+      tag: Cow::Owned(tag),
+      enabled_by_default: true,
+    });
+  }
+}
+
+fn ttf_name_by_id(face: &TtfFace<'_>, name_id: u16) -> Option<String> {
+  face
+    .names()
+    .into_iter()
+    .filter(|name| name.name_id == name_id)
+    .find_map(|name| name.to_string())
+}
+
+fn tag_to_string(tag: Tag) -> String {
+  tag.to_string().trim_end().to_string()
+}
+
+fn text_script_from_unicode(script: UnicodeScriptValue, previous: TextScript) -> TextScript {
+  match script {
+    UnicodeScriptValue::Latin => TextScript::Latin,
+    UnicodeScriptValue::Cyrillic => TextScript::Cyrillic,
+    UnicodeScriptValue::Greek => TextScript::Greek,
+    UnicodeScriptValue::Han => TextScript::Han,
+    UnicodeScriptValue::Hiragana => TextScript::Hiragana,
+    UnicodeScriptValue::Katakana => TextScript::Katakana,
+    UnicodeScriptValue::Hangul => TextScript::Hangul,
+    UnicodeScriptValue::Arabic => TextScript::Arabic,
+    UnicodeScriptValue::Hebrew => TextScript::Hebrew,
+    UnicodeScriptValue::Devanagari => TextScript::Devanagari,
+    UnicodeScriptValue::Thai => TextScript::Thai,
+    UnicodeScriptValue::Common | UnicodeScriptValue::Inherited => previous,
+    _ => TextScript::Other,
+  }
+}
+
+fn text_direction_from_bidi(direction: BidiDirection) -> TextDirection {
+  match direction {
+    BidiDirection::Ltr => TextDirection::LeftToRight,
+    BidiDirection::Rtl => TextDirection::RightToLeft,
+    BidiDirection::Mixed => TextDirection::Mixed,
+  }
+}
+
+fn is_justifiable_char(ch: char) -> bool {
+  let justification = glyph_justification(ch);
+  justification.space || justification.cjk || justification.cjk_punctuation || justification.kashida
+}
+
+fn glyph_justification(ch: char) -> GlyphJustification {
+  let script = ch.script();
+  GlyphJustification {
+    space: ch.is_whitespace(),
+    cjk: matches!(
+      script,
+      UnicodeScriptValue::Han
+        | UnicodeScriptValue::Hiragana
+        | UnicodeScriptValue::Katakana
+        | UnicodeScriptValue::Hangul
+    ),
+    cjk_punctuation: is_cjk_punctuation(ch),
+    kashida: script == UnicodeScriptValue::Arabic || ch == '\u{0640}',
+  }
+}
+
+fn is_cjk_punctuation(ch: char) -> bool {
+  matches!(
+    u32::from(ch),
+    0x3000..=0x303F | 0xFE10..=0xFE1F | 0xFE30..=0xFE4F | 0xFF00..=0xFFEF
+  )
+}
+
+fn glyph_text_range(text: &str, infos: &[rustybuzz::GlyphInfo], index: usize) -> Range<usize> {
+  let start = infos[index].cluster as usize;
+  let end = infos
+    .iter()
+    .map(|info| info.cluster as usize)
+    .filter(|cluster| *cluster > start)
+    .min()
+    .unwrap_or(text.len());
+  start.min(text.len())..end.min(text.len())
+}
+
 fn missing_glyphs_from_shaped_glyphs(glyphs: &[ShapedGlyph]) -> Vec<MissingGlyph> {
   glyphs
     .iter()
@@ -1680,7 +2857,9 @@ fn approximate_glyphs(text: &str, _size: FontSize) -> Vec<ShapedGlyph> {
         y_offset_pt: 0.0,
         safe_to_break: ch.is_whitespace(),
         source_char: Some(ch),
-        justifiable: ch.is_whitespace(),
+        justifiable: is_justifiable_char(ch),
+        justification: glyph_justification(ch),
+        bounds: None,
       }
     })
     .collect()
@@ -1691,13 +2870,6 @@ fn text_safe_breaks(text: &str) -> Vec<usize> {
     .char_indices()
     .filter_map(|(index, ch)| ch.is_whitespace().then_some(index + ch.len_utf8()))
     .collect()
-}
-
-fn next_char_boundary(text: &str, start: usize) -> usize {
-  text
-    .get(start..)
-    .and_then(|tail| tail.char_indices().nth(1).map(|(offset, _)| start + offset))
-    .unwrap_or(text.len())
 }
 
 fn font_stretch_number(stretch: FontStretch) -> i32 {
@@ -1748,6 +2920,10 @@ fn font_stretch_from_ttf(width: u16) -> FontStretch {
     8 => FontStretch::ExtraExpanded,
     _ => FontStretch::UltraExpanded,
   }
+}
+
+fn font_stretch_from_fontdb(stretch: fontdb::Stretch) -> FontStretch {
+  font_stretch_from_ttf(stretch.to_number())
 }
 
 fn buzz_direction(direction: TextDirection) -> Option<BuzzDirection> {
@@ -2017,6 +3193,7 @@ mod tests {
       std::iter::once(u32::from('B')..u32::from('B') + 1).collect();
     registry.register_face(FontSource::System, fallback);
     registry.book.fallback_chains.push(FontFallbackChain {
+      requested_family: None,
       script: Some(TextScript::Latin),
       language: None,
       families: vec![Cow::Borrowed("Fallback")],

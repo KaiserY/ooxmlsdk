@@ -1256,6 +1256,7 @@ name = "ooxmlsdk-fonts"
 version = "0.10.2"
 dependencies = [
  "fontdb",
+ "icu_segmenter",
  "ooxmlsdk",
  "rustybuzz",
  "thiserror",

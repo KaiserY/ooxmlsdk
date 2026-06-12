@@ -546,20 +546,22 @@ Scope:
 Done when layout can measure and shape text through `ooxmlsdk-fonts` without
 calling PDF code.
 
-### 15.3.1 Next Broad Development Focus
+### 15.3.1 Settled Shared-Fonts Boundary
 
-The next font step should finish the remaining LO/VCL-style integration work
-around the new shared shaping path:
+`ooxmlsdk-fonts` is now the shared owner for the behavior that layout and PDF
+must agree on before painting:
 
-- keep `shape_text_runs` as the shared layout/PDF entry point for glyph
-  fallback segmentation
-- extend script/language itemization from the current caller-provided context
-  to LO/EditEngine-style run boundaries
-- populate fallback chains from source-backed Office/LO/platform data instead
-  of hard-coded local guesses
-- migrate PDF font loading/painting to consume the same `FontRegistry`,
-  `FontId`, `ShapedRun`, and diagnostics model
-- keep host/system discovery optional and deterministic for tests
+- `shape_text_runs` / `shape_text_runs_with_options` are the shared entry
+  points for glyph fallback segmentation and shaped-run metadata.
+- font discovery is optional and explicit: tests should register fixture fonts,
+  while applications may call `register_system_fonts` or
+  `register_office_fallback_path_fonts`.
+- Office/PDF fallback aliases, family-specific fallback chains, and fixed
+  fallback path tables live in fonts, not in layout.
+- layout owns line/page decisions; fonts only returns runs, metrics, glyph
+  bounds, embedding/subset plans, and justification metadata.
+- the existing PDF crate may remain self-contained until its layout/font
+  refactor, but new shared font behavior should be added here first.
 
 ### 15.4 Current Implementation Checkpoint
 
@@ -568,25 +570,45 @@ Implemented in this stage:
 - deterministic in-memory face registration and family alias resolution
 - TTF face metadata import for names, weight, slant, stretch, pitch, and
   PDF/LO-aligned vertical/decoration metric signs
+- TTF technology metadata for color/vertical/Graphite/AAT/CFF2/variable fonts
+  and LO-aligned AAT/kashida-position capability
+- OpenType, AAT, and Graphite feature-table discovery metadata
+- OS/2 embedding rights plus a PDF subset-table plan matching LO's kept-table
+  boundary
 - match diagnostics based on explicit attribute comparison instead of arbitrary
   weighted scores
 - resolved-font metrics scaling by requested point size
 - rustybuzz shaping for in-memory/embedded/test fixture fonts, including glyph
   ids, clusters, advances, offsets, source ranges, safe breaks, direction,
   script, and language
+- HarfBuzz unsafe-to-break propagation and full-cluster source ranges for
+  ligature clusters
 - full Unicode-scalar coverage checks instead of BMP-only `0xFFFF` scans
+- lazy glyph coverage for system/path fonts whose metadata was loaded without
+  pre-scanning all Unicode scalar values
 - `shape_text_runs` fallback segmentation over explicit fallback chains and
-  registered face coverage
+  registered face coverage, using grapheme-cluster fallback spans and keeping
+  private-use characters on the current font
+- Office/PDF family fallback policy for Calibri, Calibri Light, Cambria, Times
+  New Roman, TimesNewRomanPSMT, Courier, Arial, Arial Black, Yu Gothic, and BIZ
+  UD Mincho families
+- PDF fallback font path tables exposed as explicit opt-in registration policy,
+  including family-specific paths followed by generic fallback paths
+- character spacing and small-caps shaping options, with DOCX layout passing
+  those values into fonts
+- script/direction/small-caps run itemization for the shared shaping path,
+  with small-caps split by case-mapped spans before script shaping
+- CJK, CJK punctuation, space, and Arabic kashida justification metadata on
+  shaped glyphs
 - structured `ShapingDiagnostics` for missing glyphs and fallback runs
 - approximate shaping remains explicit for system/path fonts whose bytes are
   not available
 
 Still intentionally not implemented:
 
-- host/system font discovery
-- LO-backed substitution tables and platform last-resort fallback chains
-- automatic script/language itemization independent of caller context
 - PDF backend consumption of the shared shaped-run path
+- actual PDF font subsetting/embedding byte rewriting; fonts records the plan,
+  while a renderer/writer performs the write
 
 Approximate shaping must keep `approximate = true` and must not invent glyph
 advances or glyph ids when font bytes are unavailable.

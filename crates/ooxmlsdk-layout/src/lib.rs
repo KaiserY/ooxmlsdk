@@ -11,7 +11,7 @@ use common::{
   DisplayPage, FrameId, FrameRecord, GlyphRun, LayoutDocument, LayoutEngineKind, LayoutFontRequest,
   LayoutOptions, Point, Pt, Rect, RectItem, Size, TextRun,
 };
-use ooxmlsdk_fonts::{FontRegistry, TextDirection, TextScript};
+use ooxmlsdk_fonts::{FontRegistry, ShapeOptions, TextDirection, TextScript};
 
 pub use error::{LayoutError, Result};
 
@@ -446,7 +446,10 @@ fn shape_layout_text_runs<'doc>(
   for (range, script) in script_ranges(text) {
     let font_request = request.for_script(script);
     let segment = Cow::Owned(text[range.clone()].to_owned());
-    for mut run in fonts.shape_text_runs(&font_request, segment, TextDirection::LeftToRight)? {
+    let mut options = ShapeOptions::from_request(&font_request, TextDirection::LeftToRight);
+    options.small_caps = request.small_caps;
+    options.character_spacing_pt = request.character_spacing.0;
+    for mut run in fonts.shape_text_runs_with_options(&font_request, segment, &options)? {
       run.offset_text_range(range.start);
       runs.push(run);
     }

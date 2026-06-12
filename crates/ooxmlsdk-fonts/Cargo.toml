@@ -18,6 +18,7 @@ ooxml = ["dep:ooxmlsdk"]
 
 [dependencies]
 fontdb = { workspace = true }
+icu_segmenter = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"], optional = true }
 rustybuzz = { workspace = true }
 thiserror = { workspace = true }

@@ -55,6 +55,8 @@ pub struct GradientStop<'doc> {
 pub struct LayoutFontRequest<'doc> {
   pub base: FontRequest<'doc>,
   pub families: ScriptFontFamilies<'doc>,
+  pub small_caps: bool,
+  pub character_spacing: Pt,
 }
 
 impl<'doc> LayoutFontRequest<'doc> {
@@ -66,6 +68,8 @@ impl<'doc> LayoutFontRequest<'doc> {
         ..ScriptFontFamilies::default()
       },
       base,
+      small_caps: false,
+      character_spacing: Pt::default(),
     }
   }
 

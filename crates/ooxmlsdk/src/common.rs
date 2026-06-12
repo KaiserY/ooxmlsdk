@@ -31,10 +31,10 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  TagEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes, from_bytes_inner,
-  from_reader_inner, parse_attr_value, parse_decimal_number_or_percent_attr, parse_enum_attr,
-  parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr, parse_i64_attr,
-  parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
+  PayloadEvent, TagEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes,
+  from_bytes_inner, from_reader_inner, parse_attr_value, parse_decimal_number_or_percent_attr,
+  parse_enum_attr, parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr,
+  parse_i64_attr, parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
   parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
   parse_u16_attr, parse_u32_attr, parse_u64_attr, parse_value, read_root_start_borrowed,
   read_root_start_io, root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
@@ -368,7 +368,6 @@ pub(crate) fn part_relationships_directory_path(path: &str) -> String {
 mod tests {
   use super::*;
   use quick_xml::Decoder;
-  use quick_xml::events::Event;
   use quick_xml::events::attributes::Attribute;
 
   fn with_first_attr<T>(
@@ -378,7 +377,7 @@ mod tests {
     let mut reader = from_bytes_inner(xml.as_bytes())?;
     let event = reader.next()?;
     let e = match event {
-      Event::Start(e) | Event::Empty(e) => e,
+      PayloadEvent::Start(e) | PayloadEvent::Empty(e) => e,
       other => panic!("expected start or empty tag, got {other:?}"),
     };
     let decoder = reader.decoder();

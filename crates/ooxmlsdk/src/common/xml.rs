@@ -10,7 +10,50 @@ use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
   buf: Vec<u8>,
-  pending: Option<Event<'static>>,
+  pending: Option<PayloadEvent<'static>>,
+}
+
+#[derive(Debug)]
+pub enum PayloadEvent<'xml> {
+  Start(quick_xml::events::BytesStart<'xml>),
+  Empty(quick_xml::events::BytesStart<'xml>),
+  End(quick_xml::events::BytesEnd<'xml>),
+  Text(quick_xml::events::BytesText<'xml>),
+  CData(quick_xml::events::BytesCData<'xml>),
+  GeneralRef(quick_xml::events::BytesRef<'xml>),
+  Decl(bool),
+  Eof,
+}
+
+impl<'xml> PayloadEvent<'xml> {
+  #[inline]
+  fn into_owned(self) -> PayloadEvent<'static> {
+    match self {
+      Self::Start(e) => PayloadEvent::Start(e.into_owned()),
+      Self::Empty(e) => PayloadEvent::Empty(e.into_owned()),
+      Self::End(e) => PayloadEvent::End(e.into_owned()),
+      Self::Text(e) => PayloadEvent::Text(e.into_owned()),
+      Self::CData(e) => PayloadEvent::CData(e.into_owned()),
+      Self::GeneralRef(e) => PayloadEvent::GeneralRef(e.into_owned()),
+      Self::Decl(standalone) => PayloadEvent::Decl(standalone),
+      Self::Eof => PayloadEvent::Eof,
+    }
+  }
+
+  #[cfg(feature = "flat-opc")]
+  #[inline]
+  fn into_event(self) -> Option<Event<'xml>> {
+    Some(match self {
+      Self::Start(e) => Event::Start(e),
+      Self::Empty(e) => Event::Empty(e),
+      Self::End(e) => Event::End(e),
+      Self::Text(e) => Event::Text(e),
+      Self::CData(e) => Event::CData(e),
+      Self::GeneralRef(e) => Event::GeneralRef(e),
+      Self::Decl(_) => return None,
+      Self::Eof => Event::Eof,
+    })
+  }
 }
 
 pub enum TagEvent<'xml> {
@@ -18,15 +61,44 @@ pub enum TagEvent<'xml> {
   End(quick_xml::events::BytesEnd<'xml>),
   Decl(bool),
   Eof,
-  Other,
+}
+
+#[inline]
+fn payload_event_from_event(event: Event<'_>) -> Option<PayloadEvent<'_>> {
+  Some(match event {
+    Event::Start(e) => PayloadEvent::Start(e),
+    Event::Empty(e) => PayloadEvent::Empty(e),
+    Event::End(e) => PayloadEvent::End(e),
+    Event::Text(e) => PayloadEvent::Text(e),
+    Event::CData(e) => PayloadEvent::CData(e),
+    Event::GeneralRef(e) => PayloadEvent::GeneralRef(e),
+    Event::Decl(e) => PayloadEvent::Decl(matches!(
+      e.standalone(),
+      Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+    )),
+    Event::Eof => PayloadEvent::Eof,
+    _ => return None,
+  })
+}
+
+#[inline]
+fn tag_event_from_payload(event: PayloadEvent<'_>) -> Option<TagEvent<'_>> {
+  Some(match event {
+    PayloadEvent::Start(e) => TagEvent::Start(e, false),
+    PayloadEvent::Empty(e) => TagEvent::Start(e, true),
+    PayloadEvent::End(e) => TagEvent::End(e),
+    PayloadEvent::Decl(standalone) => TagEvent::Decl(standalone),
+    PayloadEvent::Eof => TagEvent::Eof,
+    _ => return None,
+  })
 }
 
 pub trait XmlRead<'xml> {
-  fn next(&mut self) -> Result<Event<'xml>, SdkError>;
+  fn next(&mut self) -> Result<PayloadEvent<'xml>, SdkError>;
 
   fn next_tag_event(&mut self) -> Result<TagEvent<'xml>, SdkError>;
 
-  fn unread(&mut self, event: Event<'xml>) -> Result<(), SdkError>;
+  fn unread(&mut self, event: PayloadEvent<'xml>) -> Result<(), SdkError>;
 
   fn decoder(&self) -> Decoder;
 
@@ -40,7 +112,7 @@ pub trait XmlRead<'xml> {
   fn drain_text_field_from_event(
     &mut self,
     value: &mut Option<String>,
-    first: Event<'xml>,
+    first: PayloadEvent<'xml>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError>;
@@ -82,13 +154,17 @@ impl<R: BufRead> IoReader<R> {
   }
 
   #[inline]
-  pub fn next(&mut self) -> Result<Event<'static>, SdkError> {
+  pub fn next(&mut self) -> Result<PayloadEvent<'static>, SdkError> {
     if let Some(event) = self.pending.take() {
       return Ok(event);
     }
 
-    self.buf.clear();
-    Ok(self.reader.read_event_into(&mut self.buf)?.into_owned())
+    loop {
+      self.buf.clear();
+      if let Some(event) = payload_event_from_event(self.reader.read_event_into(&mut self.buf)?) {
+        return Ok(event.into_owned());
+      }
+    }
   }
 
   #[inline]
@@ -105,14 +181,14 @@ impl<R: BufRead> IoReader<R> {
   pub fn drain_text_field_from_event(
     &mut self,
     value: &mut Option<String>,
-    first: Event<'static>,
+    first: PayloadEvent<'static>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError> {
     let mut event = first;
     loop {
       match event {
-        Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
+        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
           append_xml_text_event(value, event, ty, field)?;
         }
         event => {
@@ -126,26 +202,32 @@ impl<R: BufRead> IoReader<R> {
 
   #[inline]
   pub fn next_tag_event(&mut self) -> Result<TagEvent<'static>, SdkError> {
-    if let Some(event) = self.pending.take() {
-      return Ok(Self::tag_event_from_owned(event));
+    if let Some(event) = self.pending.take()
+      && let Some(event) = tag_event_from_payload(event)
+    {
+      return Ok(event);
     }
 
-    self.buf.clear();
-    Ok(match self.reader.read_event_into(&mut self.buf)? {
-      Event::Start(e) => TagEvent::Start(e.into_owned(), false),
-      Event::Empty(e) => TagEvent::Start(e.into_owned(), true),
-      Event::End(e) => TagEvent::End(e.into_owned()),
-      Event::Decl(e) => TagEvent::Decl(matches!(
-        e.standalone(),
-        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-      )),
-      Event::Eof => TagEvent::Eof,
-      _ => TagEvent::Other,
-    })
+    loop {
+      self.buf.clear();
+      match self.reader.read_event_into(&mut self.buf)? {
+        Event::Start(e) => return Ok(TagEvent::Start(e.into_owned(), false)),
+        Event::Empty(e) => return Ok(TagEvent::Start(e.into_owned(), true)),
+        Event::End(e) => return Ok(TagEvent::End(e.into_owned())),
+        Event::Decl(e) => {
+          return Ok(TagEvent::Decl(matches!(
+            e.standalone(),
+            Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
+          )));
+        }
+        Event::Eof => return Ok(TagEvent::Eof),
+        _ => {}
+      }
+    }
   }
 
   #[inline]
-  pub fn unread(&mut self, event: Event<'static>) -> Result<(), SdkError> {
+  pub fn unread(&mut self, event: PayloadEvent<'static>) -> Result<(), SdkError> {
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
         "xml reader unread buffer already occupied".to_string(),
@@ -161,25 +243,23 @@ impl<R: BufRead> IoReader<R> {
     self.reader.decoder()
   }
 
+  #[cfg(feature = "flat-opc")]
   #[inline]
-  fn tag_event_from_owned(event: Event<'static>) -> TagEvent<'static> {
-    match event {
-      Event::Start(e) => TagEvent::Start(e, false),
-      Event::Empty(e) => TagEvent::Start(e, true),
-      Event::End(e) => TagEvent::End(e),
-      Event::Decl(e) => TagEvent::Decl(matches!(
-        e.standalone(),
-        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-      )),
-      Event::Eof => TagEvent::Eof,
-      _ => TagEvent::Other,
+  fn raw_next(&mut self) -> Result<Event<'static>, SdkError> {
+    if let Some(event) = self.pending.take()
+      && let Some(event) = event.into_event()
+    {
+      return Ok(event);
     }
+
+    self.buf.clear();
+    Ok(self.reader.read_event_into(&mut self.buf)?.into_owned())
   }
 }
 
 impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   #[inline]
-  fn next(&mut self) -> Result<Event<'static>, SdkError> {
+  fn next(&mut self) -> Result<PayloadEvent<'static>, SdkError> {
     IoReader::next(self)
   }
 
@@ -189,7 +269,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   }
 
   #[inline]
-  fn unread(&mut self, event: Event<'static>) -> Result<(), SdkError> {
+  fn unread(&mut self, event: PayloadEvent<'static>) -> Result<(), SdkError> {
     IoReader::unread(self, event)
   }
 
@@ -212,7 +292,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
   fn drain_text_field_from_event(
     &mut self,
     value: &mut Option<String>,
-    first: Event<'static>,
+    first: PayloadEvent<'static>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError> {
@@ -238,7 +318,7 @@ impl<R: BufRead> XmlRead<'static> for IoReader<R> {
 
 pub struct SliceReader<'de> {
   reader: Reader<&'de [u8]>,
-  pending: Option<Event<'de>>,
+  pending: Option<PayloadEvent<'de>>,
 }
 
 impl<'de> SliceReader<'de> {
@@ -250,12 +330,16 @@ impl<'de> SliceReader<'de> {
   }
 
   #[inline]
-  pub fn next(&mut self) -> Result<Event<'de>, SdkError> {
+  pub fn next(&mut self) -> Result<PayloadEvent<'de>, SdkError> {
     if let Some(event) = self.pending.take() {
       return Ok(event);
     }
 
-    Ok(self.reader.read_event()?)
+    loop {
+      if let Some(event) = payload_event_from_event(self.reader.read_event()?) {
+        return Ok(event);
+      }
+    }
   }
 
   #[inline]
@@ -272,14 +356,14 @@ impl<'de> SliceReader<'de> {
   pub fn drain_text_field_from_event(
     &mut self,
     value: &mut Option<String>,
-    first: Event<'de>,
+    first: PayloadEvent<'de>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError> {
     let mut event = first;
     loop {
       match event {
-        Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
+        PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_) => {
           append_xml_text_event(value, event, ty, field)?;
         }
         event => {
@@ -293,15 +377,23 @@ impl<'de> SliceReader<'de> {
 
   #[inline]
   pub fn next_tag_event(&mut self) -> Result<TagEvent<'de>, SdkError> {
-    if let Some(event) = self.pending.take() {
-      return Ok(Self::tag_event_from_event(event));
+    if let Some(event) = self.pending.take()
+      && let Some(event) = tag_event_from_payload(event)
+    {
+      return Ok(event);
     }
 
-    Ok(Self::tag_event_from_event(self.reader.read_event()?))
+    loop {
+      if let Some(event) = payload_event_from_event(self.reader.read_event()?)
+        && let Some(event) = tag_event_from_payload(event)
+      {
+        return Ok(event);
+      }
+    }
   }
 
   #[inline]
-  pub fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+  pub fn unread(&mut self, event: PayloadEvent<'de>) -> Result<(), SdkError> {
     if self.pending.is_some() {
       return Err(SdkError::CommonError(
         "xml reader unread buffer already occupied".to_string(),
@@ -317,25 +409,22 @@ impl<'de> SliceReader<'de> {
     self.reader.decoder()
   }
 
+  #[cfg(feature = "flat-opc")]
   #[inline]
-  fn tag_event_from_event(event: Event<'de>) -> TagEvent<'de> {
-    match event {
-      Event::Start(e) => TagEvent::Start(e, false),
-      Event::Empty(e) => TagEvent::Start(e, true),
-      Event::End(e) => TagEvent::End(e),
-      Event::Decl(e) => TagEvent::Decl(matches!(
-        e.standalone(),
-        Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-      )),
-      Event::Eof => TagEvent::Eof,
-      _ => TagEvent::Other,
+  fn raw_next(&mut self) -> Result<Event<'de>, SdkError> {
+    if let Some(event) = self.pending.take()
+      && let Some(event) = event.into_event()
+    {
+      return Ok(event);
     }
+
+    Ok(self.reader.read_event()?)
   }
 }
 
 impl<'de> XmlRead<'de> for SliceReader<'de> {
   #[inline]
-  fn next(&mut self) -> Result<Event<'de>, SdkError> {
+  fn next(&mut self) -> Result<PayloadEvent<'de>, SdkError> {
     SliceReader::next(self)
   }
 
@@ -345,7 +434,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
   }
 
   #[inline]
-  fn unread(&mut self, event: Event<'de>) -> Result<(), SdkError> {
+  fn unread(&mut self, event: PayloadEvent<'de>) -> Result<(), SdkError> {
     SliceReader::unread(self, event)
   }
 
@@ -368,7 +457,7 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
   fn drain_text_field_from_event(
     &mut self,
     value: &mut Option<String>,
-    first: Event<'de>,
+    first: PayloadEvent<'de>,
     ty: &'static str,
     field: &'static str,
   ) -> Result<(), SdkError> {
@@ -903,20 +992,20 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
   let mut value = None;
   loop {
     match xml_reader.next()? {
-      event @ (Event::Text(_) | Event::CData(_) | Event::GeneralRef(_)) => {
+      event @ (PayloadEvent::Text(_) | PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_)) => {
         append_xml_text_event(&mut value, event, ty, field)?;
       }
-      Event::End(e) if e.name() == end => {
+      PayloadEvent::End(e) if e.name() == end => {
         return Ok(value.unwrap_or_default());
       }
-      Event::Start(e) | Event::Empty(e) => {
+      PayloadEvent::Start(e) | PayloadEvent::Empty(e) => {
         return Err(unexpected_tag(
           ty,
           "text content",
           e.local_name().into_inner(),
         ));
       }
-      Event::Eof => return Err(unexpected_eof(ty)),
+      PayloadEvent::Eof => return Err(unexpected_eof(ty)),
       _ => {}
     }
   }
@@ -924,14 +1013,14 @@ fn read_text_events<'xml, R: XmlRead<'xml>>(
 
 fn append_xml_text_event(
   value: &mut Option<String>,
-  event: Event<'_>,
+  event: PayloadEvent<'_>,
   ty: &'static str,
   field: &'static str,
 ) -> Result<(), SdkError> {
   match event {
-    Event::Text(text) => append_cow_text(value, text.xml10_content()?),
-    Event::CData(text) => append_cow_text(value, text.xml10_content()?),
-    Event::GeneralRef(text) => {
+    PayloadEvent::Text(text) => append_cow_text(value, text.xml10_content()?),
+    PayloadEvent::CData(text) => append_cow_text(value, text.xml10_content()?),
+    PayloadEvent::GeneralRef(text) => {
       let entity = text.xml10_content()?;
       let entity = resolve_general_ref_entity(entity.as_ref())
         .ok_or_else(|| invalid_field_value(ty, field, entity.to_string()))?;
@@ -990,7 +1079,7 @@ pub(crate) fn read_outer_xml_borrowed<'de>(
 
     let mut depth = 1usize;
     loop {
-      let event = xml_reader.next()?;
+      let event = xml_reader.raw_next()?;
       match &event {
         Event::Start(_) => {
           depth += 1;
@@ -1085,7 +1174,7 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 
     let mut depth = 1usize;
     loop {
-      let event = xml_reader.next()?;
+      let event = xml_reader.raw_next()?;
       match &event {
         Event::Start(_) => {
           depth += 1;
@@ -1482,7 +1571,7 @@ pub(crate) fn read_root_start_borrowed<'de>(
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
       TagEvent::Eof => return Err(unexpected_eof(owner)),
-      TagEvent::End(_) | TagEvent::Other => {}
+      TagEvent::End(_) => {}
     }
   }
 }
@@ -1517,7 +1606,7 @@ pub(crate) fn read_root_start_io<R: std::io::BufRead>(
         return Err(unexpected_tag(owner, owner, e.name().as_ref()));
       }
       TagEvent::Eof => return Err(unexpected_eof(owner)),
-      TagEvent::End(_) | TagEvent::Other => {}
+      TagEvent::End(_) => {}
     }
   }
 }

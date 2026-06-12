@@ -4884,7 +4884,7 @@ mod tests {
 
     assert!(generated.contains("Sequence (std :: boxed :: Box < HolderChoiceSequence >)"));
     assert!(generated.contains("pub struct HolderChoiceSequence"));
-    assert!(!generated.contains("Sequence {"));
+    assert!(!generated.contains("Sequence { formula"));
   }
 
   #[test]

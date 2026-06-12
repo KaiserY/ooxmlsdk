@@ -432,7 +432,7 @@ fn stack_parser_shared_table_tokens(
           crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof("recursive table"));
           }
-          crate::common::TagEvent::Decl(_) | crate::common::TagEvent::Other => {}
+          crate::common::TagEvent::Decl(_) => {}
         }
       }
     }
@@ -2383,7 +2383,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
           let mut child_reader = crate::common::from_bytes_inner(child_xml.as_ref())?;
           loop {
             match child_reader.next()? {
-              quick_xml::events::Event::Start(e) => {
+              crate::common::PayloadEvent::Start(e) => {
                 let next_empty = false;
                 let event_name = e.local_name().into_inner();
                 break match event_name {
@@ -2391,7 +2391,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
                   _ => None,
                 };
               }
-              quick_xml::events::Event::Empty(e) => {
+              crate::common::PayloadEvent::Empty(e) => {
                 let next_empty = true;
                 let event_name = e.local_name().into_inner();
                 break match event_name {
@@ -2399,7 +2399,7 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
                   _ => None,
                 };
               }
-              quick_xml::events::Event::Eof => {
+              crate::common::PayloadEvent::Eof => {
                 return Err(crate::common::unexpected_eof(stringify!(#ident)));
               }
               _ => {}
@@ -3314,20 +3314,20 @@ fn build_choice_any_child_parse_tokens(
     if !next_empty {
       loop {
         match (#xml_reader).next()? {
-          quick_xml::events::Event::Start(e) => {
+          crate::common::PayloadEvent::Start(e) => {
             let xml = crate::common::XmlRead::read_raw_element_xml_string(#xml_reader, e)?;
             parsed_child.push(xml);
           }
-          quick_xml::events::Event::Empty(e) => {
+          crate::common::PayloadEvent::Empty(e) => {
             let xml = crate::common::XmlRead::read_raw_empty_xml_string(#xml_reader, e)?;
             parsed_child.push(xml);
           }
-          quick_xml::events::Event::End(end) => {
+          crate::common::PayloadEvent::End(end) => {
             if end.local_name().into_inner() == #local_name_lit {
               break;
             }
           }
-          quick_xml::events::Event::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
           }
           _ => {}
@@ -3582,16 +3582,8 @@ fn expand_helper_struct(
         });
       }
     }
-    push_qname_dispatch_arm(
-      &mut child_match_tokens_borrowed,
-      &field.qname,
-      build_body(),
-    );
-    push_qname_dispatch_arm(
-      &mut child_match_tokens_io,
-      &field.qname,
-      build_body(),
-    );
+    push_qname_dispatch_arm(&mut child_match_tokens_borrowed, &field.qname, build_body());
+    push_qname_dispatch_arm(&mut child_match_tokens_io, &field.qname, build_body());
   }
 
   let mut choice_decl_tokens = Vec::new();
@@ -3789,9 +3781,9 @@ fn expand_helper_struct(
     if __ooxmlsdk_seen_child {
       let _ = event_name;
       xml_reader.unread(if next_empty {
-        quick_xml::events::Event::Empty(e)
+        crate::common::PayloadEvent::Empty(e)
       } else {
-        quick_xml::events::Event::Start(e)
+        crate::common::PayloadEvent::Start(e)
       })?;
       break;
     }
@@ -3805,9 +3797,9 @@ fn expand_helper_struct(
     if __ooxmlsdk_seen_child {
       let _ = event_name;
       xml_reader.unread(if next_empty {
-        quick_xml::events::Event::Empty(e)
+        crate::common::PayloadEvent::Empty(e)
       } else {
-        quick_xml::events::Event::Start(e)
+        crate::common::PayloadEvent::Start(e)
       })?;
       break;
     }
@@ -3951,25 +3943,25 @@ fn expand_helper_struct(
         }
 
         match xml_reader.next()? {
-          quick_xml::events::Event::Start(e) => {
+          crate::common::PayloadEvent::Start(e) => {
             let next_empty = false;
             let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
-          quick_xml::events::Event::Empty(e) => {
+          crate::common::PayloadEvent::Empty(e) => {
             let next_empty = true;
             let event_name = e.local_name().into_inner();
             #main_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
-          quick_xml::events::Event::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if __ooxmlsdk_seen_child {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
+              xml_reader.unread(crate::common::PayloadEvent::End(e))?;
             }
             break;
           }
-          quick_xml::events::Event::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
           _ => continue,
@@ -4715,16 +4707,8 @@ fn expand_named_struct(
         });
       }
     }
-    push_qname_dispatch_arm(
-      &mut child_match_tokens_borrowed,
-      &field.qname,
-      build_body(),
-    );
-    push_qname_dispatch_arm(
-      &mut child_match_tokens_io,
-      &field.qname,
-      build_body(),
-    );
+    push_qname_dispatch_arm(&mut child_match_tokens_borrowed, &field.qname, build_body());
+    push_qname_dispatch_arm(&mut child_match_tokens_io, &field.qname, build_body());
   }
 
   for field in &empty_child_fields {
@@ -5295,9 +5279,9 @@ fn expand_named_struct(
                         #( #borrowed_child_arms )*
                         _ => {
                           xml_reader.unread(if next_empty {
-                            quick_xml::events::Event::Empty(e)
+                            crate::common::PayloadEvent::Empty(e)
                           } else {
-                            quick_xml::events::Event::Start(e)
+                            crate::common::PayloadEvent::Start(e)
                           })?;
                           break;
                         }
@@ -5308,14 +5292,13 @@ fn expand_named_struct(
                         pending_event = Some((e, next_empty));
                       }
                       crate::common::TagEvent::End(e) => {
-                        xml_reader.unread(quick_xml::events::Event::End(e))?;
+                        xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                         break;
                       }
                       crate::common::TagEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::TagEvent::Decl(_)
-                      | crate::common::TagEvent::Other => {}
+                      crate::common::TagEvent::Decl(_) => {}
                     }
                   }
                   #( #final_fields )*
@@ -5331,9 +5314,9 @@ fn expand_named_struct(
                         #( #io_child_arms )*
                         _ => {
                           xml_reader.unread(if next_empty {
-                            quick_xml::events::Event::Empty(e)
+                            crate::common::PayloadEvent::Empty(e)
                           } else {
-                            quick_xml::events::Event::Start(e)
+                            crate::common::PayloadEvent::Start(e)
                           })?;
                           break;
                         }
@@ -5344,14 +5327,13 @@ fn expand_named_struct(
                         pending_event = Some((e, next_empty));
                       }
                       crate::common::TagEvent::End(e) => {
-                        xml_reader.unread(quick_xml::events::Event::End(e))?;
+                        xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                         break;
                       }
                       crate::common::TagEvent::Eof => {
                         return Err(crate::common::unexpected_eof(stringify!(#ident)));
                       }
-                      crate::common::TagEvent::Decl(_)
-                      | crate::common::TagEvent::Other => {}
+                      crate::common::TagEvent::Decl(_) => {}
                     }
                   }
                   #( #final_fields )*
@@ -5713,9 +5695,9 @@ fn expand_named_struct(
                       #( #borrowed_child_arms )*
                       _ => {
                         xml_reader.unread(if next_empty {
-                          quick_xml::events::Event::Empty(e)
+                          crate::common::PayloadEvent::Empty(e)
                         } else {
-                          quick_xml::events::Event::Start(e)
+                          crate::common::PayloadEvent::Start(e)
                         })?;
                         break;
                       }
@@ -5726,14 +5708,13 @@ fn expand_named_struct(
                       pending_event = Some((e, next_empty));
                     }
                     crate::common::TagEvent::End(e) => {
-                      xml_reader.unread(quick_xml::events::Event::End(e))?;
+                      xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                       break;
                     }
                     crate::common::TagEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::TagEvent::Decl(_)
-                    | crate::common::TagEvent::Other => {}
+                    crate::common::TagEvent::Decl(_) => {}
                   }
                 }
                 #( #final_fields )*
@@ -5749,9 +5730,9 @@ fn expand_named_struct(
                       #( #io_child_arms )*
                       _ => {
                         xml_reader.unread(if next_empty {
-                          quick_xml::events::Event::Empty(e)
+                          crate::common::PayloadEvent::Empty(e)
                         } else {
-                          quick_xml::events::Event::Start(e)
+                          crate::common::PayloadEvent::Start(e)
                         })?;
                         break;
                       }
@@ -5762,14 +5743,13 @@ fn expand_named_struct(
                       pending_event = Some((e, next_empty));
                     }
                     crate::common::TagEvent::End(e) => {
-                      xml_reader.unread(quick_xml::events::Event::End(e))?;
+                      xml_reader.unread(crate::common::PayloadEvent::End(e))?;
                       break;
                     }
                     crate::common::TagEvent::Eof => {
                       return Err(crate::common::unexpected_eof(stringify!(#ident)));
                     }
-                    crate::common::TagEvent::Decl(_)
-                    | crate::common::TagEvent::Other => {}
+                    crate::common::TagEvent::Decl(_) => {}
                   }
                 }
                 #( #final_fields )*
@@ -6261,9 +6241,9 @@ fn expand_named_struct(
     let field_ident = &text_field.ident;
     quote! {
       event @ (
-        quick_xml::events::Event::Text(_)
-        | quick_xml::events::Event::CData(_)
-        | quick_xml::events::Event::GeneralRef(_)
+        crate::common::PayloadEvent::Text(_)
+        | crate::common::PayloadEvent::CData(_)
+        | crate::common::PayloadEvent::GeneralRef(_)
       ) => {
         xml_reader.drain_text_field_from_event(
           &mut #field_ident,
@@ -6279,9 +6259,9 @@ fn expand_named_struct(
     } else {
       quote! {
         event @ (
-          quick_xml::events::Event::Text(_)
-          | quick_xml::events::Event::CData(_)
-          | quick_xml::events::Event::GeneralRef(_)
+          crate::common::PayloadEvent::Text(_)
+          | crate::common::PayloadEvent::CData(_)
+          | crate::common::PayloadEvent::GeneralRef(_)
         ) => {
           let mut text_value = None;
           xml_reader.drain_text_field_from_event(
@@ -6637,11 +6617,8 @@ fn expand_named_struct(
   });
   let borrowed_decl_event_tokens = if has_xml_header_field {
     quote! {
-      quick_xml::events::Event::Decl(e) => {
-        xml_header_state = if matches!(
-          e.standalone(),
-          Some(Ok(value)) if value.as_ref().eq_ignore_ascii_case(b"yes")
-        ) {
+      crate::common::PayloadEvent::Decl(standalone) => {
+        xml_header_state = if standalone {
           crate::common::XmlHeaderType::Standalone
         } else {
           crate::common::XmlHeaderType::Plain
@@ -6650,7 +6627,7 @@ fn expand_named_struct(
     }
   } else {
     quote! {
-      quick_xml::events::Event::Decl(_) => {},
+      crate::common::PayloadEvent::Decl(_) => {},
     }
   };
   let tag_decl_tokens_borrowed = if has_xml_header_field {
@@ -6701,25 +6678,25 @@ fn expand_named_struct(
       loop {
         match xml_reader.next()? {
           #borrowed_decl_event_tokens
-          quick_xml::events::Event::Start(e) => {
+          crate::common::PayloadEvent::Start(e) => {
             let next_empty = false;
             #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
-          quick_xml::events::Event::Empty(e) => {
+          crate::common::PayloadEvent::Empty(e) => {
             let next_empty = true;
             #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
           #text_read_tokens
-          quick_xml::events::Event::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          quick_xml::events::Event::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
           _ => {}
@@ -6745,7 +6722,6 @@ fn expand_named_struct(
           crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
-          crate::common::TagEvent::Other => {}
         }
       }
     }
@@ -6760,27 +6736,25 @@ fn expand_named_struct(
       loop {
         match xml_reader.next()? {
           #borrowed_decl_event_tokens
-          quick_xml::events::Event::Start(e) => {
-            let e = e.into_owned();
+          crate::common::PayloadEvent::Start(e) => {
             let next_empty = false;
             #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
-          quick_xml::events::Event::Empty(e) => {
-            let e = e.into_owned();
+          crate::common::PayloadEvent::Empty(e) => {
             let next_empty = true;
             #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
           #text_read_tokens
-          quick_xml::events::Event::End(e) => {
+          crate::common::PayloadEvent::End(e) => {
             if #end_name_matches {
               break;
             }
           }
-          quick_xml::events::Event::Eof => {
+          crate::common::PayloadEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
           _ => {}
@@ -6806,7 +6780,6 @@ fn expand_named_struct(
           crate::common::TagEvent::Eof => {
             return Err(crate::common::unexpected_eof(stringify!(#ident)));
           }
-          crate::common::TagEvent::Other => {}
         }
       }
     }

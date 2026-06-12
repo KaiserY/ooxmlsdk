@@ -19,6 +19,10 @@ impl<'doc> XlsxWorkbook<'doc> {
   pub fn from_spreadsheet_document(_document: &'doc SpreadsheetDocument) -> Self {
     Self::default()
   }
+
+  pub fn build_print_plan(&self) -> XlsxPrintPlan<'doc> {
+    build_print_plan(self)
+  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -405,4 +409,305 @@ pub struct XlsxCellFragment<'doc> {
 pub struct XlsxDrawingFragment<'doc> {
   pub anchor: DrawingAnchor<'doc>,
   pub bounds: Rect,
+}
+
+pub fn build_print_plan<'doc>(workbook: &XlsxWorkbook<'doc>) -> XlsxPrintPlan<'doc> {
+  XlsxPrintPlan {
+    sheet_pages: workbook
+      .sheets
+      .iter()
+      .enumerate()
+      .filter(|(_, sheet)| sheet.state == SheetState::Visible)
+      .filter_map(|(sheet_index, sheet)| printed_sheet(sheet_index, sheet))
+      .collect(),
+  }
+}
+
+fn printed_sheet<'doc>(
+  sheet_index: usize,
+  sheet: &XlsxSheet<'doc>,
+) -> Option<XlsxPrintedSheet<'doc>> {
+  let sheet_range = sheet_print_range(sheet)?;
+  Some(XlsxPrintedSheet {
+    sheet_index,
+    sheet_name: sheet.name.clone(),
+    pages: vec![XlsxPrintPage {
+      page_index: 0,
+      sheet_range,
+      paper_bounds: Rect::default(),
+      content_bounds: Rect::default(),
+      cells: sheet_cell_fragments(sheet, sheet_range),
+      drawings: sheet_drawing_fragments(sheet, sheet_range),
+    }],
+  })
+}
+
+fn sheet_print_range(sheet: &XlsxSheet<'_>) -> Option<CellRange> {
+  sheet
+    .metrics
+    .print_ranges
+    .first()
+    .copied()
+    .map(|range| extend_print_range_for_merges(sheet, range))
+    .or_else(|| occupied_range(sheet))
+}
+
+fn occupied_range(sheet: &XlsxSheet<'_>) -> Option<CellRange> {
+  let mut range = None;
+  for (row_position, row) in sheet.rows.iter().enumerate() {
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    let mut current_column = 0u32;
+    for cell in &row.cells {
+      let address = cell.address.unwrap_or_else(|| {
+        let address = CellAddress {
+          column: current_column,
+          row: row_index.saturating_sub(1),
+        };
+        current_column = current_column.saturating_add(1);
+        address
+      });
+      current_column = address.column.saturating_add(1);
+      extend_range(&mut range, address);
+    }
+  }
+  for drawing_range in drawing_ranges(sheet) {
+    extend_range(&mut range, drawing_range.start);
+    extend_range(&mut range, drawing_range.end);
+  }
+  range.map(|range| {
+    extend_print_range_for_merges(
+      sheet,
+      CellRange {
+        start: CellAddress { column: 0, row: 0 },
+        end: range.end,
+      },
+    )
+  })
+}
+
+fn sheet_cell_fragments<'doc>(
+  sheet: &XlsxSheet<'doc>,
+  sheet_range: CellRange,
+) -> Vec<XlsxCellFragment<'doc>> {
+  let mut fragments = Vec::new();
+  for (row_position, row) in sheet.rows.iter().enumerate() {
+    if row.hidden {
+      continue;
+    }
+    let row_index = row.row_index.unwrap_or(row_position as u32 + 1);
+    let mut current_column = 0u32;
+    for cell in &row.cells {
+      let address = cell.address.unwrap_or_else(|| {
+        let address = CellAddress {
+          column: current_column,
+          row: row_index.saturating_sub(1),
+        };
+        current_column = current_column.saturating_add(1);
+        address
+      });
+      current_column = address.column.saturating_add(1);
+      if !range_contains(sheet_range, address) {
+        continue;
+      }
+      fragments.push(XlsxCellFragment {
+        address,
+        bounds: Rect::default(),
+        text: cell.display_text.clone(),
+        style_index: cell.style_index,
+        merged_range: sheet
+          .metrics
+          .merged_ranges
+          .iter()
+          .copied()
+          .find(|range| range_contains(*range, address)),
+      });
+    }
+  }
+  fragments
+}
+
+fn sheet_drawing_fragments<'doc>(
+  sheet: &XlsxSheet<'doc>,
+  sheet_range: CellRange,
+) -> Vec<XlsxDrawingFragment<'doc>> {
+  sheet
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.anchors.iter())
+    .filter(|anchor| anchor.print_with_sheet)
+    .filter(|anchor| range_contains(sheet_range, anchor.from))
+    .map(|anchor| XlsxDrawingFragment {
+      anchor: anchor.clone(),
+      bounds: anchor.bounds,
+    })
+    .collect()
+}
+
+fn extend_print_range_for_merges(sheet: &XlsxSheet<'_>, mut range: CellRange) -> CellRange {
+  let old_end = range.end;
+  for merged in &sheet.metrics.merged_ranges {
+    if range_contains(
+      CellRange {
+        start: range.start,
+        end: old_end,
+      },
+      merged.start,
+    ) {
+      range.end.column = range.end.column.max(merged.end.column);
+      range.end.row = range.end.row.max(merged.end.row);
+    }
+  }
+  range
+}
+
+fn drawing_ranges<'a, 'doc>(sheet: &'a XlsxSheet<'doc>) -> impl Iterator<Item = CellRange> + 'a {
+  sheet
+    .drawings
+    .iter()
+    .flat_map(|drawing| drawing.anchors.iter())
+    .filter(|anchor| anchor.print_with_sheet)
+    .map(|anchor| CellRange {
+      start: anchor.from,
+      end: anchor.to.unwrap_or(anchor.from),
+    })
+}
+
+fn extend_range(range: &mut Option<CellRange>, address: CellAddress) {
+  *range = Some(match *range {
+    Some(existing) => CellRange {
+      start: CellAddress {
+        column: existing.start.column.min(address.column),
+        row: existing.start.row.min(address.row),
+      },
+      end: CellAddress {
+        column: existing.end.column.max(address.column),
+        row: existing.end.row.max(address.row),
+      },
+    },
+    None => CellRange {
+      start: address,
+      end: address,
+    },
+  });
+}
+
+fn range_contains(range: CellRange, address: CellAddress) -> bool {
+  (range.start.column..=range.end.column).contains(&address.column)
+    && (range.start.row..=range.end.row).contains(&address.row)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn builds_print_plan_from_visible_cells_and_print_range() {
+    let workbook = XlsxWorkbook {
+      sheets: vec![XlsxSheet {
+        name: Cow::Borrowed("Sheet1"),
+        metrics: SheetMetrics {
+          print_ranges: vec![CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 0, row: 0 },
+          }],
+          merged_ranges: vec![CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 1, row: 0 },
+          }],
+          ..SheetMetrics::default()
+        },
+        rows: vec![
+          XlsxRow {
+            row_index: Some(1),
+            cells: vec![
+              XlsxCell {
+                address: Some(CellAddress { column: 0, row: 0 }),
+                display_text: Cow::Borrowed("A"),
+                ..XlsxCell::default()
+              },
+              XlsxCell {
+                address: Some(CellAddress { column: 2, row: 0 }),
+                display_text: Cow::Borrowed("C"),
+                ..XlsxCell::default()
+              },
+            ],
+            ..XlsxRow::default()
+          },
+          XlsxRow {
+            row_index: Some(2),
+            hidden: true,
+            cells: vec![XlsxCell {
+              address: Some(CellAddress { column: 0, row: 1 }),
+              display_text: Cow::Borrowed("hidden"),
+              ..XlsxCell::default()
+            }],
+            ..XlsxRow::default()
+          },
+        ],
+        ..XlsxSheet::default()
+      }],
+      ..XlsxWorkbook::default()
+    };
+
+    let plan = workbook.build_print_plan();
+
+    assert_eq!(plan.sheet_pages.len(), 1);
+    assert_eq!(plan.sheet_pages[0].pages.len(), 1);
+    assert_eq!(
+      plan.sheet_pages[0].pages[0].sheet_range,
+      CellRange {
+        start: CellAddress { column: 0, row: 0 },
+        end: CellAddress { column: 1, row: 0 }
+      }
+    );
+    assert_eq!(plan.sheet_pages[0].pages[0].cells.len(), 1);
+    assert_eq!(plan.sheet_pages[0].pages[0].cells[0].text, "A");
+    assert_eq!(
+      plan.sheet_pages[0].pages[0].cells[0].merged_range,
+      Some(CellRange {
+        start: CellAddress { column: 0, row: 0 },
+        end: CellAddress { column: 1, row: 0 }
+      })
+    );
+  }
+
+  #[test]
+  fn implicit_print_range_starts_at_a1_and_includes_drawings() {
+    let workbook = XlsxWorkbook {
+      sheets: vec![XlsxSheet {
+        name: Cow::Borrowed("Sheet1"),
+        rows: vec![XlsxRow {
+          row_index: Some(3),
+          cells: vec![XlsxCell {
+            address: Some(CellAddress { column: 2, row: 2 }),
+            display_text: Cow::Borrowed("C3"),
+            ..XlsxCell::default()
+          }],
+          ..XlsxRow::default()
+        }],
+        drawings: vec![XlsxDrawing {
+          anchors: vec![DrawingAnchor {
+            kind: DrawingAnchorKind::TwoCell,
+            from: CellAddress { column: 4, row: 4 },
+            to: Some(CellAddress { column: 5, row: 6 }),
+            bounds: Rect::default(),
+            relationship_id: Some(Cow::Borrowed("rId1")),
+            print_with_sheet: true,
+          }],
+        }],
+        ..XlsxSheet::default()
+      }],
+      ..XlsxWorkbook::default()
+    };
+
+    let plan = workbook.build_print_plan();
+
+    assert_eq!(
+      plan.sheet_pages[0].pages[0].sheet_range,
+      CellRange {
+        start: CellAddress { column: 0, row: 0 },
+        end: CellAddress { column: 5, row: 6 }
+      }
+    );
+  }
 }

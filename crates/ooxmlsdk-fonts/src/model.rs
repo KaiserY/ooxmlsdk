@@ -187,7 +187,7 @@ impl<'a> FontBook<'a> {
       synthetic_bold,
       synthetic_italic,
       variation_values: request.variations.clone(),
-      metrics: FontMetrics::default(),
+      metrics: face.metrics.clone(),
       substitution,
       match_diagnostics: FontMatchDiagnostics {
         candidates,
@@ -211,6 +211,7 @@ pub struct FontFaceInfo<'a> {
   pub flags: FontFlags,
   pub axes: Vec<VariationAxis<'a>>,
   pub features: Vec<OpenTypeFeature<'a>>,
+  pub metrics: FontMetrics,
   pub face_index: u32,
 }
 
@@ -229,6 +230,7 @@ impl<'a> FontFaceInfo<'a> {
       flags: FontFlags::default(),
       axes: Vec::new(),
       features: Vec::new(),
+      metrics: FontMetrics::default(),
       face_index: 0,
     }
   }
@@ -263,6 +265,7 @@ impl<'a> FontFaceInfo<'a> {
       monospace: face.is_monospaced(),
       ..FontFlags::default()
     };
+    let metrics = font_metrics_from_ttf(&face, 1.0);
 
     Ok(Self {
       font_id: FontId(Arc::from(id)),
@@ -277,6 +280,7 @@ impl<'a> FontFaceInfo<'a> {
       flags,
       axes: Vec::new(),
       features: Vec::new(),
+      metrics,
       face_index,
     })
   }
@@ -425,6 +429,39 @@ pub struct ResolvedFont<'a> {
   pub match_diagnostics: FontMatchDiagnostics<'a>,
 }
 
+impl<'a> ResolvedFont<'a> {
+  pub fn metrics_at_size(&self, size: FontSize) -> FontMetrics {
+    self.metrics.scaled(size.0)
+  }
+
+  pub fn shape_approximate(
+    &self,
+    text: impl Into<Cow<'a, str>>,
+    size: FontSize,
+    direction: TextDirection,
+    script: Option<TextScript>,
+    language: Option<Cow<'a, str>>,
+  ) -> ShapedRun<'a> {
+    let text = text.into();
+    let safe_breaks = text_safe_breaks(text.as_ref());
+    let glyphs = approximate_glyphs(text.as_ref(), size);
+    let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
+    ShapedRun {
+      font_id: self.font_id.clone(),
+      text_range: 0..text.len(),
+      text,
+      glyphs: Cow::Owned(glyphs),
+      advance_pt,
+      direction,
+      script,
+      language,
+      safe_breaks,
+      approximate: true,
+      decorations: Vec::new(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FontMatchDiagnostics<'a> {
   pub candidates: Vec<FontMatchCandidate<'a>>,
@@ -519,6 +556,22 @@ impl Default for FontMetrics {
   }
 }
 
+impl FontMetrics {
+  pub fn scaled(&self, size_pt: f32) -> Self {
+    let scale = if self.em_size > 0.0 {
+      size_pt / self.em_size
+    } else {
+      size_pt
+    };
+    Self {
+      vertical: self.vertical.scaled(scale),
+      decoration: self.decoration.scaled(scale),
+      script: self.script.scaled(scale),
+      em_size: size_pt,
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct VerticalMetrics {
   pub ascent_pt: f32,
@@ -533,12 +586,40 @@ pub struct VerticalMetrics {
   pub cjk_vertical_advance_pt: f32,
 }
 
+impl VerticalMetrics {
+  fn scaled(self, scale: f32) -> Self {
+    Self {
+      ascent_pt: self.ascent_pt * scale,
+      descent_pt: self.descent_pt * scale,
+      internal_leading_pt: self.internal_leading_pt * scale,
+      external_leading_pt: self.external_leading_pt * scale,
+      line_gap_pt: self.line_gap_pt * scale,
+      ink_height_pt: self.ink_height_pt * scale,
+      baseline_offset_pt: self.baseline_offset_pt * scale,
+      hanging_baseline_pt: self.hanging_baseline_pt * scale,
+      cjk_horizontal_advance_pt: self.cjk_horizontal_advance_pt * scale,
+      cjk_vertical_advance_pt: self.cjk_vertical_advance_pt * scale,
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DecorationMetrics {
   pub underline_offset_pt: f32,
   pub underline_thickness_pt: f32,
   pub strikeout_offset_pt: f32,
   pub strikeout_thickness_pt: f32,
+}
+
+impl DecorationMetrics {
+  fn scaled(self, scale: f32) -> Self {
+    Self {
+      underline_offset_pt: self.underline_offset_pt * scale,
+      underline_thickness_pt: self.underline_thickness_pt * scale,
+      strikeout_offset_pt: self.strikeout_offset_pt * scale,
+      strikeout_thickness_pt: self.strikeout_thickness_pt * scale,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -548,6 +629,18 @@ pub struct ScriptMetrics {
   pub superscript_offset_pt: f32,
   pub subscript_offset_pt: f32,
   pub small_caps_scale: f32,
+}
+
+impl ScriptMetrics {
+  fn scaled(self, scale: f32) -> Self {
+    Self {
+      superscript_scale: self.superscript_scale,
+      subscript_scale: self.subscript_scale,
+      superscript_offset_pt: self.superscript_offset_pt * scale,
+      subscript_offset_pt: self.subscript_offset_pt * scale,
+      small_caps_scale: self.small_caps_scale,
+    }
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -791,6 +884,55 @@ fn stretch_distance(left: FontStretch, right: FontStretch) -> i32 {
   (font_stretch_number(left) - font_stretch_number(right)).abs()
 }
 
+fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
+  let units_per_em = f32::from(face.units_per_em());
+  let to_em = |value: i32| value as f32 / units_per_em * em_size;
+  let ascent_units = face.ascender().max(0);
+  let descent_units = (-face.descender()).max(0);
+  let line_gap_units = face.line_gap().max(0);
+  let fallback_gap_units =
+    (i32::from(face.units_per_em()) - i32::from(ascent_units) - i32::from(descent_units)).max(0);
+  let ascender = to_em(i32::from(ascent_units));
+  let descender = to_em(i32::from(descent_units));
+  let line_gap = if line_gap_units > 0 {
+    to_em(i32::from(line_gap_units))
+  } else {
+    to_em(fallback_gap_units)
+  };
+  let underline = face.underline_metrics();
+  let strikeout = face.strikeout_metrics();
+  FontMetrics {
+    vertical: VerticalMetrics {
+      ascent_pt: ascender,
+      descent_pt: descender,
+      line_gap_pt: line_gap,
+      ink_height_pt: ascender + descender,
+      ..VerticalMetrics::default()
+    },
+    decoration: DecorationMetrics {
+      underline_offset_pt: underline
+        .map(|metrics| -to_em(i32::from(metrics.position)))
+        .unwrap_or_default(),
+      underline_thickness_pt: underline
+        .map(|metrics| to_em(i32::from(metrics.thickness)).abs())
+        .unwrap_or_default(),
+      strikeout_offset_pt: strikeout
+        .map(|metrics| to_em(i32::from(metrics.position)))
+        .unwrap_or_default(),
+      strikeout_thickness_pt: strikeout
+        .map(|metrics| to_em(i32::from(metrics.thickness)).abs())
+        .unwrap_or_default(),
+    },
+    script: ScriptMetrics {
+      superscript_scale: 1.0,
+      subscript_scale: 1.0,
+      small_caps_scale: 1.0,
+      ..ScriptMetrics::default()
+    },
+    em_size,
+  }
+}
+
 fn font_weight_number(weight: FontWeight) -> i32 {
   match weight {
     FontWeight::Thin => 100,
@@ -803,6 +945,34 @@ fn font_weight_number(weight: FontWeight) -> i32 {
     FontWeight::ExtraBold => 800,
     FontWeight::Black => 900,
   }
+}
+
+fn approximate_glyphs(text: &str, _size: FontSize) -> Vec<ShapedGlyph> {
+  text
+    .char_indices()
+    .map(|(start, ch)| {
+      let end = start + ch.len_utf8();
+      ShapedGlyph {
+        glyph_id: 0,
+        cluster: start as u32,
+        text_range: start..end,
+        x_advance_pt: 0.0,
+        y_advance_pt: 0.0,
+        x_offset_pt: 0.0,
+        y_offset_pt: 0.0,
+        safe_to_break: ch.is_whitespace(),
+        source_char: Some(ch),
+        justifiable: ch.is_whitespace(),
+      }
+    })
+    .collect()
+}
+
+fn text_safe_breaks(text: &str) -> Vec<usize> {
+  text
+    .char_indices()
+    .filter_map(|(index, ch)| ch.is_whitespace().then_some(index + ch.len_utf8()))
+    .collect()
 }
 
 fn font_stretch_number(stretch: FontStretch) -> i32 {
@@ -908,5 +1078,63 @@ mod tests {
       resolved.substitution.unwrap().reason,
       FontSubstitutionReason::Alias
     );
+  }
+
+  #[test]
+  fn resolved_font_scales_face_metrics() {
+    let mut registry = FontRegistry::new();
+    let mut face = FontFaceInfo::synthetic("example", "Example");
+    face.metrics = FontMetrics {
+      vertical: VerticalMetrics {
+        ascent_pt: 1.0,
+        descent_pt: 0.25,
+        ..VerticalMetrics::default()
+      },
+      em_size: 1.0,
+      ..FontMetrics::default()
+    };
+    registry.register_face(FontSource::System, face);
+
+    let resolved = registry
+      .resolve(&FontRequest {
+        family: Some(Cow::Borrowed("Example")),
+        ..FontRequest::default()
+      })
+      .unwrap();
+    let metrics = resolved.metrics_at_size(FontSize(12.0));
+
+    assert_eq!(metrics.vertical.ascent_pt, 12.0);
+    assert_eq!(metrics.vertical.descent_pt, 3.0);
+  }
+
+  #[test]
+  fn approximate_shaping_preserves_text_ranges_without_fake_advances() {
+    let resolved = ResolvedFont {
+      font_id: FontId(Arc::from("example")),
+      requested_family: Some(Cow::Borrowed("Example")),
+      resolved_family: Cow::Borrowed("Example"),
+      source: FontSource::System,
+      face_index: 0,
+      synthetic_bold: false,
+      synthetic_italic: false,
+      variation_values: Vec::new(),
+      metrics: FontMetrics::default(),
+      substitution: None,
+      match_diagnostics: FontMatchDiagnostics::default(),
+    };
+
+    let shaped = resolved.shape_approximate(
+      Cow::Borrowed("A B"),
+      FontSize(12.0),
+      TextDirection::LeftToRight,
+      Some(TextScript::Latin),
+      None,
+    );
+
+    assert!(shaped.approximate);
+    assert_eq!(shaped.glyphs.len(), 3);
+    assert_eq!(shaped.glyphs[0].text_range, 0..1);
+    assert_eq!(shaped.glyphs[0].x_advance_pt, 0.0);
+    assert_eq!(shaped.safe_breaks, vec![2]);
   }
 }

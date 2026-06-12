@@ -50,10 +50,18 @@ impl<'doc> WorkbookValueModel<'doc> {
         worksheet_value_model(identity, worksheet.as_ref(), &shared_strings)
       })
       .collect::<Result<Vec<_>>>()?;
+    let shared_formula_groups = shared_formula_groups(&sheets);
+    let array_formula_groups = array_formula_groups(&sheets);
+    let data_tables = data_tables(&sheets);
+    let dependency_graph = dependency_graph(&sheets);
 
     Ok(Self {
       calculation_settings: calculation_settings(&workbook),
       defined_names: defined_names(&workbook),
+      shared_formula_groups,
+      array_formula_groups,
+      data_tables,
+      dependency_graph,
       identity,
       sheets,
       ..Self::default()
@@ -178,6 +186,14 @@ pub struct FormulaCell<'doc> {
   pub address: CellAddress,
   pub formula_kind: FormulaKind,
   pub formula_text: Cow<'doc, str>,
+  pub reference: Option<CellRange>,
+  pub input1: Option<QualifiedRange<'doc>>,
+  pub input2: Option<QualifiedRange<'doc>>,
+  pub data_table_row: bool,
+  pub data_table2d: bool,
+  pub input1_deleted: bool,
+  pub input2_deleted: bool,
+  pub assigns_value_to_name: bool,
   pub parsed_formula: Option<ParsedFormula<'doc>>,
   pub cached_value: Option<FormulaValue<'doc>>,
   pub evaluated_value: Option<FormulaValue<'doc>>,
@@ -324,13 +340,16 @@ pub struct UnsupportedFormulaFeature<'doc> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SharedFormulaGroup<'doc> {
   pub index: u32,
+  pub sheet: SheetId,
   pub origin: CellAddress,
   pub range: Option<CellRange>,
   pub formula_text: Cow<'doc, str>,
+  pub dependents: Vec<CellAddress>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArrayFormulaGroup<'doc> {
+  pub sheet: SheetId,
   pub range: CellRange,
   pub formula_text: Cow<'doc, str>,
   pub always_calculate: bool,
@@ -338,9 +357,12 @@ pub struct ArrayFormulaGroup<'doc> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DataTableFormula<'doc> {
+  pub sheet: SheetId,
   pub range: CellRange,
   pub input1: Option<QualifiedRange<'doc>>,
   pub input2: Option<QualifiedRange<'doc>>,
+  pub input1_deleted: bool,
+  pub input2_deleted: bool,
   pub row_table: bool,
   pub two_dimensional: bool,
 }
@@ -506,7 +528,10 @@ fn worksheet_value_model<'doc>(
             current_column = current_column.saturating_add(1);
             address
           });
-        cells.insert(address, cell_value_record(address, cell, shared_strings)?);
+        cells.insert(
+          address,
+          cell_value_record(identity.id, address, cell, shared_strings)?,
+        );
       }
     }
   }
@@ -519,19 +544,43 @@ fn worksheet_value_model<'doc>(
 }
 
 fn cell_value_record<'doc>(
+  sheet: SheetId,
   address: CellAddress,
   cell: &x::Cell,
   shared_strings: &[String],
 ) -> Result<CellValueRecord<'doc>> {
   let raw_value = cell_value(cell, shared_strings);
+  let dirty = cell.cell_formula.as_ref().is_some_and(|formula| {
+    formula.calculate_cell.is_some_and(|value| value.as_bool())
+      || formula
+        .always_calculate_array
+        .is_some_and(|value| value.as_bool())
+  });
   let formula = cell.cell_formula.as_ref().map(|formula| FormulaCell {
     address,
     formula_kind: formula_kind(formula),
     formula_text: Cow::Owned(formula.xml_content.clone().unwrap_or_default()),
+    reference: formula
+      .reference
+      .as_deref()
+      .and_then(|reference| CellRange::parse_a1(reference).ok()),
+    input1: formula
+      .r1
+      .as_deref()
+      .and_then(|reference| qualified_range(sheet, reference)),
+    input2: formula
+      .r2
+      .as_deref()
+      .and_then(|reference| qualified_range(sheet, reference)),
+    data_table_row: formula.data_table_row.is_some_and(|value| value.as_bool()),
+    data_table2d: formula.data_table2_d.is_some_and(|value| value.as_bool()),
+    input1_deleted: formula.input1_deleted.is_some_and(|value| value.as_bool()),
+    input2_deleted: formula.input2_deleted.is_some_and(|value| value.as_bool()),
+    assigns_value_to_name: formula.bx.is_some_and(|value| value.as_bool()),
     parsed_formula: None,
     cached_value: Some(raw_value.clone()).filter(|value| !matches!(value, FormulaValue::Blank)),
     evaluated_value: None,
-    formula_state: if formula.calculate_cell.is_some_and(|value| value.as_bool()) {
+    formula_state: if dirty {
       FormulaState::Stale
     } else {
       FormulaState::CachedOnly
@@ -541,7 +590,7 @@ fn cell_value_record<'doc>(
       format_code: None,
       locale: None,
     }),
-    dirty: formula.calculate_cell.is_some_and(|value| value.as_bool()),
+    dirty,
     volatile: false,
   });
   let display_value = Some(DisplayValue {
@@ -721,6 +770,174 @@ fn formula_kind(formula: &x::CellFormula) -> FormulaKind {
       None => FormulaKind::SharedDependent { group_index: 0 },
     },
   }
+}
+
+fn shared_formula_groups<'doc>(
+  sheets: &[WorksheetValueModel<'doc>],
+) -> Vec<SharedFormulaGroup<'doc>> {
+  let mut groups = Vec::new();
+  for sheet in sheets {
+    for (address, record) in &sheet.cells {
+      let Some(formula) = &record.formula else {
+        continue;
+      };
+      let FormulaKind::SharedDefinition { group_index } = formula.formula_kind else {
+        continue;
+      };
+      groups.push(SharedFormulaGroup {
+        index: group_index,
+        sheet: sheet.id,
+        origin: *address,
+        range: formula.reference,
+        formula_text: formula.formula_text.clone(),
+        dependents: sheet
+          .cells
+          .iter()
+          .filter_map(|(dependent_address, dependent_record)| {
+            dependent_record
+              .formula
+              .as_ref()
+              .and_then(|dependent_formula| match dependent_formula.formula_kind {
+                FormulaKind::SharedDependent {
+                  group_index: dependent_index,
+                } if dependent_index == group_index => Some(*dependent_address),
+                _ => None,
+              })
+          })
+          .collect(),
+      });
+    }
+  }
+  groups
+}
+
+fn array_formula_groups<'doc>(
+  sheets: &[WorksheetValueModel<'doc>],
+) -> Vec<ArrayFormulaGroup<'doc>> {
+  let mut groups = Vec::new();
+  for sheet in sheets {
+    for (address, record) in &sheet.cells {
+      let Some(formula) = &record.formula else {
+        continue;
+      };
+      if formula.formula_kind != FormulaKind::Array {
+        continue;
+      }
+      groups.push(ArrayFormulaGroup {
+        sheet: sheet.id,
+        range: formula.reference.unwrap_or(CellRange {
+          start: *address,
+          end: *address,
+        }),
+        formula_text: formula.formula_text.clone(),
+        always_calculate: formula.dirty,
+      });
+    }
+  }
+  groups
+}
+
+fn data_tables<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> Vec<DataTableFormula<'doc>> {
+  let mut tables = Vec::new();
+  for sheet in sheets {
+    for (address, record) in &sheet.cells {
+      let Some(formula) = &record.formula else {
+        continue;
+      };
+      if formula.formula_kind != FormulaKind::DataTable {
+        continue;
+      }
+      tables.push(DataTableFormula {
+        sheet: sheet.id,
+        range: formula.reference.unwrap_or(CellRange {
+          start: *address,
+          end: *address,
+        }),
+        input1: formula.input1.clone(),
+        input2: formula.input2.clone(),
+        input1_deleted: formula.input1_deleted,
+        input2_deleted: formula.input2_deleted,
+        row_table: formula.data_table_row,
+        two_dimensional: formula.data_table2d,
+      });
+    }
+  }
+  tables
+}
+
+fn dependency_graph<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> DependencyGraph<'doc> {
+  let mut graph = DependencyGraph::default();
+  for sheet in sheets {
+    for (address, record) in &sheet.cells {
+      let Some(formula) = &record.formula else {
+        continue;
+      };
+      let node = DependencyNode {
+        sheet: sheet.id,
+        cell: *address,
+      };
+      graph.nodes.push(node);
+      for dependency in formula_dependencies(sheet.id, &formula.formula_text) {
+        graph.edges.push(DependencyEdge {
+          from: node,
+          to: dependency,
+          volatile: formula.volatile,
+        });
+      }
+    }
+  }
+  graph
+}
+
+fn formula_dependencies<'doc>(
+  sheet: SheetId,
+  formula_text: &Cow<'doc, str>,
+) -> Vec<FormulaDependency<'doc>> {
+  let mut dependencies = Vec::new();
+  for token in formula_text
+    .split(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'')))
+    .map(trim_formula_token)
+    .filter(|token| !token.is_empty())
+  {
+    if token.contains(':') {
+      if let Ok(range) = CellRange::parse_a1(token) {
+        dependencies.push(FormulaDependency::Range(QualifiedRange {
+          sheet,
+          sheet_name: None,
+          range,
+          start_flags: Default::default(),
+          end_flags: Default::default(),
+        }));
+      }
+    } else if let Ok(address) = CellAddress::parse_a1(token) {
+      dependencies.push(FormulaDependency::Cell { sheet, address });
+    }
+  }
+  dependencies
+}
+
+fn qualified_range<'doc>(sheet: SheetId, reference: &str) -> Option<QualifiedRange<'doc>> {
+  CellRange::parse_a1(reference)
+    .ok()
+    .or_else(|| {
+      CellAddress::parse_a1(reference)
+        .ok()
+        .map(|address| CellRange {
+          start: address,
+          end: address,
+        })
+    })
+    .map(|range| QualifiedRange {
+      sheet,
+      sheet_name: None,
+      range,
+      start_flags: Default::default(),
+      end_flags: Default::default(),
+    })
+}
+
+fn trim_formula_token(value: &str) -> &str {
+  value.trim_matches(|ch: char| matches!(ch, ',' | ';' | '(' | ')' | '{' | '}' | '[' | ']'))
 }
 
 fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
@@ -994,6 +1211,169 @@ mod tests {
       record.display_value.as_ref().unwrap().text,
       Cow::Borrowed("4.0999999999999996")
     );
+  }
+
+  #[test]
+  fn collects_shared_formula_groups_and_dependents() {
+    let identity = WorksheetIdentity {
+      id: SheetId(1),
+      name: Cow::Borrowed("Sheet1"),
+      relationship_id: Some(Cow::Borrowed("rId1")),
+      visible: true,
+    };
+    let worksheet = x::Worksheet {
+      sheet_data: Box::new(x::SheetData {
+        row: vec![x::Row {
+          row_index: Some(1),
+          cell: vec![
+            x::Cell {
+              cell_reference: Some("A1".to_string()),
+              cell_formula: Some(x::CellFormula {
+                formula_type: Some(x::CellFormulaValues::Shared),
+                shared_index: Some(7),
+                reference: Some("A1:A2".to_string()),
+                xml_content: Some("B1".to_string()),
+                ..x::CellFormula::default()
+              }),
+              ..x::Cell::default()
+            },
+            x::Cell {
+              cell_reference: Some("A2".to_string()),
+              cell_formula: Some(x::CellFormula {
+                formula_type: Some(x::CellFormulaValues::Shared),
+                shared_index: Some(7),
+                ..x::CellFormula::default()
+              }),
+              ..x::Cell::default()
+            },
+          ],
+          ..x::Row::default()
+        }],
+      }),
+      ..x::Worksheet::default()
+    };
+    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let groups = shared_formula_groups(&[sheet]);
+
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].index, 7);
+    assert_eq!(
+      groups[0].range,
+      Some(CellRange {
+        start: CellAddress { column: 0, row: 0 },
+        end: CellAddress { column: 0, row: 1 }
+      })
+    );
+    assert_eq!(
+      groups[0].dependents,
+      vec![CellAddress { column: 0, row: 1 }]
+    );
+  }
+
+  #[test]
+  fn collects_array_and_data_table_formula_metadata() {
+    let identity = WorksheetIdentity {
+      id: SheetId(1),
+      name: Cow::Borrowed("Sheet1"),
+      relationship_id: Some(Cow::Borrowed("rId1")),
+      visible: true,
+    };
+    let worksheet = x::Worksheet {
+      sheet_data: Box::new(x::SheetData {
+        row: vec![x::Row {
+          row_index: Some(1),
+          cell: vec![
+            x::Cell {
+              cell_reference: Some("A1".to_string()),
+              cell_formula: Some(x::CellFormula {
+                formula_type: Some(x::CellFormulaValues::Array),
+                reference: Some("A1:B2".to_string()),
+                always_calculate_array: Some(ooxmlsdk::simple_type::BooleanValue::True),
+                xml_content: Some("SUM(C1:C2)".to_string()),
+                ..x::CellFormula::default()
+              }),
+              ..x::Cell::default()
+            },
+            x::Cell {
+              cell_reference: Some("D1".to_string()),
+              cell_formula: Some(x::CellFormula {
+                formula_type: Some(x::CellFormulaValues::DataTable),
+                reference: Some("D1:E3".to_string()),
+                data_table2_d: Some(ooxmlsdk::simple_type::BooleanValue::True),
+                data_table_row: Some(ooxmlsdk::simple_type::BooleanValue::True),
+                input1_deleted: Some(ooxmlsdk::simple_type::BooleanValue::True),
+                r1: Some("B1".to_string()),
+                r2: Some("B2".to_string()),
+                ..x::CellFormula::default()
+              }),
+              ..x::Cell::default()
+            },
+          ],
+          ..x::Row::default()
+        }],
+      }),
+      ..x::Worksheet::default()
+    };
+    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let arrays = array_formula_groups(std::slice::from_ref(&sheet));
+    let tables = data_tables(&[sheet]);
+
+    assert_eq!(arrays.len(), 1);
+    assert_eq!(arrays[0].sheet, SheetId(1));
+    assert!(arrays[0].always_calculate);
+    assert_eq!(tables.len(), 1);
+    assert!(tables[0].row_table);
+    assert!(tables[0].two_dimensional);
+    assert!(tables[0].input1_deleted);
+    assert!(!tables[0].input2_deleted);
+    assert_eq!(
+      tables[0].input1.as_ref().unwrap().range,
+      CellRange {
+        start: CellAddress { column: 1, row: 0 },
+        end: CellAddress { column: 1, row: 0 }
+      }
+    );
+  }
+
+  #[test]
+  fn builds_dependency_edges_from_a1_references() {
+    let sheet = WorksheetValueModel {
+      id: SheetId(1),
+      name: Cow::Borrowed("Sheet1"),
+      cells: BTreeMap::from([(
+        CellAddress { column: 0, row: 0 },
+        CellValueRecord {
+          formula: Some(FormulaCell {
+            address: CellAddress { column: 0, row: 0 },
+            formula_kind: FormulaKind::Normal,
+            formula_text: Cow::Borrowed("SUM(B1:C2)+D4"),
+            reference: None,
+            input1: None,
+            input2: None,
+            data_table_row: false,
+            data_table2d: false,
+            input1_deleted: false,
+            input2_deleted: false,
+            assigns_value_to_name: false,
+            parsed_formula: None,
+            cached_value: None,
+            evaluated_value: None,
+            formula_state: FormulaState::CachedOnly,
+            number_format_context: None,
+            dirty: false,
+            volatile: false,
+          }),
+          ..CellValueRecord::default()
+        },
+      )]),
+    };
+
+    let graph = dependency_graph(&[sheet]);
+
+    assert_eq!(graph.nodes.len(), 1);
+    assert_eq!(graph.edges.len(), 2);
+    assert!(matches!(graph.edges[0].to, FormulaDependency::Range(_)));
+    assert!(matches!(graph.edges[1].to, FormulaDependency::Cell { .. }));
   }
 
   #[test]

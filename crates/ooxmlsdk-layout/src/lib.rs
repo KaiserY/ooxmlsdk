@@ -82,17 +82,19 @@ pub fn layout_xlsx_model<'doc>(
   {
     let bounds = Rect::default();
     push_page(&mut layout, Some(sheet.name.clone()), bounds);
-    for row in &sheet.rows {
-      for cell in &row.cells {
-        let reference = cell
-          .reference
-          .clone()
-          .or_else(|| cell.address.map(format_xlsx_address).map(Cow::Owned))
-          .unwrap_or(Cow::Borrowed(""));
+  }
+  let print_plan = if workbook.print_plan.sheet_pages.is_empty() {
+    workbook.build_print_plan()
+  } else {
+    workbook.print_plan.clone()
+  };
+  for printed_sheet in &print_plan.sheet_pages {
+    for page in &printed_sheet.pages {
+      for cell in &page.cells {
         layout.debug_records.push(DebugRecord::Cell(DebugCell {
-          sheet: sheet.name.clone(),
-          reference,
-          bounds: Rect::default(),
+          sheet: printed_sheet.sheet_name.clone(),
+          reference: Cow::Owned(format_xlsx_address(cell.address)),
+          bounds: cell.bounds,
         }));
       }
     }

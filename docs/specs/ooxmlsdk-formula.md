@@ -559,3 +559,27 @@ Scope:
 
 Done when simple evaluator fixtures pass while unsupported functions still
 produce structured state.
+
+### 14.5 Current Implementation Checkpoint
+
+Implemented in this stage:
+
+- workbook and worksheet identity import from typed SpreadsheetML parts
+- cell cached value/display value import, including shared and inline strings
+- formula kind import for normal, shared, array, and data table cells
+- shared formula group metadata with definition cell, `si`, `ref`, and
+  dependent addresses
+- array formula and data table ranges, dirty/always-calculate flags, and data
+  table input references/deleted-input flags where OOXML provides them
+- lightweight dependency graph edges for directly parseable A1 cell/range
+  tokens
+
+Still intentionally not implemented:
+
+- shared formula text expansion or relative-reference translation
+- full Calc compiler tokenization, external references, names, and volatile
+  function detection
+- evaluator logic beyond preserving cached/display values
+
+Do not fill these gaps with local guesses. Add LO-derived tests first, then
+translate the relevant Calc import/compiler behavior.

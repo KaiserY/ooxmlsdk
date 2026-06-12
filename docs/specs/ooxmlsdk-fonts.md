@@ -497,3 +497,27 @@ Scope:
 
 Done when layout can measure and shape text through `ooxmlsdk-fonts` without
 calling PDF code.
+
+### 15.4 Current Implementation Checkpoint
+
+Implemented in this stage:
+
+- deterministic in-memory face registration and family alias resolution
+- TTF face metadata import for names, weight, slant, stretch, pitch, and
+  PDF/LO-aligned vertical/decoration metric signs
+- match diagnostics based on explicit attribute comparison instead of arbitrary
+  weighted scores
+- resolved-font metrics scaling by requested point size
+- approximate shaping records that preserve clusters, source ranges, safe break
+  positions, direction, script, and language
+
+Still intentionally not implemented:
+
+- host/system font discovery
+- LO-backed substitution tables and last-resort fallback chains
+- rustybuzz glyph shaping, glyph ids, advances, offsets, fallback splitting,
+  and script/language itemization
+
+Approximate shaping must keep `approximate = true` and must not invent glyph
+advances or glyph ids. Real advances come only after rustybuzz/font-table
+translation is implemented.

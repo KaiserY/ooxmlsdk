@@ -937,3 +937,25 @@ Do not migrate `ooxmlsdk-pdf` until:
   `../ooxmlsdk-test-suite/` and passes against `ooxmlsdk-layout`
 - unsupported features are recorded as structured records instead of being
   silently dropped
+
+### 15.6 Current Implementation Checkpoint
+
+Implemented in this stage:
+
+- DOCX/XLSX/PPTX layout entry points that emit `LayoutDocument` debug records
+  without depending on `ooxmlsdk-pdf`
+- XLSX `XlsxPrintPlan` construction for visible sheets, explicit print ranges,
+  LO-style implicit A1-start occupied ranges, hidden rows, merged-range
+  expansion, and printable drawing anchors
+- `layout_xlsx_model` consumes the print plan for cell debug records instead of
+  re-parsing formula or inventing display text
+
+Still intentionally not implemented:
+
+- paper size defaults, row/column-derived geometry, pagination, repeated
+  rows/columns, and page-break splitting
+- DOCX line layout and PPTX text-body layout
+- any PDF adapter migration
+
+Unknown geometry must remain zero/default until a LO-backed page setup,
+row/column, or drawing anchor rule is translated.

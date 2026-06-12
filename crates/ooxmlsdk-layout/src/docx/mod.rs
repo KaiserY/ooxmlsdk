@@ -4,7 +4,9 @@ use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
 use ooxmlsdk::schemas::w;
 use ooxmlsdk_fonts::FontRequest;
 
-use crate::common::{Fill, Insets, Pt, Rect, Size, Stroke, Twips};
+use crate::common::{
+  Fill, Insets, LayoutFontRequest, Pt, Rect, ScriptFontFamilies, Size, Stroke, Twips,
+};
 
 // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx PageMar.
 const DEFAULT_PAGE_MARGIN_TWIPS: i32 = 1440;
@@ -245,10 +247,10 @@ fn import_run<'doc>(run: &w::Run) -> Vec<InlineItem<'doc>> {
         style: style.clone(),
       })),
       w::RunChoice::FootnoteReference(reference) => {
-        inlines.push(InlineItem::FootnoteReference(reference.id as i64));
+        inlines.push(InlineItem::FootnoteReference(reference.id));
       }
       w::RunChoice::EndnoteReference(reference) => {
-        inlines.push(InlineItem::EndnoteReference(reference.id as i64));
+        inlines.push(InlineItem::EndnoteReference(reference.id));
       }
       w::RunChoice::LastRenderedPageBreak => inlines.push(InlineItem::LastRenderedPageBreak),
       w::RunChoice::Drawing(_) | w::RunChoice::Picture(_) | w::RunChoice::EmbeddedObject(_) => {
@@ -265,13 +267,20 @@ fn import_run_style<'doc>(properties: &w::RunProperties) -> TextStyle<'doc> {
   for choice in &properties.run_properties_choice {
     match choice {
       w::RunPropertiesChoice::RunFonts(fonts) => {
-        style.font.family = fonts
-          .ascii
+        style.font_families = Box::new(ScriptFontFamilies {
+          latin: fonts.ascii.clone().map(Cow::Owned),
+          high_ansi: fonts.high_ansi.clone().map(Cow::Owned),
+          east_asian: fonts.east_asia.clone().map(Cow::Owned),
+          complex_script: fonts.complex_script.clone().map(Cow::Owned),
+          ..ScriptFontFamilies::default()
+        });
+        style.font.family = style
+          .font_families
+          .high_ansi
           .clone()
-          .or_else(|| fonts.high_ansi.clone())
-          .or_else(|| fonts.east_asia.clone())
-          .or_else(|| fonts.complex_script.clone())
-          .map(Cow::Owned);
+          .or_else(|| style.font_families.latin.clone())
+          .or_else(|| style.font_families.east_asian.clone())
+          .or_else(|| style.font_families.complex_script.clone());
       }
       w::RunPropertiesChoice::Bold(value) => {
         style.bold = value.val.map(|value| value.as_bool()).unwrap_or(true);
@@ -583,6 +592,7 @@ pub struct FieldRun<'doc> {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextStyle<'doc> {
   pub font: FontRequest<'doc>,
+  pub font_families: Box<ScriptFontFamilies<'doc>>,
   pub color: crate::common::Color,
   pub highlight: Option<crate::common::Color>,
   pub bold: bool,
@@ -593,6 +603,15 @@ pub struct TextStyle<'doc> {
   pub all_caps: bool,
   pub character_spacing: Pt,
   pub baseline_shift: Pt,
+}
+
+impl<'doc> TextStyle<'doc> {
+  pub fn layout_font_request(&self) -> LayoutFontRequest<'doc> {
+    LayoutFontRequest {
+      base: self.font.clone(),
+      families: (*self.font_families).clone(),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

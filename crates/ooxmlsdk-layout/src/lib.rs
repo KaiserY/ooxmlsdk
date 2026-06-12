@@ -8,10 +8,10 @@ use std::borrow::Cow;
 
 use common::{
   DebugCell, DebugFrame, DebugPage, DebugRecord, DebugShape, DebugTextLine, DisplayDocument,
-  DisplayPage, FrameId, FrameRecord, GlyphRun, LayoutDocument, LayoutEngineKind, LayoutOptions,
-  Point, Pt, Rect, RectItem, Size, TextRun,
+  DisplayPage, FrameId, FrameRecord, GlyphRun, LayoutDocument, LayoutEngineKind, LayoutFontRequest,
+  LayoutOptions, Point, Pt, Rect, RectItem, Size, TextRun,
 };
-use ooxmlsdk_fonts::{FontRegistry, FontRequest, TextDirection};
+use ooxmlsdk_fonts::{FontRegistry, TextDirection, TextScript};
 
 pub use error::{LayoutError, Result};
 
@@ -76,7 +76,7 @@ fn layout_docx_model_impl<'doc>(
             }));
           if let Some(text) = docx_paragraph_visible_text(paragraph) {
             let style = docx_paragraph_first_text_style(paragraph);
-            let font_request = style.as_ref().map(|(font, _)| font);
+            let font_request = style.as_ref().map(|(font, _)| font.clone());
             let color = style.as_ref().map(|(_, color)| *color).unwrap_or_default();
             push_display_text(
               &mut layout.pages[section_index],
@@ -126,6 +126,22 @@ pub fn layout_xlsx_model<'doc>(
   workbook: &xlsx::XlsxWorkbook<'doc>,
   options: LayoutOptions,
 ) -> LayoutDocument<'doc> {
+  layout_xlsx_model_impl(workbook, options, None)
+}
+
+pub fn layout_xlsx_model_with_fonts<'doc>(
+  workbook: &xlsx::XlsxWorkbook<'doc>,
+  options: LayoutOptions,
+  fonts: &FontRegistry<'doc>,
+) -> LayoutDocument<'doc> {
+  layout_xlsx_model_impl(workbook, options, Some(fonts))
+}
+
+fn layout_xlsx_model_impl<'doc>(
+  workbook: &xlsx::XlsxWorkbook<'doc>,
+  options: LayoutOptions,
+  fonts: Option<&FontRegistry<'doc>>,
+) -> LayoutDocument<'doc> {
   let mut layout = LayoutDocument {
     engine_kind: LayoutEngineKind::Xlsx,
     options,
@@ -151,20 +167,32 @@ pub fn layout_xlsx_model<'doc>(
           bounds: cell.bounds,
         }));
         if !cell.text.is_empty() {
-          layout.pages[page_index]
-            .items
-            .push(common::DisplayItem::Text(TextRun {
-              text: cell.text.clone(),
-              origin: cell.bounds.origin,
-              font_id: None,
-              color: Default::default(),
-              source: None,
-            }));
+          let style = xlsx_cell_text_style(workbook, cell);
+          push_display_text(
+            &mut layout.pages[page_index],
+            cell.text.clone(),
+            cell.bounds.origin,
+            style.as_ref().map(xlsx::XlsxTextStyle::layout_font_request),
+            style.and_then(|style| style.color).unwrap_or_default(),
+            fonts,
+          );
         }
       }
     }
   }
   layout
+}
+
+fn xlsx_cell_text_style<'doc>(
+  workbook: &xlsx::XlsxWorkbook<'doc>,
+  cell: &xlsx::XlsxCellFragment<'doc>,
+) -> Option<xlsx::XlsxTextStyle<'doc>> {
+  let index = cell.style_index? as usize;
+  workbook
+    .styles
+    .cell_formats
+    .get(index)
+    .map(|format| format.text_style.clone())
 }
 
 pub fn layout_pptx_model<'doc>(
@@ -289,10 +317,10 @@ fn docx_paragraph_line_height(paragraph: &docx::DocxParagraph<'_>) -> Pt {
 
 fn docx_paragraph_first_text_style<'doc>(
   paragraph: &docx::DocxParagraph<'doc>,
-) -> Option<(FontRequest<'doc>, common::Color)> {
+) -> Option<(LayoutFontRequest<'doc>, common::Color)> {
   paragraph.inlines.iter().find_map(|inline| match inline {
     docx::InlineItem::Text(run) if !run.text.is_empty() => {
-      Some((run.style.font.clone(), run.style.color))
+      Some((run.style.layout_font_request(), run.style.color))
     }
     _ => None,
   })
@@ -351,7 +379,7 @@ fn push_pptx_shape_debug<'doc>(
         x: shape.transform.dx,
         y: shape.transform.dy,
       },
-      style.map(|style| &style.font),
+      style.map(|style| LayoutFontRequest::from_font_request(style.font.clone())),
       style.and_then(|style| style.color).unwrap_or_default(),
       fonts,
     );
@@ -367,7 +395,7 @@ fn push_display_text<'doc>(
   page: &mut DisplayPage<'doc>,
   text: Cow<'doc, str>,
   origin: Point,
-  font: Option<&FontRequest<'doc>>,
+  font: Option<LayoutFontRequest<'doc>>,
   color: common::Color,
   fonts: Option<&FontRegistry<'doc>>,
 ) {
@@ -381,10 +409,8 @@ fn push_display_text<'doc>(
     }));
     return;
   };
-  let request = font.cloned().unwrap_or_default();
-  let shape_text = Cow::Owned(text.as_ref().to_owned());
-  let Ok(shaped_runs) = fonts.shape_text_runs(&request, shape_text, TextDirection::LeftToRight)
-  else {
+  let request = font.unwrap_or_default();
+  let Ok(shaped_runs) = shape_layout_text_runs(fonts, &request, text.as_ref()) else {
     page.items.push(common::DisplayItem::Text(TextRun {
       text,
       origin,
@@ -408,6 +434,61 @@ fn push_display_text<'doc>(
       source: None,
     }));
     x += advance;
+  }
+}
+
+fn shape_layout_text_runs<'doc>(
+  fonts: &FontRegistry<'doc>,
+  request: &LayoutFontRequest<'doc>,
+  text: &str,
+) -> ooxmlsdk_fonts::Result<Vec<ooxmlsdk_fonts::ShapedRun<'doc>>> {
+  let mut runs = Vec::new();
+  for (range, script) in script_ranges(text) {
+    let font_request = request.for_script(script);
+    let segment = Cow::Owned(text[range.clone()].to_owned());
+    for mut run in fonts.shape_text_runs(&font_request, segment, TextDirection::LeftToRight)? {
+      run.offset_text_range(range.start);
+      runs.push(run);
+    }
+  }
+  Ok(runs)
+}
+
+fn script_ranges(text: &str) -> Vec<(std::ops::Range<usize>, TextScript)> {
+  let mut ranges = Vec::new();
+  let mut start = 0usize;
+  let mut active = None::<TextScript>;
+  for (index, ch) in text.char_indices() {
+    let script = match (text_script(ch), active) {
+      (TextScript::Common, Some(active)) => active,
+      (script, _) => script,
+    };
+    if active.is_some_and(|active| active != script) {
+      ranges.push((start..index, active.unwrap_or(TextScript::Common)));
+      start = index;
+    }
+    active = Some(script);
+  }
+  if start < text.len() || text.is_empty() {
+    ranges.push((start..text.len(), active.unwrap_or(TextScript::Common)));
+  }
+  ranges
+}
+
+fn text_script(ch: char) -> TextScript {
+  match u32::from(ch) {
+    0x0041..=0x007a | 0x00c0..=0x024f => TextScript::Latin,
+    0x0370..=0x03ff => TextScript::Greek,
+    0x0400..=0x052f => TextScript::Cyrillic,
+    0x0590..=0x05ff => TextScript::Hebrew,
+    0x0600..=0x06ff | 0x0750..=0x077f | 0x08a0..=0x08ff => TextScript::Arabic,
+    0x0900..=0x097f => TextScript::Devanagari,
+    0x0e00..=0x0e7f => TextScript::Thai,
+    0x3040..=0x309f => TextScript::Hiragana,
+    0x30a0..=0x30ff => TextScript::Katakana,
+    0x3400..=0x9fff | 0xf900..=0xfaff => TextScript::Han,
+    0xac00..=0xd7af => TextScript::Hangul,
+    _ => TextScript::Common,
   }
 }
 
@@ -482,6 +563,9 @@ impl PptxShapeBounds for pptx::PptxShape<'_> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::sync::Arc;
+
+  use ooxmlsdk_fonts::{FontFaceInfo, FontId, FontSource};
 
   #[test]
   fn docx_layout_emits_page_frame_and_text_debug_records() {
@@ -522,6 +606,54 @@ mod tests {
         .any(|item| matches!(item, common::DisplayItem::Text(text) if text.text == "Hello"))
     }));
     assert!(layout.frames.iter().any(|frame| frame.kind == "docx:table"));
+  }
+
+  #[test]
+  fn docx_layout_uses_script_specific_font_families_for_glyph_runs() {
+    let mut registry = FontRegistry::new();
+    let mut latin = FontFaceInfo::synthetic("latin", "Latin Face");
+    latin.coverage.unicode_ranges = std::iter::once(u32::from('A')..u32::from('A') + 1).collect();
+    registry.register_face(FontSource::System, latin);
+    let mut east_asian = FontFaceInfo::synthetic("east-asian", "East Asian Face");
+    east_asian.coverage.unicode_ranges =
+      std::iter::once(u32::from('中')..u32::from('中') + 1).collect();
+    registry.register_face(FontSource::System, east_asian);
+
+    let document = docx::DocxDocument {
+      sections: vec![docx::DocxSection {
+        body_blocks: vec![docx::DocxBlock::Paragraph(docx::DocxParagraph {
+          inlines: vec![docx::InlineItem::Text(docx::DocxTextRun {
+            text: Cow::Borrowed("A中"),
+            style: docx::TextStyle {
+              font_families: Box::new(common::ScriptFontFamilies {
+                latin: Some(Cow::Borrowed("Latin Face")),
+                east_asian: Some(Cow::Borrowed("East Asian Face")),
+                ..common::ScriptFontFamilies::default()
+              }),
+              ..docx::TextStyle::default()
+            },
+          })],
+          ..docx::DocxParagraph::default()
+        })],
+        ..docx::DocxSection::default()
+      }],
+      ..docx::DocxDocument::default()
+    };
+
+    let layout = layout_docx_model_with_fonts(&document, LayoutOptions::default(), &registry);
+    let fonts = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        common::DisplayItem::Glyphs(run) => Some(run.shaped.font_id.clone()),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(
+      fonts,
+      vec![FontId(Arc::from("latin")), FontId(Arc::from("east-asian"))]
+    );
   }
 
   #[test]

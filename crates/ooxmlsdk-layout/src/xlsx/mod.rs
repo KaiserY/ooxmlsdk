@@ -6,7 +6,7 @@ use ooxmlsdk_formula::{
   BuiltInName, CellValueProvider, QualifiedRange as FormulaQualifiedRange, SheetId,
 };
 
-use crate::common::{Fill, Insets, Point, Pt, Rect, Size, Stroke, Twips};
+use crate::common::{Fill, Insets, LayoutFontRequest, Point, Pt, Rect, Size, Stroke, Twips};
 
 // Source: LibreOffice sc/inc/global.hxx STD_COL_WIDTH = convert(64pt, twip).
 const CALC_STANDARD_COLUMN_WIDTH_TWIPS: i32 = 1280;
@@ -717,6 +717,21 @@ pub struct XlsxTextStyle<'doc> {
   pub bold: bool,
   pub italic: bool,
   pub color: Option<crate::common::Color>,
+}
+
+impl<'doc> XlsxTextStyle<'doc> {
+  pub fn layout_font_request(&self) -> LayoutFontRequest<'doc> {
+    let mut request = ooxmlsdk_fonts::FontRequest {
+      family: self.font_family.clone(),
+      bold: self.bold,
+      italic: self.italic,
+      ..ooxmlsdk_fonts::FontRequest::default()
+    };
+    if let Some(size) = self.size {
+      request.size_pt = ooxmlsdk_fonts::FontSize(size.0);
+    }
+    LayoutFontRequest::from_font_request(request)
+  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

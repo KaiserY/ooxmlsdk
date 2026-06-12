@@ -131,14 +131,6 @@ pub fn layout_xlsx_model<'doc>(
     options,
     ..LayoutDocument::default()
   };
-  for sheet in workbook
-    .sheets
-    .iter()
-    .filter(|sheet| sheet.state == xlsx::SheetState::Visible)
-  {
-    let bounds = Rect::default();
-    push_page(&mut layout, Some(sheet.name.clone()), bounds);
-  }
   let print_plan = if workbook.print_plan.sheet_pages.is_empty() {
     workbook.build_print_plan()
   } else {
@@ -146,12 +138,29 @@ pub fn layout_xlsx_model<'doc>(
   };
   for printed_sheet in &print_plan.sheet_pages {
     for page in &printed_sheet.pages {
+      let page_index = layout.pages.len();
+      push_page(
+        &mut layout,
+        Some(printed_sheet.sheet_name.clone()),
+        page.paper_bounds,
+      );
       for cell in &page.cells {
         layout.debug_records.push(DebugRecord::Cell(DebugCell {
           sheet: printed_sheet.sheet_name.clone(),
           reference: Cow::Owned(format_xlsx_address(cell.address)),
           bounds: cell.bounds,
         }));
+        if !cell.text.is_empty() {
+          layout.pages[page_index]
+            .items
+            .push(common::DisplayItem::Text(TextRun {
+              text: cell.text.clone(),
+              origin: cell.bounds.origin,
+              font_id: None,
+              color: Default::default(),
+              source: None,
+            }));
+        }
       }
     }
   }

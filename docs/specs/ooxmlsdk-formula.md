@@ -295,6 +295,12 @@ when needed. This keeps Calc dependency tracking, print ranges, merged ranges,
 view selections, and data-table references on one interpretation of quoted
 sheet names, absolute flags, and whole-row/whole-column ranges.
 
+The expression parser is allowed to build a Calc-like AST above that shared
+address service, but it must not create a separate incompatible A1 grammar.
+When parser work discovers a missing address case, extend the shared
+`QualifiedAddress` / `QualifiedRange` layer first, then use it from tokens,
+AST, dependency graph, layout bridges, and tests.
+
 For Excel/Calc sheet limits, use LO's `sc/inc/address.hxx` constants:
 `MAXCOL = 16383` and `MAXROW = 1048575` for normal XLSX sheets. Jumbo sheet
 limits should become explicit model state if they are later supported, not a
@@ -371,6 +377,8 @@ The formula crate should follow the Calc import split:
    - use cached values when no evaluator branch exists
    - mark stale/unsupported state explicitly
    - never silently invent values
+   - follow Calc's compiler/interpreter split: parsed formula state is not the
+     same object as evaluated cell value
 
 ## 9. Evaluation Strategy
 
@@ -404,6 +412,7 @@ formula results.
 - array constants
 - references
 - error literals
+- unsupported tail/grammar fragments preserved as metadata
 
 ### Stage 4: Core Evaluator
 
@@ -412,8 +421,9 @@ formula results.
 - text concatenation
 - boolean conversion
 - common aggregate functions
-- date/time numeric behavior
 - error propagation
+- `IF`/`IFERROR`/`IFNA` control flow without eagerly evaluating unused branches
+- date/time numeric behavior
 
 ### Stage 5: Excel/Calc Compatibility Expansion
 
@@ -513,6 +523,10 @@ Use a repeated three-pass loop before implementing each formula area:
    - inspect the corresponding LO files in `../core/sc/` during the same pass;
      every new constant, fallback list, function classification, or parse
      shortcut must have an LO/OOXML source or remain unsupported
+   - if `ooxmlsdk-pdf` already has a passing behavior, treat it only as fixture
+     evidence and migration inventory; re-implement through the formula crate's
+     current model and LO's Calc owner files, not by copying the PDF helper
+     parser/evaluator
 
 1. LO pass
    - identify the Calc owner files
@@ -538,12 +552,12 @@ evaluator.
 
 ### 14.0 Next Broad Development Focus
 
-The next formula step should make parsed formula state useful without trying to
-complete the full Calc interpreter:
+The next formula step should continue turning parsed formula state into a
+Calc-shaped evaluator without trying to shortcut the full Calc interpreter:
 
-- build a shared token/dependency skeleton from formula text during typed cell
+- keep the shared token/dependency skeleton from formula text during typed cell
   import
-- preserve references, functions, operators, literals, names, arrays, and
+- preserve references, functions, operators, literals, names, arrays, AST, and
   unsupported fragments in `ParsedFormula`
 - keep `QualifiedAddress` and `QualifiedRange` as the only A1 parser surface
   used by layout and formula internals
@@ -551,9 +565,12 @@ complete the full Calc interpreter:
   before resolution/evaluation is complete
 - keep cached values as the printable result unless a supported evaluator path
   explicitly computes a value
+- grow evaluator branches from LO `ScInterpreter` methods, including their
+  control-flow behavior, error handling, and argument iteration rules
 
-This stage should support the XLSX print core by making formulas inspectable
-and dependency-aware while still avoiding speculative function semantics.
+This stage should support the XLSX print core by making formulas inspectable,
+dependency-aware, and evaluatable for LO-backed common paths while still
+avoiding speculative function semantics.
 
 ### 14.1 Workbook And Sheet Identity Import
 
@@ -582,7 +599,7 @@ Reference:
 - `../core/sc/source/filter/oox/sheetdatacontext.cxx`
 - `../core/sc/source/filter/oox/sheetdatabuffer.cxx`
 - `../core/sc/source/filter/oox/formulabuffer.cxx`
-- existing `crates/ooxmlsdk-pdf/src/xlsx/formula.rs` as migration evidence
+- current `crates/ooxmlsdk-formula/src/model.rs` import and dependency model
 
 Scope:
 
@@ -611,11 +628,13 @@ Scope:
 - create dependency graph edges for cells, ranges, defined names, externals,
   and volatile placeholders
 - keep parser failures as structured unsupported records
+- do not duplicate A1 parsing; extend `QualifiedAddress` and
+  `QualifiedRange` when the grammar needs to grow
 
 Done when dependency graph tests can assert edges separately from formula
 evaluation.
 
-### 14.4 Minimal Evaluator Gate
+### 14.4 Evaluator Gate
 
 Reference:
 
@@ -625,11 +644,18 @@ Reference:
 
 Scope:
 
-- only after import/dependency tests pass, implement arithmetic, comparison,
-  concatenation, boolean conversion, simple aggregates, and error propagation
+- implement arithmetic, comparison, concatenation, boolean conversion, simple
+  aggregates, short-circuit control-flow functions, and error propagation from
+  LO `ScInterpreter` behavior
+- evaluate only through explicit public entry points such as
+  `evaluate_supported_formulas`; import remains cache-preserving
+- use calculation-chain entries when OOXML provides them; do not invent local
+  iteration counts or recalc-pass limits
+- range evaluation must operate over workbook model state and Calc/OOXML
+  address bounds, not guessed expansion limits
 - never let evaluator work block layout from consuming cached values
 
-Done when simple evaluator fixtures pass while unsupported functions still
+Done when common formula fixtures pass while unsupported functions still
 produce structured state.
 
 ### 14.5 Current Implementation Checkpoint
@@ -644,17 +670,42 @@ Implemented in this stage:
 - shared formula dependent `parsed_formula` derivation from the definition
   formula, with relative A1 references translated according to existing
   absolute/relative address flags
+- `ParsedFormula` preserves external reference placeholders and LO-backed
+  volatile-function dependencies without evaluating values
+- workbook defined names carry parsed dependency skeletons, and
+  `DependencyGraph` exposes defined-name nodes/edges separately from cell
+  formula edges
+- workbook `externalReferences` are preserved as unavailable relationship-id
+  placeholders until external workbook parts are resolved
+- calculation-chain entries are imported from the typed calculation-chain part
+  without guessing a sheet when OOXML omits `c@i`
 - array formula and data table ranges, dirty/always-calculate flags, and data
   table input references/deleted-input flags where OOXML provides them
 - lightweight dependency graph edges for directly parseable A1 cell/range
-  tokens
+  tokens, names, externals, and volatile placeholders
+- expression AST parsing for literals, references, functions, arrays, unary
+  and binary operators, and error literals, built on the shared formula
+  address/range parser
+- explicit `evaluate_supported_formulas` entry point that updates
+  `evaluated_value` and display bridge values only for supported formula ASTs
+- LO-backed evaluator branches for arithmetic, comparison, concatenation,
+  boolean conversion, `IF`, `IFERROR`, `IFNA`, `SUM`, `PRODUCT`, `AVERAGE`,
+  `COUNT`, `COUNTA`, `MIN`, `MAX`, `AND`, `OR`, `ABS`, and `ROUND`
+- range reads scan existing workbook cell records instead of expanding guessed
+  whole-sheet loops; missing cells remain blank through the workbook value model
+- display text created by evaluator is a value bridge only. Full number-format
+  rendering remains a separate formula/value concern and must use LO number
+  formatter behavior before adding locale/date/precision rules
 
 Still intentionally not implemented:
 
 - source-text rendering of translated shared formulas
-- full Calc compiler tokenization, external references, defined-name
-  resolution, and volatile function detection
-- evaluator logic beyond preserving cached/display values
+- full Calc compiler tokenization, external workbook part resolution, and
+  defined-name formula evaluation
+- broad lookup/text/date/math/statistical function coverage
+- dynamic arrays, spilled ranges, matrix evaluation beyond literal matrix
+  values, and array formula result distribution
+- full number-format rendering for evaluated values
 
 Do not fill these gaps with local guesses. Add LO-derived tests first, then
 translate the relevant Calc import/compiler behavior.

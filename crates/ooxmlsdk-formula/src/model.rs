@@ -51,14 +51,18 @@ impl<'doc> WorkbookValueModel<'doc> {
       })
       .collect::<Result<Vec<_>>>()?;
     resolve_shared_formula_dependents(&mut sheets);
+    mark_formula_recalc_state(&mut sheets);
+    let defined_names = defined_names(&workbook);
     let shared_formula_groups = shared_formula_groups(&sheets);
     let array_formula_groups = array_formula_groups(&sheets);
     let data_tables = data_tables(&sheets);
-    let dependency_graph = dependency_graph(&sheets);
+    let dependency_graph = dependency_graph(&sheets, &defined_names);
 
     Ok(Self {
       calculation_settings: calculation_settings(&workbook),
-      defined_names: defined_names(&workbook),
+      calc_chain: calc_chain(document, &workbook_part)?,
+      external_references: external_references(&workbook),
+      defined_names,
       shared_formula_groups,
       array_formula_groups,
       data_tables,
@@ -173,6 +177,106 @@ impl<'doc> WorkbookValueModel<'doc> {
       .find(|model| model.id == sheet)
       .and_then(|sheet| sheet.cells.get(&cell))
   }
+
+  pub fn evaluate_supported_formulas(&mut self) -> EvaluationReport<'doc> {
+    let mut evaluated = Vec::new();
+    let mut unsupported = Vec::new();
+
+    let targets = self.evaluation_targets();
+    for (sheet_id, address) in targets {
+      let Some((formula, parsed)) = self.formula_at(sheet_id, address) else {
+        continue;
+      };
+      let Some(ast) = parsed.ast.as_ref() else {
+        unsupported.extend(parsed.unsupported.clone());
+        continue;
+      };
+      let context = FormulaEvaluator { workbook: self };
+      match context.evaluate(ast) {
+        Some(value) if !matches!(value, FormulaValue::Reference(_)) => {
+          let item = EvaluatedFormula {
+            sheet: sheet_id,
+            cell: formula.address,
+            value,
+          };
+          if self.set_evaluated_formula(item.sheet, item.cell, item.value.clone()) {
+            evaluated.push(item);
+          }
+        }
+        _ => unsupported.extend(parsed.unsupported.clone()),
+      }
+    }
+
+    EvaluationReport {
+      evaluated,
+      unsupported,
+    }
+  }
+
+  fn evaluation_targets(&self) -> Vec<(SheetId, CellAddress)> {
+    if !self.calc_chain.is_empty() {
+      return self
+        .calc_chain
+        .iter()
+        .filter_map(|entry| entry.sheet.map(|sheet| (sheet, entry.cell)))
+        .collect();
+    }
+    self
+      .sheets
+      .iter()
+      .flat_map(|sheet| {
+        sheet
+          .cells
+          .iter()
+          .filter(|(_, record)| record.formula.is_some())
+          .map(move |(address, _)| (sheet.id, *address))
+      })
+      .collect()
+  }
+
+  fn formula_at(
+    &self,
+    sheet: SheetId,
+    cell: CellAddress,
+  ) -> Option<(&FormulaCell<'doc>, &ParsedFormula<'doc>)> {
+    let formula = self.cell(sheet, cell)?.formula.as_ref()?;
+    Some((formula, formula.parsed_formula.as_ref()?))
+  }
+
+  fn set_evaluated_formula(
+    &mut self,
+    sheet: SheetId,
+    cell: CellAddress,
+    value: FormulaValue<'doc>,
+  ) -> bool {
+    let Some(record) = self
+      .sheets
+      .iter_mut()
+      .find(|model| model.id == sheet)
+      .and_then(|sheet| sheet.cells.get_mut(&cell))
+    else {
+      return false;
+    };
+    let Some(formula) = record.formula.as_mut() else {
+      return false;
+    };
+    if formula.evaluated_value.as_ref() == Some(&value) {
+      return false;
+    }
+    formula.evaluated_value = Some(value.clone());
+    formula.formula_state = FormulaState::Clean;
+    record.display_value = Some(DisplayValue {
+      text: Cow::Owned(display_text_from_value(&value)),
+      source_value: value,
+      number_format_id: formula
+        .number_format_context
+        .as_ref()
+        .and_then(|context| context.format_id),
+      stale: false,
+      error_text: None,
+    });
+    true
+  }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -242,6 +346,7 @@ pub struct ParsedFormula<'doc> {
 pub enum FormulaToken<'doc> {
   Literal(FormulaValue<'doc>),
   Reference(QualifiedRange<'doc>),
+  ExternalReference(ExternalReferenceId<'doc>),
   Name(Cow<'doc, str>),
   Function(Cow<'doc, str>),
   Operator(FormulaOperator),
@@ -256,6 +361,7 @@ pub enum FormulaToken<'doc> {
 pub enum FormulaAst<'doc> {
   Literal(FormulaValue<'doc>),
   Reference(QualifiedRange<'doc>),
+  ExternalReference(ExternalReferenceId<'doc>),
   Name(Cow<'doc, str>),
   Unary {
     op: FormulaOperator,
@@ -271,6 +377,19 @@ pub enum FormulaAst<'doc> {
     args: Vec<FormulaAst<'doc>>,
   },
   Array(Vec<Vec<FormulaAst<'doc>>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EvaluationReport<'doc> {
+  pub evaluated: Vec<EvaluatedFormula<'doc>>,
+  pub unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EvaluatedFormula<'doc> {
+  pub sheet: SheetId,
+  pub cell: CellAddress,
+  pub value: FormulaValue<'doc>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -373,6 +492,8 @@ pub struct DefinedName<'doc> {
   pub name: Cow<'doc, str>,
   pub sheet: Option<SheetId>,
   pub formula_text: Cow<'doc, str>,
+  pub parsed_formula: Option<ParsedFormula<'doc>>,
+  pub dependencies: Vec<FormulaDependency<'doc>>,
   pub hidden: bool,
   pub built_in: Option<BuiltInName>,
 }
@@ -397,7 +518,7 @@ pub struct NumberFormatContext<'doc> {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CalcChainEntry {
-  pub sheet: SheetId,
+  pub sheet: Option<SheetId>,
   pub cell: CellAddress,
   pub child_chain: bool,
 }
@@ -423,6 +544,8 @@ pub struct EvaluationContext<'doc> {
 pub struct DependencyGraph<'doc> {
   pub nodes: Vec<DependencyNode>,
   pub edges: Vec<DependencyEdge<'doc>>,
+  pub defined_name_nodes: Vec<DefinedNameNode<'doc>>,
+  pub defined_name_edges: Vec<DefinedNameDependencyEdge<'doc>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -436,6 +559,18 @@ pub struct DependencyEdge<'doc> {
   pub from: DependencyNode,
   pub to: FormulaDependency<'doc>,
   pub volatile: bool,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct DefinedNameNode<'doc> {
+  pub sheet: Option<SheetId>,
+  pub name: Cow<'doc, str>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DefinedNameDependencyEdge<'doc> {
+  pub from: DefinedNameNode<'doc>,
+  pub to: FormulaDependency<'doc>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -559,6 +694,11 @@ fn cell_value_record<'doc>(
   });
   let formula = cell.cell_formula.as_ref().map(|formula| {
     let formula_text: Cow<'doc, str> = Cow::Owned(formula.xml_content.clone().unwrap_or_default());
+    let parsed_formula = parse_formula(sheet, formula_text.clone());
+    let volatile = parsed_formula
+      .dependencies
+      .iter()
+      .any(|dependency| matches!(dependency, FormulaDependency::Volatile));
     FormulaCell {
       address,
       formula_kind: formula_kind(formula),
@@ -581,10 +721,12 @@ fn cell_value_record<'doc>(
       input1_deleted: formula.input1_deleted.is_some_and(|value| value.as_bool()),
       input2_deleted: formula.input2_deleted.is_some_and(|value| value.as_bool()),
       assigns_value_to_name: formula.bx.is_some_and(|value| value.as_bool()),
-      parsed_formula: Some(parse_formula(sheet, formula_text.clone())),
+      parsed_formula: Some(parsed_formula),
       cached_value: Some(raw_value.clone()).filter(|value| !matches!(value, FormulaValue::Blank)),
       evaluated_value: None,
-      formula_state: if dirty {
+      formula_state: if volatile {
+        FormulaState::Stale
+      } else if dirty {
         FormulaState::Stale
       } else {
         FormulaState::CachedOnly
@@ -595,7 +737,7 @@ fn cell_value_record<'doc>(
         locale: None,
       }),
       dirty,
-      volatile: false,
+      volatile,
     }
   });
   let display_value = Some(DisplayValue {
@@ -772,6 +914,28 @@ fn resolve_shared_formula_dependents<'doc>(sheets: &mut [WorksheetValueModel<'do
   }
 }
 
+fn mark_formula_recalc_state(sheets: &mut [WorksheetValueModel<'_>]) {
+  for sheet in sheets {
+    for record in sheet.cells.values_mut() {
+      let Some(formula) = record.formula.as_mut() else {
+        continue;
+      };
+      let volatile = formula.parsed_formula.as_ref().is_some_and(|parsed| {
+        parsed.dependencies.iter().any(|dependency| {
+          matches!(
+            dependency,
+            FormulaDependency::Volatile | FormulaDependency::External(_)
+          )
+        })
+      });
+      formula.volatile = volatile;
+      if volatile && formula.formula_state == FormulaState::CachedOnly {
+        formula.formula_state = FormulaState::Stale;
+      }
+    }
+  }
+}
+
 fn translate_shared_formula<'doc>(
   sheet: SheetId,
   parsed: &ParsedFormula<'doc>,
@@ -802,6 +966,9 @@ fn translate_shared_formula<'doc>(
     .iter()
     .filter_map(|token| match token {
       FormulaToken::Reference(range) => Some(dependency_from_range(sheet, range)),
+      FormulaToken::ExternalReference(reference) => {
+        Some(FormulaDependency::External(reference.clone()))
+      }
       FormulaToken::Name(name) => Some(FormulaDependency::Name(name.clone())),
       _ => None,
     })
@@ -1002,7 +1169,10 @@ fn data_tables<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> Vec<DataTableFormu
   tables
 }
 
-fn dependency_graph<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> DependencyGraph<'doc> {
+fn dependency_graph<'doc>(
+  sheets: &[WorksheetValueModel<'doc>],
+  defined_names: &[DefinedName<'doc>],
+) -> DependencyGraph<'doc> {
   let mut graph = DependencyGraph::default();
   for sheet in sheets {
     for (address, record) in &sheet.cells {
@@ -1026,6 +1196,24 @@ fn dependency_graph<'doc>(sheets: &[WorksheetValueModel<'doc>]) -> DependencyGra
           volatile: formula.volatile,
         });
       }
+    }
+  }
+  for defined_name in defined_names {
+    let node = DefinedNameNode {
+      sheet: defined_name.sheet,
+      name: defined_name.name.clone(),
+    };
+    graph.defined_name_nodes.push(node.clone());
+    let dependencies = defined_name
+      .parsed_formula
+      .as_ref()
+      .map(|parsed| parsed.dependencies.clone())
+      .unwrap_or_else(|| defined_name.dependencies.clone());
+    for dependency in dependencies {
+      graph.defined_name_edges.push(DefinedNameDependencyEdge {
+        from: node.clone(),
+        to: dependency,
+      });
     }
   }
   graph
@@ -1100,7 +1288,13 @@ fn parse_formula<'doc>(sheet: SheetId, source: Cow<'doc, str>) -> ParsedFormula<
         let (word, next) = parse_formula_word(text, index);
         let next_non_space = text[next..].chars().find(|ch| !ch.is_whitespace());
         if next_non_space == Some('(') && QualifiedAddress::parse_a1(sheet, word).is_err() {
+          if is_volatile_function(word) {
+            dependencies.push(FormulaDependency::Volatile);
+          }
           tokens.push(FormulaToken::Function(Cow::Owned(word.to_string())));
+        } else if let Some(external) = parse_external_reference_id(word) {
+          dependencies.push(FormulaDependency::External(external.clone()));
+          tokens.push(FormulaToken::ExternalReference(external));
         } else if let Some(range) = parse_formula_range(sheet, word) {
           dependencies.push(dependency_from_range(sheet, &range));
           tokens.push(FormulaToken::Reference(range));
@@ -1126,12 +1320,682 @@ fn parse_formula<'doc>(sheet: SheetId, source: Cow<'doc, str>) -> ParsedFormula<
     }
   }
 
+  let (ast, ast_unsupported) = parse_formula_ast(sheet, text);
+  unsupported.extend(ast_unsupported);
+
   ParsedFormula {
     source,
     tokens,
-    ast: None,
+    ast,
     dependencies,
     unsupported,
+  }
+}
+
+fn parse_formula_ast<'doc>(
+  sheet: SheetId,
+  text: &str,
+) -> (
+  Option<FormulaAst<'doc>>,
+  Vec<UnsupportedFormulaFeature<'doc>>,
+) {
+  let mut parser = FormulaAstParser::new(sheet, text);
+  let ast = parser.parse_expression();
+  parser.skip_ws();
+  if ast.is_some() && parser.is_end() {
+    (ast, parser.unsupported)
+  } else {
+    parser.unsupported.push(UnsupportedFormulaFeature {
+      feature: Cow::Owned(text.to_string()),
+      reason: Cow::Borrowed("formula expression is not fully parsed"),
+    });
+    (None, parser.unsupported)
+  }
+}
+
+struct FormulaAstParser<'a, 'doc> {
+  sheet: SheetId,
+  text: &'a str,
+  index: usize,
+  unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
+}
+
+impl<'a, 'doc> FormulaAstParser<'a, 'doc> {
+  fn new(sheet: SheetId, text: &'a str) -> Self {
+    Self {
+      sheet,
+      text,
+      index: 0,
+      unsupported: Vec::new(),
+    }
+  }
+
+  fn parse_expression(&mut self) -> Option<FormulaAst<'doc>> {
+    self.parse_comparison()
+  }
+
+  fn parse_comparison(&mut self) -> Option<FormulaAst<'doc>> {
+    let mut left = self.parse_concat()?;
+    loop {
+      self.skip_ws();
+      let Some(op) = self.consume_comparison_operator() else {
+        break;
+      };
+      let right = self.parse_concat()?;
+      left = FormulaAst::Binary {
+        op,
+        left: Box::new(left),
+        right: Box::new(right),
+      };
+    }
+    Some(left)
+  }
+
+  fn parse_concat(&mut self) -> Option<FormulaAst<'doc>> {
+    let mut left = self.parse_add_sub()?;
+    loop {
+      self.skip_ws();
+      if !self.consume_char('&') {
+        break;
+      }
+      let right = self.parse_add_sub()?;
+      left = FormulaAst::Binary {
+        op: FormulaOperator::Concat,
+        left: Box::new(left),
+        right: Box::new(right),
+      };
+    }
+    Some(left)
+  }
+
+  fn parse_add_sub(&mut self) -> Option<FormulaAst<'doc>> {
+    let mut left = self.parse_mul_div()?;
+    loop {
+      self.skip_ws();
+      let op = if self.consume_char('+') {
+        FormulaOperator::Add
+      } else if self.consume_char('-') {
+        FormulaOperator::Subtract
+      } else {
+        break;
+      };
+      let right = self.parse_mul_div()?;
+      left = FormulaAst::Binary {
+        op,
+        left: Box::new(left),
+        right: Box::new(right),
+      };
+    }
+    Some(left)
+  }
+
+  fn parse_mul_div(&mut self) -> Option<FormulaAst<'doc>> {
+    let mut left = self.parse_power()?;
+    loop {
+      self.skip_ws();
+      let op = if self.consume_char('*') {
+        FormulaOperator::Multiply
+      } else if self.consume_char('/') {
+        FormulaOperator::Divide
+      } else {
+        break;
+      };
+      let right = self.parse_power()?;
+      left = FormulaAst::Binary {
+        op,
+        left: Box::new(left),
+        right: Box::new(right),
+      };
+    }
+    Some(left)
+  }
+
+  fn parse_power(&mut self) -> Option<FormulaAst<'doc>> {
+    let left = self.parse_unary()?;
+    self.skip_ws();
+    if self.consume_char('^') {
+      let right = self.parse_power()?;
+      Some(FormulaAst::Binary {
+        op: FormulaOperator::Power,
+        left: Box::new(left),
+        right: Box::new(right),
+      })
+    } else {
+      Some(left)
+    }
+  }
+
+  fn parse_unary(&mut self) -> Option<FormulaAst<'doc>> {
+    self.skip_ws();
+    if self.consume_char('+') {
+      return Some(FormulaAst::Unary {
+        op: FormulaOperator::UnaryPlus,
+        expr: Box::new(self.parse_unary()?),
+      });
+    }
+    if self.consume_char('-') {
+      return Some(FormulaAst::Unary {
+        op: FormulaOperator::UnaryMinus,
+        expr: Box::new(self.parse_unary()?),
+      });
+    }
+    self.parse_percent()
+  }
+
+  fn parse_percent(&mut self) -> Option<FormulaAst<'doc>> {
+    let mut expr = self.parse_primary()?;
+    loop {
+      self.skip_ws();
+      if !self.consume_char('%') {
+        break;
+      }
+      expr = FormulaAst::Unary {
+        op: FormulaOperator::Percent,
+        expr: Box::new(expr),
+      };
+    }
+    Some(expr)
+  }
+
+  fn parse_primary(&mut self) -> Option<FormulaAst<'doc>> {
+    self.skip_ws();
+    if self.consume_char('(') {
+      let expr = self.parse_expression()?;
+      self.skip_ws();
+      if !self.consume_char(')') {
+        self.unsupported.push(UnsupportedFormulaFeature {
+          feature: Cow::Borrowed("parenthesized expression"),
+          reason: Cow::Borrowed("missing closing parenthesis"),
+        });
+      }
+      return Some(expr);
+    }
+    if self.peek_char() == Some('"') {
+      let (value, next) = parse_formula_string(self.text, self.index);
+      self.index = next;
+      return Some(FormulaAst::Literal(FormulaValue::String(Cow::Owned(value))));
+    }
+    if self.peek_char() == Some('{') {
+      return self.parse_array();
+    }
+    if self.starts_number() {
+      let (value, next) = parse_formula_number(self.text, self.index);
+      self.index = next;
+      return Some(FormulaAst::Literal(FormulaValue::Number(value)));
+    }
+    self.parse_identifier_reference_or_function()
+  }
+
+  fn parse_array(&mut self) -> Option<FormulaAst<'doc>> {
+    self.consume_char('{');
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    loop {
+      self.skip_ws();
+      if self.consume_char('}') {
+        break;
+      }
+      row.push(self.parse_expression()?);
+      self.skip_ws();
+      if self.consume_char(',') {
+        continue;
+      }
+      if self.consume_char(';') {
+        rows.push(row);
+        row = Vec::new();
+        continue;
+      }
+      if self.consume_char('}') {
+        break;
+      }
+      return None;
+    }
+    if !row.is_empty() {
+      rows.push(row);
+    }
+    Some(FormulaAst::Array(rows))
+  }
+
+  fn parse_identifier_reference_or_function(&mut self) -> Option<FormulaAst<'doc>> {
+    let start = self.index;
+    let (_, next) = parse_formula_word(self.text, self.index);
+    if next == start {
+      return None;
+    }
+    let word = &self.text[start..next];
+    self.index = next;
+    self.skip_ws();
+    if self.peek_char() == Some('(') && QualifiedAddress::parse_a1(self.sheet, word).is_err() {
+      self.consume_char('(');
+      let mut args = Vec::new();
+      loop {
+        self.skip_ws();
+        if self.consume_char(')') {
+          break;
+        }
+        if self.consume_char(',') {
+          args.push(FormulaAst::Literal(FormulaValue::Blank));
+          continue;
+        }
+        args.push(self.parse_expression()?);
+        self.skip_ws();
+        if self.consume_char(')') {
+          break;
+        }
+        if !self.consume_char(',') {
+          return None;
+        }
+      }
+      return Some(FormulaAst::Function {
+        name: Cow::Owned(word.to_string()),
+        args,
+      });
+    }
+    if let Some(external) = parse_external_reference_id(word) {
+      return Some(FormulaAst::ExternalReference(external));
+    }
+    if let Some(range) = parse_formula_range(self.sheet, word) {
+      return Some(FormulaAst::Reference(range));
+    }
+    if is_formula_error_literal(word) {
+      return Some(FormulaAst::Literal(FormulaValue::Error(error_value(word))));
+    }
+    if word.eq_ignore_ascii_case("TRUE") {
+      return Some(FormulaAst::Literal(FormulaValue::Boolean(true)));
+    }
+    if word.eq_ignore_ascii_case("FALSE") {
+      return Some(FormulaAst::Literal(FormulaValue::Boolean(false)));
+    }
+    Some(FormulaAst::Name(Cow::Owned(word.to_string())))
+  }
+
+  fn consume_comparison_operator(&mut self) -> Option<FormulaOperator> {
+    if self.consume_str("<>") {
+      Some(FormulaOperator::NotEqual)
+    } else if self.consume_str("<=") {
+      Some(FormulaOperator::LessOrEqual)
+    } else if self.consume_str(">=") {
+      Some(FormulaOperator::GreaterOrEqual)
+    } else if self.consume_char('=') {
+      Some(FormulaOperator::Equal)
+    } else if self.consume_char('<') {
+      Some(FormulaOperator::Less)
+    } else if self.consume_char('>') {
+      Some(FormulaOperator::Greater)
+    } else {
+      None
+    }
+  }
+
+  fn skip_ws(&mut self) {
+    while self.peek_char().is_some_and(char::is_whitespace) {
+      self.index += self.peek_char().map(char::len_utf8).unwrap_or_default();
+    }
+  }
+
+  fn is_end(&self) -> bool {
+    self.index >= self.text.len()
+  }
+
+  fn starts_number(&self) -> bool {
+    let mut chars = self.text[self.index..].chars();
+    match chars.next() {
+      Some(ch) if ch.is_ascii_digit() => true,
+      Some('.') => chars.next().is_some_and(|ch| ch.is_ascii_digit()),
+      _ => false,
+    }
+  }
+
+  fn peek_char(&self) -> Option<char> {
+    self.text[self.index..].chars().next()
+  }
+
+  fn consume_char(&mut self, expected: char) -> bool {
+    if self.peek_char() == Some(expected) {
+      self.index += expected.len_utf8();
+      true
+    } else {
+      false
+    }
+  }
+
+  fn consume_str(&mut self, expected: &str) -> bool {
+    if self.text[self.index..].starts_with(expected) {
+      self.index += expected.len();
+      true
+    } else {
+      false
+    }
+  }
+}
+
+struct FormulaEvaluator<'a, 'doc> {
+  workbook: &'a WorkbookValueModel<'doc>,
+}
+
+impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
+  fn evaluate(&self, ast: &FormulaAst<'doc>) -> Option<FormulaValue<'doc>> {
+    match ast {
+      FormulaAst::Literal(value) => Some(value.clone()),
+      FormulaAst::Reference(range) => Some(FormulaValue::Reference(range.clone())),
+      FormulaAst::ExternalReference(_) | FormulaAst::Name(_) => None,
+      FormulaAst::Unary { op, expr } => self.evaluate_unary(*op, expr),
+      FormulaAst::Binary { op, left, right } => self.evaluate_binary(*op, left, right),
+      FormulaAst::Function { name, args } => self.evaluate_function(name, args),
+      FormulaAst::Array(rows) => rows
+        .iter()
+        .map(|row| {
+          row
+            .iter()
+            .map(|item| self.evaluate(item))
+            .collect::<Option<Vec<_>>>()
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(FormulaValue::Matrix),
+    }
+  }
+
+  fn evaluate_unary(
+    &self,
+    op: FormulaOperator,
+    expr: &FormulaAst<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let value = self.evaluate(expr)?;
+    match op {
+      FormulaOperator::UnaryPlus => Some(FormulaValue::Number(self.number(&value)?)),
+      FormulaOperator::UnaryMinus => Some(FormulaValue::Number(-self.number(&value)?)),
+      FormulaOperator::Percent => Some(FormulaValue::Number(self.number(&value)? / 100.0)),
+      _ => None,
+    }
+  }
+
+  fn evaluate_binary(
+    &self,
+    op: FormulaOperator,
+    left: &FormulaAst<'doc>,
+    right: &FormulaAst<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let left = self.evaluate(left)?;
+    let right = self.evaluate(right)?;
+    match op {
+      FormulaOperator::Add => self.numeric_binary(left, right, |a, b| a + b),
+      FormulaOperator::Subtract => self.numeric_binary(left, right, |a, b| a - b),
+      FormulaOperator::Multiply => self.numeric_binary(left, right, |a, b| a * b),
+      FormulaOperator::Divide => {
+        let denominator = self.number(&right)?;
+        if denominator == 0.0 {
+          Some(FormulaValue::Error(FormulaErrorValue::Div0))
+        } else {
+          Some(FormulaValue::Number(self.number(&left)? / denominator))
+        }
+      }
+      FormulaOperator::Power => self.numeric_binary(left, right, f64::powf),
+      FormulaOperator::Concat => Some(FormulaValue::String(Cow::Owned(format!(
+        "{}{}",
+        self.text(&left),
+        self.text(&right)
+      )))),
+      FormulaOperator::Equal
+      | FormulaOperator::NotEqual
+      | FormulaOperator::Less
+      | FormulaOperator::LessOrEqual
+      | FormulaOperator::Greater
+      | FormulaOperator::GreaterOrEqual => {
+        Some(FormulaValue::Boolean(self.compare(&left, &right, op)))
+      }
+      _ => None,
+    }
+  }
+
+  fn evaluate_function(
+    &self,
+    name: &Cow<'doc, str>,
+    args: &[FormulaAst<'doc>],
+  ) -> Option<FormulaValue<'doc>> {
+    let upper = name
+      .trim_start_matches("_xlfn.")
+      .trim_start_matches("_xlws.")
+      .to_ascii_uppercase();
+    match upper.as_str() {
+      // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScIfJump().
+      "IF" => {
+        let condition = self.evaluate(args.first()?)?;
+        if self.truthy(&condition) {
+          args
+            .get(1)
+            .map(|arg| self.evaluate(arg))
+            .unwrap_or(Some(FormulaValue::Boolean(true)))
+        } else {
+          args
+            .get(2)
+            .map(|arg| self.evaluate(arg))
+            .unwrap_or(Some(FormulaValue::Boolean(false)))
+        }
+      }
+      // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScIfError().
+      "IFERROR" | "IFNA" => {
+        let value = self.evaluate(args.first()?)?;
+        let use_fallback = match (&value, upper.as_str()) {
+          (FormulaValue::Error(FormulaErrorValue::NA), "IFNA") => true,
+          (FormulaValue::Error(_), "IFERROR") => true,
+          _ => false,
+        };
+        if use_fallback {
+          self.evaluate(args.get(1)?)
+        } else {
+          Some(value)
+        }
+      }
+      // Source: LibreOffice sc/source/core/tool/interpr6.cxx IterateParameters().
+      "SUM" => Some(FormulaValue::Number(self.numeric_values(args).sum())),
+      "PRODUCT" => Some(FormulaValue::Number(self.numeric_values(args).product())),
+      "AVERAGE" => {
+        let values = self.numeric_values(args).collect::<Vec<_>>();
+        (!values.is_empty())
+          .then(|| FormulaValue::Number(values.iter().sum::<f64>() / values.len() as f64))
+      }
+      "COUNT" => Some(FormulaValue::Number(
+        self.numeric_values(args).count() as f64
+      )),
+      "COUNTA" => Some(FormulaValue::Number(
+        self
+          .values(args)
+          .filter(|value| !matches!(value, FormulaValue::Blank))
+          .count() as f64,
+      )),
+      "MIN" => self
+        .numeric_values(args)
+        .reduce(f64::min)
+        .map(FormulaValue::Number),
+      "MAX" => self
+        .numeric_values(args)
+        .reduce(f64::max)
+        .map(FormulaValue::Number),
+      // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScAnd()/ScOr().
+      "AND" => Some(FormulaValue::Boolean(
+        self.values(args).all(|value| self.truthy(&value)),
+      )),
+      "OR" => Some(FormulaValue::Boolean(
+        self.values(args).any(|value| self.truthy(&value)),
+      )),
+      "ABS" => Some(FormulaValue::Number(
+        self.number(&self.evaluate(args.first()?)?)?.abs(),
+      )),
+      "ROUND" => {
+        let value = self.number(&self.evaluate(args.first()?)?)?;
+        let digits = args
+          .get(1)
+          .and_then(|arg| self.evaluate(arg))
+          .and_then(|value| self.number(&value))
+          .unwrap_or(0.0) as i32;
+        Some(FormulaValue::Number(round_to_digits(value, digits)))
+      }
+      _ => None,
+    }
+  }
+
+  fn numeric_binary(
+    &self,
+    left: FormulaValue<'doc>,
+    right: FormulaValue<'doc>,
+    op: impl FnOnce(f64, f64) -> f64,
+  ) -> Option<FormulaValue<'doc>> {
+    Some(FormulaValue::Number(op(
+      self.number(&left)?,
+      self.number(&right)?,
+    )))
+  }
+
+  fn values<'b>(
+    &'b self,
+    args: &'b [FormulaAst<'doc>],
+  ) -> impl Iterator<Item = FormulaValue<'doc>> + 'b {
+    args
+      .iter()
+      .filter_map(|arg| self.evaluate(arg))
+      .flat_map(|value| match value {
+        FormulaValue::Reference(range) => self.range_values(&range),
+        FormulaValue::Matrix(rows) => rows.into_iter().flatten().collect(),
+        value => vec![value],
+      })
+  }
+
+  fn numeric_values<'b>(&'b self, args: &'b [FormulaAst<'doc>]) -> impl Iterator<Item = f64> + 'b {
+    self.values(args).filter_map(|value| self.number(&value))
+  }
+
+  fn range_values(&self, range: &QualifiedRange<'doc>) -> Vec<FormulaValue<'doc>> {
+    let sheet = self.range_sheet(range);
+    let Some(model) = self.workbook.sheets.iter().find(|model| model.id == sheet) else {
+      return Vec::new();
+    };
+    model
+      .cells
+      .iter()
+      .filter(|(address, _)| cell_in_range(**address, &range.range))
+      .map(|(_, record)| {
+        record
+          .formula
+          .as_ref()
+          .and_then(|formula| {
+            formula
+              .evaluated_value
+              .clone()
+              .or_else(|| formula.cached_value.clone())
+          })
+          .unwrap_or_else(|| record.raw_value.clone())
+      })
+      .collect()
+  }
+
+  fn first_value(&self, value: &FormulaValue<'doc>) -> FormulaValue<'doc> {
+    match value {
+      FormulaValue::Reference(range) => self
+        .range_values(range)
+        .into_iter()
+        .next()
+        .unwrap_or_default(),
+      FormulaValue::Matrix(rows) => rows
+        .first()
+        .and_then(|row| row.first())
+        .cloned()
+        .unwrap_or_default(),
+      value => value.clone(),
+    }
+  }
+
+  fn number(&self, value: &FormulaValue<'doc>) -> Option<f64> {
+    match self.first_value(value) {
+      FormulaValue::Number(value) => Some(value),
+      FormulaValue::Boolean(value) => Some(if value { 1.0 } else { 0.0 }),
+      FormulaValue::String(value) => value.trim().parse::<f64>().ok(),
+      FormulaValue::Blank => Some(0.0),
+      FormulaValue::Error(_) => None,
+      FormulaValue::Matrix(_) | FormulaValue::Reference(_) => None,
+    }
+  }
+
+  fn text(&self, value: &FormulaValue<'doc>) -> String {
+    display_text_from_value(&self.first_value(value))
+  }
+
+  fn truthy(&self, value: &FormulaValue<'doc>) -> bool {
+    match self.first_value(value) {
+      FormulaValue::Boolean(value) => value,
+      FormulaValue::Number(value) => value != 0.0,
+      FormulaValue::String(value) => !value.is_empty(),
+      FormulaValue::Blank | FormulaValue::Error(_) => false,
+      FormulaValue::Matrix(_) | FormulaValue::Reference(_) => false,
+    }
+  }
+
+  fn compare(
+    &self,
+    left: &FormulaValue<'doc>,
+    right: &FormulaValue<'doc>,
+    op: FormulaOperator,
+  ) -> bool {
+    let numeric = self.number(left).zip(self.number(right));
+    let ordering = if let Some((left, right)) = numeric {
+      left.partial_cmp(&right)
+    } else {
+      Some(self.text(left).cmp(&self.text(right)))
+    };
+    match op {
+      FormulaOperator::Equal => ordering == Some(std::cmp::Ordering::Equal),
+      FormulaOperator::NotEqual => ordering != Some(std::cmp::Ordering::Equal),
+      FormulaOperator::Less => ordering == Some(std::cmp::Ordering::Less),
+      FormulaOperator::LessOrEqual => matches!(
+        ordering,
+        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+      ),
+      FormulaOperator::Greater => ordering == Some(std::cmp::Ordering::Greater),
+      FormulaOperator::GreaterOrEqual => matches!(
+        ordering,
+        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+      ),
+      _ => false,
+    }
+  }
+
+  fn range_sheet(&self, range: &QualifiedRange<'doc>) -> SheetId {
+    range
+      .sheet_name
+      .as_ref()
+      .and_then(|name| {
+        self
+          .workbook
+          .identity
+          .sheets
+          .iter()
+          .find(|sheet| sheet.name.as_ref().eq_ignore_ascii_case(name.0.as_ref()))
+          .map(|sheet| sheet.id)
+      })
+      .unwrap_or(range.sheet)
+  }
+}
+
+fn round_to_digits(value: f64, digits: i32) -> f64 {
+  let scale = 10_f64.powi(digits);
+  (value * scale).round() / scale
+}
+
+fn display_text_from_value(value: &FormulaValue<'_>) -> String {
+  match value {
+    FormulaValue::Number(value) if value.is_finite() && value.fract() == 0.0 => value.to_string(),
+    FormulaValue::Number(value) if value.is_finite() => value.to_string(),
+    FormulaValue::Number(_) => error_text_value(FormulaErrorValue::Value).to_string(),
+    FormulaValue::String(value) => value.to_string(),
+    FormulaValue::Boolean(value) => {
+      if *value {
+        "TRUE".to_string()
+      } else {
+        "FALSE".to_string()
+      }
+    }
+    FormulaValue::Error(value) => error_text_value(*value).to_string(),
+    FormulaValue::Blank => String::new(),
+    FormulaValue::Matrix(_) | FormulaValue::Reference(_) => String::new(),
   }
 }
 
@@ -1149,6 +2013,20 @@ fn parse_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRan
         start_flags: address.flags,
         end_flags: address.flags,
       })
+  })
+}
+
+fn parse_external_reference_id<'doc>(token: &str) -> Option<ExternalReferenceId<'doc>> {
+  let (book, rest) = token.strip_prefix('[')?.split_once(']')?;
+  let (sheet, name) = rest.rsplit_once('!').map_or((None, rest), |(sheet, name)| {
+    (Some(sheet.trim_matches('\'')), name)
+  });
+  Some(ExternalReferenceId {
+    book: Some(Cow::Owned(book.to_string())),
+    sheet: sheet
+      .filter(|sheet| !sheet.is_empty())
+      .map(|sheet| Cow::Owned(sheet.replace("''", "'"))),
+    name: (!name.is_empty()).then(|| Cow::Owned(name.to_string())),
   })
 }
 
@@ -1258,7 +2136,34 @@ fn parse_formula_word(value: &str, start: usize) -> (&str, usize) {
 }
 
 fn is_formula_word_char(ch: char) -> bool {
-  ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_')
+  ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#')
+}
+
+fn cell_in_range(address: CellAddress, range: &CellRange) -> bool {
+  let start_column = range.start.column.min(range.end.column);
+  let end_column = range.start.column.max(range.end.column);
+  let start_row = range.start.row.min(range.end.row);
+  let end_row = range.start.row.max(range.end.row);
+  (start_column..=end_column).contains(&address.column)
+    && (start_row..=end_row).contains(&address.row)
+}
+
+fn is_volatile_function(value: &str) -> bool {
+  // Source: LibreOffice formula/source/core/api/FormulaCompiler.cxx
+  // FormulaCompiler::IsOpCodeVolatile and the ocExternal RANDBETWEEN branch.
+  matches!(
+    value.to_ascii_uppercase().as_str(),
+    "RAND"
+      | "TODAY"
+      | "NOW"
+      | "FORMULA"
+      | "INFO"
+      | "INDIRECT"
+      | "OFFSET"
+      | "DEBUGVAR"
+      | "RANDARRAY"
+      | "RANDBETWEEN"
+  )
 }
 
 fn is_formula_error_literal(value: &str) -> bool {
@@ -1365,6 +2270,54 @@ fn reference_style(value: x::ReferenceModeValues) -> ReferenceStyle {
   }
 }
 
+fn calc_chain<'doc>(
+  document: &mut SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+) -> Result<Vec<CalcChainEntry>> {
+  let Some(part) = workbook_part.calculation_chain_part(document) else {
+    return Ok(Vec::new());
+  };
+  let chain = part
+    .root_element(document)
+    .map_err(|error| FormulaError::Package(error.to_string()))?;
+  Ok(
+    chain
+      .calculation_cell
+      .iter()
+      .filter_map(|cell| {
+        let address = CellAddress::parse_a1(cell.cell_reference.as_str()).ok()?;
+        Some(CalcChainEntry {
+          sheet: cell
+            .sheet_id
+            .and_then(|sheet| u32::try_from(sheet).ok().map(SheetId)),
+          cell: address,
+          child_chain: cell.in_child_chain.is_some_and(|value| value.as_bool()),
+        })
+      })
+      .collect(),
+  )
+}
+
+fn external_references<'doc>(workbook: &x::Workbook) -> Vec<ExternalReference<'doc>> {
+  workbook
+    .external_references
+    .as_ref()
+    .map(|references| {
+      references
+        .external_reference
+        .iter()
+        .map(|reference| ExternalReference {
+          id: Cow::Owned(reference.id.clone()),
+          target: None,
+          sheet_names: Vec::new(),
+          defined_names: Vec::new(),
+          unavailable: true,
+        })
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
 fn defined_names<'doc>(workbook: &x::Workbook) -> Vec<DefinedName<'doc>> {
   workbook
     .defined_names
@@ -1373,12 +2326,27 @@ fn defined_names<'doc>(workbook: &x::Workbook) -> Vec<DefinedName<'doc>> {
       defined_names
         .defined_name
         .iter()
-        .map(|name| DefinedName {
-          name: Cow::Owned(name.name.clone()),
-          sheet: name.local_sheet_id.map(SheetId),
-          formula_text: Cow::Owned(name.xml_content.clone().unwrap_or_default()),
-          hidden: name.hidden.is_some_and(|value| value.as_bool()),
-          built_in: built_in_name(&name.name),
+        .map(|name| {
+          let sheet = name.local_sheet_id.map(SheetId);
+          let formula_text: Cow<'doc, str> =
+            Cow::Owned(name.xml_content.clone().unwrap_or_default());
+          let parsed_formula = Some(parse_formula(
+            sheet.unwrap_or_default(),
+            formula_text.clone(),
+          ));
+          let dependencies = parsed_formula
+            .as_ref()
+            .map(|parsed| parsed.dependencies.clone())
+            .unwrap_or_default();
+          DefinedName {
+            name: Cow::Owned(name.name.clone()),
+            sheet,
+            formula_text,
+            parsed_formula,
+            dependencies,
+            hidden: name.hidden.is_some_and(|value| value.as_bool()),
+            built_in: built_in_name(&name.name),
+          }
         })
         .collect()
     })
@@ -1723,7 +2691,7 @@ mod tests {
       )]),
     };
 
-    let graph = dependency_graph(&[sheet]);
+    let graph = dependency_graph(&[sheet], &[]);
 
     assert_eq!(graph.nodes.len(), 1);
     assert_eq!(graph.edges.len(), 2);
@@ -1760,7 +2728,202 @@ mod tests {
         ..
       }
     ));
-    assert!(parsed.ast.is_none());
+    assert!(matches!(
+      parsed.ast,
+      Some(FormulaAst::Binary {
+        op: FormulaOperator::Add,
+        ..
+      })
+    ));
+  }
+
+  #[test]
+  fn evaluates_supported_arithmetic_and_aggregate_formulas() {
+    let mut workbook = WorkbookValueModel {
+      identity: WorkbookIdentity {
+        sheets: vec![WorksheetIdentity {
+          id: SheetId(1),
+          name: Cow::Borrowed("Sheet1"),
+          visible: true,
+          relationship_id: None,
+        }],
+        ..WorkbookIdentity::default()
+      },
+      sheets: vec![WorksheetValueModel {
+        id: SheetId(1),
+        name: Cow::Borrowed("Sheet1"),
+        cells: BTreeMap::from([
+          (
+            CellAddress { column: 0, row: 0 },
+            CellValueRecord {
+              raw_value: FormulaValue::Number(1.0),
+              ..CellValueRecord::default()
+            },
+          ),
+          (
+            CellAddress { column: 0, row: 1 },
+            CellValueRecord {
+              raw_value: FormulaValue::Number(2.0),
+              ..CellValueRecord::default()
+            },
+          ),
+          (
+            CellAddress { column: 1, row: 0 },
+            CellValueRecord {
+              formula: Some(FormulaCell {
+                address: CellAddress { column: 1, row: 0 },
+                formula_kind: FormulaKind::Normal,
+                formula_text: Cow::Borrowed("SUM(A1:A2)+3"),
+                reference: None,
+                input1: None,
+                input2: None,
+                data_table_row: false,
+                data_table2d: false,
+                input1_deleted: false,
+                input2_deleted: false,
+                assigns_value_to_name: false,
+                parsed_formula: Some(parse_formula(SheetId(1), Cow::Borrowed("SUM(A1:A2)+3"))),
+                cached_value: Some(FormulaValue::Number(99.0)),
+                evaluated_value: None,
+                formula_state: FormulaState::CachedOnly,
+                number_format_context: None,
+                dirty: false,
+                volatile: false,
+              }),
+              ..CellValueRecord::default()
+            },
+          ),
+        ]),
+      }],
+      ..WorkbookValueModel::default()
+    };
+
+    let report = workbook.evaluate_supported_formulas();
+
+    assert_eq!(report.evaluated.len(), 1);
+    assert_eq!(report.evaluated[0].value, FormulaValue::Number(6.0));
+    assert_eq!(
+      workbook
+        .cell(SheetId(1), CellAddress { column: 1, row: 0 })
+        .and_then(|record| record.formula.as_ref())
+        .and_then(|formula| formula.evaluated_value.clone())
+        .unwrap(),
+      FormulaValue::Number(6.0)
+    );
+    assert_eq!(
+      workbook
+        .cell(SheetId(1), CellAddress { column: 1, row: 0 })
+        .and_then(|record| record.display_value.clone())
+        .unwrap()
+        .text,
+      Cow::Borrowed("6")
+    );
+  }
+
+  #[test]
+  fn evaluates_if_without_evaluating_unused_branch() {
+    let mut workbook = WorkbookValueModel {
+      identity: WorkbookIdentity {
+        sheets: vec![WorksheetIdentity {
+          id: SheetId(1),
+          name: Cow::Borrowed("Sheet1"),
+          visible: true,
+          relationship_id: None,
+        }],
+        ..WorkbookIdentity::default()
+      },
+      sheets: vec![WorksheetValueModel {
+        id: SheetId(1),
+        name: Cow::Borrowed("Sheet1"),
+        cells: BTreeMap::from([(
+          CellAddress { column: 0, row: 0 },
+          CellValueRecord {
+            formula: Some(FormulaCell {
+              address: CellAddress { column: 0, row: 0 },
+              formula_kind: FormulaKind::Normal,
+              formula_text: Cow::Borrowed("IF(0,1/0,7)"),
+              reference: None,
+              input1: None,
+              input2: None,
+              data_table_row: false,
+              data_table2d: false,
+              input1_deleted: false,
+              input2_deleted: false,
+              assigns_value_to_name: false,
+              parsed_formula: Some(parse_formula(SheetId(1), Cow::Borrowed("IF(0,1/0,7)"))),
+              cached_value: None,
+              evaluated_value: None,
+              formula_state: FormulaState::CachedOnly,
+              number_format_context: None,
+              dirty: false,
+              volatile: false,
+            }),
+            ..CellValueRecord::default()
+          },
+        )]),
+      }],
+      ..WorkbookValueModel::default()
+    };
+
+    let report = workbook.evaluate_supported_formulas();
+
+    assert_eq!(report.evaluated.len(), 1);
+    assert_eq!(report.evaluated[0].value, FormulaValue::Number(7.0));
+  }
+
+  #[test]
+  fn parses_external_and_volatile_formula_dependencies() {
+    let parsed = parse_formula(
+      SheetId(1),
+      Cow::Borrowed("RAND()+[Book.xlsx]'Q1'!$A$1+LocalName"),
+    );
+
+    assert!(
+      parsed
+        .dependencies
+        .iter()
+        .any(|dependency| matches!(dependency, FormulaDependency::Volatile))
+    );
+    assert!(parsed.dependencies.iter().any(|dependency| {
+      matches!(
+        dependency,
+        FormulaDependency::External(ExternalReferenceId {
+          book: Some(book),
+          sheet: Some(sheet),
+          name: Some(name),
+        }) if book.as_ref() == "Book.xlsx" && sheet.as_ref() == "Q1" && name.as_ref() == "$A$1"
+      )
+    }));
+    assert!(
+      parsed
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::ExternalReference(_)))
+    );
+  }
+
+  #[test]
+  fn builds_dependency_edges_from_defined_names() {
+    let workbook = x::Workbook {
+      defined_names: Some(x::DefinedNames {
+        defined_name: vec![x::DefinedName {
+          name: "LocalName".to_string(),
+          local_sheet_id: Some(2),
+          xml_content: Some("Sheet1!$A$1:$B$2".to_string()),
+          ..x::DefinedName::default()
+        }],
+      }),
+      ..x::Workbook::default()
+    };
+    let names = defined_names(&workbook);
+    let graph = dependency_graph(&[], &names);
+
+    assert_eq!(graph.defined_name_nodes.len(), 1);
+    assert_eq!(graph.defined_name_edges.len(), 1);
+    assert!(matches!(
+      graph.defined_name_edges[0].to,
+      FormulaDependency::Range(_)
+    ));
   }
 
   #[test]
@@ -1803,14 +2966,29 @@ mod tests {
       .unwrap();
     let parsed = formula.parsed_formula.as_ref().unwrap();
 
-    assert!(!formula.volatile);
+    assert!(formula.volatile);
+    assert_eq!(formula.formula_state, FormulaState::Stale);
     assert!(
       parsed
         .tokens
         .iter()
         .any(|token| matches!(token, FormulaToken::Function(name) if name.as_ref() == "NOW"))
     );
-    assert_eq!(parsed.dependencies.len(), 1);
+    assert!(
+      parsed
+        .dependencies
+        .iter()
+        .any(|dependency| matches!(dependency, FormulaDependency::Volatile))
+    );
+    assert!(parsed.dependencies.iter().any(|dependency| {
+      matches!(
+        dependency,
+        FormulaDependency::Cell {
+          address: CellAddress { column: 1, row: 0 },
+          ..
+        }
+      )
+    }));
   }
 
   #[test]

@@ -874,6 +874,8 @@ pub struct XlsxPrintedSheet<'doc> {
 pub struct XlsxPrintPage<'doc> {
   pub page_index: usize,
   pub sheet_range: CellRange,
+  pub repeated_rows: Vec<CellRange>,
+  pub repeated_columns: Vec<CellRange>,
   pub paper_bounds: Rect,
   pub content_bounds: Rect,
   pub cells: Vec<XlsxCellFragment<'doc>>,
@@ -912,19 +914,112 @@ fn printed_sheet<'doc>(
   sheet: &XlsxSheet<'doc>,
 ) -> Option<XlsxPrintedSheet<'doc>> {
   let sheet_range = sheet_print_range(sheet)?;
-  let content_bounds = sheet_range_bounds(sheet, sheet_range);
   Some(XlsxPrintedSheet {
     sheet_index,
     sheet_name: sheet.name.clone(),
-    pages: vec![XlsxPrintPage {
-      page_index: 0,
-      sheet_range,
-      paper_bounds: paper_bounds(sheet),
-      content_bounds,
-      cells: sheet_cell_fragments(sheet, sheet_range),
-      drawings: sheet_drawing_fragments(sheet, sheet_range),
-    }],
+    pages: split_print_pages(sheet, sheet_range),
   })
+}
+
+fn split_print_pages<'doc>(
+  sheet: &XlsxSheet<'doc>,
+  sheet_range: CellRange,
+) -> Vec<XlsxPrintPage<'doc>> {
+  let row_starts = manual_break_starts(
+    &sheet.metrics.row_breaks,
+    sheet_range.start.row,
+    sheet_range.end.row,
+  );
+  let column_starts = manual_break_starts(
+    &sheet.metrics.column_breaks,
+    sheet_range.start.column,
+    sheet_range.end.column,
+  );
+  let mut pages = Vec::new();
+  for (row_index, row_start) in row_starts.iter().enumerate() {
+    let row_end = row_starts
+      .get(row_index + 1)
+      .copied()
+      .and_then(|next| next.checked_sub(1))
+      .unwrap_or(sheet_range.end.row);
+    for (column_index, column_start) in column_starts.iter().enumerate() {
+      let column_end = column_starts
+        .get(column_index + 1)
+        .copied()
+        .and_then(|next| next.checked_sub(1))
+        .unwrap_or(sheet_range.end.column);
+      let page_range = CellRange {
+        start: CellAddress {
+          column: *column_start,
+          row: *row_start,
+        },
+        end: CellAddress {
+          column: column_end,
+          row: row_end,
+        },
+      };
+      let repeated_rows = repeated_row_ranges(sheet, page_range);
+      let repeated_columns = repeated_column_ranges(sheet, page_range);
+      pages.push(XlsxPrintPage {
+        page_index: pages.len(),
+        sheet_range: page_range,
+        repeated_rows: repeated_rows.clone(),
+        repeated_columns: repeated_columns.clone(),
+        paper_bounds: paper_bounds(sheet),
+        content_bounds: sheet_range_bounds(sheet, page_range),
+        cells: sheet_cell_fragments(sheet, page_range, &repeated_rows, &repeated_columns),
+        drawings: sheet_drawing_fragments(sheet, page_range),
+      });
+    }
+  }
+  pages
+}
+
+fn manual_break_starts(breaks: &[PageBreak], start: u32, end: u32) -> Vec<u32> {
+  let mut starts = vec![start];
+  for page_break in breaks.iter().filter(|page_break| page_break.manual) {
+    if (start + 1..=end).contains(&page_break.id) && !starts.contains(&page_break.id) {
+      starts.push(page_break.id);
+    }
+  }
+  starts.sort_unstable();
+  starts
+}
+
+fn repeated_row_ranges(sheet: &XlsxSheet<'_>, page_range: CellRange) -> Vec<CellRange> {
+  sheet
+    .metrics
+    .repeated_rows
+    .iter()
+    .map(|range| CellRange {
+      start: CellAddress {
+        column: page_range.start.column,
+        row: range.start.row,
+      },
+      end: CellAddress {
+        column: page_range.end.column,
+        row: range.end.row,
+      },
+    })
+    .collect()
+}
+
+fn repeated_column_ranges(sheet: &XlsxSheet<'_>, page_range: CellRange) -> Vec<CellRange> {
+  sheet
+    .metrics
+    .repeated_columns
+    .iter()
+    .map(|range| CellRange {
+      start: CellAddress {
+        column: range.start.column,
+        row: page_range.start.row,
+      },
+      end: CellAddress {
+        column: range.end.column,
+        row: page_range.end.row,
+      },
+    })
+    .collect()
 }
 
 fn sheet_print_range(sheet: &XlsxSheet<'_>) -> Option<CellRange> {
@@ -973,8 +1068,11 @@ fn occupied_range(sheet: &XlsxSheet<'_>) -> Option<CellRange> {
 fn sheet_cell_fragments<'doc>(
   sheet: &XlsxSheet<'doc>,
   sheet_range: CellRange,
+  repeated_rows: &[CellRange],
+  repeated_columns: &[CellRange],
 ) -> Vec<XlsxCellFragment<'doc>> {
   let mut fragments = Vec::new();
+  let mut seen = Vec::new();
   for (row_position, row) in sheet.rows.iter().enumerate() {
     if row.hidden {
       continue;
@@ -991,9 +1089,12 @@ fn sheet_cell_fragments<'doc>(
         address
       });
       current_column = address.column.saturating_add(1);
-      if !range_contains(sheet_range, address) {
+      if !print_page_contains(sheet_range, repeated_rows, repeated_columns, address)
+        || seen.contains(&address)
+      {
         continue;
       }
+      seen.push(address);
       let merged_range = sheet
         .metrics
         .merged_ranges
@@ -1016,6 +1117,21 @@ fn sheet_cell_fragments<'doc>(
     }
   }
   fragments
+}
+
+fn print_page_contains(
+  sheet_range: CellRange,
+  repeated_rows: &[CellRange],
+  repeated_columns: &[CellRange],
+  address: CellAddress,
+) -> bool {
+  range_contains(sheet_range, address)
+    || repeated_rows
+      .iter()
+      .any(|range| range_contains(*range, address))
+    || repeated_columns
+      .iter()
+      .any(|range| range_contains(*range, address))
 }
 
 fn sheet_drawing_fragments<'doc>(
@@ -1267,6 +1383,8 @@ mod tests {
           name: Cow::Borrowed("_xlnm.Print_Area"),
           sheet: Some(SheetId(0)),
           formula_text: Cow::Borrowed("'Q1, North'!$B$2:$D$5"),
+          parsed_formula: None,
+          dependencies: Vec::new(),
           hidden: false,
           built_in: Some(BuiltInName::PrintArea),
         },
@@ -1274,6 +1392,8 @@ mod tests {
           name: Cow::Borrowed("_xlnm.Print_Titles"),
           sheet: Some(SheetId(0)),
           formula_text: Cow::Borrowed("'Q1, North'!$1:$2,'Q1, North'!$A:$C"),
+          parsed_formula: None,
+          dependencies: Vec::new(),
           hidden: false,
           built_in: Some(BuiltInName::PrintTitles),
         },
@@ -1348,6 +1468,75 @@ mod tests {
         start: CellAddress { column: 0, row: 0 },
         end: CellAddress { column: 5, row: 6 }
       }
+    );
+  }
+
+  #[test]
+  fn splits_print_plan_at_manual_breaks_and_repeats_titles() {
+    let workbook = XlsxWorkbook {
+      sheets: vec![XlsxSheet {
+        name: Cow::Borrowed("Sheet1"),
+        metrics: SheetMetrics {
+          print_ranges: vec![CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 1, row: 3 },
+          }],
+          row_breaks: vec![PageBreak {
+            id: 2,
+            manual: true,
+            ..PageBreak::default()
+          }],
+          repeated_rows: vec![CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 0, row: 0 },
+          }],
+          ..SheetMetrics::default()
+        },
+        rows: vec![
+          XlsxRow {
+            row_index: Some(1),
+            cells: vec![XlsxCell {
+              address: Some(CellAddress { column: 0, row: 0 }),
+              display_text: Cow::Borrowed("Header"),
+              ..XlsxCell::default()
+            }],
+            ..XlsxRow::default()
+          },
+          XlsxRow {
+            row_index: Some(3),
+            cells: vec![XlsxCell {
+              address: Some(CellAddress { column: 0, row: 2 }),
+              display_text: Cow::Borrowed("Body"),
+              ..XlsxCell::default()
+            }],
+            ..XlsxRow::default()
+          },
+        ],
+        ..XlsxSheet::default()
+      }],
+      ..XlsxWorkbook::default()
+    };
+
+    let plan = workbook.build_print_plan();
+    let pages = &plan.sheet_pages[0].pages;
+
+    assert_eq!(pages.len(), 2);
+    assert_eq!(pages[0].sheet_range.start.row, 0);
+    assert_eq!(pages[0].sheet_range.end.row, 1);
+    assert_eq!(pages[1].sheet_range.start.row, 2);
+    assert_eq!(pages[1].sheet_range.end.row, 3);
+    assert_eq!(pages[1].repeated_rows.len(), 1);
+    assert!(
+      pages[1]
+        .cells
+        .iter()
+        .any(|cell| cell.text.as_ref() == "Header")
+    );
+    assert!(
+      pages[1]
+        .cells
+        .iter()
+        .any(|cell| cell.text.as_ref() == "Body")
     );
   }
 }

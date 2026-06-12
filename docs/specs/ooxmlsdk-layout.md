@@ -1047,8 +1047,17 @@ Implemented in this stage:
 - XLSX `XlsxPrintPlan` construction for visible sheets, explicit print ranges,
   LO-style implicit A1-start occupied ranges, hidden rows, merged-range
   expansion, and printable drawing anchors
+- XLSX manual `rowBreaks`/`colBreaks` split print ranges into multiple
+  `XlsxPrintPage` records using LibreOffice's `IsStartOfNewPage` import
+  behavior: only manual breaks become hard page starts, and `brk@id` is kept as
+  the start row/column of the following page
+- XLSX repeated rows/columns from `_xlnm.Print_Titles` are carried on each
+  print page and included in page cell fragments with address de-duplication
 - `layout_xlsx_model` consumes the print plan for cell debug records instead of
   re-parsing formula or inventing display text
+- `layout_xlsx_model` now creates display pages from `XlsxPrintPage`
+  `paper_bounds` and emits cached/display cell text as `TextRun` items from
+  the formula value model
 - DOCX and PPTX expose `layout_*_model_with_fonts` entry points that route text
   through `ooxmlsdk-fonts::FontRegistry::shape_text_runs`
 - the display list can emit shared `GlyphRun` items with shaped glyphs,
@@ -1057,8 +1066,9 @@ Implemented in this stage:
 
 Still intentionally not implemented:
 
-- paper size defaults, row/column-derived geometry, pagination, repeated
-  rows/columns, and page-break splitting
+- full paper size mapping beyond the current LO-sourced fallback geometry,
+  automatic Calc pagination from page content size, scaling/fit-to-page, and
+  cross-page merged-cell splitting
 - full DOCX line layout, PPTX text-body layout, and XLSX cell text shaping
 - any PDF adapter migration
 

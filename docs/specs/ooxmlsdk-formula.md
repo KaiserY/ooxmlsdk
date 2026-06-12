@@ -589,7 +589,8 @@ Scope:
 - import constants, cached values, formula text, formula kind, shared formula
   ids, array ranges, data table flags, dirty/stale flags, and cell type metadata
 - preserve cached/evaluated/display distinctions
-- expand shared formulas only enough to expose dependent records and addresses
+- expand shared formulas only enough to expose dependent records, addresses,
+  parsed tokens, and dependency skeletons
 - mark unsupported or external formulas explicitly instead of inventing values
 
 Done when cache-first XLSX fixtures expose the printable cell text and formula
@@ -640,6 +641,9 @@ Implemented in this stage:
 - formula kind import for normal, shared, array, and data table cells
 - shared formula group metadata with definition cell, `si`, `ref`, and
   dependent addresses
+- shared formula dependent `parsed_formula` derivation from the definition
+  formula, with relative A1 references translated according to existing
+  absolute/relative address flags
 - array formula and data table ranges, dirty/always-calculate flags, and data
   table input references/deleted-input flags where OOXML provides them
 - lightweight dependency graph edges for directly parseable A1 cell/range
@@ -647,9 +651,9 @@ Implemented in this stage:
 
 Still intentionally not implemented:
 
-- shared formula text expansion or relative-reference translation
-- full Calc compiler tokenization, external references, names, and volatile
-  function detection
+- source-text rendering of translated shared formulas
+- full Calc compiler tokenization, external references, defined-name
+  resolution, and volatile function detection
 - evaluator logic beyond preserving cached/display values
 
 Do not fill these gaps with local guesses. Add LO-derived tests first, then

@@ -50,11 +50,44 @@ impl<'a> FontRegistry<'a> {
     id: impl Into<Cow<'a, str>>,
     data: impl Into<Cow<'a, [u8]>>,
   ) -> Result<FontId> {
-    let id = id.into();
-    let data = data.into();
-    let face = FontFaceInfo::from_ttf_bytes(id.as_ref(), data.as_ref(), 0)?;
+    self.register_ttf_source(FontSource::Memory {
+      id: id.into(),
+      data: data.into(),
+    })
+  }
+
+  pub fn register_embedded_font(
+    &mut self,
+    id: impl Into<Cow<'a, str>>,
+    data: impl Into<Cow<'a, [u8]>>,
+  ) -> Result<FontId> {
+    self.register_ttf_source(FontSource::EmbeddedOoxml {
+      id: id.into(),
+      data: data.into(),
+    })
+  }
+
+  pub fn register_test_fixture_font(
+    &mut self,
+    id: impl Into<Cow<'a, str>>,
+    data: impl Into<Cow<'a, [u8]>>,
+  ) -> Result<FontId> {
+    self.register_ttf_source(FontSource::TestFixture {
+      id: id.into(),
+      data: data.into(),
+    })
+  }
+
+  fn register_ttf_source(&mut self, source: FontSource<'a>) -> Result<FontId> {
+    let Some(id) = source.id() else {
+      return Err(FontError::InvalidFace);
+    };
+    let Some(data) = source.data() else {
+      return Err(FontError::InvalidFace);
+    };
+    let face = FontFaceInfo::from_ttf_bytes(id, data, 0)?;
     let font_id = face.font_id.clone();
-    self.register_face(FontSource::Memory { id, data }, face);
+    self.register_face(source, face);
     Ok(font_id)
   }
 
@@ -89,6 +122,222 @@ impl<'a> FontRegistry<'a> {
       )),
     }
   }
+
+  pub fn shape_text_runs(
+    &self,
+    request: &FontRequest<'a>,
+    text: impl Into<Cow<'a, str>>,
+    direction: TextDirection,
+  ) -> Result<Vec<ShapedRun<'a>>> {
+    let text = text.into();
+    let fonts = self.resolve_fallback_fonts(request, text.as_ref())?;
+
+    let mut runs = Vec::new();
+    let mut start = 0usize;
+    let mut active = None::<usize>;
+    for (index, ch) in text.char_indices() {
+      let font_index = fonts
+        .iter()
+        .position(|font| font.face.coverage.contains_char(ch))
+        .unwrap_or(0);
+      if active.is_some_and(|active| active != font_index) {
+        runs.push(self.shape_resolved_segment(
+          &fonts[active.unwrap_or(0)],
+          text.as_ref(),
+          start..index,
+          direction,
+          request,
+        )?);
+        start = index;
+      }
+      active = Some(font_index);
+    }
+    if start < text.len() || text.is_empty() {
+      runs.push(self.shape_resolved_segment(
+        &fonts[active.unwrap_or(0)],
+        text.as_ref(),
+        start..text.len(),
+        direction,
+        request,
+      )?);
+    }
+    Ok(runs)
+  }
+
+  fn resolve_fallback_fonts(
+    &self,
+    request: &FontRequest<'a>,
+    text: &str,
+  ) -> Result<Vec<ResolvedFontWithFace<'a>>> {
+    let primary = self.resolve(request)?;
+    let Some(primary_face) = self
+      .book
+      .faces
+      .iter()
+      .find(|face| face.font_id == primary.font_id)
+    else {
+      return Ok(vec![ResolvedFontWithFace {
+        resolved: primary,
+        face: FontFaceInfo::synthetic("unknown", "unknown"),
+        fallback_level: None,
+      }]);
+    };
+
+    let mut fonts = vec![ResolvedFontWithFace {
+      resolved: primary,
+      face: primary_face.clone(),
+      fallback_level: None,
+    }];
+
+    for family in self.fallback_families(request) {
+      let mut fallback_request = request.clone();
+      fallback_request.family = Some(family.clone());
+      if let Ok(resolved) = self.resolve(&fallback_request)
+        && !fonts
+          .iter()
+          .any(|font| font.resolved.font_id == resolved.font_id)
+        && let Some(face) = self
+          .book
+          .faces
+          .iter()
+          .find(|face| face.font_id == resolved.font_id)
+      {
+        let fallback_level = fonts.len().try_into().ok();
+        fonts.push(ResolvedFontWithFace {
+          resolved,
+          face: face.clone(),
+          fallback_level,
+        });
+      }
+    }
+
+    for face in &self.book.faces {
+      if fonts
+        .iter()
+        .any(|font| font.resolved.font_id == face.font_id)
+        || !text.chars().any(|ch| face.coverage.contains_char(ch))
+      {
+        continue;
+      }
+      let fallback_level = fonts.len().try_into().ok();
+      fonts.push(ResolvedFontWithFace {
+        resolved: self.resolved_from_face(request, face, fallback_level),
+        face: face.clone(),
+        fallback_level,
+      });
+    }
+
+    Ok(fonts)
+  }
+
+  fn fallback_families(&self, request: &FontRequest<'a>) -> Vec<Cow<'a, str>> {
+    let mut families: Vec<Cow<'a, str>> = Vec::new();
+    for chain in &self.book.fallback_chains {
+      if chain
+        .script
+        .is_some_and(|script| request.script.is_some_and(|requested| requested != script))
+      {
+        continue;
+      }
+      if chain.language.as_deref().is_some_and(|language| {
+        request
+          .language
+          .as_deref()
+          .is_some_and(|requested| !requested.eq_ignore_ascii_case(language))
+      }) {
+        continue;
+      }
+      for family in &chain.families {
+        if !families
+          .iter()
+          .any(|existing| normalize_family(existing.as_ref()) == normalize_family(family.as_ref()))
+        {
+          families.push(family.clone());
+        }
+      }
+    }
+    families
+  }
+
+  fn shape_resolved_segment(
+    &self,
+    font: &ResolvedFontWithFace<'a>,
+    text: &str,
+    range: Range<usize>,
+    direction: TextDirection,
+    request: &FontRequest<'a>,
+  ) -> Result<ShapedRun<'a>> {
+    let mut run = match &font.resolved.source {
+      FontSource::Memory { data, .. }
+      | FontSource::EmbeddedOoxml { data, .. }
+      | FontSource::TestFixture { data, .. } => font.resolved.shape_with_ttf_bytes(
+        Cow::Owned(text[range.clone()].to_owned()),
+        data.as_ref(),
+        request.size_pt,
+        direction,
+        request.script,
+        request.language.clone(),
+      )?,
+      FontSource::System | FontSource::Path(_) => font.resolved.shape_approximate(
+        Cow::Owned(text[range.clone()].to_owned()),
+        request.size_pt,
+        direction,
+        request.script,
+        request.language.clone(),
+      ),
+    };
+    run.offset_text_range(range.start);
+    if let Some(fallback_level) = font.fallback_level {
+      run.diagnostics.fallback_runs.push(FallbackRun {
+        text_range: run.text_range.clone(),
+        font_id: Some(font.resolved.font_id.clone()),
+        fallback_level,
+        reason: FontSubstitutionReason::MissingGlyph,
+        family: Some(font.resolved.resolved_family.clone()),
+      });
+    }
+    Ok(run)
+  }
+
+  fn resolved_from_face(
+    &self,
+    request: &FontRequest<'a>,
+    face: &FontFaceInfo<'a>,
+    fallback_level: Option<u8>,
+  ) -> ResolvedFont<'a> {
+    let registered = self.faces.iter().find(|registered| {
+      registered.face_index == face.face_index && family_overlaps(registered, face)
+    });
+    ResolvedFont {
+      font_id: face.font_id.clone(),
+      requested_family: request.family.clone(),
+      resolved_family: primary_family(face),
+      source: registered
+        .map(|face| face.source.clone())
+        .unwrap_or(FontSource::System),
+      face_index: face.face_index,
+      synthetic_bold: false,
+      synthetic_italic: false,
+      variation_values: request.variations.clone(),
+      metrics: face.metrics.clone(),
+      substitution: Some(FontSubstitution {
+        requested_family: request.family.clone().unwrap_or_else(|| Cow::Borrowed("")),
+        substituted_family: primary_family(face),
+        reason: FontSubstitutionReason::MissingGlyph,
+      }),
+      match_diagnostics: FontMatchDiagnostics {
+        candidates: Vec::new(),
+        fallback_level,
+      },
+    }
+  }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ResolvedFontWithFace<'a> {
+  resolved: ResolvedFont<'a>,
+  face: FontFaceInfo<'a>,
+  fallback_level: Option<u8>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -325,6 +574,31 @@ pub struct FontCoverage {
   pub scripts: BTreeSet<TextScript>,
 }
 
+impl FontCoverage {
+  pub fn contains_codepoint(&self, codepoint: u32) -> bool {
+    self
+      .unicode_ranges
+      .iter()
+      .any(|range| range.start <= codepoint && codepoint < range.end)
+  }
+
+  pub fn contains_char(&self, ch: char) -> bool {
+    self.contains_codepoint(u32::from(ch))
+  }
+
+  pub fn missing_glyphs(&self, text: &str) -> Vec<MissingGlyph> {
+    text
+      .char_indices()
+      .filter_map(|(start, ch)| {
+        (!self.contains_char(ch)).then(|| MissingGlyph {
+          codepoint: u32::from(ch),
+          text_range: start..start + ch.len_utf8(),
+        })
+      })
+      .collect()
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FontFlags {
   pub symbolic: bool,
@@ -402,6 +676,26 @@ pub enum FontSource<'a> {
     id: Cow<'a, str>,
     data: Cow<'a, [u8]>,
   },
+}
+
+impl<'a> FontSource<'a> {
+  pub fn id(&self) -> Option<&str> {
+    match self {
+      Self::Memory { id, .. } | Self::EmbeddedOoxml { id, .. } | Self::TestFixture { id, .. } => {
+        Some(id.as_ref())
+      }
+      Self::System | Self::Path(_) => None,
+    }
+  }
+
+  pub fn data(&self) -> Option<&[u8]> {
+    match self {
+      Self::Memory { data, .. }
+      | Self::EmbeddedOoxml { data, .. }
+      | Self::TestFixture { data, .. } => Some(data.as_ref()),
+      Self::System | Self::Path(_) => None,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -491,6 +785,7 @@ impl<'a> ResolvedFont<'a> {
       safe_breaks,
       approximate: true,
       decorations: Vec::new(),
+      diagnostics: ShapingDiagnostics::default(),
     }
   }
 
@@ -556,6 +851,10 @@ impl<'a> ResolvedFont<'a> {
       })
       .collect::<Vec<_>>();
     let advance_pt = glyphs.iter().map(|glyph| glyph.x_advance_pt).sum();
+    let diagnostics = ShapingDiagnostics {
+      missing_glyphs: missing_glyphs_from_shaped_glyphs(&glyphs),
+      fallback_runs: Vec::new(),
+    };
 
     Ok(ShapedRun {
       font_id: self.font_id.clone(),
@@ -569,6 +868,7 @@ impl<'a> ResolvedFont<'a> {
       safe_breaks,
       approximate: false,
       decorations: Vec::new(),
+      diagnostics,
     })
   }
 }
@@ -767,6 +1067,47 @@ pub struct ShapedRun<'a> {
   pub safe_breaks: Vec<usize>,
   pub approximate: bool,
   pub decorations: Vec<TextDecoration>,
+  pub diagnostics: ShapingDiagnostics<'a>,
+}
+
+impl ShapedRun<'_> {
+  fn offset_text_range(&mut self, offset: usize) {
+    if offset == 0 {
+      return;
+    }
+    self.text_range = self.text_range.start + offset..self.text_range.end + offset;
+    for glyph in self.glyphs.to_mut() {
+      glyph.cluster = glyph.cluster.saturating_add(offset as u32);
+      glyph.text_range = glyph.text_range.start + offset..glyph.text_range.end + offset;
+    }
+    for boundary in &mut self.safe_breaks {
+      *boundary += offset;
+    }
+    for missing in &mut self.diagnostics.missing_glyphs {
+      missing.text_range = missing.text_range.start + offset..missing.text_range.end + offset;
+    }
+  }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ShapingDiagnostics<'a> {
+  pub missing_glyphs: Vec<MissingGlyph>,
+  pub fallback_runs: Vec<FallbackRun<'a>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MissingGlyph {
+  pub codepoint: u32,
+  pub text_range: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FallbackRun<'a> {
+  pub text_range: Range<usize>,
+  pub font_id: Option<FontId>,
+  pub fallback_level: u8,
+  pub reason: FontSubstitutionReason,
+  pub family: Option<Cow<'a, str>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -1048,7 +1389,7 @@ fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
   let mut ranges = Vec::new();
   let mut range_start = None;
   let mut last = 0u32;
-  for codepoint in 0..=0xFFFF {
+  for codepoint in 0..=u32::from(char::MAX) {
     let covered = char::from_u32(codepoint)
       .and_then(|ch| face.glyph_index(ch))
       .is_some();
@@ -1074,6 +1415,18 @@ fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
     unicode_ranges: ranges,
     scripts: BTreeSet::new(),
   }
+}
+
+fn missing_glyphs_from_shaped_glyphs(glyphs: &[ShapedGlyph]) -> Vec<MissingGlyph> {
+  glyphs
+    .iter()
+    .filter_map(|glyph| {
+      (glyph.glyph_id == 0).then(|| MissingGlyph {
+        codepoint: glyph.source_char.map(u32::from).unwrap_or_default(),
+        text_range: glyph.text_range.clone(),
+      })
+    })
+    .collect()
 }
 
 fn font_weight_number(weight: FontWeight) -> i32 {
@@ -1314,6 +1667,81 @@ mod tests {
     assert_eq!(shaped.glyphs[0].text_range, 0..1);
     assert_eq!(shaped.glyphs[0].x_advance_pt, 0.0);
     assert_eq!(shaped.safe_breaks, vec![2]);
+  }
+
+  #[test]
+  fn font_coverage_tracks_non_bmp_codepoints() {
+    let coverage = FontCoverage {
+      unicode_ranges: vec![
+        u32::from('A')..u32::from('B'),
+        u32::from('😀')..u32::from('😀') + 1,
+      ],
+      scripts: BTreeSet::new(),
+    };
+
+    assert!(coverage.contains_char('A'));
+    assert!(coverage.contains_char('😀'));
+    assert!(!coverage.contains_char('B'));
+    assert_eq!(
+      coverage.missing_glyphs("A😀B"),
+      vec![MissingGlyph {
+        codepoint: u32::from('B'),
+        text_range: 5..6,
+      }]
+    );
+  }
+
+  #[test]
+  fn font_source_exposes_registered_bytes_for_renderers() {
+    let source = FontSource::EmbeddedOoxml {
+      id: Cow::Borrowed("embedded"),
+      data: Cow::Borrowed(&[1, 2, 3]),
+    };
+
+    assert_eq!(source.id(), Some("embedded"));
+    assert_eq!(source.data(), Some([1, 2, 3].as_slice()));
+    assert_eq!(FontSource::System.id(), None);
+    assert_eq!(FontSource::System.data(), None);
+  }
+
+  #[test]
+  fn shape_text_runs_uses_registered_fallback_coverage() {
+    let mut registry = FontRegistry::new();
+    let mut primary = FontFaceInfo::synthetic("primary", "Primary");
+    primary.coverage.unicode_ranges = vec![u32::from('A')..u32::from('A') + 1];
+    registry.register_face(FontSource::System, primary);
+
+    let mut fallback = FontFaceInfo::synthetic("fallback", "Fallback");
+    fallback.coverage.unicode_ranges = vec![u32::from('B')..u32::from('B') + 1];
+    registry.register_face(FontSource::System, fallback);
+    registry.book.fallback_chains.push(FontFallbackChain {
+      script: Some(TextScript::Latin),
+      language: None,
+      families: vec![Cow::Borrowed("Fallback")],
+    });
+
+    let runs = registry
+      .shape_text_runs(
+        &FontRequest {
+          family: Some(Cow::Borrowed("Primary")),
+          script: Some(TextScript::Latin),
+          size_pt: FontSize(12.0),
+          ..FontRequest::default()
+        },
+        "AB",
+        TextDirection::LeftToRight,
+      )
+      .unwrap();
+
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0].font_id, FontId(Arc::from("primary")));
+    assert_eq!(runs[0].text_range, 0..1);
+    assert_eq!(runs[1].font_id, FontId(Arc::from("fallback")));
+    assert_eq!(runs[1].text_range, 1..2);
+    assert_eq!(
+      runs[1].diagnostics.fallback_runs[0].reason,
+      FontSubstitutionReason::MissingGlyph
+    );
   }
 
   #[test]

@@ -6,8 +6,8 @@ use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
 
 use crate::{
-  CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue, FormulaValue,
-  QualifiedAddress, QualifiedRange, Result, SheetId,
+  AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
+  FormulaValue, QualifiedAddress, QualifiedRange, Result, SheetId,
 };
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -38,7 +38,7 @@ impl<'doc> WorkbookValueModel<'doc> {
     let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
 
     let identity = workbook_identity(&workbook);
-    let sheets = identity
+    let mut sheets = identity
       .sheets
       .iter()
       .enumerate()
@@ -50,6 +50,7 @@ impl<'doc> WorkbookValueModel<'doc> {
         worksheet_value_model(identity, worksheet.as_ref(), &shared_strings)
       })
       .collect::<Result<Vec<_>>>()?;
+    resolve_shared_formula_dependents(&mut sheets);
     let shared_formula_groups = shared_formula_groups(&sheets);
     let array_formula_groups = array_formula_groups(&sheets);
     let data_tables = data_tables(&sheets);
@@ -730,6 +731,138 @@ fn inline_string_text(value: &x::InlineString) -> String {
       .filter_map(|run| run.text.xml_content.as_deref())
       .collect::<String>(),
   )
+}
+
+fn resolve_shared_formula_dependents<'doc>(sheets: &mut [WorksheetValueModel<'doc>]) {
+  let mut definitions = BTreeMap::new();
+  for sheet in sheets.iter() {
+    for formula in sheet
+      .cells
+      .values()
+      .filter_map(|record| record.formula.as_ref())
+    {
+      let FormulaKind::SharedDefinition { group_index } = formula.formula_kind else {
+        continue;
+      };
+      definitions.insert(
+        (sheet.id, group_index),
+        (formula.address, formula.parsed_formula.clone()),
+      );
+    }
+  }
+
+  for sheet in sheets {
+    for record in sheet.cells.values_mut() {
+      let Some(formula) = record.formula.as_mut() else {
+        continue;
+      };
+      let FormulaKind::SharedDependent { group_index } = formula.formula_kind else {
+        continue;
+      };
+      let Some((origin, Some(parsed))) = definitions.get(&(sheet.id, group_index)) else {
+        continue;
+      };
+      formula.parsed_formula = Some(translate_shared_formula(
+        sheet.id,
+        parsed,
+        *origin,
+        formula.address,
+      ));
+    }
+  }
+}
+
+fn translate_shared_formula<'doc>(
+  sheet: SheetId,
+  parsed: &ParsedFormula<'doc>,
+  origin: CellAddress,
+  target: CellAddress,
+) -> ParsedFormula<'doc> {
+  let column_delta = i64::from(target.column) - i64::from(origin.column);
+  let row_delta = i64::from(target.row) - i64::from(origin.row);
+  let mut unsupported = parsed.unsupported.clone();
+  let tokens = parsed
+    .tokens
+    .iter()
+    .map(|token| match token {
+      FormulaToken::Reference(range) => {
+        let (translated, complete) = translate_shared_range(range, column_delta, row_delta);
+        if !complete {
+          unsupported.push(UnsupportedFormulaFeature {
+            feature: Cow::Borrowed("shared formula reference translation"),
+            reason: Cow::Borrowed("translated reference moved before sheet origin"),
+          });
+        }
+        FormulaToken::Reference(translated)
+      }
+      token => token.clone(),
+    })
+    .collect::<Vec<_>>();
+  let dependencies = tokens
+    .iter()
+    .filter_map(|token| match token {
+      FormulaToken::Reference(range) => Some(dependency_from_range(sheet, range)),
+      FormulaToken::Name(name) => Some(FormulaDependency::Name(name.clone())),
+      _ => None,
+    })
+    .collect();
+
+  ParsedFormula {
+    source: parsed.source.clone(),
+    tokens,
+    ast: None,
+    dependencies,
+    unsupported,
+  }
+}
+
+fn translate_shared_range<'doc>(
+  range: &QualifiedRange<'doc>,
+  column_delta: i64,
+  row_delta: i64,
+) -> (QualifiedRange<'doc>, bool) {
+  let (start, start_complete) = translate_shared_address(
+    range.range.start,
+    range.start_flags,
+    column_delta,
+    row_delta,
+  );
+  let (end, end_complete) =
+    translate_shared_address(range.range.end, range.end_flags, column_delta, row_delta);
+  (
+    QualifiedRange {
+      sheet: range.sheet,
+      sheet_name: range.sheet_name.clone(),
+      range: CellRange { start, end },
+      start_flags: range.start_flags,
+      end_flags: range.end_flags,
+    },
+    start_complete && end_complete,
+  )
+}
+
+fn translate_shared_address(
+  address: CellAddress,
+  flags: AddressFlags,
+  column_delta: i64,
+  row_delta: i64,
+) -> (CellAddress, bool) {
+  let (column, column_complete) = if flags.absolute_column || flags.whole_row {
+    (address.column, true)
+  } else {
+    translate_coordinate(address.column, column_delta).unwrap_or((address.column, false))
+  };
+  let (row, row_complete) = if flags.absolute_row || flags.whole_column {
+    (address.row, true)
+  } else {
+    translate_coordinate(address.row, row_delta).unwrap_or((address.row, false))
+  };
+  (CellAddress { column, row }, column_complete && row_complete)
+}
+
+fn translate_coordinate(value: u32, delta: i64) -> Option<(u32, bool)> {
+  let translated = i64::from(value).checked_add(delta)?;
+  (translated >= 0).then_some((translated as u32, true))
 }
 
 fn decode_excel_escaped_text(value: &str) -> String {
@@ -1460,8 +1593,9 @@ mod tests {
       }),
       ..x::Worksheet::default()
     };
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
-    let groups = shared_formula_groups(&[sheet]);
+    let mut sheets = vec![worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap()];
+    resolve_shared_formula_dependents(&mut sheets);
+    let groups = shared_formula_groups(&sheets);
 
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].index, 7);
@@ -1476,6 +1610,19 @@ mod tests {
       groups[0].dependents,
       vec![CellAddress { column: 0, row: 1 }]
     );
+    let dependent = sheets[0]
+      .cells
+      .get(&CellAddress { column: 0, row: 1 })
+      .and_then(|record| record.formula.as_ref())
+      .and_then(|formula| formula.parsed_formula.as_ref())
+      .unwrap();
+    assert!(matches!(
+      &dependent.dependencies[0],
+      FormulaDependency::Cell {
+        sheet: SheetId(1),
+        address: CellAddress { column: 1, row: 1 }
+      }
+    ));
   }
 
   #[test]

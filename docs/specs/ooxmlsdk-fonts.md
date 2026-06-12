@@ -548,17 +548,18 @@ calling PDF code.
 
 ### 15.3.1 Next Broad Development Focus
 
-The next font step should close the gap between basic rustybuzz calls and
-LO/VCL-style layout measurement:
+The next font step should finish the remaining LO/VCL-style integration work
+around the new shared shaping path:
 
-- pass direction, script, and language into the shaping buffer instead of only
-  storing them on the result
-- derive cmap coverage beyond BMP-only scans
-- split runs at script/language/direction and glyph-fallback boundaries
-- expose diagnostics for approximate shaping, fallback shaping, and missing
-  glyph coverage so layout tests can detect unsupported behavior
-- remove any document-engine-local text width helper by moving the shared
-  behavior into `ooxmlsdk-fonts`
+- keep `shape_text_runs` as the shared layout/PDF entry point for glyph
+  fallback segmentation
+- extend script/language itemization from the current caller-provided context
+  to LO/EditEngine-style run boundaries
+- populate fallback chains from source-backed Office/LO/platform data instead
+  of hard-coded local guesses
+- migrate PDF font loading/painting to consume the same `FontRegistry`,
+  `FontId`, `ShapedRun`, and diagnostics model
+- keep host/system discovery optional and deterministic for tests
 
 ### 15.4 Current Implementation Checkpoint
 
@@ -570,16 +571,22 @@ Implemented in this stage:
 - match diagnostics based on explicit attribute comparison instead of arbitrary
   weighted scores
 - resolved-font metrics scaling by requested point size
-- approximate shaping records that preserve clusters, source ranges, safe break
-  positions, direction, script, and language
+- rustybuzz shaping for in-memory/embedded/test fixture fonts, including glyph
+  ids, clusters, advances, offsets, source ranges, safe breaks, direction,
+  script, and language
+- full Unicode-scalar coverage checks instead of BMP-only `0xFFFF` scans
+- `shape_text_runs` fallback segmentation over explicit fallback chains and
+  registered face coverage
+- structured `ShapingDiagnostics` for missing glyphs and fallback runs
+- approximate shaping remains explicit for system/path fonts whose bytes are
+  not available
 
 Still intentionally not implemented:
 
 - host/system font discovery
-- LO-backed substitution tables and last-resort fallback chains
-- rustybuzz glyph shaping, glyph ids, advances, offsets, fallback splitting,
-  and script/language itemization
+- LO-backed substitution tables and platform last-resort fallback chains
+- automatic script/language itemization independent of caller context
+- PDF backend consumption of the shared shaped-run path
 
 Approximate shaping must keep `approximate = true` and must not invent glyph
-advances or glyph ids. Real advances come only after rustybuzz/font-table
-translation is implemented.
+advances or glyph ids when font bytes are unavailable.

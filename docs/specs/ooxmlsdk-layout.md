@@ -1049,12 +1049,17 @@ Implemented in this stage:
   expansion, and printable drawing anchors
 - `layout_xlsx_model` consumes the print plan for cell debug records instead of
   re-parsing formula or inventing display text
+- DOCX and PPTX expose `layout_*_model_with_fonts` entry points that route text
+  through `ooxmlsdk-fonts::FontRegistry::shape_text_runs`
+- the display list can emit shared `GlyphRun` items with shaped glyphs,
+  resolved font ids, fallback diagnostics, and run advances while preserving
+  the old text-only entry points for callers without a font registry
 
 Still intentionally not implemented:
 
 - paper size defaults, row/column-derived geometry, pagination, repeated
   rows/columns, and page-break splitting
-- DOCX line layout and PPTX text-body layout
+- full DOCX line layout, PPTX text-body layout, and XLSX cell text shaping
 - any PDF adapter migration
 
 Unknown geometry must remain zero/default until a LO-backed page setup,

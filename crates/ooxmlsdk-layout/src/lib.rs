@@ -8,15 +8,32 @@ use std::borrow::Cow;
 
 use common::{
   DebugCell, DebugFrame, DebugPage, DebugRecord, DebugShape, DebugTextLine, DisplayDocument,
-  DisplayPage, FrameId, FrameRecord, LayoutDocument, LayoutEngineKind, LayoutOptions, Point, Pt,
-  Rect, RectItem, Size, TextRun,
+  DisplayPage, FrameId, FrameRecord, GlyphRun, LayoutDocument, LayoutEngineKind, LayoutOptions,
+  Point, Pt, Rect, RectItem, Size, TextRun,
 };
+use ooxmlsdk_fonts::{FontRegistry, FontRequest, TextDirection};
 
 pub use error::{LayoutError, Result};
 
 pub fn layout_docx_model<'doc>(
   document: &docx::DocxDocument<'doc>,
   options: LayoutOptions,
+) -> LayoutDocument<'doc> {
+  layout_docx_model_impl(document, options, None)
+}
+
+pub fn layout_docx_model_with_fonts<'doc>(
+  document: &docx::DocxDocument<'doc>,
+  options: LayoutOptions,
+  fonts: &FontRegistry<'doc>,
+) -> LayoutDocument<'doc> {
+  layout_docx_model_impl(document, options, Some(fonts))
+}
+
+fn layout_docx_model_impl<'doc>(
+  document: &docx::DocxDocument<'doc>,
+  options: LayoutOptions,
+  fonts: Option<&FontRegistry<'doc>>,
 ) -> LayoutDocument<'doc> {
   let mut layout = LayoutDocument {
     engine_kind: LayoutEngineKind::Docx,
@@ -58,15 +75,17 @@ pub fn layout_docx_model<'doc>(
               bounds: line_bounds,
             }));
           if let Some(text) = docx_paragraph_visible_text(paragraph) {
-            layout.pages[section_index]
-              .items
-              .push(common::DisplayItem::Text(TextRun {
-                text,
-                origin: line_bounds.origin,
-                font_id: None,
-                color: common::Color::default(),
-                source: None,
-              }));
+            let style = docx_paragraph_first_text_style(paragraph);
+            let font_request = style.as_ref().map(|(font, _)| font);
+            let color = style.as_ref().map(|(_, color)| *color).unwrap_or_default();
+            push_display_text(
+              &mut layout.pages[section_index],
+              text,
+              line_bounds.origin,
+              font_request,
+              color,
+              fonts,
+            );
           }
           block_y += line_height.0;
         }
@@ -143,6 +162,22 @@ pub fn layout_pptx_model<'doc>(
   presentation: &pptx::PptxPresentation<'doc>,
   options: LayoutOptions,
 ) -> LayoutDocument<'doc> {
+  layout_pptx_model_impl(presentation, options, None)
+}
+
+pub fn layout_pptx_model_with_fonts<'doc>(
+  presentation: &pptx::PptxPresentation<'doc>,
+  options: LayoutOptions,
+  fonts: &FontRegistry<'doc>,
+) -> LayoutDocument<'doc> {
+  layout_pptx_model_impl(presentation, options, Some(fonts))
+}
+
+fn layout_pptx_model_impl<'doc>(
+  presentation: &pptx::PptxPresentation<'doc>,
+  options: LayoutOptions,
+  fonts: Option<&FontRegistry<'doc>>,
+) -> LayoutDocument<'doc> {
   let mut layout = LayoutDocument {
     engine_kind: LayoutEngineKind::Pptx,
     options,
@@ -152,7 +187,7 @@ pub fn layout_pptx_model<'doc>(
     let bounds = page_bounds(presentation.page_size);
     push_page(&mut layout, slide.name.clone(), bounds);
     for (shape_index, shape) in slide.shapes.iter().enumerate() {
-      push_pptx_shape_debug(&mut layout, page_index, vec![shape_index], shape);
+      push_pptx_shape_debug(&mut layout, page_index, vec![shape_index], shape, fonts);
     }
   }
   layout
@@ -243,6 +278,17 @@ fn docx_paragraph_line_height(paragraph: &docx::DocxParagraph<'_>) -> Pt {
     .unwrap_or_default()
 }
 
+fn docx_paragraph_first_text_style<'doc>(
+  paragraph: &docx::DocxParagraph<'doc>,
+) -> Option<(FontRequest<'doc>, common::Color)> {
+  paragraph.inlines.iter().find_map(|inline| match inline {
+    docx::InlineItem::Text(run) if !run.text.is_empty() => {
+      Some((run.style.font.clone(), run.style.color))
+    }
+    _ => None,
+  })
+}
+
 fn docx_table_height(table: &docx::DocxTable<'_>) -> Pt {
   let height = table
     .rows
@@ -258,6 +304,7 @@ fn push_pptx_shape_debug<'doc>(
   page_index: usize,
   path: Vec<usize>,
   shape: &pptx::PptxShape<'doc>,
+  fonts: Option<&FontRegistry<'doc>>,
 ) {
   layout.debug_records.push(DebugRecord::Shape(DebugShape {
     page_index,
@@ -282,23 +329,76 @@ fn push_pptx_shape_debug<'doc>(
       .map(|run| run.text.as_ref())
       .collect::<Vec<_>>()
       .join("");
-    layout.pages[page_index]
-      .items
-      .push(common::DisplayItem::Text(TextRun {
-        text: Cow::Owned(text),
-        origin: Point {
-          x: shape.transform.dx,
-          y: shape.transform.dy,
-        },
-        font_id: None,
-        color: common::Color::default(),
-        source: None,
-      }));
+    let style = text_body
+      .paragraphs
+      .iter()
+      .flat_map(|paragraph| paragraph.runs.iter())
+      .find(|run| !run.text.is_empty())
+      .map(|run| &run.style);
+    push_display_text(
+      &mut layout.pages[page_index],
+      Cow::Owned(text),
+      Point {
+        x: shape.transform.dx,
+        y: shape.transform.dy,
+      },
+      style.map(|style| &style.font),
+      style.and_then(|style| style.color).unwrap_or_default(),
+      fonts,
+    );
   }
   for (index, child) in shape.children.iter().enumerate() {
     let mut child_path = path.clone();
     child_path.push(index);
-    push_pptx_shape_debug(layout, page_index, child_path, child);
+    push_pptx_shape_debug(layout, page_index, child_path, child, fonts);
+  }
+}
+
+fn push_display_text<'doc>(
+  page: &mut DisplayPage<'doc>,
+  text: Cow<'doc, str>,
+  origin: Point,
+  font: Option<&FontRequest<'doc>>,
+  color: common::Color,
+  fonts: Option<&FontRegistry<'doc>>,
+) {
+  let Some(fonts) = fonts else {
+    page.items.push(common::DisplayItem::Text(TextRun {
+      text,
+      origin,
+      font_id: None,
+      color,
+      source: None,
+    }));
+    return;
+  };
+  let request = font.cloned().unwrap_or_default();
+  let shape_text = Cow::Owned(text.as_ref().to_owned());
+  let Ok(shaped_runs) = fonts.shape_text_runs(&request, shape_text, TextDirection::LeftToRight)
+  else {
+    page.items.push(common::DisplayItem::Text(TextRun {
+      text,
+      origin,
+      font_id: None,
+      color,
+      source: None,
+    }));
+    return;
+  };
+  let mut x = origin.x.0;
+  for shaped in shaped_runs {
+    let advance = shaped.advance_pt;
+    page.items.push(common::DisplayItem::Glyphs(GlyphRun {
+      glyphs: shaped.glyphs.clone(),
+      shaped,
+      origin: Point {
+        x: Pt(x),
+        y: origin.y,
+      },
+      color,
+      source: None,
+    }));
+    x += advance;
   }
 }
 

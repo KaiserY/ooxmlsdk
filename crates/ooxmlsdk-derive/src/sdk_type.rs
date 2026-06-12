@@ -2044,10 +2044,10 @@ fn choice_item_parse_bodies<'a>(
     SdkTypeChoiceItem::TextChild { variant, qname, .. } => {
       let parsed_tokens = quote! {
         let parsed_child = if next_empty {
-          crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
+          crate::common::parse_value("", stringify!(#ident), stringify!(#variant))?
         } else {
           let value = xml_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
-          crate::common::parse_text_child_value::<_>(value.as_ref(), stringify!(#ident), stringify!(#variant))?
+          crate::common::parse_text_child_value(value.as_ref(), stringify!(#ident), stringify!(#variant))?
         };
       };
       let assign_tokens = if repeated {
@@ -2335,10 +2335,10 @@ fn mce_choice_impl_tokens(field: &SdkTypeChoiceField) -> proc_macro2::TokenStrea
         parse_replacement_arms.push(quote! {
           #( #targets )|* => {
             let parsed_child = if next_empty {
-              crate::common::parse_value::<_>("", stringify!(#ident), stringify!(#variant))?
+              crate::common::parse_value("", stringify!(#ident), stringify!(#variant))?
             } else {
               let value = child_reader.read_text(e.name(), stringify!(#ident), stringify!(#variant))?;
-              crate::common::parse_text_child_value::<_>(
+              crate::common::parse_text_child_value(
                 value.as_ref(),
                 stringify!(#ident),
                 stringify!(#variant),
@@ -2910,10 +2910,7 @@ fn push_flat_choice_wildcard_arms(
   io_visit_tokens.push(flat_choice_wildcard_arm_tokens(io_body, true));
 }
 
-fn sdk_type_read_inner_call_tokens(
-  child_ty: &Type,
-  _mode: DeserializeMode,
-) -> proc_macro2::TokenStream {
+fn sdk_type_read_inner_call_tokens(child_ty: &Type) -> proc_macro2::TokenStream {
   quote! { <#child_ty as crate::sdk::SdkType>::read_inner }
 }
 
@@ -2941,6 +2938,25 @@ fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::Tok
     }
     SimpleUnionTypeKind::MeasurementOrPercent => {
       quote! { crate::common::parse_measurement_or_percent_attr(&attr, decoder)? }
+    }
+  }
+}
+
+fn parse_from_bytes_attr_tokens(
+  value_ty: &Type,
+  owner_expr: proc_macro2::TokenStream,
+  field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  quote! {
+    if let Some(value) = crate::common::attr_raw_value(&attr)
+      && let Ok(value) = <#value_ty>::from_bytes(value)
+    {
+      value
+    } else {
+      let value = crate::common::decode_attr_value(&attr, decoder)?;
+      <#value_ty>::from_bytes(value.as_bytes()).map_err(|_| {
+        crate::common::invalid_field_value(#owner_expr, #field_expr, value)
+      })?
     }
   }
 }
@@ -3500,8 +3516,8 @@ fn expand_helper_struct(
     } else {
       quote! { parsed_child }
     };
-    let build_body = |mode: DeserializeMode| {
-      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
+    let build_body = || {
+      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
       if field.repeated {
         quote! {
           let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
@@ -3569,12 +3585,12 @@ fn expand_helper_struct(
     push_qname_dispatch_arm(
       &mut child_match_tokens_borrowed,
       &field.qname,
-      build_body(DeserializeMode::Borrowed),
+      build_body(),
     );
     push_qname_dispatch_arm(
       &mut child_match_tokens_io,
       &field.qname,
-      build_body(DeserializeMode::Io),
+      build_body(),
     );
   }
 
@@ -4245,6 +4261,7 @@ fn expand_named_struct(
     };
     let simple_type = field.simple_type.as_deref();
     let simple_union_kind = simple_union_effective_type_kind(&value_ty, simple_type);
+    let from_bytes_attr = is_from_bytes_attr_effective_type(&value_ty, simple_type);
     let integer_kind = integer_effective_type_kind(&value_ty, simple_type);
     let parser = if field.list {
       quote! {
@@ -4257,6 +4274,12 @@ fn expand_named_struct(
       }
     } else if let Some(kind) = simple_union_kind {
       parse_simple_union_attr_tokens(kind)
+    } else if from_bytes_attr {
+      parse_from_bytes_attr_tokens(
+        &value_ty,
+        quote! { stringify!(#ident) },
+        quote! { #name_lit },
+      )
     } else if let Some(kind) = integer_kind {
       parse_integer_attr_tokens_by_kind(
         kind,
@@ -4266,7 +4289,7 @@ fn expand_named_struct(
         quote! { #name_lit },
       )
     } else if is_sdk_enum_effective_type(&value_ty, simple_type) {
-      quote! { crate::common::parse_enum_attr::<#value_ty>(&attr, decoder, stringify!(#ident))? }
+      quote! { crate::common::parse_enum_attr::<#value_ty>(&attr, decoder)? }
     } else if is_string_like_effective_type(&value_ty, simple_type) {
       quote! { crate::common::decode_attr_value(&attr, decoder)? }
     } else {
@@ -4637,8 +4660,8 @@ fn expand_named_struct(
       "",
       false,
     );
-    let build_body = |mode: DeserializeMode| {
-      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty, mode);
+    let build_body = || {
+      let deserialize_call = sdk_type_read_inner_call_tokens(&child_ty);
       if field.repeated {
         quote! {
           let parsed_child = #deserialize_call(xml_reader, e, next_empty)?;
@@ -4695,12 +4718,12 @@ fn expand_named_struct(
     push_qname_dispatch_arm(
       &mut child_match_tokens_borrowed,
       &field.qname,
-      build_body(DeserializeMode::Borrowed),
+      build_body(),
     );
     push_qname_dispatch_arm(
       &mut child_match_tokens_io,
       &field.qname,
-      build_body(DeserializeMode::Io),
+      build_body(),
     );
   }
 

@@ -1726,6 +1726,30 @@ fn write_simple_union_value_tokens(
   }
 }
 
+fn is_from_bytes_attr_type_name(name: &str) -> bool {
+  matches!(
+    name,
+    "DrawingmlPercentageValue"
+      | "PositiveDrawingmlPercentageValue"
+      | "FixedPercentageValue"
+      | "PositiveFixedPercentageValue"
+      | "TextFontScalePercentOrPercentStringValue"
+      | "TextSpacingPercentOrPercentStringValue"
+      | "CoordinateValue"
+      | "PositiveCoordinateValue"
+      | "Coordinate32Value"
+      | "PositiveCoordinate32Value"
+      | "TextPointValue"
+      | "TextBulletSizeValue"
+  )
+}
+
+fn is_from_bytes_attr_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type)
+    .as_deref()
+    .is_some_and(is_from_bytes_attr_type_name)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum IntegerTypeKind {
   U8,

@@ -1,6 +1,3 @@
-use quick_xml::Decoder;
-use quick_xml::events::attributes::Attribute;
-
 #[cfg(feature = "parts")]
 pub mod data_part;
 mod error;
@@ -34,9 +31,12 @@ pub(crate) use xml::mce_choice_replacement_child_bytes;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
-  TagEvent, XmlRead, decode_attr_value, decode_utf16_xml_bytes, from_bytes_inner,
-  from_reader_inner, parse_decimal_number_or_percent_attr, parse_measurement_or_percent_attr,
-  parse_signed_twips_measure_attr, parse_twips_measure_attr, read_root_start_borrowed,
+  TagEvent, XmlRead, attr_raw_value, decode_attr_value, decode_utf16_xml_bytes, from_bytes_inner,
+  from_reader_inner, parse_attr_value, parse_decimal_number_or_percent_attr, parse_enum_attr,
+  parse_i8_attr, parse_i16_attr, parse_i32_attr, parse_i32_zero_on_overflow_attr, parse_i64_attr,
+  parse_list_attr, parse_list_value, parse_measurement_or_percent_attr,
+  parse_signed_twips_measure_attr, parse_text_child_value, parse_twips_measure_attr, parse_u8_attr,
+  parse_u16_attr, parse_u32_attr, parse_u64_attr, parse_value, read_root_start_borrowed,
   read_root_start_io, root_element_matches_namespace_local, write_attr_value, write_attr_value_str,
   write_decimal_number_or_percent_attr, write_escaped_content_str, write_escaped_content_text,
   write_escaped_text, write_list_attr_value, write_list_text_content_value,
@@ -252,108 +252,6 @@ fn write_raw_attr_value<W: std::io::Write>(
 }
 
 #[inline]
-pub(crate) fn parse_attr_value<T>(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<T, SdkError>
-where
-  T: std::str::FromStr,
-{
-  xml::parse_attr_value(attr, decoder, ty, field)
-}
-
-#[inline]
-pub(crate) fn parse_list_attr<T>(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<Vec<T>, SdkError>
-where
-  T: std::str::FromStr,
-{
-  xml::parse_list_attr(attr, decoder, ty, field)
-}
-
-#[inline]
-pub(crate) fn parse_list_value<T>(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<Vec<T>, SdkError>
-where
-  T: std::str::FromStr,
-{
-  xml::parse_list_value(value, ty, field)
-}
-
-macro_rules! define_attr_parser_forwarders {
-  ($($name:ident -> $ty:ty),* $(,)?) => {
-    $(
-      #[inline]
-      pub(crate) fn $name(
-        attr: &Attribute<'_>,
-        decoder: Decoder,
-        ty: &'static str,
-        field: &'static str,
-      ) -> Result<$ty, SdkError> {
-        xml::$name(attr, decoder, ty, field)
-      }
-    )*
-  };
-}
-
-define_attr_parser_forwarders! {
-  parse_u8_attr -> u8,
-  parse_i8_attr -> i8,
-  parse_u16_attr -> u16,
-  parse_i16_attr -> i16,
-  parse_u32_attr -> u32,
-  parse_i32_attr -> i32,
-  parse_i32_zero_on_overflow_attr -> i32,
-  parse_u64_attr -> u64,
-  parse_i64_attr -> i64,
-}
-
-#[inline]
-pub(crate) fn parse_enum_attr<T>(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-) -> Result<T, SdkError>
-where
-  T: crate::sdk::SdkEnum,
-{
-  xml::parse_enum_attr(attr, decoder, ty)
-}
-
-#[inline]
-pub(crate) fn parse_value<T>(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<T, SdkError>
-where
-  T: std::str::FromStr,
-{
-  xml::parse_value(value, ty, field)
-}
-
-#[inline]
-pub(crate) fn parse_text_child_value<T>(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<T, SdkError>
-where
-  T: std::str::FromStr,
-{
-  xml::parse_text_child_value(value, ty, field)
-}
-
-#[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_bytes(actual: &[u8], canonical: &[u8]) -> bool {
   actual == canonical
@@ -469,7 +367,9 @@ pub(crate) fn part_relationships_directory_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use quick_xml::Decoder;
   use quick_xml::events::Event;
+  use quick_xml::events::attributes::Attribute;
 
   fn with_first_attr<T>(
     xml: &str,

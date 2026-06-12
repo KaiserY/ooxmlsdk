@@ -809,11 +809,7 @@ where
 }
 
 #[inline]
-pub(crate) fn parse_enum_attr<T>(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  _ty: &'static str,
-) -> Result<T, SdkError>
+pub(crate) fn parse_enum_attr<T>(attr: &Attribute<'_>, decoder: Decoder) -> Result<T, SdkError>
 where
   T: crate::sdk::SdkEnum,
 {

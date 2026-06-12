@@ -1296,6 +1296,7 @@ dependencies = [
  "libm",
  "lopdf",
  "ooxmlsdk",
+ "ooxmlsdk-fonts",
  "png 0.18.1",
  "quick-xml",
  "rustybuzz",

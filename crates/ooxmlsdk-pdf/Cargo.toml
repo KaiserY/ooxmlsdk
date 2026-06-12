@@ -22,6 +22,7 @@ krilla-svg = { workspace = true }
 libm = { workspace = true }
 lopdf = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts", "mce"] }
+ooxmlsdk-fonts = { workspace = true }
 png = { workspace = true }
 quick-xml = { workspace = true }
 rustybuzz = { workspace = true }

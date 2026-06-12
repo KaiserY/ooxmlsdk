@@ -24,7 +24,7 @@ use super::emf_wmf;
 use super::form_widgets::inject_form_widget_annotations;
 use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
-use crate::fonts::{FontFaceData, load_text_face};
+use crate::fonts::{FontFaceData, cached_text_face};
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem,
   OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
@@ -1913,7 +1913,7 @@ struct FontKey {
 }
 
 fn load_font(style: &TextStyle) -> Result<Font> {
-  if let Some(face) = load_text_face(style)
+  if let Some(face) = cached_text_face(style)
     && let Some(font) = font_from_face(&face)
   {
     return Ok(font);

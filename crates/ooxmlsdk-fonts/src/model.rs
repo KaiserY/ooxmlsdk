@@ -1,10 +1,11 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use fontdb::{Database as FontDatabase, Source as FontDbSource};
 use icu_segmenter::GraphemeClusterSegmenter;
@@ -20,6 +21,42 @@ use crate::{FontError, Result};
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct FontId(pub Arc<str>);
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct RuntimeFaceKey {
+  font_id: FontId,
+  face_index: u32,
+}
+
+struct RuntimeFace {
+  buzz: BuzzFace<'static>,
+  ttf: TtfFace<'static>,
+  _data: Arc<[u8]>,
+}
+
+impl RuntimeFace {
+  fn new(data: Vec<u8>, face_index: u32) -> Result<Self> {
+    let data = Arc::<[u8]>::from(data);
+    let slice = unsafe { std::slice::from_raw_parts(data.as_ptr(), data.len()) };
+    let buzz = BuzzFace::from_slice(slice, face_index).ok_or(FontError::InvalidFace)?;
+    let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
+    Ok(Self {
+      buzz,
+      ttf,
+      _data: data,
+    })
+  }
+}
+
+fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
+  if std::env::var_os("OOXMLSDK_FONT_TIMING").is_none() {
+    return work();
+  }
+  let start = Instant::now();
+  let output = work();
+  eprintln!("[ooxmlsdk-fonts] {label}: {:?}", start.elapsed());
+  output
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FontRegistry<'a> {
@@ -97,6 +134,84 @@ impl<'a> FontRegistry<'a> {
     Ok(registered)
   }
 
+  pub fn register_system_query_fonts(&mut self, request: &FontRequest<'a>) -> Result<usize> {
+    let database = font_timing("system font database", system_font_database);
+    let mut registered = 0usize;
+    let mut queries = Vec::new();
+    if let Some(family) = request
+      .family
+      .as_deref()
+      .filter(|family| !family.trim().is_empty())
+    {
+      for family in family
+        .split(';')
+        .map(str::trim)
+        .filter(|family| !family.is_empty())
+      {
+        queries.push(FontDbQueryFamily::Name(family.to_string()));
+        let aliased = resolve_family_alias(&self.book, &Cow::Borrowed(family));
+        if aliased.as_ref() != family {
+          queries.push(FontDbQueryFamily::Name(aliased.into_owned()));
+        }
+      }
+      for family in self.fallback_families(request) {
+        queries.push(FontDbQueryFamily::Name(family.into_owned()));
+      }
+      queries.push(FontDbQueryFamily::SansSerif);
+      queries.push(FontDbQueryFamily::Serif);
+    } else {
+      queries.push(FontDbQueryFamily::SansSerif);
+      queries.push(FontDbQueryFamily::Serif);
+    }
+
+    for query_family in queries {
+      let family = query_family.as_fontdb_family();
+      let query = fontdb::Query {
+        families: &[family],
+        weight: fontdb_weight(request),
+        style: fontdb_style(request),
+        ..fontdb::Query::default()
+      };
+      let Some(id) = font_timing("fontdb query", || database.query(&query)) else {
+        continue;
+      };
+      let Some(info) = database.face(id) else {
+        continue;
+      };
+      let Some((data, face_index)) = font_timing("fontdb face data", || {
+        database.with_face_data(id, |data, face_index| (data.to_vec(), face_index))
+      }) else {
+        continue;
+      };
+      let font_id = format!("system-query:{}:{}", info.post_script_name, face_index);
+      if self
+        .sources
+        .iter()
+        .any(|source| source.id() == Some(font_id.as_str()))
+      {
+        continue;
+      }
+      let face = font_timing("system query face metadata", || {
+        FontFaceInfo::from_ttf_bytes(&font_id, &data, face_index)
+      })
+      .unwrap_or_else(|_| FontFaceInfo::from_fontdb_face_info(&font_id, info));
+      let source = match &info.source {
+        FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
+          id: Cow::Owned(font_id),
+          path: path.clone(),
+          data: Some(Cow::Owned(data)),
+        },
+        FontDbSource::Binary(_) => FontSource::Memory {
+          id: Cow::Owned(font_id),
+          data: Cow::Owned(data),
+        },
+      };
+      self.register_face(source, face);
+      registered += 1;
+    }
+    Ok(registered)
+  }
+
   pub fn register_memory_font(
     &mut self,
     id: impl Into<Cow<'a, str>>,
@@ -136,6 +251,13 @@ impl<'a> FontRegistry<'a> {
     path: impl AsRef<Path>,
   ) -> Result<FontId> {
     let id = id.into();
+    if self
+      .sources
+      .iter()
+      .any(|source| source.id() == Some(id.as_ref()))
+    {
+      return Ok(FontId(Arc::from(id.as_ref())));
+    }
     let path = path.as_ref().to_path_buf();
     let data = fs::read(&path).map_err(|error| FontError::SourceUnavailable(error.to_string()))?;
     let face = FontFaceInfo::from_ttf_bytes(id.as_ref(), &data, 0)?;
@@ -175,6 +297,41 @@ impl<'a> FontRegistry<'a> {
       }
     }
     registered
+  }
+
+  pub fn register_office_fallback_path_font(&mut self, request: &FontRequest<'a>) -> usize {
+    let mut paths: Vec<&'static str> = Vec::new();
+    if let Some(family) = request.family.as_deref() {
+      paths.extend(office_fallback_font_paths(
+        family,
+        request.bold,
+        request.italic,
+      ));
+    }
+    paths.extend(generic_fallback_font_paths(request.bold, request.italic));
+
+    let cjk_first = request.script.is_some_and(|script| {
+      matches!(
+        script,
+        TextScript::Han | TextScript::Hiragana | TextScript::Katakana | TextScript::Hangul
+      )
+    });
+    paths.sort_by_key(|path| {
+      let is_cjk = path.contains("CJK");
+      if cjk_first { !is_cjk } else { is_cjk }
+    });
+
+    for path in paths {
+      let path = Path::new(path);
+      if !path.exists() {
+        continue;
+      }
+      let id = format!("fallback-path:{}", path.display());
+      if self.register_path_font(id, path).is_ok() {
+        return 1;
+      }
+    }
+    0
   }
 
   fn register_ttf_source(&mut self, source: FontSource<'a>) -> Result<FontId> {
@@ -218,11 +375,11 @@ impl<'a> FontRegistry<'a> {
     self.book.faces.iter().find(|face| &face.font_id == font_id)
   }
 
-  pub fn resolved_face_data(&self, resolved: &ResolvedFont<'a>) -> Option<FontFaceData<'a>> {
+  pub fn resolved_face_data(&self, resolved: &ResolvedFont<'a>) -> Option<FontFaceData<'_>> {
     self.font_face_data(&resolved.font_id)
   }
 
-  pub fn font_face_data(&self, font_id: &FontId) -> Option<FontFaceData<'a>> {
+  pub fn font_face_data(&self, font_id: &FontId) -> Option<FontFaceData<'_>> {
     let registered = self
       .faces
       .iter()
@@ -233,10 +390,7 @@ impl<'a> FontRegistry<'a> {
       face_index: registered.face_index,
       family_names: registered.family_names.clone(),
       style_name: registered.style_name.clone(),
-      data: registered
-        .source
-        .data()
-        .map(|data| Cow::Owned(data.to_vec())),
+      data: registered.source.data().map(Cow::Borrowed),
     })
   }
 
@@ -355,15 +509,19 @@ impl<'a> FontRegistry<'a> {
     text: Cow<'a, str>,
     options: &ShapeOptions<'a>,
   ) -> Result<Vec<ShapedRun<'a>>> {
-    let fonts = self.resolve_fallback_fonts(request, text.as_ref())?;
-    let parsed_faces = fonts
-      .iter()
-      .map(|font| {
-        self
-          .source_data_for_font_id(&font.resolved.font_id)
-          .and_then(|(data, face_index)| TtfFace::parse(data, face_index).ok())
-      })
-      .collect::<Vec<_>>();
+    let fonts = font_timing("resolve fallback fonts", || {
+      self.resolve_fallback_fonts(request, text.as_ref(), options)
+    })?;
+    let parsed_faces = font_timing("prepare runtime faces", || {
+      fonts
+        .iter()
+        .map(|font| {
+          self
+            .runtime_face_for_font(&font.resolved.font_id)
+            .map(|face| face.ttf.clone())
+        })
+        .collect::<Vec<_>>()
+    });
 
     let mut runs = Vec::new();
     let mut start = 0usize;
@@ -402,6 +560,7 @@ impl<'a> FontRegistry<'a> {
     &self,
     request: &FontRequest<'a>,
     text: &str,
+    options: &ShapeOptions<'a>,
   ) -> Result<Vec<ResolvedFontWithFace<'a>>> {
     let primary = self.resolve(request)?;
     let Some(primary_face) = self
@@ -423,7 +582,37 @@ impl<'a> FontRegistry<'a> {
       fallback_level: None,
     }];
 
+    if !options.scan_registered_fallbacks {
+      for family in self.fallback_families(request) {
+        let mut fallback_request = request.clone();
+        fallback_request.family = Some(family.clone());
+        if let Ok(resolved) = self.resolve(&fallback_request)
+          && !fonts
+            .iter()
+            .any(|font| font.resolved.font_id == resolved.font_id)
+          && let Some(face) = self
+            .book
+            .faces
+            .iter()
+            .find(|face| face.font_id == resolved.font_id)
+        {
+          let fallback_level = fonts.len().try_into().ok();
+          fonts.push(ResolvedFontWithFace {
+            resolved,
+            face: face.clone(),
+            fallback_level,
+          });
+        }
+      }
+      return Ok(fonts);
+    }
+
+    let mut missing_chars = self.missing_chars_for_fonts(&fonts, text);
+
     for family in self.fallback_families(request) {
+      if missing_chars.is_empty() {
+        break;
+      }
       let mut fallback_request = request.clone();
       fallback_request.family = Some(family.clone());
       if let Ok(resolved) = self.resolve(&fallback_request)
@@ -442,16 +631,21 @@ impl<'a> FontRegistry<'a> {
           face: face.clone(),
           fallback_level,
         });
+        missing_chars = self.missing_chars_for_fonts(&fonts, text);
       }
+    }
+
+    if missing_chars.is_empty() {
+      return Ok(fonts);
     }
 
     for face in &self.book.faces {
       if fonts
         .iter()
         .any(|font| font.resolved.font_id == face.font_id)
-        || !text
-          .chars()
-          .any(|ch| self.face_info_supports_char(face, ch))
+        || !missing_chars
+          .iter()
+          .any(|ch| self.face_info_supports_char(face, *ch))
       {
         continue;
       }
@@ -461,9 +655,29 @@ impl<'a> FontRegistry<'a> {
         face: face.clone(),
         fallback_level,
       });
+      missing_chars = self.missing_chars_for_fonts(&fonts, text);
+      if missing_chars.is_empty() {
+        break;
+      }
     }
 
     Ok(fonts)
+  }
+
+  fn missing_chars_for_fonts(&self, fonts: &[ResolvedFontWithFace<'a>], text: &str) -> Vec<char> {
+    let mut missing = Vec::new();
+    for ch in text.chars() {
+      if is_private_use_char(ch) || missing.contains(&ch) {
+        continue;
+      }
+      if !fonts
+        .iter()
+        .any(|font| self.face_info_supports_char(&font.face, ch))
+      {
+        missing.push(ch);
+      }
+    }
+    missing
   }
 
   fn fallback_families(&self, request: &FontRequest<'a>) -> Vec<Cow<'a, str>> {
@@ -516,11 +730,23 @@ impl<'a> FontRegistry<'a> {
       | FontSource::TestFixture { data, .. }
       | FontSource::Path {
         data: Some(data), ..
-      } => font.resolved.shape_with_ttf_bytes(
-        Cow::Owned(text[range.clone()].to_owned()),
-        data.as_ref(),
-        options,
-      )?,
+      } => {
+        let runtime_face = self
+          .runtime_face_for_font(&font.resolved.font_id)
+          .or_else(|| {
+            runtime_face_for_data(
+              &font.resolved.font_id,
+              data.as_ref(),
+              font.resolved.face_index,
+            )
+          })
+          .ok_or(FontError::InvalidFace)?;
+        font.resolved.shape_with_runtime_face(
+          Cow::Owned(text[range.clone()].to_owned()),
+          &runtime_face,
+          options,
+        )?
+      }
       FontSource::System | FontSource::Path { data: None, .. } => font.resolved.shape_approximate(
         Cow::Owned(text[range.clone()].to_owned()),
         options.size_pt,
@@ -547,10 +773,14 @@ impl<'a> FontRegistry<'a> {
       return true;
     }
     self
-      .source_data_for_font_id(&face.font_id)
-      .and_then(|(data, face_index)| TtfFace::parse(data, face_index).ok())
-      .and_then(|parsed| parsed.glyph_index(ch))
+      .runtime_face_for_font(&face.font_id)
+      .and_then(|parsed| parsed.ttf.glyph_index(ch))
       .is_some()
+  }
+
+  fn runtime_face_for_font(&self, font_id: &FontId) -> Option<Arc<RuntimeFace>> {
+    let (data, face_index) = self.source_data_for_font_id(font_id)?;
+    runtime_face_for_data(font_id, data, face_index)
   }
 
   fn source_data_for_font_id(&self, font_id: &FontId) -> Option<(&[u8], u32)> {
@@ -1205,7 +1435,7 @@ impl<'a> Default for FontEmbeddingPlan<'a> {
   }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ShapeOptions<'a> {
   pub size_pt: FontSize,
   pub direction: TextDirection,
@@ -1213,19 +1443,37 @@ pub struct ShapeOptions<'a> {
   pub language: Option<Cow<'a, str>>,
   pub character_spacing_pt: f32,
   pub small_caps: bool,
+  pub scan_registered_fallbacks: bool,
   pub features: Vec<FeatureValue<'a>>,
   pub variations: Vec<VariationValue<'a>>,
 }
 
+impl Default for ShapeOptions<'_> {
+  fn default() -> Self {
+    Self {
+      size_pt: FontSize::default(),
+      direction: TextDirection::default(),
+      script: None,
+      language: None,
+      character_spacing_pt: 0.0,
+      small_caps: false,
+      scan_registered_fallbacks: true,
+      features: Vec::new(),
+      variations: Vec::new(),
+    }
+  }
+}
+
 impl<'a> ShapeOptions<'a> {
   pub fn from_request(request: &FontRequest<'a>, direction: TextDirection) -> Self {
-    Self {
+    ShapeOptions {
       size_pt: request.size_pt,
       direction,
       script: request.script,
       language: request.language.clone(),
       character_spacing_pt: 0.0,
       small_caps: false,
+      scan_registered_fallbacks: true,
       features: request.features.clone(),
       variations: request.variations.clone(),
     }
@@ -1271,6 +1519,17 @@ impl<'a> ResolvedFont<'a> {
     data: &[u8],
     options: &ShapeOptions<'a>,
   ) -> Result<ShapedRun<'a>> {
+    let runtime_face =
+      runtime_face_for_data(&self.font_id, data, self.face_index).ok_or(FontError::InvalidFace)?;
+    self.shape_with_runtime_face(text, &runtime_face, options)
+  }
+
+  fn shape_with_runtime_face(
+    &self,
+    text: impl Into<Cow<'a, str>>,
+    runtime_face: &RuntimeFace,
+    options: &ShapeOptions<'a>,
+  ) -> Result<ShapedRun<'a>> {
     let text = text.into();
     let shaped_text = if options.small_caps {
       Cow::Owned(text.to_uppercase())
@@ -1282,8 +1541,8 @@ impl<'a> ResolvedFont<'a> {
     } else {
       options.size_pt
     };
-    let face = BuzzFace::from_slice(data, self.face_index).ok_or(FontError::InvalidFace)?;
-    let ttf_face = TtfFace::parse(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
+    let face = &runtime_face.buzz;
+    let ttf_face = &runtime_face.ttf;
     let units_per_em = face.units_per_em() as f32;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(shaped_text.as_ref());
@@ -1302,7 +1561,9 @@ impl<'a> ResolvedFont<'a> {
       buffer.set_language(language);
     }
     let features = buzz_features(&options.features);
-    let output = rustybuzz::shape(&face, &features, buffer);
+    let output = font_timing("rustybuzz shape", || {
+      rustybuzz::shape(face, &features, buffer)
+    });
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
     let safe_breaks = text_safe_breaks(text.as_ref());
@@ -1979,7 +2240,7 @@ pub enum TextDirection {
   Mixed,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TextScript {
   #[default]
   Common,
@@ -2303,6 +2564,79 @@ fn font_charset_matches(
     || (charset == FontCharset::Symbol && face.flags.symbolic)
 }
 
+enum FontDbQueryFamily {
+  Name(String),
+  SansSerif,
+  Serif,
+}
+
+impl FontDbQueryFamily {
+  fn as_fontdb_family(&self) -> fontdb::Family<'_> {
+    match self {
+      Self::Name(family) => fontdb::Family::Name(family),
+      Self::SansSerif => fontdb::Family::SansSerif,
+      Self::Serif => fontdb::Family::Serif,
+    }
+  }
+}
+
+fn fontdb_weight(request: &FontRequest<'_>) -> fontdb::Weight {
+  match requested_weight(request) {
+    FontWeight::Thin => fontdb::Weight::THIN,
+    FontWeight::ExtraLight => fontdb::Weight::EXTRA_LIGHT,
+    FontWeight::Light => fontdb::Weight::LIGHT,
+    FontWeight::Normal => fontdb::Weight::NORMAL,
+    FontWeight::Medium => fontdb::Weight::MEDIUM,
+    FontWeight::SemiBold => fontdb::Weight::SEMIBOLD,
+    FontWeight::Bold => fontdb::Weight::BOLD,
+    FontWeight::ExtraBold => fontdb::Weight::EXTRA_BOLD,
+    FontWeight::Black => fontdb::Weight::BLACK,
+  }
+}
+
+fn fontdb_style(request: &FontRequest<'_>) -> fontdb::Style {
+  match requested_slant(request) {
+    FontSlant::Italic => fontdb::Style::Italic,
+    FontSlant::Oblique => fontdb::Style::Oblique,
+    FontSlant::Upright => fontdb::Style::Normal,
+  }
+}
+
+fn system_font_database() -> &'static FontDatabase {
+  static DATABASE: OnceLock<FontDatabase> = OnceLock::new();
+  DATABASE.get_or_init(|| {
+    let mut database = FontDatabase::new();
+    database.load_system_fonts();
+    database
+  })
+}
+
+fn runtime_face_cache() -> &'static Mutex<HashMap<RuntimeFaceKey, Arc<RuntimeFace>>> {
+  static CACHE: OnceLock<Mutex<HashMap<RuntimeFaceKey, Arc<RuntimeFace>>>> = OnceLock::new();
+  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn runtime_face_for_data(
+  font_id: &FontId,
+  data: &[u8],
+  face_index: u32,
+) -> Option<Arc<RuntimeFace>> {
+  let key = RuntimeFaceKey {
+    font_id: font_id.clone(),
+    face_index,
+  };
+  if let Ok(cache) = runtime_face_cache().lock()
+    && let Some(face) = cache.get(&key)
+  {
+    return Some(face.clone());
+  }
+  let face = Arc::new(RuntimeFace::new(data.to_vec(), face_index).ok()?);
+  if let Ok(mut cache) = runtime_face_cache().lock() {
+    cache.insert(key, face.clone());
+  }
+  Some(face)
+}
+
 fn font_supports_char(
   font: &ResolvedFontWithFace<'_>,
   parsed_face: Option<&TtfFace<'_>>,
@@ -2559,30 +2893,34 @@ fn font_metrics_from_ttf(face: &TtfFace<'_>, em_size: f32) -> FontMetrics {
 }
 
 fn font_coverage_from_ttf(face: &TtfFace<'_>) -> FontCoverage {
-  let mut ranges = Vec::new();
-  let mut range_start = None;
-  let mut last = 0u32;
-  for codepoint in 0..=u32::from(char::MAX) {
-    let covered = char::from_u32(codepoint)
-      .and_then(|ch| face.glyph_index(ch))
-      .is_some();
-    match (range_start, covered) {
-      (None, true) => {
-        range_start = Some(codepoint);
-        last = codepoint;
-      }
-      (Some(_), true) => {
-        last = codepoint;
-      }
-      (Some(start), false) => {
-        ranges.push(start..last + 1);
-        range_start = None;
-      }
-      (None, false) => {}
+  let mut codepoints = Vec::new();
+  for subtable in face
+    .tables()
+    .cmap
+    .into_iter()
+    .flat_map(|table| table.subtables)
+  {
+    if subtable.is_unicode() {
+      subtable.codepoints(|codepoint| codepoints.push(codepoint));
     }
   }
-  if let Some(start) = range_start {
-    ranges.push(start..last + 1);
+  codepoints.sort_unstable();
+  codepoints.dedup();
+
+  let mut ranges = Vec::new();
+  let mut iter = codepoints.into_iter();
+  if let Some(mut start) = iter.next() {
+    let mut end = start + 1;
+    for codepoint in iter {
+      if codepoint == end {
+        end += 1;
+      } else {
+        ranges.push(start..end);
+        start = codepoint;
+        end = codepoint + 1;
+      }
+    }
+    ranges.push(start..end);
   }
   FontCoverage {
     unicode_ranges: ranges,

@@ -12,6 +12,25 @@ pub enum FormulaValue<'a> {
   Reference(crate::QualifiedRange<'a>),
 }
 
+impl<'a> FormulaValue<'a> {
+  pub(crate) fn into_owned(self) -> FormulaValue<'static> {
+    match self {
+      FormulaValue::Number(value) => FormulaValue::Number(value),
+      FormulaValue::String(value) => FormulaValue::String(Cow::Owned(value.into_owned())),
+      FormulaValue::Boolean(value) => FormulaValue::Boolean(value),
+      FormulaValue::Error(value) => FormulaValue::Error(value),
+      FormulaValue::Blank => FormulaValue::Blank,
+      FormulaValue::Matrix(rows) => FormulaValue::Matrix(
+        rows
+          .into_iter()
+          .map(|row| row.into_iter().map(FormulaValue::into_owned).collect())
+          .collect(),
+      ),
+      FormulaValue::Reference(value) => FormulaValue::Reference(value.into_owned()),
+    }
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FormulaErrorValue {
   Null,
@@ -24,6 +43,7 @@ pub enum FormulaErrorValue {
   GettingData,
   Spill,
   Calc,
+  IllegalArgument,
   Unknown,
 }
 
@@ -34,4 +54,16 @@ pub struct DisplayValue<'a> {
   pub number_format_id: Option<u32>,
   pub stale: bool,
   pub error_text: Option<Cow<'a, str>>,
+}
+
+impl<'a> DisplayValue<'a> {
+  pub(crate) fn into_owned(self) -> DisplayValue<'static> {
+    DisplayValue {
+      text: Cow::Owned(self.text.into_owned()),
+      source_value: self.source_value.into_owned(),
+      number_format_id: self.number_format_id,
+      stale: self.stale,
+      error_text: self.error_text.map(|value| Cow::Owned(value.into_owned())),
+    }
+  }
 }

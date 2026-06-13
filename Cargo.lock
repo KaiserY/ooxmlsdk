@@ -1269,6 +1269,7 @@ dependencies = [
 name = "ooxmlsdk-formula"
 version = "0.10.2"
 dependencies = [
+ "libm",
  "ooxmlsdk",
  "thiserror",
 ]
@@ -1297,6 +1298,7 @@ dependencies = [
  "lopdf",
  "ooxmlsdk",
  "ooxmlsdk-fonts",
+ "ooxmlsdk-formula",
  "png 0.18.1",
  "quick-xml",
  "rustybuzz",

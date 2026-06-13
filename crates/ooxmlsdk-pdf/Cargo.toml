@@ -23,6 +23,7 @@ libm = { workspace = true }
 lopdf = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts", "mce"] }
 ooxmlsdk-fonts = { workspace = true }
+ooxmlsdk-formula = { workspace = true }
 png = { workspace = true }
 quick-xml = { workspace = true }
 rustybuzz = { workspace = true }

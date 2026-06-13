@@ -607,10 +607,6 @@ impl CellRange {
       },
     }
   }
-
-  pub(crate) fn cell_count_hint(&self) -> u64 {
-    u64::from(self.end.col - self.start.col + 1) * u64::from(self.end.row - self.start.row + 1)
-  }
 }
 
 impl SheetMetrics {

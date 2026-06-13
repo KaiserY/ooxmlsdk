@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::schemas::x;
+use ooxmlsdk::sdk::SdkPart;
 use ooxmlsdk_formula::{
   BuiltInName, CellValueProvider, QualifiedRange as FormulaQualifiedRange, SheetId,
 };
@@ -48,10 +49,14 @@ impl<'doc> XlsxWorkbook<'doc> {
     let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
     let mut sheets = Vec::new();
     for (index, sheet) in sheet_identities.iter().enumerate() {
-      let worksheet = worksheet_parts
-        .get(index)
-        .and_then(|part| part.root_element(document).ok());
-      sheets.push(import_sheet(index, sheet, worksheet, value_model));
+      let worksheet_part = worksheet_parts
+        .iter()
+        .find(|part| part.relationship_id() == Some(sheet.id.as_str()));
+      let tables = worksheet_part
+        .map(|part| import_table_parts(document, part))
+        .unwrap_or_default();
+      let worksheet = worksheet_part.and_then(|part| part.root_element(document).ok());
+      sheets.push(import_sheet(index, sheet, worksheet, tables, value_model));
     }
     if let Some(value_model) = value_model {
       apply_defined_names_to_sheets(&mut sheets, value_model);
@@ -67,12 +72,65 @@ impl<'doc> XlsxWorkbook<'doc> {
   pub fn build_print_plan(&self) -> XlsxPrintPlan<'doc> {
     build_print_plan(self)
   }
+
+  pub fn formula_evaluation_book(&self) -> Option<ooxmlsdk_formula::FormulaEvaluationBook<'doc>> {
+    let value_model = self.value_model?;
+    let mut book = ooxmlsdk_formula::FormulaEvaluationBook::from_workbook_value_model(value_model);
+    let sheet_ids = value_model
+      .identity
+      .sheets
+      .iter()
+      .map(|sheet| sheet.id)
+      .collect::<Vec<_>>();
+    for sheet in &self.sheets {
+      let Some(sheet_id) = sheet_ids.get(sheet.workbook_index).copied() else {
+        continue;
+      };
+      let filtered_range = sheet.auto_filter.as_ref().map(|filter| filter.range);
+      for row in &sheet.rows {
+        let Some(row_index) = row.row_index else {
+          continue;
+        };
+        let formula_row = row_index.saturating_sub(1);
+        if row.hidden {
+          book.row_states.insert(
+            (sheet_id, formula_row),
+            ooxmlsdk_formula::FormulaRowState {
+              hidden: true,
+              filtered: filtered_range.is_some_and(|range| {
+                formula_row >= range.start.row && formula_row <= range.end.row
+              }),
+            },
+          );
+        }
+      }
+      for table in &sheet.tables {
+        book.tables.insert(
+          table.display_name.to_ascii_uppercase(),
+          ooxmlsdk_formula::FormulaTable {
+            sheet: sheet_id,
+            name: Cow::Owned(table.display_name.to_string()),
+            range: formula_cell_range(table.range),
+            header_rows: table.header_rows,
+            totals_rows: table.totals_rows,
+            columns: table
+              .columns
+              .iter()
+              .map(|column| Cow::Owned(column.to_string()))
+              .collect(),
+          },
+        );
+      }
+    }
+    Some(book)
+  }
 }
 
 fn import_sheet<'doc>(
   index: usize,
   sheet: &x::Sheet,
   worksheet: Option<&x::Worksheet>,
+  tables: Vec<XlsxTable<'doc>>,
   value_model: Option<&'doc ooxmlsdk_formula::WorkbookValueModel<'doc>>,
 ) -> XlsxSheet<'doc> {
   let Some(worksheet) = worksheet else {
@@ -80,6 +138,7 @@ fn import_sheet<'doc>(
       workbook_index: index,
       name: Cow::Owned(sheet.name.clone()),
       state: sheet_state(sheet.state),
+      tables,
       ..XlsxSheet::default()
     };
   };
@@ -89,6 +148,11 @@ fn import_sheet<'doc>(
     state: sheet_state(sheet.state),
     page_setup: import_page_setup(worksheet),
     metrics: import_sheet_metrics(worksheet),
+    tables,
+    auto_filter: worksheet
+      .auto_filter
+      .as_ref()
+      .and_then(|auto_filter| import_auto_filter(auto_filter)),
     rows: worksheet
       .sheet_data
       .row
@@ -105,6 +169,87 @@ fn import_sheet<'doc>(
       .collect(),
     ..XlsxSheet::default()
   }
+}
+
+fn import_table_parts<'doc>(
+  document: &mut SpreadsheetDocument,
+  worksheet_part: &ooxmlsdk::parts::worksheet_part::WorksheetPart,
+) -> Vec<XlsxTable<'doc>> {
+  let table_parts = worksheet_part
+    .table_definition_parts(document)
+    .collect::<Vec<_>>();
+  table_parts
+    .iter()
+    .filter_map(|part| {
+      let table = part.root_element(document).ok()?;
+      import_table_definition(table)
+    })
+    .collect()
+}
+
+fn import_table_definition<'doc>(table: &x::Table) -> Option<XlsxTable<'doc>> {
+  let range = parse_layout_range(&table.reference)?;
+  Some(XlsxTable {
+    name: Cow::Owned(
+      table
+        .name
+        .clone()
+        .unwrap_or_else(|| table.display_name.clone()),
+    ),
+    display_name: Cow::Owned(table.display_name.clone()),
+    range,
+    style_name: table
+      .table_style_info
+      .as_ref()
+      .and_then(|style| style.name.clone())
+      .map(Cow::Owned),
+    header_rows: table.header_row_count.unwrap_or(1),
+    totals_rows: table.totals_row_count.unwrap_or(0),
+    show_header_row: table.header_row_count.unwrap_or(1) > 0,
+    show_totals_row: table.totals_row_count.unwrap_or(0) > 0,
+    columns: table
+      .table_columns
+      .table_column
+      .iter()
+      .map(|column| Cow::Owned(column.name.clone()))
+      .collect(),
+  })
+}
+
+fn import_auto_filter<'doc>(auto_filter: &x::AutoFilter) -> Option<AutoFilter<'doc>> {
+  Some(AutoFilter {
+    range: parse_layout_range(auto_filter.reference.as_deref()?)?,
+    filters: auto_filter
+      .filter_column
+      .iter()
+      .map(import_filter_column)
+      .collect(),
+  })
+}
+
+fn import_filter_column<'doc>(column: &x::FilterColumn) -> FilterColumn<'doc> {
+  FilterColumn {
+    column_id: column.column_id,
+    values: filter_column_values(column)
+      .into_iter()
+      .map(Cow::Owned)
+      .collect(),
+    hidden_button: column.hidden_button.is_some_and(|value| value.as_bool()),
+  }
+}
+
+fn filter_column_values(column: &x::FilterColumn) -> Vec<String> {
+  let Some(x::FilterColumnChoice::Filters(filters)) = &column.filter_column_choice else {
+    return Vec::new();
+  };
+  filters
+    .filters_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      x::FiltersChoice::XFilter(filter) => Some(filter.val.clone()),
+      _ => None,
+    })
+    .collect()
 }
 
 fn formula_sheet_id<'doc>(
@@ -214,6 +359,20 @@ fn layout_cell_range(range: ooxmlsdk_formula::CellRange) -> CellRange {
       column: range.end.column,
       row: range.end.row,
     },
+  }
+}
+
+fn formula_cell_range(range: CellRange) -> ooxmlsdk_formula::CellRange {
+  ooxmlsdk_formula::CellRange {
+    start: formula_cell_address(range.start),
+    end: formula_cell_address(range.end),
+  }
+}
+
+fn formula_cell_address(address: CellAddress) -> ooxmlsdk_formula::CellAddress {
+  ooxmlsdk_formula::CellAddress {
+    column: address.column,
+    row: address.row,
   }
 }
 
@@ -826,8 +985,11 @@ pub struct XlsxTable<'doc> {
   pub display_name: Cow<'doc, str>,
   pub range: CellRange,
   pub style_name: Option<Cow<'doc, str>>,
+  pub header_rows: u32,
+  pub totals_rows: u32,
   pub show_header_row: bool,
   pub show_totals_row: bool,
+  pub columns: Vec<Cow<'doc, str>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1444,6 +1606,65 @@ mod tests {
       sheets[0].metrics.repeated_columns,
       vec![expected_repeated_columns]
     );
+  }
+
+  #[test]
+  fn builds_formula_evaluation_book_with_layout_tables_and_row_state() {
+    let value_model = ooxmlsdk_formula::WorkbookValueModel {
+      identity: ooxmlsdk_formula::WorkbookIdentity {
+        sheets: vec![ooxmlsdk_formula::WorksheetIdentity {
+          id: SheetId(7),
+          name: Cow::Borrowed("Data"),
+          relationship_id: Some(Cow::Borrowed("rId1")),
+          visible: true,
+        }],
+        ..ooxmlsdk_formula::WorkbookIdentity::default()
+      },
+      ..ooxmlsdk_formula::WorkbookValueModel::default()
+    };
+    let workbook = XlsxWorkbook {
+      value_model: Some(&value_model),
+      sheets: vec![XlsxSheet {
+        workbook_index: 0,
+        name: Cow::Borrowed("Data"),
+        rows: vec![XlsxRow {
+          row_index: Some(3),
+          hidden: true,
+          ..XlsxRow::default()
+        }],
+        auto_filter: Some(AutoFilter {
+          range: CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 2, row: 5 },
+          },
+          filters: Vec::new(),
+        }),
+        tables: vec![XlsxTable {
+          name: Cow::Borrowed("Table1"),
+          display_name: Cow::Borrowed("Table1"),
+          range: CellRange {
+            start: CellAddress { column: 0, row: 0 },
+            end: CellAddress { column: 1, row: 3 },
+          },
+          style_name: None,
+          header_rows: 1,
+          totals_rows: 1,
+          show_header_row: true,
+          show_totals_row: true,
+          columns: vec![Cow::Borrowed("Amount"), Cow::Borrowed("Tax")],
+        }],
+        ..XlsxSheet::default()
+      }],
+      ..XlsxWorkbook::default()
+    };
+
+    let book = workbook.formula_evaluation_book().unwrap();
+    let table = book.tables.get("TABLE1").unwrap();
+
+    assert_eq!(table.sheet, SheetId(7));
+    assert_eq!(table.columns[1].as_ref(), "Tax");
+    assert!(book.row_hidden(SheetId(7), 2));
+    assert!(book.row_filtered(SheetId(7), 2));
   }
 
   #[test]

@@ -429,9 +429,9 @@ impl CalcPrintNamedRanges {
   fn from_import(import: &ExcelImport, sheet: &CalcSheet) -> Self {
     // Source: LibreOffice sc/source/filter/oox/defnamesbuffer.cxx
     // DefinedName::convertFormula extracts print areas, repeated titles, and
-    // filter database ranges after the defined-name formula token model exists.
-    // Keep the built-in defined names attached to the ScPrintFunc owner; range
-    // extraction belongs here once the Calc formula parser lands.
+    // filter database ranges. Keep built-in print defined names attached to
+    // the ScPrintFunc owner; scalar formula evaluation lives in
+    // ooxmlsdk-formula.
     let print_areas = import
       .defined_names
       .records_for_sheet(sheet.workbook_index, DefinedNameBuiltin::PrintArea);

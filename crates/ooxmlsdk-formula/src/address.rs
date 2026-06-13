@@ -32,13 +32,29 @@ pub struct CellRange {
 }
 
 impl CellRange {
+  pub fn new(start: CellAddress, end: CellAddress) -> Self {
+    Self { start, end }
+  }
+
   pub fn parse_a1(value: &str) -> Result<Self> {
     Ok(QualifiedRange::parse_a1(SheetId::default(), value)?.range)
+  }
+
+  pub fn cell_count_hint(self) -> u64 {
+    let columns = self.start.column.abs_diff(self.end.column) as u64 + 1;
+    let rows = self.start.row.abs_diff(self.end.row) as u64 + 1;
+    columns.saturating_mul(rows)
   }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SheetName<'a>(pub Cow<'a, str>);
+
+impl<'a> SheetName<'a> {
+  pub(crate) fn into_owned(self) -> SheetName<'static> {
+    SheetName(Cow::Owned(self.0.into_owned()))
+  }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct QualifiedAddress<'a> {
@@ -68,6 +84,18 @@ pub struct QualifiedRange<'a> {
   pub range: CellRange,
   pub start_flags: AddressFlags,
   pub end_flags: AddressFlags,
+}
+
+impl<'a> QualifiedRange<'a> {
+  pub(crate) fn into_owned(self) -> QualifiedRange<'static> {
+    QualifiedRange {
+      sheet: self.sheet,
+      sheet_name: self.sheet_name.map(SheetName::into_owned),
+      range: self.range,
+      start_flags: self.start_flags,
+      end_flags: self.end_flags,
+    }
+  }
 }
 
 impl<'a> QualifiedRange<'a> {

@@ -109,6 +109,13 @@ Do not build formula state from `ooxmlsdk-pdf`'s current Calc structs as the
 primary input. That code is useful migration evidence, but the formula crate
 must read the same typed `ooxmlsdk` data that non-PDF consumers use.
 
+During the current split-and-performance refactor, formula/value behavior that
+currently lives in `ooxmlsdk-pdf/src/xlsx/` should migrate into this crate when
+it is Calc formula, value, address, display-value, shared-formula, or
+defined-name behavior. The migrated implementation must use typed
+SpreadsheetML roots and shared formula types, not PDF-local worksheet structs as
+the ownership boundary.
+
 ### 2.3 Typst Reference
 
 Typst is not a formula engine reference. Use it only for Rust implementation
@@ -311,7 +318,11 @@ silent replacement for standard XLSX bounds.
 Use borrowed data where it naturally comes from parsed `ooxmlsdk` structs:
 
 - formula text, cell references, defined-name text, sheet names, relationship
-  ids, and cached string values may be `Cow<'doc, str>`
+  ids, and cached string values should be borrowed as `&'doc str` when they are
+  direct source payloads
+- use `Cow<'doc, str>` only for leaf payloads that may be either source-borrowed
+  or computed, such as translated shared formulas, normalized names, evaluator
+  strings, and number-formatted display strings
 - parsed addresses, ranges, workbook ids, formula kind, state flags, and error
   identities should be compact copyable Rust types
 - evaluated values and display strings may be owned when they are computed,
@@ -320,6 +331,10 @@ Use borrowed data where it naturally comes from parsed `ooxmlsdk` structs:
 The model should be able to operate as a borrowed view over a parsed workbook
 for layout/export, with an explicit conversion path to an owned model when a
 consumer needs to keep formula state after the source package is dropped.
+Avoid cloning worksheet cells, shared strings, defined names, formulas, or
+external-reference metadata merely to simplify lifetimes. The
+`SpreadsheetDocument` and generated `x::*` roots are the source model; this
+crate owns formula/value state derived from them, not a second workbook copy.
 
 ## 7. Value Provider API
 
@@ -523,10 +538,12 @@ Use a repeated three-pass loop before implementing each formula area:
    - inspect the corresponding LO files in `../core/sc/` during the same pass;
      every new constant, fallback list, function classification, or parse
      shortcut must have an LO/OOXML source or remain unsupported
-   - if `ooxmlsdk-pdf` already has a passing behavior, treat it only as fixture
-     evidence and migration inventory; re-implement through the formula crate's
-     current model and LO's Calc owner files, not by copying the PDF helper
-     parser/evaluator
+   - if `ooxmlsdk-pdf` already has a passing behavior, treat it as fixture
+     evidence, temporary regression coverage, and migration inventory;
+     re-implement through the formula crate's current model and LO's Calc owner
+     files, not by copying the PDF helper parser/evaluator
+   - keep `crates/ooxmlsdk-pdf-test` green during migration unless a changed
+     expectation is deliberately updated with LO-backed evidence
 
 1. LO pass
    - identify the Calc owner files
@@ -547,16 +564,21 @@ Repeat the loop after tests fail or reveal a missing Calc concept.
 
 ## 14. Logic Kickoff Plan
 
-Start with a cache-preserving typed import path. Do not begin with a full
-evaluator.
+Start with a cache-preserving typed import path and migrate PDF-local formula
+helpers into this crate as the shared owner. Do not begin by cloning the current
+PDF worksheet/value model into formula.
 
 ### 14.0 Next Broad Development Focus
 
-The next formula step should continue turning parsed formula state into a
-Calc-shaped evaluator without trying to shortcut the full Calc interpreter:
+The next formula step is to turn parsed formula state and PDF-local formula
+helpers into a Calc-shaped shared model without trying to shortcut the full Calc
+interpreter:
 
 - keep the shared token/dependency skeleton from formula text during typed cell
   import
+- migrate duplicated PDF-local A1 parsing, shared-formula translation,
+  conditional-format formula evaluation, cached-value replacement, and display
+  value helpers into `ooxmlsdk-formula` when they are formula/value behavior
 - preserve references, functions, operators, literals, names, arrays, AST, and
   unsupported fragments in `ParsedFormula`
 - keep `QualifiedAddress` and `QualifiedRange` as the only A1 parser surface
@@ -571,6 +593,11 @@ Calc-shaped evaluator without trying to shortcut the full Calc interpreter:
 This stage should support the XLSX print core by making formulas inspectable,
 dependency-aware, and evaluatable for LO-backed common paths while still
 avoiding speculative function semantics.
+
+During this migration, `ooxmlsdk-layout` and `ooxmlsdk-pdf` should consume
+formula results through `CellValueProvider` and structured value/display APIs.
+They should not keep parallel formula parsers or formula cell caches once the
+behavior has moved into this crate.
 
 ### 14.1 Workbook And Sheet Identity Import
 
@@ -689,8 +716,37 @@ Implemented in this stage:
 - explicit `evaluate_supported_formulas` entry point that updates
   `evaluated_value` and display bridge values only for supported formula ASTs
 - LO-backed evaluator branches for arithmetic, comparison, concatenation,
-  boolean conversion, `IF`, `IFERROR`, `IFNA`, `SUM`, `PRODUCT`, `AVERAGE`,
-  `COUNT`, `COUNTA`, `MIN`, `MAX`, `AND`, `OR`, `ABS`, and `ROUND`
+  boolean conversion, `IF`, `IFERROR`, `IFNA`, `LET`, `SUM`, `PRODUCT`,
+  `AVERAGE`, `COUNT`, `COUNTA`, `MIN`, `MAX`, `AND`, `OR`, `NOT`, `N`,
+  `ABS`, `SIGN`, `INT`, `TRUNC`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`,
+  `FLOOR`, `SUBTOTAL`, and `AGGREGATE`
+- lookup, reference, and table-reference evaluation for `INDIRECT`, `INDEX`,
+  `OFFSET`, `VLOOKUP`, `FORMULATEXT`, `ROW`, `COLUMN`, `ROWS`, `COLUMNS`,
+  structured table references, external cached cells, and relative
+  conditional-format formula translation
+- text/date/math/statistical coverage migrated from PDF and LO evidence,
+  including `TEXT`, `TIMEVALUE`, `DATE`, `TIME`, `YEAR`, `MONTH`, `DAY`,
+  `WEEKDAY`, `HOUR`, `MINUTE`, `SECOND`, `DAYS`, `LEFT`, `RIGHT`, `MID`,
+  `TRIM`, `UPPER`, `LOWER`, `LEN`, `T`, `CONCAT`, `CONCATENATE`, `EXACT`,
+  `FIND`, `SEARCH`, `REPT`, `SUBSTITUTE`, `VALUE`, `CODE`, `CHAR`,
+  trigonometric/logarithmic basics, `MOD`, `EVEN`, `ODD`, `SUMSQ`,
+  `SUMPRODUCT`, `NETWORKDAYS`, `WORKDAY`, percentile/quartile/rank,
+  covariance, confidence, chi-square, F, beta, gamma, normal/lognormal,
+  binomial, negative-binomial, poisson, T, weibull, and Z-test functions
+- type, blank, and error introspection for `ISBLANK`, `ISERR`, `ISTEXT`,
+  `ISNONTEXT`, `ISLOGICAL`, `ISNUMBER`, `ISREF`, `ISFORMULA`, `ERROR.TYPE`,
+  and `COUNTBLANK`
+- selection/control helpers such as `CHOOSE`, preserving lazy branch behavior
+  where the function semantics require it
+- PDF-local special formula paths now owned by formula: `EMPTY_ARRAY`,
+  `CELL("filename")` and other non-style `CELL` info types, and adjacent
+  `INDIRECT(...)INDIRECT(...)` intersection evaluation
+- array formula result distribution for matrix/reference results over the
+  target array range
+- `ooxmlsdk-pdf` XLSX formula recalculation and conditional-format formula
+  evaluation now route through `FormulaEvaluationBook`; the previous PDF-local
+  evaluator is retained only as test-only migration evidence until the layout
+  split removes the compatibility module
 - range reads scan existing workbook cell records instead of expanding guessed
   whole-sheet loops; missing cells remain blank through the workbook value model
 - display text created by evaluator is a value bridge only. Full number-format
@@ -699,12 +755,12 @@ Implemented in this stage:
 
 Still intentionally not implemented:
 
-- source-text rendering of translated shared formulas
 - full Calc compiler tokenization, external workbook part resolution, and
-  defined-name formula evaluation
-- broad lookup/text/date/math/statistical function coverage
-- dynamic arrays, spilled ranges, matrix evaluation beyond literal matrix
-  values, and array formula result distribution
+  full external defined-name formula evaluation
+- style/format-sensitive `CELL` results such as exact width, prefix, protect,
+  format, color, and parentheses from workbook styles
+- full dynamic arrays, spilled ranges, and matrix evaluation beyond the
+  currently migrated PDF/LO subset
 - full number-format rendering for evaluated values
 
 Do not fill these gaps with local guesses. Add LO-derived tests first, then

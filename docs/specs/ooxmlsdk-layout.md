@@ -110,7 +110,7 @@ Existing `ooxmlsdk-pdf` code is not the layout design source.
 It can provide:
 
 - known fixture evidence
-- partial Rust translations of LO behavior
+- partial Rust translations of LO behavior that should migrate upward
 - code snippets for table/text/fly edge cases
 - regression tests to preserve later
 
@@ -129,7 +129,12 @@ Relevant code paths when mining behavior:
 - `crates/ooxmlsdk-pdf/src/xlsx/`
 - `crates/ooxmlsdk-pdf/src/pptx/`
 
-Treat this code as migration evidence and a warning about over-coupling.
+Treat this code as migration inventory and a warning about over-coupling. The
+current refactor direction is to move layout behavior from `ooxmlsdk-pdf` into
+`ooxmlsdk-layout` while replacing PDF-local document copies, parsers,
+measurement shortcuts, and owned clones with direct typed `ooxmlsdk` traversal,
+borrowed source views, shared `ooxmlsdk-formula` values, and shared
+`ooxmlsdk-fonts` shaping.
 
 ## 3. Crate Responsibility
 
@@ -166,7 +171,10 @@ preservation or explicit unsupported records.
 Existing `ooxmlsdk-pdf` layout/import code is migration evidence, not the input
 contract. New layout code should read from typed `WordprocessingDocument`,
 `SpreadsheetDocument`, `PresentationDocument`, their parts, and generated schema
-roots, then produce layout-owned imported views.
+roots, then produce borrowed layout views and derived layout state. Do not
+recreate broad PDF-local document models in this crate when the same source
+facts can be read from `ooxmlsdk` typed roots or represented by stable source
+references.
 
 ## 4. Engine Split
 
@@ -244,15 +252,38 @@ The lifetime represents data borrowed from parsed `ooxmlsdk` package parts,
 generated schema structs, formula value models, font requests, and media/font
 resources.
 
-Use `Cow<'doc, str>` or `Cow<'doc, [u8]>` for:
+The `ooxmlsdk` package/schema tree is the document model. Layout import models
+must not become a second editable OOXML document model. Prefer direct references
+to typed source structs and stable source identities:
 
-- paragraph/run text and field display text
-- style ids, numbering ids represented as strings, relationship ids, and
-  bookmark/hyperlink targets
-- sheet names, cell references, defined-name text, formula display text, header
-  and footer text
-- image, embedded object, and font bytes when the source can be borrowed
-- debug labels and display-list text when they come directly from import data
+```text
+&'doc w::Paragraph / &'doc w::Run / &'doc w::Table
+&'doc x::Worksheet / &'doc x::Row / &'doc x::Cell
+&'doc p::Slide / &'doc p::Shape / &'doc a::Paragraph
+PartId + engine-specific path indexes
+```
+
+Use `SourceRef`-style identities for hit testing, debug output, accessibility
+mapping, and future editor commands. A layout result may point back to source
+locations, but editing and saving must mutate the `ooxmlsdk` document model and
+then invalidate/rebuild layout. Do not design a path where layout mutations are
+serialized back into OOXML.
+
+Use plain references (`&'doc str`, `&'doc [u8]`) for source payload whenever the
+payload is guaranteed to come directly from `ooxmlsdk` data and does not need
+computed ownership.
+
+Use `Cow<'doc, str>` or `Cow<'doc, [u8]>` only for leaf payloads that may be
+borrowed from source or computed by layout/formula/font processing:
+
+- computed field display text, formula display text, formatted cell text, and
+  line text
+- image, embedded object, and font bytes only when the source can actually be
+  borrowed and a backend may also supply computed/converted bytes
+- display-list text and shaped glyph slices when runs are split, trimmed, or
+  synthesized
+- debug labels only when the label may be either a static string or a computed
+  string
 
 Use owned values for:
 
@@ -261,6 +292,8 @@ Use owned values for:
 - generated debug dump strings
 - normalized resource keys that must outlive the source document
 - display documents explicitly converted to owned output
+- derived layout structures such as pages, frames, line boxes, print pages,
+  resolved placeholders, and unsupported records
 
 Keep copyable data as plain fields: enums, booleans, addresses, indexes, i32/u32
 values, unit wrappers, colors, geometry, transforms, and layout flags should not
@@ -268,7 +301,9 @@ use `Cow`.
 
 Layout should provide an explicit owned conversion for consumers that need to
 hold output after the source package is dropped. Do not make eager cloning the
-default import behavior.
+default import behavior. Avoid cloning source strings, schema subtrees, and
+binary payloads merely to simplify lifetimes; use source references and
+derived-state structs instead.
 
 ## 6. Common Layer
 
@@ -763,10 +798,10 @@ Pure export XML round-trip tests stay outside layout.
 
 ### 12.4 LibreOffice Coverage Gate
 
-Before `ooxmlsdk-pdf` is wired to this crate, port the layout-level subset of
-`ooxmlsdk-pdf-test` LibreOffice coverage into `../ooxmlsdk-test-suite/` as
-layout/debug tests. The current PDF suite contains many source-backed LO
-regressions whose assertions are really about imported layout state:
+During the migration from `ooxmlsdk-pdf` to `ooxmlsdk-layout`, keep
+`crates/ooxmlsdk-pdf-test` as the temporary regression gate. The current PDF
+suite contains many source-backed LO regressions and should catch behavior
+breaks while layout and formula behavior are moved upward:
 
 - DOCX line, page, table, header/footer, floating object, field, redline, and
   drawing placement
@@ -776,21 +811,27 @@ regressions whose assertions are really about imported layout state:
   geometry, grouped shape transforms, tables, SmartArt, and theme-derived
   drawing output
 
-Treat the existing PDF projection as evidence, not as the primary contract.
-Each ported test should assert the earliest stable layout/debug representation
-that corresponds to the LibreOffice behavior. PDF text/path/image/raster checks
-remain useful only after the same behavior is already covered below the renderer
-boundary.
+Treat the existing PDF projection as evidence and temporary safety coverage, not
+as the final owner of layout behavior. As each behavior stabilizes in
+`ooxmlsdk-layout`, identify the earliest stable layout/debug representation that
+should eventually own the assertion. PDF text/path/image/raster checks remain
+useful during migration and should later narrow to renderer/PDF-object behavior.
 
-The acceptance gate for PDF migration is:
+The temporary acceptance gate for each migrated behavior is:
 
-- LO-derived layout/debug fixtures exist for the feature area
+- the behavior is represented in `ooxmlsdk-layout` with a LO-backed model
+- formula/address/value behavior used by the layout path lives in
+  `ooxmlsdk-formula`
+- `ooxmlsdk-pdf` consumes the migrated layout/formula state without keeping a
+  competing PDF-local parser, document model, or layout algorithm
+- the existing `crates/ooxmlsdk-pdf-test` coverage still passes or the failure
+  is explained by a deliberate, LO-backed expectation update
 - expected values come from LO assertions, layout dumps, rendered metafile/
   bitmap evidence, or fixture facts; never from current Rust PDF output
 - unsupported behavior is recorded structurally, so a test can fail on a
   missing LO concept instead of passing through dropped output
-- a passing layout test suite is required before adding the corresponding PDF
-  adapter or renderer assertion
+- planned final-owner tests are recorded for the later layout/formula/PDF test
+  redesign
 
 ## 13. Development Stages
 
@@ -841,14 +882,16 @@ The acceptance gate for PDF migration is:
 - text body layout
 - table/shape display list
 
-### Stage 7: PDF Integration
+### Stage 7: PDF Migration
 
-Only after layout outputs are stable, migrate `ooxmlsdk-pdf` to consume
-`DisplayDocument`.
+Migrate `ooxmlsdk-pdf` to consume `ooxmlsdk-layout` outputs incrementally. Each
+migrated area should delete or bypass the corresponding PDF-local import,
+formula, or layout code rather than wrapping it in another intermediate model.
 
-Do not use PDF migration pressure to change the layout model. The model is
-validated first by LO-style layout dumps and engine-specific layout tests; PDF
-parity is a later consumer check.
+Do not use PDF migration pressure to weaken the layout model. The model is
+validated by LO-style source evidence, layout/debug records, and temporary
+`ooxmlsdk-pdf-test` parity until the dedicated layout/formula/PDF test split is
+rebuilt.
 
 ## 14. Calibration Loop
 
@@ -886,22 +929,33 @@ Run this loop for each new feature area:
    - record unsupported behavior as structured state
 
 Repeat after implementation review. If the design starts copying
-`ooxmlsdk-pdf` module shape, restart from the LO source map.
+`ooxmlsdk-pdf` module shape or adding owned clone-heavy intermediate models,
+restart from the LO source map and the typed `ooxmlsdk` source boundary.
 
 ## 15. Logic Kickoff Plan
 
 Start layout logic by proving each engine can import typed `ooxmlsdk` input and
-emit inspectable layout/debug state. PDF integration remains out of scope until
-these outputs stabilize.
+emit inspectable layout/debug state. PDF backend migration should happen
+incrementally only after the corresponding layout/formula owner exists, and the
+existing PDF tests should remain the temporary regression gate for migrated
+behavior.
 
 ### 15.0 Next Broad Development Focus
 
-The next implementation cycle should advance four large areas together while
-keeping shared ownership boundaries intact:
+The next implementation cycle is a split-and-performance refactor. Move layout
+capabilities currently embedded in `ooxmlsdk-pdf` into `ooxmlsdk-layout`, move
+formula/value capabilities into `ooxmlsdk-formula`, and keep
+`ooxmlsdk-pdf-test` as the temporary behavior gate while the dedicated
+layout/formula/PDF test split is redesigned.
+
+The cycle should advance four large areas together while keeping shared
+ownership boundaries intact:
 
 1. XLSX Calc print core
    - expand `XlsxWorkbook` typed import into a Calc-like print model
    - keep values and references supplied by `ooxmlsdk-formula`
+   - remove duplicated PDF-local formula/address/display-value helpers as their
+     behavior moves into `ooxmlsdk-formula`
    - port row/column twips geometry, print ranges, repeats, page breaks,
      fit-to-page, merged-cell bounds, hidden row/column handling, and
      header/footer placement from `../core/sc/source/ui/view/printfun.cxx`,
@@ -917,20 +971,26 @@ keeping shared ownership boundaries intact:
    - move from typed import records toward Writer-like pages, body frames,
      paragraphs, line boxes, table frames, headers/footers, notes, and anchored
      objects
+   - migrate PDF-local Writer layout behavior upward without cloning broad
+     `ooxmlsdk` schema subtrees into a second document model
    - use `../core/sw/source/core/layout/`,
      `../core/sw/source/core/text/itrform2.cxx`, and
      `../core/sw/source/writerfilter/dmapper/` as the owner sources
 
 4. PPTX fixed-page shape and text layout
    - expand slide display construction from typed shape-tree records
+   - migrate PDF-local Impress/Draw import and fixed-page layout behavior into
+     borrowed typed-source views and derived display state
    - port placeholder inheritance, text body properties, paragraph/run style
      cascade, basic preset geometry, picture/graphic-frame bounds, and text
      autofit from `../core/oox/source/drawingml/`,
      `../core/oox/source/ppt/`, and `../core/sd/`
 
 Before implementing any item, run the calibration loop below. In particular,
-search existing modules first and extend shared APIs instead of adding a second
-parser, formatter, unit converter, font measurer, or geometry model.
+read the existing `ooxmlsdk-layout`, `ooxmlsdk-formula`, and relevant
+`ooxmlsdk-pdf` modules as migration inventory; then extend shared APIs instead
+of adding a second parser, formatter, unit converter, font measurer, geometry
+model, or owned document copy.
 
 ### 15.1 Shared Layout Substrate
 
@@ -1027,16 +1087,24 @@ resolved placeholders, and basic text display without PDF.
 
 ### 15.5 PDF Migration Gate
 
-Do not migrate `ooxmlsdk-pdf` until:
+Migrate `ooxmlsdk-pdf` incrementally once the target behavior has a
+typed-source layout/formula owner. For each migrated slice:
 
-- fonts can resolve and shape through `ooxmlsdk-fonts`
-- formula can provide cached/display values for XLSX layout
-- layout can produce display/debug output for at least one DOCX, XLSX, and PPTX
-  smoke fixture
-- the LO-derived layout-level subset of `ooxmlsdk-pdf-test` has been ported to
-  `../ooxmlsdk-test-suite/` and passes against `ooxmlsdk-layout`
+- fonts resolve and shape through `ooxmlsdk-fonts`
+- XLSX values and references come from `ooxmlsdk-formula`
+- layout produces display/debug output for the affected DOCX, XLSX, or PPTX
+  fixture path
+- the existing `crates/ooxmlsdk-pdf-test` coverage for that behavior remains
+  green, or the changed expectation is documented with LO-backed evidence
+- PDF-local duplicate layout/formula code is removed, bypassed, or clearly
+  marked as pending migration inventory
 - unsupported features are recorded as structured records instead of being
   silently dropped
+
+After the broad migration refactor is complete, redesign tests by owner:
+formula import/evaluation tests in `ooxmlsdk-formula`, layout/debug tests in
+`ooxmlsdk-layout` or `../ooxmlsdk-test-suite`, and PDF object/rendering tests in
+`ooxmlsdk-pdf-test`.
 
 ### 15.6 Current Implementation Checkpoint
 

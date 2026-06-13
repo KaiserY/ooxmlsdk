@@ -13,5 +13,6 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+libm = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 thiserror = { workspace = true }

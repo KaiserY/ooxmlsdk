@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -22,6 +22,56 @@ use crate::{FontError, Result};
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct FontId(pub Arc<str>);
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FontBytes(Arc<[u8]>);
+
+impl FontBytes {
+  pub fn as_slice(&self) -> &[u8] {
+    &self.0
+  }
+}
+
+impl AsRef<[u8]> for FontBytes {
+  fn as_ref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl Deref for FontBytes {
+  type Target = [u8];
+
+  fn deref(&self) -> &Self::Target {
+    self.as_slice()
+  }
+}
+
+impl From<Vec<u8>> for FontBytes {
+  fn from(data: Vec<u8>) -> Self {
+    Self(Arc::from(data))
+  }
+}
+
+impl From<Arc<[u8]>> for FontBytes {
+  fn from(data: Arc<[u8]>) -> Self {
+    Self(data)
+  }
+}
+
+impl From<&'static [u8]> for FontBytes {
+  fn from(data: &'static [u8]) -> Self {
+    Self(Arc::from(data))
+  }
+}
+
+impl<'a> From<Cow<'a, [u8]>> for FontBytes {
+  fn from(data: Cow<'a, [u8]>) -> Self {
+    match data {
+      Cow::Borrowed(data) => Self(Arc::from(data)),
+      Cow::Owned(data) => Self::from(data),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct RuntimeFaceKey {
   font_id: FontId,
@@ -31,12 +81,11 @@ struct RuntimeFaceKey {
 struct RuntimeFace {
   buzz: BuzzFace<'static>,
   ttf: TtfFace<'static>,
-  _data: Arc<[u8]>,
+  _data: FontBytes,
 }
 
 impl RuntimeFace {
-  fn new(data: Vec<u8>, face_index: u32) -> Result<Self> {
-    let data = Arc::<[u8]>::from(data);
+  fn new(data: FontBytes, face_index: u32) -> Result<Self> {
     let slice = unsafe { std::slice::from_raw_parts(data.as_ptr(), data.len()) };
     let buzz = BuzzFace::from_slice(slice, face_index).ok_or(FontError::InvalidFace)?;
     let ttf = TtfFace::parse(slice, face_index).map_err(|_| FontError::InvalidFace)?;
@@ -121,11 +170,11 @@ impl<'a> FontRegistry<'a> {
         FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
           id: Cow::Owned(id),
           path: path.clone(),
-          data: Some(Cow::Owned(data)),
+          data: Some(data.into()),
         },
         FontDbSource::Binary(_) => FontSource::Memory {
           id: Cow::Owned(id),
-          data: Cow::Owned(data),
+          data: data.into(),
         },
       };
       self.register_face(source, face);
@@ -199,11 +248,11 @@ impl<'a> FontRegistry<'a> {
         FontDbSource::File(path) | FontDbSource::SharedFile(path, _) => FontSource::Path {
           id: Cow::Owned(font_id),
           path: path.clone(),
-          data: Some(Cow::Owned(data)),
+          data: Some(data.into()),
         },
         FontDbSource::Binary(_) => FontSource::Memory {
           id: Cow::Owned(font_id),
-          data: Cow::Owned(data),
+          data: data.into(),
         },
       };
       self.register_face(source, face);
@@ -215,7 +264,7 @@ impl<'a> FontRegistry<'a> {
   pub fn register_memory_font(
     &mut self,
     id: impl Into<Cow<'a, str>>,
-    data: impl Into<Cow<'a, [u8]>>,
+    data: impl Into<FontBytes>,
   ) -> Result<FontId> {
     self.register_ttf_source(FontSource::Memory {
       id: id.into(),
@@ -226,7 +275,7 @@ impl<'a> FontRegistry<'a> {
   pub fn register_embedded_font(
     &mut self,
     id: impl Into<Cow<'a, str>>,
-    data: impl Into<Cow<'a, [u8]>>,
+    data: impl Into<FontBytes>,
   ) -> Result<FontId> {
     self.register_ttf_source(FontSource::EmbeddedOoxml {
       id: id.into(),
@@ -237,7 +286,7 @@ impl<'a> FontRegistry<'a> {
   pub fn register_test_fixture_font(
     &mut self,
     id: impl Into<Cow<'a, str>>,
-    data: impl Into<Cow<'a, [u8]>>,
+    data: impl Into<FontBytes>,
   ) -> Result<FontId> {
     self.register_ttf_source(FontSource::TestFixture {
       id: id.into(),
@@ -266,7 +315,7 @@ impl<'a> FontRegistry<'a> {
       FontSource::Path {
         id,
         path,
-        data: Some(Cow::Owned(data)),
+        data: Some(data.into()),
       },
       face,
     );
@@ -390,7 +439,7 @@ impl<'a> FontRegistry<'a> {
       face_index: registered.face_index,
       family_names: registered.family_names.clone(),
       style_name: registered.style_name.clone(),
-      data: registered.source.data().map(Cow::Borrowed),
+      data: registered.source.data_handle(),
     })
   }
 
@@ -407,9 +456,9 @@ impl<'a> FontRegistry<'a> {
       | FontSource::TestFixture { data, .. }
       | FontSource::Path {
         data: Some(data), ..
-      } => resolved.shape_with_ttf_bytes(
+      } => resolved.shape_with_font_bytes(
         text,
-        data.as_ref(),
+        data.clone(),
         &ShapeOptions::from_request(request, direction),
       ),
       FontSource::System | FontSource::Path { data: None, .. } => Ok(resolved.shape_approximate(
@@ -434,7 +483,7 @@ impl<'a> FontRegistry<'a> {
       | FontSource::TestFixture { data, .. }
       | FontSource::Path {
         data: Some(data), ..
-      } => resolved.shape_with_ttf_bytes(text, data.as_ref(), options),
+      } => resolved.shape_with_font_bytes(text, data.clone(), options),
       FontSource::System | FontSource::Path { data: None, .. } => Ok(resolved.shape_approximate(
         text,
         options.size_pt,
@@ -736,7 +785,7 @@ impl<'a> FontRegistry<'a> {
           .or_else(|| {
             runtime_face_for_data(
               &font.resolved.font_id,
-              data.as_ref(),
+              data.clone(),
               font.resolved.face_index,
             )
           })
@@ -783,12 +832,12 @@ impl<'a> FontRegistry<'a> {
     runtime_face_for_data(font_id, data, face_index)
   }
 
-  fn source_data_for_font_id(&self, font_id: &FontId) -> Option<(&[u8], u32)> {
+  fn source_data_for_font_id(&self, font_id: &FontId) -> Option<(FontBytes, u32)> {
     let registered = self
       .faces
       .iter()
       .find(|registered| registered.font_id().as_ref() == Some(font_id))?;
-    Some((registered.source.data()?, registered.face_index))
+    Some((registered.source.data_handle()?, registered.face_index))
   }
 
   fn resolved_from_face(
@@ -1235,19 +1284,19 @@ pub enum FontSource<'a> {
   Path {
     id: Cow<'a, str>,
     path: PathBuf,
-    data: Option<Cow<'a, [u8]>>,
+    data: Option<FontBytes>,
   },
   Memory {
     id: Cow<'a, str>,
-    data: Cow<'a, [u8]>,
+    data: FontBytes,
   },
   EmbeddedOoxml {
     id: Cow<'a, str>,
-    data: Cow<'a, [u8]>,
+    data: FontBytes,
   },
   TestFixture {
     id: Cow<'a, str>,
-    data: Cow<'a, [u8]>,
+    data: FontBytes,
   },
 }
 
@@ -1266,10 +1315,22 @@ impl<'a> FontSource<'a> {
     match self {
       Self::Memory { data, .. }
       | Self::EmbeddedOoxml { data, .. }
-      | Self::TestFixture { data, .. } => Some(data.as_ref()),
+      | Self::TestFixture { data, .. } => Some(data.as_slice()),
       Self::Path {
         data: Some(data), ..
-      } => Some(data.as_ref()),
+      } => Some(data.as_slice()),
+      Self::System | Self::Path { data: None, .. } => None,
+    }
+  }
+
+  fn data_handle(&self) -> Option<FontBytes> {
+    match self {
+      Self::Memory { data, .. }
+      | Self::EmbeddedOoxml { data, .. }
+      | Self::TestFixture { data, .. } => Some(data.clone()),
+      Self::Path {
+        data: Some(data), ..
+      } => Some(data.clone()),
       Self::System | Self::Path { data: None, .. } => None,
     }
   }
@@ -1359,7 +1420,7 @@ pub struct FontFaceData<'a> {
   pub face_index: u32,
   pub family_names: Vec<Cow<'a, str>>,
   pub style_name: Option<Cow<'a, str>>,
-  pub data: Option<Cow<'a, [u8]>>,
+  pub data: Option<FontBytes>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1519,8 +1580,17 @@ impl<'a> ResolvedFont<'a> {
     data: &[u8],
     options: &ShapeOptions<'a>,
   ) -> Result<ShapedRun<'a>> {
-    let runtime_face =
-      runtime_face_for_data(&self.font_id, data, self.face_index).ok_or(FontError::InvalidFace)?;
+    self.shape_with_font_bytes(text, FontBytes::from(data.to_vec()), options)
+  }
+
+  fn shape_with_font_bytes(
+    &self,
+    text: impl Into<Cow<'a, str>>,
+    data: impl Into<FontBytes>,
+    options: &ShapeOptions<'a>,
+  ) -> Result<ShapedRun<'a>> {
+    let runtime_face = runtime_face_for_data(&self.font_id, data.into(), self.face_index)
+      .ok_or(FontError::InvalidFace)?;
     self.shape_with_runtime_face(text, &runtime_face, options)
   }
 
@@ -2618,7 +2688,7 @@ fn runtime_face_cache() -> &'static Mutex<HashMap<RuntimeFaceKey, Arc<RuntimeFac
 
 fn runtime_face_for_data(
   font_id: &FontId,
-  data: &[u8],
+  data: FontBytes,
   face_index: u32,
 ) -> Option<Arc<RuntimeFace>> {
   let key = RuntimeFaceKey {
@@ -2630,7 +2700,7 @@ fn runtime_face_for_data(
   {
     return Some(face.clone());
   }
-  let face = Arc::new(RuntimeFace::new(data.to_vec(), face_index).ok()?);
+  let face = Arc::new(RuntimeFace::new(data, face_index).ok()?);
   if let Ok(mut cache) = runtime_face_cache().lock() {
     cache.insert(key, face.clone());
   }
@@ -3431,7 +3501,7 @@ mod tests {
   fn font_source_exposes_registered_bytes_for_renderers() {
     let source = FontSource::EmbeddedOoxml {
       id: Cow::Borrowed("embedded"),
-      data: Cow::Borrowed(&[1, 2, 3]),
+      data: [1, 2, 3].as_slice().into(),
     };
 
     assert_eq!(source.id(), Some("embedded"));
@@ -3446,7 +3516,7 @@ mod tests {
     registry.register_face(
       FontSource::Memory {
         id: Cow::Borrowed("memory"),
-        data: Cow::Borrowed(&[1, 2, 3]),
+        data: [1, 2, 3].as_slice().into(),
       },
       FontFaceInfo::synthetic("memory", "Memory"),
     );

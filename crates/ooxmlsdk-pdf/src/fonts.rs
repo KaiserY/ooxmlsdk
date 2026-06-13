@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FontFaceData as SharedFontFaceData, FontId, FontRegistry, FontRequest, FontSize, ShapeOptions,
-  ShapedRun, TextScript, script_direction_runs,
+  FontBytes, FontFaceData as SharedFontFaceData, FontId, FontRegistry, FontRequest, FontSize,
+  ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
 
 use crate::docx::TextStyle;
@@ -19,15 +19,6 @@ fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
   let output = work();
   eprintln!("[ooxmlsdk-pdf] {label}: {:?}", start.elapsed());
   output
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct FontBytes(Arc<[u8]>);
-
-impl AsRef<[u8]> for FontBytes {
-  fn as_ref(&self) -> &[u8] {
-    &self.0
-  }
 }
 
 #[derive(Clone, Debug)]
@@ -204,7 +195,7 @@ fn font_face_data_from_shared(
   face: SharedFontFaceData<'_>,
 ) -> Option<FontFaceData> {
   Some(FontFaceData {
-    data: Arc::new(FontBytes(Arc::from(face.data?.as_ref()))),
+    data: Arc::new(face.data?),
     index: face.face_index,
     id: font_id.0.clone(),
   })

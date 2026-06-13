@@ -5,6 +5,12 @@ use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
 use ooxmlsdk::sdk::SdkPart;
+use rustfft::FftPlanner;
+use rustfft::num_complex::Complex;
+use statrs::distribution::{
+  Beta, Binomial, ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, FisherSnedecor,
+  Gamma, Hypergeometric, LogNormal, NegativeBinomial, Normal, Poisson, StudentsT, Weibull,
+};
 
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
@@ -1883,6 +1889,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       locals: BTreeMap::new(),
     }
     .evaluate(ast.as_ref()?)
+    .map(|value| self.array_formula_cell_value(current_sheet, current_cell, value))
   }
 
   pub fn evaluate_formula_text_with_grammar(
@@ -1971,6 +1978,51 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       return Some(range_intersection_value(self, left, right));
     }
     None
+  }
+
+  fn array_formula_cell_value(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    value: FormulaValue<'doc>,
+  ) -> FormulaValue<'doc> {
+    let Some(address) = current_cell else {
+      return value;
+    };
+    let Some(formula) = self.formulas.get(&(current_sheet, address)) else {
+      return value;
+    };
+    let Some(range) = formula.reference else {
+      return value;
+    };
+    let start_row = range.start.row.min(range.end.row);
+    let start_column = range.start.column.min(range.end.column);
+    let row_offset = address.row.saturating_sub(start_row) as usize;
+    let column_offset = address.column.saturating_sub(start_column) as usize;
+    match value {
+      FormulaValue::Matrix(rows) => rows
+        .get(row_offset)
+        .and_then(|row| row.get(column_offset))
+        .cloned()
+        .unwrap_or_default(),
+      FormulaValue::Reference(reference) => {
+        let context = FormulaEvaluator {
+          book: self,
+          current_sheet,
+          current_cell,
+          locals: BTreeMap::new(),
+        };
+        let source_sheet = context.range_sheet(&reference);
+        self.cell_value(
+          source_sheet,
+          CellAddress {
+            column: reference.range.start.column + column_offset as u32,
+            row: reference.range.start.row + row_offset as u32,
+          },
+        )
+      }
+      value => value,
+    }
   }
 
   pub fn formula_text(&self, sheet: SheetId, address: CellAddress) -> Option<String> {
@@ -4003,13 +4055,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "BESSELJ" => self.evaluate_bessel(args, BesselKind::J),
       "BESSELK" => self.evaluate_bessel(args, BesselKind::K),
       "BESSELY" => self.evaluate_bessel(args, BesselKind::Y),
+      "FOURIER" | "ORG.LIBREOFFICE.FOURIER" => self.evaluate_fourier(args),
       "IMREAL" => self.evaluate_complex_part(args, false),
       "IMAGINARY" => self.evaluate_complex_part(args, true),
       "IMSUB" => self.evaluate_complex_binary(args, |left, right| left - right),
       "IMSUM" => self.evaluate_complex_sum_product(args, false),
       "IMPRODUCT" => self.evaluate_complex_sum_product(args, true),
       "COMPLEX" => self.evaluate_complex(args),
-      "WEIBULL.DIST" => self.evaluate_weibull_dist(args),
+      "WEIBULL.DIST" | "WEIBULL" => self.evaluate_weibull_dist(args),
       "NETWORKDAYS.INTL" | "NETWORKDAYS" => self.evaluate_networkdays(args),
       "WORKDAY.INTL" | "WORKDAY" => self.evaluate_workday(args),
       "Z.TEST" | "ZTEST" => self.evaluate_z_test(args),
@@ -6431,10 +6484,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
     let scaled = (x - lower) / (upper - lower);
+    let dist = Beta::new(alpha, beta).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      beta_dist(scaled, alpha, beta)
+      dist.cdf(scaled)
     } else {
-      beta_dist_pdf(scaled, alpha, beta) / (upper - lower)
+      dist.pdf(scaled) / (upper - lower)
     }))
   }
 
@@ -6455,8 +6509,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..=1.0).contains(&p) || alpha <= 0.0 || beta <= 0.0 || upper <= lower {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    if p == 0.0 {
+      return Some(FormulaValue::Number(lower));
+    }
+    if p == 1.0 {
+      return Some(FormulaValue::Number(upper));
+    }
+    let dist = Beta::new(alpha, beta).ok()?;
     Some(FormulaValue::Number(
-      lower + inverse_monotonic(p, 0.0, 1.0, |x| beta_dist(x, alpha, beta)) * (upper - lower),
+      lower + dist.inverse_cdf(p) * (upper - lower),
     ))
   }
 
@@ -6468,10 +6529,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || n < 0.0 || x > n || !(0.0..=1.0).contains(&p) {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = Binomial::new(p, n as u64).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      (0..=x as u64).map(|k| binom_dist_pmf(k as f64, n, p)).sum()
+      dist.cdf(x as u64)
     } else {
-      binom_dist_pmf(x, n, p)
+      dist.pmf(x as u64)
     }))
   }
 
@@ -6535,14 +6597,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if df < 1.0 || x < 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = ChiSquared::new(df).ok()?;
     if right_tail {
-      return Some(FormulaValue::Number(upper_reg_igamma(df / 2.0, x / 2.0)));
+      return Some(FormulaValue::Number(dist.sf(x)));
     }
     let cumulative = self.truthy(&self.evaluate(args.get(2)?)?);
     Some(FormulaValue::Number(if cumulative {
-      lower_reg_igamma(df / 2.0, x / 2.0)
+      dist.cdf(x)
     } else {
-      chisq_dist_pdf(x, df)
+      dist.pdf(x)
     }))
   }
 
@@ -6556,9 +6619,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..=1.0).contains(&p) || df < 1.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let target = if right_tail { 1.0 - p } else { p };
-    Some(FormulaValue::Number(inverse_positive(target, |x| {
-      lower_reg_igamma(df / 2.0, x / 2.0)
+    let dist = ChiSquared::new(df).ok()?;
+    Some(FormulaValue::Number(dist.inverse_cdf(if right_tail {
+      1.0 - p
+    } else {
+      p
     })))
   }
 
@@ -6612,7 +6677,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if df == 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    Some(FormulaValue::Number(upper_reg_igamma(df / 2.0, chi / 2.0)))
+    Some(FormulaValue::Number(ChiSquared::new(df).ok()?.sf(chi)))
   }
 
   fn evaluate_confidence_norm(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6634,8 +6699,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..1.0).contains(&alpha) || sigma <= 0.0 || size < 2.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = StudentsT::new(0.0, 1.0, size - 1.0).ok()?;
     Some(FormulaValue::Number(
-      t_inv_2t(alpha, size - 1.0) * sigma / size.sqrt(),
+      dist.inverse_cdf(1.0 - alpha / 2.0).abs() * sigma / size.sqrt(),
     ))
   }
 
@@ -6682,12 +6748,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || df1 <= 0.0 || df2 <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = FisherSnedecor::new(df1, df2).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      beta_dist(df1 * x / (df1 * x + df2), df1 / 2.0, df2 / 2.0)
+      dist.cdf(x)
     } else {
-      let a = df1 / 2.0;
-      let b = df2 / 2.0;
-      (df1 / df2).powf(a) * x.powf(a - 1.0) / beta(a, b) / (1.0 + df1 * x / df2).powf(a + b)
+      dist.pdf(x)
     }))
   }
 
@@ -6698,11 +6763,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || df1 <= 0.0 || df2 <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number(beta_dist(
-      df2 / (df2 + df1 * x),
-      df2 / 2.0,
-      df1 / 2.0,
-    )))
+    Some(FormulaValue::Number(
+      FisherSnedecor::new(df1, df2).ok()?.sf(x),
+    ))
   }
 
   fn evaluate_f_inv(
@@ -6716,10 +6779,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..=1.0).contains(&p) || df1 <= 0.0 || df2 <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let target = if right_tail { 1.0 - p } else { p };
-    Some(FormulaValue::Number(inverse_positive(target, |x| {
-      beta_dist(df1 * x / (df1 * x + df2), df1 / 2.0, df2 / 2.0)
-    })))
+    Some(FormulaValue::Number(
+      FisherSnedecor::new(df1, df2)
+        .ok()?
+        .inverse_cdf(if right_tail { 1.0 - p } else { p }),
+    ))
   }
 
   fn evaluate_f_test(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6746,7 +6810,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         left.len() as f64 - 1.0,
       )
     };
-    let cdf = beta_dist(df1 * f / (df1 * f + df2), df1 / 2.0, df2 / 2.0);
+    let cdf = FisherSnedecor::new(df1, df2).ok()?.cdf(f);
     Some(FormulaValue::Number(2.0 * cdf.min(1.0 - cdf)))
   }
 
@@ -6758,10 +6822,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || alpha <= 0.0 || beta <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = Gamma::new(alpha, 1.0 / beta).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      gamma_dist(x, alpha, beta)
+      dist.cdf(x)
     } else {
-      gamma_dist_pdf(x, alpha, beta)
+      dist.pdf(x)
     }))
   }
 
@@ -6772,9 +6837,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..=1.0).contains(&p) || alpha <= 0.0 || beta <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number(inverse_positive(p, |x| {
-      gamma_dist(x, alpha, beta)
-    })))
+    Some(FormulaValue::Number(
+      Gamma::new(alpha, 1.0 / beta).ok()?.inverse_cdf(p),
+    ))
   }
 
   fn evaluate_gamma(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6800,15 +6865,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let pmf = |x: f64| {
-      binom_coeff(population_success, x)
-        * binom_coeff(population_size - population_success, sample_size - x)
-        / binom_coeff(population_size, sample_size)
-    };
+    let dist = Hypergeometric::new(
+      population_size as u64,
+      population_success as u64,
+      sample_size as u64,
+    )
+    .ok()?;
     Some(FormulaValue::Number(if cumulative {
-      (0..=sample_success as u64).map(|x| pmf(x as f64)).sum()
+      dist.cdf(sample_success as u64)
     } else {
-      pmf(sample_success)
+      dist.pmf(sample_success as u64)
     }))
   }
 
@@ -6820,11 +6886,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x <= 0.0 || sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let z = (x.ln() - mean) / sigma;
+    let dist = LogNormal::new(mean, sigma).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      norm_s_dist(z)
+      dist.cdf(x)
     } else {
-      (-0.5 * z * z).exp() / (x * sigma * (2.0 * std::f64::consts::PI).sqrt())
+      dist.pdf(x)
     }))
   }
 
@@ -6835,7 +6901,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..1.0).contains(&p) || sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number((mean + sigma * norm_s_inv(p)).exp()))
+    Some(FormulaValue::Number(
+      LogNormal::new(mean, sigma).ok()?.inverse_cdf(p),
+    ))
   }
 
   fn evaluate_negbinom_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6846,11 +6914,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if failures < 0.0 || successes < 1.0 || !(0.0..=1.0).contains(&p) {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let pmf = |f: f64| binom_coeff(f + successes - 1.0, f) * p.powf(successes) * (1.0 - p).powf(f);
+    let dist = NegativeBinomial::new(successes, p).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      (0..=failures as u64).map(|f| pmf(f as f64)).sum()
+      dist.cdf(failures as u64)
     } else {
-      pmf(failures)
+      dist.pmf(failures as u64)
     }))
   }
 
@@ -6862,11 +6930,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let z = (x - mean) / sigma;
+    let dist = Normal::new(mean, sigma).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      norm_s_dist(z)
+      dist.cdf(x)
     } else {
-      norm_s_pdf(z) / sigma
+      dist.pdf(x)
     }))
   }
 
@@ -6877,16 +6945,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..1.0).contains(&p) || sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number(mean + sigma * norm_s_inv(p)))
+    Some(FormulaValue::Number(
+      Normal::new(mean, sigma).ok()?.inverse_cdf(p),
+    ))
   }
 
   fn evaluate_norm_s_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let z = self.number(&self.evaluate(args.first()?)?)?;
     let cumulative = self.truthy(&self.evaluate(args.get(1)?)?);
+    let dist = Normal::new(0.0, 1.0).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      norm_s_dist(z)
+      dist.cdf(z)
     } else {
-      norm_s_pdf(z)
+      dist.pdf(z)
     }))
   }
 
@@ -6938,11 +7009,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || lambda <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let pmf = |k: f64| (k * lambda.ln() - lambda - log_gamma(k + 1.0)).exp();
+    let dist = Poisson::new(lambda).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      (0..=x as u64).map(|k| pmf(k as f64)).sum()
+      dist.cdf(x as u64)
     } else {
-      pmf(x)
+      dist.pmf(x as u64)
     }))
   }
 
@@ -6983,6 +7054,130 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     } else {
       Some(FormulaValue::Error(FormulaErrorValue::Num))
     }
+  }
+
+  fn evaluate_fourier(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if !(2..=5).contains(&args.len()) {
+      return None;
+    }
+    let input = self.matrix_values(&self.evaluate(args.first()?)?);
+    if input.is_empty() || input.first()?.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let grouped_by_column = self.truthy(&self.evaluate(args.get(1)?)?);
+    let inverse = args
+      .get(2)
+      .and_then(|arg| self.evaluate(arg))
+      .map(|value| self.truthy(&value))
+      .unwrap_or(false);
+    let polar = args
+      .get(3)
+      .and_then(|arg| self.evaluate(arg))
+      .map(|value| self.truthy(&value))
+      .unwrap_or(false);
+    let min_magnitude = args
+      .get(4)
+      .and_then(|arg| self.evaluate(arg))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(0.0);
+
+    let row_count = input.len();
+    let column_count = input.first()?.len();
+    if input.iter().any(|row| row.len() != column_count) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    if (grouped_by_column && column_count > 2) || (!grouped_by_column && row_count > 2) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+
+    let real_input = if grouped_by_column {
+      column_count == 1
+    } else {
+      row_count == 1
+    };
+    let point_count = if grouped_by_column {
+      row_count
+    } else {
+      column_count
+    };
+    let mut values = Vec::with_capacity(point_count);
+    if grouped_by_column {
+      for row in &input {
+        let Some(real) = self.number(&row[0]) else {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        };
+        let imaginary = if real_input {
+          0.0
+        } else {
+          let Some(imaginary) = self.number(&row[1]) else {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          };
+          imaginary
+        };
+        values.push(Complex::new(real, imaginary));
+      }
+    } else {
+      for (real, imaginary) in input[0].iter().zip(input.get(1).into_iter().flatten()) {
+        let Some(real) = self.number(real) else {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        };
+        let Some(imaginary) = self.number(imaginary) else {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        };
+        values.push(Complex::new(real, imaginary));
+      }
+      if real_input {
+        values.clear();
+        for real in &input[0] {
+          let Some(real) = self.number(real) else {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          };
+          values.push(Complex::new(real, 0.0));
+        }
+      }
+    }
+
+    let mut planner = FftPlanner::<f64>::new();
+    let fft = if inverse {
+      planner.plan_fft_inverse(point_count)
+    } else {
+      planner.plan_fft_forward(point_count)
+    };
+    fft.process(&mut values);
+
+    let scale = if inverse {
+      1.0 / point_count as f64
+    } else {
+      1.0
+    };
+    Some(FormulaValue::Matrix(
+      values
+        .into_iter()
+        .map(|value| {
+          if polar {
+            let mut magnitude = value.norm();
+            let mut phase = if magnitude < min_magnitude {
+              magnitude = 0.0;
+              0.0
+            } else {
+              value.im.atan2(value.re)
+            };
+            if inverse {
+              magnitude *= scale;
+            }
+            if !phase.is_finite() {
+              phase = 0.0;
+            }
+            vec![FormulaValue::Number(magnitude), FormulaValue::Number(phase)]
+          } else {
+            vec![
+              FormulaValue::Number(value.re * scale),
+              FormulaValue::Number(value.im * scale),
+            ]
+          }
+        })
+        .collect(),
+    ))
   }
 
   fn evaluate_complex_part(
@@ -7073,10 +7268,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if df <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      t_dist(t, df, 4)
+      dist.cdf(t)
     } else {
-      t_dist(t, df, 3)
+      dist.pdf(t)
     }))
   }
 
@@ -7090,7 +7286,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if t < 0.0 || df <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number(t_dist(t, df, tails)))
+    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
+    Some(FormulaValue::Number(match tails {
+      1 => dist.sf(t),
+      2 => 2.0 * dist.sf(t),
+      _ => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
+    }))
   }
 
   fn evaluate_t_inv(
@@ -7103,10 +7304,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..1.0).contains(&p) || df <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
     Some(FormulaValue::Number(if two_tailed {
-      t_inv_2t(p, df)
+      dist.inverse_cdf(1.0 - p / 2.0)
     } else {
-      inverse_monotonic(p, -100.0, 100.0, |x| t_dist(x, df, 4))
+      dist.inverse_cdf(p)
     }))
   }
 
@@ -7149,23 +7351,58 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         + var_right.powi(2) / ((right.len() as f64).powi(2) * (right.len() - 1) as f64);
       ((mean_left - mean_right).abs() / se, df_num / df_den)
     };
-    Some(FormulaValue::Number(t_dist(t, df, tails)))
+    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
+    Some(FormulaValue::Number(match tails {
+      1 => dist.sf(t),
+      2 => 2.0 * dist.sf(t),
+      _ => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
+    }))
   }
 
   fn evaluate_weibull_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let x = self.number(&self.evaluate(args.first()?)?)?;
-    let alpha = self.number(&self.evaluate(args.get(1)?)?)?;
-    let beta = self.number(&self.evaluate(args.get(2)?)?)?;
-    let cumulative = self.truthy(&self.evaluate(args.get(3)?)?);
-    if x < 0.0 || alpha <= 0.0 || beta <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let x_value = self.evaluate(args.first()?)?;
+    let alpha_value = self.evaluate(args.get(1)?)?;
+    let beta_value = self.evaluate(args.get(2)?)?;
+    let cumulative_value = self.evaluate(args.get(3)?)?;
+    let x_matrix = self.matrix_values(&x_value);
+    let alpha_matrix = self.matrix_values(&alpha_value);
+    let beta_matrix = self.matrix_values(&beta_value);
+    let rows = x_matrix
+      .len()
+      .max(alpha_matrix.len())
+      .max(beta_matrix.len());
+    let columns = x_matrix
+      .first()
+      .map(Vec::len)
+      .unwrap_or(1)
+      .max(alpha_matrix.first().map(Vec::len).unwrap_or(1))
+      .max(beta_matrix.first().map(Vec::len).unwrap_or(1));
+    let cumulative = self.truthy(&cumulative_value);
+    let mut result = Vec::with_capacity(rows);
+    for row in 0..rows {
+      let mut result_row = Vec::with_capacity(columns);
+      for column in 0..columns {
+        let x = self.number(matrix_item(&x_matrix, row, column)?)?;
+        let alpha = self.number(matrix_item(&alpha_matrix, row, column)?)?;
+        let beta = self.number(matrix_item(&beta_matrix, row, column)?)?;
+        if x < 0.0 || alpha <= 0.0 || beta <= 0.0 {
+          result_row.push(FormulaValue::Error(FormulaErrorValue::Num));
+          continue;
+        }
+        let dist = Weibull::new(alpha, beta).ok()?;
+        result_row.push(FormulaValue::Number(if cumulative {
+          dist.cdf(x)
+        } else {
+          dist.pdf(x)
+        }));
+      }
+      result.push(result_row);
     }
-    let pow = (x / beta).powf(alpha);
-    Some(FormulaValue::Number(if cumulative {
-      1.0 - (-pow).exp()
+    if rows == 1 && columns == 1 {
+      result.into_iter().next()?.into_iter().next()
     } else {
-      alpha / beta.powf(alpha) * x.powf(alpha - 1.0) * (-pow).exp()
-    }))
+      Some(FormulaValue::Matrix(result))
+    }
   }
 
   fn evaluate_z_test(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -9434,207 +9671,6 @@ fn log_gamma(z: f64) -> f64 {
   }
 }
 
-fn beta(a: f64, b: f64) -> f64 {
-  (log_gamma(a) + log_gamma(b) - log_gamma(a + b)).exp()
-}
-
-fn log_beta(a: f64, b: f64) -> f64 {
-  log_gamma(a) + log_gamma(b) - log_gamma(a + b)
-}
-
-fn beta_dist_pdf(x: f64, a: f64, b: f64) -> f64 {
-  if x <= 0.0 {
-    return if a < 1.0 && x == 0.0 {
-      f64::INFINITY
-    } else {
-      0.0
-    };
-  }
-  if x >= 1.0 {
-    return if b < 1.0 && x == 1.0 {
-      f64::INFINITY
-    } else {
-      0.0
-    };
-  }
-  ((a - 1.0) * x.ln() + (b - 1.0) * (1.0 - x).ln() - log_beta(a, b)).exp()
-}
-
-fn beta_cont_frac(x: f64, a: f64, b: f64) -> f64 {
-  // Source: LibreOffice lcl_GetBetaHelperContFrac.
-  let mut a1 = 1.0;
-  let mut b1 = 1.0;
-  let mut b2 = 1.0 - (a + b) / (a + 1.0) * x;
-  let mut a2;
-  let mut norm;
-  let mut cf;
-  if b2 == 0.0 {
-    a2 = 0.0;
-    norm = 1.0;
-    cf = 1.0;
-  } else {
-    a2 = 1.0;
-    norm = 1.0 / b2;
-    cf = a2 * norm;
-  }
-  let mut rm = 1.0;
-  while rm < 50_000.0 {
-    let apl2m = a + 2.0 * rm;
-    let d2m = rm * (b - rm) * x / ((apl2m - 1.0) * apl2m);
-    let d2m1 = -(a + rm) * (a + b + rm) * x / (apl2m * (apl2m + 1.0));
-    a1 = (a2 + d2m * a1) * norm;
-    b1 = (b2 + d2m * b1) * norm;
-    a2 = a1 + d2m1 * a2 * norm;
-    b2 = b1 + d2m1 * b2 * norm;
-    if b2 != 0.0 {
-      norm = 1.0 / b2;
-      let next = a2 * norm;
-      if (cf - next).abs() < cf.abs() * f64::EPSILON {
-        return next;
-      }
-      cf = next;
-    }
-    rm += 1.0;
-  }
-  cf
-}
-
-fn beta_dist(x_in: f64, alpha: f64, beta_value: f64) -> f64 {
-  if x_in <= 0.0 {
-    return 0.0;
-  }
-  if x_in >= 1.0 {
-    return 1.0;
-  }
-  if beta_value == 1.0 {
-    return x_in.powf(alpha);
-  }
-  if alpha == 1.0 {
-    return -((beta_value * (1.0 - x_in).ln()).exp_m1());
-  }
-  let mut x = x_in;
-  let mut y = 1.0 - x_in;
-  let mut a = alpha;
-  let mut b = beta_value;
-  let reflect = x_in > alpha / (alpha + beta_value);
-  if reflect {
-    a = beta_value;
-    b = alpha;
-    x = y;
-    y = x_in;
-  }
-  let mut result = beta_cont_frac(x, a, b) / a;
-  let p = a / (a + b);
-  let q = b / (a + b);
-  let factor = if a > 1.0 && b > 1.0 && p < 0.97 && q < 0.97 {
-    beta_dist_pdf(x, a, b) * x * y
-  } else {
-    (a * x.ln() + b * y.ln() - log_beta(a, b)).exp()
-  };
-  result *= factor;
-  if reflect {
-    result = 1.0 - result;
-  }
-  result.clamp(0.0, 1.0)
-}
-
-fn gamma_cont_fraction(a: f64, x: f64) -> f64 {
-  let big_inv = f64::EPSILON;
-  let big = 1.0 / big_inv;
-  let mut count = 0.0;
-  let mut y = 1.0 - a;
-  let mut denom = x + 2.0 - a;
-  let mut pkm1 = x + 1.0;
-  let mut pkm2 = 1.0;
-  let mut qkm1 = denom * x;
-  let mut qkm2 = x;
-  let mut approx = pkm1 / qkm1;
-  while count < 10_000.0 {
-    count += 1.0;
-    y += 1.0;
-    let num = y * count;
-    denom += 2.0;
-    let pk = pkm1 * denom - pkm2 * num;
-    let qk = qkm1 * denom - qkm2 * num;
-    if qk != 0.0 {
-      let next = pk / qk;
-      if ((approx - next) / next).abs() <= f64::EPSILON {
-        return next;
-      }
-      approx = next;
-    }
-    pkm2 = pkm1;
-    pkm1 = pk;
-    qkm2 = qkm1;
-    qkm1 = qk;
-    if pk.abs() > big {
-      pkm2 *= big_inv;
-      pkm1 *= big_inv;
-      qkm2 *= big_inv;
-      qkm1 *= big_inv;
-    }
-  }
-  approx
-}
-
-fn gamma_series(a: f64, x: f64) -> f64 {
-  let mut denom = a;
-  let mut summand = 1.0 / a;
-  let mut sum = summand;
-  for _ in 1..=10_000 {
-    denom += 1.0;
-    summand = summand * x / denom;
-    sum += summand;
-    if (summand / sum).abs() <= f64::EPSILON {
-      break;
-    }
-  }
-  sum
-}
-
-fn lower_reg_igamma(a: f64, x: f64) -> f64 {
-  if x <= 0.0 {
-    return 0.0;
-  }
-  let factor = (a * x.ln() - x - log_gamma(a)).exp();
-  if x > a + 1.0 {
-    1.0 - factor * gamma_cont_fraction(a, x)
-  } else {
-    factor * gamma_series(a, x)
-  }
-}
-
-fn upper_reg_igamma(a: f64, x: f64) -> f64 {
-  if x <= 0.0 {
-    return 1.0;
-  }
-  let factor = (a * x.ln() - x - log_gamma(a)).exp();
-  if x > a + 1.0 {
-    factor * gamma_cont_fraction(a, x)
-  } else {
-    1.0 - factor * gamma_series(a, x)
-  }
-}
-
-fn gamma_dist_pdf(x: f64, alpha: f64, lambda: f64) -> f64 {
-  if x < 0.0 {
-    0.0
-  } else if x == 0.0 {
-    if alpha == 1.0 { 1.0 / lambda } else { 0.0 }
-  } else {
-    let xr = x / lambda;
-    ((alpha - 1.0) * xr.ln() - xr - lambda.ln() - log_gamma(alpha)).exp()
-  }
-}
-
-fn gamma_dist(x: f64, alpha: f64, lambda: f64) -> f64 {
-  if x <= 0.0 {
-    0.0
-  } else {
-    lower_reg_igamma(alpha, x / lambda)
-  }
-}
-
 fn binom_coeff(n: f64, k: f64) -> f64 {
   let k = k.floor();
   if n < k || k < 0.0 {
@@ -9654,18 +9690,6 @@ fn binom_dist_pmf(x: f64, n: f64, p: f64) -> f64 {
     return if x == n { 1.0 } else { 0.0 };
   }
   binom_coeff(n, x) * p.powf(x) * (1.0 - p).powf(n - x)
-}
-
-fn chisq_dist_pdf(x: f64, df: f64) -> f64 {
-  if x <= 0.0 {
-    0.0
-  } else {
-    ((0.5 * df - 1.0) * (0.5 * x).ln() - 0.5 * x - 2.0_f64.ln() - log_gamma(0.5 * df)).exp()
-  }
-}
-
-fn norm_s_pdf(x: f64) -> f64 {
-  (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt()
 }
 
 fn norm_s_dist(x: f64) -> f64 {
@@ -9768,44 +9792,6 @@ fn erf(x: f64) -> f64 {
 
 fn erfc(x: f64) -> f64 {
   libm::erfc(x)
-}
-
-fn t_dist(t: f64, df: f64, kind: i32) -> f64 {
-  match kind {
-    1 => 0.5 * beta_dist(df / (df + t * t), df / 2.0, 0.5),
-    2 => beta_dist(df / (df + t * t), df / 2.0, 0.5),
-    3 => (1.0 + t * t / df).powf(-(df + 1.0) / 2.0) / (df.sqrt() * beta(0.5, df / 2.0)),
-    4 => {
-      let x = df / (t * t + df);
-      let r = 0.5 * beta_dist(x, 0.5 * df, 0.5);
-      if t < 0.0 { r } else { 1.0 - r }
-    }
-    _ => f64::NAN,
-  }
-}
-
-fn t_inv_2t(p: f64, df: f64) -> f64 {
-  inverse_monotonic(1.0 - p / 2.0, 0.0, 100.0, |x| t_dist(x, df, 4))
-}
-
-fn inverse_positive(target: f64, f: impl Fn(f64) -> f64) -> f64 {
-  let mut high = 1.0;
-  while f(high) < target && high < 1.0e10 {
-    high *= 2.0;
-  }
-  inverse_monotonic(target, 0.0, high, f)
-}
-
-fn inverse_monotonic(target: f64, mut low: f64, mut high: f64, f: impl Fn(f64) -> f64) -> f64 {
-  for _ in 0..100 {
-    let mid = (low + high) / 2.0;
-    if f(mid) < target {
-      low = mid;
-    } else {
-      high = mid;
-    }
-  }
-  (low + high) / 2.0
 }
 
 fn rtl_round(value: f64, decimal_places: i32) -> f64 {
@@ -10942,6 +10928,23 @@ fn reorder_columns<'doc>(
         .collect()
     })
     .collect()
+}
+
+fn matrix_item<'doc>(
+  matrix: &'doc [Vec<FormulaValue<'doc>>],
+  row: usize,
+  column: usize,
+) -> Option<&'doc FormulaValue<'doc>> {
+  if matrix.len() == 1 && matrix.first()?.len() == 1 {
+    return matrix.first()?.first();
+  }
+  if matrix.len() == 1 {
+    return matrix.first()?.get(column);
+  }
+  if matrix.first()?.len() == 1 {
+    return matrix.get(row)?.first();
+  }
+  matrix.get(row)?.get(column)
 }
 
 fn take_drop_bounds(len: usize, arg: Option<isize>, take: bool) -> (usize, usize) {

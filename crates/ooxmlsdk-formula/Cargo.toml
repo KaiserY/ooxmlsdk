@@ -15,4 +15,6 @@ readme.workspace = true
 [dependencies]
 libm = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
+rustfft = { workspace = true }
+statrs = { workspace = true }
 thiserror = { workspace = true }

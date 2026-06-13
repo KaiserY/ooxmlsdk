@@ -150,6 +150,111 @@ pub enum FormulaGrammar {
   CalcA1,
 }
 
+pub fn normalize_formula_text(formula: &str, grammar: FormulaGrammar) -> Cow<'_, str> {
+  let formula = formula.trim();
+  let formula = formula
+    .strip_prefix("of:=")
+    .or_else(|| formula.strip_prefix('='))
+    .unwrap_or(formula);
+  match grammar {
+    FormulaGrammar::ExcelA1 => Cow::Borrowed(formula),
+    FormulaGrammar::ExcelR1C1 => Cow::Owned(normalize_r1c1_formula_text(
+      formula,
+      CellAddress { column: 0, row: 0 },
+    )),
+    FormulaGrammar::OpenFormula => Cow::Owned(normalize_open_formula_text(formula)),
+    FormulaGrammar::CalcA1 => Cow::Owned(normalize_calc_formula_text(formula)),
+  }
+}
+
+pub fn normalize_r1c1_formula_text(formula: &str, base: CellAddress) -> String {
+  if let Some(reference) = r1c1_whole_axis_reference_to_a1(formula.trim(), base) {
+    reference
+  } else {
+    formula.to_string()
+  }
+}
+
+pub fn r1c1_whole_axis_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
+  let reference = reference.trim().trim_start_matches('=');
+  if let Some(offset) = parse_r1c1_relative(reference, 'C') {
+    let column = base.column.checked_add_signed(offset)?.checked_add(1)?;
+    let column = column_name(column);
+    return Some(format!("{column}:{column}"));
+  }
+  if let Some(offset) = parse_r1c1_relative(reference, 'R') {
+    let row = base.row.checked_add_signed(offset)?.checked_add(1)?;
+    return Some(format!("{row}:{row}"));
+  }
+  None
+}
+
+fn normalize_open_formula_text(formula: &str) -> String {
+  let text = normalize_formula_separators(formula);
+  normalize_open_formula_references(&text)
+}
+
+fn normalize_calc_formula_text(formula: &str) -> String {
+  normalize_formula_separators(formula)
+}
+
+fn normalize_formula_separators(formula: &str) -> String {
+  let mut output = String::with_capacity(formula.len());
+  let mut quoted = false;
+  for ch in formula.chars() {
+    match ch {
+      '"' => {
+        quoted = !quoted;
+        output.push(ch);
+      }
+      ';' if !quoted => output.push(','),
+      _ => output.push(ch),
+    }
+  }
+  output
+}
+
+fn normalize_open_formula_references(formula: &str) -> String {
+  let mut output = String::with_capacity(formula.len());
+  let mut chars = formula.chars().peekable();
+  while let Some(ch) = chars.next() {
+    if ch == '[' {
+      let mut reference = String::new();
+      let mut closed = false;
+      for next in chars.by_ref() {
+        if next == ']' {
+          closed = true;
+          break;
+        }
+        reference.push(next);
+      }
+      if closed {
+        output.push_str(
+          reference
+            .trim_start_matches('.')
+            .replace(":.", ":")
+            .as_str(),
+        );
+      } else {
+        output.push('[');
+        output.push_str(&reference);
+      }
+    } else {
+      output.push(ch);
+    }
+  }
+  output
+}
+
+fn parse_r1c1_relative(reference: &str, axis: char) -> Option<i32> {
+  let rest = reference.strip_prefix(axis)?;
+  if rest.is_empty() {
+    return Some(0);
+  }
+  let offset = rest.strip_prefix('[')?.strip_suffix(']')?;
+  offset.parse::<i32>().ok()
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorksheetIdentity<'doc> {
   pub id: SheetId,
@@ -925,6 +1030,61 @@ pub struct FormulaEvaluationBook<'doc> {
   pub tables: BTreeMap<String, FormulaTable<'doc>>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FormulaEvaluationBookBuilder<'doc> {
+  book: FormulaEvaluationBook<'doc>,
+}
+
+impl<'doc> FormulaEvaluationBookBuilder<'doc> {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn with_source_file_name(mut self, source_file_name: impl Into<Cow<'doc, str>>) -> Self {
+    self.book.source_file_name = Some(source_file_name.into());
+    self
+  }
+
+  pub fn with_sheet(mut self, id: SheetId, name: impl Into<Cow<'doc, str>>) -> Self {
+    self.book.sheet_names.push(SheetBinding {
+      id,
+      name: name.into(),
+    });
+    self
+  }
+
+  pub fn with_cell(
+    mut self,
+    sheet: SheetId,
+    address: CellAddress,
+    value: FormulaValue<'doc>,
+  ) -> Self {
+    self.book.cells.insert((sheet, address), value);
+    self
+  }
+
+  pub fn with_formula(
+    mut self,
+    sheet: SheetId,
+    address: CellAddress,
+    formula: impl Into<Cow<'doc, str>>,
+  ) -> Self {
+    self.book.formulas.insert(
+      (sheet, address),
+      FormulaText {
+        text: formula.into(),
+        kind: FormulaKind::Normal,
+        reference: None,
+      },
+    );
+    self
+  }
+
+  pub fn build(self) -> FormulaEvaluationBook<'doc> {
+    self.book
+  }
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DefinedNameKey {
   pub sheet: Option<SheetId>,
@@ -1083,6 +1243,17 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       locals: BTreeMap::new(),
     }
     .evaluate(ast.as_ref()?)
+  }
+
+  pub fn evaluate_formula_text_with_grammar(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    formula: &str,
+    grammar: FormulaGrammar,
+  ) -> Option<FormulaValue<'doc>> {
+    let normalized = normalize_formula_text(formula, grammar);
+    self.evaluate_formula_text(current_sheet, current_cell, normalized.as_ref())
   }
 
   pub fn evaluate_relative_formula_text(
@@ -2661,7 +2832,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         }
       }
       "IFERROR" | "IFNA" => {
-        let value = self.evaluate(args.first()?)?;
+        let value = self.scalar_value(self.evaluate(args.first()?)?);
         let use_fallback = matches!(
           (&value, upper.as_str()),
           (FormulaValue::Error(FormulaErrorValue::NA), "IFNA")
@@ -2752,9 +2923,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "COUNTBLANK" => Some(FormulaValue::Number(
         self.count_blank(&self.evaluate(args.first()?)?) as f64,
       )),
-      "ABS" => Some(FormulaValue::Number(
-        self.number(&self.evaluate(args.first()?)?)?.abs(),
-      )),
+      "ABS" => self.map_numeric_value(self.evaluate(args.first()?)?, |value| value.abs()),
       "SIGN" => Some(FormulaValue::Number(sign_number(
         self.number(&self.evaluate(args.first()?)?)?,
       ))),
@@ -4520,12 +4689,84 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     &self,
     left: FormulaValue<'doc>,
     right: FormulaValue<'doc>,
-    op: impl FnOnce(f64, f64) -> f64,
+    op: impl Fn(f64, f64) -> f64 + Copy,
   ) -> Option<FormulaValue<'doc>> {
+    if matches!(left, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+      || matches!(right, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+    {
+      return self.map_numeric_binary(left, right, op);
+    }
     Some(FormulaValue::Number(op(
       self.number(&left)?,
       self.number(&right)?,
     )))
+  }
+
+  fn map_numeric_value(
+    &self,
+    value: FormulaValue<'doc>,
+    op: impl Fn(f64) -> f64 + Copy,
+  ) -> Option<FormulaValue<'doc>> {
+    if !matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
+      return Some(FormulaValue::Number(op(self.number(&value)?)));
+    }
+    let values = self.matrix_values(&value);
+    values
+      .into_iter()
+      .map(|row| {
+        row
+          .into_iter()
+          .map(|value| {
+            self
+              .number(&value)
+              .map(|value| FormulaValue::Number(op(value)))
+          })
+          .collect::<Option<Vec<_>>>()
+      })
+      .collect::<Option<Vec<_>>>()
+      .map(FormulaValue::Matrix)
+  }
+
+  fn map_numeric_binary(
+    &self,
+    left: FormulaValue<'doc>,
+    right: FormulaValue<'doc>,
+    op: impl Fn(f64, f64) -> f64 + Copy,
+  ) -> Option<FormulaValue<'doc>> {
+    let left_matrix = self.matrix_values(&left);
+    let right_matrix = self.matrix_values(&right);
+    let left_rows = left_matrix.len();
+    let left_columns = left_matrix.first().map_or(0, Vec::len);
+    let right_rows = right_matrix.len();
+    let right_columns = right_matrix.first().map_or(0, Vec::len);
+    if left_rows == 0 || left_columns == 0 || right_rows == 0 || right_columns == 0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let rows = left_rows.max(right_rows);
+    let columns = left_columns.max(right_columns);
+    if !matrix_can_broadcast(left_rows, left_columns, rows, columns)
+      || !matrix_can_broadcast(right_rows, right_columns, rows, columns)
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+
+    let mut result = Vec::with_capacity(rows);
+    for row in 0..rows {
+      let mut result_row = Vec::with_capacity(columns);
+      for column in 0..columns {
+        let left = &left_matrix[row.min(left_rows - 1)][column.min(left_columns - 1)];
+        let right = &right_matrix[row.min(right_rows - 1)][column.min(right_columns - 1)];
+        result_row.push(FormulaValue::Number(op(
+          self.number(left)?,
+          self.number(right)?,
+        )));
+      }
+      result.push(result_row);
+    }
+    if rows == 1 && columns == 1 {
+      return result.into_iter().next()?.into_iter().next();
+    }
+    Some(FormulaValue::Matrix(result))
   }
 
   fn values<'b>(
@@ -4595,15 +4836,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         self
           .range_values(reference)
           .into_iter()
-          .filter(|value| matches!(value, FormulaValue::Blank))
+          .filter(|value| is_blank_for_countblank(value))
           .count()
       }
       FormulaValue::Matrix(rows) => rows
         .iter()
         .flatten()
-        .filter(|value| matches!(value, FormulaValue::Blank))
+        .filter(|value| is_blank_for_countblank(value))
         .count(),
-      FormulaValue::Blank => 1,
+      value if is_blank_for_countblank(value) => 1,
       _ => 0,
     }
   }
@@ -4686,6 +4927,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .unwrap_or_default(),
       value => value.clone(),
     }
+  }
+
+  fn scalar_value(&self, value: FormulaValue<'doc>) -> FormulaValue<'doc> {
+    self.first_value(&value)
   }
 
   fn number(&self, value: &FormulaValue<'doc>) -> Option<f64> {
@@ -4964,6 +5209,20 @@ fn collect_aggregate_scalar(
     _ => {}
   }
   Ok(())
+}
+
+fn matrix_can_broadcast(
+  rows: usize,
+  columns: usize,
+  target_rows: usize,
+  target_columns: usize,
+) -> bool {
+  (rows == target_rows || rows == 1) && (columns == target_columns || columns == 1)
+}
+
+fn is_blank_for_countblank(value: &FormulaValue<'_>) -> bool {
+  matches!(value, FormulaValue::Blank)
+    || matches!(value, FormulaValue::String(text) if text.is_empty())
 }
 
 fn aggregate_counta<'doc>(
@@ -8353,6 +8612,62 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ERROR.TYPE(#DIV/0!)"),
       Some(FormulaValue::Number(2.0))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_builder_and_libreoffice_scalar_array_semantics() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Formula")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 3, row: 0 },
+        FormulaValue::String(Cow::Borrowed("")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 0 },
+        FormulaValue::Number(-3.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 1 },
+        FormulaValue::Number(4.0),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "IFERROR(A1,9)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(D1)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(ABS(E1:E2),E1:E2+E1:E2)"),
+      Some(FormulaValue::Number(14.0))
+    );
+  }
+
+  #[test]
+  fn normalizes_formula_grammar_entry_points() {
+    assert_eq!(
+      r1c1_whole_axis_reference_to_a1("=C[10]", CellAddress { column: 1, row: 1 }),
+      Some("L:L".to_string())
+    );
+    assert_eq!(
+      r1c1_whole_axis_reference_to_a1("=R[3]", CellAddress { column: 1, row: 1 }),
+      Some("5:5".to_string())
+    );
+    assert_eq!(
+      normalize_formula_text("of:=SUM([.A1:.A2];3)", FormulaGrammar::OpenFormula),
+      Cow::Borrowed("SUM(A1:A2,3)")
     );
   }
 

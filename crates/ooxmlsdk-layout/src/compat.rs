@@ -18,6 +18,10 @@ pub struct LayoutDocument {
 }
 
 pub(crate) fn item_pages(pages: Vec<(PageSetup, Vec<PageItem>)>) -> LayoutDocument {
+  fixed_pages_with_items(pages)
+}
+
+pub(crate) fn fixed_pages_with_items(pages: Vec<(PageSetup, Vec<PageItem>)>) -> LayoutDocument {
   let mut output_pages = Vec::new();
   for (setup, items) in pages {
     output_pages.push(Page {

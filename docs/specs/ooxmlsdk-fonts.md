@@ -89,11 +89,11 @@ behavior.
 
 ### 2.3 Existing Rust Code Reference
 
-Existing `ooxmlsdk-pdf` code can seed implementation details, but not the crate
-design:
+Existing `ooxmlsdk-layout` and `ooxmlsdk-pdf` code can seed implementation
+details, but not the crate design:
 
-- `crates/ooxmlsdk-pdf/src/fonts.rs`
-- `crates/ooxmlsdk-pdf/src/text_metrics.rs`
+- `crates/ooxmlsdk-layout/src/fonts.rs`
+- `crates/ooxmlsdk-layout/src/text_metrics.rs`
 - `crates/ooxmlsdk-pdf/src/render/krilla.rs`
 
 This code currently mixes PDF availability checks, text measurement, fallback,
@@ -533,7 +533,7 @@ Reference:
 - `../core/vcl/source/font/fontmetric.cxx`
 - `../core/vcl/source/gdi/`
 - `../typst/crates/typst-layout/src/inline/shaping.rs`
-- existing `crates/ooxmlsdk-pdf/src/text_metrics.rs` as migration evidence
+- existing `crates/ooxmlsdk-layout/src/text_metrics.rs` as migration evidence
 
 Scope:
 

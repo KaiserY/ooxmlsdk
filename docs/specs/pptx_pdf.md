@@ -299,7 +299,8 @@ Skeleton constraints:
 
 ## 4. Module Boundaries
 
-PPTX support lives under `crates/ooxmlsdk-pdf/src/pptx/`.
+PPTX layout support lives under `crates/ooxmlsdk-layout/src/pptx/`; PDF keeps
+only the rendering adapter.
 
 Keep these ownership boundaries:
 

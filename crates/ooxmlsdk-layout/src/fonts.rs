@@ -1,13 +1,15 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use ooxmlsdk_fonts::{
-  FontRegistry, FontRequest, FontSize, ShapeOptions, TextScript, script_direction_runs,
+  FontBytes, FontFaceData as SharedFontFaceData, FontId, FontRegistry, FontRequest, FontSize,
+  ShapeOptions, ShapedRun, TextScript, script_direction_runs,
 };
 
-use crate::compat::TextStyle;
+use crate::docx::TextStyle;
 
 fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
   if std::env::var_os("OOXMLSDK_FONT_TIMING").is_none() {
@@ -15,18 +17,45 @@ fn font_timing<T>(label: &str, work: impl FnOnce() -> T) -> T {
   }
   let start = Instant::now();
   let output = work();
-  eprintln!("[ooxmlsdk-layout] {label}: {:?}", start.elapsed());
+  eprintln!("[ooxmlsdk-pdf] {label}: {:?}", start.elapsed());
   output
 }
 
-pub(crate) fn measure_text_width(text: &str, style: &TextStyle) -> Option<f32> {
-  font_timing("measure text width", || {
-    measure_text_width_inner(text, style)
-  })
+#[derive(Clone, Debug)]
+pub struct FontFaceData {
+  pub data: Arc<FontBytes>,
+  pub index: u32,
+  id: Arc<str>,
 }
 
-fn measure_text_width_inner(text: &str, style: &TextStyle) -> Option<f32> {
-  let mut width = 0.0;
+impl PartialEq for FontFaceData {
+  fn eq(&self, other: &Self) -> bool {
+    self.index == other.index && self.id == other.id
+  }
+}
+
+impl Eq for FontFaceData {}
+
+impl Hash for FontFaceData {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.index.hash(state);
+    self.id.hash(state);
+  }
+}
+
+pub fn load_text_face(style: &TextStyle) -> Option<FontFaceData> {
+  let request = font_request(style);
+  let registry = style_font_registry(style, None);
+  let resolved = registry.resolve(&request).ok()?;
+  font_face_data_from_registry(&registry, &resolved.font_id)
+}
+
+pub fn shape_text_runs(text: &str, style: &TextStyle) -> Option<Vec<ShapedRun<'static>>> {
+  font_timing("shape text runs", || shape_text_runs_inner(text, style))
+}
+
+fn shape_text_runs_inner(text: &str, style: &TextStyle) -> Option<Vec<ShapedRun<'static>>> {
+  let mut output = Vec::new();
   for script_run in script_direction_runs(
     text.to_string(),
     FontSize(style.font_size_pt),
@@ -40,12 +69,44 @@ fn measure_text_width_inner(text: &str, style: &TextStyle) -> Option<f32> {
     options.character_spacing_pt = style.character_spacing_pt;
     options.small_caps = false;
     options.scan_registered_fallbacks = false;
-    let runs = registry
+    let mut runs = registry
       .shape_text_runs_with_options(&request, script_run.text, &options)
       .ok()?;
-    width += runs.iter().map(|run| run.advance_pt).sum::<f32>();
+    for run in &runs {
+      let _ = font_face_data_from_registry(&registry, &run.font_id);
+    }
+    for run in &mut runs {
+      run.offset_text_range(script_run.text_range.start);
+    }
+    output.extend(runs);
   }
-  Some(width)
+  Some(output)
+}
+
+pub fn font_face_data(font_id: &FontId) -> Option<FontFaceData> {
+  font_data_cache().lock().ok()?.get(font_id).cloned()
+}
+
+pub fn vertical_metrics(style: &TextStyle) -> Option<ooxmlsdk_fonts::VerticalMetrics> {
+  let request = font_request(style);
+  let registry = style_font_registry(style, None);
+  let resolved = registry.resolve(&request).ok()?;
+  Some(
+    resolved
+      .metrics_at_size(FontSize(style.font_size_pt))
+      .vertical,
+  )
+}
+
+pub fn decoration_metrics(style: &TextStyle) -> Option<ooxmlsdk_fonts::DecorationMetrics> {
+  let request = font_request(style);
+  let registry = style_font_registry(style, None);
+  let resolved = registry.resolve(&request).ok()?;
+  Some(
+    resolved
+      .metrics_at_size(FontSize(style.font_size_pt))
+      .decoration,
+  )
 }
 
 fn font_request(style: &TextStyle) -> FontRequest<'static> {
@@ -112,6 +173,39 @@ fn build_style_font_registry(
   })
 }
 
+fn font_face_data_from_registry(
+  registry: &FontRegistry<'static>,
+  font_id: &FontId,
+) -> Option<FontFaceData> {
+  if let Ok(cache) = font_data_cache().lock()
+    && let Some(face) = cache.get(font_id)
+  {
+    return Some(face.clone());
+  }
+  let face = registry.font_face_data(font_id)?;
+  let face = font_face_data_from_shared(font_id, face)?;
+  if let Ok(mut cache) = font_data_cache().lock() {
+    cache.insert(font_id.clone(), face.clone());
+  }
+  Some(face)
+}
+
+fn font_face_data_from_shared(
+  font_id: &FontId,
+  face: SharedFontFaceData<'_>,
+) -> Option<FontFaceData> {
+  Some(FontFaceData {
+    data: Arc::new(face.data?),
+    index: face.face_index,
+    id: font_id.0.clone(),
+  })
+}
+
+fn font_data_cache() -> &'static Mutex<HashMap<FontId, FontFaceData>> {
+  static CACHE: OnceLock<Mutex<HashMap<FontId, FontFaceData>>> = OnceLock::new();
+  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 fn font_registry_cache() -> &'static Mutex<HashMap<FontFaceKey, Arc<FontRegistry<'static>>>> {
   static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, Arc<FontRegistry<'static>>>>> = OnceLock::new();
   CACHE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -123,4 +217,57 @@ struct FontFaceKey {
   bold: bool,
   italic: bool,
   script: Option<TextScript>,
+}
+
+fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, FontFaceData>> {
+  static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, FontFaceData>>> = OnceLock::new();
+  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn cached_text_face(style: &TextStyle) -> Option<FontFaceData> {
+  let key = FontFaceKey {
+    family: style.font_family.as_deref().map(str::to_string),
+    bold: style.bold,
+    italic: style.italic,
+    script: None,
+  };
+  if let Ok(cache) = font_face_cache().lock()
+    && let Some(face) = cache.get(&key)
+  {
+    return Some(face.clone());
+  }
+  let face = load_text_face(style)?;
+  if let Ok(mut cache) = font_face_cache().lock() {
+    cache.insert(key, face.clone());
+  }
+  Some(face)
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::Arc;
+
+  use crate::docx::TextStyle;
+
+  use super::load_text_face;
+
+  #[test]
+  fn missing_named_font_uses_system_fallback() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("CodexDefinitelyMissingFont")),
+      ..Default::default()
+    };
+
+    assert!(load_text_face(&style).is_some());
+  }
+
+  #[test]
+  fn din_bold_uses_system_fallback_when_family_is_not_installed() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("DIN-Bold")),
+      ..Default::default()
+    };
+
+    assert!(load_text_face(&style).is_some());
+  }
 }

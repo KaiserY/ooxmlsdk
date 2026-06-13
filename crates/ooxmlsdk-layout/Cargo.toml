@@ -13,6 +13,9 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+hypher = { workspace = true }
+icu_segmenter = { workspace = true }
+image = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }

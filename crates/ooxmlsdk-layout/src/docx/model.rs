@@ -3,6 +3,10 @@ use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
+pub(crate) use crate::compat::{
+  BorderStyle, CellBordersModel, DynamicFieldKind, FormWidget, FormWidgetKind, ImageCrop,
+  LineNumbering, PageSetup, RgbColor, TextStyle,
+};
 use crate::units;
 
 #[derive(Clone, Debug)]
@@ -218,33 +222,6 @@ pub(crate) struct TableBordersModel {
   pub inside_vertical: Option<BorderStyle>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct CellBordersModel {
-  pub top: Option<BorderStyle>,
-  pub right: Option<BorderStyle>,
-  pub bottom: Option<BorderStyle>,
-  pub left: Option<BorderStyle>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct BorderStyle {
-  pub width_pt: f32,
-  pub spacing_pt: f32,
-  pub color: RgbColor,
-  pub compound: bool,
-}
-
-impl Default for BorderStyle {
-  fn default() -> Self {
-    Self {
-      width_pt: 0.5,
-      spacing_pt: 0.0,
-      color: RgbColor { r: 0, g: 0, b: 0 },
-      compound: false,
-    }
-  }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
   pub style_id: Option<Arc<str>>,
@@ -409,20 +386,6 @@ pub(crate) struct TextRun {
   pub preserve_text_portion: bool,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct FormWidget {
-  pub id: u32,
-  pub kind: FormWidgetKind,
-  pub entries: Vec<String>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum FormWidgetKind {
-  Text,
-  DropDownList,
-  ComboBox,
-}
-
 #[derive(Clone, Debug, Default)]
 pub(crate) struct FormWidgetIdAllocator {
   next_id: u32,
@@ -440,16 +403,6 @@ impl FormWidgetIdAllocator {
   pub(crate) fn widgets(&self) -> &[FormWidget] {
     &self.widgets
   }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum DynamicFieldKind {
-  Page,
-  NumPages,
-  StyleRef {
-    style_name: Arc<str>,
-    from_bottom: bool,
-  },
 }
 
 #[derive(Clone, Debug)]
@@ -537,14 +490,6 @@ pub(crate) enum TextBoxVerticalAlignment {
   Top,
   Center,
   Bottom,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct ImageCrop {
-  pub left: f32,
-  pub top: f32,
-  pub right: f32,
-  pub bottom: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -640,118 +585,4 @@ pub(crate) enum ImageWrapMode {
   Through,
   TopBottom,
   None,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TextStyle {
-  pub font_family: Option<Arc<str>>,
-  pub symbol_font_family: Option<Arc<str>>,
-  pub font_size_pt: f32,
-  pub complex_font_size_pt: Option<f32>,
-  pub character_spacing_pt: f32,
-  pub baseline_shift_pt: f32,
-  pub bold: bool,
-  pub italic: bool,
-  pub underline: bool,
-  pub strikethrough: bool,
-  pub uppercase: bool,
-  pub small_caps: bool,
-  pub hidden: bool,
-  pub rotation_deg: f32,
-  pub color: RgbColor,
-  pub opacity: f32,
-  pub outline_color: Option<RgbColor>,
-  pub outline_opacity: f32,
-  pub outline_width_pt: f32,
-  pub highlight: Option<RgbColor>,
-  pub underline_color: Option<RgbColor>,
-}
-
-impl Default for TextStyle {
-  fn default() -> Self {
-    Self {
-      font_family: None,
-      symbol_font_family: None,
-      font_size_pt: 11.0,
-      complex_font_size_pt: None,
-      character_spacing_pt: 0.0,
-      baseline_shift_pt: 0.0,
-      bold: false,
-      italic: false,
-      underline: false,
-      strikethrough: false,
-      uppercase: false,
-      small_caps: false,
-      hidden: false,
-      rotation_deg: 0.0,
-      color: RgbColor { r: 0, g: 0, b: 0 },
-      opacity: 1.0,
-      outline_color: None,
-      outline_opacity: 1.0,
-      outline_width_pt: 0.0,
-      highlight: None,
-      underline_color: None,
-    }
-  }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) struct RgbColor {
-  pub r: u8,
-  pub g: u8,
-  pub b: u8,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct PageSetup {
-  pub width_pt: f32,
-  pub height_pt: f32,
-  pub margin_top_pt: f32,
-  pub margin_right_pt: f32,
-  pub margin_bottom_pt: f32,
-  pub margin_left_pt: f32,
-  pub mirror_margins: bool,
-  pub top_margin_was_negative: bool,
-  pub bottom_margin_was_negative: bool,
-  pub header_distance_pt: f32,
-  pub footer_distance_pt: f32,
-  pub background: Option<RgbColor>,
-  pub borders: CellBordersModel,
-  pub borders_offset_from_text: bool,
-  pub line_numbering: Option<LineNumbering>,
-  pub doc_grid_line_pitch_pt: Option<f32>,
-  pub page_number_start: Option<i32>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct LineNumbering {
-  pub count_by: i16,
-  pub start: i16,
-  pub distance_pt: f32,
-  pub restart_each_page: bool,
-}
-
-impl Default for PageSetup {
-  fn default() -> Self {
-    // Word's default Letter page with one-inch margins.
-    Self {
-      width_pt: 612.0,
-      height_pt: 792.0,
-      margin_top_pt: 72.0,
-      margin_right_pt: 72.0,
-      margin_bottom_pt: 72.0,
-      margin_left_pt: 72.0,
-      mirror_margins: false,
-      top_margin_was_negative: false,
-      bottom_margin_was_negative: false,
-      header_distance_pt: 36.0,
-      footer_distance_pt: 36.0,
-      background: None,
-      borders: CellBordersModel::default(),
-      borders_offset_from_text: false,
-      line_numbering: None,
-      doc_grid_line_pitch_pt: None,
-      page_number_start: None,
-    }
-  }
 }

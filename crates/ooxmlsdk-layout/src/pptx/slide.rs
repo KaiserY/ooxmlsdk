@@ -25,8 +25,8 @@ use ooxmlsdk::sdk::SdkPart;
 
 use crate::docx::PageSetup;
 use crate::error::Result;
+use crate::render::math::text_math_text;
 use crate::units;
-use ooxmlsdk_layout::render::math::text_math_text;
 
 use super::drawingml::color::Color;
 use super::drawingml::fill::FillProperties;

@@ -1278,6 +1278,9 @@ dependencies = [
 name = "ooxmlsdk-layout"
 version = "0.10.2"
 dependencies = [
+ "hypher",
+ "icu_segmenter",
+ "image",
  "ooxmlsdk",
  "ooxmlsdk-fonts",
  "ooxmlsdk-formula",

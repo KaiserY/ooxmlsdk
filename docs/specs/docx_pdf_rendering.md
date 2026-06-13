@@ -744,7 +744,7 @@ Minimal tests:
 
 Current progress:
 
-- Added a typed section collector in `crates/ooxmlsdk-pdf/src/docx/mod.rs`.
+- Added a typed section collector in `crates/ooxmlsdk-layout/src/docx/mod.rs`.
 - The collector reads `w::Body.body_choice`, paragraph
   `w::ParagraphProperties.section_properties`, and final
   `w::Body.w_sect_pr` through generated `ooxmlsdk` types.

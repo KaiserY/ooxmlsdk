@@ -2,18 +2,17 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use crate::docx::{BorderStyle, ImageCrop, RgbColor, TextStyle};
-use crate::layout::{
-  self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
-  TextItem,
+use crate::compat::RgbColor as LayoutRgbColor;
+use crate::compat::{
+  self as layout, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation,
+  RectItem, TextItem,
 };
+use crate::docx::{BorderStyle, ImageCrop, RgbColor, TextStyle};
+use crate::render::chart as shared_chart;
+use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
-use crate::{
-  PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
-  PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
-};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, GenericImageView, ImageEncoder};
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2008_diagram as dsp;
@@ -21,9 +20,6 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
-use ooxmlsdk_layout::compat::RgbColor as LayoutRgbColor;
-use ooxmlsdk_layout::render::chart as shared_chart;
-use ooxmlsdk_layout::render::diagram as shared_diagram;
 
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -45,6 +41,10 @@ use super::drawingml::text_list_style::{
 use super::import::{PowerPointImport, ThemeFragmentRecord};
 use super::slide::{
   BackgroundKind, BackgroundProperties, ChartResource, ImageResource, SlidePersist,
+};
+use super::{
+  PptxBulletParagraphSummary, PptxDrawShapeSummary, PptxLayoutSummary,
+  PptxSmartArtTextShapeSummary, PptxTextShapeSummary,
 };
 
 const DEFAULT_TEXT_FONT_SIZE_PT: f32 = 18.0;

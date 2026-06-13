@@ -124,10 +124,11 @@ It must not define:
 
 Relevant code paths when mining behavior:
 
-- `crates/ooxmlsdk-pdf/src/layout/mod.rs`
-- `crates/ooxmlsdk-pdf/src/docx/model.rs`
+- `crates/ooxmlsdk-layout/src/docx/layout.rs`
+- `crates/ooxmlsdk-layout/src/docx/model.rs`
+- `crates/ooxmlsdk-layout/src/xlsx/`
+- `crates/ooxmlsdk-layout/src/pptx/`
 - `crates/ooxmlsdk-pdf/src/xlsx/`
-- `crates/ooxmlsdk-pdf/src/pptx/`
 
 Treat this code as migration inventory and a warning about over-coupling. The
 current refactor direction is to move layout behavior from `ooxmlsdk-pdf` into

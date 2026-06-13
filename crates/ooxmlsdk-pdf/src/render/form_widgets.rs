@@ -2,18 +2,19 @@ use std::collections::HashMap;
 
 use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
-use crate::docx::{FormWidget, FormWidgetKind};
 use crate::error::{PdfError, Result};
 use crate::layout::{LayoutDocument, PageItem};
-use crate::text_metrics::measure_text;
+use ooxmlsdk_layout::compat::{FormWidget, FormWidgetKind};
+use ooxmlsdk_layout::text_metrics::measure_text;
 
 // Source: LibreOffice sw/source/core/text/itrform2.cxx
 // SwContentControlPortion::DescribePDFControl() expands content-control widget
 // bounds by 20 twips before handing them to PDFWriter.
-const LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
+const LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT: f32 = 20.0 / ooxmlsdk_layout::units::TWIPS_PER_POINT;
 const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 =
   LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
-const LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT: f32 = 19.0 / crate::units::TWIPS_PER_POINT;
+const LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT: f32 =
+  19.0 / ooxmlsdk_layout::units::TWIPS_PER_POINT;
 // Source: LibreOffice vcl/source/pdf/pdfwriter_impl.cxx
 // PDFWriterImpl::emitWidgetAnnotations() applies iRectMargin = 1 for
 // non-signature widget annotation rectangles.
@@ -197,11 +198,12 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
 }
 
 fn lo_swrect_leading_edge(value: f32) -> f32 {
-  (value * crate::units::TWIPS_PER_POINT).floor() / crate::units::TWIPS_PER_POINT
+  (value * ooxmlsdk_layout::units::TWIPS_PER_POINT).floor()
+    / ooxmlsdk_layout::units::TWIPS_PER_POINT
 }
 
 fn lo_swrect_trailing_x_edge(value: f32) -> f32 {
-  (value * crate::units::TWIPS_PER_POINT).ceil() / crate::units::TWIPS_PER_POINT
+  (value * ooxmlsdk_layout::units::TWIPS_PER_POINT).ceil() / ooxmlsdk_layout::units::TWIPS_PER_POINT
 }
 
 fn widget_annotation_field(

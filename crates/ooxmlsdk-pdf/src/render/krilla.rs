@@ -20,17 +20,17 @@ use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
 
-use super::emf_wmf;
 use super::form_widgets::inject_form_widget_annotations;
-use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
-use crate::fonts::{FontFaceData, cached_text_face};
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem,
   OutlineEntry, PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
 };
 use crate::options::PdfOptions;
-use crate::text_metrics::{
+use ooxmlsdk_layout::compat::{DynamicFieldKind, RgbColor, TextStyle};
+use ooxmlsdk_layout::fonts::{FontFaceData, cached_text_face};
+use ooxmlsdk_layout::render::emf_wmf;
+use ooxmlsdk_layout::text_metrics::{
   baseline_offset_in_line, measure_text, shape_text, text_decoration_metrics, vertical_metrics,
 };
 
@@ -1919,7 +1919,16 @@ fn load_font(style: &TextStyle) -> Result<Font> {
     return Ok(font);
   }
 
-  Err(PdfError::font_unavailable(style))
+  Err(PdfError::Krilla(format!(
+    "required PDF font was not found: family={} bold={} italic={}",
+    style
+      .font_family
+      .as_deref()
+      .filter(|family| !family.trim().is_empty())
+      .unwrap_or("<document-default>"),
+    style.bold,
+    style.italic
+  )))
 }
 
 fn fill(style: &TextStyle) -> Fill {

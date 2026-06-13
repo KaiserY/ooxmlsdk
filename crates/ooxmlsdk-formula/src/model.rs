@@ -8,9 +8,11 @@ use ooxmlsdk::sdk::SdkPart;
 use rustfft::FftPlanner;
 use rustfft::num_complex::Complex;
 use statrs::distribution::{
-  Beta, Binomial, ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, FisherSnedecor,
-  Gamma, Hypergeometric, LogNormal, NegativeBinomial, Normal, Poisson, StudentsT, Weibull,
+  Beta, Binomial, ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp,
+  FisherSnedecor, Gamma, Hypergeometric, LogNormal, NegativeBinomial, Normal, Poisson, StudentsT,
+  Weibull,
 };
+use statrs::function::{erf as statrs_erf, gamma as statrs_gamma};
 
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
@@ -6562,9 +6564,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0.0..=1.0).contains(&p) || n < 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = Binomial::new(p, n as u64).ok()?;
     Some(FormulaValue::Number(
       (start as u64..=end as u64)
-        .map(|k| binom_dist_pmf(k as f64, n, p))
+        .map(|k| dist.pmf(k))
         .sum::<f64>()
         .min(1.0),
     ))
@@ -6577,9 +6580,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if n < 0.0 || !(0.0..=1.0).contains(&p) || !(0.0..=1.0).contains(&alpha) {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = Binomial::new(p, n as u64).ok()?;
     let mut cumulative = 0.0;
     for k in 0..=n as u64 {
-      cumulative += binom_dist_pmf(k as f64, n, p);
+      cumulative += dist.pmf(k);
       if cumulative >= alpha {
         return Some(FormulaValue::Number(k as f64));
       }
@@ -6733,10 +6737,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if x < 0.0 || lambda <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let dist = Exp::new(lambda).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      1.0 - (-lambda * x).exp()
+      dist.cdf(x)
     } else {
-      lambda * (-lambda * x).exp()
+      dist.pdf(x)
     }))
   }
 
@@ -9587,211 +9592,37 @@ fn unescape_table_reference_column(value: &str) -> String {
   result
 }
 
-fn gamma_lanczos_sum(z: f64) -> f64 {
-  // Source: LibreOffice sc/source/core/tool/interpr3.cxx, lanczos13m53.
-  const NUM: [f64; 13] = [
-    23531376880.41076,
-    42919803642.6491,
-    35711959237.35567,
-    17921034426.03721,
-    6039542586.352028,
-    1439720407.3117216,
-    248874557.86205417,
-    31426415.585400194,
-    2876370.6289353725,
-    186056.2653952235,
-    8071.672002365816,
-    210.82427775157935,
-    2.5066282746310002,
-  ];
-  const DEN: [f64; 13] = [
-    0.0,
-    39916800.0,
-    120543840.0,
-    150917976.0,
-    105258076.0,
-    45995730.0,
-    13339535.0,
-    2637558.0,
-    357423.0,
-    32670.0,
-    1925.0,
-    66.0,
-    1.0,
-  ];
-  let (mut sum_num, mut sum_den);
-  if z <= 1.0 {
-    sum_num = NUM[12];
-    sum_den = DEN[12];
-    for index in (0..12).rev() {
-      sum_num = sum_num * z + NUM[index];
-      sum_den = sum_den * z + DEN[index];
-    }
-  } else {
-    let inv = 1.0 / z;
-    sum_num = NUM[0];
-    sum_den = DEN[0];
-    for index in 1..=12 {
-      sum_num = sum_num * inv + NUM[index];
-      sum_den = sum_den * inv + DEN[index];
-    }
-  }
-  sum_num / sum_den
-}
-
 fn gamma(value: f64) -> f64 {
-  if value >= 1.0 {
-    return gamma_helper(value);
-  }
-  if value >= 0.5 {
-    return gamma_helper(value + 1.0) / value;
-  }
-  std::f64::consts::PI / (gamma_helper(1.0 - value) * (std::f64::consts::PI * value).sin())
-}
-
-fn gamma_helper(z: f64) -> f64 {
-  let g = 6.02468004077673;
-  let help = z + g - 0.5;
-  let half = help.powf(z / 2.0 - 0.25);
-  gamma_lanczos_sum(z) * half / help.exp() * half
+  statrs_gamma::gamma(value)
 }
 
 fn log_gamma(z: f64) -> f64 {
-  let g = 6.02468004077673;
-  let help = z + g - 0.5;
-  if z >= 1.0 {
-    gamma_lanczos_sum(z).ln() + (z - 0.5) * help.ln() - help
-  } else if z >= 0.5 {
-    gamma(z).ln()
-  } else {
-    gamma_lanczos_sum(z + 2.0).ln() + (z + 1.5) * (z + 2.0 + g - 0.5).ln()
-      - (z + 2.0 + g - 0.5)
-      - (1.0 + z).ln()
-      - z.ln()
-  }
-}
-
-fn binom_coeff(n: f64, k: f64) -> f64 {
-  let k = k.floor();
-  if n < k || k < 0.0 {
-    return 0.0;
-  }
-  if k == 0.0 {
-    return 1.0;
-  }
-  (log_gamma(n + 1.0) - log_gamma(k + 1.0) - log_gamma(n - k + 1.0)).exp()
-}
-
-fn binom_dist_pmf(x: f64, n: f64, p: f64) -> f64 {
-  if p == 0.0 {
-    return if x == 0.0 { 1.0 } else { 0.0 };
-  }
-  if p == 1.0 {
-    return if x == n { 1.0 } else { 0.0 };
-  }
-  binom_coeff(n, x) * p.powf(x) * (1.0 - p).powf(n - x)
+  statrs_gamma::ln_gamma(z)
 }
 
 fn norm_s_dist(x: f64) -> f64 {
-  0.5 * erfc(-x / 2.0_f64.sqrt())
+  Normal::standard().cdf(x)
 }
 
 fn norm_s_inv(p: f64) -> f64 {
-  // Source: LibreOffice sc/source/core/tool/interpr3.cxx ScInterpreter::gaussinv.
+  if p.is_nan() {
+    return f64::NAN;
+  }
   if p <= 0.0 {
     return f64::NEG_INFINITY;
   }
   if p >= 1.0 {
     return f64::INFINITY;
   }
-  let q = p - 0.5;
-  if q.abs() <= 0.425 {
-    let t = 0.180625 - q * q;
-    return q
-      * (((((((t * 2509.0809287301227 + 33430.57558358813) * t + 67265.7709270087) * t
-        + 45921.95393154987)
-        * t
-        + 13731.69376550946)
-        * t
-        + 1971.5909503065514)
-        * t
-        + 133.14166789178438)
-        * t
-        + 3.3871328727963665)
-      / (((((((t * 5226.495278852855 + 28729.085735721943) * t + 39307.89580009271) * t
-        + 21213.794301586596)
-        * t
-        + 5394.196021424751)
-        * t
-        + 687.1870074920579)
-        * t
-        + 42.31333070160091)
-        * t
-        + 1.0);
-  }
-
-  let mut t = if q > 0.0 { 1.0 - p } else { p };
-  t = (-t.ln()).sqrt();
-  let mut z = if t <= 5.0 {
-    t += -1.6;
-    (((((((t * 7.745450142783414e-4 + 0.022723844989269185) * t + 0.2417807251774506) * t
-      + 1.2704582524523684)
-      * t
-      + 3.6478483247632045)
-      * t
-      + 5.769497221460691)
-      * t
-      + 4.630337846156545)
-      * t
-      + 1.4234371107496835)
-      / (((((((t * 1.0507500716444169e-9 + 5.475938084995345e-4) * t + 0.015198666563616457)
-        * t
-        + 0.14810397642748008)
-        * t
-        + 0.6897673349851)
-        * t
-        + 1.6763848301838038)
-        * t
-        + 2.053191626637759)
-        * t
-        + 1.0)
-  } else {
-    t += -5.0;
-    (((((((t * 2.010334399292288e-7 + 2.7115555687434876e-5) * t + 0.0012426609473880784) * t
-      + 0.026532189526576123)
-      * t
-      + 0.2965605718285049)
-      * t
-      + 1.7848265399172913)
-      * t
-      + 5.463784911164114)
-      * t
-      + 6.657904643501104)
-      / (((((((t * 2.0442631033899397e-15 + 1.421_511_758_316_446e-7) * t
-        + 1.8463183175100547e-5)
-        * t
-        + 7.868691311456133e-4)
-        * t
-        + 0.014875361290850615)
-        * t
-        + 0.1369298809227358)
-        * t
-        + 0.5998322065558879)
-        * t
-        + 1.0)
-  };
-  if q < 0.0 {
-    z = -z;
-  }
-  z
+  Normal::standard().inverse_cdf(p)
 }
 
 fn erf(x: f64) -> f64 {
-  libm::erf(x)
+  statrs_erf::erf(x)
 }
 
 fn erfc(x: f64) -> f64 {
-  libm::erfc(x)
+  statrs_erf::erfc(x)
 }
 
 fn rtl_round(value: f64, decimal_places: i32) -> f64 {

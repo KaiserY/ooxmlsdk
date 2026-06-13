@@ -7,8 +7,6 @@ use crate::layout::{
   self, ImageItem, LineItem, LineItemKind, LinkAreaItem, PageItem, PdfTextSegmentation, RectItem,
   TextItem,
 };
-use crate::render::chart as shared_chart;
-use crate::render::diagram as shared_diagram;
 use crate::render::emf_wmf;
 use crate::text_metrics::measure_text;
 use crate::units;
@@ -23,6 +21,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::units as sdk_units;
 use ooxmlsdk::units::DrawingmlPercentageValue;
+use ooxmlsdk_layout::compat::RgbColor as LayoutRgbColor;
+use ooxmlsdk_layout::render::chart as shared_chart;
+use ooxmlsdk_layout::render::diagram as shared_diagram;
 
 use super::drawingml::color::{Color, SchemeColor};
 use super::drawingml::fill::{FillKind, FillProperties};
@@ -772,7 +773,7 @@ fn lower_diagram(
   {
     return;
   }
-  let fill = diagram_accent_fill(context.import, context.slide);
+  let fill = layout_rgb_color(diagram_accent_fill(context.import, context.slide));
   let styles = diagram_styles(record);
   let colors = diagram_style_colors(context.import, context.slide, record);
   let shapes = shared_diagram::layout_shapes(
@@ -832,7 +833,7 @@ fn lower_diagram(
       .and_then(|properties| {
         diagram_model_shape_fill_color(context.import, context.slide, properties)
       })
-      .unwrap_or(diagram_shape.fill);
+      .unwrap_or_else(|| pdf_rgb_color(diagram_shape.fill));
     let suppress_fill = diagram_shape
       .shape_properties
       .as_deref()
@@ -889,10 +890,12 @@ fn lower_diagram(
         diagram_shape.y,
         text_frame,
       );
-      let font_reference = diagram_shape
-        .style
-        .as_deref()
-        .map(|style| diagram_font_style_reference(&style.font_reference, diagram_shape.text_fill));
+      let font_reference = diagram_shape.style.as_deref().map(|style| {
+        diagram_font_style_reference(
+          &style.font_reference,
+          diagram_shape.text_fill.map(pdf_rgb_color),
+        )
+      });
       let options = TextLoweringOptions::from_text_body(&text_body);
       let base_style = text_base_style(
         context.import,
@@ -2160,12 +2163,12 @@ fn diagram_style_colors(
   let mut text_fill_by_label = HashMap::new();
   for label in &color_resource.colors.color_transform_style_label {
     if let Some(fill_list) = label.fill_color_list.as_ref() {
-      let fills: Vec<RgbColor> = fill_list
+      let fills: Vec<LayoutRgbColor> = fill_list
         .fill_color_list_choice
         .iter()
         .filter_map(Color::from_diagram_fill_color_choice)
         .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
-        .map(|color| RgbColor {
+        .map(|color| LayoutRgbColor {
           r: color.r,
           g: color.g,
           b: color.b,
@@ -2176,12 +2179,12 @@ fn diagram_style_colors(
       }
     }
     if let Some(text_fill_list) = label.text_fill_color_list.as_ref() {
-      let fills: Vec<RgbColor> = text_fill_list
+      let fills: Vec<LayoutRgbColor> = text_fill_list
         .text_fill_color_list_choice
         .iter()
         .filter_map(Color::from_diagram_text_fill_color_choice)
         .filter_map(|color| import.resolve_color_for_slide(slide, &color, None))
-        .map(|color| RgbColor {
+        .map(|color| LayoutRgbColor {
           r: color.r,
           g: color.g,
           b: color.b,
@@ -2219,6 +2222,22 @@ fn diagram_font_style_reference(
           .as_ref()
           .and_then(Color::from_font_reference_choice)
       }),
+  }
+}
+
+fn layout_rgb_color(color: RgbColor) -> LayoutRgbColor {
+  LayoutRgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  }
+}
+
+fn pdf_rgb_color(color: LayoutRgbColor) -> RgbColor {
+  RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
   }
 }
 

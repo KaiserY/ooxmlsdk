@@ -1281,6 +1281,7 @@ dependencies = [
  "ooxmlsdk",
  "ooxmlsdk-fonts",
  "ooxmlsdk-formula",
+ "quick-xml",
  "thiserror",
 ]
 
@@ -1299,6 +1300,7 @@ dependencies = [
  "ooxmlsdk",
  "ooxmlsdk-fonts",
  "ooxmlsdk-formula",
+ "ooxmlsdk-layout",
  "png 0.18.1",
  "quick-xml",
  "rustybuzz",

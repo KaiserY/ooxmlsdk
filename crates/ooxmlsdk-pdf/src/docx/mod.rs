@@ -45,10 +45,10 @@ use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::units;
 
-use crate::render::chart as shared_chart;
 use chart::supplemental_graphic_blocks;
 pub(crate) use custom_xml::CustomXmlBindings;
 pub(crate) use model::*;
+use ooxmlsdk_layout::render::chart as shared_chart;
 use package::{HyperlinkCatalog, ImageCatalog};
 use settings::{
   compatibility_mode, default_tab_stop_pt, no_column_balance, split_page_break_and_paragraph_mark,

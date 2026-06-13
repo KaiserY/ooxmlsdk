@@ -6,7 +6,7 @@ use super::page_settings::CalcPageSettings;
 use super::pivot::pivot_print_address;
 use super::styles::DefinedNameBuiltin;
 use super::worksheet::{CalcCell, CalcRow, CalcSheet, CellAddress, CellRange, SheetType};
-use crate::docx::TextStyle;
+use crate::compat::TextStyle;
 use crate::text_metrics;
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
@@ -3436,6 +3436,7 @@ fn column_name_to_index(value: &str) -> Option<u32> {
 mod tests {
   use std::fs::File;
 
+  use crate::options::LayoutOptions;
   use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
   use ooxmlsdk::sdk::{
     FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
@@ -3530,11 +3531,9 @@ mod tests {
       .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/tdf100709.xlsx");
     let mut document =
       SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
-    let import = super::super::import::ExcelImport::import_document(
-      &mut document,
-      &crate::options::PdfOptions::default(),
-    )
-    .unwrap();
+    let import =
+      super::super::import::ExcelImport::import_document(&mut document, &LayoutOptions::default())
+        .unwrap();
     let print = CalcPrintDocument::from_import(&import);
     assert_eq!(print.pages.len(), 2);
     let text = print

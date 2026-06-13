@@ -4,7 +4,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use crate::render::math::text_math_text;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ChartKind {
+pub enum ChartKind {
   Pie,
   Bar,
   Area,
@@ -12,23 +12,23 @@ pub(crate) enum ChartKind {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct ChartSeriesRef<'a> {
-  pub(crate) series_text: Option<&'a c::SeriesText>,
-  pub(crate) category_axis_data: Option<&'a c::CategoryAxisData>,
-  pub(crate) values: Option<&'a c::Values>,
-  pub(crate) y_values: Option<&'a c::YValues>,
-  pub(crate) x_values: Option<&'a c::XValues>,
-  pub(crate) bubble_size: Option<&'a c::BubbleSize>,
-  pub(crate) data_labels: Option<&'a c::DataLabels>,
+pub struct ChartSeriesRef<'a> {
+  pub series_text: Option<&'a c::SeriesText>,
+  pub category_axis_data: Option<&'a c::CategoryAxisData>,
+  pub values: Option<&'a c::Values>,
+  pub y_values: Option<&'a c::YValues>,
+  pub x_values: Option<&'a c::XValues>,
+  pub bubble_size: Option<&'a c::BubbleSize>,
+  pub data_labels: Option<&'a c::DataLabels>,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct ChartDataPointFill<'a> {
-  pub(crate) index: u32,
-  pub(crate) fill: &'a a::SolidFill,
+pub struct ChartDataPointFill<'a> {
+  pub index: u32,
+  pub fill: &'a a::SolidFill,
 }
 
-pub(crate) fn kind(chart_space: &c::ChartSpace) -> ChartKind {
+pub fn kind(chart_space: &c::ChartSpace) -> ChartKind {
   chart_space
     .chart
     .plot_area
@@ -46,14 +46,14 @@ pub(crate) fn kind(chart_space: &c::ChartSpace) -> ChartKind {
     .unwrap_or(ChartKind::Other)
 }
 
-pub(crate) fn has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
+pub fn has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
   let values = visible_texts(chart_space);
   expected
     .iter()
     .all(|expected| values.iter().any(|value| value == expected))
 }
 
-pub(crate) fn has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> bool {
+pub fn has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> bool {
   chart_space
     .chart
     .plot_area
@@ -77,13 +77,11 @@ pub(crate) fn has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace)
     })
 }
 
-pub(crate) fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
+pub fn visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
   visible_texts_with_default_series_label(chart_space, default_series_label)
 }
 
-pub(crate) fn visible_texts_with_uncached_series_labels(
-  chart_space: &c::ChartSpace,
-) -> Vec<String> {
+pub fn visible_texts_with_uncached_series_labels(chart_space: &c::ChartSpace) -> Vec<String> {
   visible_texts_with_default_series_label(chart_space, uncached_series_label)
 }
 
@@ -230,7 +228,7 @@ fn parse_chart_a1_cell(reference: &str) -> Option<(u32, u32)> {
   (col > 0 && row > 0).then_some((col, row))
 }
 
-pub(crate) fn axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Title> {
+pub fn axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Title> {
   chart_space
     .chart
     .plot_area
@@ -244,7 +242,7 @@ pub(crate) fn axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &
     })
 }
 
-pub(crate) fn series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
+pub fn series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
   let mut series = Vec::new();
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     match choice {
@@ -301,7 +299,7 @@ pub(crate) fn series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
   series
 }
 
-pub(crate) fn data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::DataLabels> {
+pub fn data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::DataLabels> {
   chart_space
     .chart
     .plot_area
@@ -327,7 +325,7 @@ pub(crate) fn data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &
     })
 }
 
-pub(crate) fn data_point_solid_fills(chart_space: &c::ChartSpace) -> Vec<ChartDataPointFill<'_>> {
+pub fn data_point_solid_fills(chart_space: &c::ChartSpace) -> Vec<ChartDataPointFill<'_>> {
   let mut fills = Vec::new();
   for choice in &chart_space.chart.plot_area.plot_area_choice1 {
     match choice {
@@ -387,7 +385,7 @@ fn collect_data_point_solid_fills<'a>(
   }
 }
 
-pub(crate) fn scheme_color_token(
+pub fn scheme_color_token(
   color_map: Option<&c::ColorMapOverride>,
   token: a::SchemeColorValues,
 ) -> Option<a::ColorSchemeIndexValues> {

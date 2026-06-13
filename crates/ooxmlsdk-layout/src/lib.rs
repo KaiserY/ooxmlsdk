@@ -1,7 +1,13 @@
 pub mod common;
+pub mod compat;
 pub mod docx;
 pub mod error;
+mod fonts;
+pub mod options;
 pub mod pptx;
+pub mod render;
+mod text_metrics;
+mod units;
 pub mod xlsx;
 
 use std::borrow::Cow;

@@ -18,7 +18,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_spreadsheet_drawing as xdr;
 use ooxmlsdk::sdk::SdkPart;
 
-use crate::docx::RgbColor;
+use crate::compat::RgbColor;
 use crate::error::Result;
 use crate::render::chart as shared_chart;
 

@@ -6,11 +6,11 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram as dgm;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 
-use crate::docx::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
-use crate::layout::{
-  self, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem, PageItem,
+use crate::compat::{
+  self as layout, ImageItem, LayoutDocument, LineItem, LineItemKind, LinkAreaItem, PageItem,
   PdfTextSegmentation, RectItem, TextItem,
 };
+use crate::compat::{BorderStyle, ImageCrop, PageSetup, RgbColor, TextStyle};
 use crate::render::{diagram as shared_diagram, emf_wmf};
 use crate::text_metrics;
 use crate::units;
@@ -1410,7 +1410,6 @@ fn print_page_diagram_items(
   let mut items = Vec::new();
   let page_area_rect = page.area.map(|area| page.sheet.range_rect(area));
   for drawing in &page.sheet.resources.drawings {
-    let styles = diagram_styles(&drawing.diagrams);
     for anchor in &drawing.anchors {
       if anchor.object.hidden
         || !anchor.print_with_sheet
@@ -1459,7 +1458,7 @@ fn print_page_diagram_items(
           .layout_parts
           .iter()
           .find_map(|layout| layout.layout.as_deref()),
-        styles.as_ref(),
+        None,
         None,
         bounds,
         RgbColor {
@@ -1752,19 +1751,6 @@ fn collect_persisted_group_bounds(
       dsp::GroupShapeChoice::GroupShape(group) => collect_persisted_group_bounds(group, bounds),
     }
   }
-}
-
-fn diagram_styles(
-  diagrams: &super::drawing::DiagramResourceCatalog,
-) -> Option<shared_diagram::DiagramStyles> {
-  let style_by_label: HashMap<String, _> = diagrams
-    .style_parts
-    .iter()
-    .filter_map(|part| part.style.as_deref())
-    .flat_map(|style| style.style_label.iter())
-    .filter_map(|label| Some((label.name.clone(), label.style.clone()?)))
-    .collect();
-  (!style_by_label.is_empty()).then_some(shared_diagram::DiagramStyles { style_by_label })
 }
 
 fn push_diagram_shape_items(items: &mut Vec<PageItem>, shape: &shared_diagram::DiagramShape) {

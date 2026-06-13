@@ -5,7 +5,7 @@ use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
-use crate::docx::RgbColor;
+use crate::compat::RgbColor;
 use crate::error::Result;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};

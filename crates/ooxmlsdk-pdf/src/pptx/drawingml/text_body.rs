@@ -4,7 +4,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_presentationml_2006_main as p,
 };
 
-use crate::render::math::text_math_text;
+use ooxmlsdk_layout::render::math::text_math_text;
 
 use super::text_list_style::{TextListParagraphStyle, TextListParagraphStyleRef, TextListStyle};
 

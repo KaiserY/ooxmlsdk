@@ -25,7 +25,7 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepr
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main as x;
 use ooxmlsdk::sdk::SdkPart;
 
-use crate::error::Result;
+use crate::error::{LayoutError, Result};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct WorkbookCatalog {
@@ -706,7 +706,7 @@ impl CustomXmlResource {
       .as_ref()
       .map(|props| {
         let item = props.root_element(package)?;
-        Ok::<(usize, usize), crate::error::PdfError>((
+        Ok::<(usize, usize), LayoutError>((
           item
             .schema_references
             .as_ref()

@@ -6,40 +6,40 @@ use ooxmlsdk::schemas::{
 };
 use ooxmlsdk::simple_type::Coordinate32Value;
 
-use crate::docx::RgbColor;
+use crate::compat::RgbColor;
 use crate::render::math::text_math_text;
 
 #[derive(Clone, Debug)]
-pub(crate) struct DiagramShape {
-  pub(crate) x: f32,
-  pub(crate) y: f32,
-  pub(crate) width: f32,
-  pub(crate) height: f32,
-  pub(crate) text_body: DiagramTextBody,
-  pub(crate) shape_properties: Option<Box<dgm::ShapeProperties>>,
-  pub(crate) style: Option<Box<dgm::Style>>,
-  pub(crate) text_fill: Option<RgbColor>,
-  pub(crate) text_rotation_deg: f32,
-  pub(crate) is_connector: bool,
-  pub(crate) connector_angle_deg: f32,
-  pub(crate) is_blip_placeholder: bool,
-  pub(crate) fill: RgbColor,
-  pub(crate) text_order: usize,
-  pub(crate) font_size_pt: Option<f32>,
-  pub(crate) font_sync_group: Option<String>,
+pub struct DiagramShape {
+  pub x: f32,
+  pub y: f32,
+  pub width: f32,
+  pub height: f32,
+  pub text_body: DiagramTextBody,
+  pub shape_properties: Option<Box<dgm::ShapeProperties>>,
+  pub style: Option<Box<dgm::Style>>,
+  pub text_fill: Option<RgbColor>,
+  pub text_rotation_deg: f32,
+  pub is_connector: bool,
+  pub connector_angle_deg: f32,
+  pub is_blip_placeholder: bool,
+  pub fill: RgbColor,
+  pub text_order: usize,
+  pub font_size_pt: Option<f32>,
+  pub font_sync_group: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DiagramTextBody {
-  pub(crate) body_properties: Option<Box<a::BodyProperties>>,
-  pub(crate) list_style: Option<Box<a::ListStyle>>,
-  pub(crate) auto_fit: bool,
-  pub(crate) paragraphs: Vec<DiagramTextParagraph>,
+pub struct DiagramTextBody {
+  pub body_properties: Option<Box<a::BodyProperties>>,
+  pub list_style: Option<Box<a::ListStyle>>,
+  pub auto_fit: bool,
+  pub paragraphs: Vec<DiagramTextParagraph>,
   custom_text: bool,
 }
 
 impl DiagramTextBody {
-  pub(crate) fn is_empty(&self) -> bool {
+  pub fn is_empty(&self) -> bool {
     self.paragraphs.iter().all(DiagramTextParagraph::is_empty)
   }
 
@@ -202,12 +202,12 @@ impl DiagramTextBody {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DiagramTextParagraph {
-  pub(crate) source_order: Option<usize>,
-  pub(crate) level: Option<u8>,
-  pub(crate) paragraph_properties: Option<Box<a::ParagraphProperties>>,
-  pub(crate) end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
-  pub(crate) runs: Vec<DiagramTextRun>,
+pub struct DiagramTextParagraph {
+  pub source_order: Option<usize>,
+  pub level: Option<u8>,
+  pub paragraph_properties: Option<Box<a::ParagraphProperties>>,
+  pub end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
+  pub runs: Vec<DiagramTextRun>,
 }
 
 impl DiagramTextParagraph {
@@ -253,12 +253,12 @@ impl DiagramTextParagraph {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct DiagramTextRun {
-  pub(crate) text: String,
-  pub(crate) kind: DiagramTextRunKind,
-  pub(crate) field_type: Option<String>,
-  pub(crate) run_properties: Option<Box<a::RunProperties>>,
-  pub(crate) field_paragraph_properties: Option<Box<a::ParagraphProperties>>,
+pub struct DiagramTextRun {
+  pub text: String,
+  pub kind: DiagramTextRunKind,
+  pub field_type: Option<String>,
+  pub run_properties: Option<Box<a::RunProperties>>,
+  pub field_paragraph_properties: Option<Box<a::ParagraphProperties>>,
 }
 
 impl DiagramTextRun {
@@ -310,7 +310,7 @@ impl DiagramTextRun {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum DiagramTextRunKind {
+pub enum DiagramTextRunKind {
   #[default]
   Run,
   Break,
@@ -319,25 +319,25 @@ pub(crate) enum DiagramTextRunKind {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DiagramStyleColors {
-  pub(crate) fill_by_label: HashMap<String, Vec<RgbColor>>,
-  pub(crate) text_fill_by_label: HashMap<String, Vec<RgbColor>>,
+pub struct DiagramStyleColors {
+  pub fill_by_label: HashMap<String, Vec<RgbColor>>,
+  pub text_fill_by_label: HashMap<String, Vec<RgbColor>>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DiagramStyles {
-  pub(crate) style_by_label: HashMap<String, Box<dgm::Style>>,
+pub struct DiagramStyles {
+  pub style_by_label: HashMap<String, Box<dgm::Style>>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct DiagramBounds {
-  pub(crate) x: f32,
-  pub(crate) y: f32,
-  pub(crate) width: f32,
-  pub(crate) height: f32,
+pub struct DiagramBounds {
+  pub x: f32,
+  pub y: f32,
+  pub width: f32,
+  pub height: f32,
 }
 
-pub(crate) fn layout_shapes(
+pub fn layout_shapes(
   data: &dgm::DataModelRoot,
   layout: Option<&dgm::LayoutDefinition>,
   styles: Option<&DiagramStyles>,
@@ -462,7 +462,7 @@ enum ContinueDirection {
   ReverseDirection,
 }
 
-pub(crate) fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
+pub fn presentation_point_list_orders(data: &dgm::DataModelRoot) -> HashMap<String, usize> {
   let points = diagram_points(data);
   let data_orders: HashMap<&str, usize> = points
     .iter()

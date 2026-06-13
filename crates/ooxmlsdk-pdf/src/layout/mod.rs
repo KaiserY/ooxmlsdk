@@ -1,26 +1,22 @@
-mod simple_text;
-
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
-  FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
-  FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
-  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem, InlineShape,
-  InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
-  SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
-  VerticalImageAlignment, VerticalImageReference,
+  Block, BorderStyle, CellBordersModel, DocxDocument, DynamicFieldKind, FloatingFrame,
+  FloatingFramePlacement, FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment,
+  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
+  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
+  InlineItem, InlineShape, InlineShapeGeometry, LineHeightRule, LineNumbering, PageSetup,
+  ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, Table,
+  TableAlignment, TableCell, TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment,
+  TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
 use crate::units;
-
-pub(crate) use simple_text::item_pages;
 
 // Word document defaults used by LibreOffice import/export are 11pt text,
 // 0.5in tab stops, and widow/orphan control of two lines.
@@ -887,6 +883,300 @@ pub(crate) fn fixed_pages_with_items(
     reflow_executions: Vec::new(),
     reflow_requests: Vec::new(),
     restart_plan: None,
+  }
+}
+
+pub(crate) fn from_compat_document(
+  document: ooxmlsdk_layout::compat::LayoutDocument,
+) -> LayoutDocument {
+  let mut pages = document
+    .pages
+    .into_iter()
+    .map(compat_page)
+    .collect::<Vec<_>>();
+  if pages.is_empty() {
+    pages.push(empty_page(PageSetup::default(), 0));
+  }
+
+  LayoutDocument {
+    pages,
+    form_widgets: document
+      .form_widgets
+      .into_iter()
+      .map(compat_form_widget)
+      .collect(),
+    follows: Vec::new(),
+    frames: Vec::new(),
+    outline_entries: document
+      .outline_entries
+      .into_iter()
+      .map(compat_outline_entry)
+      .collect(),
+    page_replays: Vec::new(),
+    page_replay_applications: Vec::new(),
+    backward_moves: Vec::new(),
+    layout_reruns: Vec::new(),
+    page_invalidations: Vec::new(),
+    reflow_executions: Vec::new(),
+    reflow_requests: Vec::new(),
+    restart_plan: None,
+  }
+}
+
+fn compat_page(page: ooxmlsdk_layout::compat::Page) -> Page {
+  let mut output = empty_section_page(
+    compat_page_setup(page.setup),
+    page.section_index,
+    page.section_page_index,
+  );
+  output.items = page.items.into_iter().map(compat_page_item).collect();
+  output.preserve_empty = true;
+  output
+}
+
+fn compat_outline_entry(entry: ooxmlsdk_layout::compat::OutlineEntry) -> OutlineEntry {
+  OutlineEntry {
+    level: entry.level,
+    text: entry.text,
+    page_index: entry.page_index,
+    x_pt: entry.x_pt,
+    y_pt: entry.y_pt,
+    merged_hidden_separator: entry.merged_hidden_separator,
+  }
+}
+
+fn compat_form_widget(widget: ooxmlsdk_layout::compat::FormWidget) -> crate::docx::FormWidget {
+  crate::docx::FormWidget {
+    id: widget.id,
+    kind: match widget.kind {
+      ooxmlsdk_layout::compat::FormWidgetKind::Text => crate::docx::FormWidgetKind::Text,
+      ooxmlsdk_layout::compat::FormWidgetKind::DropDownList => {
+        crate::docx::FormWidgetKind::DropDownList
+      }
+      ooxmlsdk_layout::compat::FormWidgetKind::ComboBox => crate::docx::FormWidgetKind::ComboBox,
+    },
+    entries: widget.entries,
+  }
+}
+
+fn compat_page_item(item: ooxmlsdk_layout::compat::PageItem) -> PageItem {
+  match item {
+    ooxmlsdk_layout::compat::PageItem::Text(item) => PageItem::Text(compat_text_item(item)),
+    ooxmlsdk_layout::compat::PageItem::Image(item) => PageItem::Image(compat_image_item(item)),
+    ooxmlsdk_layout::compat::PageItem::LinkArea(item) => {
+      PageItem::LinkArea(compat_link_area_item(item))
+    }
+    ooxmlsdk_layout::compat::PageItem::Rect(item) => PageItem::Rect(compat_rect_item(item)),
+    ooxmlsdk_layout::compat::PageItem::Fill(item) => PageItem::Fill(compat_fill_item(item)),
+    ooxmlsdk_layout::compat::PageItem::Line(item) => PageItem::Line(compat_line_item(item)),
+    ooxmlsdk_layout::compat::PageItem::Polyline(item) => {
+      PageItem::Polyline(compat_polyline_item(item))
+    }
+  }
+}
+
+fn compat_text_item(item: ooxmlsdk_layout::compat::TextItem) -> TextItem {
+  TextItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    line_height_pt: item.line_height_pt,
+    text: item.text,
+    style: compat_text_style(item.style),
+    rotation_center_pt: item.rotation_center_pt,
+    hyperlink_url: item.hyperlink_url,
+    dynamic_field: item.dynamic_field.map(compat_dynamic_field),
+    style_ref_keys: item.style_ref_keys,
+    style_ref_text: item.style_ref_text,
+    form_widget_id: item.form_widget_id,
+    paragraph_bidi: item.paragraph_bidi,
+    preserve_text_portion: item.preserve_text_portion,
+    decoration_span_start_x_pt: item.decoration_span_start_x_pt,
+    pdf_text_segmentation: match item.pdf_text_segmentation {
+      ooxmlsdk_layout::compat::PdfTextSegmentation::Line => PdfTextSegmentation::Line,
+      ooxmlsdk_layout::compat::PdfTextSegmentation::Portion => PdfTextSegmentation::Portion,
+    },
+  }
+}
+
+fn compat_dynamic_field(field: ooxmlsdk_layout::compat::DynamicFieldKind) -> DynamicFieldKind {
+  match field {
+    ooxmlsdk_layout::compat::DynamicFieldKind::Page => DynamicFieldKind::Page,
+    ooxmlsdk_layout::compat::DynamicFieldKind::NumPages => DynamicFieldKind::NumPages,
+    ooxmlsdk_layout::compat::DynamicFieldKind::StyleRef {
+      style_name,
+      from_bottom,
+    } => DynamicFieldKind::StyleRef {
+      style_name,
+      from_bottom,
+    },
+  }
+}
+
+fn compat_image_item(item: ooxmlsdk_layout::compat::ImageItem) -> ImageItem {
+  ImageItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    width_pt: item.width_pt,
+    height_pt: item.height_pt,
+    crop: compat_image_crop(item.crop),
+    rotation_deg: item.rotation_deg,
+    flip_horizontal: item.flip_horizontal,
+    flip_vertical: item.flip_vertical,
+    data: item.data,
+    content_type: item.content_type,
+    alt_text: item.alt_text,
+    hyperlink_url: item.hyperlink_url,
+    floating: item.floating,
+    behind_text: item.behind_text,
+  }
+}
+
+fn compat_link_area_item(item: ooxmlsdk_layout::compat::LinkAreaItem) -> LinkAreaItem {
+  LinkAreaItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    width_pt: item.width_pt,
+    height_pt: item.height_pt,
+    hyperlink_url: item.hyperlink_url,
+  }
+}
+
+fn compat_rect_item(item: ooxmlsdk_layout::compat::RectItem) -> RectItem {
+  RectItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    width_pt: item.width_pt,
+    height_pt: item.height_pt,
+    fill_color: item.fill_color.map(compat_rgb_color),
+    fill_opacity: item.fill_opacity,
+    stroke: item.stroke.map(compat_border_style),
+    stroke_opacity: item.stroke_opacity,
+  }
+}
+
+fn compat_fill_item(item: ooxmlsdk_layout::compat::FillItem) -> FillItem {
+  FillItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    width_pt: item.width_pt,
+    height_pt: item.height_pt,
+    color: compat_rgb_color(item.color),
+  }
+}
+
+fn compat_line_item(item: ooxmlsdk_layout::compat::LineItem) -> LineItem {
+  LineItem {
+    x1_pt: item.x1_pt,
+    y1_pt: item.y1_pt,
+    x2_pt: item.x2_pt,
+    y2_pt: item.y2_pt,
+    width_pt: item.width_pt,
+    color: compat_rgb_color(item.color),
+    kind: match item.kind {
+      ooxmlsdk_layout::compat::LineItemKind::Stroke => LineItemKind::Stroke,
+      ooxmlsdk_layout::compat::LineItemKind::FilledRect => LineItemKind::FilledRect,
+    },
+  }
+}
+
+fn compat_polyline_item(item: ooxmlsdk_layout::compat::PolylineItem) -> PolylineItem {
+  PolylineItem {
+    x_pt: item.x_pt,
+    y_pt: item.y_pt,
+    width_pt: item.width_pt,
+    height_pt: item.height_pt,
+    points: item.points,
+    closed: item.closed,
+    fill_color: item.fill_color.map(compat_rgb_color),
+    stroke: item.stroke.map(compat_border_style),
+  }
+}
+
+fn compat_page_setup(setup: ooxmlsdk_layout::compat::PageSetup) -> PageSetup {
+  PageSetup {
+    width_pt: setup.width_pt,
+    height_pt: setup.height_pt,
+    margin_top_pt: setup.margin_top_pt,
+    margin_right_pt: setup.margin_right_pt,
+    margin_bottom_pt: setup.margin_bottom_pt,
+    margin_left_pt: setup.margin_left_pt,
+    mirror_margins: setup.mirror_margins,
+    top_margin_was_negative: setup.top_margin_was_negative,
+    bottom_margin_was_negative: setup.bottom_margin_was_negative,
+    header_distance_pt: setup.header_distance_pt,
+    footer_distance_pt: setup.footer_distance_pt,
+    background: setup.background.map(compat_rgb_color),
+    borders: compat_cell_borders(setup.borders),
+    borders_offset_from_text: setup.borders_offset_from_text,
+    line_numbering: setup.line_numbering.map(|line_numbering| LineNumbering {
+      count_by: line_numbering.count_by,
+      start: line_numbering.start,
+      distance_pt: line_numbering.distance_pt,
+      restart_each_page: line_numbering.restart_each_page,
+    }),
+    doc_grid_line_pitch_pt: setup.doc_grid_line_pitch_pt,
+    page_number_start: setup.page_number_start,
+  }
+}
+
+fn compat_text_style(style: ooxmlsdk_layout::compat::TextStyle) -> TextStyle {
+  TextStyle {
+    font_family: style.font_family,
+    symbol_font_family: style.symbol_font_family,
+    font_size_pt: style.font_size_pt,
+    complex_font_size_pt: style.complex_font_size_pt,
+    character_spacing_pt: style.character_spacing_pt,
+    baseline_shift_pt: style.baseline_shift_pt,
+    bold: style.bold,
+    italic: style.italic,
+    underline: style.underline,
+    strikethrough: style.strikethrough,
+    uppercase: style.uppercase,
+    small_caps: style.small_caps,
+    hidden: style.hidden,
+    rotation_deg: style.rotation_deg,
+    color: compat_rgb_color(style.color),
+    opacity: style.opacity,
+    outline_color: style.outline_color.map(compat_rgb_color),
+    outline_opacity: style.outline_opacity,
+    outline_width_pt: style.outline_width_pt,
+    highlight: style.highlight.map(compat_rgb_color),
+    underline_color: style.underline_color.map(compat_rgb_color),
+  }
+}
+
+fn compat_cell_borders(borders: ooxmlsdk_layout::compat::CellBordersModel) -> CellBordersModel {
+  CellBordersModel {
+    top: borders.top.map(compat_border_style),
+    right: borders.right.map(compat_border_style),
+    bottom: borders.bottom.map(compat_border_style),
+    left: borders.left.map(compat_border_style),
+  }
+}
+
+fn compat_border_style(style: ooxmlsdk_layout::compat::BorderStyle) -> BorderStyle {
+  BorderStyle {
+    width_pt: style.width_pt,
+    spacing_pt: style.spacing_pt,
+    color: compat_rgb_color(style.color),
+    compound: style.compound,
+  }
+}
+
+fn compat_rgb_color(color: ooxmlsdk_layout::compat::RgbColor) -> RgbColor {
+  RgbColor {
+    r: color.r,
+    g: color.g,
+    b: color.b,
+  }
+}
+
+fn compat_image_crop(crop: ooxmlsdk_layout::compat::ImageCrop) -> ImageCrop {
+  ImageCrop {
+    left: crop.left,
+    top: crop.top,
+    right: crop.right,
+    bottom: crop.bottom,
   }
 }
 

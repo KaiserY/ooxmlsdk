@@ -18,7 +18,7 @@ pub(crate) fn recalculate_formula_cells(
 
   for _ in 0..12 {
     let book = FormulaBook::from_sheets(sheets, &defined, workbook_catalog);
-    let formula_book = formula_evaluation_book_from_pdf_book(&book, source_file_name);
+    let formula_book = formula_evaluation_book_from_calc_book(&book, source_file_name);
     let mut changed = false;
     let mut sheet_index = 0;
     while sheet_index < sheets.len() {
@@ -30,7 +30,7 @@ pub(crate) fn recalculate_formula_cells(
             Some(formula_address(formula_cell.address)),
             &formula_cell.formula,
           )
-          .map(|value| pdf_value_from_formula_value(&book, value))
+          .map(|value| calc_value_from_formula_value(&book, value))
         else {
           continue;
         };
@@ -70,10 +70,10 @@ pub(crate) fn evaluate_relative_formula_as_condition(
 ) -> bool {
   let defined = DefinedNames::from_catalog(&import.defined_names);
   let book = FormulaBook::from_sheets(&import.sheets, &defined, &import.workbook_catalog);
-  let Some(sheet_index) = pdf_sheet_index(import, sheet) else {
+  let Some(sheet_index) = calc_sheet_index(import, sheet) else {
     return false;
   };
-  let formula_book = formula_evaluation_book_from_pdf_book(&book, None);
+  let formula_book = formula_evaluation_book_from_calc_book(&book, None);
   match formula_book.evaluate_relative_formula_text(
     formula_book_sheet_id(&book, sheet_index),
     formula,
@@ -94,8 +94,8 @@ pub(crate) fn evaluate_relative_formula_as_number(
 ) -> Option<f64> {
   let defined = DefinedNames::from_catalog(&import.defined_names);
   let book = FormulaBook::from_sheets(&import.sheets, &defined, &import.workbook_catalog);
-  let sheet_index = pdf_sheet_index(import, sheet)?;
-  let formula_book = formula_evaluation_book_from_pdf_book(&book, None);
+  let sheet_index = calc_sheet_index(import, sheet)?;
+  let formula_book = formula_evaluation_book_from_calc_book(&book, None);
   formula_book
     .evaluate_relative_formula_text(
       formula_book_sheet_id(&book, sheet_index),
@@ -106,7 +106,7 @@ pub(crate) fn evaluate_relative_formula_as_number(
     .and_then(|value| formula_value_number(&formula_book, &value))
 }
 
-fn pdf_sheet_index(import: &super::import::ExcelImport, sheet: &CalcSheet) -> Option<usize> {
+fn calc_sheet_index(import: &super::import::ExcelImport, sheet: &CalcSheet) -> Option<usize> {
   import
     .sheets
     .iter()
@@ -507,7 +507,7 @@ impl FormulaBook {
   }
 }
 
-fn formula_evaluation_book_from_pdf_book(
+fn formula_evaluation_book_from_calc_book(
   book: &FormulaBook,
   source_file_name: Option<&str>,
 ) -> ooxmlsdk_formula::FormulaEvaluationBook<'static> {
@@ -531,7 +531,7 @@ fn formula_evaluation_book_from_pdf_book(
             formula_book_sheet_id(book, *sheet),
             formula_address(*address),
           ),
-          formula_value_from_pdf_value(value),
+          formula_value_from_calc_value(value),
         )
       })
       .collect(),
@@ -582,7 +582,7 @@ fn formula_evaluation_book_from_pdf_book(
           },
           rows
             .iter()
-            .map(|row| row.iter().map(formula_value_from_pdf_value).collect())
+            .map(|row| row.iter().map(formula_value_from_calc_value).collect())
             .collect(),
         )
       })
@@ -593,7 +593,7 @@ fn formula_evaluation_book_from_pdf_book(
       .map(|((link_index, sheet_name, address), value)| {
         (
           (*link_index, sheet_name.clone(), formula_address(*address)),
-          formula_value_from_pdf_value(value),
+          formula_value_from_calc_value(value),
         )
       })
       .collect(),
@@ -669,21 +669,21 @@ fn formula_range(range: CellRange) -> ooxmlsdk_formula::CellRange {
   }
 }
 
-fn pdf_cell_address(address: ooxmlsdk_formula::CellAddress) -> CellAddress {
+fn calc_cell_address(address: ooxmlsdk_formula::CellAddress) -> CellAddress {
   CellAddress {
     col: address.column.saturating_add(1),
     row: address.row.saturating_add(1),
   }
 }
 
-fn pdf_cell_range(range: ooxmlsdk_formula::CellRange) -> CellRange {
+fn calc_cell_range(range: ooxmlsdk_formula::CellRange) -> CellRange {
   CellRange {
-    start: pdf_cell_address(range.start),
-    end: pdf_cell_address(range.end),
+    start: calc_cell_address(range.start),
+    end: calc_cell_address(range.end),
   }
 }
 
-fn formula_value_from_pdf_value(value: &Value) -> ooxmlsdk_formula::FormulaValue<'static> {
+fn formula_value_from_calc_value(value: &Value) -> ooxmlsdk_formula::FormulaValue<'static> {
   match value {
     Value::Number(value) => ooxmlsdk_formula::FormulaValue::Number(*value),
     Value::Text(value) => ooxmlsdk_formula::FormulaValue::String(Cow::Owned(value.clone())),
@@ -693,7 +693,7 @@ fn formula_value_from_pdf_value(value: &Value) -> ooxmlsdk_formula::FormulaValue
     Value::Matrix(rows) => ooxmlsdk_formula::FormulaValue::Matrix(
       rows
         .iter()
-        .map(|row| row.iter().map(formula_value_from_pdf_value).collect())
+        .map(|row| row.iter().map(formula_value_from_calc_value).collect())
         .collect(),
     ),
     Value::Range(reference) => {
@@ -711,7 +711,7 @@ fn formula_value_from_pdf_value(value: &Value) -> ooxmlsdk_formula::FormulaValue
   }
 }
 
-fn pdf_value_from_formula_value(
+fn calc_value_from_formula_value(
   book: &FormulaBook,
   value: ooxmlsdk_formula::FormulaValue<'_>,
 ) -> Value {
@@ -719,7 +719,9 @@ fn pdf_value_from_formula_value(
     ooxmlsdk_formula::FormulaValue::Number(value) => Value::Number(value),
     ooxmlsdk_formula::FormulaValue::String(value) => Value::Text(value.into_owned()),
     ooxmlsdk_formula::FormulaValue::Boolean(value) => Value::Bool(value),
-    ooxmlsdk_formula::FormulaValue::Error(value) => Value::Error(pdf_error_text(value).to_string()),
+    ooxmlsdk_formula::FormulaValue::Error(value) => {
+      Value::Error(calc_error_text(value).to_string())
+    }
     ooxmlsdk_formula::FormulaValue::Blank => Value::Blank,
     ooxmlsdk_formula::FormulaValue::Matrix(rows) => Value::Matrix(
       rows
@@ -727,7 +729,7 @@ fn pdf_value_from_formula_value(
         .map(|row| {
           row
             .into_iter()
-            .map(|value| pdf_value_from_formula_value(book, value))
+            .map(|value| calc_value_from_formula_value(book, value))
             .collect()
         })
         .collect(),
@@ -739,7 +741,7 @@ fn pdf_value_from_formula_value(
         .position(|index| *index as u32 == reference.sheet.0),
       external_link_index: None,
       external_sheet_name: None,
-      range: pdf_cell_range(reference.range),
+      range: calc_cell_range(reference.range),
     }),
   }
 }
@@ -802,7 +804,7 @@ fn formula_error_value(value: &str) -> ooxmlsdk_formula::FormulaErrorValue {
   }
 }
 
-fn pdf_error_text(value: ooxmlsdk_formula::FormulaErrorValue) -> &'static str {
+fn calc_error_text(value: ooxmlsdk_formula::FormulaErrorValue) -> &'static str {
   match value {
     ooxmlsdk_formula::FormulaErrorValue::Null => "#NULL!",
     ooxmlsdk_formula::FormulaErrorValue::Div0 => "#DIV/0!",
@@ -954,6 +956,7 @@ mod tests {
   use super::*;
   use std::fs::File;
 
+  use crate::options::LayoutOptions;
   use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
   use ooxmlsdk::sdk::{
     FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
@@ -980,11 +983,9 @@ mod tests {
       .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/xlsx/functions-excel-2010.xlsx");
     let mut document =
       SpreadsheetDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
-    let import = super::super::import::ExcelImport::import_document(
-      &mut document,
-      &crate::options::PdfOptions::default(),
-    )
-    .unwrap();
+    let import =
+      super::super::import::ExcelImport::import_document(&mut document, &LayoutOptions::default())
+        .unwrap();
     let sheet = &import.sheets[0];
     assert_eq!(imported_cell_text(sheet, "B10"), "2");
     assert_eq!(imported_cell_text(sheet, "D3"), "TRUE");

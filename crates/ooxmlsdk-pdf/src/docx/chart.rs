@@ -1,5 +1,5 @@
 use super::*;
-use crate::render::chart as shared_chart;
+use ooxmlsdk_layout::render::chart as shared_chart;
 
 pub(super) fn supplemental_graphic_blocks(
   package: &mut WordprocessingDocument,

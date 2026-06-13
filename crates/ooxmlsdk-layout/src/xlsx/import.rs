@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::options::LayoutOptions;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 
 use super::styles::{DefinedNamesCatalog, StylesCatalog};
@@ -19,7 +20,7 @@ pub(crate) struct ExcelImport {
 impl ExcelImport {
   pub(crate) fn import_document(
     package: &mut SpreadsheetDocument,
-    options: &crate::options::PdfOptions,
+    options: &LayoutOptions,
   ) -> Result<Self> {
     // Source: LibreOffice sc/source/filter/oox/excelfilter.cxx
     // ExcelFilter::importDocument creates workbook-global state and delegates

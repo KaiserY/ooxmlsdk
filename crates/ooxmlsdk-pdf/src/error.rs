@@ -8,6 +8,9 @@ pub enum PdfError {
   #[error(transparent)]
   Ooxml(#[from] ooxmlsdk::common::SdkError),
 
+  #[error(transparent)]
+  Layout(#[from] ooxmlsdk_layout::error::LayoutError),
+
   #[error("krilla failed to produce PDF output: {0}")]
   Krilla(String),
 

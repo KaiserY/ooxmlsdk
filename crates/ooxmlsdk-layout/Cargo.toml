@@ -16,4 +16,5 @@ readme.workspace = true
 ooxmlsdk = { workspace = true, features = ["parts"] }
 ooxmlsdk-fonts = { workspace = true }
 ooxmlsdk-formula = { workspace = true }
+quick-xml = { workspace = true }
 thiserror = { workspace = true }

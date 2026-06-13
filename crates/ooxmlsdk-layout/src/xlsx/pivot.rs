@@ -11,7 +11,7 @@ use super::styles::StylesCatalog;
 use super::text::decode_excel_escaped_text;
 use super::workbook::SharedStringModel;
 use super::worksheet::{CalcSheet, CellAddress, CellRange};
-use crate::docx::{BorderStyle, RgbColor};
+use crate::compat::{BorderStyle, RgbColor};
 use crate::error::Result;
 
 #[derive(Clone, Debug, Default, PartialEq)]

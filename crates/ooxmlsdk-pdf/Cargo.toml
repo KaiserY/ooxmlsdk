@@ -19,7 +19,6 @@ icu_segmenter = { workspace = true }
 image = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
-libm = { workspace = true }
 lopdf = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts", "mce"] }
 ooxmlsdk-fonts = { workspace = true }

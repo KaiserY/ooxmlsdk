@@ -1327,7 +1327,6 @@ dependencies = [
  "image",
  "krilla",
  "krilla-svg",
- "libm",
  "lopdf",
  "ooxmlsdk",
  "ooxmlsdk-fonts",

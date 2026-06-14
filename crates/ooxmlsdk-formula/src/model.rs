@@ -1880,6 +1880,17 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     if let Some(value) = self.evaluate_special_formula_text(current_sheet, current_cell, formula) {
       return Some(value);
     }
+    self
+      .evaluate_formula_ast_value(current_sheet, current_cell, formula)
+      .map(|value| self.final_formula_value(current_sheet, current_cell, value))
+  }
+
+  fn evaluate_formula_ast_value(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    formula: &str,
+  ) -> Option<FormulaValue<'doc>> {
     let (ast, unsupported) = parse_formula_ast(current_sheet, formula);
     if !unsupported.is_empty() {
       return None;
@@ -1891,7 +1902,30 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       locals: BTreeMap::new(),
     }
     .evaluate(ast.as_ref()?)
-    .map(|value| self.array_formula_cell_value(current_sheet, current_cell, value))
+  }
+
+  pub fn evaluate_parsed_formula(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    formula: &ParsedFormula<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    if !formula.unsupported.is_empty() {
+      return None;
+    }
+    if let Some(value) =
+      self.evaluate_special_formula_text(current_sheet, current_cell, formula.source.as_ref())
+    {
+      return Some(value);
+    }
+    FormulaEvaluator {
+      book: self,
+      current_sheet,
+      current_cell,
+      locals: BTreeMap::new(),
+    }
+    .evaluate(formula.ast.as_ref()?)
+    .map(|value| self.final_formula_value(current_sheet, current_cell, value))
   }
 
   pub fn evaluate_formula_text_with_grammar(
@@ -1975,8 +2009,8 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       return Some(FormulaValue::Error(error_value(clean)));
     }
     if let Some((left, right)) = split_indirect_intersection(clean) {
-      let left = self.evaluate_formula_text(current_sheet, current_cell, left)?;
-      let right = self.evaluate_formula_text(current_sheet, current_cell, right)?;
+      let left = self.evaluate_formula_ast_value(current_sheet, current_cell, left)?;
+      let right = self.evaluate_formula_ast_value(current_sheet, current_cell, right)?;
       return Some(range_intersection_value(self, left, right));
     }
     None
@@ -2027,12 +2061,41 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     }
   }
 
+  fn final_formula_value(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    value: FormulaValue<'doc>,
+  ) -> FormulaValue<'doc> {
+    let value = self.array_formula_cell_value(current_sheet, current_cell, value);
+    if matches!(value, FormulaValue::Reference(_)) {
+      FormulaEvaluator {
+        book: self,
+        current_sheet,
+        current_cell,
+        locals: BTreeMap::new(),
+      }
+      .first_value(&value)
+    } else {
+      value
+    }
+  }
+
   pub fn formula_text(&self, sheet: SheetId, address: CellAddress) -> Option<String> {
     let formula = self.formulas.get(&(sheet, address))?;
-    Some(if formula.kind == FormulaKind::Array {
-      format!("{{={}}}", formula.text)
+    let text = formula.text.as_ref();
+    Some(if text.starts_with('{') {
+      text.to_string()
+    } else if formula.kind == FormulaKind::Array {
+      if text.starts_with('=') {
+        format!("{{{text}}}")
+      } else {
+        format!("{{={text}}}")
+      }
+    } else if text.starts_with('=') {
+      text.to_string()
     } else {
-      format!("={}", formula.text)
+      format!("={text}")
     })
   }
 
@@ -3663,12 +3726,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .reduce(f64::max)
         .map(FormulaValue::Number),
       "MAXA" => self.evaluate_maxa(args),
-      "AND" => Some(FormulaValue::Boolean(
-        self.values(args).all(|value| self.truthy(&value)),
-      )),
-      "OR" => Some(FormulaValue::Boolean(
-        self.values(args).any(|value| self.truthy(&value)),
-      )),
+      "AND" => self.evaluate_and(args),
+      "OR" => self.evaluate_or(args),
       "NOT" => Some(FormulaValue::Boolean(
         !self.truthy(&self.evaluate(args.first()?)?),
       )),
@@ -3871,9 +3930,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       "UNICHAR" => {
         let code = self.number(&self.evaluate(args.first()?)?)? as u32;
-        char::from_u32(code)
-          .map(|ch| FormulaValue::String(Cow::Owned(ch.to_string())))
-          .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+        if code == 0 {
+          Some(FormulaValue::String(Cow::Borrowed("")))
+        } else {
+          char::from_u32(code)
+            .map(|ch| FormulaValue::String(Cow::Owned(ch.to_string())))
+            .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+        }
       }
       "CLEAN" => Some(FormulaValue::String(Cow::Owned(clean_formula_text(
         &self.text(&self.evaluate(args.first()?)?),
@@ -3987,7 +4050,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "FLOOR" => self.evaluate_floor(args, CeilingFloorKind::Odff),
       "FLOOR.MATH" => self.evaluate_floor(args, CeilingFloorKind::Math),
       "FLOOR.PRECISE" => self.evaluate_floor(args, CeilingFloorKind::Precise),
-      "BETA.DIST" | "BETADIST" => self.evaluate_beta_dist(args),
+      "BETA.DIST" => self.evaluate_beta_dist(args, false),
+      "BETADIST" => self.evaluate_beta_dist(args, true),
       "BETA.INV" | "BETAINV" => self.evaluate_beta_inv(args),
       "BINOM.DIST" | "BINOMDIST" => self.evaluate_binom_dist(args),
       "BINOM.DIST.RANGE" => self.evaluate_binom_dist_range(args),
@@ -4003,9 +4067,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "CONFIDENCE.T" => self.evaluate_confidence_t(args),
       "COVARIANCE.P" => self.evaluate_covariance(args, false),
       "COVARIANCE.S" => self.evaluate_covariance(args, true),
-      "ERF.PRECISE" | "ERF" => Some(FormulaValue::Number(erf(
+      "ERF.PRECISE" => Some(FormulaValue::Number(erf(
         self.number(&self.evaluate(args.first()?)?)?,
       ))),
+      "ERF" => self.evaluate_erf(args),
       "ERFC.PRECISE" | "ERFC" => Some(FormulaValue::Number(erfc(
         self.number(&self.evaluate(args.first()?)?)?,
       ))),
@@ -4064,6 +4129,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "IMSUM" => self.evaluate_complex_sum_product(args, false),
       "IMPRODUCT" => self.evaluate_complex_sum_product(args, true),
       "COMPLEX" => self.evaluate_complex(args),
+      "DELTA" => self.evaluate_delta(args),
+      "GESTEP" => self.evaluate_gestep(args),
       "WEIBULL.DIST" | "WEIBULL" => self.evaluate_weibull_dist(args),
       "NETWORKDAYS.INTL" | "NETWORKDAYS" => self.evaluate_networkdays(args),
       "WORKDAY.INTL" | "WORKDAY" => self.evaluate_workday(args),
@@ -5140,10 +5207,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or(0.0) as i32;
+    let search_mode = args
+      .get(5)
+      .and_then(|arg| self.evaluate(arg))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(1.0) as i32;
     let index = match match_mode {
+      0 if search_mode == -1 => lookup_exact_index_reverse(self, &lookup, &lookup_vector),
       0 => lookup_exact_index(self, &lookup, &lookup_vector),
       -1 => lookup_approximate_index(self, &lookup, &lookup_vector),
-      1 => lookup_descending_index(self, &lookup, &lookup_vector),
+      1 => lookup_next_larger_index(self, &lookup, &lookup_vector),
+      _ if search_mode == -1 => lookup_exact_index_reverse(self, &lookup, &lookup_vector),
       _ => lookup_exact_index(self, &lookup, &lookup_vector),
     };
     let Some(index) = index else {
@@ -5207,6 +5281,44 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .formula_text(sheet, reference.range.start)
       .map(|text| FormulaValue::String(Cow::Owned(text)))
       .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
+  }
+
+  fn evaluate_and(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let mut has_value = false;
+    let mut result = true;
+    for value in self.values(args) {
+      if let FormulaValue::Error(error) = value {
+        return Some(FormulaValue::Error(error));
+      }
+      if let Some(logical) = logical_value(&value) {
+        has_value = true;
+        result &= logical;
+      }
+    }
+    Some(if has_value {
+      FormulaValue::Boolean(result)
+    } else {
+      FormulaValue::Error(FormulaErrorValue::Value)
+    })
+  }
+
+  fn evaluate_or(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let mut has_value = false;
+    let mut result = false;
+    for value in self.values(args) {
+      if let FormulaValue::Error(error) = value {
+        return Some(FormulaValue::Error(error));
+      }
+      if let Some(logical) = logical_value(&value) {
+        has_value = true;
+        result |= logical;
+      }
+    }
+    Some(if has_value {
+      FormulaValue::Boolean(result)
+    } else {
+      FormulaValue::Error(FormulaErrorValue::Value)
+    })
   }
 
   fn evaluate_cell(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6467,23 +6579,61 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     ))
   }
 
-  fn evaluate_beta_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_beta_dist(
+    &self,
+    args: &[FormulaAst<'doc>],
+    legacy: bool,
+  ) -> Option<FormulaValue<'doc>> {
     let x = self.number(&self.evaluate(args.first()?)?)?;
     let alpha = self.number(&self.evaluate(args.get(1)?)?)?;
     let beta = self.number(&self.evaluate(args.get(2)?)?)?;
-    let cumulative = self.truthy(&self.evaluate(args.get(3)?)?);
-    let lower = args
-      .get(4)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(0.0);
-    let upper = args
-      .get(5)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0);
-    if alpha <= 0.0 || beta <= 0.0 || upper <= lower || x < lower || x > upper {
+    let (cumulative, lower, upper) = if legacy {
+      let lower = args
+        .get(3)
+        .and_then(|arg| self.evaluate(arg))
+        .and_then(|value| self.number(&value))
+        .unwrap_or(0.0);
+      let upper = args
+        .get(4)
+        .and_then(|arg| self.evaluate(arg))
+        .and_then(|value| self.number(&value))
+        .unwrap_or(1.0);
+      let cumulative = args
+        .get(5)
+        .and_then(|arg| self.evaluate(arg))
+        .map(|value| self.truthy(&value))
+        .unwrap_or(true);
+      (cumulative, lower, upper)
+    } else {
+      let cumulative = self.truthy(&self.evaluate(args.get(3)?)?);
+      let lower = args
+        .get(4)
+        .and_then(|arg| self.evaluate(arg))
+        .and_then(|value| self.number(&value))
+        .unwrap_or(0.0);
+      let upper = args
+        .get(5)
+        .and_then(|arg| self.evaluate(arg))
+        .and_then(|value| self.number(&value))
+        .unwrap_or(1.0);
+      (cumulative, lower, upper)
+    };
+    if alpha <= 0.0 || beta <= 0.0 || upper <= lower {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    }
+    if x < lower {
+      return Some(if legacy && cumulative {
+        FormulaValue::Number(0.0)
+      } else {
+        FormulaValue::Error(FormulaErrorValue::Num)
+      });
+    }
+    if x > upper {
+      return Some(if legacy && cumulative {
+        FormulaValue::Number(1.0)
+      } else {
+        FormulaValue::Error(FormulaErrorValue::Num)
+      });
     }
     let scaled = (x - lower) / (upper - lower);
     let dist = Beta::new(alpha, beta).ok()?;
@@ -6492,6 +6642,36 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     } else {
       dist.pdf(scaled) / (upper - lower)
     }))
+  }
+
+  fn evaluate_erf(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let lower = self.number(&self.evaluate(args.first()?)?)?;
+    let value = if let Some(upper) = args.get(1) {
+      erf(self.number(&self.evaluate(upper)?)?) - erf(lower)
+    } else {
+      erf(lower)
+    };
+    Some(FormulaValue::Number(value))
+  }
+
+  fn evaluate_delta(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let left = self.number(&self.evaluate(args.first()?)?)?;
+    let right = args
+      .get(1)
+      .and_then(|arg| self.evaluate(arg))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(0.0);
+    Some(FormulaValue::Number((left == right) as u8 as f64))
+  }
+
+  fn evaluate_gestep(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let value = self.number(&self.evaluate(args.first()?)?)?;
+    let step = args
+      .get(1)
+      .and_then(|arg| self.evaluate(arg))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(0.0);
+    Some(FormulaValue::Number((value >= step) as u8 as f64))
   }
 
   fn evaluate_beta_inv(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -8313,6 +8493,29 @@ fn lookup_approximate_index<'doc>(
   found
 }
 
+fn lookup_next_larger_index<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  lookup: &FormulaValue<'doc>,
+  vector: &[FormulaValue<'doc>],
+) -> Option<usize> {
+  let mut found = None;
+  for (index, candidate) in vector.iter().enumerate() {
+    if matches!(candidate, FormulaValue::Error(_)) {
+      continue;
+    }
+    if lookup_compare(evaluator, candidate, lookup).is_some_and(|ordering| ordering >= 0) {
+      let replace = found.is_none_or(|found_index| {
+        lookup_compare(evaluator, candidate, &vector[found_index])
+          .is_some_and(|ordering| ordering < 0)
+      });
+      if replace {
+        found = Some(index);
+      }
+    }
+  }
+  found
+}
+
 fn lookup_descending_index<'doc>(
   evaluator: &FormulaEvaluator<'_, 'doc>,
   lookup: &FormulaValue<'doc>,
@@ -8336,6 +8539,22 @@ fn lookup_exact_index<'doc>(
   vector: &[FormulaValue<'doc>],
 ) -> Option<usize> {
   for (index, candidate) in vector.iter().enumerate() {
+    if matches!(candidate, FormulaValue::Error(_)) {
+      continue;
+    }
+    if lookup_exact_match(evaluator, candidate, lookup) {
+      return Some(index);
+    }
+  }
+  None
+}
+
+fn lookup_exact_index_reverse<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  lookup: &FormulaValue<'doc>,
+  vector: &[FormulaValue<'doc>],
+) -> Option<usize> {
+  for (index, candidate) in vector.iter().enumerate().rev() {
     if matches!(candidate, FormulaValue::Error(_)) {
       continue;
     }
@@ -9182,8 +9401,13 @@ fn trim_formula_text(value: &str) -> String {
 fn clean_formula_text(value: &str) -> String {
   value
     .chars()
-    .filter(|ch| !ch.is_control() && *ch != '\u{fffe}' && *ch != '\u{ffff}')
+    .filter(|ch| !ch.is_control() && !is_unicode_noncharacter(*ch))
     .collect()
+}
+
+fn is_unicode_noncharacter(ch: char) -> bool {
+  let code = ch as u32;
+  (0xfdd0..=0xfdef).contains(&code) || code & 0xfffe == 0xfffe
 }
 
 fn parse_complex_number(value: &str) -> Option<(f64, f64, char)> {
@@ -10464,6 +10688,14 @@ fn error_value(value: &str) -> FormulaErrorValue {
     "ERR:502" => FormulaErrorValue::IllegalArgument,
     "ERR:504" | "#ERR502!" | "#ERR504!" => FormulaErrorValue::Unknown,
     _ => FormulaErrorValue::Unknown,
+  }
+}
+
+fn logical_value(value: &FormulaValue<'_>) -> Option<bool> {
+  match value {
+    FormulaValue::Boolean(value) => Some(*value),
+    FormulaValue::Number(value) => Some(*value != 0.0),
+    _ => None,
   }
 }
 

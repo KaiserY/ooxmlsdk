@@ -1296,8 +1296,10 @@ dependencies = [
 name = "ooxmlsdk-formula"
 version = "0.10.2"
 dependencies = [
+ "encoding_rs",
  "libm",
  "ooxmlsdk",
+ "regex",
  "rustfft",
  "statrs",
  "thiserror",

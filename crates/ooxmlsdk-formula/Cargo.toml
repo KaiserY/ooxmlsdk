@@ -13,8 +13,10 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+encoding_rs = { workspace = true }
 libm = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
+regex = { workspace = true }
 rustfft = { workspace = true }
 statrs = { workspace = true }
 thiserror = { workspace = true }

@@ -10,6 +10,7 @@ pub enum FormulaValue<'a> {
   Blank,
   Matrix(Vec<Vec<FormulaValue<'a>>>),
   Reference(crate::QualifiedRange<'a>),
+  RefList(Vec<crate::QualifiedRange<'a>>),
 }
 
 impl<'a> FormulaValue<'a> {
@@ -27,6 +28,9 @@ impl<'a> FormulaValue<'a> {
           .collect(),
       ),
       FormulaValue::Reference(value) => FormulaValue::Reference(value.into_owned()),
+      FormulaValue::RefList(values) => {
+        FormulaValue::RefList(values.into_iter().map(|value| value.into_owned()).collect())
+      }
     }
   }
 }

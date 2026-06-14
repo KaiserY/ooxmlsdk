@@ -619,6 +619,7 @@ fn formula_evaluation_book_from_calc_book(
         )
       })
       .collect(),
+    ..ooxmlsdk_formula::FormulaEvaluationBook::default()
   }
 }
 
@@ -743,6 +744,22 @@ fn calc_value_from_formula_value(
       external_sheet_name: None,
       range: calc_cell_range(reference.range),
     }),
+    ooxmlsdk_formula::FormulaValue::RefList(mut references) => {
+      if references.len() == 1 {
+        let reference = references.remove(0);
+        Value::Range(Reference {
+          sheet_index: book
+            .sheet_workbook_indices
+            .iter()
+            .position(|index| *index as u32 == reference.sheet.0),
+          external_link_index: None,
+          external_sheet_name: None,
+          range: calc_cell_range(reference.range),
+        })
+      } else {
+        Value::Error(calc_error_text(ooxmlsdk_formula::FormulaErrorValue::Value).to_string())
+      }
+    }
   }
 }
 
@@ -763,6 +780,15 @@ fn formula_value_number(
       book,
       &book.cell_value(reference.sheet, reference.range.start),
     ),
+    ooxmlsdk_formula::FormulaValue::RefList(references) => {
+      let [reference] = references.as_slice() else {
+        return None;
+      };
+      formula_value_number(
+        book,
+        &book.cell_value(reference.sheet, reference.range.start),
+      )
+    }
     ooxmlsdk_formula::FormulaValue::Error(_) => None,
   }
 }
@@ -783,6 +809,15 @@ fn formula_value_truthy(
       book,
       &book.cell_value(reference.sheet, reference.range.start),
     ),
+    ooxmlsdk_formula::FormulaValue::RefList(references) => {
+      let [reference] = references.as_slice() else {
+        return false;
+      };
+      formula_value_truthy(
+        book,
+        &book.cell_value(reference.sheet, reference.range.start),
+      )
+    }
     ooxmlsdk_formula::FormulaValue::Error(_) | ooxmlsdk_formula::FormulaValue::Blank => false,
   }
 }

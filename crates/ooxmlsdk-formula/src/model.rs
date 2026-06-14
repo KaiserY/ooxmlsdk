@@ -1,8 +1,11 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use encoding_rs::WINDOWS_1252;
+use icu_collator::options::{CollatorOptions, Strength};
+use icu_collator::{Collator, CollatorBorrowed};
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
@@ -1761,6 +1764,7 @@ pub struct EvaluationContext<'doc> {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FormulaEvaluationBook<'doc> {
   pub source_file_name: Option<Cow<'doc, str>>,
+  pub locale: Option<Cow<'doc, str>>,
   pub sheet_names: Vec<SheetBinding<'doc>>,
   pub cells: BTreeMap<(SheetId, CellAddress), FormulaValue<'doc>>,
   pub query_cell_values: BTreeMap<(SheetId, CellAddress), FormulaValue<'doc>>,
@@ -1838,6 +1842,11 @@ impl<'doc> FormulaEvaluationBookBuilder<'doc> {
 
   pub fn with_source_file_name(mut self, source_file_name: impl Into<Cow<'doc, str>>) -> Self {
     self.book.source_file_name = Some(source_file_name.into());
+    self
+  }
+
+  pub fn with_locale(mut self, locale: impl Into<Cow<'doc, str>>) -> Self {
+    self.book.locale = Some(locale.into());
     self
   }
 
@@ -4023,7 +4032,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     match op {
       FormulaOperator::Add => self.numeric_binary(left, right, |a, b| a + b),
-      FormulaOperator::Subtract => self.numeric_binary(left, right, |a, b| a - b),
+      FormulaOperator::Subtract => self.numeric_binary(left, right, approx_sub),
       FormulaOperator::Multiply => self.numeric_binary(left, right, |a, b| a * b),
       FormulaOperator::Divide => {
         if matches!(left, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
@@ -4163,6 +4172,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "LET" => self.evaluate_let(args),
       "IF" => {
         let condition = self.evaluate(args.first()?)?;
+        if let FormulaValue::Error(error) = self.first_value(&condition) {
+          return Some(FormulaValue::Error(error));
+        }
         let if_value = |arg: Option<&FormulaAst<'doc>>, default: FormulaValue<'doc>| {
           Some(match arg.and_then(|arg| self.evaluate(arg)) {
             Some(FormulaValue::Blank) => FormulaValue::Number(0.0),
@@ -4198,7 +4210,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "IFS" => self.evaluate_ifs_function(args),
       "SWITCH" => self.evaluate_switch(args),
       "SUM" => match self.numeric_aggregate(args, true) {
-        Ok(aggregate) => Some(FormulaValue::Number(aggregate.values.iter().sum())),
+        Ok(aggregate) => Some(FormulaValue::Number(kahan_sum(aggregate.values))),
         Err(error) => Some(FormulaValue::Error(error)),
       },
       "PRODUCT" => match self.numeric_aggregate(args, true) {
@@ -4217,7 +4229,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           Err(error) => return Some(FormulaValue::Error(error)),
         };
         (!values.is_empty())
-          .then(|| FormulaValue::Number(values.iter().sum::<f64>() / values.len() as f64))
+          .then(|| FormulaValue::Number(kahan_sum(values.iter().copied()) / values.len() as f64))
       }
       "COUNT" => Some(FormulaValue::Number(
         match self.numeric_aggregate(args, false) {
@@ -4235,20 +4247,20 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .and_then(|value| self.first_error_value(&value)),
+          .map(|value| self.first_value(&value)),
         Some(FormulaValue::Error(_))
       ))),
       "ISNA" => Some(FormulaValue::Boolean(matches!(
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .and_then(|value| self.first_error_value(&value)),
+          .map(|value| self.first_value(&value)),
         Some(FormulaValue::Error(FormulaErrorValue::NA))
       ))),
       "ISERR" => Some(FormulaValue::Boolean(matches!(
         args.first()
           .and_then(|arg| self.evaluate(arg))
-          .and_then(|value| self.first_error_value(&value)),
+          .map(|value| self.first_value(&value)),
         Some(FormulaValue::Error(error)) if error != FormulaErrorValue::NA
       ))),
       "ISBLANK" => self.evaluate_isblank(args),
@@ -4514,9 +4526,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .unwrap_or(10.0);
         Some(FormulaValue::Number(value.log(base)))
       }
-      "SUMSQ" => Some(FormulaValue::Number(
-        self.numeric_values(args).map(|value| value * value).sum(),
-      )),
+      "SUMSQ" => Some(FormulaValue::Number(kahan_sum(
+        self.numeric_values(args).map(|value| value * value),
+      ))),
       "SUMPRODUCT" => self.evaluate_sumproduct(args),
       "ROUND" => {
         let value = self.number(&self.evaluate(args.first()?)?)?;
@@ -5540,7 +5552,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut total = 0.0;
+    let mut total = KahanSum::default();
     for row in 0..rows {
       for column in 0..columns {
         let mut product = 1.0;
@@ -5551,10 +5563,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             value => product *= self.number(value).unwrap_or(0.0),
           }
         }
-        total += product;
+        total.add(product);
       }
     }
-    Some(FormulaValue::Number(total))
+    Some(FormulaValue::Number(total.finish()))
   }
 
   fn evaluate_choose(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -5742,34 +5754,70 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_textsplit(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let text = self.text(&self.evaluate(args.first()?)?);
-    let column_delimiter = self.text(&self.evaluate(args.get(1)?)?);
-    if column_delimiter.is_empty() {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    if args.is_empty() || args.len() > 6 {
+      return None;
     }
-    let row_delimiter = args.get(2).and_then(|arg| self.evaluate(arg)).map(|value| {
-      let delimiter = self.text(&value);
-      if delimiter.is_empty() {
-        "\n".to_string()
-      } else {
-        delimiter
-      }
-    });
-    let rows = row_delimiter
-      .as_deref()
-      .map(|delimiter| text.split(delimiter).collect::<Vec<_>>())
-      .unwrap_or_else(|| vec![text.as_str()]);
+    let text = self.text(&self.evaluate(args.first()?)?);
+    if text.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let column_delimiters = args
+      .get(1)
+      .and_then(|arg| self.evaluate(arg))
+      .map(|value| self.textsplit_delimiters(&value))
+      .unwrap_or_default();
+    let row_delimiters = args
+      .get(2)
+      .and_then(|arg| self.evaluate(arg))
+      .map(|value| self.textsplit_delimiters(&value))
+      .unwrap_or_default();
+    let ignore_empty = args
+      .get(3)
+      .and_then(|arg| self.evaluate(arg))
+      .is_some_and(|value| self.truthy(&value));
+    let match_mode = args
+      .get(4)
+      .and_then(|arg| self.evaluate(arg))
+      .is_some_and(|value| self.truthy(&value));
+    let pad_with = args.get(5).and_then(|arg| self.evaluate(arg));
+    let pad_with = pad_with.as_ref().map(|value| self.text(value));
+    let row_texts = split_text_multi(&text, &row_delimiters, ignore_empty, match_mode);
+    let mut result_rows = Vec::with_capacity(row_texts.len());
+    let mut columns = 1usize;
+    for row in row_texts {
+      let values = split_text_multi(&row, &column_delimiters, ignore_empty, match_mode);
+      columns = columns.max(values.len());
+      result_rows.push(values);
+    }
     Some(FormulaValue::Matrix(
-      rows
+      result_rows
         .into_iter()
         .map(|row| {
-          row
-            .split(&column_delimiter)
-            .map(|value| FormulaValue::String(Cow::Owned(value.to_string())))
+          (0..columns)
+            .map(|column| {
+              row
+                .get(column)
+                .map(|value| FormulaValue::String(Cow::Owned(value.clone())))
+                .unwrap_or_else(|| {
+                  pad_with
+                    .as_ref()
+                    .map(|value| FormulaValue::String(Cow::Owned(value.clone())))
+                    .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA))
+                })
+            })
             .collect()
         })
         .collect(),
     ))
+  }
+
+  fn textsplit_delimiters(&self, value: &FormulaValue<'doc>) -> Vec<String> {
+    self
+      .matrix_values(value)
+      .into_iter()
+      .flatten()
+      .map(|value| self.text(&value))
+      .collect()
   }
 
   fn evaluate_textjoin(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6089,7 +6137,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       if sheet.is_empty() {
         String::new()
       } else if a1 {
-        format!("{sheet}.")
+        format!("{sheet}!")
       } else {
         format!("{sheet}!")
       }
@@ -6110,7 +6158,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         row
       )
     } else {
-      format!("R{row}C{column}")
+      match abs_num {
+        1 | 5 => format!("R{row}C{column}"),
+        2 | 6 => format!("R{row}C[{column}]"),
+        3 | 7 => format!("R[{row}]C{column}"),
+        4 | 8 => format!("R[{row}]C[{column}]"),
+        _ => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+      }
     };
     Some(FormulaValue::String(Cow::Owned(format!(
       "{}{reference}",
@@ -6723,6 +6777,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let lookup = self.scalar_value(self.evaluate(args.first()?)?);
+    if matches!(lookup, FormulaValue::Blank) {
+      return Some(FormulaValue::Error(FormulaErrorValue::NA));
+    }
     let array_evaluator = self.with_array_context();
     let data = array_evaluator.evaluate(args.get(1)?)?;
     let data_matrix = self.matrix_values(&data);
@@ -6733,20 +6790,39 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     };
     let result_matrix = result.as_ref().map(|value| self.matrix_values(value));
     let (data_vector, data_vertical) = lookup_vector(&data_matrix)?;
-    let Some(index) = search_vector(
-      self,
-      &lookup,
-      &data_vector,
-      QueryOp::LessOrEqual,
-      LookupSearchMode::Forward,
-      false,
-    ) else {
+    let query = QueryEntry {
+      op: QueryOp::LessOrEqual,
+      field: 0,
+      item: QueryItem {
+        kind: query_value_kind(&lookup),
+        value: lookup.clone(),
+        match_empty: false,
+      },
+    };
+    let param = QueryParam::single(query, QuerySearchType::Normal).with_range_lookup(true);
+    let query = param.entries.first()?;
+    let (search_vector, index_map) = lookup_search_vector_omitting_errors(&data_vector);
+    let search_slice = search_vector.as_deref().unwrap_or(&data_vector);
+    let Some(search_index) = lookup_binary_search(self, search_slice, query, &param, true, false)
+    else {
       return Some(FormulaValue::Error(FormulaErrorValue::NA));
     };
+    let index = index_map
+      .as_ref()
+      .and_then(|indices| indices.get(search_index).copied())
+      .unwrap_or(search_index);
 
     if let Some(result_matrix) = result_matrix {
       let rows = result_matrix.len();
       let columns = result_matrix.first().map_or(0, Vec::len);
+      if rows == 1 && columns == 1 {
+        return result_matrix
+          .first()
+          .and_then(|row| row.first())
+          .cloned()
+          .map(lookup_result_value)
+          .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
+      }
       if rows > 1 && columns > 1 {
         return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
       }
@@ -6803,7 +6879,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup,
         &vector,
         QueryOp::LessOrEqual,
-        LookupSearchMode::Forward,
+        LookupSearchMode::BinaryAscending,
         false,
       ),
       -1 => search_vector(
@@ -6811,7 +6887,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup,
         &vector,
         QueryOp::GreaterOrEqual,
-        LookupSearchMode::Forward,
+        LookupSearchMode::BinaryDescending,
         false,
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
@@ -6840,15 +6916,52 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|value| self.number(&value))
       .unwrap_or(1.0) as i32;
     let search = LookupSearchMode::from_excel(search_mode)?;
+    if matches!(match_mode, 2 | 3)
+      && matches!(
+        search,
+        LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending
+      )
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
     let index = match match_mode {
       0 => search_vector(self, &lookup, &vector, QueryOp::Equal, search, true),
-      -1 => search_vector(self, &lookup, &vector, QueryOp::LessOrEqual, search, false),
-      1 => search_vector(
+      -1 => search_vector_with_type(
+        self,
+        &lookup,
+        &vector,
+        QueryOp::LessOrEqual,
+        search,
+        false,
+        QuerySearchType::Normal,
+        true,
+      ),
+      1 => search_vector_with_type(
         self,
         &lookup,
         &vector,
         QueryOp::GreaterOrEqual,
         search,
+        false,
+        QuerySearchType::Normal,
+        true,
+      ),
+      2 | 3 => search_vector_with_type(
+        self,
+        &lookup,
+        &vector,
+        QueryOp::Equal,
+        search,
+        true,
+        if !matches!(lookup, FormulaValue::String(_)) {
+          QuerySearchType::Normal
+        } else if match_mode == 2 && may_be_wildcard(self.text(&lookup).as_ref()) {
+          QuerySearchType::Wildcard
+        } else if match_mode == 3 && may_be_regex(self.text(&lookup).as_ref()) {
+          QuerySearchType::Regex
+        } else {
+          QuerySearchType::Normal
+        },
         false,
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
@@ -6880,37 +6993,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     };
     if let FormulaValue::Matrix(rows) = table {
       let result_index = result_column.checked_sub(1)? as usize;
-      if rows.first().is_some_and(|row| result_index >= row.len()) {
-        return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+      if rows.first().is_none_or(|row| result_index >= row.len()) {
+        return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
       }
-      let vector = rows
-        .iter()
-        .map(|row| row.first().cloned().unwrap_or_default())
-        .collect::<Vec<_>>();
       let sorted = args
         .get(3)
         .and_then(|arg| self.evaluate(arg))
         .map(|value| self.truthy(&value))
         .unwrap_or(true);
-      let index = if sorted {
-        search_vector(
-          self,
-          &lookup,
-          &vector,
-          QueryOp::LessOrEqual,
-          LookupSearchMode::Forward,
-          false,
-        )
-      } else {
-        search_vector(
-          self,
-          &lookup,
-          &vector,
-          QueryOp::Equal,
-          LookupSearchMode::Forward,
-          true,
-        )
-      };
+      let index = vhlookup_matrix_index(self, &lookup, &rows, false, sorted);
       let Some(index) = index else {
         return Some(FormulaValue::Error(FormulaErrorValue::NA));
       };
@@ -6925,43 +7016,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
     if reference.range.start.column + result_column - 1 > reference.range.end.column {
-      return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     let sorted = args
       .get(3)
       .and_then(|arg| self.evaluate(arg))
       .map(|value| self.truthy(&value))
       .unwrap_or(true);
-    let vector = (reference.range.start.row..=reference.range.end.row)
-      .map(|row| {
-        self.reference_cell_value(
-          &reference,
-          CellAddress {
-            column: reference.range.start.column,
-            row,
-          },
-        )
-      })
-      .collect::<Vec<_>>();
-    let index = if sorted {
-      search_vector(
-        self,
-        &lookup,
-        &vector,
-        QueryOp::LessOrEqual,
-        LookupSearchMode::Forward,
-        false,
-      )
-    } else {
-      search_vector(
-        self,
-        &lookup,
-        &vector,
-        QueryOp::Equal,
-        LookupSearchMode::Forward,
-        true,
-      )
-    };
+    let matrix = self.matrix_values(&FormulaValue::Reference(reference.clone()));
+    let index = vhlookup_matrix_index(self, &lookup, &matrix, false, sorted);
     index
       .map(|index| {
         self.reference_cell_value(
@@ -6991,26 +7054,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .map(|value| self.truthy(&value))
       .unwrap_or(true);
     let matrix = self.matrix_values(&self.evaluate(args.get(1)?)?);
-    let first_row = matrix.first()?;
-    let index = if sorted {
-      search_vector(
-        self,
-        &lookup,
-        first_row,
-        QueryOp::LessOrEqual,
-        LookupSearchMode::Forward,
-        false,
-      )
-    } else {
-      search_vector(
-        self,
-        &lookup,
-        first_row,
-        QueryOp::Equal,
-        LookupSearchMode::Forward,
-        true,
-      )
-    };
+    if row_index >= matrix.len() {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let index = vhlookup_matrix_index(self, &lookup, &matrix, true, sorted);
     let Some(index) = index else {
       return Some(FormulaValue::Error(FormulaErrorValue::NA));
     };
@@ -7065,7 +7112,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending
       )
     {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
     let index = match match_mode {
       0 => search_vector_with_type(
@@ -7076,6 +7123,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         search,
         true,
         QuerySearchType::Normal,
+        false,
       ),
       -1 => search_vector_with_type(
         self,
@@ -7085,15 +7133,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         search,
         true,
         QuerySearchType::Normal,
+        false,
       )
       .or_else(|| {
-        search_vector(
+        search_vector_with_type(
           self,
           &lookup,
           &lookup_vector,
           QueryOp::LessOrEqual,
           search,
           false,
+          QuerySearchType::Normal,
+          true,
         )
       }),
       1 => search_vector_with_type(
@@ -7104,15 +7155,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         search,
         true,
         QuerySearchType::Normal,
+        false,
       )
       .or_else(|| {
-        search_vector(
+        search_vector_with_type(
           self,
           &lookup,
           &lookup_vector,
           QueryOp::GreaterOrEqual,
           search,
           false,
+          QuerySearchType::Normal,
+          true,
         )
       }),
       2 | 3 => search_vector_with_type(
@@ -7122,11 +7176,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         true,
-        if match_mode == 2 {
+        if !matches!(lookup, FormulaValue::String(_)) {
+          QuerySearchType::Normal
+        } else if match_mode == 2 && may_be_wildcard(self.text(&lookup).as_ref()) {
           QuerySearchType::Wildcard
-        } else {
+        } else if match_mode == 3 && may_be_regex(self.text(&lookup).as_ref()) {
           QuerySearchType::Regex
+        } else {
+          QuerySearchType::Normal
         },
+        false,
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     };
@@ -8243,7 +8302,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if matrix_dimensions(&left) != matrix_dimensions(&right) {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut total = 0.0;
+    let mut total = KahanSum::default();
     for (left_row, right_row) in left.iter().zip(&right) {
       for (left_value, right_value) in left_row.iter().zip(right_row) {
         let Some(left_number) = matrix_stat_number(left_value) else {
@@ -8252,15 +8311,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let Some(right_number) = matrix_stat_number(right_value) else {
           continue;
         };
-        total += left_number * left_number;
+        total.add(left_number * left_number);
         if plus {
-          total += right_number * right_number;
+          total.add(right_number * right_number);
         } else {
-          total -= right_number * right_number;
+          total.add(-(right_number * right_number));
         }
       }
     }
-    Some(FormulaValue::Number(total))
+    Some(FormulaValue::Number(total.finish()))
   }
 
   fn evaluate_sumxmy2(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -8272,7 +8331,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if matrix_dimensions(&left) != matrix_dimensions(&right) {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut total = 0.0;
+    let mut total = KahanSum::default();
     for (left_row, right_row) in left.iter().zip(&right) {
       for (left_value, right_value) in left_row.iter().zip(right_row) {
         let Some(left_number) = matrix_stat_number(left_value) else {
@@ -8281,11 +8340,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let Some(right_number) = matrix_stat_number(right_value) else {
           continue;
         };
-        let difference = left_number - right_number;
-        total += difference * difference;
+        let difference = approx_sub(left_number, right_number);
+        total.add(difference * difference);
       }
     }
-    Some(FormulaValue::Number(total))
+    Some(FormulaValue::Number(total.finish()))
   }
 
   fn evaluate_frequency(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -8807,7 +8866,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .get(4)
       .and_then(|arg| self.evaluate(arg))
       .is_some_and(|value| self.truthy(&value));
-    Some(FormulaValue::Number(-financial_fv(
+    Some(FormulaValue::Number(financial_fv(
       rate,
       nper,
       payment,
@@ -9388,13 +9447,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if ranges.is_empty() {
       return None;
     }
-    let criterion = QueryEntry::from_value(self, &self.evaluate(args.get(1)?)?);
+    let criterion = QueryParam::from_criterion(self, &self.evaluate(args.get(1)?)?, 0);
     let mut count = 0.0;
     for range in ranges {
       let sheet = self.range_sheet(&range);
       for (address, value) in self.range_cells(&range) {
         let value = self.book.query_cell_value(sheet, address, value);
-        if criterion.matches_cell(self, sheet, address, &value) {
+        if criterion.matches_value(self, &value, self.book.is_query_empty_cell(sheet, address)) {
           count += 1.0;
         }
       }
@@ -9457,22 +9516,20 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 3 {
       return None;
     }
-    let Some(database_arg) = self.evaluate(args.first()?) else {
+    let Some(database) = self.query_grid_from_ast(args.first()?) else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    let Some(criteria_arg) = self.evaluate(args.get(2)?) else {
+    let Some(criteria) = self.query_grid_from_ast(args.get(2)?) else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    let database = self.matrix_values(&database_arg);
-    let criteria = self.matrix_values(&criteria_arg);
-    if database.len() < 2
-      || database.first().is_none_or(Vec::is_empty)
-      || criteria.len() < 2
-      || criteria.first().is_none_or(Vec::is_empty)
+    if database.values.len() < 2
+      || database.values.first().is_none_or(Vec::is_empty)
+      || criteria.values.len() < 2
+      || criteria.values.first().is_none_or(Vec::is_empty)
     {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let field = match self.database_field_index(args.get(1)?, &database[0], function) {
+    let field = match self.database_field_index(args.get(1)?, &database.values[0], function) {
       Some(field) => field,
       None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     };
@@ -9483,7 +9540,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(field) = field else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    if field >= database[0].len() {
+    if field >= database.values[0].len() {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
 
@@ -9502,7 +9559,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             values.push(1.0);
           }
         }
-        DatabaseFunction::Get => text_values.push(value),
+        DatabaseFunction::Get => {
+          if !matches!(value, FormulaValue::Blank) {
+            text_values.push(value);
+          }
+        }
         _ => {
           if let Some(number) = self.number(&value) {
             values.push(number);
@@ -9515,12 +9576,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       DatabaseFunction::Count | DatabaseFunction::CountA => {
         Some(FormulaValue::Number(values.len() as f64))
       }
-      DatabaseFunction::Sum => Some(FormulaValue::Number(values.iter().sum())),
+      DatabaseFunction::Sum => Some(FormulaValue::Number(kahan_sum(values.iter().copied()))),
       DatabaseFunction::Average if values.is_empty() => {
         Some(FormulaValue::Error(FormulaErrorValue::Div0))
       }
       DatabaseFunction::Average => Some(FormulaValue::Number(
-        values.iter().sum::<f64>() / values.len() as f64,
+        kahan_sum(values.iter().copied()) / values.len() as f64,
       )),
       DatabaseFunction::Get => match text_values.as_slice() {
         [value] => Some(value.clone()),
@@ -9586,38 +9647,73 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn database_matching_rows<'b>(
     &self,
-    database: &'b [Vec<FormulaValue<'doc>>],
-    criteria: &[Vec<FormulaValue<'doc>>],
+    database: &'b QueryGrid<'doc>,
+    criteria: &QueryGrid<'doc>,
   ) -> Vec<&'b [FormulaValue<'doc>]> {
-    let headers = &database[0];
-    let criteria_headers = &criteria[0];
-    database[1..]
+    let params = self.database_query_params(&database.values[0], &criteria.values);
+    database
+      .values
       .iter()
-      .filter(|row| {
-        criteria[1..].iter().any(|criteria_row| {
-          criteria_row
+      .zip(database.query_empty.iter())
+      .skip(1)
+      .filter(|(row, query_empty)| {
+        params
+          .iter()
+          .any(|param| param.matches_row_with_empty(self, row, query_empty))
+      })
+      .map(|(row, _)| row.as_slice())
+      .collect()
+  }
+
+  fn database_query_params(
+    &self,
+    headers: &[FormulaValue<'doc>],
+    criteria: &[Vec<FormulaValue<'doc>>],
+  ) -> Vec<QueryParam<'doc>> {
+    let Some(criteria_headers) = criteria.first() else {
+      return Vec::new();
+    };
+    criteria[1..]
+      .iter()
+      .filter_map(|criteria_row| {
+        let mut entries = Vec::new();
+        let mut search_type = QuerySearchType::Normal;
+        let mut invalid = false;
+        for (criteria_column, criterion_value) in criteria_row.iter().enumerate() {
+          if !database_criterion_present(criterion_value) {
+            continue;
+          }
+          let Some(header) = criteria_headers.get(criteria_column) else {
+            continue;
+          };
+          let header = self.text(header);
+          if header.is_empty() {
+            continue;
+          }
+          let Some(field) = headers
             .iter()
-            .enumerate()
-            .filter(|(_, value)| database_criterion_present(value))
-            .all(|(criteria_column, criterion_value)| {
-              let Some(header) = criteria_headers.get(criteria_column) else {
-                return true;
-              };
-              let header = self.text(header);
-              if header.is_empty() {
-                return true;
-              }
-              let Some(field_column) = headers.iter().position(|database_header| {
-                self.text(database_header).eq_ignore_ascii_case(&header)
-              }) else {
-                return false;
-              };
-              let candidate = row.get(field_column).cloned().unwrap_or_default();
-              QueryEntry::from_value(self, criterion_value).matches(self, &candidate)
-            })
+            .position(|database_header| self.text(database_header).eq_ignore_ascii_case(&header))
+          else {
+            invalid = true;
+            break;
+          };
+          let (entry, entry_search_type) = QueryEntry::from_value(self, criterion_value, field);
+          if search_type == QuerySearchType::Normal {
+            search_type = entry_search_type;
+          }
+          entries.push(entry);
+        }
+        if invalid {
+          return None;
+        }
+        Some(QueryParam {
+          entries,
+          search_type,
+          range_lookup: false,
+          match_whole_cell: true,
+          case_sensitive: false,
         })
       })
-      .map(Vec::as_slice)
       .collect()
   }
 
@@ -9632,10 +9728,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let mut result_shape = (1usize, 1usize);
     let mut result_len = 1usize;
     for pair in criteria_args.chunks_exact(2) {
-      let range = self.matrix_values(&self.evaluate(&pair[0])?);
-      let rows = range.len();
-      let columns = range.first().map_or(0, Vec::len);
-      if rows == 0 || columns == 0 || range.iter().any(|row| row.len() != columns) {
+      let range = self.query_grid_from_ast(&pair[0])?;
+      let rows = range.values.len();
+      let columns = range.values.first().map_or(0, Vec::len);
+      if rows == 0
+        || columns == 0
+        || range.values.iter().any(|row| row.len() != columns)
+        || range.query_empty.iter().any(|row| row.len() != columns)
+      {
         return Some(FormulaValue::Error(FormulaErrorValue::Value));
       }
       let criteria_matrix = self.matrix_values(&self.evaluate(&pair[1])?);
@@ -9657,21 +9757,21 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         criteria_matrix
           .into_iter()
           .flatten()
-          .map(|value| QueryEntry::from_value(self, &value))
+          .map(|value| QueryParam::from_criterion(self, &value, 0))
           .collect::<Vec<_>>(),
       );
     }
 
     if criteria_ranges
       .windows(2)
-      .any(|window| matrix_dimensions(&window[0]) != matrix_dimensions(&window[1]))
+      .any(|window| window[0].dimensions() != window[1].dimensions())
     {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let dimensions = matrix_dimensions(criteria_ranges.first()?);
+    let dimensions = criteria_ranges.first()?.dimensions();
     let main_values = if let Some(main_range) = main_range {
-      let values = self.matrix_values(&self.evaluate(main_range)?);
-      if matrix_dimensions(&values) != dimensions {
+      let values = self.query_grid_from_ast(main_range)?;
+      if values.dimensions() != dimensions {
         return Some(FormulaValue::Error(FormulaErrorValue::Value));
       }
       Some(values)
@@ -9682,7 +9782,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let mut outputs = Vec::with_capacity(result_len);
     for criteria_index in 0..result_len {
       let mut count = 0.0;
-      let mut sum = 0.0;
+      let mut sum = KahanSum::default();
       let mut minmax = None::<f64>;
       for row in 0..dimensions.0 {
         for column in 0..dimensions.1 {
@@ -9696,7 +9796,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
                 } else {
                   &criteria[criteria_index]
                 };
-                criteria.matches(self, &range[row][column])
+                criteria.matches_value(
+                  self,
+                  &range.values[row][column],
+                  range.query_empty[row][column],
+                )
               });
           if !matches_all {
             continue;
@@ -9706,10 +9810,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             IfsAggregate::Sum | IfsAggregate::Average | IfsAggregate::Min | IfsAggregate::Max => {
               if let Some(number) = main_values
                 .as_ref()
-                .and_then(|values| self.number(&values[row][column]))
+                .and_then(|values| self.number(&values.values[row][column]))
               {
                 count += 1.0;
-                sum += number;
+                sum.add(number);
                 minmax = Some(match (aggregate, minmax) {
                   (IfsAggregate::Min, Some(value)) => value.min(number),
                   (IfsAggregate::Max, Some(value)) => value.max(number),
@@ -9722,9 +9826,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       outputs.push(match aggregate {
         IfsAggregate::Count => FormulaValue::Number(count),
-        IfsAggregate::Sum => FormulaValue::Number(sum),
+        IfsAggregate::Sum => FormulaValue::Number(sum.finish()),
         IfsAggregate::Average if count == 0.0 => FormulaValue::Error(FormulaErrorValue::Div0),
-        IfsAggregate::Average => FormulaValue::Number(sum / count),
+        IfsAggregate::Average => FormulaValue::Number(sum.finish() / count),
         IfsAggregate::Min | IfsAggregate::Max => FormulaValue::Number(minmax.unwrap_or(0.0)),
       });
     }
@@ -9919,15 +10023,23 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or(1.0);
-    if value == 0.0 || significance == 0.0 {
+    if value == 0.0 {
       return Some(FormulaValue::Number(0.0));
     }
-    if value * significance < 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if value * significance > 0.0 {
+      return Some(FormulaValue::Number(
+        approx_floor(value / significance) * significance,
+      ));
     }
-    Some(FormulaValue::Number(
-      approx_floor(value / significance) * significance,
-    ))
+    if significance == 0.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    if value < 0.0 {
+      return Some(FormulaValue::Number(
+        approx_ceil(value / -significance) * -significance,
+      ));
+    }
+    Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
   }
 
   fn evaluate_percentile(
@@ -12487,9 +12599,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return self.map_numeric_binary(left, right, op);
     }
+    let Some(left) = arithmetic_matrix_number(&left) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    let Some(right) = arithmetic_matrix_number(&right) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
     Some(FormulaValue::Number(normalize_formula_number(op(
-      self.number(&left)?,
-      self.number(&right)?,
+      left, right,
     ))))
   }
 
@@ -12802,6 +12919,74 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
   }
 
+  fn query_grid_from_ast(&self, ast: &FormulaAst<'doc>) -> Option<QueryGrid<'doc>> {
+    let value = self.evaluate(ast)?;
+    Some(match value {
+      FormulaValue::Reference(reference) => self.query_grid_from_reference(&reference),
+      FormulaValue::RefList(ranges) if ranges.len() == 1 => {
+        self.query_grid_from_reference(ranges.first()?)
+      }
+      FormulaValue::RefList(ranges) => {
+        let mut values = Vec::new();
+        let mut query_empty = Vec::new();
+        for range in ranges {
+          let grid = self.query_grid_from_reference(&range);
+          values.extend(grid.values);
+          query_empty.extend(grid.query_empty);
+        }
+        QueryGrid {
+          values,
+          query_empty,
+        }
+      }
+      FormulaValue::Matrix(values) => {
+        let query_empty = values
+          .iter()
+          .map(|row| vec![false; row.len()])
+          .collect::<Vec<_>>();
+        QueryGrid {
+          values,
+          query_empty,
+        }
+      }
+      value => QueryGrid {
+        values: vec![vec![value]],
+        query_empty: vec![vec![false]],
+      },
+    })
+  }
+
+  fn query_grid_from_reference(&self, reference: &QualifiedRange<'doc>) -> QueryGrid<'doc> {
+    if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+      return QueryGrid {
+        values: Vec::new(),
+        query_empty: Vec::new(),
+      };
+    }
+    let sheet = self.range_sheet(reference);
+    let start_row = reference.range.start.row.min(reference.range.end.row);
+    let end_row = reference.range.start.row.max(reference.range.end.row);
+    let start_column = reference.range.start.column.min(reference.range.end.column);
+    let end_column = reference.range.start.column.max(reference.range.end.column);
+    let mut values = Vec::new();
+    let mut query_empty = Vec::new();
+    for row in start_row..=end_row {
+      let mut value_row = Vec::new();
+      let mut empty_row = Vec::new();
+      for column in start_column..=end_column {
+        let address = CellAddress { column, row };
+        value_row.push(self.book.cell_value(sheet, address));
+        empty_row.push(self.book.is_query_empty_cell(sheet, address));
+      }
+      values.push(value_row);
+      query_empty.push(empty_row);
+    }
+    QueryGrid {
+      values,
+      query_empty,
+    }
+  }
+
   fn count_blank(&self, value: &FormulaValue<'doc>) -> usize {
     match value {
       FormulaValue::Reference(reference) => {
@@ -13085,17 +13270,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           FormulaValue::Error(FormulaErrorValue::Value)
         }
       }
-      FormulaValue::Matrix(rows) => {
-        if rows.len() == 1 && rows.first().is_some_and(|row| row.len() == 1) {
-          rows
-            .into_iter()
-            .next()
-            .and_then(|row| row.into_iter().next())
-            .unwrap_or_default()
-        } else {
-          FormulaValue::Error(FormulaErrorValue::Value)
-        }
-      }
+      FormulaValue::Matrix(rows) => rows
+        .into_iter()
+        .next()
+        .and_then(|row| row.into_iter().next())
+        .unwrap_or_default(),
       value => value,
     }
   }
@@ -13756,7 +13935,7 @@ fn aggregate_duplicate_ets_points(
       .into_iter()
       .reduce(f64::min)
       .ok_or(FormulaErrorValue::Value)?,
-    7 => values.iter().sum(),
+    7 => kahan_sum(values.iter().copied()),
     _ => return Err(FormulaErrorValue::IllegalArgument),
   };
   Ok(())
@@ -13869,15 +14048,140 @@ enum QuerySearchType {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+struct QueryItem<'doc> {
+  value: FormulaValue<'doc>,
+  kind: QueryValueKind,
+  match_empty: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct QueryEntry<'doc> {
   op: QueryOp,
-  value: FormulaValue<'doc>,
+  field: usize,
+  item: QueryItem<'doc>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct QueryParam<'doc> {
+  entries: Vec<QueryEntry<'doc>>,
   search_type: QuerySearchType,
-  kind: QueryValueKind,
+  range_lookup: bool,
+  match_whole_cell: bool,
+  case_sensitive: bool,
+}
+
+impl<'doc> QueryParam<'doc> {
+  fn single(entry: QueryEntry<'doc>, search_type: QuerySearchType) -> Self {
+    Self {
+      entries: vec![entry],
+      search_type,
+      range_lookup: false,
+      match_whole_cell: true,
+      case_sensitive: false,
+    }
+  }
+
+  fn from_criterion(
+    evaluator: &FormulaEvaluator<'_, 'doc>,
+    value: &FormulaValue<'doc>,
+    field: usize,
+  ) -> Self {
+    let (entry, search_type) = QueryEntry::from_value(evaluator, value, field);
+    Self::single(entry, search_type)
+  }
+
+  fn with_range_lookup(mut self, range_lookup: bool) -> Self {
+    self.range_lookup = range_lookup;
+    self
+  }
+
+  fn matches_value(
+    &self,
+    evaluator: &FormulaEvaluator<'_, 'doc>,
+    candidate: &FormulaValue<'doc>,
+    candidate_query_empty: bool,
+  ) -> bool {
+    QueryEvaluator {
+      evaluator,
+      param: self,
+    }
+    .matches_value(candidate, candidate_query_empty)
+  }
+
+  fn matches_row_with_empty(
+    &self,
+    evaluator: &FormulaEvaluator<'_, 'doc>,
+    row: &[FormulaValue<'doc>],
+    query_empty: &[bool],
+  ) -> bool {
+    QueryEvaluator {
+      evaluator,
+      param: self,
+    }
+    .matches_row_with_empty(row, query_empty)
+  }
+}
+
+struct QueryEvaluator<'eval, 'ctx, 'doc> {
+  evaluator: &'eval FormulaEvaluator<'ctx, 'doc>,
+  param: &'eval QueryParam<'doc>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct QueryGrid<'doc> {
+  values: Vec<Vec<FormulaValue<'doc>>>,
+  query_empty: Vec<Vec<bool>>,
+}
+
+impl<'doc> QueryGrid<'doc> {
+  fn dimensions(&self) -> (usize, usize) {
+    matrix_dimensions(&self.values)
+  }
+}
+
+impl<'eval, 'ctx, 'doc> QueryEvaluator<'eval, 'ctx, 'doc> {
+  fn matches_value(&self, candidate: &FormulaValue<'doc>, candidate_query_empty: bool) -> bool {
+    self
+      .param
+      .entries
+      .first()
+      .is_some_and(|entry| self.matches_entry(entry, candidate, candidate_query_empty))
+  }
+
+  fn matches_row_with_empty(&self, row: &[FormulaValue<'doc>], query_empty: &[bool]) -> bool {
+    self.param.entries.iter().all(|entry| {
+      row.get(entry.field).is_some_and(|candidate| {
+        self.matches_entry(
+          entry,
+          candidate,
+          query_empty.get(entry.field).copied().unwrap_or(false),
+        )
+      })
+    })
+  }
+
+  fn matches_entry(
+    &self,
+    entry: &QueryEntry<'doc>,
+    candidate: &FormulaValue<'doc>,
+    candidate_query_empty: bool,
+  ) -> bool {
+    query_matches(
+      self.evaluator,
+      self.param,
+      entry,
+      candidate,
+      candidate_query_empty,
+    )
+  }
 }
 
 impl<'doc> QueryEntry<'doc> {
-  fn from_value(evaluator: &FormulaEvaluator<'_, 'doc>, value: &FormulaValue<'doc>) -> Self {
+  fn from_value(
+    evaluator: &FormulaEvaluator<'_, 'doc>,
+    value: &FormulaValue<'doc>,
+    field: usize,
+  ) -> (Self, QuerySearchType) {
     let value = evaluator.first_value(value);
     if let FormulaValue::String(text) = value {
       let (op, operand) = parse_criteria_operator(text.as_ref());
@@ -13906,44 +14210,38 @@ impl<'doc> QueryEntry<'doc> {
       } else {
         QueryValueKind::Text
       };
-      Self {
-        op,
-        value: operand_value,
+      (
+        Self {
+          op,
+          field,
+          item: QueryItem {
+            value: operand_value,
+            kind,
+            match_empty: (op == QueryOp::Equal && trimmed.is_empty())
+              || (op == QueryOp::NotEqual && !trimmed.is_empty()),
+          },
+        },
         search_type,
-        kind,
-      }
+      )
     } else {
-      Self {
-        op: QueryOp::Equal,
-        kind: query_value_kind(&value),
-        value,
-        search_type: QuerySearchType::Normal,
-      }
+      let value = if matches!(value, FormulaValue::Blank) {
+        FormulaValue::Number(0.0)
+      } else {
+        value
+      };
+      (
+        Self {
+          op: QueryOp::Equal,
+          field,
+          item: QueryItem {
+            kind: query_value_kind(&value),
+            value,
+            match_empty: false,
+          },
+        },
+        QuerySearchType::Normal,
+      )
     }
-  }
-
-  fn matches(
-    &self,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-    candidate: &FormulaValue<'doc>,
-  ) -> bool {
-    query_matches(evaluator, self, candidate, false, false)
-  }
-
-  fn matches_cell(
-    &self,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-    sheet: SheetId,
-    address: CellAddress,
-    candidate: &FormulaValue<'doc>,
-  ) -> bool {
-    query_matches(
-      evaluator,
-      self,
-      candidate,
-      false,
-      evaluator.book.is_query_empty_cell(sheet, address),
-    )
   }
 }
 
@@ -13969,57 +14267,75 @@ impl LookupSearchMode {
 
 fn query_matches<'doc>(
   evaluator: &FormulaEvaluator<'_, 'doc>,
+  param: &QueryParam<'doc>,
   query: &QueryEntry<'doc>,
   candidate: &FormulaValue<'doc>,
-  range_lookup: bool,
   candidate_query_empty: bool,
 ) -> bool {
   if matches!(candidate, FormulaValue::Error(_)) {
     return false;
   }
-  if matches!(query.kind, QueryValueKind::Empty | QueryValueKind::NonEmpty) {
+  if matches!(
+    query.item.kind,
+    QueryValueKind::Empty | QueryValueKind::NonEmpty
+  ) {
     let blank = candidate_query_empty || is_query_empty(candidate);
-    return if query.kind == QueryValueKind::Empty {
+    return if query.item.kind == QueryValueKind::Empty {
       blank
     } else {
       !blank
     };
   }
-  if !range_lookup
-    && query.kind == QueryValueKind::Number
+  if query.item.match_empty && (candidate_query_empty || is_query_empty(candidate)) {
+    return matches!(
+      query.op,
+      QueryOp::NotEqual | QueryOp::LessOrEqual | QueryOp::GreaterOrEqual
+    );
+  }
+  if !param.range_lookup
+    && query.item.kind == QueryValueKind::Number
     && query_candidate_number(candidate).is_none()
   {
     return matches!(query.op, QueryOp::NotEqual);
   }
-  if !range_lookup
-    && query.kind == QueryValueKind::Text
+  if !param.range_lookup
+    && query.item.kind == QueryValueKind::Text
     && matches!(candidate, FormulaValue::Number(_))
   {
     return matches!(query.op, QueryOp::NotEqual);
   }
-  if query.search_type == QuerySearchType::Wildcard {
-    let FormulaValue::String(pattern) = &query.value else {
+  if param.search_type == QuerySearchType::Wildcard {
+    let FormulaValue::String(pattern) = &query.item.value else {
       return false;
     };
-    let matched = wildcard_match(pattern.as_ref(), &evaluator.text(candidate));
+    let text = evaluator.text(candidate);
+    let matched = if param.match_whole_cell {
+      wildcard_match(pattern.as_ref(), &text)
+    } else {
+      wildcard_match(pattern.as_ref(), &text) || lookup_text_contains(&text, pattern.as_ref())
+    };
     return match query.op {
       QueryOp::Equal => matched,
       QueryOp::NotEqual => !matched,
       _ => false,
     };
   }
-  if query.search_type == QuerySearchType::Regex {
-    let FormulaValue::String(pattern) = &query.value else {
+  if param.search_type == QuerySearchType::Regex {
+    let FormulaValue::String(pattern) = &query.item.value else {
       return false;
     };
-    let matched = regex_match_whole_cell(pattern, &evaluator.text(candidate)).unwrap_or(false);
+    let matched =
+      regex_match(pattern, &evaluator.text(candidate), param.match_whole_cell).unwrap_or(false);
     return match query.op {
       QueryOp::Equal => matched,
       QueryOp::NotEqual => !matched,
       _ => false,
     };
   }
-  let ordering = query_compare_value(evaluator, candidate, &query.value, range_lookup);
+  let ordering = query_compare_value(evaluator, candidate, &query.item.value, param);
+  if ordering.is_none() && param.range_lookup {
+    return query_compare_by_range_lookup(query, candidate);
+  }
   match query.op {
     QueryOp::Equal => ordering == Some(0),
     QueryOp::NotEqual => ordering != Some(0),
@@ -14030,24 +14346,36 @@ fn query_matches<'doc>(
   }
 }
 
+fn query_compare_by_range_lookup(query: &QueryEntry<'_>, candidate: &FormulaValue<'_>) -> bool {
+  match query.item.kind {
+    QueryValueKind::Text if !matches!(query.op, QueryOp::Less | QueryOp::LessOrEqual) => false,
+    QueryValueKind::Text => query_candidate_number(candidate).is_some(),
+    _ if !matches!(query.op, QueryOp::Greater | QueryOp::GreaterOrEqual) => false,
+    _ => query_candidate_number(candidate).is_none(),
+  }
+}
+
 fn query_compare_value<'doc>(
   evaluator: &FormulaEvaluator<'_, 'doc>,
   candidate: &FormulaValue<'doc>,
   query: &FormulaValue<'doc>,
-  range_lookup: bool,
+  param: &QueryParam<'doc>,
 ) -> Option<i32> {
   if let Some((candidate, query)) = query_candidate_number(candidate).zip(evaluator.number(query)) {
     return Some(compare_numbers(candidate, query));
   }
   match (candidate, query) {
-    (FormulaValue::String(candidate), FormulaValue::String(query)) => {
-      Some(compare_text_case_insensitive(candidate, query))
-    }
+    (FormulaValue::String(candidate), FormulaValue::String(query)) => Some(compare_text(
+      evaluator,
+      candidate,
+      query,
+      param.case_sensitive,
+    )),
     (FormulaValue::Blank, FormulaValue::Blank) => Some(0),
-    (FormulaValue::Blank, _) if range_lookup => Some(-1),
-    (_, FormulaValue::Blank) if range_lookup => Some(1),
-    (FormulaValue::Number(_), FormulaValue::String(_)) if range_lookup => None,
-    (FormulaValue::String(_), FormulaValue::Number(_)) if range_lookup => None,
+    (FormulaValue::Blank, _) if param.range_lookup => Some(-1),
+    (_, FormulaValue::Blank) if param.range_lookup => Some(1),
+    (FormulaValue::Number(_), FormulaValue::String(_)) if param.range_lookup => None,
+    (FormulaValue::String(_), FormulaValue::Number(_)) if param.range_lookup => None,
     (FormulaValue::Boolean(left), FormulaValue::Boolean(right)) => Some(match left.cmp(right) {
       std::cmp::Ordering::Less => -1,
       std::cmp::Ordering::Equal => 0,
@@ -14061,7 +14389,6 @@ fn query_candidate_number(value: &FormulaValue<'_>) -> Option<f64> {
   match value {
     FormulaValue::Number(value) => Some(*value),
     FormulaValue::Boolean(value) => Some(if *value { 1.0 } else { 0.0 }),
-    FormulaValue::String(value) => value.trim().parse::<f64>().ok(),
     _ => None,
   }
 }
@@ -14099,12 +14426,67 @@ fn compare_numbers(left: f64, right: f64) -> i32 {
   }
 }
 
-fn compare_text_case_insensitive(left: &str, right: &str) -> i32 {
-  match left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase()) {
+fn compare_text(
+  evaluator: &FormulaEvaluator<'_, '_>,
+  left: &str,
+  right: &str,
+  case_sensitive: bool,
+) -> i32 {
+  let ordering =
+    lookup_collator(evaluator.book.locale.as_deref(), case_sensitive).compare(left, right);
+  match ordering {
     std::cmp::Ordering::Less => -1,
     std::cmp::Ordering::Equal => 0,
     std::cmp::Ordering::Greater => 1,
   }
+}
+
+fn lookup_collator(
+  locale: Option<&str>,
+  case_sensitive: bool,
+) -> &'static CollatorBorrowed<'static> {
+  static COLLATORS: OnceLock<
+    Mutex<BTreeMap<(Option<String>, bool), &'static CollatorBorrowed<'static>>>,
+  > = OnceLock::new();
+  let key = (
+    locale
+      .filter(|value| !value.trim().is_empty())
+      .map(str::to_string),
+    case_sensitive,
+  );
+  let mut collators = COLLATORS
+    .get_or_init(|| Mutex::new(BTreeMap::new()))
+    .lock()
+    .expect("lookup collator cache lock must not be poisoned");
+  if let Some(collator) = collators.get(&key) {
+    return collator;
+  }
+  let mut options = CollatorOptions::default();
+  options.strength = Some(if case_sensitive {
+    Strength::Tertiary
+  } else {
+    Strength::Secondary
+  });
+  let prefs = key
+    .0
+    .as_deref()
+    .and_then(|locale| locale.parse::<Locale>().ok())
+    .map(|locale| CollatorPreferences::from(&locale))
+    .unwrap_or_default();
+  let collator = Box::leak(Box::new(
+    Collator::try_new(prefs, options)
+      .expect("ICU compiled collator data must contain the requested locale"),
+  ));
+  collators.insert(key, collator);
+  collator
+}
+
+fn lookup_search_key(value: &str) -> String {
+  value.chars().flat_map(char::to_lowercase).collect()
+}
+
+fn lookup_text_contains(text: &str, pattern: &str) -> bool {
+  lookup_search_key(text).contains(&lookup_search_key(pattern))
 }
 
 fn search_vector<'doc>(
@@ -14115,13 +14497,21 @@ fn search_vector<'doc>(
   mode: LookupSearchMode,
   exact_type: bool,
 ) -> Option<usize> {
-  let search_type = if matches!(lookup, FormulaValue::String(text) if text.chars().any(|ch| matches!(ch, '*' | '?' | '~')))
-  {
+  let search_type = if matches!(lookup, FormulaValue::String(text) if may_be_wildcard(text)) {
     QuerySearchType::Wildcard
   } else {
     QuerySearchType::Normal
   };
-  search_vector_with_type(evaluator, lookup, vector, op, mode, exact_type, search_type)
+  search_vector_with_type(
+    evaluator,
+    lookup,
+    vector,
+    op,
+    mode,
+    exact_type,
+    search_type,
+    false,
+  )
 }
 
 fn search_vector_with_type<'doc>(
@@ -14132,87 +14522,245 @@ fn search_vector_with_type<'doc>(
   mode: LookupSearchMode,
   exact_type: bool,
   search_type: QuerySearchType,
+  match_empty: bool,
 ) -> Option<usize> {
+  let range_lookup = !matches!(op, QueryOp::Equal | QueryOp::NotEqual);
   let query = QueryEntry {
     op,
-    kind: query_value_kind(lookup),
-    value: lookup.clone(),
-    search_type,
+    field: 0,
+    item: QueryItem {
+      kind: query_value_kind(lookup),
+      value: lookup.clone(),
+      match_empty,
+    },
   };
-  let range_lookup = !matches!(op, QueryOp::Equal | QueryOp::NotEqual);
+  let param = QueryParam::single(query, search_type).with_range_lookup(range_lookup);
+  let query = param.entries.first()?;
   match mode {
-    LookupSearchMode::Forward | LookupSearchMode::BinaryAscending => {
+    LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending => {
+      if search_type != QuerySearchType::Normal {
+        return None;
+      }
+      lookup_binary_search(
+        evaluator,
+        vector,
+        query,
+        &param,
+        matches!(mode, LookupSearchMode::BinaryAscending),
+        true,
+      )
+    }
+    LookupSearchMode::Forward => {
       let mut found = None;
       for (index, candidate) in vector.iter().enumerate() {
-        if (exact_type || range_lookup) && !lookup_types_compatible(evaluator, lookup, candidate) {
+        if exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
           continue;
         }
-        if query_matches(evaluator, &query, candidate, range_lookup, false) {
+        if query_matches(evaluator, &param, query, candidate, false) {
           match op {
             QueryOp::Equal => {
               found = Some(index);
               break;
             }
             QueryOp::LessOrEqual => {
-              let replace = found.is_none_or(|found_index| {
-                query_compare_value(evaluator, candidate, &vector[found_index], true)
-                  .is_some_and(|ordering| ordering > 0)
-              });
-              if replace {
+              if lookup_candidate_type_matches(query, candidate)
+                && found.is_none_or(|found_index| {
+                  lookup_compare_cells(evaluator, candidate, &vector[found_index]) >= 0
+                })
+              {
                 found = Some(index);
               }
             }
             QueryOp::GreaterOrEqual => {
-              let replace = found.is_none_or(|found_index| {
-                query_compare_value(evaluator, candidate, &vector[found_index], true)
-                  .is_some_and(|ordering| ordering < 0)
-              });
-              if replace {
+              if lookup_candidate_type_matches(query, candidate)
+                && found.is_none_or(|found_index| {
+                  lookup_compare_cells(evaluator, candidate, &vector[found_index]) <= 0
+                })
+              {
                 found = Some(index);
               }
             }
-            _ => found = Some(index),
+            _ => {
+              if lookup_candidate_type_matches(query, candidate) {
+                found = Some(index);
+              }
+            }
           }
         }
       }
       found
     }
-    LookupSearchMode::Reverse | LookupSearchMode::BinaryDescending => {
+    LookupSearchMode::Reverse => {
       let mut found = None;
       for (index, candidate) in vector.iter().enumerate().rev() {
-        if (exact_type || range_lookup) && !lookup_types_compatible(evaluator, lookup, candidate) {
+        if exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
           continue;
         }
-        if query_matches(evaluator, &query, candidate, range_lookup, false) {
+        if query_matches(evaluator, &param, query, candidate, false) {
           match op {
             QueryOp::Equal => {
               found = Some(index);
               break;
             }
             QueryOp::LessOrEqual => {
-              let replace = found.is_none_or(|found_index| {
-                query_compare_value(evaluator, candidate, &vector[found_index], true)
-                  .is_some_and(|ordering| ordering > 0)
-              });
-              if replace {
+              if lookup_candidate_type_matches(query, candidate)
+                && found.is_none_or(|found_index| {
+                  lookup_compare_cells(evaluator, candidate, &vector[found_index]) > 0
+                })
+              {
                 found = Some(index);
               }
             }
             QueryOp::GreaterOrEqual => {
-              let replace = found.is_none_or(|found_index| {
-                query_compare_value(evaluator, candidate, &vector[found_index], true)
-                  .is_some_and(|ordering| ordering < 0)
-              });
-              if replace {
+              if lookup_candidate_type_matches(query, candidate)
+                && found.is_none_or(|found_index| {
+                  lookup_compare_cells(evaluator, candidate, &vector[found_index]) < 0
+                })
+              {
                 found = Some(index);
               }
             }
-            _ => found = Some(index),
+            _ => {
+              if lookup_candidate_type_matches(query, candidate) {
+                found = Some(index);
+              }
+            }
           }
         }
       }
       found
     }
+  }
+}
+
+fn lookup_binary_search<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  vector: &[FormulaValue<'doc>],
+  query: &QueryEntry<'doc>,
+  param: &QueryParam<'doc>,
+  sorted_ascending: bool,
+  empty_is_less: bool,
+) -> Option<usize> {
+  if vector.is_empty() {
+    return None;
+  }
+  let mut low = 0usize;
+  let mut high = vector.len();
+  let mut exact = None;
+  while low < high {
+    let mid = low + (high - low) / 2;
+    let cmp =
+      lookup_compare_candidate_to_query(evaluator, &vector[mid], query, param, empty_is_less)?;
+    if cmp == 0 {
+      exact = Some(mid);
+      break;
+    }
+    if sorted_ascending {
+      if cmp < 0 {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    } else {
+      if cmp > 0 {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+  }
+  if let Some(mut index) = exact {
+    while index + 1 < vector.len() && lookup_same_match_value(&vector[index], &vector[index + 1]) {
+      index += 1;
+    }
+    return lookup_binary_result_index(vector, query, index);
+  }
+  if query.op == QueryOp::Equal {
+    return None;
+  }
+  let index = match (sorted_ascending, query.op) {
+    (true, QueryOp::LessOrEqual) => low.checked_sub(1),
+    (true, QueryOp::GreaterOrEqual) => (low < vector.len()).then_some(low),
+    (false, QueryOp::LessOrEqual) => (low < vector.len()).then_some(low),
+    (false, QueryOp::GreaterOrEqual) => low.checked_sub(1),
+    _ => None,
+  }?;
+  lookup_binary_result_index(vector, query, index)
+}
+
+fn lookup_binary_result_index<'doc>(
+  vector: &[FormulaValue<'doc>],
+  query: &QueryEntry<'doc>,
+  index: usize,
+) -> Option<usize> {
+  (lookup_candidate_type_matches(query, vector.get(index)?)).then_some(index)
+}
+
+fn lookup_candidate_type_matches(query: &QueryEntry<'_>, candidate: &FormulaValue<'_>) -> bool {
+  match query.item.kind {
+    QueryValueKind::Text => !matches!(candidate, FormulaValue::Number(_)),
+    QueryValueKind::Number => query_candidate_number(candidate).is_some(),
+    _ => true,
+  }
+}
+
+fn lookup_compare_candidate_to_query<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  candidate: &FormulaValue<'doc>,
+  query: &QueryEntry<'doc>,
+  param: &QueryParam<'doc>,
+  empty_is_less: bool,
+) -> Option<i32> {
+  if matches!(candidate, FormulaValue::Blank) {
+    return Some(if empty_is_less { -1 } else { 1 });
+  }
+  query_compare_value(evaluator, candidate, &query.item.value, param).or_else(|| {
+    match query.item.kind {
+      QueryValueKind::Text if query_candidate_number(candidate).is_some() => Some(-1),
+      QueryValueKind::Number if matches!(candidate, FormulaValue::String(_)) => Some(1),
+      _ => None,
+    }
+  })
+}
+
+fn lookup_compare_cells<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  left: &FormulaValue<'doc>,
+  right: &FormulaValue<'doc>,
+) -> i32 {
+  match (left, right) {
+    (FormulaValue::Blank, FormulaValue::Blank) => 0,
+    (FormulaValue::Blank, _) => -1,
+    (_, FormulaValue::Blank) => 1,
+    (FormulaValue::Error(_), FormulaValue::Error(_)) => 0,
+    (FormulaValue::Error(_), _) => 1,
+    (_, FormulaValue::Error(_)) => -1,
+    _ => {
+      let left_number = query_candidate_number(left);
+      let right_number = query_candidate_number(right);
+      match (left_number, right_number) {
+        (Some(left), Some(right)) => compare_numbers(left, right),
+        (Some(_), None) => -1,
+        (None, Some(_)) => 1,
+        (None, None) => compare_text(
+          evaluator,
+          &evaluator.text(left),
+          &evaluator.text(right),
+          false,
+        ),
+      }
+    }
+  }
+}
+
+fn lookup_same_match_value(left: &FormulaValue<'_>, right: &FormulaValue<'_>) -> bool {
+  match (left, right) {
+    (FormulaValue::Number(left), FormulaValue::Number(right)) => left == right,
+    (FormulaValue::Boolean(left), FormulaValue::Boolean(right)) => left == right,
+    (FormulaValue::Blank, FormulaValue::Blank) => true,
+    (FormulaValue::String(left), FormulaValue::String(right)) => left == right,
+    (FormulaValue::Error(_), FormulaValue::Error(_)) => true,
+    _ => false,
   }
 }
 
@@ -14341,7 +14889,7 @@ fn aggregate_function_value<'doc>(
     6 => Some(values.into_iter().product()),
     7 => variance_slice(&values, true).map(f64::sqrt),
     8 => variance_slice(&values, false).map(f64::sqrt),
-    9 => Some(values.into_iter().sum()),
+    9 => Some(kahan_sum(values)),
     10 => variance_slice(&values, true),
     11 => variance_slice(&values, false),
     12 => {
@@ -14923,12 +15471,12 @@ fn regression_state(data: &RegressionData, constant: bool) -> Option<RegressionS
   if constant {
     mean_y = centered_y.iter().sum::<f64>() / n as f64;
     for value in &mut centered_y {
-      *value = approx_sub(*value, mean_y);
+      *value = approx_diff(*value, mean_y);
     }
     for column in 0..k {
       means[column] = centered_x.iter().map(|row| row[column]).sum::<f64>() / n as f64;
       for row in &mut centered_x {
-        row[column] = approx_sub(row[column], means[column]);
+        row[column] = approx_diff(row[column], means[column]);
       }
     }
   }
@@ -15181,6 +15729,149 @@ fn lookup_result_value(value: FormulaValue<'_>) -> FormulaValue<'_> {
   }
 }
 
+fn lookup_search_vector_omitting_errors<'doc>(
+  vector: &[FormulaValue<'doc>],
+) -> (Option<Vec<FormulaValue<'doc>>>, Option<Vec<usize>>) {
+  if !vector
+    .iter()
+    .all(|value| matches!(value, FormulaValue::Number(_) | FormulaValue::Error(_)))
+  {
+    return (None, None);
+  }
+  let mut values = Vec::new();
+  let mut indices = Vec::new();
+  for (index, value) in vector.iter().enumerate() {
+    if matches!(value, FormulaValue::Number(_)) {
+      values.push(value.clone());
+      indices.push(index);
+    }
+  }
+  if values.len() == vector.len() {
+    (None, None)
+  } else {
+    (Some(values), Some(indices))
+  }
+}
+
+fn vhlookup_matrix_index<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  lookup: &FormulaValue<'doc>,
+  matrix: &[Vec<FormulaValue<'doc>>],
+  horizontal: bool,
+  sorted: bool,
+) -> Option<usize> {
+  let count = if horizontal {
+    matrix.first().map_or(0, Vec::len)
+  } else {
+    matrix.len()
+  };
+  if count == 0 {
+    return None;
+  }
+  let lookup_is_text = matches!(lookup, FormulaValue::String(_) | FormulaValue::Blank);
+  let mut index = None;
+  if lookup_is_text {
+    let lookup_text = evaluator.text(lookup);
+    if sorted {
+      for candidate_index in 0..count {
+        let candidate = vhlookup_search_cell(matrix, horizontal, candidate_index);
+        if candidate.is_none_or(is_lookup_string_or_empty) {
+          let candidate_text = candidate
+            .map(|value| evaluator.text(value))
+            .unwrap_or_default();
+          let ordering = compare_text(evaluator, &candidate_text, &lookup_text, false);
+          if ordering <= 0 {
+            index = Some(candidate_index);
+          } else if candidate_index > 0 {
+            break;
+          }
+        } else {
+          index = Some(candidate_index);
+        }
+      }
+    } else {
+      for candidate_index in 0..count {
+        let candidate = vhlookup_search_cell(matrix, horizontal, candidate_index);
+        if candidate.is_none_or(is_lookup_string_or_empty)
+          && compare_text(
+            evaluator,
+            &candidate
+              .map(|value| evaluator.text(value))
+              .unwrap_or_default(),
+            &lookup_text,
+            false,
+          ) == 0
+        {
+          index = Some(candidate_index);
+          break;
+        }
+      }
+    }
+    if index.is_some_and(|index| {
+      matches!(
+        vhlookup_search_cell(matrix, horizontal, index),
+        Some(FormulaValue::Number(_))
+      )
+    }) {
+      return None;
+    }
+    return index;
+  }
+
+  let lookup_number = evaluator.number(lookup)?;
+  if sorted {
+    for candidate_index in 0..count {
+      let Some(candidate) = vhlookup_search_cell(matrix, horizontal, candidate_index) else {
+        continue;
+      };
+      if is_lookup_string_or_empty(candidate) {
+        continue;
+      }
+      let Some(candidate_number) = evaluator.number(candidate) else {
+        break;
+      };
+      if candidate_number <= lookup_number {
+        index = Some(candidate_index);
+      } else {
+        break;
+      }
+    }
+  } else {
+    for candidate_index in 0..count {
+      let Some(candidate) = vhlookup_search_cell(matrix, horizontal, candidate_index) else {
+        continue;
+      };
+      if is_lookup_string_or_empty(candidate) {
+        continue;
+      }
+      if evaluator
+        .number(candidate)
+        .is_some_and(|candidate_number| compare_numbers(candidate_number, lookup_number) == 0)
+      {
+        index = Some(candidate_index);
+        break;
+      }
+    }
+  }
+  index
+}
+
+fn vhlookup_search_cell<'doc>(
+  matrix: &'doc [Vec<FormulaValue<'doc>>],
+  horizontal: bool,
+  index: usize,
+) -> Option<&'doc FormulaValue<'doc>> {
+  if horizontal {
+    matrix.first().and_then(|row| row.get(index))
+  } else {
+    matrix.get(index).and_then(|row| row.first())
+  }
+}
+
+fn is_lookup_string_or_empty(value: &FormulaValue<'_>) -> bool {
+  matches!(value, FormulaValue::String(_) | FormulaValue::Blank)
+}
+
 fn choose_row_column_index(index: i64, len: usize) -> Option<usize> {
   if index == 0 {
     return None;
@@ -15211,8 +15902,8 @@ fn parse_criteria_operator(value: &str) -> (QueryOp, &str) {
 }
 
 fn wildcard_match(pattern: &str, text: &str) -> bool {
-  let pattern = pattern.to_ascii_lowercase().chars().collect::<Vec<_>>();
-  let text = text.to_ascii_lowercase().chars().collect::<Vec<_>>();
+  let pattern = lookup_search_key(pattern).chars().collect::<Vec<_>>();
+  let text = lookup_search_key(text).chars().collect::<Vec<_>>();
   let mut p = 0usize;
   let mut t = 0usize;
   let mut star = None;
@@ -15250,6 +15941,10 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
   p == pattern.len()
 }
 
+fn may_be_wildcard(value: &str) -> bool {
+  value.chars().any(|ch| matches!(ch, '*' | '?' | '~'))
+}
+
 fn may_be_regex(value: &str) -> bool {
   if value.is_empty() || (value.chars().count() == 1 && value != ".") {
     return false;
@@ -15262,9 +15957,13 @@ fn may_be_regex(value: &str) -> bool {
   })
 }
 
-fn regex_match_whole_cell(pattern: &str, text: &str) -> Option<bool> {
-  let anchored = format!("^(?:{pattern})$");
-  RegexBuilder::new(&anchored)
+fn regex_match(pattern: &str, text: &str, whole_cell: bool) -> Option<bool> {
+  let pattern = if whole_cell {
+    Cow::Owned(format!("^(?:{pattern})$"))
+  } else {
+    Cow::Borrowed(pattern)
+  };
+  RegexBuilder::new(pattern.as_ref())
     .case_insensitive(true)
     .build()
     .ok()
@@ -16411,7 +17110,7 @@ fn format_complex_number(real: f64, imaginary: f64, suffix: char) -> String {
   let has_real = !has_imaginary || real != 0.0;
   let mut output = String::new();
   if has_real {
-    output.push_str(&display_text_from_value(&FormulaValue::Number(real)));
+    output.push_str(&format_complex_component(real, false));
   }
   if has_imaginary {
     if imaginary == 1.0 {
@@ -16421,14 +17120,50 @@ fn format_complex_number(real: f64, imaginary: f64, suffix: char) -> String {
     } else if imaginary == -1.0 {
       output.push('-');
     } else {
-      if has_real && imaginary > 0.0 {
-        output.push('+');
-      }
-      output.push_str(&display_text_from_value(&FormulaValue::Number(imaginary)));
+      output.push_str(&format_complex_component(imaginary, has_real));
     }
     output.push(suffix);
   }
   output
+}
+
+fn format_complex_component(value: f64, leading_sign: bool) -> String {
+  if !value.is_finite() {
+    return error_text_value(FormulaErrorValue::Value).to_string();
+  }
+  let mut output = if value == 0.0 {
+    "0".to_string()
+  } else if value.abs() >= 1e-4 && value.abs() < 1e15 {
+    let integer_digits = value.abs().log10().floor().max(0.0) as i32 + 1;
+    let decimals = (15 - integer_digits).max(0) as usize;
+    format!("{value:.decimals$}")
+  } else {
+    format!("{value:.14e}")
+  };
+  if let Some((mantissa, exponent)) = output.split_once('e') {
+    let mantissa = trim_float_text(mantissa);
+    let exponent_value = exponent.parse::<i32>().unwrap_or(0);
+    output = format!("{mantissa}e{exponent_value:+03}");
+  } else {
+    output = trim_float_text(&output);
+  }
+  if leading_sign && value > 0.0 && !output.starts_with('+') {
+    output.insert(0, '+');
+  }
+  output
+}
+
+fn trim_float_text(value: &str) -> String {
+  if let Some((head, tail)) = value.split_once('.') {
+    let tail = tail.trim_end_matches('0');
+    if tail.is_empty() {
+      head.to_string()
+    } else {
+      format!("{head}.{tail}")
+    }
+  } else {
+    value.to_string()
+  }
 }
 
 fn convert_to_decimal(value: &str, base: u32, char_limit: usize) -> Option<f64> {
@@ -16883,18 +17618,73 @@ fn rtl_round(value: f64, decimal_places: i32) -> f64 {
 fn round_significant(value: f64, digits: f64) -> f64 {
   let scale = value.abs().log10().floor() + 1.0 - digits;
   let mut input = value;
+  let factor = 10.0_f64.powi(scale.abs() as i32);
   if scale < 0.0 {
-    input *= 10.0_f64.powf(-scale);
+    input *= factor;
   } else {
-    input /= 10.0_f64.powf(scale);
+    input /= factor;
   }
   let mut result = rtl_round(input, 0);
   if scale < 0.0 {
-    result /= 10.0_f64.powf(-scale);
+    result /= factor;
   } else {
-    result *= 10.0_f64.powf(scale);
+    result *= factor;
   }
   result
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct KahanSum {
+  sum: f64,
+  error: f64,
+  memory: f64,
+}
+
+impl KahanSum {
+  fn add(&mut self, value: f64) {
+    if value == 0.0 {
+      return;
+    }
+    if self.memory == 0.0 {
+      self.memory = value;
+      return;
+    }
+    Self::sum_neumaier(&mut self.sum, &mut self.error, self.memory);
+    self.memory = value;
+  }
+
+  fn finish(mut self) -> f64 {
+    let total = self.sum + self.error;
+    if self.memory == 0.0 {
+      return total;
+    }
+    if ((self.memory < 0.0 && total > 0.0) || (total < 0.0 && self.memory > 0.0))
+      && approx_equal(self.memory, -total)
+    {
+      return 0.0;
+    }
+    Self::sum_neumaier(&mut self.sum, &mut self.error, self.memory);
+    self.memory = 0.0;
+    self.sum + self.error
+  }
+
+  fn sum_neumaier(sum: &mut f64, error: &mut f64, value: f64) {
+    let next = *sum + value;
+    if sum.abs() >= value.abs() {
+      *error += (*sum - next) + value;
+    } else {
+      *error += (value - next) + *sum;
+    }
+    *sum = next;
+  }
+}
+
+fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+  let mut sum = KahanSum::default();
+  for value in values {
+    sum.add(value);
+  }
+  sum.finish()
 }
 
 fn approx_floor(value: f64) -> f64 {
@@ -16909,17 +17699,60 @@ fn approx_equal(left: f64, right: f64) -> bool {
   if left == right {
     return true;
   }
-  let scale = left.abs().max(right.abs()).max(1.0);
-  (left - right).abs() <= f64::EPSILON * scale * 4.0
+  if left == 0.0 || right == 0.0 || left.is_sign_negative() != right.is_sign_negative() {
+    return false;
+  }
+  let difference = (left - right).abs();
+  if !difference.is_finite() {
+    return false;
+  }
+  let left = left.abs();
+  let right = right.abs();
+  let min_value = left.min(right);
+  let threshold1 = min_value * 2_f64.powi(-48);
+  let threshold2 = pow10_exp(min_value.log10().floor() as i32) * 5.0e-15;
+  if difference >= threshold1.max(threshold2) {
+    return false;
+  }
+  !(is_representable_integer(left) && is_representable_integer(right))
 }
 
 fn approx_sub(left: f64, right: f64) -> f64 {
-  let value = left - right;
-  if approx_equal(left, right) {
-    0.0
-  } else {
-    value
+  if ((left < 0.0 && right < 0.0) || (left > 0.0 && right > 0.0)) && approx_equal(left, right) {
+    return 0.0;
   }
+  left - right
+}
+
+fn approx_diff(left: f64, right: f64) -> f64 {
+  if left == right {
+    return 0.0;
+  }
+  if left == 0.0 {
+    return -right;
+  }
+  if right == 0.0 {
+    return left;
+  }
+  let value = left - right;
+  let left_abs = left.abs();
+  let right_abs = right.abs();
+  if !(1e-16..=1e16).contains(&left_abs) || !(1e-16..=1e16).contains(&right_abs) {
+    return value;
+  }
+  let quotient = if left_abs < right_abs {
+    right / left
+  } else {
+    left / right
+  };
+  let adjusted = ((left * quotient) - (right * quotient)) / quotient;
+  if adjusted == value {
+    return value;
+  }
+  let error = (adjusted - value).abs();
+  let error_exp = error.log10().floor() as i32 + 1;
+  let arg_exp = left_abs.max(right_abs).log10().floor() as i32 - 15;
+  rtl_round(value, -error_exp.max(arg_exp))
 }
 
 fn normalize_formula_number(value: f64) -> f64 {
@@ -16948,6 +17781,10 @@ fn approx_value(value: f64) -> f64 {
     return value;
   }
   if sign { -rounded } else { rounded }
+}
+
+fn pow10_exp(exp: i32) -> f64 {
+  10_f64.powi(exp)
 }
 
 fn is_representable_integer(value: f64) -> bool {
@@ -17179,13 +18016,14 @@ fn financial_nper(rate: f64, pmt: f64, pv: f64, fv: f64, pay_in_advance: bool) -
 }
 
 fn financial_fv(rate: f64, nper: f64, pmt: f64, pv: f64, pay_in_advance: bool) -> f64 {
-  if rate == 0.0 {
+  let fv = if rate == 0.0 {
     pv + pmt * nper
   } else if pay_in_advance {
     pv * (nper * rate.ln_1p()).exp() + pmt * (1.0 + rate) * (nper * rate.ln_1p()).exp_m1() / rate
   } else {
     pv * (nper * rate.ln_1p()).exp() + pmt * (nper * rate.ln_1p()).exp_m1() / rate
-  }
+  };
+  -fv
 }
 
 fn financial_ipmt(
@@ -18367,6 +19205,59 @@ fn time_seed() -> u64 {
     .duration_since(UNIX_EPOCH)
     .map(|duration| duration.as_nanos() as u64)
     .unwrap_or(0x9e37_79b9_7f4a_7c15)
+}
+
+fn split_text_multi(
+  text: &str,
+  delimiters: &[String],
+  ignore_empty: bool,
+  match_case_insensitive: bool,
+) -> Vec<String> {
+  if delimiters.is_empty() || text.is_empty() {
+    return vec![text.to_string()];
+  }
+  let search_text = if match_case_insensitive {
+    text.to_lowercase()
+  } else {
+    text.to_string()
+  };
+  let search_delimiters = delimiters
+    .iter()
+    .map(|delimiter| {
+      if match_case_insensitive {
+        delimiter.to_lowercase()
+      } else {
+        delimiter.clone()
+      }
+    })
+    .collect::<Vec<_>>();
+  let mut output = Vec::new();
+  let mut start = 0usize;
+  while start < text.len() {
+    let mut index = text.len();
+    let mut delimiter_len = 0usize;
+    for delimiter in &search_delimiters {
+      if delimiter.is_empty() {
+        continue;
+      }
+      if let Some(position) = search_text[start..].find(delimiter) {
+        let position = start + position;
+        if position < index {
+          index = position;
+          delimiter_len = delimiter.len();
+        }
+      }
+    }
+    let segment = &text[start..index];
+    if !ignore_empty || !segment.is_empty() {
+      output.push(segment.to_string());
+    }
+    if delimiter_len == 0 {
+      break;
+    }
+    start = index + delimiter_len;
+  }
+  output
 }
 
 fn datevalue(text: &str, date_system: DateSystem) -> FormulaValue<'static> {

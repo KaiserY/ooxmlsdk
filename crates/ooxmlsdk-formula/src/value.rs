@@ -48,6 +48,7 @@ pub enum FormulaErrorValue {
   Spill,
   Calc,
   IllegalArgument,
+  Parameter,
   Unknown,
 }
 

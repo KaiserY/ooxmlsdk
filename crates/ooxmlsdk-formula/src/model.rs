@@ -1815,7 +1815,7 @@ pub struct EvaluationContext<'doc> {
   pub locale: Option<Cow<'doc, str>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FormulaEvaluationBook<'doc> {
   pub source_file_name: Option<Cow<'doc, str>>,
   pub locale: Option<Cow<'doc, str>>,
@@ -1832,7 +1832,32 @@ pub struct FormulaEvaluationBook<'doc> {
   pub pivot_tables: Vec<FormulaPivotTable<'doc>>,
   pub date_system: DateSystem,
   pub formula_search_type: FormulaSearchType,
+  pub formula_match_whole_cell: bool,
   pub today_serial: Option<f64>,
+}
+
+impl<'doc> Default for FormulaEvaluationBook<'doc> {
+  fn default() -> Self {
+    Self {
+      source_file_name: None,
+      locale: None,
+      sheet_names: Vec::new(),
+      cells: BTreeMap::new(),
+      query_cell_values: BTreeMap::new(),
+      query_empty_cells: BTreeSet::new(),
+      formulas: BTreeMap::new(),
+      defined_names: BTreeMap::new(),
+      defined_arrays: BTreeMap::new(),
+      external_cached_cells: BTreeMap::new(),
+      row_states: BTreeMap::new(),
+      tables: BTreeMap::new(),
+      pivot_tables: Vec::new(),
+      date_system: DateSystem::default(),
+      formula_search_type: FormulaSearchType::default(),
+      formula_match_whole_cell: true,
+      today_serial: None,
+    }
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1955,6 +1980,11 @@ impl<'doc> FormulaEvaluationBookBuilder<'doc> {
 
   pub fn with_formula_search_type(mut self, formula_search_type: FormulaSearchType) -> Self {
     self.book.formula_search_type = formula_search_type;
+    self
+  }
+
+  pub fn with_formula_match_whole_cell(mut self, formula_match_whole_cell: bool) -> Self {
+    self.book.formula_match_whole_cell = formula_match_whole_cell;
     self
   }
 
@@ -2555,11 +2585,21 @@ impl<'doc> FormulaEvaluationBook<'doc> {
 
   pub fn is_nested_aggregate(&self, sheet: SheetId, address: CellAddress) -> bool {
     self.formulas.get(&(sheet, address)).is_some_and(|formula| {
-      let text = formula
+      let mut text = formula
         .text
         .trim_start()
         .trim_start_matches("_xlfn.")
+        .trim_start_matches("COM.MICROSOFT.")
         .to_ascii_uppercase();
+      if let Some(stripped) = text.strip_prefix('=') {
+        text = stripped.trim_start().to_string();
+      }
+      if let Some(stripped) = text.strip_prefix("_XLFN.") {
+        text = stripped.trim_start().to_string();
+      }
+      if let Some(stripped) = text.strip_prefix("COM.MICROSOFT.") {
+        text = stripped.trim_start().to_string();
+      }
       text.starts_with("SUBTOTAL(") || text.starts_with("AGGREGATE(")
     })
   }
@@ -4447,18 +4487,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         (!values.is_empty())
           .then(|| FormulaValue::Number(kahan_sum(values.iter().copied()) / values.len() as f64))
       }
-      "COUNT" => Some(FormulaValue::Number(
-        match self.numeric_aggregate(args, false) {
-          Ok(aggregate) => aggregate.values.len() as f64,
-          Err(_) => 0.0,
-        },
-      )),
-      "COUNTA" => Some(FormulaValue::Number(
-        self
-          .values(args)
-          .filter(|value| !matches!(value, FormulaValue::Blank))
-          .count() as f64,
-      )),
+      "COUNT" => Some(FormulaValue::Number(self.count_numbers(args) as f64)),
+      "COUNTA" => Some(FormulaValue::Number(self.count_all_values(args) as f64)),
       "ISERROR" => self.evaluate_information_error(args, |_| true),
       "ISNA" => self.evaluate_information_error(args, |error| error == FormulaErrorValue::NA),
       "ISERR" => self.evaluate_information_error(args, |error| error != FormulaErrorValue::NA),
@@ -7359,7 +7389,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         empty_matches_text: false,
       },
     };
-    let param = QueryParam::single(query, QuerySearchType::Normal).with_range_lookup(true);
+    let param = QueryParam::single(query, QuerySearchType::Normal, true).with_range_lookup(true);
     let query = param.entries.first()?;
     let (search_vector, index_map) = lookup_search_vector_omitting_errors(&data_vector);
     let search_slice = search_vector.as_deref().unwrap_or(&data_vector);
@@ -7634,7 +7664,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if sorted {
       query.op = QueryOp::LessOrEqual;
     }
-    let param = QueryParam::single(query, search_type).with_range_lookup(sorted);
+    let param = QueryParam::single(query, search_type, true).with_range_lookup(sorted);
     let query = param.entries.first()?;
     let mut found = None;
     for row in start_row..=end_row {
@@ -9556,9 +9586,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     if count < 0.0 || chosen < 0.0 || chosen > count {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     if repetition {
+      if count == 0.0 && chosen == 0.0 {
+        return Some(FormulaValue::Number(0.0));
+      }
       count += chosen - 1.0;
     }
     Some(FormulaValue::Number(
@@ -10654,7 +10687,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           entries,
           search_type,
           range_lookup: false,
-          match_whole_cell: true,
+          match_whole_cell: self.book.formula_match_whole_cell,
           case_sensitive: false,
         })
       })
@@ -10680,7 +10713,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       entries: Vec::new(),
       search_type: QuerySearchType::Normal,
       range_lookup: false,
-      match_whole_cell: true,
+      match_whole_cell: self.book.formula_match_whole_cell,
       case_sensitive: false,
     };
     for (row_index, (row, _row_empty)) in criteria
@@ -10698,7 +10731,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           entries: Vec::new(),
           search_type: QuerySearchType::Normal,
           range_lookup: false,
-          match_whole_cell: true,
+          match_whole_cell: self.book.formula_match_whole_cell,
           case_sensitive: false,
         };
       } else if row_index > 0 && !connector.is_empty() && !connector.eq_ignore_ascii_case("AND") {
@@ -11693,9 +11726,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(size) = self.number_arg(args, 2) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    if !(0.0..1.0).contains(&alpha) || sigma <= 0.0 || size < 1.0 {
+    if !alpha.is_finite()
+      || !sigma.is_finite()
+      || !size.is_finite()
+      || alpha <= 0.0
+      || alpha >= 1.0
+      || sigma <= 0.0
+      || size.floor() < 1.0
+    {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
+    let size = size.floor();
     Some(FormulaValue::Number(
       norm_s_inv(1.0 - alpha / 2.0).abs() * sigma / size.sqrt(),
     ))
@@ -11711,8 +11752,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(size) = self.number_arg(args, 2) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    if !(0.0..1.0).contains(&alpha) || sigma <= 0.0 || size < 2.0 {
+    if !alpha.is_finite()
+      || !sigma.is_finite()
+      || !size.is_finite()
+      || alpha <= 0.0
+      || alpha >= 1.0
+      || sigma <= 0.0
+      || size.floor() < 1.0
+    {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    }
+    let size = size.floor();
+    if size == 1.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
     }
     let dist = StudentsT::new(0.0, 1.0, size - 1.0).ok()?;
     Some(FormulaValue::Number(
@@ -14187,6 +14239,105 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Ok(NumericAggregate { values })
   }
 
+  fn count_numbers(&self, args: &[FormulaAst<'doc>]) -> usize {
+    let mut count = 0usize;
+    let array_evaluator = self.with_array_context();
+    for arg in args {
+      let ranges = self.reference_ranges_from_ast(arg);
+      if !ranges.is_empty() {
+        for range in ranges {
+          count += self.count_numbers_in_range(&range);
+        }
+        continue;
+      }
+      let Some(value) = array_evaluator.evaluate(arg) else {
+        continue;
+      };
+      match value {
+        FormulaValue::Reference(reference) => {
+          count += self.count_numbers_in_range(&reference);
+        }
+        FormulaValue::RefList(ranges) => {
+          for range in ranges {
+            count += self.count_numbers_in_range(&range);
+          }
+        }
+        FormulaValue::Matrix(rows) => {
+          count += rows
+            .iter()
+            .flatten()
+            .filter(|value| matches!(value, FormulaValue::Number(_) | FormulaValue::Boolean(_)))
+            .count();
+        }
+        FormulaValue::Number(_) | FormulaValue::Boolean(_) => count += 1,
+        FormulaValue::String(value) => {
+          if value.trim().parse::<f64>().is_ok() {
+            count += 1;
+          }
+        }
+        FormulaValue::Blank | FormulaValue::Error(_) => {}
+      }
+    }
+    count
+  }
+
+  fn count_numbers_in_range(&self, reference: &QualifiedRange<'doc>) -> usize {
+    self
+      .range_values(reference)
+      .iter()
+      .filter(|value| matches!(value, FormulaValue::Number(_) | FormulaValue::Boolean(_)))
+      .count()
+  }
+
+  fn count_all_values(&self, args: &[FormulaAst<'doc>]) -> usize {
+    let mut count = 0usize;
+    let array_evaluator = self.with_array_context();
+    for arg in args {
+      if is_missing_argument(arg) {
+        count += 1;
+        continue;
+      }
+      let ranges = self.reference_ranges_from_ast(arg);
+      if !ranges.is_empty() {
+        for range in ranges {
+          count += self.count_all_values_in_range(&range);
+        }
+        continue;
+      }
+      let Some(value) = array_evaluator.evaluate(arg) else {
+        continue;
+      };
+      match value {
+        FormulaValue::Reference(reference) => {
+          count += self.count_all_values_in_range(&reference);
+        }
+        FormulaValue::RefList(ranges) => {
+          for range in ranges {
+            count += self.count_all_values_in_range(&range);
+          }
+        }
+        FormulaValue::Matrix(rows) => {
+          count += rows
+            .iter()
+            .flatten()
+            .filter(|value| !matches!(value, FormulaValue::Blank))
+            .count();
+        }
+        FormulaValue::Blank => {}
+        _ => count += 1,
+      }
+    }
+    count
+  }
+
+  fn count_all_values_in_range(&self, reference: &QualifiedRange<'doc>) -> usize {
+    self
+      .range_values(reference)
+      .iter()
+      .filter(|value| !matches!(value, FormulaValue::Blank))
+      .count()
+  }
+
   fn push_range_numeric_aggregate_values(
     &self,
     reference: &QualifiedRange<'doc>,
@@ -14383,11 +14534,23 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
           return 0;
         }
-        self
-          .range_values(reference)
-          .into_iter()
-          .filter(|value| is_blank_for_countblank(value))
-          .count()
+        let sheet = self.range_sheet(reference);
+        let mut count = 0usize;
+        for row in reference.range.start.row..=reference.range.end.row {
+          for column in reference.range.start.column..=reference.range.end.column {
+            let address = CellAddress { column, row };
+            let value = self.book.cell_value(sheet, address);
+            let is_blank = if self.book.formula_text(sheet, address).is_some() {
+              matches!(value, FormulaValue::String(ref text) if text.is_empty())
+            } else {
+              matches!(value, FormulaValue::Blank)
+            };
+            if is_blank {
+              count += 1;
+            }
+          }
+        }
+        count
       }
       FormulaValue::RefList(ranges) => ranges
         .iter()
@@ -15780,12 +15943,12 @@ struct QueryParam<'doc> {
 }
 
 impl<'doc> QueryParam<'doc> {
-  fn single(entry: QueryEntry<'doc>, search_type: QuerySearchType) -> Self {
+  fn single(entry: QueryEntry<'doc>, search_type: QuerySearchType, match_whole_cell: bool) -> Self {
     Self {
       entries: vec![entry],
       search_type,
       range_lookup: false,
-      match_whole_cell: true,
+      match_whole_cell,
       case_sensitive: false,
     }
   }
@@ -15796,7 +15959,7 @@ impl<'doc> QueryParam<'doc> {
     field: usize,
   ) -> Self {
     let (entry, search_type) = QueryEntry::from_value(evaluator, value, field);
-    Self::single(entry, search_type)
+    Self::single(entry, search_type, evaluator.book.formula_match_whole_cell)
   }
 
   fn with_range_lookup(mut self, range_lookup: bool) -> Self {
@@ -16078,7 +16241,13 @@ fn query_matches<'doc>(
       && let FormulaValue::String(candidate_text) = candidate
       && matches!(query.op, QueryOp::Equal | QueryOp::NotEqual)
     {
-      let matched = compare_text(evaluator, candidate_text, source_text, param.case_sensitive) == 0;
+      let matched = if param.match_whole_cell {
+        compare_text(evaluator, candidate_text, source_text, param.case_sensitive) == 0
+      } else if param.case_sensitive {
+        candidate_text.contains(source_text.as_ref())
+      } else {
+        lookup_text_contains(candidate_text, source_text)
+      };
       return if query.op == QueryOp::Equal {
         matched
       } else {
@@ -16119,6 +16288,22 @@ fn query_matches<'doc>(
       QueryOp::Equal => matched,
       QueryOp::NotEqual => !matched,
       _ => false,
+    };
+  }
+  if !param.match_whole_cell
+    && matches!(query.op, QueryOp::Equal | QueryOp::NotEqual)
+    && let (FormulaValue::String(candidate_text), FormulaValue::String(query_text)) =
+      (candidate, &query.item.value)
+  {
+    let matched = if param.case_sensitive {
+      candidate_text.contains(query_text.as_ref())
+    } else {
+      lookup_text_contains(candidate_text, query_text)
+    };
+    return if query.op == QueryOp::Equal {
+      matched
+    } else {
+      !matched
     };
   }
   let ordering = query_compare_value(
@@ -16341,7 +16526,7 @@ fn search_vector_with_type<'doc>(
       empty_matches_text: false,
     },
   };
-  let param = QueryParam::single(query, search_type).with_range_lookup(range_lookup);
+  let param = QueryParam::single(query, search_type, true).with_range_lookup(range_lookup);
   let query = param.entries.first()?;
   match mode {
     LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending => {
@@ -16681,6 +16866,10 @@ fn aggregate_function_value<'doc>(
   if function == 2 {
     return Some(Ok(aggregate_count_numbers(evaluator, args, options) as f64));
   }
+  if function == 3 {
+    return aggregate_counta(evaluator, args, options)
+      .map(|result| result.map(|count| count as f64));
+  }
   let values = match aggregate_numbers(evaluator, args, options) {
     Ok(values) => values,
     Err(error) => return Some(Err(error)),
@@ -16688,10 +16877,6 @@ fn aggregate_function_value<'doc>(
   match function {
     1 => mean(&values),
     2 => Some(values.len() as f64),
-    3 => match aggregate_counta(evaluator, args, options)? {
-      Ok(count) => Some(count as f64),
-      Err(error) => return Some(Err(error)),
-    },
     4 => Some(values.into_iter().reduce(f64::max).unwrap_or(0.0)),
     5 => Some(values.into_iter().reduce(f64::min).unwrap_or(0.0)),
     6 => Some(values.into_iter().product()),
@@ -18057,7 +18242,7 @@ fn aggregate_counta_scalar(
 ) -> std::result::Result<(), FormulaErrorValue> {
   match value {
     FormulaValue::Blank => {}
-    FormulaValue::Error(error) if !options.ignore_errors => return Err(error),
+    FormulaValue::Error(_) if options.ignore_errors => {}
     _ => *count += 1,
   }
   Ok(())
@@ -19935,6 +20120,15 @@ fn lo_low_reg_igamma(a: f64, x: f64) -> std::result::Result<f64, FormulaErrorVal
   }
 }
 
+fn lo_up_reg_igamma(a: f64, x: f64) -> std::result::Result<f64, FormulaErrorValue> {
+  let factor = (a * x.ln() - x - lo_log_gamma(a)).exp();
+  if x > a + 1.0 {
+    Ok(factor * lo_gamma_cont_fraction(a, x)?)
+  } else {
+    Ok(1.0 - factor * lo_gamma_series(a, x)?)
+  }
+}
+
 fn lo_gamma_dist_pdf(
   x: f64,
   alpha: f64,
@@ -19979,7 +20173,7 @@ fn lo_chi_dist(x: f64, df: f64) -> f64 {
   if x <= 0.0 {
     1.0
   } else {
-    1.0 - lo_low_reg_igamma(df / 2.0, x / 2.0).unwrap_or(f64::NAN)
+    lo_up_reg_igamma(df / 2.0, x / 2.0).unwrap_or(f64::NAN)
   }
 }
 
@@ -20423,7 +20617,8 @@ fn pow10_exp(exp: i32) -> f64 {
 }
 
 fn is_representable_integer(value: f64) -> bool {
-  value.is_finite() && value.fract() == 0.0
+  // Source: LibreOffice sal/rtl/math.cxx isRepresentableInteger.
+  value.is_finite() && value >= 0.0 && value < 2_f64.powi(53) && value.fract() == 0.0
 }
 
 fn fraction_bit_count(value: f64) -> u32 {
@@ -25303,8 +25498,33 @@ mod tests {
       )
       .with_cell(
         SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 0 },
+        FormulaValue::String(Cow::Borrowed("x")),
+      )
+      .with_cell(
+        SheetId(1),
         CellAddress { column: 3, row: 0 },
         FormulaValue::String(Cow::Borrowed("")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 5, row: 0 },
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 6, row: 0 },
+        FormulaValue::Error(FormulaErrorValue::Div0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 7, row: 0 },
+        FormulaValue::String(Cow::Borrowed("x")),
       )
       .with_cell(
         SheetId(1),
@@ -25354,6 +25574,144 @@ mod tests {
         FormulaGrammar::OpenFormula,
       ),
       Some(FormulaValue::Number(4.0_f64.atan2(-3.0)))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "AGGREGATE(3,4,F1:H1)"),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "AGGREGATE(3,6,F1:H1)"),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "COUNTA(5,,10)"),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=CONFIDENCE(0;1.5;100)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=COM.MICROSOFT.CONFIDENCE.NORM(0;1.5;100)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+    assert_eq!(
+      book.evaluate_formula_text_with_grammar(
+        SheetId(1),
+        None,
+        "of:=COM.MICROSOFT.CONFIDENCE.T(0;1.5;100)",
+        FormulaGrammar::OpenFormula,
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Num))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_countblank_matches_libreoffice_formula_result_rules() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Blank,
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::String(Cow::Borrowed("")),
+      )
+      .with_formula(SheetId(1), CellAddress { column: 0, row: 1 }, "\"\"")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 2 },
+        FormulaValue::Blank,
+      )
+      .with_formula(SheetId(1), CellAddress { column: 0, row: 2 }, "A1")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 3 },
+        FormulaValue::String(Cow::Borrowed("")),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(A1:A4)"),
+      Some(FormulaValue::Number(2.0))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_countif_honors_match_whole_cell_option() {
+    let whole_cell_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::String(Cow::Borrowed("one")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::String(Cow::Borrowed("oneone")),
+      )
+      .build();
+    let partial_cell_book = FormulaEvaluationBookBuilder::new()
+      .with_formula_match_whole_cell(false)
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::String(Cow::Borrowed("one")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::String(Cow::Borrowed("oneone")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::String(Cow::Borrowed("A2")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::String(Cow::Borrowed("2")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 2 },
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 3 },
+        FormulaValue::Number(3.0),
+      )
+      .build();
+
+    assert_eq!(
+      whole_cell_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,\"one\")"),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      partial_cell_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,\"one\")"),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      partial_cell_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(B1:B4,\"=2\")"),
+      Some(FormulaValue::Number(3.0))
+    );
+    assert_eq!(
+      partial_cell_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(B1:B4,\">2\")"),
+      Some(FormulaValue::Number(1.0))
     );
   }
 

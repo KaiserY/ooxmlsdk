@@ -16,7 +16,7 @@ use ooxmlsdk::parts::{
   slide_part::SlidePart, spreadsheet_document::SpreadsheetDocument,
   style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
   wordprocessing_document::WordprocessingDocument, workbook_part::WorkbookPart,
-  worksheet_part::WorksheetPart,
+  workbook_styles_part::WorkbookStylesPart, worksheet_part::WorksheetPart,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
@@ -2359,7 +2359,7 @@ fn add_new_parts_use_unique_upstream_style_part_names() {
 
   let image1 = main_part.add_image_part(&mut package, "image/png").unwrap();
   let image2 = main_part.add_image_part(&mut package, "image/png").unwrap();
-  assert_eq!(image1.path(&package), Some("word/media/image1.png"));
+  assert_eq!(image1.path(&package), Some("word/media/image.png"));
   assert_eq!(image2.path(&package), Some("word/media/image2.png"));
 }
 
@@ -2412,7 +2412,7 @@ fn package_add_new_part_creates_package_relationship() {
     .add_new_part::<RibbonExtensibilityPart>(relationship_id)
     .unwrap();
   assert_eq!(package.get_id_of_part(&ribbon_part), Some(relationship_id));
-  assert_eq!(ribbon_part.path(&package), Some("customUI/customUI1.xml"));
+  assert_eq!(ribbon_part.path(&package), Some("customUI/customUI.xml"));
   assert_eq!(ribbon_part.content_type(&package), Some("application/xml"));
 
   let mut buffer = Cursor::new(Vec::new());
@@ -2423,10 +2423,7 @@ fn package_add_new_part_creates_package_relationship() {
     .get_part_by_id(relationship_id)
     .and_then(|part| part_ref_variant!(part, RibbonExtensibilityPart))
     .unwrap();
-  assert_eq!(
-    reopened_part.path(&reopened),
-    Some("customUI/customUI1.xml")
-  );
+  assert_eq!(reopened_part.path(&reopened), Some("customUI/customUI.xml"));
 }
 
 #[test]
@@ -2719,7 +2716,7 @@ fn add_image_part_auto_id_uses_next_relationship_id() {
     relationship_count + 1
   );
   assert_eq!(image_part.content_type(&package), Some("image/jpeg"));
-  assert_eq!(image_part.path(&package), Some("word/media/image1.jpeg"));
+  assert_eq!(image_part.path(&package), Some("word/media/image.jpeg"));
 
   let mut buffer = Cursor::new(Vec::new());
   package.save(&mut buffer).unwrap();
@@ -2991,7 +2988,7 @@ fn part_extension_selection_matches_openxml_part_tests() {
       "rIdJpg",
     )
     .unwrap();
-  assert_eq!(jpg.path(&package), Some("extendedPart1.jpg"));
+  assert_eq!(jpg.path(&package), Some("extendedPart.jpg"));
   assert_eq!(jpg.content_type(&package), Some("test/mimetype"));
 
   let no_dot = package
@@ -3002,7 +2999,7 @@ fn part_extension_selection_matches_openxml_part_tests() {
       "rIdNoDot",
     )
     .unwrap();
-  assert_eq!(no_dot.path(&package), Some("extendedPart1.jpeg"));
+  assert_eq!(no_dot.path(&package), Some("extendedPart.jpeg"));
 
   let default_extension = package
     .add_extended_part_with_id(
@@ -3012,12 +3009,12 @@ fn part_extension_selection_matches_openxml_part_tests() {
       "rIdDefaultExtension",
     )
     .unwrap();
-  assert_eq!(default_extension.path(&package), Some("extendedPart1.xml"));
+  assert_eq!(default_extension.path(&package), Some("extendedPart.xml"));
 
   let fixed_type = package
     .add_thumbnail_part_with_id("image/jpeg", "rIdThumbnail")
     .unwrap();
-  assert_eq!(fixed_type.path(&package), Some("docProps/thumbnail1.bin"));
+  assert_eq!(fixed_type.path(&package), Some("docProps/thumbnail.bin"));
   assert_eq!(fixed_type.content_type(&package), Some("image/jpeg"));
 }
 
@@ -4213,6 +4210,82 @@ fn create_apis_create_office_document_packages() {
       .count(),
     1
   );
+}
+
+#[test]
+fn spreadsheet_create_registers_relationship_content_type_and_upstream_part_names() {
+  let mut document = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+  let workbook_part = document.add_new_part_auto_id::<WorkbookPart>().unwrap();
+  let worksheet_part = workbook_part
+    .add_new_part_auto_id::<_, WorksheetPart>(&mut document)
+    .unwrap();
+  let styles_part = workbook_part
+    .add_new_part_auto_id::<_, WorkbookStylesPart>(&mut document)
+    .unwrap();
+
+  assert_eq!(workbook_part.path(&document), Some("xl/workbook.xml"));
+  assert_eq!(
+    worksheet_part.path(&document),
+    Some("xl/worksheets/sheet1.xml")
+  );
+  assert_eq!(styles_part.path(&document), Some("xl/styles.xml"));
+
+  let worksheet_relationship_id = workbook_part
+    .get_id_of_part(&document, &worksheet_part)
+    .expect("worksheet relationship id")
+    .to_string();
+  workbook_part
+    .set_data(
+      &mut document,
+      format!(
+        r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="{worksheet_relationship_id}"/></sheets></workbook>"#
+      )
+      .into_bytes(),
+    )
+    .unwrap();
+  worksheet_part
+    .set_data(
+      &mut document,
+      br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
+    )
+    .unwrap();
+  styles_part
+    .set_data(
+      &mut document,
+      br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+        .to_vec(),
+    )
+    .unwrap();
+
+  let mut buffer = Cursor::new(Vec::new());
+  document.save(&mut buffer).unwrap();
+  let bytes = buffer.into_inner();
+  let content_types =
+    String::from_utf8(package_entry_data(bytes.clone(), "[Content_Types].xml")).unwrap();
+
+  assert!(content_types.contains(
+    r#"<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />"#
+  ));
+  assert!(content_types.contains(
+    r#"<Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" PartName="/xl/workbook.xml" />"#
+  ));
+  assert!(content_types.contains(
+    r#"<Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml" PartName="/xl/worksheets/sheet1.xml" />"#
+  ));
+  assert!(content_types.contains(
+    r#"<Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml" PartName="/xl/styles.xml" />"#
+  ));
+  assert!(package_entry_exists(bytes.clone(), "_rels/.rels"));
+  assert!(package_entry_exists(
+    bytes.clone(),
+    "xl/_rels/workbook.xml.rels"
+  ));
+  assert!(package_entry_exists(bytes.clone(), "xl/workbook.xml"));
+  assert!(package_entry_exists(
+    bytes.clone(),
+    "xl/worksheets/sheet1.xml"
+  ));
+  assert!(package_entry_exists(bytes, "xl/styles.xml"));
 }
 
 #[test]

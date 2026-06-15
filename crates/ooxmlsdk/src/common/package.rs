@@ -17,7 +17,6 @@ use super::{
 
 #[cfg(feature = "flat-opc")]
 const FLAT_OPC_PACKAGE_NS: &str = "http://schemas.microsoft.com/office/2006/xmlPackage";
-#[cfg(feature = "flat-opc")]
 const RELATIONSHIP_CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -1617,6 +1616,7 @@ impl SdkPackageStorage {
       descriptor.path_prefix,
       descriptor.target_name,
       descriptor.extension.as_ref(),
+      descriptor.content_type.as_ref(),
     );
     let relationship_target = relationship_target_from_source(&source_part_path, &child_path);
     let part_id = self.push_part(
@@ -1939,6 +1939,7 @@ impl SdkPackageStorage {
     path_prefix: &str,
     target_name: &str,
     extension: &str,
+    content_type: &str,
   ) -> String {
     let directory_path = child_part_directory_path(source_part_path, path_prefix);
     let extension = if extension.is_empty() {
@@ -1952,18 +1953,14 @@ impl SdkPackageStorage {
       format!(".{extension}")
     };
 
-    for index in 1.. {
-      let path = if directory_path.is_empty() {
-        format!("{target_name}{index}{extension}")
-      } else {
-        format!("{directory_path}{target_name}{index}{extension}")
-      };
+    let mut sequence = first_part_path_sequence(content_type);
+    loop {
+      let path = part_path_with_sequence(&directory_path, target_name, &extension, sequence);
       if !self.by_path.contains_key(path.as_str()) {
         return path;
       }
+      sequence = next_part_path_sequence(sequence);
     }
-
-    unreachable!("usize iteration should always find a free part path")
   }
 
   fn package_part_path(
@@ -1988,21 +1985,19 @@ impl SdkPackageStorage {
       return Ok(path);
     }
 
-    for index in 1.. {
-      let path = if directory_path.is_empty() {
-        format!("{}{index}{}", descriptor.target_name, extension)
-      } else {
-        format!(
-          "{directory_path}{}{index}{}",
-          descriptor.target_name, extension
-        )
-      };
+    let mut sequence = first_part_path_sequence(descriptor.content_type.as_ref());
+    loop {
+      let path = part_path_with_sequence(
+        &directory_path,
+        descriptor.target_name,
+        &extension,
+        sequence,
+      );
       if !self.by_path.contains_key(path.as_str()) {
         return Ok(path);
       }
+      sequence = next_part_path_sequence(sequence);
     }
-
-    unreachable!("usize iteration should always find a free part path")
   }
 
   fn next_data_part_path(&self, stem: &str, extension: &str) -> String {
@@ -2064,6 +2059,48 @@ struct RawPart {
   bytes: Vec<u8>,
 }
 
+struct ContentTypeResolver<'a> {
+  overrides: HashMap<&'a str, &'a str>,
+  defaults: HashMap<&'a str, &'a str>,
+}
+
+impl<'a> ContentTypeResolver<'a> {
+  fn new(content_types: &'a Types) -> Self {
+    let mut overrides = HashMap::with_capacity(content_types.types_choice.len());
+    let mut defaults = HashMap::with_capacity(content_types.types_choice.len());
+
+    for child in &content_types.types_choice {
+      match child {
+        TypesChoice::Override(override_type) => {
+          overrides.insert(
+            override_type.part_name.trim_start_matches('/'),
+            override_type.content_type.as_str(),
+          );
+        }
+        TypesChoice::Default(default_type) => {
+          defaults.insert(
+            default_type.extension.as_str(),
+            default_type.content_type.as_str(),
+          );
+        }
+      }
+    }
+
+    Self {
+      overrides,
+      defaults,
+    }
+  }
+
+  fn content_type_for_part(&self, path: &str) -> Option<&'a str> {
+    self.overrides.get(path).copied().or_else(|| {
+      path
+        .rsplit_once('.')
+        .and_then(|(_, extension)| self.defaults.get(extension).copied())
+    })
+  }
+}
+
 #[cfg(feature = "flat-opc")]
 struct FlatOpcPart {
   path: String,
@@ -2094,7 +2131,12 @@ fn empty_content_types() -> Types {
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],
     xml_header: super::XmlHeaderType::Standalone,
-    types_choice: Vec::new(),
+    types_choice: vec![TypesChoice::Default(Box::new(
+      crate::schemas::opc_content_types::Default {
+        extension: "rels".to_string(),
+        content_type: RELATIONSHIP_CONTENT_TYPE.to_string(),
+      },
+    ))],
   }
 }
 
@@ -2454,6 +2496,28 @@ fn is_numbered_part_content_type(content_type: &str) -> bool {
   )
 }
 
+fn first_part_path_sequence(content_type: &str) -> usize {
+  usize::from(is_numbered_part_content_type(content_type))
+}
+
+fn next_part_path_sequence(sequence: usize) -> usize {
+  if sequence == 0 { 2 } else { sequence + 1 }
+}
+
+fn part_path_with_sequence(
+  directory_path: &str,
+  target_name: &str,
+  extension: &str,
+  sequence: usize,
+) -> String {
+  match (directory_path.is_empty(), sequence) {
+    (true, 0) => format!("{target_name}{extension}"),
+    (true, sequence) => format!("{target_name}{sequence}{extension}"),
+    (false, 0) => format!("{directory_path}{target_name}{extension}"),
+    (false, sequence) => format!("{directory_path}{target_name}{sequence}{extension}"),
+  }
+}
+
 fn relationship_target_from_source(source_part_path: &str, child_part_path: &str) -> String {
   let source_parent_path = super::parent_zip_path(source_part_path);
   if let Some(relative) = child_part_path.strip_prefix(&source_parent_path) {
@@ -2535,6 +2599,7 @@ fn read_raw_parts<R: Read + Seek>(
   content_types: &Types,
 ) -> Result<Vec<RawPart>, SdkError> {
   let mut parts = Vec::new();
+  let content_type_resolver = ContentTypeResolver::new(content_types);
 
   for index in 0..archive.len() {
     let mut entry = archive.by_index(index)?;
@@ -2547,7 +2612,9 @@ fn read_raw_parts<R: Read + Seek>(
       continue;
     }
 
-    let content_type = content_type_for_part(content_types, &path).unwrap_or_default();
+    let content_type = content_type_resolver
+      .content_type_for_part(&path)
+      .unwrap_or_default();
     let mut bytes = Vec::with_capacity(entry.size() as usize);
     entry.read_to_end(&mut bytes)?;
     parts.push(RawPart {
@@ -2664,26 +2731,6 @@ fn relationship_info(
     target_kind,
     target_part_id,
   }
-}
-
-fn content_type_for_part<'a>(content_types: &'a Types, path: &str) -> Option<&'a str> {
-  let normalized_part_name = format!("/{path}");
-  let extension = path.rsplit_once('.').map(|(_, extension)| extension);
-  let mut default_content_type = None;
-
-  for child in &content_types.types_choice {
-    match child {
-      TypesChoice::Override(override_type) if override_type.part_name == normalized_part_name => {
-        return Some(override_type.content_type.as_str());
-      }
-      TypesChoice::Default(default_type) if extension == Some(default_type.extension.as_str()) => {
-        default_content_type = Some(default_type.content_type.as_str());
-      }
-      _ => {}
-    }
-  }
-
-  default_content_type
 }
 
 fn is_relationships_part_path(path: &str) -> bool {

@@ -2626,17 +2626,17 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       used_end_row = used_end_row.max(address.row);
       used_end_column = used_end_column.max(address.column);
     };
-    for ((cell_sheet, address), _) in &self.cells {
+    for (cell_sheet, address) in self.cells.keys() {
       if *cell_sheet == sheet {
         include(*address);
       }
     }
-    for ((cell_sheet, address), _) in &self.query_cell_values {
+    for (cell_sheet, address) in self.query_cell_values.keys() {
       if *cell_sheet == sheet {
         include(*address);
       }
     }
-    for ((cell_sheet, address), _) in &self.formulas {
+    for (cell_sheet, address) in self.formulas.keys() {
       if *cell_sheet == sheet {
         include(*address);
       }
@@ -4541,7 +4541,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
               .map(FormulaValue::Number)
               .unwrap_or(FormulaValue::Number(0.0))
           })
-          .unwrap_or_else(|error| FormulaValue::Error(error)),
+          .unwrap_or_else(FormulaValue::Error),
       ),
       "MINA" => self.evaluate_mina(args),
       "MAX" => Some(
@@ -4556,7 +4556,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
               .map(FormulaValue::Number)
               .unwrap_or(FormulaValue::Number(0.0))
           })
-          .unwrap_or_else(|error| FormulaValue::Error(error)),
+          .unwrap_or_else(FormulaValue::Error),
       ),
       "MAXA" => self.evaluate_maxa(args),
       "AND" => self.evaluate_and(args),
@@ -5880,7 +5880,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       ));
     }
 
-    Some(self.base_to_base_value(&value, from_base, to_base, min, max, places)?)
+    self.base_to_base_value(&value, from_base, to_base, min, max, places)
   }
 
   fn base_to_base_value(
@@ -7522,9 +7522,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &vector,
         QueryOp::LessOrEqual,
         search,
-        false,
         QuerySearchType::Normal,
-        true,
+        SearchVectorFlags::new(false, true),
       ),
       1 => search_vector_with_type(
         self,
@@ -7532,9 +7531,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &vector,
         QueryOp::GreaterOrEqual,
         search,
-        false,
         QuerySearchType::Normal,
-        true,
+        SearchVectorFlags::new(false, true),
       ),
       2 | 3 => search_vector_with_type(
         self,
@@ -7542,7 +7540,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &vector,
         QueryOp::Equal,
         search,
-        true,
         if !matches!(lookup, FormulaValue::String(_)) {
           QuerySearchType::Normal
         } else if match_mode == 2 && may_be_wildcard(self.text(&lookup).as_ref()) {
@@ -7552,7 +7549,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         } else {
           QuerySearchType::Normal
         },
-        false,
+        SearchVectorFlags::new(true, false),
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     };
@@ -7618,7 +7615,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       if rows.first().is_none_or(|row| result_index >= row.len()) {
         return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
       }
-      let index = vhlookup_matrix_index(self, &lookup, &rows, false, sorted);
+      let index = vhlookup_matrix_index(self, &lookup, rows, false, sorted);
       let Some(index) = index else {
         return FormulaValue::Error(FormulaErrorValue::NA);
       };
@@ -7629,7 +7626,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .unwrap_or(FormulaValue::Error(FormulaErrorValue::Ref));
     }
 
-    let Some(reference) = self.as_reference(&table) else {
+    let Some(reference) = self.as_reference(table) else {
       return FormulaValue::Error(FormulaErrorValue::Value);
     };
     if reference.range.start.column + result_column - 1 > reference.range.end.column {
@@ -7794,9 +7791,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       ),
       -1 => search_vector_with_type(
         self,
@@ -7804,9 +7800,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -7815,9 +7810,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           &lookup_vector,
           QueryOp::LessOrEqual,
           search,
-          false,
           QuerySearchType::Normal,
-          true,
+          SearchVectorFlags::new(false, true),
         )
       }),
       1 => search_vector_with_type(
@@ -7826,9 +7820,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -7837,9 +7830,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           &lookup_vector,
           QueryOp::GreaterOrEqual,
           search,
-          false,
           QuerySearchType::Normal,
-          true,
+          SearchVectorFlags::new(false, true),
         )
       }),
       2 | 3 => search_vector_with_type(
@@ -7848,7 +7840,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         if !matches!(lookup, FormulaValue::String(_)) {
           QuerySearchType::Normal
         } else if match_mode == 2 && may_be_wildcard(self.text(&lookup).as_ref()) {
@@ -7858,7 +7849,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         } else {
           QuerySearchType::Normal
         },
-        false,
+        SearchVectorFlags::new(true, false),
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     };
@@ -9211,19 +9202,24 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         values.swap(pivot, pivot_row);
       }
       let pivot_value = values[pivot][pivot];
-      for column in 0..columns * 2 {
-        values[pivot][column] /= pivot_value;
+      for value in values[pivot].iter_mut().take(columns * 2) {
+        *value /= pivot_value;
       }
-      for row in 0..rows {
+      let pivot_values = values[pivot].clone();
+      for (row, row_values) in values.iter_mut().enumerate().take(rows) {
         if row == pivot {
           continue;
         }
-        let factor = values[row][pivot];
+        let factor = row_values[pivot];
         if factor == 0.0 {
           continue;
         }
-        for column in 0..columns * 2 {
-          values[row][column] -= factor * values[pivot][column];
+        for (value, pivot_value) in row_values
+          .iter_mut()
+          .zip(pivot_values.iter())
+          .take(columns * 2)
+        {
+          *value -= factor * pivot_value;
         }
       }
     }
@@ -12338,7 +12334,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let p = self.number(matrix_item(&p_matrix, row, column)?)?;
         let alpha = self.number(matrix_item(&alpha_matrix, row, column)?)?;
         let beta = self.number(matrix_item(&beta_matrix, row, column)?)?;
-        if p < 0.0 || p >= 1.0 || alpha <= 0.0 || beta <= 0.0 {
+        if !(0.0..1.0).contains(&p) || alpha <= 0.0 || beta <= 0.0 {
           result_row.push(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
           continue;
         }
@@ -13559,16 +13555,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    financial_oddlprice(
+    financial_oddlprice(OddPeriodArgs {
       settle,
       maturity,
-      last_interest,
+      last_coupon: last_interest,
       rate,
-      yield_value,
+      value: yield_value,
       redemption,
       frequency,
       basis,
-    )
+    })
     .filter(|value| value.is_finite())
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(
@@ -13598,16 +13594,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    financial_oddlyield(
+    financial_oddlyield(OddPeriodArgs {
       settle,
       maturity,
-      last_interest,
+      last_coupon: last_interest,
       rate,
-      price,
+      value: price,
       redemption,
       frequency,
       basis,
-    )
+    })
     .filter(|value| value.is_finite())
     .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(
@@ -14669,9 +14665,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       ),
       -1 => search_vector_with_type(
         self,
@@ -14679,9 +14674,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -14690,9 +14684,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           &lookup_vector,
           QueryOp::LessOrEqual,
           search,
-          false,
           QuerySearchType::Normal,
-          true,
+          SearchVectorFlags::new(false, true),
         )
       }),
       1 => search_vector_with_type(
@@ -14701,9 +14694,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         &lookup_vector,
         QueryOp::Equal,
         search,
-        true,
         QuerySearchType::Normal,
-        false,
+        SearchVectorFlags::new(true, false),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -14712,9 +14704,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           &lookup_vector,
           QueryOp::GreaterOrEqual,
           search,
-          false,
           QuerySearchType::Normal,
-          true,
+          SearchVectorFlags::new(false, true),
         )
       }),
       _ => return None,
@@ -15220,7 +15211,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn date_number_from_scalar(&self, value: &FormulaValue<'doc>) -> Option<f64> {
     match value {
-      FormulaValue::String(text) => match datevalue(&text, self.book.date_system) {
+      FormulaValue::String(text) => match datevalue(text, self.book.date_system) {
         FormulaValue::Number(value) => Some(value),
         _ => None,
       },
@@ -16435,9 +16426,9 @@ fn lookup_collator(
   locale: Option<&str>,
   case_sensitive: bool,
 ) -> &'static CollatorBorrowed<'static> {
-  static COLLATORS: OnceLock<
-    Mutex<BTreeMap<(Option<String>, bool), &'static CollatorBorrowed<'static>>>,
-  > = OnceLock::new();
+  type CollatorCache = Mutex<BTreeMap<(Option<String>, bool), &'static CollatorBorrowed<'static>>>;
+
+  static COLLATORS: OnceLock<CollatorCache> = OnceLock::new();
   let key = (
     locale
       .filter(|value| !value.trim().is_empty())
@@ -16479,6 +16470,21 @@ fn lookup_text_contains(text: &str, pattern: &str) -> bool {
   lookup_search_key(text).contains(&lookup_search_key(pattern))
 }
 
+#[derive(Clone, Copy)]
+struct SearchVectorFlags {
+  exact_type: bool,
+  match_empty: bool,
+}
+
+impl SearchVectorFlags {
+  fn new(exact_type: bool, match_empty: bool) -> Self {
+    Self {
+      exact_type,
+      match_empty,
+    }
+  }
+}
+
 fn search_vector<'doc>(
   evaluator: &FormulaEvaluator<'_, 'doc>,
   lookup: &FormulaValue<'doc>,
@@ -16498,9 +16504,8 @@ fn search_vector<'doc>(
     vector,
     op,
     mode,
-    exact_type,
     search_type,
-    false,
+    SearchVectorFlags::new(exact_type, false),
   )
 }
 
@@ -16510,9 +16515,8 @@ fn search_vector_with_type<'doc>(
   vector: &[FormulaValue<'doc>],
   op: QueryOp,
   mode: LookupSearchMode,
-  exact_type: bool,
   search_type: QuerySearchType,
-  match_empty: bool,
+  flags: SearchVectorFlags,
 ) -> Option<usize> {
   let range_lookup = !matches!(op, QueryOp::Equal | QueryOp::NotEqual);
   let query = QueryEntry {
@@ -16522,7 +16526,7 @@ fn search_vector_with_type<'doc>(
       kind: query_value_kind(lookup),
       value: lookup.clone(),
       source_text: None,
-      match_empty,
+      match_empty: flags.match_empty,
       empty_matches_text: false,
     },
   };
@@ -16545,7 +16549,7 @@ fn search_vector_with_type<'doc>(
     LookupSearchMode::Forward => {
       let mut found = None;
       for (index, candidate) in vector.iter().enumerate() {
-        if exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
+        if flags.exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
           continue;
         }
         if query_matches(evaluator, &param, query, candidate, false) {
@@ -16585,7 +16589,7 @@ fn search_vector_with_type<'doc>(
     LookupSearchMode::Reverse => {
       let mut found = None;
       for (index, candidate) in vector.iter().enumerate().rev() {
-        if exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
+        if flags.exact_type && !lookup_types_compatible(evaluator, lookup, candidate) {
           continue;
         }
         if query_matches(evaluator, &param, query, candidate, false) {
@@ -17636,7 +17640,7 @@ fn regression_state(data: &RegressionData, constant: bool) -> Option<RegressionS
   }
   let mut qr = centered_x.clone();
   let r_diagonal = qr_decompose(&mut qr, k, n)?;
-  if r_diagonal.iter().any(|value| *value == 0.0) {
+  if r_diagonal.contains(&0.0) {
     return None;
   }
   let mut z = centered_y.clone();
@@ -17719,10 +17723,10 @@ fn regression_fill_stats<'doc>(
   let k = data.k();
   let n = data.n();
   let mut z = vec![0.0; n];
-  for row in 0..k {
-    z[row] = state.r_diagonal[row] * state.model.slopes[row];
+  for (row, value) in z.iter_mut().enumerate().take(k) {
+    *value = state.r_diagonal[row] * state.model.slopes[row];
     for column in row + 1..k {
-      z[row] += state.centered_x[row][column] * state.model.slopes[column];
+      *value += state.centered_x[row][column] * state.model.slopes[column];
     }
   }
   for column in (0..k).rev() {
@@ -17795,8 +17799,8 @@ fn qr_decompose(matrix: &mut [Vec<f64>], k: usize, n: usize) -> Option<Vec<f64>>
     if scale == 0.0 {
       return None;
     }
-    for row in column..n {
-      matrix[row][column] /= scale;
+    for row_values in matrix.iter_mut().take(n).skip(column) {
+      row_values[column] /= scale;
     }
     let euclid = (column..n)
       .map(|row| matrix[row][column] * matrix[row][column])
@@ -17814,8 +17818,8 @@ fn qr_decompose(matrix: &mut [Vec<f64>], k: usize, n: usize) -> Option<Vec<f64>>
       let sum = (column..n)
         .map(|row| matrix[row][column] * matrix[row][c])
         .sum::<f64>();
-      for row in column..n {
-        matrix[row][c] -= sum * factor * matrix[row][column];
+      for row_values in matrix.iter_mut().take(n).skip(column) {
+        row_values[c] -= sum * factor * row_values[column];
       }
     }
   }
@@ -19728,24 +19732,24 @@ fn log_gamma(z: f64) -> f64 {
 }
 
 const LO_MAX_GAMMA_ARGUMENT: f64 = 171.624376956302;
-const LO_LANCZOS_G: f64 = 6.024680040776729583740234375;
+const LO_LANCZOS_G: f64 = 6.024_680_040_776_73;
 const LO_HALF_MACH_EPS: f64 = 0.5 * f64::EPSILON;
 
 fn lo_lanczos_sum(z: f64) -> f64 {
   const NUM: [f64; 13] = [
-    23531376880.41075968857200767445163675473,
-    42919803642.64909876895789904700198885093,
-    35711959237.35566804944018545154716670596,
-    17921034426.03720969991975575445893111267,
-    6039542586.35202800506429164430729792107,
-    1439720407.311721673663223072794912393972,
-    248874557.8620541565114603864132294232163,
-    31426415.58540019438061423162831820536287,
-    2876370.628935372441225409051620849613599,
-    186056.2653952234950402949897160456992822,
-    8071.672002365816210638002902272250613822,
-    210.8242777515793458725097339207133627117,
-    2.506628274631000270164908177133837338626,
+    23_531_376_880.410_76,
+    42_919_803_642.649_1,
+    35_711_959_237.355_67,
+    17_921_034_426.037_21,
+    6_039_542_586.352_028,
+    1_439_720_407.311_721_6,
+    248_874_557.862_054_17,
+    31_426_415.585_400_194,
+    2_876_370.628_935_372_5,
+    186_056.265_395_223_48,
+    8_071.672_002_365_816,
+    210.824_277_751_579_36,
+    2.506_628_274_631_000_2,
   ];
   const DENOM: [f64; 13] = [
     0.0,
@@ -20233,7 +20237,10 @@ fn chisq_dist_value<'doc>(
 }
 
 fn chisq_inv_value<'doc>(p: f64, df: f64, right_tail: bool) -> FormulaValue<'doc> {
-  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && (p < 0.0 || p >= 1.0)) {
+  if df < 1.0
+    || (right_tail && !(0.0..=1.0).contains(&p))
+    || (!right_tail && !(0.0..1.0).contains(&p))
+  {
     return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
   let result = if right_tail {
@@ -21428,23 +21435,26 @@ fn finance_price(
   Some(price)
 }
 
-fn financial_oddlprice(
+#[derive(Clone, Copy)]
+struct OddPeriodArgs {
   settle: i32,
   maturity: i32,
   last_coupon: i32,
   rate: f64,
-  yield_value: f64,
+  value: f64,
   redemption: f64,
   frequency: i32,
   basis: i32,
-) -> Option<f64> {
-  let frequency = f64::from(frequency);
-  let dci = yearfrac(last_coupon, maturity, basis)? * frequency;
-  let dsci = yearfrac(settle, maturity, basis)? * frequency;
-  let ai = yearfrac(last_coupon, settle, basis)? * frequency;
-  let mut price = redemption + dci * 100.0 * rate / frequency;
-  price /= dsci * yield_value / frequency + 1.0;
-  price -= ai * 100.0 * rate / frequency;
+}
+
+fn financial_oddlprice(args: OddPeriodArgs) -> Option<f64> {
+  let frequency = f64::from(args.frequency);
+  let dci = yearfrac(args.last_coupon, args.maturity, args.basis)? * frequency;
+  let dsci = yearfrac(args.settle, args.maturity, args.basis)? * frequency;
+  let ai = yearfrac(args.last_coupon, args.settle, args.basis)? * frequency;
+  let mut price = args.redemption + dci * 100.0 * args.rate / frequency;
+  price /= dsci * args.value / frequency + 1.0;
+  price -= ai * 100.0 * args.rate / frequency;
   Some(price)
 }
 
@@ -21507,22 +21517,13 @@ fn finance_yield(
   }
 }
 
-fn financial_oddlyield(
-  settle: i32,
-  maturity: i32,
-  last_coupon: i32,
-  rate: f64,
-  price: f64,
-  redemption: f64,
-  frequency: i32,
-  basis: i32,
-) -> Option<f64> {
-  let frequency = f64::from(frequency);
-  let dci = yearfrac(last_coupon, maturity, basis)? * frequency;
-  let dsci = yearfrac(settle, maturity, basis)? * frequency;
-  let ai = yearfrac(last_coupon, settle, basis)? * frequency;
-  let mut yield_value = redemption + dci * 100.0 * rate / frequency;
-  yield_value /= price + ai * 100.0 * rate / frequency;
+fn financial_oddlyield(args: OddPeriodArgs) -> Option<f64> {
+  let frequency = f64::from(args.frequency);
+  let dci = yearfrac(args.last_coupon, args.maturity, args.basis)? * frequency;
+  let dsci = yearfrac(args.settle, args.maturity, args.basis)? * frequency;
+  let ai = yearfrac(args.last_coupon, args.settle, args.basis)? * frequency;
+  let mut yield_value = args.redemption + dci * 100.0 * args.rate / frequency;
+  yield_value /= args.value + ai * 100.0 * args.rate / frequency;
   yield_value -= 1.0;
   Some(yield_value * frequency / dsci)
 }
@@ -22890,8 +22891,8 @@ fn index_matrix<'doc>(
       return FormulaValue::Error(FormulaErrorValue::Ref);
     }
     let index = element - 1;
-    let row_index = if width == 0 { 0 } else { index / width };
-    let column_index = if width == 0 { 0 } else { index % width };
+    let row_index = index / width;
+    let column_index = index % width;
     return rows
       .get(row_index)
       .and_then(|row| row.get(column_index))

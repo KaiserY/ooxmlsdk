@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.10.2
+
+### Changed
+
+- Aligned package part naming more closely with Open XML SDK. Parts whose upstream content type is not numbered now use the plain first path, such as `xl/workbook.xml`, `xl/styles.xml`, `customUI/customUI.xml`, and `word/media/image.png`, while numbered parts such as worksheets continue to start at names like `sheet1.xml`.
+- Simplified generated choice-sequence payload code so generated schema readers keep the same XML behavior with less generated dispatch code.
+
+### Fixed
+
+- Added the required `.rels` default content type when saving packages, so newly-created documents include `application/vnd.openxmlformats-package.relationships+xml` in `[Content_Types].xml`.
+- Fixed newly-created spreadsheet packages that use low-level part APIs so workbook, worksheet, styles, package relationships, and workbook relationships are saved with upstream-compatible paths and content type entries.
+
+### Performance
+
+- Reduced package-open content type lookup work by resolving overrides and default extensions through borrowed lookup tables instead of scanning `[Content_Types].xml` entries for every part.
+- Improved XML parsing paths for preserved raw XML, byte-backed attributes, and event dispatch, reducing temporary string work while keeping the public XML and package APIs unchanged.
+
 ## 0.10.1
 
 ### Changed

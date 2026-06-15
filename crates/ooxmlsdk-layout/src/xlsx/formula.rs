@@ -852,6 +852,7 @@ fn calc_error_text(value: ooxmlsdk_formula::FormulaErrorValue) -> &'static str {
     ooxmlsdk_formula::FormulaErrorValue::Spill => "#SPILL!",
     ooxmlsdk_formula::FormulaErrorValue::Calc => "#CALC!",
     ooxmlsdk_formula::FormulaErrorValue::IllegalArgument => "Err:502",
+    ooxmlsdk_formula::FormulaErrorValue::Parameter => "Err:511",
     ooxmlsdk_formula::FormulaErrorValue::Unknown => "#UNKNOWN!",
   }
 }

@@ -274,14 +274,16 @@ fn parse_column_letters(value: &str) -> Option<u32> {
       .checked_mul(26)?
       .checked_add(ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1)?;
   }
-  column.checked_sub(1)
+  let column = column.checked_sub(1)?;
+  (column <= EXCEL_MAX_COLUMN_ZERO_BASED).then_some(column)
 }
 
 fn parse_row_digits(value: &str) -> Option<u32> {
   if value.is_empty() || !value.chars().all(|ch| ch.is_ascii_digit()) {
     return None;
   }
-  value.parse::<u32>().ok()?.checked_sub(1)
+  let row = value.parse::<u32>().ok()?.checked_sub(1)?;
+  (row <= EXCEL_MAX_ROW_ZERO_BASED).then_some(row)
 }
 
 #[cfg(test)]
@@ -301,6 +303,16 @@ mod tests {
       CellAddress::parse_a1("'Sheet 1'!C3").unwrap(),
       CellAddress { column: 2, row: 2 }
     );
+    assert_eq!(
+      CellAddress::parse_a1("XFD1048576").unwrap(),
+      CellAddress {
+        column: EXCEL_MAX_COLUMN_ZERO_BASED,
+        row: EXCEL_MAX_ROW_ZERO_BASED,
+      }
+    );
+    assert!(CellAddress::parse_a1("XFE1").is_err());
+    assert!(CellAddress::parse_a1("A1048577").is_err());
+    assert!(CellAddress::parse_a1("column1").is_err());
   }
 
   #[test]

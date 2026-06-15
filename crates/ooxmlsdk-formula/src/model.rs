@@ -4400,13 +4400,25 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       | FormulaOperator::LessOrEqual
       | FormulaOperator::Greater
       | FormulaOperator::GreaterOrEqual => {
-        if matches!(left, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
-          || matches!(right, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
-        {
+        let left_is_matrix_compare = matches!(left, FormulaValue::Matrix(_))
+          || matches!(
+            &left,
+            FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1
+          )
+          || matches!(left, FormulaValue::RefList(_));
+        let right_is_matrix_compare = matches!(right, FormulaValue::Matrix(_))
+          || matches!(
+            &right,
+            FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1
+          )
+          || matches!(right, FormulaValue::RefList(_));
+        if left_is_matrix_compare || right_is_matrix_compare {
           return self.map_binary_values(left, right, |evaluator, left, right| {
             Some(FormulaValue::Boolean(evaluator.compare(left, right, op)))
           });
         }
+        let left = self.scalar_value(left);
+        let right = self.scalar_value(right);
         Some(FormulaValue::Boolean(self.compare(&left, &right, op)))
       }
       _ => None,
@@ -4605,20 +4617,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .current_value
         .clone()
         .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
-      "N" => Some(FormulaValue::Number(
-        match self.first_value(&self.evaluate(args.first()?)?) {
-          FormulaValue::Number(value) => value,
-          FormulaValue::Boolean(value) => {
-            if value {
-              1.0
-            } else {
-              0.0
-            }
-          }
-          FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
-          _ => 0.0,
-        },
-      )),
+      "N" => self.evaluate_n(args),
       "COUNTBLANK" => Some(FormulaValue::Number(
         self.count_blank(&self.evaluate(args.first()?)?) as f64,
       )),
@@ -5712,21 +5711,60 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
     let value = self.evaluate(args.first()?)?;
-    if matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
-      let matrix = self.matrix_values(&value);
-      return Some(FormulaValue::Matrix(
-        matrix
-          .into_iter()
-          .map(|row| {
-            row
-              .into_iter()
-              .map(|value| FormulaValue::Boolean(!self.truthy(&value)))
-              .collect()
-          })
-          .collect(),
-      ));
+    match &value {
+      FormulaValue::Reference(reference) if reference.range.cell_count_hint() == 1 => {}
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_) => {
+        return self.map_unary_values(value, |evaluator, value| match value {
+          FormulaValue::Error(error) => Some(FormulaValue::Error(*error)),
+          value => Some(FormulaValue::Boolean(!evaluator.truthy(value))),
+        });
+      }
+      _ => {}
     }
-    Some(FormulaValue::Boolean(!self.truthy(&value)))
+    let value = self.scalar_value(value);
+    match value {
+      FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+      value => Some(FormulaValue::Boolean(!self.truthy(&value))),
+    }
+  }
+
+  fn evaluate_n(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.len() != 1 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    }
+    let value = self.evaluate(args.first()?)?;
+    if self.array_context
+      && matches!(
+        value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      )
+    {
+      return self.map_unary_values(value, |_, value| match value {
+        FormulaValue::Number(value) => Some(FormulaValue::Number(*value)),
+        FormulaValue::Boolean(value) => Some(FormulaValue::Number(if *value { 1.0 } else { 0.0 })),
+        FormulaValue::Error(error) => Some(FormulaValue::Error(*error)),
+        _ => Some(FormulaValue::Number(0.0)),
+      });
+    }
+    match &value {
+      FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1 => {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      FormulaValue::RefList(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+      _ => {}
+    }
+    Some(FormulaValue::Number(match self.first_value(&value) {
+      FormulaValue::Number(value) => value,
+      FormulaValue::Boolean(value) => {
+        if value {
+          1.0
+        } else {
+          0.0
+        }
+      }
+      FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
+      _ => 0.0,
+    }))
   }
 
   fn evaluate_dollar(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -6267,6 +6305,30 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let skip = start - 1;
     let haystack_tail = haystack.chars().skip(skip).collect::<String>();
+    if !case_sensitive {
+      match detect_query_search_type(self.book.formula_search_type, &needle) {
+        QuerySearchType::Regex => {
+          let regex = RegexBuilder::new(&needle).case_insensitive(true).build();
+          return match regex.ok().and_then(|regex| regex.find(&haystack_tail)) {
+            Some(match_) => Some(FormulaValue::Number(
+              (skip + haystack_tail[..match_.start()].chars().count() + 1) as f64,
+            )),
+            None => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+          };
+        }
+        QuerySearchType::Wildcard => {
+          let pattern = wildcard_search_regex_pattern(&needle);
+          let regex = RegexBuilder::new(&pattern).case_insensitive(true).build();
+          return match regex.ok().and_then(|regex| regex.find(&haystack_tail)) {
+            Some(match_) => Some(FormulaValue::Number(
+              (skip + haystack_tail[..match_.start()].chars().count() + 1) as f64,
+            )),
+            None => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+          };
+        }
+        QuerySearchType::Normal => {}
+      }
+    }
     let (haystack_search, needle_search) = if case_sensitive {
       (haystack_tail, needle)
     } else {
@@ -7403,8 +7465,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let text = if use_a1 {
       text.as_str()
     } else {
-      reference_text = r1c1_reference_to_a1(&text, self.current_cell.unwrap_or_default())
-        .unwrap_or_else(|| text.clone());
+      let Some(converted) = r1c1_reference_to_a1(&text, self.current_cell.unwrap_or_default())
+      else {
+        return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+      };
+      reference_text = converted;
       reference_text.as_str()
     };
     self
@@ -8572,13 +8637,38 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(1..=2).contains(&args.len()) {
       return None;
     }
-    if let Some(display) = args.get(1).and_then(|arg| self.evaluate(arg)) {
-      Some(self.scalar_value(display))
+    let url_value = self.evaluate(args.first()?)?;
+    let url = match self.scalar_value(url_value) {
+      FormulaValue::Error(error) => {
+        return Some(FormulaValue::Matrix(vec![
+          vec![FormulaValue::Error(error)],
+          vec![FormulaValue::Error(error)],
+        ]));
+      }
+      value => self.text(&value),
+    };
+    let display = if let Some(display_arg) = args.get(1) {
+      match self.scalar_value(self.evaluate(display_arg)?) {
+        FormulaValue::Error(error) => FormulaValue::Error(error),
+        FormulaValue::Number(value) => FormulaValue::Number(value),
+        FormulaValue::String(value) => FormulaValue::String(value),
+        FormulaValue::Boolean(value) => FormulaValue::Number(if value { 1.0 } else { 0.0 }),
+        FormulaValue::Blank => FormulaValue::Number(0.0),
+        value => FormulaValue::String(Cow::Owned(self.text(&value))),
+      }
     } else {
-      Some(FormulaValue::String(Cow::Owned(
-        self.text(&self.evaluate(args.first()?)?),
-      )))
+      FormulaValue::String(Cow::Owned(url.clone()))
+    };
+    if let FormulaValue::Error(error) = display {
+      return Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Error(error)],
+        vec![FormulaValue::Error(error)],
+      ]));
     }
+    Some(FormulaValue::Matrix(vec![
+      vec![display],
+      vec![FormulaValue::String(Cow::Owned(url))],
+    ]))
   }
 
   fn evaluate_to_row_column(
@@ -15419,11 +15509,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     match value {
       FormulaValue::Reference(reference) => self
         .implicit_intersection_value(&reference)
+        .map(|value| self.first_value(&value))
         .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value)),
       FormulaValue::RefList(ranges) => {
         if ranges.len() == 1 {
           self
             .implicit_intersection_value(&ranges[0])
+            .map(|value| self.first_value(&value))
             .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value))
         } else {
           FormulaValue::Error(FormulaErrorValue::Value)
@@ -18614,6 +18706,26 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
     p += 1;
   }
   p == pattern.len()
+}
+
+fn wildcard_search_regex_pattern(pattern: &str) -> String {
+  let mut output = String::new();
+  let mut chars = pattern.chars();
+  while let Some(ch) = chars.next() {
+    match ch {
+      '*' => output.push_str(".*"),
+      '?' => output.push('.'),
+      '~' => {
+        if let Some(escaped) = chars.next() {
+          output.push_str(&regex::escape(&escaped.to_string()));
+        } else {
+          output.push_str(&regex::escape("~"));
+        }
+      }
+      ch => output.push_str(&regex::escape(&ch.to_string())),
+    }
+  }
+  output
 }
 
 fn may_be_wildcard(value: &str) -> bool {
@@ -25683,6 +25795,22 @@ mod tests {
       Some(FormulaValue::Number(12.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 2, row: 4 }),
+        "INDIRECT(\"R1C1\",0)"
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 2, row: 4 }),
+        "INDIRECT(\"A1\",0)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Ref))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FORMULATEXT(D1)"),
       Some(FormulaValue::String(Cow::Owned("=SUM(A1:A3)".to_string())))
     );
@@ -26293,11 +26421,47 @@ mod tests {
       Some(FormulaValue::String(Cow::Borrowed("0%2E08")))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HYPERLINK(\"url\",\"label\")"),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::String(Cow::Borrowed("label"))],
+        vec![FormulaValue::String(Cow::Borrowed("url"))],
+      ]))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HYPERLINK(\"url\",1/0)"),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Error(FormulaErrorValue::Div0)],
+        vec![FormulaValue::Error(FormulaErrorValue::Div0)],
+      ]))
+    );
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FIXED(\"1,234,567.890\",-1)"),
       Some(FormulaValue::String(Cow::Borrowed("1,234,570")))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "FIXED(A1:A2,2)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    let regex_search_book = FormulaEvaluationBookBuilder::new()
+      .with_formula_search_type(FormulaSearchType::Regex)
+      .build();
+    assert_eq!(
+      regex_search_book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "SEARCH(\"Gewinn|Promotion|Replay\",\"Gewinn\")"
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    let literal_search_book = FormulaEvaluationBookBuilder::new()
+      .with_formula_search_type(FormulaSearchType::Normal)
+      .build();
+    assert_eq!(
+      literal_search_book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "SEARCH(\"Gewinn|Promotion|Replay\",\"Gewinn\")"
+      ),
       Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
     assert_eq!(
@@ -26351,6 +26515,14 @@ mod tests {
       )
       .with_cell(
         SheetId(1),
+        CellAddress { column: 8, row: 0 },
+        FormulaValue::Matrix(vec![
+          vec![FormulaValue::String(Cow::Borrowed("anchor"))],
+          vec![FormulaValue::String(Cow::Borrowed("spill"))],
+        ]),
+      )
+      .with_cell(
+        SheetId(1),
         CellAddress { column: 4, row: 0 },
         FormulaValue::Number(-3.0),
       )
@@ -26372,6 +26544,37 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "IFNA(,\"A\")"),
       Some(FormulaValue::Error(FormulaErrorValue::Parameter))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "N(A1:E1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    let (ast, unsupported) = parse_formula_ast(SheetId(1), "N(A1:E1)");
+    let formula = ParsedFormula {
+      source: Cow::Borrowed("N(A1:E1)"),
+      grammar: FormulaGrammar::ExcelA1,
+      tokens: Vec::new(),
+      ast,
+      dependencies: Vec::new(),
+      unsupported,
+    };
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Matrix(vec![vec![
+        FormulaValue::Number(1.0),
+        FormulaValue::Error(FormulaErrorValue::Div0),
+        FormulaValue::Number(0.0),
+        FormulaValue::Number(0.0),
+        FormulaValue::Number(-3.0),
+      ]]))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "NOT(B1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Div0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "I1=\"anchor\""),
+      Some(FormulaValue::Boolean(true))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(D1)"),

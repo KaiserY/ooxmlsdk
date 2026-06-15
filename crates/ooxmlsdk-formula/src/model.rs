@@ -4113,7 +4113,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let formula = self
       .book
       .defined_name_formula(Some(self.current_sheet), name.as_ref())?;
-    if let Ok(reference) = QualifiedRange::parse_a1(self.current_sheet, formula.as_ref()) {
+    if formula.trim().parse::<f64>().is_err()
+      && let Ok(reference) = QualifiedRange::parse_a1(self.current_sheet, formula.as_ref())
+    {
       return Some(FormulaValue::Reference(reference));
     }
     let (ast, unsupported) = parse_formula_ast(self.current_sheet, formula.as_ref());
@@ -4941,6 +4943,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "FLOOR" => self.evaluate_floor(args, CeilingFloorKind::Odff),
       "FLOOR.MATH" => self.evaluate_floor(args, CeilingFloorKind::Math),
       "FLOOR.PRECISE" => self.evaluate_floor(args, CeilingFloorKind::Precise),
+      "B" => self.evaluate_b(args),
       "BETA.DIST" => self.evaluate_beta_dist(args, false),
       "BETADIST" => self.evaluate_beta_dist(args, true),
       "BETA.INV" | "BETAINV" => self.evaluate_beta_inv(args),
@@ -7269,6 +7272,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         kind: query_value_kind(&lookup),
         value: lookup.clone(),
         match_empty: false,
+        empty_matches_text: false,
       },
     };
     let param = QueryParam::single(query, QuerySearchType::Normal).with_range_lookup(true);
@@ -7559,6 +7563,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .query_cell_value(sheet, address, self.book.cell_value(sheet, address));
       let query_empty = self.book.is_query_empty_cell(sheet, address);
       if !query_matches(self, &param, query, &value, query_empty) {
+        if sorted
+          && found.is_some()
+          && lookup_candidate_type_matches(query, &value)
+          && lookup_compare_candidate_to_query(self, &value, query, &param, true) == Some(1)
+        {
+          break;
+        }
         continue;
       }
       if sorted {
@@ -10779,6 +10790,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     kind: CeilingFloorKind,
   ) -> Option<FormulaValue<'doc>> {
+    if kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = match kind {
       CeilingFloorKind::Odff => args
@@ -10854,6 +10868,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     kind: CeilingFloorKind,
   ) -> Option<FormulaValue<'doc>> {
+    if kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = match kind {
       CeilingFloorKind::Odff => args
@@ -10925,7 +10942,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_ceiling_excel_legacy(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    if args.len() < 2 {
+    if args.len() != 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
     let value = self.number(&self.evaluate(args.first()?)?)?;
@@ -11134,6 +11151,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           result_row.push(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
           continue;
         }
+        if !legacy && scale == 0.0 {
+          result_row.push(FormulaValue::Error(FormulaErrorValue::Num));
+          continue;
+        }
         if !legacy && (x < lower || x > upper) {
           result_row.push(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
           continue;
@@ -11299,62 +11320,138 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }))
   }
 
-  fn evaluate_binom_dist_range(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_b(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     if !(3..=4).contains(&args.len()) {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let Some(n) = self.number_arg(args, 0).map(approx_floor) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
-    };
-    let Some(p) = self.number_arg(args, 1) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
-    };
-    let Some(start) = self.number_arg(args, 2).map(approx_floor) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
-    };
-    let end = args
-      .get(3)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .map(|value| value.floor())
-      .unwrap_or(start);
-    if start < 0.0 || start > end || end > n {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let n = approx_floor(self.number(&self.evaluate(args.first()?)?)?);
+    let p = self.number(&self.evaluate(args.get(1)?)?)?;
+    if args.len() == 3 {
+      let x = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
+      if n < 0.0 || x < 0.0 || x > n || !(0.0..=1.0).contains(&p) {
+        return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      }
+      if p == 0.0 {
+        return Some(FormulaValue::Number((x == 0.0) as u8 as f64));
+      }
+      if p == 1.0 {
+        return Some(FormulaValue::Number((x == n) as u8 as f64));
+      }
+      return Some(FormulaValue::Number(lo_binom_dist_pmf(x, n, p)));
     }
-    if p == 0.0 {
-      return Some(FormulaValue::Number(if start == 0.0 { 1.0 } else { 0.0 }));
+
+    let xs = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
+    let xe = approx_floor(self.number(&self.evaluate(args.get(3)?)?)?);
+    let valid_x = 0.0 <= xs && xs <= xe && xe <= n;
+    if valid_x && 0.0 < p && p < 1.0 {
+      if xs == xe {
+        return Some(FormulaValue::Number(lo_binom_dist_pmf(xs, n, p)));
+      }
+      let q = (0.5 - p) + 0.5;
+      let mut factor = q.powf(n);
+      if factor > f64::MIN_POSITIVE {
+        return Some(FormulaValue::Number(lo_binom_dist_range(
+          n, xs, xe, factor, p, q,
+        )));
+      }
+      factor = p.powf(n);
+      if factor > f64::MIN_POSITIVE {
+        return Some(FormulaValue::Number(lo_binom_dist_range(
+          n,
+          n - xe,
+          n - xs,
+          factor,
+          q,
+          p,
+        )));
+      }
+      return Some(FormulaValue::Number(
+        lo_beta_dist(q, n - xe, xe + 1.0) - lo_beta_dist(q, n - xs + 1.0, xs),
+      ));
     }
-    if p == 1.0 {
-      return Some(FormulaValue::Number(if end == n { 1.0 } else { 0.0 }));
+    if valid_x {
+      if p == 0.0 {
+        Some(FormulaValue::Number((xs == 0.0) as u8 as f64))
+      } else if p == 1.0 {
+        Some(FormulaValue::Number((xe == n) as u8 as f64))
+      } else {
+        Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+      }
+    } else {
+      Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
     }
-    if !(0.0..=1.0).contains(&p) || n < 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
-    }
-    let dist = Binomial::new(p, n as u64).ok()?;
-    Some(FormulaValue::Number(
-      (start as u64..=end as u64)
-        .map(|k| dist.pmf(k))
-        .sum::<f64>()
-        .min(1.0),
-    ))
+  }
+
+  fn evaluate_binom_dist_range(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    self.evaluate_b(args)
   }
 
   fn evaluate_binom_inv(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let n = self.number(&self.evaluate(args.first()?)?)?.floor();
+    let n = approx_floor(self.number(&self.evaluate(args.first()?)?)?);
     let p = self.number(&self.evaluate(args.get(1)?)?)?;
     let alpha = self.number(&self.evaluate(args.get(2)?)?)?;
     if n < 0.0 || !(0.0..=1.0).contains(&p) || !(0.0..=1.0).contains(&alpha) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let dist = Binomial::new(p, n as u64).ok()?;
-    let mut cumulative = 0.0;
-    for k in 0..=n as u64 {
-      cumulative += dist.pmf(k);
-      if cumulative >= alpha {
-        return Some(FormulaValue::Number(k as f64));
+    if alpha == 0.0 {
+      return Some(FormulaValue::Number(0.0));
+    }
+    if alpha == 1.0 {
+      return Some(FormulaValue::Number(if p == 0.0 { 0.0 } else { n }));
+    }
+
+    let q = (0.5 - p) + 0.5;
+    if q > p {
+      let mut factor = q.powf(n);
+      if factor > f64::MIN_POSITIVE {
+        let mut sum = KahanSum::default();
+        sum.add(factor);
+        let mut i = 0_u32;
+        let max = n as u32;
+        while i < max && sum.finish() < alpha {
+          factor *= (n - f64::from(i)) / f64::from(i + 1) * p / q;
+          sum.add(factor);
+          i += 1;
+        }
+        Some(FormulaValue::Number(f64::from(i)))
+      } else {
+        let mut sum = KahanSum::default();
+        let mut i = 0_u32;
+        let max = n as u32;
+        while i < max && sum.finish() < alpha {
+          let x = lo_beta_dist_pdf(p, f64::from(i + 1), n - f64::from(i) + 1.0).ok()? / (n + 1.0);
+          sum.add(x);
+          i += 1;
+        }
+        Some(FormulaValue::Number(f64::from(i.saturating_sub(1))))
+      }
+    } else {
+      let mut factor = p.powf(n);
+      if factor > f64::MIN_POSITIVE {
+        let mut sum = KahanSum::default();
+        sum.add(1.0);
+        sum.add(-factor);
+        let mut i = 0_u32;
+        let max = n as u32;
+        while i < max && sum.finish() >= alpha {
+          factor *= (n - f64::from(i)) / f64::from(i + 1) * q / p;
+          sum.add(-factor);
+          i += 1;
+        }
+        Some(FormulaValue::Number(n - f64::from(i)))
+      } else {
+        let mut sum = KahanSum::default();
+        let tail_alpha = 1.0 - alpha;
+        let mut i = 0_u32;
+        let max = n as u32;
+        while i < max && sum.finish() < tail_alpha {
+          let x = lo_beta_dist_pdf(q, f64::from(i + 1), n - f64::from(i) + 1.0).ok()? / (n + 1.0);
+          sum.add(x);
+          i += 1;
+        }
+        Some(FormulaValue::Number(n - f64::from(i) + 1.0))
       }
     }
-    Some(FormulaValue::Number(n))
   }
 
   fn evaluate_chisq_dist(
@@ -11362,24 +11459,57 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     right_tail: bool,
   ) -> Option<FormulaValue<'doc>> {
-    let x = self.number(&self.evaluate(args.first()?)?)?;
-    let df = self.number(&self.evaluate(args.get(1)?)?)?.floor();
-    if df < 1.0 || x < 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let x_value = self.evaluate(args.first()?)?;
+    let df_value = self.evaluate(args.get(1)?)?;
+    let cumulative_value = args.get(2).and_then(|arg| self.evaluate(arg));
+    if self.array_context
+      && (matches!(
+        x_value,
+        FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+      ) || matches!(
+        df_value,
+        FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+      ) || cumulative_value
+        .as_ref()
+        .is_some_and(|value| matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))))
+    {
+      let x_matrix = self.matrix_values(&x_value);
+      let df_matrix = self.matrix_values(&df_value);
+      let cumulative_matrix = cumulative_value
+        .as_ref()
+        .map(|value| self.matrix_values(value))
+        .unwrap_or_default();
+      let rows = x_matrix
+        .len()
+        .max(df_matrix.len())
+        .max(cumulative_matrix.len());
+      let columns = x_matrix
+        .first()
+        .map(Vec::len)
+        .unwrap_or(1)
+        .max(df_matrix.first().map(Vec::len).unwrap_or(1))
+        .max(cumulative_matrix.first().map(Vec::len).unwrap_or(1));
+      let mut result = Vec::with_capacity(rows);
+      for row in 0..rows {
+        let mut result_row = Vec::with_capacity(columns);
+        for column in 0..columns {
+          let x = self.number(matrix_item(&x_matrix, row, column)?)?;
+          let df = approx_floor(self.number(matrix_item(&df_matrix, row, column)?)?);
+          let cumulative = cumulative_value.as_ref().map(|_| {
+            matrix_item(&cumulative_matrix, row, column)
+              .map(|value| self.truthy(value))
+              .unwrap_or(false)
+          });
+          result_row.push(chisq_dist_value(x, df, right_tail, cumulative));
+        }
+        result.push(result_row);
+      }
+      return Some(FormulaValue::Matrix(result));
     }
-    let dist = ChiSquared::new(df).ok()?;
-    if right_tail {
-      return Some(FormulaValue::Number(dist.sf(x)));
-    }
-    let cumulative = args
-      .get(2)
-      .and_then(|arg| self.evaluate(arg))
-      .is_some_and(|value| self.truthy(&value));
-    Some(FormulaValue::Number(if cumulative {
-      dist.cdf(x)
-    } else {
-      dist.pdf(x)
-    }))
+    let x = self.number(&x_value)?;
+    let df = approx_floor(self.number(&df_value)?);
+    let cumulative = cumulative_value.as_ref().map(|value| self.truthy(value));
+    Some(chisq_dist_value(x, df, right_tail, cumulative))
   }
 
   fn evaluate_chisq_inv(
@@ -11387,17 +11517,40 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     right_tail: bool,
   ) -> Option<FormulaValue<'doc>> {
-    let p = self.number(&self.evaluate(args.first()?)?)?;
-    let df = self.number(&self.evaluate(args.get(1)?)?)?.floor();
-    if !(0.0..=1.0).contains(&p) || df < 1.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let p_value = self.evaluate(args.first()?)?;
+    let df_value = self.evaluate(args.get(1)?)?;
+    if self.array_context
+      && (matches!(
+        p_value,
+        FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+      ) || matches!(
+        df_value,
+        FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+      ))
+    {
+      let p_matrix = self.matrix_values(&p_value);
+      let df_matrix = self.matrix_values(&df_value);
+      let rows = p_matrix.len().max(df_matrix.len());
+      let columns = p_matrix
+        .first()
+        .map(Vec::len)
+        .unwrap_or(1)
+        .max(df_matrix.first().map(Vec::len).unwrap_or(1));
+      let mut result = Vec::with_capacity(rows);
+      for row in 0..rows {
+        let mut result_row = Vec::with_capacity(columns);
+        for column in 0..columns {
+          let p = self.number(matrix_item(&p_matrix, row, column)?)?;
+          let df = approx_floor(self.number(matrix_item(&df_matrix, row, column)?)?);
+          result_row.push(chisq_inv_value(p, df, right_tail));
+        }
+        result.push(result_row);
+      }
+      return Some(FormulaValue::Matrix(result));
     }
-    let dist = ChiSquared::new(df).ok()?;
-    Some(FormulaValue::Number(dist.inverse_cdf(if right_tail {
-      1.0 - p
-    } else {
-      p
-    })))
+    let p = self.number(&p_value)?;
+    let df = approx_floor(self.number(&df_value)?);
+    Some(chisq_inv_value(p, df, right_tail))
   }
 
   fn evaluate_chisq_test(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -15521,6 +15674,7 @@ struct QueryItem<'doc> {
   value: FormulaValue<'doc>,
   kind: QueryValueKind,
   match_empty: bool,
+  empty_matches_text: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -15656,6 +15810,7 @@ impl<'doc> QueryEntry<'doc> {
       let (op, operand) = parse_criteria_operator(text.as_ref());
       let trimmed = operand.trim();
       let is_empty_criterion = operand.is_empty();
+      let explicit_empty_operator = matches!(text.as_ref(), "=" | "<>");
       let operand_value = trimmed
         .parse::<f64>()
         .map(FormulaValue::Number)
@@ -15685,6 +15840,7 @@ impl<'doc> QueryEntry<'doc> {
             kind,
             match_empty: (op == QueryOp::Equal && is_empty_criterion)
               || (op == QueryOp::NotEqual && !is_empty_criterion),
+            empty_matches_text: is_empty_criterion && !explicit_empty_operator,
           },
         },
         search_type,
@@ -15703,6 +15859,7 @@ impl<'doc> QueryEntry<'doc> {
             kind: query_value_kind(&value),
             value,
             match_empty: false,
+            empty_matches_text: false,
           },
         },
         QuerySearchType::Normal,
@@ -15741,6 +15898,7 @@ impl<'doc> QueryEntry<'doc> {
             value: operand_value,
             kind,
             match_empty: false,
+            empty_matches_text: false,
           },
         },
         search_type,
@@ -15759,6 +15917,7 @@ impl<'doc> QueryEntry<'doc> {
             kind: query_value_kind(&value),
             value,
             match_empty: false,
+            empty_matches_text: false,
           },
         },
         QuerySearchType::Normal,
@@ -15801,7 +15960,10 @@ fn query_matches<'doc>(
     query.item.kind,
     QueryValueKind::Empty | QueryValueKind::NonEmpty
   ) {
-    let blank = candidate_query_empty || is_query_empty(candidate);
+    let blank = candidate_query_empty
+      || matches!(candidate, FormulaValue::Blank)
+      || (query.item.empty_matches_text
+        && matches!(candidate, FormulaValue::String(text) if text.is_empty()));
     return if query.item.kind == QueryValueKind::Empty {
       blank
     } else {
@@ -15917,7 +16079,7 @@ fn query_compare_value<'doc>(
 }
 
 fn query_candidate_number(value: &FormulaValue<'_>, query_empty: bool) -> Option<f64> {
-  if query_empty || matches!(value, FormulaValue::Blank) {
+  if query_empty {
     return Some(0.0);
   }
   match value {
@@ -16070,6 +16232,7 @@ fn search_vector_with_type<'doc>(
       kind: query_value_kind(lookup),
       value: lookup.clone(),
       match_empty,
+      empty_matches_text: false,
     },
   };
   let param = QueryParam::single(query, search_type).with_range_lookup(range_lookup);
@@ -16960,17 +17123,8 @@ fn regression_coefficients<'doc>(
   stats: bool,
   log_regression: bool,
 ) -> Option<Vec<Vec<FormulaValue<'doc>>>> {
-  if !stats && data.case == RegressionCase::Simple {
-    let model = simple_regression_model(data, constant)?;
-    let slope = model.slopes.first().copied()?;
-    return Some(vec![vec![
-      FormulaValue::Number(if log_regression { slope.exp() } else { slope }),
-      FormulaValue::Number(if log_regression {
-        model.intercept.exp()
-      } else {
-        model.intercept
-      }),
-    ]]);
+  if data.case == RegressionCase::Simple {
+    return simple_regression_coefficients(data, constant, stats, log_regression);
   }
   let mut state = regression_state(data, constant)?;
   let k = data.k();
@@ -16992,6 +17146,98 @@ fn regression_coefficients<'doc>(
     return Some(result);
   }
   regression_fill_stats(data, constant, &mut state, &mut result);
+  Some(result)
+}
+
+fn simple_regression_coefficients<'doc>(
+  data: &RegressionData,
+  constant: bool,
+  stats: bool,
+  log_regression: bool,
+) -> Option<Vec<Vec<FormulaValue<'doc>>>> {
+  // Source: LibreOffice sc/source/core/tool/interpr5.cxx
+  // ScInterpreter::CalculateRGPRKP nCase==1.
+  let n = data.n();
+  if (constant && n < 2) || n < 1 {
+    return None;
+  }
+  let mut x = data
+    .design
+    .iter()
+    .map(|row| row.first().copied())
+    .collect::<Option<Vec<_>>>()?;
+  let mut y = data.y.clone();
+  let mut mean_x = 0.0;
+  let mut mean_y = 0.0;
+  if constant {
+    mean_y = kahan_sum(y.iter().copied()) / n as f64;
+    for value in &mut y {
+      *value = approx_diff(*value, mean_y);
+    }
+    mean_x = kahan_sum(x.iter().copied()) / n as f64;
+    for value in &mut x {
+      *value = approx_diff(*value, mean_x);
+    }
+  }
+  let sum_xy = kahan_sum(x.iter().zip(&y).map(|(x, y)| x * y));
+  let sum_x2 = kahan_sum(x.iter().map(|value| value * value));
+  if sum_x2 == 0.0 {
+    return None;
+  }
+  let slope = sum_xy / sum_x2;
+  let intercept = if constant {
+    mean_y - slope * mean_x
+  } else {
+    0.0
+  };
+  let mut result = if stats {
+    vec![vec![FormulaValue::Error(FormulaErrorValue::NA); 2]; 5]
+  } else {
+    vec![vec![FormulaValue::Error(FormulaErrorValue::NA); 2]; 1]
+  };
+  result[0][0] = FormulaValue::Number(if log_regression { slope.exp() } else { slope });
+  result[0][1] = FormulaValue::Number(if log_regression {
+    intercept.exp()
+  } else {
+    intercept
+  });
+  if !stats {
+    return Some(result);
+  }
+
+  let ss_reg = slope * slope * sum_x2;
+  let degrees_freedom = (if constant { n - 2 } else { n - 1 }) as f64;
+  let ss_resid = kahan_sum(x.iter().zip(&y).map(|(x, y)| {
+    let temp = y - slope * x;
+    temp * temp
+  }));
+  result[4][0] = FormulaValue::Number(ss_reg);
+  result[3][1] = FormulaValue::Number(degrees_freedom);
+  result[4][1] = FormulaValue::Number(ss_resid);
+  if degrees_freedom == 0.0 || ss_resid == 0.0 || ss_reg == 0.0 {
+    result[4][1] = FormulaValue::Number(0.0);
+    result[3][0] = FormulaValue::Error(FormulaErrorValue::NA);
+    result[2][1] = FormulaValue::Number(0.0);
+    result[1][0] = FormulaValue::Number(0.0);
+    result[1][1] = if constant {
+      FormulaValue::Number(0.0)
+    } else {
+      FormulaValue::Error(FormulaErrorValue::NA)
+    };
+    result[2][0] = FormulaValue::Number(1.0);
+    return Some(result);
+  }
+
+  result[3][0] = FormulaValue::Number(ss_reg / (ss_resid / degrees_freedom));
+  let rmse = (ss_resid / degrees_freedom).sqrt();
+  result[2][1] = FormulaValue::Number(rmse);
+  result[1][0] = FormulaValue::Number(rmse / sum_x2.sqrt());
+  result[1][1] = if constant {
+    FormulaValue::Number(rmse * (mean_x * mean_x / sum_x2 + 1.0 / n as f64).sqrt())
+  } else {
+    FormulaValue::Error(FormulaErrorValue::NA)
+  };
+  result[2][0] = FormulaValue::Number(ss_reg / (ss_reg + ss_resid));
   Some(result)
 }
 
@@ -19480,6 +19726,46 @@ fn lo_beta_dist(x_in: f64, alpha: f64, beta: f64) -> f64 {
   result.clamp(0.0, 1.0)
 }
 
+fn lo_binom_dist_pmf(x: f64, n: f64, p: f64) -> f64 {
+  let q = (0.5 - p) + 0.5;
+  let mut factor = q.powf(n);
+  if factor <= f64::MIN_POSITIVE {
+    factor = p.powf(n);
+    if factor <= f64::MIN_POSITIVE {
+      lo_beta_dist_pdf(p, x + 1.0, n - x + 1.0).unwrap_or(f64::INFINITY) / (n + 1.0)
+    } else {
+      for i in 0..((n - x) as u32) {
+        factor *= (n - f64::from(i)) / f64::from(i + 1) * q / p;
+      }
+      factor
+    }
+  } else {
+    for i in 0..(x as u32) {
+      factor *= (n - f64::from(i)) / f64::from(i + 1) * p / q;
+    }
+    factor
+  }
+}
+
+fn lo_binom_dist_range(n: f64, xs: f64, xe: f64, mut factor: f64, p: f64, q: f64) -> f64 {
+  let xs = xs as u32;
+  for i in 1..=xs {
+    if factor <= 0.0 {
+      break;
+    }
+    factor *= (n - f64::from(i) + 1.0) / f64::from(i) * p / q;
+  }
+  let mut values = vec![factor];
+  for i in xs + 1..=xe as u32 {
+    if factor <= 0.0 {
+      break;
+    }
+    factor *= (n - f64::from(i) + 1.0) / f64::from(i) * p / q;
+    values.push(factor);
+  }
+  kahan_sum(values).min(1.0)
+}
+
 fn lo_gamma_cont_fraction(a: f64, x: f64) -> std::result::Result<f64, FormulaErrorValue> {
   let big_inv = f64::EPSILON;
   let big = 1.0 / big_inv;
@@ -19580,6 +19866,84 @@ fn lo_gamma_dist(x: f64, alpha: f64, lambda: f64) -> f64 {
     0.0
   } else {
     lo_low_reg_igamma(alpha, x / lambda).unwrap_or(f64::NAN)
+  }
+}
+
+fn lo_chi_dist(x: f64, df: f64) -> f64 {
+  if x <= 0.0 {
+    1.0
+  } else {
+    1.0 - lo_low_reg_igamma(df / 2.0, x / 2.0).unwrap_or(f64::NAN)
+  }
+}
+
+fn lo_chisq_dist_cdf(x: f64, df: f64) -> f64 {
+  if x <= 0.0 {
+    0.0
+  } else {
+    lo_low_reg_igamma(df / 2.0, x / 2.0).unwrap_or(f64::NAN)
+  }
+}
+
+fn lo_chisq_dist_pdf(x: f64, df: f64) -> f64 {
+  if x <= 0.0 {
+    return 0.0;
+  }
+  if df * x > 1_391_000.0 {
+    return (((0.5 * df - 1.0) * (x * 0.5).ln()) - 0.5 * x - 2.0_f64.ln() - lo_log_gamma(0.5 * df))
+      .exp();
+  }
+  let mut value;
+  let mut count;
+  if df % 2.0 < 0.5 {
+    value = 0.5;
+    count = 2.0;
+  } else {
+    value = 1.0 / (x * 2.0 * std::f64::consts::PI).sqrt();
+    count = 1.0;
+  }
+  while count < df {
+    value *= x / count;
+    count += 2.0;
+  }
+  if x >= 1425.0 {
+    (value.ln() - x / 2.0).exp()
+  } else {
+    value * (-x / 2.0).exp()
+  }
+}
+
+fn chisq_dist_value<'doc>(
+  x: f64,
+  df: f64,
+  right_tail: bool,
+  cumulative: Option<bool>,
+) -> FormulaValue<'doc> {
+  if df < 1.0 || x < 0.0 {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  if right_tail {
+    return FormulaValue::Number(lo_chi_dist(x, df));
+  }
+  FormulaValue::Number(if cumulative.unwrap_or(false) {
+    lo_chisq_dist_cdf(x, df)
+  } else {
+    lo_chisq_dist_pdf(x, df)
+  })
+}
+
+fn chisq_inv_value<'doc>(p: f64, df: f64, right_tail: bool) -> FormulaValue<'doc> {
+  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && (p < 0.0 || p >= 1.0)) {
+    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+  }
+  let result = if right_tail {
+    lo_iterate_inverse(|x| p - lo_chi_dist(x, df), df * 0.5, df)
+  } else {
+    lo_iterate_inverse(|x| p - lo_chisq_dist_cdf(x, df), df * 0.5, df)
+  };
+  match result {
+    Ok(value) => FormulaValue::Number(value),
+    Err(error) => FormulaValue::Error(error),
   }
 }
 
@@ -24462,6 +24826,45 @@ mod tests {
         "of:=COUNTIF([.I1:.I10];[.K1])",
         FormulaGrammar::OpenFormula
       ),
+      Some(FormulaValue::Number(3.0))
+    );
+
+    let blank_countif_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Blank,
+      )
+      .with_query_empty_cell(SheetId(1), CellAddress { column: 0, row: 1 })
+      .with_query_cell_value(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::Number(0.0),
+      )
+      .build();
+    assert_eq!(
+      blank_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A2,0)"),
+      Some(FormulaValue::Number(1.0))
+    );
+    let empty_text_countif_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::String(Cow::Borrowed("")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::Blank,
+      )
+      .with_query_empty_cell(SheetId(1), CellAddress { column: 0, row: 2 })
+      .build();
+    assert_eq!(
+      empty_text_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A3,\"=\")"),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      empty_text_countif_book.evaluate_formula_text(SheetId(1), None, "COUNTIF(A1:A3,\"\")"),
       Some(FormulaValue::Number(3.0))
     );
   }

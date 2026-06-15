@@ -26,15 +26,15 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { path = "crates/ooxmlsdk-build" }
-ooxmlsdk-derive = { path = "crates/ooxmlsdk-derive" }
-ooxmlsdk-fonts = { path = "crates/ooxmlsdk-fonts" }
-ooxmlsdk-formula = { path = "crates/ooxmlsdk-formula" }
-ooxmlsdk-layout = { path = "crates/ooxmlsdk-layout" }
-ooxmlsdk-pdf = { path = "crates/ooxmlsdk-pdf" }
-ooxmlsdk-pdf-test = { path = "crates/ooxmlsdk-pdf-test" }
-ooxmlsdk-test = { path = "crates/ooxmlsdk-test" }
+ooxmlsdk = { version = "0.10.2", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.10.2", path = "crates/ooxmlsdk-build" }
+ooxmlsdk-derive = { version = "0.10.2", path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-fonts = { version = "0.10.2", path = "crates/ooxmlsdk-fonts" }
+ooxmlsdk-formula = { version = "0.10.2", path = "crates/ooxmlsdk-formula" }
+ooxmlsdk-layout = { version = "0.10.2", path = "crates/ooxmlsdk-layout" }
+ooxmlsdk-pdf = { version = "0.10.2", path = "crates/ooxmlsdk-pdf" }
+ooxmlsdk-pdf-test = { version = "0.10.2", path = "crates/ooxmlsdk-pdf-test" }
+ooxmlsdk-test = { version = "0.10.2", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.40.1"
 regex = "1.12.4"

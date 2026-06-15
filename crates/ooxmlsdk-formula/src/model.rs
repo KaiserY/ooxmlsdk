@@ -4559,7 +4559,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         Some(FormulaValue::Reference(_) | FormulaValue::RefList(_))
       ))),
       "ISFORMULA" => self.evaluate_is_formula(args),
-      "ERROR.TYPE" | "ERRORTYPE" => self.evaluate_error_type(args),
+      "ERROR.TYPE" => self.evaluate_error_type(args),
+      "ERRORTYPE" => self.evaluate_error_type_raw(args),
       "TYPE" => self.evaluate_type(args),
       "AREAS" => self.evaluate_areas(args),
       "MIN" => Some(
@@ -5647,21 +5648,41 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.is_empty() || args.len() > 2 {
       return None;
     }
-    let value = self.number(&self.evaluate(args.first()?)?)?;
+    let value = self.evaluate(args.first()?)?;
     let digits = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(2.0) as i32;
-    let rounded = rtl_round(value, digits);
-    if digits >= 0 {
-      Some(FormulaValue::String(Cow::Owned(format!(
-        "${rounded:.digits$}",
-        digits = digits as usize
-      ))))
-    } else {
-      Some(FormulaValue::String(Cow::Owned(format!("${rounded:.0}"))))
+      .unwrap_or(FormulaValue::Number(2.0));
+    if self.array_context
+      && (matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+        || matches!(digits, FormulaValue::Reference(_) | FormulaValue::Matrix(_)))
+    {
+      return self.map_binary_values(value, digits, |evaluator, value, digits| {
+        Some(evaluator.dollar_value(value, digits))
+      });
     }
+    Some(self.dollar_value(&value, &digits))
+  }
+
+  fn dollar_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    digits: &FormulaValue<'doc>,
+  ) -> FormulaValue<'doc> {
+    let Some(value) = self.number(value) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
+    };
+    let Some(digits) = self.number(digits) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
+    };
+    let digits = approx_floor(digits) as i32;
+    if !(-15..=15).contains(&digits) {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    }
+    FormulaValue::String(Cow::Owned(format_dollar_value(
+      rtl_round(value, digits),
+      digits.max(0) as usize,
+    )))
   }
 
   fn evaluate_dollar_decimal(
@@ -6542,16 +6563,28 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       | FormulaErrorValue::Spill
       | FormulaErrorValue::Calc
       | FormulaErrorValue::IllegalArgument
-      | FormulaErrorValue::Parameter
-      | FormulaErrorValue::Unknown => return Some(FormulaValue::Error(FormulaErrorValue::NA)),
+      | FormulaErrorValue::Parameter => return Some(FormulaValue::Error(FormulaErrorValue::NA)),
+      FormulaErrorValue::Unknown => return Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
     };
     Some(FormulaValue::Number(code))
   }
 
   fn evaluate_error_type_raw(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let direct_unknown_error = matches!(
+      args.first(),
+      Some(FormulaAst::Literal(FormulaValue::Error(
+        FormulaErrorValue::Unknown
+      )))
+    );
     let Some(value) = args.first().and_then(|arg| self.evaluate(arg)) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
+    if let FormulaValue::Reference(reference) = &value
+      && reference.range.cell_count_hint() == 1
+      && self.first_error_value(&value).is_none()
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::NA));
+    }
     if matches!(
       value,
       FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
@@ -6562,6 +6595,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(FormulaValue::Error(error)) = self.first_error_value(&value) else {
       return Some(FormulaValue::Error(FormulaErrorValue::NA));
     };
+    if error == FormulaErrorValue::Unknown && direct_unknown_error {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    }
     Some(FormulaValue::Number(match error {
       FormulaErrorValue::Null => 521.0,
       FormulaErrorValue::Div0 => 532.0,
@@ -6573,9 +6609,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       FormulaErrorValue::Spill => 541.0,
       FormulaErrorValue::IllegalArgument => 502.0,
       FormulaErrorValue::Parameter => 511.0,
-      FormulaErrorValue::GettingData | FormulaErrorValue::Calc | FormulaErrorValue::Unknown => {
-        515.0
-      }
+      FormulaErrorValue::Unknown => 508.0,
+      FormulaErrorValue::GettingData | FormulaErrorValue::Calc => 515.0,
     }))
   }
 
@@ -6682,6 +6717,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     if year < 100 {
       year = expand_two_digit_year(year);
+    }
+    let (normalized_year, normalized_month, normalized_day) =
+      normalized_date_components(year, month, day)?;
+    if !is_valid_libreoffice_gregorian_date(normalized_year, normalized_month, normalized_day) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
     date_serial_with_system(year, month, day, self.book.date_system).map(FormulaValue::Number)
   }
@@ -7210,12 +7250,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.time_number_from_value(&value))
       .unwrap_or_default();
-    let total_seconds = ((value.fract() * 86_400.0).round() as i64).rem_euclid(86_400);
+    let total_seconds = (value.fract() * 86_400.0).floor() as i64;
     Some(FormulaValue::Number(match part {
-      TimePart::Hour => (total_seconds / 3600) as f64,
-      TimePart::Minute => ((total_seconds % 3600) / 60) as f64,
-      TimePart::Second => (total_seconds % 60) as f64,
-    }))
+      TimePart::Hour => total_seconds.rem_euclid(86_400) / 3600,
+      TimePart::Minute => total_seconds.rem_euclid(3_600) / 60,
+      TimePart::Second => ((value.fract() * 86_400.0).round() as i64).rem_euclid(60),
+    } as f64))
   }
 
   fn time_number_from_value(&self, value: &FormulaValue<'doc>) -> Option<f64> {
@@ -7998,6 +8038,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_and(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let mut has_value = false;
     let mut result = true;
     for value in self.values(args) {
@@ -8017,6 +8060,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_or(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let mut has_value = false;
     let mut result = false;
     for value in self.values(args) {
@@ -8157,27 +8203,34 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn evaluate_left(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let value = self.evaluate(args.first()?)?;
-    let len = args
+    let len_value = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0) as usize;
-    if self.array_context && matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
-      let matrix = self.matrix_values(&value);
-      return Some(FormulaValue::Matrix(
-        matrix
-          .into_iter()
-          .map(|row| {
-            row
-              .into_iter()
-              .map(|value| {
-                FormulaValue::String(Cow::Owned(self.text(&value).chars().take(len).collect()))
-              })
-              .collect()
-          })
-          .collect(),
-      ));
+      .unwrap_or(FormulaValue::Number(1.0));
+    if self.array_context
+      && (matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+        || matches!(
+          len_value,
+          FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+        ))
+    {
+      return self.map_binary_values(value, len_value, |evaluator, value, len| {
+        evaluator.left_value(value, len)
+      });
     }
+    self.left_value(&value, &len_value)
+  }
+
+  fn left_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    len: &FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let len = self.number(len)?;
+    if len < 0.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let len = len.floor() as usize;
     let text = self.text(&value);
     Some(FormulaValue::String(Cow::Owned(
       text.chars().take(len).collect(),
@@ -8185,15 +8238,35 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_leftb(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let text = self.text(&self.evaluate(args.first()?)?);
-    let len = args
+    let value = self.evaluate(args.first()?)?;
+    let len_value = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0);
+      .unwrap_or(FormulaValue::Number(1.0));
+    if self.array_context
+      && (matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+        || matches!(
+          len_value,
+          FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+        ))
+    {
+      return self.map_binary_values(value, len_value, |evaluator, value, len| {
+        evaluator.leftb_value(value, len)
+      });
+    }
+    self.leftb_value(&value, &len_value)
+  }
+
+  fn leftb_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    len: &FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let len = self.number(len)?;
     if len < 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
+    let text = self.text(value);
     Some(FormulaValue::String(Cow::Owned(leftb(
       &text,
       len.floor() as usize,
@@ -8201,16 +8274,36 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_right(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let text = self.text(&self.evaluate(args.first()?)?);
-    let len = args
+    let value = self.evaluate(args.first()?)?;
+    let len_value = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0);
+      .unwrap_or(FormulaValue::Number(1.0));
+    if self.array_context
+      && (matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+        || matches!(
+          len_value,
+          FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+        ))
+    {
+      return self.map_binary_values(value, len_value, |evaluator, value, len| {
+        evaluator.right_value(value, len)
+      });
+    }
+    self.right_value(&value, &len_value)
+  }
+
+  fn right_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    len: &FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let len = self.number(len)?;
     if len < 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     let len = len.floor() as usize;
+    let text = self.text(value);
     Some(FormulaValue::String(Cow::Owned(
       text
         .chars()
@@ -8224,15 +8317,35 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_rightb(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let text = self.text(&self.evaluate(args.first()?)?);
-    let len = args
+    let value = self.evaluate(args.first()?)?;
+    let len_value = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0);
+      .unwrap_or(FormulaValue::Number(1.0));
+    if self.array_context
+      && (matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
+        || matches!(
+          len_value,
+          FormulaValue::Reference(_) | FormulaValue::Matrix(_)
+        ))
+    {
+      return self.map_binary_values(value, len_value, |evaluator, value, len| {
+        evaluator.rightb_value(value, len)
+      });
+    }
+    self.rightb_value(&value, &len_value)
+  }
+
+  fn rightb_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    len: &FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    let len = self.number(len)?;
     if len < 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
+    let text = self.text(value);
     Some(FormulaValue::String(Cow::Owned(rightb(
       &text,
       len.floor() as usize,
@@ -9522,7 +9635,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_devsq(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let values = self.numeric_args(args);
+    let values = match self.numeric_aggregate(args, false) {
+      Ok(aggregate) => aggregate.values,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
     if values.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Div0));
     }
@@ -9563,6 +9679,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_gcd_lcm(&self, args: &[FormulaAst<'doc>], lcm: bool) -> Option<FormulaValue<'doc>> {
+    if args.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let mut result = if lcm { 1.0 } else { 0.0 };
     let values = self.numeric_values(args).collect::<Vec<_>>();
     if values.iter().any(|value| *value < 0.0) {
@@ -10234,9 +10353,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
     let text = self.text(&self.evaluate(args.first()?)?);
+    if text.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
     let mut output = String::with_capacity(text.len());
     for byte in text.bytes() {
-      if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+      if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_') {
         output.push(byte as char);
       } else {
         output.push_str(&format!("%{byte:02X}"));
@@ -10965,22 +11087,34 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = match kind {
-      CeilingFloorKind::Odff => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
-      CeilingFloorKind::Math => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(1.0),
-      CeilingFloorKind::Precise => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(1.0)
-        .abs(),
+      CeilingFloorKind::Odff => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
+        _ => {
+          if value < 0.0 {
+            -1.0
+          } else {
+            1.0
+          }
+        }
+      },
+      CeilingFloorKind::Math => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(1.0),
+        _ => 1.0,
+      },
+      CeilingFloorKind::Precise => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(1.0)
+          .abs(),
+        _ => 1.0,
+      },
     };
     if value == 0.0 || significance == 0.0 {
       return Some(FormulaValue::Number(0.0));
@@ -11043,22 +11177,34 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = match kind {
-      CeilingFloorKind::Odff => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
-      CeilingFloorKind::Math => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(1.0),
-      CeilingFloorKind::Precise => args
-        .get(1)
-        .and_then(|arg| self.evaluate(arg))
-        .and_then(|value| self.number(&value))
-        .unwrap_or(1.0)
-        .abs(),
+      CeilingFloorKind::Odff => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
+        _ => {
+          if value < 0.0 {
+            -1.0
+          } else {
+            1.0
+          }
+        }
+      },
+      CeilingFloorKind::Math => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(1.0),
+        _ => 1.0,
+      },
+      CeilingFloorKind::Precise => match args.get(1) {
+        Some(arg) if !is_missing_argument(arg) => self
+          .evaluate(arg)
+          .and_then(|value| self.number(&value))
+          .unwrap_or(1.0)
+          .abs(),
+        _ => 1.0,
+      },
     };
     if value == 0.0 || significance == 0.0 {
       return Some(FormulaValue::Number(0.0));
@@ -16467,7 +16613,7 @@ fn is_query_empty(value: &FormulaValue<'_>) -> bool {
 }
 
 fn database_criterion_cell_present(value: &FormulaValue<'_>, query_empty: bool) -> bool {
-  !query_empty && !matches!(value, FormulaValue::Blank)
+  query_empty || !matches!(value, FormulaValue::Blank)
 }
 
 fn database_criterion_entry_present(value: &FormulaValue<'_>, query_empty: bool) -> bool {
@@ -19068,10 +19214,25 @@ fn date_serial_with_system(
   day: i32,
   date_system: DateSystem,
 ) -> Option<f64> {
+  let (normalized_year, normalized_month, normalized_day) =
+    normalized_date_components(year, month, day)?;
+  let days = days_from_civil(
+    normalized_year,
+    normalized_month as i32,
+    normalized_day as i32,
+  )?;
+  date_serial_from_days(days, date_system)
+}
+
+fn normalized_date_components(year: i32, month: i32, day: i32) -> Option<(i32, u32, u32)> {
   let month_index = month - 1;
   let normalized_year = year + month_index.div_euclid(12);
   let normalized_month = month_index.rem_euclid(12) + 1;
   let days = days_from_civil(normalized_year, normalized_month, 1)? + i64::from(day - 1);
+  civil_from_days(days)
+}
+
+fn date_serial_from_days(days: i64, date_system: DateSystem) -> Option<f64> {
   let serial = match date_system {
     DateSystem::Date1900 => {
       let base = days_from_civil(1899, 12, 31)?;
@@ -19086,6 +19247,10 @@ fn date_serial_with_system(
     DateSystem::LibreOffice => days - days_from_civil(1899, 12, 30)?,
   };
   Some(serial as f64)
+}
+
+fn is_valid_libreoffice_gregorian_date(year: i32, month: u32, day: u32) -> bool {
+  (year, month, day) >= (1582, 10, 15)
 }
 
 fn date_from_serial(serial: i32) -> Option<(i32, u32, u32)> {
@@ -20518,6 +20683,25 @@ fn first_error_in_value<'doc>(value: &FormulaValue<'doc>) -> Option<FormulaValue
     FormulaValue::Error(error) => Some(FormulaValue::Error(*error)),
     FormulaValue::Matrix(rows) => rows.iter().flatten().find_map(first_error_in_value),
     _ => None,
+  }
+}
+
+fn format_dollar_value(value: f64, digits: usize) -> String {
+  let sign = if value.is_sign_negative() { "-" } else { "" };
+  let formatted = format!("{:.*}", digits, value.abs());
+  let (integer, fraction) = formatted.split_once('.').unwrap_or((&formatted, ""));
+  let mut grouped = String::new();
+  for (index, ch) in integer.chars().rev().enumerate() {
+    if index > 0 && index % 3 == 0 {
+      grouped.push(',');
+    }
+    grouped.push(ch);
+  }
+  let integer = grouped.chars().rev().collect::<String>();
+  if digits == 0 {
+    format!("{sign}${integer}")
+  } else {
+    format!("{sign}${integer}.{fraction}")
   }
 }
 
@@ -23450,9 +23634,7 @@ fn is_volatile_function(value: &str) -> bool {
 }
 
 fn is_formula_error_literal(value: &str) -> bool {
-  formula_error_literals()
-    .iter()
-    .any(|literal| literal.eq_ignore_ascii_case(value))
+  formula_error_literals().contains(&value)
 }
 
 fn parse_formula_error_literal_at(value: &str, start: usize) -> Option<(&str, usize)> {
@@ -23462,7 +23644,7 @@ fn parse_formula_error_literal_at(value: &str, start: usize) -> Option<(&str, us
     .find(|literal| {
       rest
         .get(..literal.len())
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(literal))
+        .is_some_and(|prefix| prefix == **literal)
     })
     .map(|literal| (*literal, start + literal.len()))
 }
@@ -23470,6 +23652,7 @@ fn parse_formula_error_literal_at(value: &str, start: usize) -> Option<(&str, us
 fn formula_error_literals() -> &'static [&'static str] {
   &[
     "#GETTING_DATA",
+    "#getting_data",
     "#DIV/0!",
     "#VALUE!",
     "#NULL!",
@@ -23503,6 +23686,9 @@ fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
 }
 
 fn error_value(value: &str) -> FormulaErrorValue {
+  if value == "#getting_data" {
+    return FormulaErrorValue::Unknown;
+  }
   match value.to_ascii_uppercase().as_str() {
     "#NULL" | "#NULL!" => FormulaErrorValue::Null,
     "#DIV/0!" => FormulaErrorValue::Div0,
@@ -25373,6 +25559,53 @@ mod tests {
       Some(FormulaValue::String(Cow::Owned("abcdef".to_string())))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DOLLAR(1234.567,2)"),
+      Some(FormulaValue::String(Cow::Borrowed("$1,234.57")))
+    );
+    let array_text_book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::Number(110.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::Number(120.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 0 },
+        FormulaValue::Number(90.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::String(Cow::Borrowed("NO")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::String(Cow::Borrowed("O")),
+      )
+      .build();
+    let formula = parse_formula_with_context(
+      FormulaParseContext {
+        current_sheet: SheetId(1),
+        current_cell: None,
+        grammar: FormulaGrammar::ExcelA1,
+      },
+      Cow::Borrowed("MAX(A1:C1*(RIGHT(A2:C2)=\"O\"))"),
+    );
+    assert_eq!(
+      array_text_book.evaluate_parsed_formula_raw(SheetId(1), None, &formula, true),
+      Some(FormulaValue::Number(120.0))
+    );
+    assert!(matches!(
+      book.evaluate_formula_text(SheetId(1), None, "DEVSQ({1,-2,3,1/0,5})"),
+      Some(FormulaValue::Error(_))
+    ));
+    assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "MEDIAN(A1:B2)"),
       Some(FormulaValue::Number(2.5))
     );
@@ -25391,6 +25624,18 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "CEILING(2.1,1)+FLOOR(2.9,1)"),
       Some(FormulaValue::Number(5.0))
     );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "FLOOR(7.9,,5)"),
+      Some(FormulaValue::Number(7.0))
+    );
+    assert!(matches!(
+      book.evaluate_formula_text(SheetId(1), None, "GCD()"),
+      Some(FormulaValue::Error(_))
+    ));
+    assert!(matches!(
+      book.evaluate_formula_text(SheetId(1), None, "LCM()"),
+      Some(FormulaValue::Error(_))
+    ));
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ROUND(2.675,2)"),
       Some(FormulaValue::Number(2.68))
@@ -25553,6 +25798,14 @@ mod tests {
       Some(FormulaValue::Number(1.0))
     );
     assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "HOUR(0.4583287037037037)"),
+      Some(FormulaValue::Number(10.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "MINUTE(0.42499537037037033)"),
+      Some(FormulaValue::Number(11.0))
+    );
+    assert_eq!(
       book.evaluate_formula_text(
         SheetId(1),
         None,
@@ -25650,6 +25903,38 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "ERROR.TYPE(#DIV/0!)"),
       Some(FormulaValue::Number(2.0))
     );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ERROR.TYPE(#null)"),
+      Some(FormulaValue::Number(5.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ERRORTYPE(#null)"),
+      Some(FormulaValue::Number(525.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ERROR.TYPE(#getting_data)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ERRORTYPE(#getting_data)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Unknown))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ERRORTYPE(B1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ENCODEURL(0.08)"),
+      Some(FormulaValue::String(Cow::Borrowed("0%2E08")))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "AND()"),
+      Some(FormulaValue::Error(FormulaErrorValue::Parameter))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "OR()"),
+      Some(FormulaValue::Error(FormulaErrorValue::Parameter))
+    );
   }
 
   #[test]
@@ -25709,7 +25994,7 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(D1)"),
-      Some(FormulaValue::Number(1.0))
+      Some(FormulaValue::Number(0.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(ABS(E1:E2),E1:E2+E1:E2)"),
@@ -26043,6 +26328,14 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DATE(0,12,31)"),
       Some(FormulaValue::Number(36891.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(100,1,1)"),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(1582,10,15)"),
+      Some(FormulaValue::Number(-115859.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DAY(\"1899-12-29T15:26:14\")"),

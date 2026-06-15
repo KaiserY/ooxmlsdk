@@ -122,6 +122,7 @@ const EXCEL_MAX_ROW_ZERO_BASED: u32 = 1_048_575;
 fn split_sheet_name(value: &str) -> (Option<&str>, &str) {
   let mut quoted = false;
   let mut last_bang = None;
+  let mut last_dot = None;
   let mut chars = value.char_indices().peekable();
   while let Some((index, ch)) = chars.next() {
     match ch {
@@ -133,10 +134,12 @@ fn split_sheet_name(value: &str) -> (Option<&str>, &str) {
         }
       }
       '!' if !quoted => last_bang = Some(index),
+      '.' if !quoted => last_dot = Some(index),
       _ => {}
     }
   }
   last_bang
+    .or(last_dot)
     .map(|index| (Some(&value[..index]), &value[index + 1..]))
     .unwrap_or((None, value))
 }

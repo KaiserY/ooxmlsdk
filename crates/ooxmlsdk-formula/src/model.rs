@@ -1119,6 +1119,7 @@ impl<'doc> WorkbookValueModel<'doc> {
             grammar: parsed.grammar,
             locals: BTreeMap::new(),
             array_context: formula.formula_kind == FormulaKind::Array,
+            current_value: None,
           };
           match context.evaluate(ast) {
             Some(value)
@@ -2194,6 +2195,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       grammar,
       locals: BTreeMap::new(),
       array_context: false,
+      current_value: None,
     }
     .evaluate(ast.as_ref()?)
   }
@@ -2219,6 +2221,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       grammar: formula.grammar,
       locals: BTreeMap::new(),
       array_context: false,
+      current_value: None,
     }
     .evaluate(formula.ast.as_ref()?)
     .map(|value| self.final_formula_value(current_sheet, current_cell, value))
@@ -2270,6 +2273,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           grammar: FormulaGrammar::ExcelA1,
           locals: BTreeMap::new(),
           array_context: false,
+          current_value: None,
         }
         .truthy(&value)
       })
@@ -2290,6 +2294,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       grammar: FormulaGrammar::ExcelA1,
       locals: BTreeMap::new(),
       array_context: false,
+      current_value: None,
     }
     .number(&value)
   }
@@ -2376,6 +2381,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           grammar: FormulaGrammar::ExcelA1,
           locals: BTreeMap::new(),
           array_context: true,
+          current_value: None,
         };
         let source_sheet = context.range_sheet(&reference);
         self.cell_value(
@@ -2408,6 +2414,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         grammar: FormulaGrammar::ExcelA1,
         locals: BTreeMap::new(),
         array_context: false,
+        current_value: None,
       }
       .first_value(&value)
     } else {
@@ -2457,6 +2464,60 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         .trim_start_matches("_xlfn.")
         .to_ascii_uppercase();
       text.starts_with("SUBTOTAL(") || text.starts_with("AGGREGATE(")
+    })
+  }
+
+  fn data_area_subrange(&self, sheet: SheetId, range: CellRange) -> Option<CellRange> {
+    let start_row = range.start.row.min(range.end.row);
+    let end_row = range.start.row.max(range.end.row);
+    let start_column = range.start.column.min(range.end.column);
+    let end_column = range.start.column.max(range.end.column);
+    let mut used_start_row = u32::MAX;
+    let mut used_start_column = u32::MAX;
+    let mut used_end_row = 0u32;
+    let mut used_end_column = 0u32;
+    let mut include = |address: CellAddress| {
+      if address.row < start_row
+        || address.row > end_row
+        || address.column < start_column
+        || address.column > end_column
+      {
+        return;
+      }
+      used_start_row = used_start_row.min(address.row);
+      used_start_column = used_start_column.min(address.column);
+      used_end_row = used_end_row.max(address.row);
+      used_end_column = used_end_column.max(address.column);
+    };
+    for ((cell_sheet, address), _) in &self.cells {
+      if *cell_sheet == sheet {
+        include(*address);
+      }
+    }
+    for ((cell_sheet, address), _) in &self.query_cell_values {
+      if *cell_sheet == sheet {
+        include(*address);
+      }
+    }
+    for ((cell_sheet, address), _) in &self.formulas {
+      if *cell_sheet == sheet {
+        include(*address);
+      }
+    }
+    for (cell_sheet, address) in &self.query_empty_cells {
+      if *cell_sheet == sheet {
+        include(*address);
+      }
+    }
+    (used_start_row != u32::MAX).then_some(CellRange {
+      start: CellAddress {
+        column: used_start_column,
+        row: used_start_row,
+      },
+      end: CellAddress {
+        column: used_end_column,
+        row: used_end_row,
+      },
     })
   }
 
@@ -3947,6 +4008,7 @@ struct FormulaEvaluator<'a, 'doc> {
   grammar: FormulaGrammar,
   locals: BTreeMap<String, FormulaValue<'doc>>,
   array_context: bool,
+  current_value: Option<FormulaValue<'doc>>,
 }
 
 struct NumericAggregate {
@@ -3962,6 +4024,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       grammar: self.grammar,
       locals: self.locals.clone(),
       array_context: true,
+      current_value: self.current_value.clone(),
+    }
+  }
+
+  fn with_current_value(&self, current_value: FormulaValue<'doc>) -> Self {
+    Self {
+      book: self.book,
+      current_sheet: self.current_sheet,
+      current_cell: self.current_cell,
+      grammar: self.grammar,
+      locals: self.locals.clone(),
+      array_context: self.array_context,
+      current_value: Some(current_value),
     }
   }
 
@@ -4009,6 +4084,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if let Some(range) = parse_table_reference(self.book, name.as_ref(), self.current_cell) {
       return Some(FormulaValue::Reference(range));
     }
+    self
+      .evaluate_defined_name(name)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Name)))
+  }
+
+  fn evaluate_defined_name(&self, name: &Cow<'doc, str>) -> Option<FormulaValue<'doc>> {
     if let Some(array) = self
       .book
       .defined_name_array(Some(self.current_sheet), name.as_ref())
@@ -4082,7 +4163,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
     }
     let left = self.evaluate(left)?;
-    let right = self.evaluate(right)?;
+    let right = self.with_current_value(left.clone()).evaluate(right)?;
     if let Some(error) = propagate_binary_error(&left, &right) {
       return Some(FormulaValue::Error(error));
     }
@@ -4277,57 +4358,49 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .count() as f64,
       )),
       "ISERROR" => Some(FormulaValue::Boolean(matches!(
-        args
-          .first()
-          .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.first_value(&value)),
-        Some(FormulaValue::Error(_))
+        self.information_error_value(args.first()?),
+        FormulaValue::Error(_)
       ))),
       "ISNA" => Some(FormulaValue::Boolean(matches!(
-        args
-          .first()
-          .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.first_value(&value)),
-        Some(FormulaValue::Error(FormulaErrorValue::NA))
+        self.information_error_value(args.first()?),
+        FormulaValue::Error(FormulaErrorValue::NA)
       ))),
       "ISERR" => Some(FormulaValue::Boolean(matches!(
-        args.first()
-          .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.first_value(&value)),
-        Some(FormulaValue::Error(error)) if error != FormulaErrorValue::NA
+        self.information_error_value(args.first()?),
+        FormulaValue::Error(error) if error != FormulaErrorValue::NA
       ))),
       "ISBLANK" => self.evaluate_isblank(args),
       "ISTEXT" => Some(FormulaValue::Boolean(matches!(
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.scalar_value(value)),
+          .and_then(|value| self.information_scalar_value(value)),
         Some(FormulaValue::String(_))
       ))),
       "ISNONTEXT" => Some(FormulaValue::Boolean(!matches!(
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.scalar_value(value)),
+          .and_then(|value| self.information_scalar_value(value)),
         Some(FormulaValue::String(_))
       ))),
       "ISLOGICAL" => Some(FormulaValue::Boolean(matches!(
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.scalar_value(value)),
+          .and_then(|value| self.information_scalar_value(value)),
         Some(FormulaValue::Boolean(_))
       ))),
       "ISNUMBER" => Some(FormulaValue::Boolean(matches!(
         args
           .first()
           .and_then(|arg| self.evaluate(arg))
-          .map(|value| self.scalar_value(value)),
+          .and_then(|value| self.information_scalar_value(value)),
         Some(FormulaValue::Number(_))
       ))),
       "ISREF" => Some(FormulaValue::Boolean(matches!(
         args.first().and_then(|arg| self.evaluate(arg)),
-        Some(FormulaValue::Reference(_))
+        Some(FormulaValue::Reference(_) | FormulaValue::RefList(_))
       ))),
       "ISFORMULA" => self.evaluate_is_formula(args),
       "ERROR.TYPE" | "ERRORTYPE" => self.evaluate_error_type(args),
@@ -4370,7 +4443,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "TRUE" => Some(FormulaValue::Boolean(true)),
       "FALSE" => Some(FormulaValue::Boolean(false)),
       "NA" => Some(FormulaValue::Error(FormulaErrorValue::NA)),
-      "STYLE" | "CURRENT" => Some(FormulaValue::Number(0.0)),
+      "STYLE" => Some(FormulaValue::Number(0.0)),
+      "CURRENT" => self
+        .current_value
+        .clone()
+        .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
       "N" => Some(FormulaValue::Number(
         match self.first_value(&self.evaluate(args.first()?)?) {
           FormulaValue::Number(value) => value,
@@ -5000,8 +5077,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "TREND" => self.evaluate_trend_growth(args, false),
       "GROWTH" => self.evaluate_trend_growth(args, true),
       "WEIBULL.DIST" | "WEIBULL" => self.evaluate_weibull_dist(args),
-      "NETWORKDAYS.INTL" | "NETWORKDAYS" => self.evaluate_networkdays(args),
-      "WORKDAY.INTL" | "WORKDAY" => self.evaluate_workday(args),
+      "NETWORKDAYS.INTL" => self.evaluate_networkdays(args, true),
+      "NETWORKDAYS" => self.evaluate_networkdays(args, false),
+      "WORKDAY.INTL" => self.evaluate_workday(args, true),
+      "WORKDAY" => self.evaluate_workday(args, false),
       "Z.TEST" | "ZTEST" => self.evaluate_z_test(args),
       "STANDARDIZE" => self.evaluate_standardize(args),
       "SUBTOTAL" => self.evaluate_subtotal(args),
@@ -5622,15 +5701,46 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(arg) = args.first() else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let text = self.base_digits_text(&self.evaluate(arg)?);
-    let Some(value) = convert_to_decimal(&text, from_base, 10) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
-    };
+    let value = self.evaluate(arg)?;
     let places = args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .map(|value| approx_floor(value) as i32);
+
+    if self.array_context && matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
+      return Some(FormulaValue::Matrix(
+        self
+          .matrix_values(&value)
+          .into_iter()
+          .map(|row| {
+            row
+              .into_iter()
+              .map(|value| {
+                self
+                  .base_to_base_value(&value, from_base, to_base, min, max, places)
+                  .unwrap_or(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+              })
+              .collect()
+          })
+          .collect(),
+      ));
+    }
+
+    Some(self.base_to_base_value(&value, from_base, to_base, min, max, places)?)
+  }
+
+  fn base_to_base_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    from_base: u32,
+    to_base: u32,
+    min: f64,
+    max: f64,
+    places: Option<i32>,
+  ) -> Option<FormulaValue<'doc>> {
+    let text = self.base_digits_text(value);
+    let value = convert_to_decimal(&text, from_base, 10)?;
     convert_from_decimal(value, min, max, to_base, places, 10)
       .map(|value| FormulaValue::String(Cow::Owned(value)))
       .or(Some(FormulaValue::Error(
@@ -5691,6 +5801,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       grammar: self.grammar,
       locals: self.locals.clone(),
       array_context: self.array_context,
+      current_value: self.current_value.clone(),
     };
     let mut local_names = BTreeMap::new();
     let mut index = 0;
@@ -5948,29 +6059,76 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     let text = self.text(&text_value);
-    let delimiter = self.text(&delimiter_value);
-    let instance = args
-      .get(2)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0) as i32;
-    if delimiter.is_empty() || instance == 0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    if text.is_empty() {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let matches = text.match_indices(&delimiter).collect::<Vec<_>>();
-    let position = if instance > 0 {
-      matches.get(instance as usize - 1).map(|(index, _)| *index)
-    } else {
-      let Some(index) = matches.len().checked_sub(instance.unsigned_abs() as usize) else {
-        return Some(FormulaValue::Error(FormulaErrorValue::NA));
-      };
-      matches.get(index).map(|(index, _)| *index)
-    };
-    let Some(position) = position else {
+    let delimiters = self.textsplit_delimiters(&delimiter_value);
+    let mut instance = self.optional_number_arg(args, 2, 1.0) as i32;
+    if instance == 0 {
       return Some(FormulaValue::Error(FormulaErrorValue::NA));
+    }
+    let match_mode = self.optional_number_arg(args, 3, 0.0) != 0.0;
+    let match_end = self.optional_number_arg(args, 4, 0.0) != 0.0;
+    let if_not_found = args
+      .get(5)
+      .and_then(|arg| self.evaluate(arg))
+      .filter(|value| !matches!(value, FormulaValue::Blank))
+      .map(|value| self.text(&value));
+    let mut positions = Vec::new();
+    if match_end && after {
+      positions.push(0usize);
+    }
+    let search_text = if match_mode {
+      text.to_lowercase()
+    } else {
+      text.clone()
     };
+    let search_delimiters = delimiters
+      .iter()
+      .map(|delimiter| {
+        if match_mode {
+          delimiter.to_lowercase()
+        } else {
+          delimiter.clone()
+        }
+      })
+      .collect::<Vec<_>>();
+    let mut start = 0usize;
+    while start < search_text.len() {
+      let mut found = None::<(usize, usize)>;
+      for delimiter in &search_delimiters {
+        if delimiter.is_empty() {
+          continue;
+        }
+        if let Some(offset) = search_text[start..].find(delimiter) {
+          let index = start + offset;
+          if found.is_none_or(|(best, _)| index < best) {
+            found = Some((index, delimiter.len()));
+          }
+        }
+      }
+      let Some((index, delimiter_len)) = found else {
+        break;
+      };
+      positions.push(if after { index + delimiter_len } else { index });
+      start = index + delimiter_len;
+    }
+    if match_end && !after {
+      positions.push(text.len());
+    }
+    if positions.is_empty() || instance.unsigned_abs() as usize > positions.len() {
+      return Some(if let Some(value) = if_not_found {
+        FormulaValue::String(Cow::Owned(value))
+      } else {
+        FormulaValue::Error(FormulaErrorValue::NA)
+      });
+    }
+    if instance < 0 {
+      instance = positions.len() as i32 + instance + 1;
+    };
+    let position = positions[instance as usize - 1];
     Some(FormulaValue::String(Cow::Owned(if after {
-      text[position + delimiter.len()..].to_string()
+      text[position..].to_string()
     } else {
       text[..position].to_string()
     })))
@@ -6373,9 +6531,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           FormulaGrammar::OpenFormula | FormulaGrammar::CalcA1 => ".",
           FormulaGrammar::ExcelA1 | FormulaGrammar::ExcelR1C1 => "!",
         };
-        format!("{sheet}{separator}")
+        format!(
+          "{}{}",
+          quote_sheet_name_for_reference(sheet.as_ref()),
+          separator
+        )
       } else {
-        format!("{sheet}!")
+        format!("{}!", quote_sheet_name_for_reference(sheet.as_ref()))
       }
     });
     let reference = if a1 {
@@ -6707,6 +6869,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_weeks(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    // Source: LibreOffice scaddins/source/datefunc/datefunc.cxx
+    // ScaDateAddIn::getDiffWeeks.
     if args.len() != 3 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
@@ -6858,7 +7022,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     self
       .resolve_reference(&text)
       .map(FormulaValue::Reference)
-      .or_else(|| self.evaluate_name(&Cow::Owned(text)))
+      .or_else(|| self.evaluate_defined_name(&Cow::Owned(text)))
       .or(Some(FormulaValue::Error(FormulaErrorValue::Ref)))
   }
 
@@ -7358,16 +7522,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let not_found = args.get(3).and_then(|arg| self.evaluate(arg));
+    let not_found = args
+      .get(3)
+      .and_then(|arg| self.evaluate(arg))
+      .filter(|value| !matches!(value, FormulaValue::Blank));
     let match_mode = args
       .get(4)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
+      .and_then(|arg| self.optional_number_value(arg))
       .unwrap_or(0.0) as i32;
     let search_mode = args
       .get(5)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
+      .and_then(|arg| self.optional_number_value(arg))
       .unwrap_or(1.0) as i32;
     let Some(search) = LookupSearchMode::from_excel(search_mode) else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
@@ -8422,17 +8587,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let sort_index = args
       .get(1)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
+      .and_then(|arg| self.optional_number_value(arg))
       .unwrap_or(1.0);
     let sort_order = args
       .get(2)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
+      .and_then(|arg| self.optional_number_value(arg))
       .unwrap_or(1.0);
     let by_col = args
       .get(3)
       .and_then(|arg| self.evaluate(arg))
+      .filter(|value| !matches!(value, FormulaValue::Blank))
       .map(|value| self.truthy(&value))
       .unwrap_or(false);
     if sort_index < 1.0 || !matches!(sort_order, 1.0 | -1.0) {
@@ -8900,13 +9064,97 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_stdeva(&self, args: &[FormulaAst<'doc>], sample: bool) -> Option<FormulaValue<'doc>> {
-    let values = self
-      .values(args)
-      .map(|value| self.number(&value).unwrap_or(0.0))
-      .collect::<Vec<_>>();
+    let values = match self.stvar_text_as_zero_values(args) {
+      Ok(values) => values,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
     variance_slice(&values, sample)
       .map(|value| FormulaValue::Number(value.sqrt()))
       .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+  }
+
+  fn stvar_text_as_zero_values(
+    &self,
+    args: &[FormulaAst<'doc>],
+  ) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+    let mut values = Vec::new();
+    for arg in args {
+      let ranges = self.reference_ranges_from_ast(arg);
+      if !ranges.is_empty() {
+        for range in ranges {
+          self.push_stvar_range_values(&range, &mut values)?;
+        }
+        continue;
+      }
+      match self.evaluate(arg).ok_or(FormulaErrorValue::Unknown)? {
+        FormulaValue::Reference(reference) => {
+          self.push_stvar_range_values(&reference, &mut values)?
+        }
+        FormulaValue::RefList(ranges) => {
+          for range in ranges {
+            self.push_stvar_range_values(&range, &mut values)?;
+          }
+        }
+        FormulaValue::Matrix(rows) => {
+          for value in rows.into_iter().flatten() {
+            self.push_stvar_matrix_value(value, &mut values)?;
+          }
+        }
+        value => self.push_stvar_direct_value(value, &mut values)?,
+      }
+    }
+    Ok(values)
+  }
+
+  fn push_stvar_range_values(
+    &self,
+    reference: &QualifiedRange<'doc>,
+    values: &mut Vec<f64>,
+  ) -> std::result::Result<(), FormulaErrorValue> {
+    for value in self.range_values(reference) {
+      match value {
+        FormulaValue::Number(value) => values.push(value),
+        FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
+        FormulaValue::String(_) => values.push(0.0),
+        FormulaValue::Error(error) => return Err(error),
+        FormulaValue::Blank
+        | FormulaValue::Matrix(_)
+        | FormulaValue::Reference(_)
+        | FormulaValue::RefList(_) => {}
+      }
+    }
+    Ok(())
+  }
+
+  fn push_stvar_matrix_value(
+    &self,
+    value: FormulaValue<'doc>,
+    values: &mut Vec<f64>,
+  ) -> std::result::Result<(), FormulaErrorValue> {
+    match value {
+      FormulaValue::Number(value) => values.push(value),
+      FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
+      FormulaValue::String(_) | FormulaValue::Blank => values.push(0.0),
+      FormulaValue::Error(error) => return Err(error),
+      FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {}
+    }
+    Ok(())
+  }
+
+  fn push_stvar_direct_value(
+    &self,
+    value: FormulaValue<'doc>,
+    values: &mut Vec<f64>,
+  ) -> std::result::Result<(), FormulaErrorValue> {
+    match value {
+      FormulaValue::Number(value) => values.push(value),
+      FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
+      FormulaValue::String(_) => values.push(0.0),
+      FormulaValue::Blank => values.push(0.0),
+      FormulaValue::Error(error) => return Err(error),
+      FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => {}
+    }
+    Ok(())
   }
 
   fn evaluate_devsq(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -9162,18 +9410,105 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() < 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let Some(rate) = self.number_arg(args, 0) else {
+    let Some(rate) = self.npv_scalar_number(&self.evaluate(args.first()?)?) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     let mut period = 1i32;
     let mut result = 0.0;
-    for value in self.values(&args[1..]) {
-      if let Some(number) = self.number(&value) {
+    for arg in &args[1..] {
+      let values = match self.npv_values_from_ast(arg) {
+        Ok(values) => values,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      for number in values {
         result += number / (1.0 + rate).powi(period);
         period += 1;
       }
     }
     Some(FormulaValue::Number(result))
+  }
+
+  fn npv_values_from_ast(
+    &self,
+    ast: &FormulaAst<'doc>,
+  ) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+    let ranges = self.reference_ranges_from_ast(ast);
+    if !ranges.is_empty() {
+      let mut values = Vec::new();
+      for range in ranges {
+        values.extend(self.horizontal_range_numbers(&range)?);
+      }
+      return Ok(values);
+    }
+    match self.evaluate(ast).ok_or(FormulaErrorValue::Unknown)? {
+      FormulaValue::Reference(reference) => self.horizontal_range_numbers(&reference),
+      FormulaValue::RefList(ranges) => {
+        let mut values = Vec::new();
+        for range in ranges {
+          values.extend(self.horizontal_range_numbers(&range)?);
+        }
+        Ok(values)
+      }
+      FormulaValue::Matrix(rows) => self.npv_matrix_numbers(&rows),
+      value => self
+        .npv_scalar_number(&value)
+        .map(|value| vec![value])
+        .ok_or(FormulaErrorValue::IllegalArgument),
+    }
+  }
+
+  fn horizontal_range_numbers(
+    &self,
+    reference: &QualifiedRange<'doc>,
+  ) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+    let mut values = Vec::new();
+    for (_address, value) in self.range_cells(reference) {
+      match value {
+        FormulaValue::Number(value) => values.push(value),
+        FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
+        FormulaValue::Error(error) => return Err(error),
+        FormulaValue::String(_)
+        | FormulaValue::Blank
+        | FormulaValue::Matrix(_)
+        | FormulaValue::Reference(_)
+        | FormulaValue::RefList(_) => {}
+      }
+    }
+    Ok(values)
+  }
+
+  fn npv_matrix_numbers(
+    &self,
+    rows: &[Vec<FormulaValue<'doc>>],
+  ) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+    let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
+    if rows.is_empty() || columns == 0 {
+      return Err(FormulaErrorValue::IllegalArgument);
+    }
+    let mut values = Vec::new();
+    for column in 0..columns {
+      for row in rows {
+        let Some(value) = row.get(column) else {
+          return Err(FormulaErrorValue::IllegalArgument);
+        };
+        let Some(number) = self.npv_scalar_number(value) else {
+          return Err(match value {
+            FormulaValue::Error(error) => *error,
+            _ => FormulaErrorValue::IllegalArgument,
+          });
+        };
+        values.push(number);
+      }
+    }
+    Ok(values)
+  }
+
+  fn npv_scalar_number(&self, value: &FormulaValue<'doc>) -> Option<f64> {
+    match self.first_value(value) {
+      FormulaValue::Number(value) => Some(value),
+      FormulaValue::Boolean(value) => Some(if value { 1.0 } else { 0.0 }),
+      _ => None,
+    }
   }
 
   fn evaluate_fvschedule(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12177,14 +12512,22 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Some(FormulaValue::Number((x - mean) / sigma))
   }
 
-  fn evaluate_networkdays(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_networkdays(
+    &self,
+    args: &[FormulaAst<'doc>],
+    intl: bool,
+  ) -> Option<FormulaValue<'doc>> {
     let mut start = self.number(&self.evaluate(args.first()?)?)?.floor() as i64;
     let mut end = self.number(&self.evaluate(args.get(1)?)?)?.floor() as i64;
-    let weekend_arg = args.get(2).and_then(|arg| self.evaluate(arg));
+    let weekend_arg = intl
+      .then(|| args.get(2).and_then(|arg| self.evaluate(arg)))
+      .flatten();
     let Some(weekend) = weekend_mask(weekend_arg.as_ref(), false, self) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
-    let holiday_arg = args.get(3).and_then(|arg| self.evaluate(arg));
+    let holiday_arg = args
+      .get(if intl { 3 } else { 2 })
+      .and_then(|arg| self.evaluate(arg));
     let holidays = holiday_serials(holiday_arg.as_ref(), self);
     let reverse = start > end;
     if reverse {
@@ -12203,7 +12546,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }))
   }
 
-  fn evaluate_workday(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_workday(&self, args: &[FormulaAst<'doc>], intl: bool) -> Option<FormulaValue<'doc>> {
     let Some(mut date) = args
       .first()
       .and_then(|arg| self.evaluate(arg))
@@ -12220,11 +12563,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let weekend_arg = args.get(2).and_then(|arg| self.evaluate(arg));
+    let weekend_arg = intl
+      .then(|| args.get(2).and_then(|arg| self.evaluate(arg)))
+      .flatten();
     let Some(weekend) = weekend_mask(weekend_arg.as_ref(), true, self) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
-    let holiday_arg = args.get(3).and_then(|arg| self.evaluate(arg));
+    let holiday_arg = args
+      .get(if intl { 3 } else { 2 })
+      .and_then(|arg| self.evaluate(arg));
     let holidays = holiday_serials(holiday_arg.as_ref(), self);
     if days == 0 {
       return Some(FormulaValue::Number(date as f64));
@@ -13145,7 +13492,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn numeric_values<'b>(&'b self, args: &'b [FormulaAst<'doc>]) -> impl Iterator<Item = f64> + 'b {
-    self.values(args).filter_map(|value| self.number(&value))
+    // Source: LibreOffice ScInterpreter::GetNumberSequenceArray and
+    // ScInterpreter::CalculateSkew use ScValueIterator for range/ref-list
+    // arguments, which yields numeric cells and skips empty/text cells. Direct
+    // scalar arguments still use normal value conversion, so a direct blank is
+    // zero while a blank inside a range is ignored.
+    args
+      .iter()
+      .flat_map(|arg| self.value_numbers_from_ast(arg).into_iter())
   }
 
   fn numeric_aggregate(
@@ -13340,17 +13694,22 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn query_grid_from_reference(&self, reference: &QualifiedRange<'doc>) -> QueryGrid<'doc> {
-    if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
-      return QueryGrid {
-        values: Vec::new(),
-        query_empty: Vec::new(),
-      };
-    }
     let sheet = self.range_sheet(reference);
-    let start_row = reference.range.start.row.min(reference.range.end.row);
-    let end_row = reference.range.start.row.max(reference.range.end.row);
-    let start_column = reference.range.start.column.min(reference.range.end.column);
-    let end_column = reference.range.start.column.max(reference.range.end.column);
+    let range = if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+      let Some(range) = self.book.data_area_subrange(sheet, reference.range) else {
+        return QueryGrid {
+          values: Vec::new(),
+          query_empty: Vec::new(),
+        };
+      };
+      range
+    } else {
+      reference.range
+    };
+    let start_row = range.start.row.min(range.end.row);
+    let end_row = range.start.row.max(range.end.row);
+    let start_column = range.start.column.min(range.end.column);
+    let end_column = range.start.column.max(range.end.column);
     let mut values = Vec::new();
     let mut query_empty = Vec::new();
     for row in start_row..=end_row {
@@ -13438,12 +13797,138 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         }
         intersections
       }
+      FormulaAst::Function { name, args } if canonical_function_name(name) == "XLOOKUP" => {
+        self.xlookup_reference_ranges(args).unwrap_or_default()
+      }
       FormulaAst::Name(_) | FormulaAst::ExternalReference(_) | FormulaAst::Function { .. } => self
         .evaluate(ast)
         .map(|value| self.reference_ranges_from_value(&value))
         .unwrap_or_default(),
       _ => Vec::new(),
     }
+  }
+
+  fn xlookup_reference_ranges(
+    &self,
+    args: &[FormulaAst<'doc>],
+  ) -> Option<Vec<QualifiedRange<'doc>>> {
+    if args.len() < 3 {
+      return None;
+    }
+    let lookup = self.scalar_value(self.evaluate(args.first()?)?);
+    let lookup_reference = self.reference_ranges_from_ast(args.get(1)?).pop()?;
+    let return_reference = self.reference_ranges_from_ast(args.get(2)?).pop()?;
+    let lookup_matrix = self.matrix_values(&FormulaValue::Reference(lookup_reference.clone()));
+    let lookup_rows = lookup_matrix.len();
+    let lookup_columns = lookup_matrix.first().map_or(0, Vec::len);
+    if lookup_rows > 1 && lookup_columns > 1 {
+      return None;
+    }
+    let (lookup_vector, lookup_vertical) = lookup_vector(&lookup_matrix)?;
+    let return_rows = return_reference
+      .range
+      .start
+      .row
+      .abs_diff(return_reference.range.end.row)
+      + 1;
+    let return_columns = return_reference
+      .range
+      .start
+      .column
+      .abs_diff(return_reference.range.end.column)
+      + 1;
+    if (lookup_vertical && return_rows as usize != lookup_vector.len())
+      || (!lookup_vertical && return_columns as usize != lookup_vector.len())
+    {
+      return None;
+    }
+    let match_mode = args
+      .get(4)
+      .and_then(|arg| self.optional_number_value(arg))
+      .unwrap_or(0.0) as i32;
+    let search_mode = args
+      .get(5)
+      .and_then(|arg| self.optional_number_value(arg))
+      .unwrap_or(1.0) as i32;
+    let search = LookupSearchMode::from_excel(search_mode)?;
+    let index = match match_mode {
+      0 => search_vector_with_type(
+        self,
+        &lookup,
+        &lookup_vector,
+        QueryOp::Equal,
+        search,
+        true,
+        QuerySearchType::Normal,
+        false,
+      ),
+      -1 => search_vector_with_type(
+        self,
+        &lookup,
+        &lookup_vector,
+        QueryOp::Equal,
+        search,
+        true,
+        QuerySearchType::Normal,
+        false,
+      )
+      .or_else(|| {
+        search_vector_with_type(
+          self,
+          &lookup,
+          &lookup_vector,
+          QueryOp::LessOrEqual,
+          search,
+          false,
+          QuerySearchType::Normal,
+          true,
+        )
+      }),
+      1 => search_vector_with_type(
+        self,
+        &lookup,
+        &lookup_vector,
+        QueryOp::Equal,
+        search,
+        true,
+        QuerySearchType::Normal,
+        false,
+      )
+      .or_else(|| {
+        search_vector_with_type(
+          self,
+          &lookup,
+          &lookup_vector,
+          QueryOp::GreaterOrEqual,
+          search,
+          false,
+          QuerySearchType::Normal,
+          true,
+        )
+      }),
+      _ => return None,
+    }?;
+    let address = if lookup_vertical {
+      CellAddress {
+        column: return_reference.range.start.column,
+        row: return_reference.range.start.row + index as u32,
+      }
+    } else {
+      CellAddress {
+        column: return_reference.range.start.column + index as u32,
+        row: return_reference.range.start.row,
+      }
+    };
+    Some(vec![QualifiedRange {
+      sheet: return_reference.sheet,
+      sheet_name: return_reference.sheet_name,
+      range: CellRange {
+        start: address,
+        end: address,
+      },
+      start_flags: return_reference.start_flags,
+      end_flags: return_reference.end_flags,
+    }])
   }
 
   fn reference_ranges_from_value(&self, value: &FormulaValue<'doc>) -> Vec<QualifiedRange<'doc>> {
@@ -13639,6 +14124,27 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     self.first_value(&value)
   }
 
+  fn information_scalar_value(&self, value: FormulaValue<'doc>) -> Option<FormulaValue<'doc>> {
+    match value {
+      FormulaValue::Reference(reference) if reference.range.cell_count_hint() == 1 => {
+        self.range_values(&reference).into_iter().next()
+      }
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) => None,
+      FormulaValue::Matrix(rows) => rows
+        .into_iter()
+        .next()
+        .and_then(|row| row.into_iter().next()),
+      value => Some(value),
+    }
+  }
+
+  fn information_error_value(&self, ast: &FormulaAst<'doc>) -> FormulaValue<'doc> {
+    self
+      .evaluate(ast)
+      .map(|value| self.first_value(&value))
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Unknown))
+  }
+
   fn scalar_binary_operand(&self, value: FormulaValue<'doc>) -> FormulaValue<'doc> {
     match value {
       FormulaValue::Reference(reference) => self
@@ -13712,6 +14218,20 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .get(index)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
+  }
+
+  fn optional_number_value(&self, arg: &FormulaAst<'doc>) -> Option<f64> {
+    self
+      .evaluate(arg)
+      .filter(|value| !matches!(value, FormulaValue::Blank))
+      .and_then(|value| self.number(&value))
+  }
+
+  fn optional_number_arg(&self, args: &[FormulaAst<'doc>], index: usize, default: f64) -> f64 {
+    args
+      .get(index)
+      .and_then(|arg| self.optional_number_value(arg))
+      .unwrap_or(default)
   }
 
   fn date_arg(&self, args: &[FormulaAst<'doc>], index: usize) -> Option<i32> {
@@ -17246,6 +17766,8 @@ fn basis_o_datetime_text(serial: f64) -> Option<String> {
 }
 
 fn weeks_mode_one_index(serial: i32, date_system: DateSystem) -> Option<i64> {
+  // Source: LibreOffice ScaDateAddIn::getDiffWeeks:
+  // floor((serial + NullDate - 1) / 7.0), with NullDate in DateToDays units.
   let null_date_days = match date_system {
     DateSystem::Date1900 | DateSystem::LibreOffice => date_to_days(1899, 12, 30)?,
     DateSystem::Date1904 => date_to_days(1904, 1, 1)?,
@@ -17254,6 +17776,7 @@ fn weeks_mode_one_index(serial: i32, date_system: DateSystem) -> Option<i64> {
 }
 
 fn date_to_days(year: i32, month: i32, day: i32) -> Option<i64> {
+  // Source: LibreOffice scaddins/source/datefunc/datefunc.cxx DateToDays.
   Some(days_from_civil(year, month, day)? - days_from_civil(1, 1, 1)? + 1)
 }
 
@@ -17793,6 +18316,17 @@ fn column_index_to_name(mut column: u32) -> String {
     column -= 1;
   }
   name.into_iter().rev().collect()
+}
+
+fn quote_sheet_name_for_reference(sheet: &str) -> String {
+  if sheet
+    .chars()
+    .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+  {
+    sheet.to_string()
+  } else {
+    format!("'{}'", sheet.replace('\'', "''"))
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20128,25 +20662,176 @@ fn split_text_multi(
 }
 
 fn datevalue(text: &str, date_system: DateSystem) -> FormulaValue<'static> {
-  let Some((date, _time)) = text.trim().split_once(' ').or(Some((text.trim(), ""))) else {
+  let text = text.trim();
+  if text.is_empty() {
     return FormulaValue::Error(FormulaErrorValue::Value);
-  };
-  let mut parts = date.split('-');
-  let Some(year) = parts.next().and_then(|part| part.parse::<i32>().ok()) else {
-    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
-  };
-  let Some(month) = parts.next().and_then(|part| part.parse::<i32>().ok()) else {
-    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
-  };
-  let Some(day) = parts.next().and_then(|part| part.parse::<i32>().ok()) else {
-    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
-  };
-  if parts.next().is_some() {
-    return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
-  date_serial_with_system(year, month, day, date_system)
+  parse_date_input(text, date_system)
     .map(|value| FormulaValue::Number(value.floor()))
     .unwrap_or(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+}
+
+fn parse_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
+  let date = date_input_prefix(text)?;
+  parse_iso_date_input(date, date_system).or_else(|| parse_month_date_input(date, date_system))
+}
+
+fn date_input_prefix(text: &str) -> Option<&str> {
+  let trimmed = text.trim();
+  if trimmed.is_empty() {
+    return None;
+  }
+  let mut split = trimmed.len();
+  for (index, ch) in trimmed.char_indices() {
+    if ch.is_ascii_whitespace() {
+      let rest = trimmed[index..].trim();
+      if rest.is_empty() || rest.chars().any(|ch| ch == ':') {
+        split = index;
+        break;
+      }
+    }
+  }
+  Some(trimmed[..split].trim_end_matches(',').trim())
+}
+
+fn parse_iso_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
+  let mut parts = text.split('-');
+  let year = parts.next()?.parse::<i32>().ok()?;
+  let month = parts.next()?.parse::<i32>().ok()?;
+  let day = parts.next()?.parse::<i32>().ok()?;
+  if parts.next().is_some() {
+    return None;
+  }
+  valid_date_serial_with_system(year, month, day, date_system)
+}
+
+fn parse_month_date_input(text: &str, date_system: DateSystem) -> Option<f64> {
+  let tokens = date_input_tokens(text)?;
+  let month_index = tokens
+    .iter()
+    .position(|token| matches!(token.kind, DateInputTokenKind::Month(_)))?;
+  let month = match tokens[month_index].kind {
+    DateInputTokenKind::Month(month) => month,
+    DateInputTokenKind::Number(_) => return None,
+  };
+  let numbers = tokens
+    .iter()
+    .filter_map(|token| match token.kind {
+      DateInputTokenKind::Number(value) => Some((value, token.text)),
+      DateInputTokenKind::Month(_) => None,
+    })
+    .collect::<Vec<_>>();
+  let (year, day) = match (month_index, numbers.as_slice()) {
+    // Source: LibreOffice ImpSvNumberInputScan::GetDateRef, nMonthPos == 1
+    // with two numeric substrings uses MDY in the default English locale.
+    (0, [(day, _), (year, _)]) => (*year, *day),
+    // For middle-month long dates, LO accepts both DMY and YMD depending on
+    // locale/date order. Treat a four-digit leading number as year, otherwise
+    // use the common DMY order.
+    (1, [(left, left_text), (right, _)]) if left_text.len() >= 4 => (*left, *right),
+    (1, [(day, _), (year, _)]) => (*year, *day),
+    // Month at the end is accepted as YDM only when the locale long-date order
+    // requests it. The English default used by the LO FODS corpus does not.
+    (2, _) => return None,
+    _ => return None,
+  };
+  valid_date_serial_with_system(year, i32::from(month), day, date_system)
+}
+
+#[derive(Clone, Copy)]
+struct DateInputToken<'a> {
+  kind: DateInputTokenKind,
+  text: &'a str,
+}
+
+#[derive(Clone, Copy)]
+enum DateInputTokenKind {
+  Number(i32),
+  Month(u8),
+}
+
+fn date_input_tokens(text: &str) -> Option<Vec<DateInputToken<'_>>> {
+  let mut tokens = Vec::new();
+  let mut index = 0usize;
+  while index < text.len() {
+    let rest = &text[index..];
+    let ch = rest.chars().next()?;
+    if ch.is_ascii_whitespace() || matches!(ch, ',' | '-' | '/' | '.') {
+      index += ch.len_utf8();
+      continue;
+    }
+    if ch.is_ascii_digit() {
+      let start = index;
+      index += ch.len_utf8();
+      while index < text.len() {
+        let ch = text[index..].chars().next()?;
+        if !ch.is_ascii_digit() {
+          break;
+        }
+        index += ch.len_utf8();
+      }
+      let value = text[start..index].parse::<i32>().ok()?;
+      tokens.push(DateInputToken {
+        kind: DateInputTokenKind::Number(value),
+        text: &text[start..index],
+      });
+      continue;
+    }
+    if ch.is_ascii_alphabetic() {
+      let start = index;
+      index += ch.len_utf8();
+      while index < text.len() {
+        let ch = text[index..].chars().next()?;
+        if !ch.is_ascii_alphabetic() {
+          break;
+        }
+        index += ch.len_utf8();
+      }
+      let month = english_month_number(&text[start..index])?;
+      tokens.push(DateInputToken {
+        kind: DateInputTokenKind::Month(month),
+        text: &text[start..index],
+      });
+      continue;
+    }
+    return None;
+  }
+  Some(tokens)
+}
+
+fn english_month_number(text: &str) -> Option<u8> {
+  match text.to_ascii_uppercase().as_str() {
+    "JAN" | "JANUARY" => Some(1),
+    "FEB" | "FEBRUARY" => Some(2),
+    "MAR" | "MARCH" => Some(3),
+    "APR" | "APRIL" => Some(4),
+    "MAY" => Some(5),
+    "JUN" | "JUNE" => Some(6),
+    "JUL" | "JULY" => Some(7),
+    "AUG" | "AUGUST" => Some(8),
+    "SEP" | "SEPT" | "SEPTEMBER" => Some(9),
+    "OCT" | "OCTOBER" => Some(10),
+    "NOV" | "NOVEMBER" => Some(11),
+    "DEC" | "DECEMBER" => Some(12),
+    _ => None,
+  }
+}
+
+fn valid_date_serial_with_system(
+  year: i32,
+  month: i32,
+  day: i32,
+  date_system: DateSystem,
+) -> Option<f64> {
+  if !(1..=12).contains(&month) || day < 1 {
+    return None;
+  }
+  let days = days_from_civil(year, month, day)?;
+  let (actual_year, actual_month, actual_day) = civil_from_days(days)?;
+  if actual_year != year || actual_month != month as u32 || actual_day != day as u32 {
+    return None;
+  }
+  date_serial_with_system(year, month, day, date_system)
 }
 
 fn text_byte_len(text: &str) -> usize {
@@ -22348,6 +23033,7 @@ mod tests {
       grammar: FormulaGrammar::ExcelA1,
       locals: BTreeMap::new(),
       array_context: false,
+      current_value: None,
     };
 
     assert_eq!(
@@ -22412,6 +23098,7 @@ mod tests {
       grammar: FormulaGrammar::ExcelA1,
       locals: BTreeMap::new(),
       array_context: false,
+      current_value: None,
     };
 
     assert_eq!(

@@ -15,8 +15,8 @@ use regex::RegexBuilder;
 use rustfft::FftPlanner;
 use rustfft::num_complex::Complex;
 use statrs::distribution::{
-  Binomial, ChiSquared, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, FisherSnedecor,
-  Hypergeometric, LogNormal, NegativeBinomial, Normal, Poisson, StudentsT, Weibull,
+  Binomial, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, FisherSnedecor, Hypergeometric,
+  LogNormal, NegativeBinomial, Normal, Poisson, StudentsT, Weibull,
 };
 use statrs::function::{erf as statrs_erf, gamma as statrs_gamma};
 
@@ -983,6 +983,44 @@ fn parse_r1c1_relative(reference: &str, axis: char) -> Option<i32> {
   }
   let offset = rest.strip_prefix('[')?.strip_suffix(']')?;
   offset.parse::<i32>().ok()
+}
+
+fn r1c1_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
+  let (start, end) = reference.split_once(':').unwrap_or((reference, reference));
+  let start = parse_r1c1_cell(start.trim(), base)?;
+  let end = parse_r1c1_cell(end.trim(), base)?;
+  let start = format!("{}{}", column_index_to_name(start.column), start.row + 1);
+  let end = format!("{}{}", column_index_to_name(end.column), end.row + 1);
+  if start == end {
+    Some(start)
+  } else {
+    Some(format!("{start}:{end}"))
+  }
+}
+
+fn parse_r1c1_cell(reference: &str, base: CellAddress) -> Option<CellAddress> {
+  let reference = reference.trim().trim_start_matches('=');
+  let upper = reference.to_ascii_uppercase();
+  let rest = upper.strip_prefix('R')?;
+  let column_marker = rest.find('C')?;
+  let (row_text, column_text) = rest.split_at(column_marker);
+  let column_text = column_text.strip_prefix('C')?;
+  let row = parse_r1c1_axis(row_text, base.row)?;
+  let column = parse_r1c1_axis(column_text, base.column)?;
+  Some(CellAddress { column, row })
+}
+
+fn parse_r1c1_axis(text: &str, base: u32) -> Option<u32> {
+  if text.is_empty() {
+    return Some(base);
+  }
+  if let Some(relative) = text
+    .strip_prefix('[')
+    .and_then(|text| text.strip_suffix(']'))
+  {
+    return base.checked_add_signed(relative.parse::<i32>().ok()?);
+  }
+  text.parse::<u32>().ok()?.checked_sub(1)
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -2239,6 +2277,51 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       current_value: None,
     }
     .evaluate(formula.ast.as_ref()?)
+  }
+
+  pub fn array_recalc_updates(
+    &self,
+    sheet: SheetId,
+    target: CellRange,
+    value: &FormulaValue<'doc>,
+  ) -> Vec<(SheetId, CellAddress, FormulaValue<'doc>)> {
+    let mut updates = Vec::new();
+    let start_row = target.start.row.min(target.end.row);
+    let end_row = target.start.row.max(target.end.row);
+    let start_column = target.start.column.min(target.end.column);
+    let end_column = target.start.column.max(target.end.column);
+    for row in start_row..=end_row {
+      for column in start_column..=end_column {
+        let row_offset = (row - start_row) as usize;
+        let column_offset = (column - start_column) as usize;
+        let address = CellAddress { column, row };
+        let item = match value {
+          FormulaValue::Matrix(rows) => rows
+            .get(row_offset)
+            .and_then(|row| row.get(column_offset))
+            .cloned()
+            .unwrap_or_else(|| {
+              if self.is_query_empty_cell(sheet, address) {
+                self.cell_value(sheet, address)
+              } else {
+                FormulaValue::Blank
+              }
+            }),
+          FormulaValue::Reference(reference) => self.cell_value(
+            reference.sheet,
+            CellAddress {
+              column: reference.range.start.column + column_offset as u32,
+              row: reference.range.start.row + row_offset as u32,
+            },
+          ),
+          FormulaValue::Error(_) => value.clone(),
+          value if row_offset == 0 && column_offset == 0 => value.clone(),
+          _ => FormulaValue::Blank,
+        };
+        updates.push((sheet, address, item));
+      }
+    }
+    updates
   }
 
   pub fn evaluate_formula_text_with_grammar(
@@ -7271,6 +7354,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       item: QueryItem {
         kind: query_value_kind(&lookup),
         value: lookup.clone(),
+        source_text: None,
         match_empty: false,
         empty_matches_text: false,
       },
@@ -9471,13 +9555,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(chosen) = self.number_arg(args, 1).map(approx_floor) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    if count < 0.0 || chosen < 0.0 || (!repetition && chosen > count) {
+    if count < 0.0 || chosen < 0.0 || chosen > count {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
     if repetition {
-      if count == 0.0 && chosen > 0.0 {
-        return Some(FormulaValue::Error(FormulaErrorValue::Num));
-      }
       count += chosen - 1.0;
     }
     Some(FormulaValue::Number(
@@ -10602,7 +10683,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       match_whole_cell: true,
       case_sensitive: false,
     };
-    for (row_index, (row, row_empty)) in criteria
+    for (row_index, (row, _row_empty)) in criteria
       .values
       .iter()
       .zip(criteria.query_empty.iter())
@@ -10641,10 +10722,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         _ => return None,
       };
       let criterion = row.get(3).cloned().unwrap_or_default();
-      let criterion_empty = row_empty.get(3).copied().unwrap_or(false);
-      if !database_criterion_entry_present(&criterion, criterion_empty) {
-        continue;
-      }
       let (mut entry, search_type) = QueryEntry::from_database_value(self, &criterion, field);
       entry.op = op;
       if current.search_type == QuerySearchType::Normal {
@@ -11107,7 +11184,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       )
     } else {
       (
-        vec![vec![self.evaluate(args.get(3)?)?]],
+        self.matrix_values(&self.evaluate(args.get(3)?)?),
         args
           .get(4)
           .and_then(|arg| self.evaluate(arg))
@@ -11603,7 +11680,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if df == 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    Some(FormulaValue::Number(ChiSquared::new(df).ok()?.sf(chi)))
+    Some(FormulaValue::Number(lo_chi_dist(chi, df)))
   }
 
   fn evaluate_confidence_norm(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -14512,6 +14589,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn resolve_reference(&self, reference: &str) -> Option<QualifiedRange<'doc>> {
     let reference = reference.trim();
+    let normalized;
+    let reference = if self.grammar == FormulaGrammar::ExcelR1C1 {
+      normalized = r1c1_reference_to_a1(reference, self.current_cell.unwrap_or_default())
+        .unwrap_or_else(|| reference.to_string());
+      normalized.as_str()
+    } else {
+      reference
+    };
     if let Some(table) = parse_table_reference(self.book, reference, self.current_cell) {
       return Some(table);
     }
@@ -15672,6 +15757,7 @@ enum QuerySearchType {
 #[derive(Clone, Debug, PartialEq)]
 struct QueryItem<'doc> {
   value: FormulaValue<'doc>,
+  source_text: Option<Cow<'doc, str>>,
   kind: QueryValueKind,
   match_empty: bool,
   empty_matches_text: bool,
@@ -15815,6 +15901,8 @@ impl<'doc> QueryEntry<'doc> {
         .parse::<f64>()
         .map(FormulaValue::Number)
         .unwrap_or_else(|_| FormulaValue::String(Cow::Owned(operand.to_string())));
+      let source_text =
+        matches!(operand_value, FormulaValue::Number(_)).then(|| Cow::Owned(operand.to_string()));
       let search_type = if matches!(operand_value, FormulaValue::String(_)) {
         detect_query_search_type(evaluator.book.formula_search_type, operand)
       } else {
@@ -15837,6 +15925,7 @@ impl<'doc> QueryEntry<'doc> {
           field,
           item: QueryItem {
             value: operand_value,
+            source_text,
             kind,
             match_empty: (op == QueryOp::Equal && is_empty_criterion)
               || (op == QueryOp::NotEqual && !is_empty_criterion),
@@ -15858,6 +15947,7 @@ impl<'doc> QueryEntry<'doc> {
           item: QueryItem {
             kind: query_value_kind(&value),
             value,
+            source_text: None,
             match_empty: false,
             empty_matches_text: false,
           },
@@ -15880,6 +15970,8 @@ impl<'doc> QueryEntry<'doc> {
         .parse::<f64>()
         .map(FormulaValue::Number)
         .unwrap_or_else(|_| FormulaValue::String(Cow::Owned(operand.to_string())));
+      let source_text =
+        matches!(operand_value, FormulaValue::Number(_)).then(|| Cow::Owned(operand.to_string()));
       let search_type = if matches!(operand_value, FormulaValue::String(_)) {
         detect_query_search_type(evaluator.book.formula_search_type, operand)
       } else {
@@ -15896,6 +15988,7 @@ impl<'doc> QueryEntry<'doc> {
           field,
           item: QueryItem {
             value: operand_value,
+            source_text,
             kind,
             match_empty: false,
             empty_matches_text: false,
@@ -15916,6 +16009,7 @@ impl<'doc> QueryEntry<'doc> {
           item: QueryItem {
             kind: query_value_kind(&value),
             value,
+            source_text: None,
             match_empty: false,
             empty_matches_text: false,
           },
@@ -15980,6 +16074,17 @@ fn query_matches<'doc>(
     && query.item.kind == QueryValueKind::Number
     && query_candidate_number(candidate, candidate_query_empty).is_none()
   {
+    if let Some(source_text) = &query.item.source_text
+      && let FormulaValue::String(candidate_text) = candidate
+      && matches!(query.op, QueryOp::Equal | QueryOp::NotEqual)
+    {
+      let matched = compare_text(evaluator, candidate_text, source_text, param.case_sensitive) == 0;
+      return if query.op == QueryOp::Equal {
+        matched
+      } else {
+        !matched
+      };
+    }
     return matches!(query.op, QueryOp::NotEqual);
   }
   if !param.range_lookup
@@ -16231,6 +16336,7 @@ fn search_vector_with_type<'doc>(
     item: QueryItem {
       kind: query_value_kind(lookup),
       value: lookup.clone(),
+      source_text: None,
       match_empty,
       empty_matches_text: false,
     },
@@ -17172,11 +17278,11 @@ fn simple_regression_coefficients<'doc>(
   if constant {
     mean_y = kahan_sum(y.iter().copied()) / n as f64;
     for value in &mut y {
-      *value = approx_diff(*value, mean_y);
+      *value = approx_sub(*value, mean_y);
     }
     mean_x = kahan_sum(x.iter().copied()) / n as f64;
     for value in &mut x {
-      *value = approx_diff(*value, mean_x);
+      *value = approx_sub(*value, mean_x);
     }
   }
   let sum_xy = kahan_sum(x.iter().zip(&y).map(|(x, y)| x * y));
@@ -17334,12 +17440,12 @@ fn regression_state(data: &RegressionData, constant: bool) -> Option<RegressionS
   if constant {
     mean_y = centered_y.iter().sum::<f64>() / n as f64;
     for value in &mut centered_y {
-      *value = approx_diff(*value, mean_y);
+      *value = approx_sub(*value, mean_y);
     }
     for column in 0..k {
       means[column] = centered_x.iter().map(|row| row[column]).sum::<f64>() / n as f64;
       for row in &mut centered_x {
-        row[column] = approx_diff(row[column], means[column]);
+        row[column] = approx_sub(row[column], means[column]);
       }
     }
   }
@@ -17395,11 +17501,11 @@ fn simple_regression_model(data: &RegressionData, constant: bool) -> Option<Regr
   if constant {
     mean_y = kahan_sum(y.iter().copied()) / n as f64;
     for value in &mut y {
-      *value = approx_diff(*value, mean_y);
+      *value = approx_sub(*value, mean_y);
     }
     mean_x = kahan_sum(x_values.iter().copied()) / n as f64;
     for value in &mut x_values {
-      *value = approx_diff(*value, mean_x);
+      *value = approx_sub(*value, mean_x);
     }
   }
   let sum_xy = kahan_sum(x_values.iter().zip(&y).map(|(x, y)| x * y));
@@ -19925,7 +20031,7 @@ fn chisq_dist_value<'doc>(
   if right_tail {
     return FormulaValue::Number(lo_chi_dist(x, df));
   }
-  FormulaValue::Number(if cumulative.unwrap_or(false) {
+  FormulaValue::Number(if cumulative.unwrap_or(true) {
     lo_chisq_dist_cdf(x, df)
   } else {
     lo_chisq_dist_pdf(x, df)
@@ -20155,7 +20261,7 @@ fn rtl_round(value: f64, decimal_places: i32) -> f64 {
 fn round_significant(value: f64, digits: f64) -> f64 {
   let scale = value.abs().log10().floor() + 1.0 - digits;
   let mut input = value;
-  let factor = 10.0_f64.powi(scale.abs() as i32);
+  let factor = 10.0_f64.powf(scale.abs());
   if scale < 0.0 {
     input *= factor;
   } else {
@@ -20258,7 +20364,7 @@ fn approx_sub(left: f64, right: f64) -> f64 {
   if ((left < 0.0 && right < 0.0) || (left > 0.0 && right > 0.0)) && approx_equal(left, right) {
     return 0.0;
   }
-  left - right
+  normalize_duration_difference(left, right, left - right)
 }
 
 fn approx_add(left: f64, right: f64) -> f64 {
@@ -20269,39 +20375,23 @@ fn approx_add(left: f64, right: f64) -> f64 {
   left + right
 }
 
-fn approx_diff(left: f64, right: f64) -> f64 {
-  if left == right {
-    return 0.0;
-  }
-  if left == 0.0 {
-    return -right;
-  }
-  if right == 0.0 {
-    return left;
-  }
-  let value = left - right;
-  let left_abs = left.abs();
-  let right_abs = right.abs();
-  if !(1e-16..=1e16).contains(&left_abs) || !(1e-16..=1e16).contains(&right_abs) {
-    return value;
-  }
-  let quotient = if left_abs < right_abs {
-    right / left
-  } else {
-    left / right
-  };
-  let adjusted = ((left * quotient) - (right * quotient)) / quotient;
-  if adjusted == value {
-    return value;
-  }
-  let error = (adjusted - value).abs();
-  let error_exp = error.log10().floor() as i32 + 1;
-  let arg_exp = left_abs.max(right_abs).log10().floor() as i32 - 15;
-  rtl_round(value, -error_exp.max(arg_exp))
-}
-
 fn normalize_formula_number(value: f64) -> f64 {
   if approx_equal(value, 0.0) { 0.0 } else { value }
+}
+
+fn normalize_duration_difference(left: f64, right: f64, value: f64) -> f64 {
+  // Source: LibreOffice sc/source/core/tool/interpr5.cxx
+  // ScInterpreter::CalculateAddSub uses tools::Duration with microsecond
+  // accuracy when date/duration formatted values participate in subtraction.
+  if value != 0.0
+    && value.abs() < 1.0
+    && (left.abs() >= 1.0 || right.abs() >= 1.0)
+    && (left - right).abs() <= i32::MAX as f64
+  {
+    let micros_per_day = 86_400_000_000.0;
+    return (value * micros_per_day).round() / micros_per_day;
+  }
+  value
 }
 
 fn approx_value(value: f64) -> f64 {
@@ -22531,33 +22621,35 @@ fn parse_array_constant_formula<'doc>(formula: &str) -> Option<Vec<Vec<FormulaVa
 
 fn parse_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRange<'doc>> {
   if token.contains(':') {
-    return QualifiedRange::parse_a1(sheet, token).ok().or_else(|| {
-      let (left, right) = token.split_once(':')?;
-      let left = QualifiedAddress::parse_a1(sheet, left).ok()?;
-      let right = QualifiedAddress::parse_a1(sheet, right).ok()?;
-      extend_qualified_range(
-        &QualifiedRange {
-          sheet,
-          sheet_name: left.sheet_name,
-          range: CellRange {
-            start: left.cell,
-            end: left.cell,
+    return token
+      .split_once(':')
+      .and_then(|(left, right)| {
+        let left = QualifiedAddress::parse_a1(sheet, left).ok()?;
+        let right = QualifiedAddress::parse_a1(sheet, right).ok()?;
+        extend_qualified_range(
+          &QualifiedRange {
+            sheet,
+            sheet_name: left.sheet_name,
+            range: CellRange {
+              start: left.cell,
+              end: left.cell,
+            },
+            start_flags: left.flags,
+            end_flags: left.flags,
           },
-          start_flags: left.flags,
-          end_flags: left.flags,
-        },
-        &QualifiedRange {
-          sheet,
-          sheet_name: right.sheet_name,
-          range: CellRange {
-            start: right.cell,
-            end: right.cell,
+          &QualifiedRange {
+            sheet,
+            sheet_name: right.sheet_name,
+            range: CellRange {
+              start: right.cell,
+              end: right.cell,
+            },
+            start_flags: right.flags,
+            end_flags: right.flags,
           },
-          start_flags: right.flags,
-          end_flags: right.flags,
-        },
-      )
-    });
+        )
+      })
+      .or_else(|| QualifiedRange::parse_a1(sheet, token).ok());
   }
   QualifiedAddress::parse_a1(sheet, token)
     .ok()
@@ -23465,6 +23557,21 @@ fn sort_value_rank(value: &FormulaValue<'_>) -> u8 {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn parses_odf_range_endpoints_with_inherited_sheet_name() {
+    let same_sheet = parse_formula_range(SheetId(3), ".B8:.B95").unwrap();
+    assert_eq!(same_sheet.sheet, SheetId(3));
+    assert!(same_sheet.sheet_name.is_none());
+    assert_eq!(same_sheet.range.start, CellAddress { column: 1, row: 7 });
+    assert_eq!(same_sheet.range.end, CellAddress { column: 1, row: 94 });
+
+    let inherited = parse_formula_range(SheetId(3), "Sheet2.C2:.C92").unwrap();
+    assert_eq!(inherited.sheet, SheetId(3));
+    assert_eq!(inherited.sheet_name.unwrap().0, "Sheet2");
+    assert_eq!(inherited.range.start, CellAddress { column: 2, row: 1 });
+    assert_eq!(inherited.range.end, CellAddress { column: 2, row: 91 });
+  }
 
   #[test]
   fn imports_workbook_identity_from_typed_schema() {

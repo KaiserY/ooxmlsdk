@@ -140,8 +140,9 @@ fn split_sheet_name(value: &str) -> (Option<&str>, &str) {
   }
   last_bang
     .or(last_dot)
+    .filter(|index| *index > 0)
     .map(|index| (Some(&value[..index]), &value[index + 1..]))
-    .unwrap_or((None, value))
+    .unwrap_or((None, value.trim_start_matches('.')))
 }
 
 fn unquote_sheet_name(value: &str) -> String {

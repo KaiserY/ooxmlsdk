@@ -4957,7 +4957,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "ASC" => self.evaluate_width_conversion(args, false),
       "JIS" => self.evaluate_width_conversion(args, true),
       "MEDIAN" => {
-        let mut values = self.numeric_args(args);
+        let mut values = self.median_numeric_args(args);
         percentile_sorted(&mut values, 0.5, PercentileKind::Inc)
           .map(FormulaValue::Number)
           .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown)))
@@ -4980,9 +4980,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
         Err(error) => Some(FormulaValue::Error(error)),
       },
-      "STDEV" => variance_slice(&self.numeric_args(args), true)
-        .map(|value| FormulaValue::Number(value.sqrt()))
-        .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
+      "STDEV" => match self.st_var_numbers(args, true) {
+        Ok(values) => variance_slice(&values, true)
+          .map(|value| FormulaValue::Number(value.sqrt()))
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
+        Err(error) => Some(FormulaValue::Error(error)),
+      },
       "STDEVA" => self.evaluate_stdeva(args, true),
       "STDEVPA" => self.evaluate_stdeva(args, false),
       "VAR.P" | "VARP" => match self.st_var_numbers(args, true) {
@@ -8065,7 +8068,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       let rows = result_matrix.len();
       let columns = result_matrix.first().map_or(0, Vec::len);
       if rows == 1 && columns == 1 {
-        if index != 0 {
+        if args
+          .get(2)
+          .is_some_and(|arg| matches!(arg, FormulaAst::Array(_)))
+          && index != 0
+        {
           return Some(FormulaValue::Error(FormulaErrorValue::NA));
         }
         return result_matrix
@@ -9875,8 +9882,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 2 {
       return None;
     }
-    let mut data = self.value_numbers(&self.evaluate(args.first()?)?);
-    let bins = self.value_numbers(&self.evaluate(args.get(1)?)?);
+    let array_evaluator = self.with_array_context();
+    let mut data = self.value_numbers(&array_evaluator.evaluate(args.first()?)?);
+    let bins = self.value_numbers(&array_evaluator.evaluate(args.get(1)?)?);
     if data.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
@@ -10031,20 +10039,20 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_varpa(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let values = self
-      .values(args)
-      .map(|value| self.number(&value).unwrap_or(0.0))
-      .collect::<Vec<_>>();
+    let values = match self.stvar_text_as_zero_values(args) {
+      Ok(values) => values,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
     variance_slice(&values, false)
       .map(FormulaValue::Number)
       .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown)))
   }
 
   fn evaluate_vara(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let values = self
-      .values(args)
-      .map(|value| self.number(&value).unwrap_or(0.0))
-      .collect::<Vec<_>>();
+    let values = match self.stvar_text_as_zero_values(args) {
+      Ok(values) => values,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    };
     variance_slice(&values, true)
       .map(FormulaValue::Number)
       .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown)))
@@ -14097,7 +14105,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or_else(|| variance_slice(&values, true).unwrap_or(0.0).sqrt());
-    if values.is_empty() || sigma <= 0.0 {
+    if values.len() <= 1 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+    }
+    if sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     let z = (mean(&values)? - x) / (sigma / (values.len() as f64).sqrt());
@@ -15228,18 +15239,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     text_error: bool,
   ) -> std::result::Result<NumericAggregate, FormulaErrorValue> {
     let mut values = Vec::new();
-    let array_evaluator = self.with_array_context();
     for arg in args {
-      let ranges = self.reference_ranges_from_ast(arg);
-      if !ranges.is_empty() {
-        for range in ranges {
-          self.push_range_numeric_aggregate_values(&range, &mut values)?;
-        }
-        continue;
-      }
-      let value = array_evaluator
-        .evaluate(arg)
-        .ok_or(FormulaErrorValue::Unknown)?;
+      let value = self.evaluate(arg).ok_or(FormulaErrorValue::Unknown)?;
       match value {
         FormulaValue::Reference(reference) => {
           self.push_range_numeric_aggregate_values(&reference, &mut values)?;
@@ -15404,6 +15405,35 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn numeric_args(&self, args: &[FormulaAst<'doc>]) -> Vec<f64> {
     self.numeric_values(args).collect()
+  }
+
+  fn median_numeric_args(&self, args: &[FormulaAst<'doc>]) -> Vec<f64> {
+    let mut values = Vec::new();
+    for arg in args {
+      if let Some(value) = self.evaluate(arg) {
+        values.extend(self.median_numbers_from_value(&value));
+      }
+    }
+    values
+  }
+
+  fn median_numbers_from_value(&self, value: &FormulaValue<'doc>) -> Vec<f64> {
+    match value {
+      FormulaValue::Reference(reference) => self
+        .range_values(reference)
+        .iter()
+        .filter_map(number_only)
+        .collect(),
+      FormulaValue::RefList(ranges) => ranges
+        .iter()
+        .flat_map(|range| self.range_values(range))
+        .filter_map(|value| number_only(&value))
+        .collect(),
+      FormulaValue::Matrix(rows) => rows.iter().flatten().filter_map(number_only).collect(),
+      FormulaValue::Boolean(value) => vec![if *value { 1.0 } else { 0.0 }],
+      FormulaValue::Number(value) => vec![*value],
+      _ => Vec::new(),
+    }
   }
 
   fn st_var_numbers(
@@ -15723,15 +15753,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           return 0;
         }
         let sheet = self.range_sheet(reference);
+        let single_cell = reference.range.cell_count_hint() == 1;
         let mut count = 0usize;
         for row in reference.range.start.row..=reference.range.end.row {
           for column in reference.range.start.column..=reference.range.end.column {
             let address = CellAddress { column, row };
             let value = self.book.cell_value(sheet, address);
-            let is_blank = if self.book.formula_text(sheet, address).is_some() {
-              matches!(value, FormulaValue::String(ref text) if text.is_empty())
-            } else {
-              matches!(value, FormulaValue::Blank)
+            let formula = self.book.formula_text(sheet, address).is_some();
+            let is_blank = match value {
+              FormulaValue::Blank => !formula,
+              FormulaValue::String(ref text) => text.is_empty() && (single_cell || formula),
+              _ => false,
             };
             if is_blank {
               count += 1;
@@ -16048,6 +16080,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .ok_or(FormulaErrorValue::Ref)?;
       filter_columns.push((column, filter.match_value.as_ref()));
     }
+    if pivot_row_filter_is_ambiguous(self.book, block_sheet, pivot, request) {
+      return Err(FormulaErrorValue::Ref);
+    }
 
     let mut values = Vec::new();
     let source = &pivot.source.range;
@@ -16215,11 +16250,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           FormulaValue::Error(FormulaErrorValue::Value)
         }
       }
-      FormulaValue::Matrix(rows) => rows
-        .into_iter()
-        .next()
-        .and_then(|row| row.into_iter().next())
-        .unwrap_or_default(),
+      FormulaValue::Matrix(_) => value,
       value => value,
     }
   }
@@ -16372,11 +16403,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
     let value = self.evaluate(args.first()?)?;
-    if self.array_context
+    if (self.array_context
       && matches!(
         value,
         FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
-      )
+      ))
+      || matches!(value, FormulaValue::Matrix(_))
     {
       return self.map_unary_values(value, |evaluator, value| {
         if let FormulaValue::Error(error) = value {
@@ -16389,6 +16421,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         })
       });
     }
+    let value = self.scalar_binary_operand(value);
     if let FormulaValue::Error(error) = value {
       return Some(FormulaValue::Error(error));
     }
@@ -17619,9 +17652,31 @@ fn parse_query_number_format(text: &str, date_system: DateSystem) -> std::result
   if let Ok(value) = text.parse::<f64>() {
     return Ok(value);
   }
+  if let Some(value) = parse_query_decimal_comma_number(text) {
+    return Ok(value);
+  }
   parse_date_input(text, date_system)
     .map(f64::floor)
     .ok_or(())
+}
+
+fn parse_query_decimal_comma_number(text: &str) -> Option<f64> {
+  let trimmed = text.trim();
+  if trimmed.contains('.') || trimmed.matches(',').count() != 1 {
+    return None;
+  }
+  let (integer, fraction) = trimmed.split_once(',')?;
+  if fraction.is_empty() || !fraction.bytes().all(|byte| byte.is_ascii_digit()) {
+    return None;
+  }
+  let sign_stripped = integer
+    .strip_prefix('+')
+    .or_else(|| integer.strip_prefix('-'))
+    .unwrap_or(integer);
+  if !sign_stripped.is_empty() && !sign_stripped.bytes().all(|byte| byte.is_ascii_digit()) {
+    return None;
+  }
+  trimmed.replace(',', ".").parse::<f64>().ok()
 }
 
 fn is_query_empty(value: &FormulaValue<'_>) -> bool {
@@ -18475,6 +18530,73 @@ fn pivot_value_eq(left: &str, right: &str) -> bool {
   left.eq_ignore_ascii_case(right)
 }
 
+fn pivot_row_filter_is_ambiguous<'doc>(
+  book: &FormulaEvaluationBook<'doc>,
+  sheet: SheetId,
+  pivot: &FormulaPivotTable<'doc>,
+  request: &PivotDataRequest<'doc>,
+) -> bool {
+  let row_fields = pivot
+    .fields
+    .iter()
+    .filter(|field| field.orientation == FormulaPivotFieldOrientation::Row)
+    .collect::<Vec<_>>();
+  if row_fields.len() <= 1 {
+    return false;
+  }
+  let row_filters = row_fields
+    .iter()
+    .filter_map(|field| {
+      request
+        .filters
+        .iter()
+        .find(|filter| pivot_name_eq(&field.name, &filter.field_name))
+        .map(|filter| (field.name.as_ref(), filter.match_value.as_ref()))
+    })
+    .collect::<Vec<_>>();
+  if row_filters.is_empty() || row_filters.len() == row_fields.len() {
+    return false;
+  }
+
+  let target = &pivot.target.range;
+  let mut inherited = vec![String::new(); row_fields.len()];
+  let mut matches = 0usize;
+  for row in target.start.row.saturating_add(1)..=target.end.row {
+    for (index, inherited_value) in inherited.iter_mut().enumerate() {
+      let value = book.cell_value(
+        sheet,
+        CellAddress {
+          column: target.start.column + index as u32,
+          row,
+        },
+      );
+      if !matches!(value, FormulaValue::Blank) {
+        *inherited_value = pivot_output_cell_text(&value);
+      }
+    }
+    if row_filters.iter().all(|(field_name, expected)| {
+      row_fields
+        .iter()
+        .position(|field| pivot_name_eq(&field.name, field_name))
+        .is_some_and(|index| pivot_value_eq(&inherited[index], expected))
+    }) {
+      matches += 1;
+      if matches > 1 {
+        return true;
+      }
+    }
+  }
+  matches != 1
+}
+
+fn pivot_output_cell_text(value: &FormulaValue<'_>) -> String {
+  match value {
+    FormulaValue::String(value) => value.to_string(),
+    FormulaValue::Blank => String::new(),
+    _ => display_text_from_value(value),
+  }
+}
+
 fn parse_getpivotdata_filter_text<'doc>(
   text: &str,
 ) -> (Option<Cow<'doc, str>>, Vec<PivotFieldFilter<'doc>>) {
@@ -18550,6 +18672,13 @@ fn value_number_for_array(value: &FormulaValue<'_>) -> Option<f64> {
   match value {
     FormulaValue::Number(value) => Some(*value),
     FormulaValue::Boolean(value) => Some(if *value { 1.0 } else { 0.0 }),
+    _ => None,
+  }
+}
+
+fn number_only(value: &FormulaValue<'_>) -> Option<f64> {
+  match value {
+    FormulaValue::Number(value) => Some(*value),
     _ => None,
   }
 }
@@ -20585,7 +20714,6 @@ fn weeks_mode_one_index(serial: i32, date_system: DateSystem) -> Option<i64> {
   // floor((serial + NullDate - 1) / 7.0), with NullDate in DateToDays units.
   let null_date_days = match date_system {
     DateSystem::Date1900 => date_to_days(1899, 12, 31)?,
-    DateSystem::LibreOffice if serial < 0 => date_to_days(1899, 12, 31)?,
     DateSystem::LibreOffice => date_to_days(1899, 12, 30)?,
     DateSystem::Date1904 => date_to_days(1904, 1, 1)?,
   };
@@ -27949,11 +28077,43 @@ mod tests {
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(D1)"),
-      Some(FormulaValue::Number(0.0))
+      Some(FormulaValue::Number(1.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(ABS(E1:E2),E1:E2+E1:E2)"),
       Some(FormulaValue::Number(14.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 61 }),
+        "ABS(E1:E2)"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 1 }),
+        "ABS(E1:E2)"
+      ),
+      Some(FormulaValue::Number(4.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 61 }),
+        "SUM(ABS(E1:E2))"
+      ),
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUM(ABS(MUNIT(2)))"),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "SUM(ABS(MUNIT(2)*-1))"),
+      Some(FormulaValue::Number(2.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "SUMPRODUCT(A1:A1,D1:D1)"),
@@ -28273,6 +28433,79 @@ mod tests {
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "CUMPRINC(0.055/12,24,5000,4,6,)"),
       Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+    );
+  }
+
+  #[test]
+  fn evaluation_book_dsum_parses_decimal_comma_criteria_like_libreoffice() {
+    // Source: LibreOffice sc/qa/unit/data/functions/database/fods/dsum.fods,
+    // Interest sheet uses criteria text such as ">,005" and "<=0,01".
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 0 },
+        FormulaValue::String(Cow::Borrowed("Interest Rate")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 0 },
+        FormulaValue::String(Cow::Borrowed("Bal Now")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 1 },
+        FormulaValue::Number(0.004),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 1 },
+        FormulaValue::Number(29.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 2 },
+        FormulaValue::Number(0.007),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 2 },
+        FormulaValue::Number(14.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 0, row: 3 },
+        FormulaValue::Number(0.012),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 1, row: 3 },
+        FormulaValue::Number(10.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 3, row: 0 },
+        FormulaValue::String(Cow::Borrowed("Interest Rate")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 0 },
+        FormulaValue::String(Cow::Borrowed("Interest Rate")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 3, row: 1 },
+        FormulaValue::String(Cow::Borrowed(">,005")),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 4, row: 1 },
+        FormulaValue::String(Cow::Borrowed("<=0,01")),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DSUM(A1:B4,\"Bal Now\",D1:E2)"),
+      Some(FormulaValue::Number(14.0))
     );
   }
 

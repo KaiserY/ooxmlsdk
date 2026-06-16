@@ -10,6 +10,7 @@ pub(crate) mod fourier;
 pub mod matrix;
 pub mod numeric;
 pub mod query;
+pub mod radix;
 pub mod special;
 pub mod statistics;
 pub mod text;

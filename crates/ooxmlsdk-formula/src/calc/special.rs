@@ -10,6 +10,14 @@ pub enum SpecialError {
   Div0,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BesselKind {
+  I,
+  J,
+  K,
+  Y,
+}
+
 pub fn gamma(value: f64) -> f64 {
   lo_gamma(value).unwrap_or_else(|_| statrs_gamma::gamma(value))
 }
@@ -767,6 +775,196 @@ pub fn erfc(x: f64) -> f64 {
   libm::erfc(x)
 }
 
+pub fn bessel(kind: BesselKind, x: f64, order: i32) -> f64 {
+  match kind {
+    BesselKind::I => bessel_i(x, order),
+    BesselKind::J => bessel_j(x, order),
+    BesselKind::K => bessel_k(x, order),
+    BesselKind::Y => bessel_y(x, order),
+  }
+}
+
+fn bessel_i(x: f64, order: i32) -> f64 {
+  let max_iteration = 2000;
+  let half = x / 2.0;
+  let mut term = 1.0;
+  for n in 1..=order {
+    term = term / f64::from(n) * half;
+  }
+  let mut result = term;
+  if term != 0.0 {
+    for k in 1..max_iteration {
+      term = term * half / f64::from(k) * half / f64::from(k + order);
+      result += term;
+      if term.abs() <= result.abs() * 1.0e-15 {
+        break;
+      }
+    }
+  }
+  result
+}
+
+fn bessel_j(x: f64, order: i32) -> f64 {
+  if x == 0.0 {
+    return if order == 0 { 1.0 } else { 0.0 };
+  }
+  let sign = if order % 2 == 1 && x < 0.0 { -1.0 } else { 1.0 };
+  let x = x.abs();
+  let max_iteration = 9_000_000.0;
+  let estimate_iteration = x * 1.5 + f64::from(order);
+  let asymptotic_possible = x.powf(0.4) > f64::from(order);
+  if estimate_iteration > max_iteration {
+    if !asymptotic_possible {
+      return f64::NAN;
+    }
+    return sign
+      * (std::f64::consts::FRAC_2_PI / x).sqrt()
+      * (x - f64::from(order) * std::f64::consts::FRAC_PI_2 - std::f64::consts::FRAC_PI_4).cos();
+  }
+
+  let epsilon = 1.0e-15;
+  let mut k;
+  let mut u;
+  let mut m_bar;
+  let mut g_bar;
+  let mut g_bar_delta_u;
+  let mut g = 0.0;
+  let mut delta_u = 0.0;
+  let mut f_bar = -1.0;
+
+  if order == 0 {
+    u = 1.0;
+    g_bar_delta_u = 0.0;
+    g_bar = -2.0 / x;
+    delta_u = g_bar_delta_u / g_bar;
+    u += delta_u;
+    g = -1.0 / g_bar;
+    f_bar *= g;
+    k = 2.0;
+  } else {
+    u = 0.0;
+    k = 1.0;
+    while k <= f64::from(order - 1) {
+      m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
+      g_bar_delta_u = -g * delta_u - m_bar * u;
+      g_bar = m_bar - 2.0 * k / x + g;
+      delta_u = g_bar_delta_u / g_bar;
+      u += delta_u;
+      g = -1.0 / g_bar;
+      f_bar *= g;
+      k += 1.0;
+    }
+    m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
+    g_bar_delta_u = f_bar - g * delta_u - m_bar * u;
+    g_bar = m_bar - 2.0 * k / x + g;
+    delta_u = g_bar_delta_u / g_bar;
+    u += delta_u;
+    g = -1.0 / g_bar;
+    f_bar *= g;
+    k += 1.0;
+  }
+
+  loop {
+    m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
+    g_bar_delta_u = -g * delta_u - m_bar * u;
+    g_bar = m_bar - 2.0 * k / x + g;
+    delta_u = g_bar_delta_u / g_bar;
+    u += delta_u;
+    g = -1.0 / g_bar;
+    f_bar *= g;
+    if delta_u.abs() <= u.abs() * epsilon {
+      return u * sign;
+    }
+    k += 1.0;
+    if k > max_iteration {
+      return f64::NAN;
+    }
+  }
+}
+
+fn bessel_k(x: f64, order: i32) -> f64 {
+  match order {
+    0 => bessel_k0(x),
+    1 => bessel_k1(x),
+    _ => {
+      let factor = 2.0 / x;
+      let mut previous = bessel_k0(x);
+      let mut current = bessel_k1(x);
+      for n in 1..order {
+        let next = previous + f64::from(n) * factor * current;
+        previous = current;
+        current = next;
+      }
+      current
+    }
+  }
+}
+
+fn bessel_k0(x: f64) -> f64 {
+  if x <= 2.0 {
+    let half = x * 0.5;
+    let y = half * half;
+    -half.ln() * bessel_i(x, 0)
+      + (-0.57721566
+        + y
+          * (0.42278420
+            + y
+              * (0.23069756
+                + y * (0.3488590e-1 + y * (0.262698e-2 + y * (0.10750e-3 + y * 0.74e-5))))))
+  } else {
+    let y = 2.0 / x;
+    (-x).exp() / x.sqrt()
+      * (1.25331414
+        + y
+          * (-0.7832358e-1
+            + y
+              * (0.2189568e-1
+                + y * (-0.1062446e-1 + y * (0.587872e-2 + y * (-0.251540e-2 + y * 0.53208e-3))))))
+  }
+}
+
+fn bessel_k1(x: f64) -> f64 {
+  if x <= 2.0 {
+    let half = x * 0.5;
+    let y = half * half;
+    half.ln() * bessel_i(x, 1)
+      + (1.0
+        + y
+          * (0.15443144
+            + y
+              * (-0.67278579
+                + y * (-0.18156897 + y * (-0.1919402e-1 + y * (-0.110404e-2 + y * -0.4686e-4))))))
+        / x
+  } else {
+    let y = 2.0 / x;
+    (-x).exp() / x.sqrt()
+      * (1.25331414
+        + y
+          * (0.23498619
+            + y
+              * (-0.3655620e-1
+                + y * (0.1504268e-1 + y * (-0.780353e-2 + y * (0.325614e-2 + y * -0.68245e-3))))))
+  }
+}
+
+fn bessel_y(x: f64, order: i32) -> f64 {
+  match order {
+    0 => libm::y0(x),
+    1 => libm::y1(x),
+    _ => {
+      let factor = 2.0 / x;
+      let mut previous = libm::y0(x);
+      let mut current = libm::y1(x);
+      for n in 1..order {
+        let next = f64::from(n) * factor * current - previous;
+        previous = current;
+        current = next;
+      }
+      current
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -786,5 +984,13 @@ mod tests {
       lo_iterate_inverse(|_| 1.0, 0.0, 1.0),
       Err(SpecialError::Num)
     );
+  }
+
+  #[test]
+  fn bessel_helpers_match_known_values() {
+    assert!((bessel(BesselKind::I, 1.0, 0) - 1.2660658777520082).abs() < 1.0e-15);
+    assert!((bessel(BesselKind::J, 1.0, 0) - 0.7651976865579666).abs() < 1.0e-15);
+    assert!((bessel(BesselKind::K, 1.0, 0) - 0.4210244382407083).abs() < 1.0e-8);
+    assert!((bessel(BesselKind::Y, 1.0, 0) - 0.088256964215677).abs() < 1.0e-15);
   }
 }

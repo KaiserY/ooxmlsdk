@@ -2,6 +2,16 @@ pub use crate::calc::combinatorics::{gcd_number, lcm_number};
 
 use num_traits::ToPrimitive;
 
+pub fn sign_number(value: f64) -> f64 {
+  if value < 0.0 {
+    -1.0
+  } else if value > 0.0 {
+    1.0
+  } else {
+    0.0
+  }
+}
+
 pub fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   if value == 0.0 || !value.is_finite() {
     return value;

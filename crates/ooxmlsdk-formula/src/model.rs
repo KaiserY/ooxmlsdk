@@ -47,17 +47,20 @@ use crate::calc::numeric::{
   KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
   even_odd, floor_to_i32, floor_to_u32, floor_to_u64, floor_to_usize, kahan_sum,
   normalize_formula_number, round_direction, round_half_away_from_zero, round_to_decimal_places,
-  round_to_significant_digits, trunc_to_u32,
+  round_to_significant_digits, sign_number, trunc_to_u32,
 };
 use crate::calc::query::{
   FindTextError, QueryOp, QuerySearchType, detect_query_search_type, find_byte_text_position,
   find_text_position, lookup_text_contains, may_be_regex, may_be_wildcard, parse_criteria_operator,
   regex_match, wildcard_match,
 };
+use crate::calc::radix::{
+  base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
+};
 use crate::calc::special::{
-  SpecialError, erf, erfc, gamma, lo_beta_dist, lo_beta_dist_pdf, lo_binom_dist_pmf,
-  lo_binom_dist_range, lo_chi_dist, lo_chisq_dist_cdf, lo_chisq_dist_pdf, lo_f_dist_pdf,
-  lo_f_dist_right_tail, lo_gamma_dist, lo_gamma_dist_pdf, lo_gauss, lo_integral_phi,
+  BesselKind, SpecialError, bessel, erf, erfc, gamma, lo_beta_dist, lo_beta_dist_pdf,
+  lo_binom_dist_pmf, lo_binom_dist_range, lo_chi_dist, lo_chisq_dist_cdf, lo_chisq_dist_pdf,
+  lo_f_dist_pdf, lo_f_dist_right_tail, lo_gamma_dist, lo_gamma_dist_pdf, lo_gauss, lo_integral_phi,
   lo_iterate_inverse, lo_phi, lo_poisson_dist, lo_t_dist, log_gamma, norm_s_dist, norm_s_inv,
 };
 use crate::calc::statistics::{
@@ -5761,15 +5764,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let text = self.text(&self.evaluate(args.first()?)?);
     let radix = self.number(&self.evaluate(args.get(1)?)?)?;
     let Some(radix) = trunc_to_u32(radix) else {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
     if !(2..=36).contains(&radix) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    match i128::from_str_radix(text.trim(), radix) {
-      Ok(value) => Some(FormulaValue::Number(value as f64)),
-      Err(_) => Some(FormulaValue::Error(FormulaErrorValue::Num)),
-    }
+    decimal_text_to_number(&text, radix)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(
+        FormulaErrorValue::IllegalArgument,
+      )))
   }
 
   fn evaluate_bit_binary(
@@ -5875,7 +5879,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     radix: &FormulaValue<'doc>,
     min_len: &FormulaValue<'doc>,
   ) -> Option<FormulaValue<'doc>> {
-    // Source: LibreOffice sc/source/core/tool/interpr2.cxx ScInterpreter::ScBase.
     let value = approx_floor(self.number(value)?);
     let radix = approx_floor(self.number(radix)?);
     let min_len_value = approx_floor(self.number(min_len)?);
@@ -5889,11 +5892,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if value < 0.0 || !(2.0..=36.0).contains(&radix) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let radix = floor_to_u32(radix)?;
-    let mut text = format_radix(value as i128, radix)?;
-    if text.len() < min_len {
-      text = format!("{}{}", "0".repeat(min_len - text.len()), text);
-    }
+    let text = base_number_text(value, floor_to_u32(radix)?, min_len)?;
     Some(FormulaValue::String(Cow::Owned(text)))
   }
 
@@ -13296,12 +13295,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if order < 0 || matches!(kind, BesselKind::K | BesselKind::Y) && value <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let result = match kind {
-      BesselKind::I => bessel_i(value, order),
-      BesselKind::J => bessel_j(value, order),
-      BesselKind::K => bessel_k(value, order),
-      BesselKind::Y => bessel_y(value, order),
-    };
+    let result = bessel(kind, value, order);
     if result.is_finite() {
       Some(FormulaValue::Number(result))
     } else {
@@ -16194,14 +16188,6 @@ enum CeilingFloorKind {
   Odff,
   Math,
   Precise,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BesselKind {
-  I,
-  J,
-  K,
-  Y,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19357,197 +19343,6 @@ fn old_networkdays_weekend_mask(
   Some(mask)
 }
 
-fn sign_number(value: f64) -> f64 {
-  if value < 0.0 {
-    -1.0
-  } else if value > 0.0 {
-    1.0
-  } else {
-    0.0
-  }
-}
-
-fn bessel_i(x: f64, order: i32) -> f64 {
-  let max_iteration = 2000;
-  let half = x / 2.0;
-  let mut term = 1.0;
-  for n in 1..=order {
-    term = term / f64::from(n) * half;
-  }
-  let mut result = term;
-  if term != 0.0 {
-    for k in 1..max_iteration {
-      term = term * half / f64::from(k) * half / f64::from(k + order);
-      result += term;
-      if term.abs() <= result.abs() * 1.0e-15 {
-        break;
-      }
-    }
-  }
-  result
-}
-
-fn bessel_j(x: f64, order: i32) -> f64 {
-  if x == 0.0 {
-    return if order == 0 { 1.0 } else { 0.0 };
-  }
-  let sign = if order % 2 == 1 && x < 0.0 { -1.0 } else { 1.0 };
-  let x = x.abs();
-  let max_iteration = 9_000_000.0;
-  let estimate_iteration = x * 1.5 + f64::from(order);
-  let asymptotic_possible = x.powf(0.4) > f64::from(order);
-  if estimate_iteration > max_iteration {
-    if !asymptotic_possible {
-      return f64::NAN;
-    }
-    return sign
-      * (std::f64::consts::FRAC_2_PI / x).sqrt()
-      * (x - f64::from(order) * std::f64::consts::FRAC_PI_2 - std::f64::consts::FRAC_PI_4).cos();
-  }
-
-  let epsilon = 1.0e-15;
-  let mut k;
-  let mut u;
-  let mut m_bar;
-  let mut g_bar;
-  let mut g_bar_delta_u;
-  let mut g = 0.0;
-  let mut delta_u = 0.0;
-  let mut f_bar = -1.0;
-
-  if order == 0 {
-    u = 1.0;
-    g_bar_delta_u = 0.0;
-    g_bar = -2.0 / x;
-    delta_u = g_bar_delta_u / g_bar;
-    u += delta_u;
-    g = -1.0 / g_bar;
-    f_bar *= g;
-    k = 2.0;
-  } else {
-    u = 0.0;
-    k = 1.0;
-    while k <= f64::from(order - 1) {
-      m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
-      g_bar_delta_u = -g * delta_u - m_bar * u;
-      g_bar = m_bar - 2.0 * k / x + g;
-      delta_u = g_bar_delta_u / g_bar;
-      u += delta_u;
-      g = -1.0 / g_bar;
-      f_bar *= g;
-      k += 1.0;
-    }
-    m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
-    g_bar_delta_u = f_bar - g * delta_u - m_bar * u;
-    g_bar = m_bar - 2.0 * k / x + g;
-    delta_u = g_bar_delta_u / g_bar;
-    u += delta_u;
-    g = -1.0 / g_bar;
-    f_bar *= g;
-    k += 1.0;
-  }
-
-  loop {
-    m_bar = 2.0 * (k - 1.0).rem_euclid(2.0) * f_bar;
-    g_bar_delta_u = -g * delta_u - m_bar * u;
-    g_bar = m_bar - 2.0 * k / x + g;
-    delta_u = g_bar_delta_u / g_bar;
-    u += delta_u;
-    g = -1.0 / g_bar;
-    f_bar *= g;
-    if delta_u.abs() <= u.abs() * epsilon {
-      return u * sign;
-    }
-    k += 1.0;
-    if k > max_iteration {
-      return f64::NAN;
-    }
-  }
-}
-
-fn bessel_k(x: f64, order: i32) -> f64 {
-  match order {
-    0 => bessel_k0(x),
-    1 => bessel_k1(x),
-    _ => {
-      let factor = 2.0 / x;
-      let mut previous = bessel_k0(x);
-      let mut current = bessel_k1(x);
-      for n in 1..order {
-        let next = previous + f64::from(n) * factor * current;
-        previous = current;
-        current = next;
-      }
-      current
-    }
-  }
-}
-
-fn bessel_k0(x: f64) -> f64 {
-  if x <= 2.0 {
-    let half = x * 0.5;
-    let y = half * half;
-    -half.ln() * bessel_i(x, 0)
-      + (-0.57721566
-        + y
-          * (0.42278420
-            + y
-              * (0.23069756
-                + y * (0.3488590e-1 + y * (0.262698e-2 + y * (0.10750e-3 + y * 0.74e-5))))))
-  } else {
-    let y = 2.0 / x;
-    (-x).exp() / x.sqrt()
-      * (1.25331414
-        + y
-          * (-0.7832358e-1
-            + y
-              * (0.2189568e-1
-                + y * (-0.1062446e-1 + y * (0.587872e-2 + y * (-0.251540e-2 + y * 0.53208e-3))))))
-  }
-}
-
-fn bessel_k1(x: f64) -> f64 {
-  if x <= 2.0 {
-    let half = x * 0.5;
-    let y = half * half;
-    half.ln() * bessel_i(x, 1)
-      + (1.0
-        + y
-          * (0.15443144
-            + y
-              * (-0.67278579
-                + y * (-0.18156897 + y * (-0.1919402e-1 + y * (-0.110404e-2 + y * -0.4686e-4))))))
-        / x
-  } else {
-    let y = 2.0 / x;
-    (-x).exp() / x.sqrt()
-      * (1.25331414
-        + y
-          * (0.23498619
-            + y
-              * (-0.3655620e-1
-                + y * (0.1504268e-1 + y * (-0.780353e-2 + y * (0.325614e-2 + y * -0.68245e-3))))))
-  }
-}
-
-fn bessel_y(x: f64, order: i32) -> f64 {
-  match order {
-    0 => libm::y0(x),
-    1 => libm::y1(x),
-    _ => {
-      let factor = 2.0 / x;
-      let mut previous = libm::y0(x);
-      let mut current = libm::y1(x);
-      for n in 1..order {
-        let next = f64::from(n) * factor * current - previous;
-        previous = current;
-        current = next;
-      }
-      current
-    }
-  }
-}
-
 fn add_group_separators(value: &str) -> String {
   let (sign, body) = value
     .strip_prefix('-')
@@ -19613,91 +19408,6 @@ fn trim_float_text(value: &str) -> String {
   } else {
     value.to_string()
   }
-}
-
-fn convert_to_decimal(value: &str, base: u32, char_limit: usize) -> Option<f64> {
-  if !(2..=36).contains(&base) {
-    return None;
-  }
-  let value = value.trim();
-  if value.len() > char_limit {
-    return None;
-  }
-  if value.is_empty() {
-    return Some(0.0);
-  }
-  let mut result = 0.0;
-  let mut first_digit = None;
-  for ch in value.chars() {
-    let digit = ch.to_digit(base)?;
-    if first_digit.is_none() {
-      first_digit = Some(digit);
-    }
-    result = result * base as f64 + digit as f64;
-  }
-  if value.len() == char_limit && first_digit.is_some_and(|digit| digit >= base / 2) {
-    result += -(base as f64).powi(char_limit as i32);
-  }
-  Some(result)
-}
-
-fn convert_from_decimal(
-  value: f64,
-  min: f64,
-  max: f64,
-  base: u32,
-  places: Option<i32>,
-  max_places: usize,
-) -> Option<String> {
-  let value = approx_floor(value);
-  if value < approx_floor(min) || value > approx_floor(max) {
-    return None;
-  }
-  if places.is_some_and(|places| places <= 0 || places as usize > max_places) {
-    return None;
-  }
-  let negative = value < 0.0;
-  let mut number = value as i128;
-  if negative {
-    number += (base as i128).pow(max_places as u32);
-  }
-  let mut output = format_radix(number, base)?;
-  if let Some(places) = places {
-    let places = places as usize;
-    if !negative && output.len() > places {
-      return None;
-    }
-    let target = if negative { max_places } else { places };
-    if output.len() < target {
-      let pad = if negative { max_digit_char(base)? } else { '0' };
-      let mut padded = String::with_capacity(target);
-      padded.extend(std::iter::repeat_n(pad, target - output.len()));
-      padded.push_str(&output);
-      output = padded;
-    }
-  }
-  Some(output)
-}
-
-fn format_radix(mut value: i128, base: u32) -> Option<String> {
-  if !(2..=36).contains(&base) || value < 0 {
-    return None;
-  }
-  if value == 0 {
-    return Some("0".to_string());
-  }
-  let mut digits = Vec::new();
-  while value > 0 {
-    let digit = (value % base as i128) as u32;
-    digits.push(char::from_digit(digit, base)?.to_ascii_uppercase());
-    value /= base as i128;
-  }
-  digits.reverse();
-  Some(digits.into_iter().collect())
-}
-
-fn max_digit_char(base: u32) -> Option<char> {
-  char::from_digit(base.checked_sub(1)?, base).map(|ch| ch.to_ascii_uppercase())
 }
 
 fn split_indirect_intersection(formula: &str) -> Option<(&str, &str)> {

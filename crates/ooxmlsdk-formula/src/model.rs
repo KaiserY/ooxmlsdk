@@ -27,6 +27,9 @@ use crate::calc::complex::{
   FormulaComplex, binary_suffix, format_complex_number as format_formula_complex_number,
   parse_complex_number,
 };
+use crate::calc::matrix::{
+  apply_householder, determinant, lup_decompose, lup_solve, qr_decompose, solve_lower, solve_upper,
+};
 use crate::calc::numeric::{
   KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
   even_odd, is_representable_integer, kahan_sum, normalize_formula_number, round_direction,
@@ -10014,7 +10017,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       values.push(out);
     }
-    Some(FormulaValue::Number(matrix_determinant(values)))
+    Some(FormulaValue::Number(determinant(values)))
   }
 
   fn evaluate_minverse(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -10036,14 +10039,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         values[row][column] = number;
       }
     }
-    let Some(permutation) = lup_decompose_like_libreoffice(&mut values) else {
+    let Some(decomposition) = lup_decompose(&mut values) else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
     let mut inverse = vec![vec![0.0; columns]; rows];
     for column in 0..columns {
       let mut rhs = vec![0.0; rows];
       rhs[column] = 1.0;
-      let solution = lup_solve_like_libreoffice(&values, &permutation, &rhs);
+      let Some(solution) = lup_solve(&values, &decomposition, &rhs) else {
+        return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+      };
       for row in 0..rows {
         inverse[row][column] = solution[row];
       }
@@ -19289,194 +19294,6 @@ fn regression_fill_stats<'doc>(
     FormulaValue::Error(FormulaErrorValue::NA)
   };
   result[2][0] = FormulaValue::Number(ss_reg / (ss_reg + ss_resid));
-}
-
-fn qr_decompose(matrix: &mut [Vec<f64>], k: usize, n: usize) -> Option<Vec<f64>> {
-  let mut r_diagonal = vec![0.0; k];
-  for column in 0..k {
-    let scale = (column..n)
-      .map(|row| matrix[row][column].abs())
-      .fold(0.0, f64::max);
-    if scale == 0.0 {
-      return None;
-    }
-    for row_values in matrix.iter_mut().take(n).skip(column) {
-      row_values[column] /= scale;
-    }
-    let euclid = (column..n)
-      .map(|row| matrix[row][column] * matrix[row][column])
-      .sum::<f64>()
-      .sqrt();
-    let factor = 1.0 / euclid / (euclid + matrix[column][column].abs());
-    let sign = if matrix[column][column] >= 0.0 {
-      1.0
-    } else {
-      -1.0
-    };
-    matrix[column][column] += sign * euclid;
-    r_diagonal[column] = -sign * scale * euclid;
-    for c in column + 1..k {
-      let sum = (column..n)
-        .map(|row| matrix[row][column] * matrix[row][c])
-        .sum::<f64>();
-      for row_values in matrix.iter_mut().take(n).skip(column) {
-        row_values[c] -= sum * factor * row_values[column];
-      }
-    }
-  }
-  Some(r_diagonal)
-}
-
-fn apply_householder(matrix: &[Vec<f64>], column: usize, values: &mut [f64], n: usize) {
-  let denominator = (column..n)
-    .map(|row| matrix[row][column] * matrix[row][column])
-    .sum::<f64>();
-  let numerator = (column..n)
-    .map(|row| matrix[row][column] * values[row])
-    .sum::<f64>();
-  let factor = if denominator == 0.0 {
-    0.0
-  } else {
-    2.0 * numerator / denominator
-  };
-  for row in column..n {
-    values[row] -= factor * matrix[row][column];
-  }
-}
-
-fn solve_upper(matrix: &[Vec<f64>], diagonal: &[f64], values: &mut [f64], k: usize) {
-  for row in (0..k).rev() {
-    let mut sum = values[row];
-    for column in row + 1..k {
-      sum -= matrix[row][column] * values[column];
-    }
-    values[row] = sum / diagonal[row];
-  }
-}
-
-fn solve_lower(matrix: &[Vec<f64>], diagonal: &[f64], values: &mut [f64], k: usize) {
-  for row in 0..k {
-    let mut sum = values[row];
-    for column in 0..row {
-      sum -= matrix[column][row] * values[column];
-    }
-    values[row] = sum / diagonal[row];
-  }
-}
-
-fn matrix_determinant(mut matrix: Vec<Vec<f64>>) -> f64 {
-  let n = matrix.len();
-  let mut sign = 1.0;
-  let mut det = 1.0;
-  for pivot in 0..n {
-    let mut best = pivot;
-    for row in pivot + 1..n {
-      if matrix[row][pivot].abs() > matrix[best][pivot].abs() {
-        best = row;
-      }
-    }
-    if matrix[best][pivot] == 0.0 {
-      return 0.0;
-    }
-    if best != pivot {
-      matrix.swap(best, pivot);
-      sign = -sign;
-    }
-    let pivot_value = matrix[pivot][pivot];
-    det *= pivot_value;
-    let (head, tail) = matrix.split_at_mut(pivot + 1);
-    let pivot_row = &head[pivot];
-    for row in tail.iter_mut() {
-      let factor = row[pivot] / pivot_value;
-      row[pivot] = 0.0;
-      for (cell, pivot_cell) in row[pivot + 1..].iter_mut().zip(&pivot_row[pivot + 1..]) {
-        *cell -= factor * pivot_cell;
-      }
-    }
-  }
-  sign * det
-}
-
-fn lup_decompose_like_libreoffice(matrix: &mut [Vec<f64>]) -> Option<Vec<usize>> {
-  // Source: LibreOffice sc/source/core/tool/interpr5.cxx lcl_LUP_decompose.
-  let n = matrix.len();
-  let mut scale = vec![0.0; n];
-  for row in 0..n {
-    let mut max = 0.0;
-    for column in 0..n {
-      let value = matrix[row][column].abs();
-      if max < value {
-        max = value;
-      }
-    }
-    if max == 0.0 {
-      return None;
-    }
-    scale[row] = 1.0 / max;
-  }
-
-  let mut permutation = (0..n).collect::<Vec<_>>();
-  for pivot in 0..n.saturating_sub(1) {
-    let mut max = 0.0;
-    let mut pivot_row = pivot;
-    let pivot_scale = scale[pivot];
-    for row in pivot..n {
-      let value = pivot_scale * matrix[row][pivot].abs();
-      if max < value {
-        max = value;
-        pivot_row = row;
-      }
-    }
-    if max == 0.0 {
-      return None;
-    }
-    if pivot != pivot_row {
-      permutation.swap(pivot, pivot_row);
-      scale.swap(pivot, pivot_row);
-      matrix.swap(pivot, pivot_row);
-    }
-    for row in (pivot + 1)..n {
-      let numerator = matrix[row][pivot];
-      let denominator = matrix[pivot][pivot];
-      matrix[row][pivot] = numerator / denominator;
-      for column in (pivot + 1)..n {
-        matrix[row][column] =
-          (matrix[row][column] * denominator - numerator * matrix[pivot][column]) / denominator;
-      }
-    }
-  }
-
-  if (0..n).any(|index| matrix[index][index] == 0.0) {
-    None
-  } else {
-    Some(permutation)
-  }
-}
-
-fn lup_solve_like_libreoffice(lu: &[Vec<f64>], permutation: &[usize], rhs: &[f64]) -> Vec<f64> {
-  // Source: LibreOffice sc/source/core/tool/interpr5.cxx lcl_LUP_solve.
-  let n = lu.len();
-  let mut x = vec![0.0; n];
-  let mut first_nonzero = None;
-  for row in 0..n {
-    let mut sum = rhs[permutation[row]];
-    if let Some(first) = first_nonzero {
-      for column in first..row {
-        sum -= lu[row][column] * x[column];
-      }
-    } else if sum != 0.0 {
-      first_nonzero = Some(row);
-    }
-    x[row] = sum;
-  }
-  for row in (0..n).rev() {
-    let mut sum = x[row];
-    for column in (row + 1)..n {
-      sum -= lu[row][column] * x[column];
-    }
-    x[row] = sum / lu[row][row];
-  }
-  x
 }
 
 fn lookup_vector<'doc>(

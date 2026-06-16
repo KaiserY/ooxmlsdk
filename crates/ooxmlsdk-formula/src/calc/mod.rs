@@ -5,6 +5,7 @@ use num_complex::Complex;
 pub mod combinatorics;
 pub mod complex;
 pub(crate) mod fourier;
+pub mod matrix;
 pub mod numeric;
 pub mod special;
 pub mod statistics;

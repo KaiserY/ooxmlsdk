@@ -151,6 +151,185 @@ pub fn rightb(text: &str, mut count: usize) -> String {
   chars.into_iter().rev().collect()
 }
 
+pub fn half_width_like_asc(text: &str) -> String {
+  let mut output = String::with_capacity(text.len());
+  for ch in text.chars() {
+    match ch {
+      '\u{2015}' | '\u{30FC}' => output.push('\u{FF70}'),
+      '\u{2018}' => output.push('`'),
+      '\u{2019}' => output.push('\''),
+      '\u{201D}' => output.push('"'),
+      '\u{3001}' => output.push('\u{FF64}'),
+      '\u{3002}' => output.push('\u{FF61}'),
+      '\u{300C}' => output.push('\u{FF62}'),
+      '\u{300D}' => output.push('\u{FF63}'),
+      '\u{309B}' => output.push('\u{FF9E}'),
+      '\u{309C}' => output.push('\u{FF9F}'),
+      '\u{30FB}' => output.push('\u{FF65}'),
+      '\u{FFE5}' => output.push('\\'),
+      '\u{FF01}'..='\u{FF5E}' => {
+        output.push(char::from_u32(ch as u32 - 0xFEE0).unwrap_or(ch));
+      }
+      _ => {
+        if let Some((base, mark)) = decompose_katakana_mark(ch) {
+          output.push(base);
+          output.push(mark);
+        } else {
+          output.push(full_katakana_to_half(ch).unwrap_or(ch));
+        }
+      }
+    }
+  }
+  output
+}
+
+pub fn full_width_like_jis(text: &str) -> String {
+  let mut output = String::with_capacity(text.len());
+  let mut chars = text.chars().peekable();
+  while let Some(ch) = chars.next() {
+    match ch {
+      '!'..='~' => output.push(match ch {
+        '"' => '\u{201D}',
+        '\'' => '\u{2019}',
+        '\\' => '\u{FFE5}',
+        '`' => '\u{2018}',
+        _ => char::from_u32(ch as u32 + 0xFEE0).unwrap_or(ch),
+      }),
+      '\u{FF61}' => output.push('\u{3002}'),
+      '\u{FF62}' => output.push('\u{300C}'),
+      '\u{FF63}' => output.push('\u{300D}'),
+      '\u{FF64}' => output.push('\u{3001}'),
+      '\u{FF65}' => output.push('\u{30FB}'),
+      '\u{FF70}' => output.push('\u{30FC}'),
+      '\u{FF9E}' => output.push('\u{309B}'),
+      '\u{FF9F}' => output.push('\u{309C}'),
+      _ => {
+        if let Some(full) = half_katakana_to_full(ch) {
+          if full == '\u{30A6}' && chars.peek().copied() == Some('\u{FF9E}') {
+            chars.next();
+            output.push(full);
+            output.push('\u{309B}');
+          } else if let Some(composed) = chars
+            .peek()
+            .copied()
+            .and_then(|mark| compose_katakana_mark(full, mark))
+          {
+            chars.next();
+            output.push(composed);
+          } else {
+            output.push(full);
+          }
+        } else {
+          output.push(ch);
+        }
+      }
+    }
+  }
+  output
+}
+
+fn full_katakana_to_half(ch: char) -> Option<char> {
+  let index = FULL_KATAKANA.iter().position(|full| *full == ch)?;
+  Some(HALF_KATAKANA[index])
+}
+
+fn half_katakana_to_full(ch: char) -> Option<char> {
+  let index = HALF_KATAKANA.iter().position(|half| *half == ch)?;
+  Some(FULL_KATAKANA[index])
+}
+
+fn compose_katakana_mark(ch: char, mark: char) -> Option<char> {
+  match mark {
+    '\u{FF9E}' => Some(match ch {
+      '\u{30A6}' => '\u{30F4}',
+      '\u{30AB}' => '\u{30AC}',
+      '\u{30AD}' => '\u{30AE}',
+      '\u{30AF}' => '\u{30B0}',
+      '\u{30B1}' => '\u{30B2}',
+      '\u{30B3}' => '\u{30B4}',
+      '\u{30B5}' => '\u{30B6}',
+      '\u{30B7}' => '\u{30B8}',
+      '\u{30B9}' => '\u{30BA}',
+      '\u{30BB}' => '\u{30BC}',
+      '\u{30BD}' => '\u{30BE}',
+      '\u{30BF}' => '\u{30C0}',
+      '\u{30C1}' => '\u{30C2}',
+      '\u{30C4}' => '\u{30C5}',
+      '\u{30C6}' => '\u{30C7}',
+      '\u{30C8}' => '\u{30C9}',
+      '\u{30CF}' => '\u{30D0}',
+      '\u{30D2}' => '\u{30D3}',
+      '\u{30D5}' => '\u{30D6}',
+      '\u{30D8}' => '\u{30D9}',
+      '\u{30DB}' => '\u{30DC}',
+      _ => return None,
+    }),
+    '\u{FF9F}' => Some(match ch {
+      '\u{30CF}' => '\u{30D1}',
+      '\u{30D2}' => '\u{30D4}',
+      '\u{30D5}' => '\u{30D7}',
+      '\u{30D8}' => '\u{30DA}',
+      '\u{30DB}' => '\u{30DD}',
+      _ => return None,
+    }),
+    _ => None,
+  }
+}
+
+fn decompose_katakana_mark(ch: char) -> Option<(char, char)> {
+  Some(match ch {
+    '\u{30F4}' => ('\u{FF73}', '\u{FF9E}'),
+    '\u{30AC}' => ('\u{FF76}', '\u{FF9E}'),
+    '\u{30AE}' => ('\u{FF77}', '\u{FF9E}'),
+    '\u{30B0}' => ('\u{FF78}', '\u{FF9E}'),
+    '\u{30B2}' => ('\u{FF79}', '\u{FF9E}'),
+    '\u{30B4}' => ('\u{FF7A}', '\u{FF9E}'),
+    '\u{30B6}' => ('\u{FF7B}', '\u{FF9E}'),
+    '\u{30B8}' => ('\u{FF7C}', '\u{FF9E}'),
+    '\u{30BA}' => ('\u{FF7D}', '\u{FF9E}'),
+    '\u{30BC}' => ('\u{FF7E}', '\u{FF9E}'),
+    '\u{30BE}' => ('\u{FF7F}', '\u{FF9E}'),
+    '\u{30C0}' => ('\u{FF80}', '\u{FF9E}'),
+    '\u{30C2}' => ('\u{FF81}', '\u{FF9E}'),
+    '\u{30C5}' => ('\u{FF82}', '\u{FF9E}'),
+    '\u{30C7}' => ('\u{FF83}', '\u{FF9E}'),
+    '\u{30C9}' => ('\u{FF84}', '\u{FF9E}'),
+    '\u{30D0}' => ('\u{FF8A}', '\u{FF9E}'),
+    '\u{30D3}' => ('\u{FF8B}', '\u{FF9E}'),
+    '\u{30D6}' => ('\u{FF8C}', '\u{FF9E}'),
+    '\u{30D9}' => ('\u{FF8D}', '\u{FF9E}'),
+    '\u{30DC}' => ('\u{FF8E}', '\u{FF9E}'),
+    '\u{30D1}' => ('\u{FF8A}', '\u{FF9F}'),
+    '\u{30D4}' => ('\u{FF8B}', '\u{FF9F}'),
+    '\u{30D7}' => ('\u{FF8C}', '\u{FF9F}'),
+    '\u{30DA}' => ('\u{FF8D}', '\u{FF9F}'),
+    '\u{30DD}' => ('\u{FF8E}', '\u{FF9F}'),
+    _ => return None,
+  })
+}
+
+const FULL_KATAKANA: [char; 58] = [
+  '\u{30A1}', '\u{30A2}', '\u{30A3}', '\u{30A4}', '\u{30A5}', '\u{30A6}', '\u{30A7}', '\u{30A8}',
+  '\u{30A9}', '\u{30AA}', '\u{30AB}', '\u{30AD}', '\u{30AF}', '\u{30B1}', '\u{30B3}', '\u{30B5}',
+  '\u{30B7}', '\u{30B9}', '\u{30BB}', '\u{30BD}', '\u{30BF}', '\u{30C1}', '\u{30C3}', '\u{30C4}',
+  '\u{30C6}', '\u{30C8}', '\u{30CA}', '\u{30CB}', '\u{30CC}', '\u{30CD}', '\u{30CE}', '\u{30CF}',
+  '\u{30D2}', '\u{30D5}', '\u{30D8}', '\u{30DB}', '\u{30DE}', '\u{30DF}', '\u{30E0}', '\u{30E1}',
+  '\u{30E2}', '\u{30E3}', '\u{30E4}', '\u{30E5}', '\u{30E6}', '\u{30E7}', '\u{30E8}', '\u{30E9}',
+  '\u{30EA}', '\u{30EB}', '\u{30EC}', '\u{30ED}', '\u{30EF}', '\u{30F2}', '\u{30F3}', '\u{30FB}',
+  '\u{30FC}', '\u{309B}',
+];
+
+const HALF_KATAKANA: [char; 58] = [
+  '\u{FF67}', '\u{FF71}', '\u{FF68}', '\u{FF72}', '\u{FF69}', '\u{FF73}', '\u{FF6A}', '\u{FF74}',
+  '\u{FF6B}', '\u{FF75}', '\u{FF76}', '\u{FF77}', '\u{FF78}', '\u{FF79}', '\u{FF7A}', '\u{FF7B}',
+  '\u{FF7C}', '\u{FF7D}', '\u{FF7E}', '\u{FF7F}', '\u{FF80}', '\u{FF81}', '\u{FF6F}', '\u{FF82}',
+  '\u{FF83}', '\u{FF84}', '\u{FF85}', '\u{FF86}', '\u{FF87}', '\u{FF88}', '\u{FF89}', '\u{FF8A}',
+  '\u{FF8B}', '\u{FF8C}', '\u{FF8D}', '\u{FF8E}', '\u{FF8F}', '\u{FF90}', '\u{FF91}', '\u{FF92}',
+  '\u{FF93}', '\u{FF6C}', '\u{FF94}', '\u{FF6D}', '\u{FF95}', '\u{FF6E}', '\u{FF96}', '\u{FF97}',
+  '\u{FF98}', '\u{FF99}', '\u{FF9A}', '\u{FF9B}', '\u{FF9C}', '\u{FF66}', '\u{FF9D}', '\u{FF65}',
+  '\u{FF70}', '\u{FF9E}',
+];
+
 pub fn baht_text(value: f64) -> String {
   const TH_ZERO: &str = "ศูนย์";
   const TH_BAHT: &str = "บาท";
@@ -316,6 +495,13 @@ mod tests {
     assert_eq!(leftb("AあB", 3), "Aあ");
     assert_eq!(rightb("AあB", 2), " B");
     assert_eq!(rightb("AあB", 3), "あB");
+  }
+
+  #[test]
+  fn asc_and_jis_convert_width_and_katakana_marks() {
+    assert_eq!(half_width_like_asc("ＡＢＣ￥。ガパ"), "ABC\\｡ｶﾞﾊﾟ");
+    assert_eq!(full_width_like_jis("ABC\\｡ｶﾞﾊﾟ"), "ＡＢＣ￥。ガパ");
+    assert_eq!(full_width_like_jis("ｳﾞ"), "ウ゛");
   }
 
   #[test]

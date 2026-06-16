@@ -4636,17 +4636,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         )))
       }
       "TRUNC" => self.evaluate_trunc(args),
-      "MOD" => {
-        let number = self.number(&self.evaluate(args.first()?)?)?;
-        let divisor = self.number(&self.evaluate(args.get(1)?)?)?;
-        if divisor == 0.0 {
-          Some(FormulaValue::Error(FormulaErrorValue::Div0))
-        } else {
-          Some(FormulaValue::Number(
-            number - divisor * approx_floor(number / divisor),
-          ))
-        }
-      }
+      "MOD" => self.evaluate_mod(args),
       "EVEN" => Some(FormulaValue::Number(even_odd(
         match self.number_arg(args, 0) {
           Some(value) => value,
@@ -4951,9 +4941,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         self.text(&self.evaluate(args.first()?)?) == self.text(&self.evaluate(args.get(1)?)?),
       )),
       "FIND" => self.evaluate_find(args, true),
-      "FINDB" => self.evaluate_findb(args),
+      "FINDB" => self.evaluate_findb(args, true),
       "SEARCH" => self.evaluate_find(args, false),
-      "SEARCHB" => self.evaluate_findb(args),
+      "SEARCHB" => self.evaluate_findb(args, false),
       "REPT" => {
         let text = self.text(&self.evaluate(args.first()?)?);
         let count = self.number(&self.evaluate(args.get(1)?)?)?;
@@ -6343,6 +6333,52 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     )))
   }
 
+  fn evaluate_mod(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.len() != 2 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    }
+    let number = self.evaluate(args.first()?)?;
+    let divisor = self.evaluate(args.get(1)?)?;
+    if self.array_context
+      && (matches!(
+        number,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ) || matches!(
+        divisor,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ))
+    {
+      return self.map_binary_values(number, divisor, |evaluator, number, divisor| {
+        Some(evaluator.mod_value(number, divisor))
+      });
+    }
+    Some(self.mod_value(&number, &divisor))
+  }
+
+  fn mod_value(
+    &self,
+    number: &FormulaValue<'doc>,
+    divisor: &FormulaValue<'doc>,
+  ) -> FormulaValue<'doc> {
+    let Some(number) = self.number(number) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
+    };
+    let Some(divisor) = self.number(divisor) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
+    };
+    if divisor == 0.0 {
+      return FormulaValue::Error(FormulaErrorValue::Div0);
+    }
+    let result = approx_sub(number, approx_floor(number / divisor) * divisor);
+    if (divisor > 0.0 && result >= 0.0 && result < divisor)
+      || (divisor < 0.0 && result <= 0.0 && result > divisor)
+    {
+      FormulaValue::Number(result)
+    } else {
+      FormulaValue::Error(FormulaErrorValue::Value)
+    }
+  }
+
   fn evaluate_trunc(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     if !(1..=2).contains(&args.len()) || is_missing_argument(args.first()?) {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
@@ -6453,55 +6489,83 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     let needle = self.text(&needle_value);
-    let haystack = self.text(&haystack_value);
     let start = args
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or(1.0) as usize;
+    if self.array_context
+      && (matches!(
+        needle_value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ) || matches!(
+        haystack_value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ))
+    {
+      return self.map_find_values(needle_value, haystack_value, start, case_sensitive, false);
+    }
+    Some(self.find_text_value(&needle, &haystack_value, start, case_sensitive))
+  }
+
+  fn find_text_value(
+    &self,
+    needle: &str,
+    haystack_value: &FormulaValue<'doc>,
+    start: usize,
+    case_sensitive: bool,
+  ) -> FormulaValue<'doc> {
+    let haystack = self.text(haystack_value);
     if start == 0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      return FormulaValue::Error(FormulaErrorValue::Value);
     }
     let skip = start - 1;
     let haystack_tail = haystack.chars().skip(skip).collect::<String>();
     if !case_sensitive {
-      match detect_query_search_type(self.book.formula_search_type, &needle) {
+      match detect_query_search_type(self.book.formula_search_type, needle) {
         QuerySearchType::Regex => {
-          let regex = RegexBuilder::new(&needle).case_insensitive(true).build();
+          let regex = RegexBuilder::new(needle).case_insensitive(true).build();
           return match regex.ok().and_then(|regex| regex.find(&haystack_tail)) {
-            Some(match_) => Some(FormulaValue::Number(
+            Some(match_) => FormulaValue::Number(
               (skip + haystack_tail[..match_.start()].chars().count() + 1) as f64,
-            )),
-            None => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+            ),
+            None => FormulaValue::Error(FormulaErrorValue::Value),
           };
         }
         QuerySearchType::Wildcard => {
-          let pattern = wildcard_search_regex_pattern(&needle);
+          let pattern = wildcard_search_regex_pattern(needle);
           let regex = RegexBuilder::new(&pattern).case_insensitive(true).build();
           return match regex.ok().and_then(|regex| regex.find(&haystack_tail)) {
-            Some(match_) => Some(FormulaValue::Number(
+            Some(match_) => FormulaValue::Number(
               (skip + haystack_tail[..match_.start()].chars().count() + 1) as f64,
-            )),
-            None => Some(FormulaValue::Error(FormulaErrorValue::Value)),
+            ),
+            None => FormulaValue::Error(FormulaErrorValue::Value),
           };
         }
         QuerySearchType::Normal => {}
       }
     }
-    let (haystack_search, needle_search) = if case_sensitive {
-      (haystack_tail, needle)
+    let (haystack_search, needle_search): (Cow<'_, str>, Cow<'_, str>) = if case_sensitive {
+      (Cow::Owned(haystack_tail), Cow::Borrowed(needle))
     } else {
-      (haystack_tail.to_lowercase(), needle.to_lowercase())
+      (
+        Cow::Owned(haystack_tail.to_lowercase()),
+        Cow::Owned(needle.to_lowercase()),
+      )
     };
     haystack_search
-      .find(&needle_search)
+      .find(needle_search.as_ref())
       .map(|offset| {
         FormulaValue::Number((skip + haystack_search[..offset].chars().count() + 1) as f64)
       })
-      .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value))
   }
 
-  fn evaluate_findb(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_findb(
+    &self,
+    args: &[FormulaAst<'doc>],
+    case_sensitive: bool,
+  ) -> Option<FormulaValue<'doc>> {
     if args.len() < 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
@@ -6518,16 +6582,107 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or(1.0) as usize;
+    if self.array_context
+      && (matches!(
+        needle_value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ) || matches!(
+        haystack_value,
+        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+      ))
+    {
+      return self.map_find_values(needle_value, haystack_value, start, case_sensitive, true);
+    }
+    Some(self.findb_text_value(
+      &needle,
+      &FormulaValue::String(Cow::Owned(haystack)),
+      start,
+      case_sensitive,
+    ))
+  }
+
+  fn findb_text_value(
+    &self,
+    needle: &str,
+    haystack_value: &FormulaValue<'doc>,
+    start: usize,
+    case_sensitive: bool,
+  ) -> FormulaValue<'doc> {
+    let haystack = self.text(haystack_value);
     let haystack_len = text_byte_len(&haystack);
-    let needle_len = text_byte_len(&needle);
-    if start == 0 || start > haystack_len.saturating_sub(needle_len) + 1 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    if start == 0 {
+      return FormulaValue::Error(FormulaErrorValue::Value);
+    }
+    if start - 1 >= haystack_len {
+      return FormulaValue::Error(FormulaErrorValue::NA);
     }
     let tail = rightb(&haystack, haystack_len - start + 1);
-    tail
-      .find(&needle)
-      .map(|offset| FormulaValue::Number((start + text_byte_len(&tail[..offset])) as f64))
-      .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
+    if case_sensitive {
+      return tail
+        .find(needle)
+        .map(|offset| FormulaValue::Number((start + text_byte_len(&tail[..offset])) as f64))
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    match detect_query_search_type(self.book.formula_search_type, needle) {
+      QuerySearchType::Regex => RegexBuilder::new(needle).case_insensitive(true).build(),
+      QuerySearchType::Wildcard => RegexBuilder::new(&wildcard_search_regex_pattern(needle))
+        .case_insensitive(true)
+        .build(),
+      QuerySearchType::Normal => RegexBuilder::new(&regex::escape(needle))
+        .case_insensitive(true)
+        .build(),
+    }
+    .ok()
+    .and_then(|regex| regex.find(&tail))
+    .map(|match_| FormulaValue::Number((start + text_byte_len(&tail[..match_.start()])) as f64))
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value))
+  }
+
+  fn map_find_values(
+    &self,
+    needle_value: FormulaValue<'doc>,
+    haystack_value: FormulaValue<'doc>,
+    start: usize,
+    case_sensitive: bool,
+    bytes: bool,
+  ) -> Option<FormulaValue<'doc>> {
+    let needles = self.matrix_values(&needle_value);
+    let haystacks = self.matrix_values(&haystack_value);
+    let (needle_rows, needle_columns) = matrix_dimensions(&needles);
+    let (haystack_rows, haystack_columns) = matrix_dimensions(&haystacks);
+    if needle_rows == 0 || needle_columns == 0 || haystack_rows == 0 || haystack_columns == 0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let rows = needle_rows.max(haystack_rows);
+    let columns = needle_columns.max(haystack_columns);
+    if !matrix_can_broadcast(needle_rows, needle_columns, rows, columns)
+      || !matrix_can_broadcast(haystack_rows, haystack_columns, rows, columns)
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let mut result = Vec::with_capacity(rows);
+    for row in 0..rows {
+      let mut result_row = Vec::with_capacity(columns);
+      for column in 0..columns {
+        let needle_row = if needle_rows == 1 { 0 } else { row };
+        let needle_column = if needle_columns == 1 { 0 } else { column };
+        let haystack_row = if haystack_rows == 1 { 0 } else { row };
+        let haystack_column = if haystack_columns == 1 { 0 } else { column };
+        let needle = needles.get(needle_row)?.get(needle_column)?;
+        let haystack = haystacks.get(haystack_row)?.get(haystack_column)?;
+        let needle_text = self.text(needle);
+        result_row.push(if bytes {
+          self.findb_text_value(&needle_text, haystack, start, case_sensitive)
+        } else {
+          self.find_text_value(&needle_text, haystack, start, case_sensitive)
+        });
+      }
+      result.push(result_row);
+    }
+    if rows == 1 && columns == 1 {
+      return result.into_iter().next()?.into_iter().next();
+    }
+    Some(FormulaValue::Matrix(result))
   }
 
   fn evaluate_substitute(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -7048,11 +7203,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         _ => self.compare(&selector, &candidate, FormulaOperator::Equal),
       };
       if matches {
-        return self.evaluate(&pair[1]);
+        return Some(self.scalar_value(self.evaluate(&pair[1])?));
       }
     }
     if args.len().is_multiple_of(2) {
-      self.evaluate(args.last()?)
+      Some(self.scalar_value(self.evaluate(args.last()?)?))
     } else {
       Some(FormulaValue::Error(FormulaErrorValue::NA))
     }
@@ -7873,7 +8028,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let query = param.entries.first()?;
     let (search_vector, index_map) = lookup_search_vector_omitting_errors(&data_vector);
     let search_slice = search_vector.as_deref().unwrap_or(&data_vector);
-    let Some(search_index) = lookup_binary_search(self, search_slice, query, &param, true, false)
+    let Some(search_index) =
+      lookup_binary_search(self, search_slice, query, &param, true, false, false)
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::NA));
     };
@@ -7882,15 +8038,47 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|indices| indices.get(search_index).copied())
       .unwrap_or(search_index);
 
+    if let Some(FormulaValue::Reference(reference)) = result.as_ref() {
+      let start_row = reference.range.start.row.min(reference.range.end.row);
+      let end_row = reference.range.start.row.max(reference.range.end.row);
+      let start_column = reference.range.start.column.min(reference.range.end.column);
+      let end_column = reference.range.start.column.max(reference.range.end.column);
+      if start_row != end_row && start_column != end_column {
+        return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+      }
+      let address = if start_row != end_row {
+        let row = start_row.saturating_add(index as u32);
+        if row > XLSX_MAX_ROW_ZERO_BASED {
+          return Some(FormulaValue::Number(0.0));
+        }
+        CellAddress {
+          column: start_column,
+          row,
+        }
+      } else {
+        let column = start_column.saturating_add(index as u32);
+        if column > XLSX_MAX_COLUMN_ZERO_BASED {
+          return Some(FormulaValue::Number(0.0));
+        }
+        CellAddress {
+          column,
+          row: start_row,
+        }
+      };
+      return Some(self.book.cell_value(self.range_sheet(reference), address));
+    }
+
     if let Some(result_matrix) = result_matrix {
       let rows = result_matrix.len();
       let columns = result_matrix.first().map_or(0, Vec::len);
       if rows == 1 && columns == 1 {
+        if index != 0 {
+          return Some(FormulaValue::Error(FormulaErrorValue::NA));
+        }
         return result_matrix
           .first()
           .and_then(|row| row.first())
           .cloned()
-          .map(lookup_result_value)
           .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
       }
       if rows > 1 && columns > 1 {
@@ -7901,7 +8089,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return result_vector
         .get(index)
         .cloned()
-        .map(lookup_result_value)
         .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
     }
 
@@ -7910,14 +8097,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .get(index)
         .and_then(|row| row.last())
         .cloned()
-        .map(lookup_result_value)
         .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
     } else {
       data_matrix
         .last()
         .and_then(|row| row.get(index))
         .cloned()
-        .map(lookup_result_value)
         .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
     }
   }
@@ -7926,42 +8111,58 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(2..=3).contains(&args.len()) {
       return None;
     }
-    let lookup = self.scalar_value(self.evaluate(args.first()?)?);
+    let lookup = self.first_value(&self.evaluate(args.first()?)?);
     let data = self.evaluate(args.get(1)?)?;
-    let matrix = self.matrix_values(&data);
-    let (vector, _) = lookup_vector(&matrix)?;
+    let (vector, index_map, data_vertical) = match &data {
+      FormulaValue::Reference(reference) => self.lookup_reference_vector(reference)?,
+      _ => {
+        let matrix = self.matrix_values(&data);
+        let (vector, data_vertical) = lookup_vector(&matrix)?;
+        (vector, None, data_vertical)
+      }
+    };
     let mode = args
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
       .unwrap_or(1.0) as i32;
-    let index = match mode {
-      0 => search_vector(
-        self,
-        &lookup,
-        &vector,
-        QueryOp::Equal,
-        LookupSearchMode::Forward,
-        true,
-      ),
-      1 => search_vector(
-        self,
-        &lookup,
-        &vector,
-        QueryOp::LessOrEqual,
-        LookupSearchMode::BinaryAscending,
-        false,
-      ),
-      -1 => search_vector(
-        self,
-        &lookup,
-        &vector,
-        QueryOp::GreaterOrEqual,
-        LookupSearchMode::BinaryDescending,
-        false,
-      ),
-      _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+    let index = if index_map.is_some() && !data_vertical && matches!(mode, 1 | -1) {
+      match_range_linear_index(self, &lookup, &vector, mode)
+    } else {
+      match mode {
+        0 => search_vector(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::Equal,
+          LookupSearchMode::Forward,
+          true,
+        ),
+        1 => search_vector(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::LessOrEqual,
+          LookupSearchMode::BinaryAscending,
+          false,
+        ),
+        -1 => search_vector(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::GreaterOrEqual,
+          LookupSearchMode::BinaryDescending,
+          false,
+        ),
+        _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+      }
     };
+    let index = index.map(|index| {
+      index_map
+        .as_ref()
+        .and_then(|indices| indices.get(index).copied())
+        .unwrap_or(index)
+    });
     index
       .map(|index| FormulaValue::Number(index as f64 + 1.0))
       .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
@@ -7972,7 +8173,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let lookup = self.scalar_value(self.evaluate(args.first()?)?);
-    let data = self.evaluate(args.get(1)?)?;
+    let data = self.with_array_context().evaluate(args.get(1)?)?;
     let matrix = self.matrix_values(&data);
     let (vector, _) = lookup_vector(&matrix)?;
     let match_mode = args
@@ -8141,7 +8342,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if sorted {
       query.op = QueryOp::LessOrEqual;
     }
-    let param = QueryParam::single(query, search_type, true).with_range_lookup(sorted);
+    let param = QueryParam::single(query, search_type, self.book.formula_match_whole_cell)
+      .with_range_lookup(sorted);
     let query = param.entries.first()?;
     let mut found = None;
     for row in start_row..=end_row {
@@ -8272,7 +8474,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       ),
       -1 => search_vector_with_type(
         self,
@@ -8281,7 +8483,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -8301,7 +8503,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -9229,6 +9431,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             row
               .get(index)
               .map(display_text_from_value)
+              .map(|text| text.to_lowercase())
               .unwrap_or_default()
           })
           .collect::<Vec<_>>()
@@ -9236,6 +9439,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         data[index]
           .iter()
           .map(display_text_from_value)
+          .map(|text| text.to_lowercase())
           .collect::<Vec<_>>()
       };
       if let Some(existing) = keys.iter().position(|item| *item == key) {
@@ -9785,7 +9989,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if rows == 0 || rows != columns || matrix.iter().any(|row| row.len() != columns) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let mut values = vec![vec![0.0; columns * 2]; rows];
+    let mut values = vec![vec![0.0; columns]; rows];
     for row in 0..rows {
       for column in 0..columns {
         let Some(number) = matrix_stat_number(&matrix[row][column]) else {
@@ -9793,52 +9997,23 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         };
         values[row][column] = number;
       }
-      values[row][columns + row] = 1.0;
     }
-    for pivot in 0..rows {
-      let mut pivot_row = pivot;
-      for row in (pivot + 1)..rows {
-        if values[row][pivot].abs() > values[pivot_row][pivot].abs() {
-          pivot_row = row;
-        }
-      }
-      if values[pivot_row][pivot].abs() < f64::EPSILON {
-        return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
-      }
-      if pivot_row != pivot {
-        values.swap(pivot, pivot_row);
-      }
-      let pivot_value = values[pivot][pivot];
-      for value in values[pivot].iter_mut().take(columns * 2) {
-        *value /= pivot_value;
-      }
-      let pivot_values = values[pivot].clone();
-      for (row, row_values) in values.iter_mut().enumerate().take(rows) {
-        if row == pivot {
-          continue;
-        }
-        let factor = row_values[pivot];
-        if factor == 0.0 {
-          continue;
-        }
-        for (value, pivot_value) in row_values
-          .iter_mut()
-          .zip(pivot_values.iter())
-          .take(columns * 2)
-        {
-          *value -= factor * pivot_value;
-        }
+    let Some(permutation) = lup_decompose_like_libreoffice(&mut values) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    };
+    let mut inverse = vec![vec![0.0; columns]; rows];
+    for column in 0..columns {
+      let mut rhs = vec![0.0; rows];
+      rhs[column] = 1.0;
+      let solution = lup_solve_like_libreoffice(&values, &permutation, &rhs);
+      for row in 0..rows {
+        inverse[row][column] = solution[row];
       }
     }
     Some(FormulaValue::Matrix(
-      values
+      inverse
         .into_iter()
-        .map(|row| {
-          row[columns..]
-            .iter()
-            .map(|value| FormulaValue::Number(*value))
-            .collect()
-        })
+        .map(|row| row.into_iter().map(FormulaValue::Number).collect())
         .collect(),
     ))
   }
@@ -9883,17 +10058,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_mina(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    self
+    let array_evaluator = self.with_array_context();
+    array_evaluator
       .values(args)
-      .map(|value| self.number(&value).unwrap_or(0.0))
+      .map(|value| array_evaluator.number(&value).unwrap_or(0.0))
       .reduce(f64::min)
       .map(FormulaValue::Number)
   }
 
   fn evaluate_maxa(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    self
+    let array_evaluator = self.with_array_context();
+    array_evaluator
       .values(args)
-      .map(|value| self.number(&value).unwrap_or(0.0))
+      .map(|value| array_evaluator.number(&value).unwrap_or(0.0))
       .reduce(f64::max)
       .map(FormulaValue::Number)
   }
@@ -11852,7 +12029,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let values = self.numeric_args(args);
     let n = values.len();
     if n < 4 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
     }
     let mean = values.iter().sum::<f64>() / n as f64;
     let mut second = 0.0;
@@ -12544,7 +12721,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_intercept(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    regression_scalar_state(self, args).map(|state| {
+    if args.len() != 2 {
+      return None;
+    }
+    let y_value = self.evaluate(args.first()?)?;
+    let x_value = self.evaluate(args.get(1)?)?;
+    if matrix_dimensions(&self.matrix_values(&y_value))
+      != matrix_dimensions(&self.matrix_values(&x_value))
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    regression_scalar_state_for_values(self, &y_value, &x_value).map(|state| {
       if state.x_sum_sq == 0.0 {
         FormulaValue::Error(FormulaErrorValue::Div0)
       } else {
@@ -12558,12 +12745,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let x = self.number(&self.evaluate(args.first()?)?)?;
-    regression_scalar_state_for_values(
-      self,
-      &self.evaluate(args.get(1)?)?,
-      &self.evaluate(args.get(2)?)?,
-    )
-    .map(|state| {
+    let y_value = self.evaluate(args.get(1)?)?;
+    let x_value = self.evaluate(args.get(2)?)?;
+    if matrix_dimensions(&self.matrix_values(&y_value))
+      != matrix_dimensions(&self.matrix_values(&x_value))
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    regression_scalar_state_for_values(self, &y_value, &x_value).map(|state| {
       if state.x_sum_sq == 0.0 {
         FormulaValue::Error(FormulaErrorValue::Div0)
       } else {
@@ -15403,6 +15592,64 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
   }
 
+  fn lookup_reference_vector(
+    &self,
+    reference: &QualifiedRange<'doc>,
+  ) -> Option<(Vec<FormulaValue<'doc>>, Option<Vec<usize>>, bool)> {
+    let sheet = self.range_sheet(reference);
+    let original_start_row = reference.range.start.row.min(reference.range.end.row);
+    let original_end_row = reference.range.start.row.max(reference.range.end.row);
+    let original_start_column = reference.range.start.column.min(reference.range.end.column);
+    let original_end_column = reference.range.start.column.max(reference.range.end.column);
+    let rows = original_end_row - original_start_row + 1;
+    let columns = original_end_column - original_start_column + 1;
+    if rows > 1 && columns > 1 {
+      return None;
+    }
+    let range = if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+      self.book.data_area_subrange(sheet, reference.range)?
+    } else {
+      reference.range
+    };
+    let start_row = range.start.row.min(range.end.row);
+    let end_row = range.start.row.max(range.end.row);
+    let start_column = range.start.column.min(range.end.column);
+    let end_column = range.start.column.max(range.end.column);
+    let vertical = rows >= columns;
+    let mut values = Vec::new();
+    let mut indices = Vec::new();
+    if vertical {
+      for row in start_row..=end_row {
+        let value = self.book.cell_value(
+          sheet,
+          CellAddress {
+            column: start_column,
+            row,
+          },
+        );
+        if !matches!(value, FormulaValue::Blank) {
+          values.push(value);
+          indices.push((row - original_start_row) as usize);
+        }
+      }
+    } else {
+      for column in start_column..=end_column {
+        let value = self.book.cell_value(
+          sheet,
+          CellAddress {
+            column,
+            row: start_row,
+          },
+        );
+        if !matches!(value, FormulaValue::Blank) {
+          values.push(value);
+          indices.push((column - original_start_column) as usize);
+        }
+      }
+    }
+    Some((values, Some(indices), vertical))
+  }
+
   fn query_grid_from_ast(&self, ast: &FormulaAst<'doc>) -> Option<QueryGrid<'doc>> {
     let value = self.evaluate(ast)?;
     Some(match value {
@@ -15622,7 +15869,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       ),
       -1 => search_vector_with_type(
         self,
@@ -15631,7 +15878,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -15651,7 +15898,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       )
       .or_else(|| {
         search_vector_with_type(
@@ -17467,6 +17714,7 @@ fn lookup_text_contains(text: &str, pattern: &str) -> bool {
 struct SearchVectorFlags {
   exact_type: bool,
   match_empty: bool,
+  first_exact: bool,
 }
 
 impl SearchVectorFlags {
@@ -17474,7 +17722,13 @@ impl SearchVectorFlags {
     Self {
       exact_type,
       match_empty,
+      first_exact: false,
     }
+  }
+
+  fn with_first_exact(mut self) -> Self {
+    self.first_exact = true;
+    self
   }
 }
 
@@ -17500,6 +17754,66 @@ fn search_vector<'doc>(
     search_type,
     SearchVectorFlags::new(exact_type, false),
   )
+}
+
+fn match_range_linear_index<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  lookup: &FormulaValue<'doc>,
+  vector: &[FormulaValue<'doc>],
+  mode: i32,
+) -> Option<usize> {
+  // Source: LibreOffice sc/source/core/data/queryiter.cxx
+  // ScQueryCellIterator::FindEqualOrSortedLastInRange for horizontal MATCH
+  // ranges.  Horizontal document ranges use the direct iterator path, not the
+  // matrix binary search path.
+  let op = match mode {
+    1 => QueryOp::LessOrEqual,
+    -1 => QueryOp::GreaterOrEqual,
+    _ => return None,
+  };
+  let query = QueryEntry {
+    op,
+    field: 0,
+    item: QueryItem {
+      kind: query_value_kind(lookup),
+      value: lookup.clone(),
+      source_text: None,
+      match_empty: false,
+      empty_matches_text: false,
+    },
+  };
+  let param = QueryParam::single(query, QuerySearchType::Normal, true).with_range_lookup(true);
+  let query = param.entries.first()?;
+  let mut found = None;
+  let mut first_string_ignore = matches!(lookup, FormulaValue::String(_));
+  for (index, candidate) in vector.iter().enumerate() {
+    let exact = lookup_types_compatible(evaluator, lookup, candidate)
+      && evaluator.compare(candidate, lookup, FormulaOperator::Equal);
+    let valid = query_matches(evaluator, &param, query, candidate, false);
+    if valid {
+      found = Some(index);
+      if exact {
+        let mut last_equal = index;
+        for (next_index, next) in vector.iter().enumerate().skip(index + 1) {
+          if lookup_types_compatible(evaluator, lookup, next)
+            && evaluator.compare(next, lookup, FormulaOperator::Equal)
+          {
+            last_equal = next_index;
+          } else {
+            break;
+          }
+        }
+        return Some(last_equal);
+      }
+    } else if first_string_ignore && matches!(candidate, FormulaValue::String(_)) {
+      first_string_ignore = false;
+      continue;
+    } else {
+      break;
+    }
+    first_string_ignore = false;
+  }
+  found.filter(|index| lookup_candidate_type_matches(query, &vector[*index]))
 }
 
 fn search_vector_with_type<'doc>(
@@ -17537,6 +17851,7 @@ fn search_vector_with_type<'doc>(
         &param,
         matches!(mode, LookupSearchMode::BinaryAscending),
         true,
+        flags.first_exact,
       )
     }
     LookupSearchMode::Forward => {
@@ -17629,6 +17944,7 @@ fn lookup_binary_search<'doc>(
   param: &QueryParam<'doc>,
   sorted_ascending: bool,
   empty_is_less: bool,
+  first_exact: bool,
 ) -> Option<usize> {
   if vector.is_empty() {
     return None;
@@ -17659,8 +17975,15 @@ fn lookup_binary_search<'doc>(
     }
   }
   if let Some(mut index) = exact {
-    while index + 1 < vector.len() && lookup_same_match_value(&vector[index], &vector[index + 1]) {
-      index += 1;
+    if first_exact && sorted_ascending {
+      while index > 0 && lookup_same_match_value(&vector[index], &vector[index - 1]) {
+        index -= 1;
+      }
+    } else {
+      while index + 1 < vector.len() && lookup_same_match_value(&vector[index], &vector[index + 1])
+      {
+        index += 1;
+      }
     }
     return lookup_binary_result_index(vector, query, index);
   }
@@ -18918,6 +19241,88 @@ fn matrix_determinant(mut matrix: Vec<Vec<f64>>) -> f64 {
   sign * det
 }
 
+fn lup_decompose_like_libreoffice(matrix: &mut [Vec<f64>]) -> Option<Vec<usize>> {
+  // Source: LibreOffice sc/source/core/tool/interpr5.cxx lcl_LUP_decompose.
+  let n = matrix.len();
+  let mut scale = vec![0.0; n];
+  for row in 0..n {
+    let mut max = 0.0;
+    for column in 0..n {
+      let value = matrix[row][column].abs();
+      if max < value {
+        max = value;
+      }
+    }
+    if max == 0.0 {
+      return None;
+    }
+    scale[row] = 1.0 / max;
+  }
+
+  let mut permutation = (0..n).collect::<Vec<_>>();
+  for pivot in 0..n.saturating_sub(1) {
+    let mut max = 0.0;
+    let mut pivot_row = pivot;
+    let pivot_scale = scale[pivot];
+    for row in pivot..n {
+      let value = pivot_scale * matrix[row][pivot].abs();
+      if max < value {
+        max = value;
+        pivot_row = row;
+      }
+    }
+    if max == 0.0 {
+      return None;
+    }
+    if pivot != pivot_row {
+      permutation.swap(pivot, pivot_row);
+      scale.swap(pivot, pivot_row);
+      matrix.swap(pivot, pivot_row);
+    }
+    for row in (pivot + 1)..n {
+      let numerator = matrix[row][pivot];
+      let denominator = matrix[pivot][pivot];
+      matrix[row][pivot] = numerator / denominator;
+      for column in (pivot + 1)..n {
+        matrix[row][column] =
+          (matrix[row][column] * denominator - numerator * matrix[pivot][column]) / denominator;
+      }
+    }
+  }
+
+  if (0..n).any(|index| matrix[index][index] == 0.0) {
+    None
+  } else {
+    Some(permutation)
+  }
+}
+
+fn lup_solve_like_libreoffice(lu: &[Vec<f64>], permutation: &[usize], rhs: &[f64]) -> Vec<f64> {
+  // Source: LibreOffice sc/source/core/tool/interpr5.cxx lcl_LUP_solve.
+  let n = lu.len();
+  let mut x = vec![0.0; n];
+  let mut first_nonzero = None;
+  for row in 0..n {
+    let mut sum = rhs[permutation[row]];
+    if let Some(first) = first_nonzero {
+      for column in first..row {
+        sum -= lu[row][column] * x[column];
+      }
+    } else if sum != 0.0 {
+      first_nonzero = Some(row);
+    }
+    x[row] = sum;
+  }
+  for row in (0..n).rev() {
+    let mut sum = x[row];
+    for column in (row + 1)..n {
+      sum -= lu[row][column] * x[column];
+    }
+    x[row] = sum / lu[row][row];
+  }
+  x
+}
+
 fn lookup_vector<'doc>(
   matrix: &[Vec<FormulaValue<'doc>>],
 ) -> Option<(Vec<FormulaValue<'doc>>, bool)> {
@@ -18946,13 +19351,6 @@ fn lookup_vector_with_orientation<'doc>(
     matrix.first()?.clone()
   };
   Some(values)
-}
-
-fn lookup_result_value(value: FormulaValue<'_>) -> FormulaValue<'_> {
-  match value {
-    FormulaValue::Blank => FormulaValue::Number(0.0),
-    value => value,
-  }
 }
 
 fn lookup_search_vector_omitting_errors<'doc>(
@@ -19625,7 +20023,11 @@ fn full_width_like_jis(text: &str) -> String {
       '\u{FF9F}' => output.push('\u{309C}'),
       _ => {
         if let Some(full) = half_katakana_to_full(ch) {
-          if let Some(composed) = chars
+          if full == '\u{30A6}' && chars.peek().copied() == Some('\u{FF9E}') {
+            chars.next();
+            output.push(full);
+            output.push('\u{309B}');
+          } else if let Some(composed) = chars
             .peek()
             .copied()
             .and_then(|mark| compose_katakana_mark(full, mark))
@@ -19792,6 +20194,34 @@ fn sign_number(value: f64) -> f64 {
 }
 
 fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
+  if value == 0.0 || !value.is_finite() {
+    return value;
+  }
+  const LO_ROUND_SIG_DIGITS: i32 = 12;
+  if digits < LO_ROUND_SIG_DIGITS && value.fract() != 0.0 {
+    let temp = value.abs().log10().floor() as i32 + 1 - LO_ROUND_SIG_DIGITS;
+    let scale = 10_f64.powi(temp.abs());
+    let mut scaled_to_significant = if temp < 0 {
+      value * scale
+    } else {
+      value / scale
+    };
+    if scaled_to_significant.is_finite() {
+      if away_from_zero {
+        scaled_to_significant = approx_floor(scaled_to_significant);
+      }
+      let rounded = round_direction_basic(scaled_to_significant, digits + temp, away_from_zero);
+      return if temp < 0 {
+        rounded / scale
+      } else {
+        rounded * scale
+      };
+    }
+  }
+  round_direction_basic(value, digits, away_from_zero)
+}
+
+fn round_direction_basic(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   if value == 0.0 || !value.is_finite() {
     return value;
   }
@@ -20125,7 +20555,9 @@ fn weeks_mode_one_index(serial: i32, date_system: DateSystem) -> Option<i64> {
   // Source: LibreOffice ScaDateAddIn::getDiffWeeks:
   // floor((serial + NullDate - 1) / 7.0), with NullDate in DateToDays units.
   let null_date_days = match date_system {
-    DateSystem::Date1900 | DateSystem::LibreOffice => date_to_days(1899, 12, 30)?,
+    DateSystem::Date1900 => date_to_days(1899, 12, 31)?,
+    DateSystem::LibreOffice if serial < 0 => date_to_days(1899, 12, 31)?,
+    DateSystem::LibreOffice => date_to_days(1899, 12, 30)?,
     DateSystem::Date1904 => date_to_days(1904, 1, 1)?,
   };
   Some((i64::from(serial) + null_date_days - 1).div_euclid(7))

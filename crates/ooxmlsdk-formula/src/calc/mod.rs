@@ -11,6 +11,7 @@ pub mod matrix;
 pub mod numeric;
 pub mod special;
 pub mod statistics;
+pub mod text;
 pub mod units;
 
 #[derive(Default)]

@@ -37,6 +37,9 @@ use crate::calc::special::{
   lo_f_dist_right_tail, lo_gamma_dist, lo_gamma_dist_pdf, lo_gauss, lo_integral_phi,
   lo_iterate_inverse, lo_phi, lo_poisson_dist, lo_t_dist, log_gamma, norm_s_dist, norm_s_inv,
 };
+use crate::calc::statistics::{
+  PercentileKind, kth_value, mean, mode_ms_values, mode_slice, percentile_sorted, variance_slice,
+};
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
   FormulaValue, QualifiedAddress, QualifiedRange, Result, SheetId, SheetName,
@@ -16504,12 +16507,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PercentileKind {
-  Inc,
-  Exc,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum EtsKind {
   Add,
   Mult,
@@ -19849,119 +19846,6 @@ fn aggregate_counta_scalar(
     _ => *count += 1,
   }
   Ok(())
-}
-
-fn mean(values: &[f64]) -> Option<f64> {
-  (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
-}
-
-fn variance_slice(values: &[f64], sample: bool) -> Option<f64> {
-  if values.is_empty() || (sample && values.len() < 2) {
-    return None;
-  }
-  let mean = kahan_sum(values.iter().copied()) / values.len() as f64;
-  let sum = values
-    .iter()
-    .map(|value| {
-      let delta = approx_sub(*value, mean);
-      delta * delta
-    })
-    .sum::<f64>();
-  Some(
-    sum
-      / if sample {
-        values.len() - 1
-      } else {
-        values.len()
-      } as f64,
-  )
-}
-
-fn percentile_sorted(values: &mut [f64], k: f64, kind: PercentileKind) -> Option<f64> {
-  if values.is_empty() {
-    return None;
-  }
-  values.sort_by(f64::total_cmp);
-  let count = values.len() as f64;
-  let rank = match kind {
-    PercentileKind::Inc => 1.0 + k * (count - 1.0),
-    PercentileKind::Exc => k * (count + 1.0),
-  };
-  if rank < 1.0 || rank > count {
-    return None;
-  }
-  let lower = rank.floor();
-  let upper = rank.ceil();
-  let lower_value = values[(lower as usize).saturating_sub(1)];
-  if lower == upper {
-    return Some(lower_value);
-  }
-  let upper_value = values[(upper as usize).saturating_sub(1)];
-  Some(lower_value + (rank - lower) * (upper_value - lower_value))
-}
-
-fn mode_slice(values: &[f64]) -> Option<f64> {
-  let mut values = values.to_vec();
-  values.sort_by(f64::total_cmp);
-  let mut best_value = None;
-  let mut best_count = 1usize;
-  let mut current_value = None;
-  let mut current_count = 0usize;
-  for value in values {
-    if current_value == Some(value) {
-      current_count += 1;
-    } else {
-      current_value = Some(value);
-      current_count = 1;
-    }
-    if current_count > best_count {
-      best_count = current_count;
-      best_value = current_value;
-    }
-  }
-  best_value
-}
-
-fn mode_ms_values(values: &[f64]) -> Option<Vec<f64>> {
-  let mut counts: Vec<(f64, usize)> = Vec::new();
-  for value in values {
-    if let Some((_, count)) = counts
-      .iter_mut()
-      .find(|(candidate, _)| *candidate == *value)
-    {
-      *count += 1;
-    } else {
-      counts.push((*value, 1));
-    }
-  }
-  let max_count = counts.iter().map(|(_, count)| *count).max().unwrap_or(0);
-  if max_count <= 1 {
-    return None;
-  }
-  let mut modes = Vec::new();
-  for value in values {
-    if modes.iter().any(|mode| mode == value) {
-      continue;
-    }
-    if counts
-      .iter()
-      .any(|(candidate, count)| *candidate == *value && *count == max_count)
-    {
-      modes.push(*value);
-    }
-  }
-  Some(modes)
-}
-
-fn kth_value(mut values: Vec<f64>, k: f64, descending: bool) -> Option<f64> {
-  if k < 1.0 || values.is_empty() {
-    return None;
-  }
-  values.sort_by(f64::total_cmp);
-  if descending {
-    values.reverse();
-  }
-  values.get(k as usize - 1).copied()
 }
 
 fn permutationa_value<'doc>(count: f64, chosen: f64) -> FormulaValue<'doc> {

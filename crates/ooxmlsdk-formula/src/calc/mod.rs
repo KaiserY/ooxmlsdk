@@ -7,6 +7,7 @@ pub mod complex;
 pub(crate) mod fourier;
 pub mod numeric;
 pub mod special;
+pub mod statistics;
 
 #[derive(Default)]
 pub(crate) struct CalcEngine {

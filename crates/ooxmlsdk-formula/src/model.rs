@@ -1909,8 +1909,8 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         .and_then(|row| row.first())
         .cloned();
     }
-    if is_formula_error_literal(clean) {
-      return Some(FormulaValue::Error(error_value(clean)));
+    if let Some(error) = crate::parser::formula_error_value(clean) {
+      return Some(FormulaValue::Error(formula_error_from_lex(error)));
     }
     if clean
       .get(..6)
@@ -19414,79 +19414,84 @@ fn formula_value_from_cached_text(value: &str) -> FormulaValue<'static> {
 }
 
 fn parse_array_constant_formula<'doc>(formula: &str) -> Option<Vec<Vec<FormulaValue<'doc>>>> {
-  let inner = formula.trim().strip_prefix('{')?.strip_suffix('}')?;
-  Some(
-    inner
-      .split(';')
+  crate::parser::parse_array_constant(formula).map(|array| {
+    array
+      .rows
+      .into_iter()
       .map(|row| {
         row
-          .split(',')
-          .map(|item| {
-            let item = item.trim();
-            if item.is_empty() {
-              FormulaValue::Blank
-            } else if item.starts_with('#') {
-              FormulaValue::Error(error_value(item))
-            } else if item.eq_ignore_ascii_case("TRUE") {
-              FormulaValue::Boolean(true)
-            } else if item.eq_ignore_ascii_case("FALSE") {
-              FormulaValue::Boolean(false)
-            } else if let Ok(number) = item.parse::<f64>() {
-              FormulaValue::Number(number)
-            } else {
-              FormulaValue::String(Cow::Owned(item.trim_matches('"').to_string()))
-            }
-          })
+          .into_iter()
+          .map(formula_value_from_array_constant)
           .collect()
       })
-      .collect(),
-  )
+      .collect()
+  })
+}
+
+fn formula_value_from_array_constant<'doc>(
+  value: crate::parser::ArrayConstantValue<'_>,
+) -> FormulaValue<'doc> {
+  match value {
+    crate::parser::ArrayConstantValue::Blank => FormulaValue::Blank,
+    crate::parser::ArrayConstantValue::Number(value) => FormulaValue::Number(value),
+    crate::parser::ArrayConstantValue::Boolean(value) => FormulaValue::Boolean(value),
+    crate::parser::ArrayConstantValue::Error(value) => {
+      FormulaValue::Error(formula_error_from_lex(value))
+    }
+    crate::parser::ArrayConstantValue::Text(value) => match value {
+      crate::parser::TextLiteral::Borrowed(value) => FormulaValue::String(Cow::Owned(value.into())),
+      crate::parser::TextLiteral::Owned(value) => FormulaValue::String(Cow::Owned(value)),
+    },
+    crate::parser::ArrayConstantValue::Raw(value) => {
+      FormulaValue::String(Cow::Owned(value.trim_matches('"').to_string()))
+    }
+  }
 }
 
 fn parse_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRange<'doc>> {
-  if token.contains(':') {
-    return token
-      .split_once(':')
-      .and_then(|(left, right)| {
-        let left = QualifiedAddress::parse_a1(sheet, left).ok()?;
-        let right = QualifiedAddress::parse_a1(sheet, right).ok()?;
-        extend_qualified_range(
-          &QualifiedRange {
-            sheet,
-            sheet_name: left.sheet_name,
-            range: CellRange {
-              start: left.cell,
-              end: left.cell,
-            },
-            start_flags: left.flags,
-            end_flags: left.flags,
-          },
-          &QualifiedRange {
-            sheet,
-            sheet_name: right.sheet_name,
-            range: CellRange {
-              start: right.cell,
-              end: right.cell,
-            },
-            start_flags: right.flags,
-            end_flags: right.flags,
-          },
-        )
-      })
-      .or_else(|| QualifiedRange::parse_a1(sheet, token).ok());
+  match crate::parser::reference_parts(token)? {
+    crate::parser::ReferenceParts::Range { start, end } => {
+      let start = span_text(token, start);
+      let end = span_text(token, end);
+      parse_formula_range_from_addresses(sheet, start, end)
+        .or_else(|| QualifiedRange::parse_a1(sheet, token).ok())
+    }
+    crate::parser::ReferenceParts::Single(span) => {
+      let value = span_text(token, span);
+      QualifiedAddress::parse_a1(sheet, value)
+        .ok()
+        .map(|address| qualified_range_from_address(sheet, address))
+    }
   }
-  QualifiedAddress::parse_a1(sheet, token)
-    .ok()
-    .map(|address| QualifiedRange {
-      sheet,
-      sheet_name: address.sheet_name,
-      range: CellRange {
-        start: address.cell,
-        end: address.cell,
-      },
-      start_flags: address.flags,
-      end_flags: address.flags,
-    })
+}
+
+fn parse_formula_range_from_addresses<'doc>(
+  sheet: SheetId,
+  start: &str,
+  end: &str,
+) -> Option<QualifiedRange<'doc>> {
+  let start = QualifiedAddress::parse_a1(sheet, start).ok()?;
+  let end = QualifiedAddress::parse_a1(sheet, end).ok()?;
+  extend_qualified_range(
+    &qualified_range_from_address(sheet, start),
+    &qualified_range_from_address(sheet, end),
+  )
+}
+
+fn qualified_range_from_address<'doc>(
+  sheet: SheetId,
+  address: QualifiedAddress<'doc>,
+) -> QualifiedRange<'doc> {
+  QualifiedRange {
+    sheet,
+    sheet_name: address.sheet_name,
+    range: CellRange {
+      start: address.cell,
+      end: address.cell,
+    },
+    start_flags: address.flags,
+    end_flags: address.flags,
+  }
 }
 
 fn index_matrix<'doc>(
@@ -19786,35 +19791,6 @@ fn compatible_range_sheet_name<'doc>(
   }
 }
 
-fn is_formula_error_literal(value: &str) -> bool {
-  formula_error_literals().contains(&value)
-}
-
-fn formula_error_literals() -> &'static [&'static str] {
-  &[
-    "#GETTING_DATA",
-    "#getting_data",
-    "#DIV/0!",
-    "#VALUE!",
-    "#NULL!",
-    "#NULL",
-    "#REF!",
-    "#NAME?",
-    "#NUM!",
-    "#SPILL!",
-    "#CALC!",
-    "Err:502",
-    "Err:504",
-    "Err:508",
-    "Err:511",
-    "#ERR502!",
-    "#ERR508!",
-    "#ERR504!",
-    "#ERR511!",
-    "#N/A",
-  ]
-}
-
 fn qualified_range<'doc>(sheet: SheetId, reference: &str) -> Option<QualifiedRange<'doc>> {
   QualifiedRange::parse_a1(sheet, reference).ok()
 }
@@ -19827,25 +19803,9 @@ fn error_text(value: &FormulaValue<'_>) -> Option<&'static str> {
 }
 
 fn error_value(value: &str) -> FormulaErrorValue {
-  if value == "#getting_data" {
-    return FormulaErrorValue::Unknown;
-  }
-  match value.to_ascii_uppercase().as_str() {
-    "#NULL" | "#NULL!" => FormulaErrorValue::Null,
-    "#DIV/0!" => FormulaErrorValue::Div0,
-    "#VALUE!" => FormulaErrorValue::Value,
-    "#REF!" => FormulaErrorValue::Ref,
-    "#NAME?" => FormulaErrorValue::Name,
-    "#NUM!" => FormulaErrorValue::Num,
-    "#N/A" => FormulaErrorValue::NA,
-    "#GETTING_DATA" => FormulaErrorValue::GettingData,
-    "#SPILL!" => FormulaErrorValue::Spill,
-    "#CALC!" => FormulaErrorValue::Calc,
-    "ERR:502" => FormulaErrorValue::IllegalArgument,
-    "ERR:511" | "#ERR511!" => FormulaErrorValue::Parameter,
-    "ERR:504" | "ERR:508" | "#ERR502!" | "#ERR508!" | "#ERR504!" => FormulaErrorValue::Unknown,
-    _ => FormulaErrorValue::Unknown,
-  }
+  crate::parser::formula_error_value(value)
+    .map(formula_error_from_lex)
+    .unwrap_or(FormulaErrorValue::Unknown)
 }
 
 fn logical_value(value: &FormulaValue<'_>) -> Option<bool> {

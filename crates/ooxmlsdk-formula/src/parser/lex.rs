@@ -141,6 +141,10 @@ impl<'a> FormulaCursor<'a> {
     self.source
   }
 
+  pub(crate) fn index(&self) -> usize {
+    self.index
+  }
+
   pub(crate) fn set_index(&mut self, index: usize) -> bool {
     if self.source.get(index..).is_some() {
       self.index = index;
@@ -296,6 +300,12 @@ pub(crate) fn formula_text_literal(source: &str, start: usize) -> Option<TextLit
   })
 }
 
+pub(crate) fn formula_error_value(source: &str) -> Option<LexErrorValue> {
+  let mut input = source;
+  let value = formula_error.parse_next(&mut input).ok()?;
+  input.is_empty().then_some(value)
+}
+
 fn formula_body_start_parser(input: &mut &str) -> WinnowResult<usize> {
   let start_len = input.len();
   let _ = opt(literal("=")).parse_next(input)?;
@@ -308,7 +318,7 @@ fn formula_token_kind(input: &mut &str) -> WinnowResult<LexTokenKind> {
     '"' => formula_text.value(LexTokenKind::Text),
     '0'..='9' => formula_number.map(LexTokenKind::Number),
     '.' => formula_dot_prefixed_number.map(LexTokenKind::Number),
-    '#' | 'E' => formula_error_or_word,
+    '#' | 'E' | 'e' => formula_error_or_word,
     '<' => formula_comparison_operator,
     '>' => formula_comparison_operator,
     '+' => '+'.value(LexTokenKind::Operator(LexOperator::Add)),
@@ -403,8 +413,19 @@ fn formula_dot_prefixed_number(input: &mut &str) -> WinnowResult<f64> {
 }
 
 fn formula_error(input: &mut &str) -> WinnowResult<LexErrorValue> {
+  if input.starts_with("#getting_data") {
+    *input = &input["#getting_data".len()..];
+    return Ok(LexErrorValue::Unknown);
+  }
   for (literal_value, error) in formula_error_literals() {
-    if input.starts_with(literal_value) {
+    let matches = if literal_value.starts_with("Err:") {
+      input
+        .get(..literal_value.len())
+        .is_some_and(|value| value.eq_ignore_ascii_case(literal_value))
+    } else {
+      input.starts_with(literal_value)
+    };
+    if matches {
       *input = &input[literal_value.len()..];
       return Ok(*error);
     }
@@ -561,7 +582,6 @@ fn consume_one_char(input: &mut &str) {
 fn formula_error_literals() -> &'static [(&'static str, LexErrorValue)] {
   &[
     ("#GETTING_DATA", LexErrorValue::GettingData),
-    ("#getting_data", LexErrorValue::Unknown),
     ("#DIV/0!", LexErrorValue::Div0),
     ("#VALUE!", LexErrorValue::Value),
     ("#NULL!", LexErrorValue::Null),

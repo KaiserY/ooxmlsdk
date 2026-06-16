@@ -746,6 +746,8 @@ impl<'doc> WorkbookValueModel<'doc> {
       .map_err(|error| FormulaError::Package(error.to_string()))?
       .clone();
     let shared_strings = shared_strings(document, &workbook_part)?;
+    let metadata = workbook_metadata(document, &workbook_part)?;
+    let styles = workbook_styles(document, &workbook_part)?;
     let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
 
     let identity = workbook_identity(&workbook).into_owned();
@@ -758,13 +760,19 @@ impl<'doc> WorkbookValueModel<'doc> {
           .find(|part| part.relationship_id() == identity.relationship_id.as_deref())
           .and_then(|part| part.root_element(document).ok())
           .cloned();
-        worksheet_value_model(identity, worksheet.as_ref(), &shared_strings)
-          .map(WorksheetValueModel::into_owned)
+        worksheet_value_model(
+          identity,
+          worksheet.as_ref(),
+          &shared_strings,
+          &metadata,
+          &styles,
+        )
+        .map(WorksheetValueModel::into_owned)
       })
       .collect::<Result<Vec<_>>>()?;
     resolve_shared_formula_dependents(&mut sheets);
     mark_formula_recalc_state(&mut sheets);
-    let defined_names: Vec<DefinedName<'doc>> = defined_names(&workbook)
+    let defined_names: Vec<DefinedName<'doc>> = defined_names(&workbook, &identity)
       .into_iter()
       .map(DefinedName::into_owned)
       .collect();
@@ -776,7 +784,7 @@ impl<'doc> WorkbookValueModel<'doc> {
     Ok(Self {
       calculation_settings: calculation_settings(&workbook),
       calc_chain: calc_chain(document, &workbook_part)?,
-      external_references: external_references(&workbook)
+      external_references: external_references(document, &workbook_part, &workbook)?
         .into_iter()
         .map(ExternalReference::into_owned)
         .collect(),
@@ -1217,10 +1225,14 @@ impl<'doc> WorkbookValueModel<'doc> {
             current_value: None,
           };
           match context.evaluate(ast) {
-            Some(value)
-              if formula.reference.is_some() || !matches!(value, FormulaValue::Reference(_)) =>
-            {
-              let value = value.into_owned();
+            Some(value) => {
+              let value = if formula.reference.is_some() {
+                value.into_owned()
+              } else {
+                book
+                  .final_formula_value(sheet_id, Some(address), value)
+                  .into_owned()
+              };
               if let Some(range) = formula.reference
                 && let Some(items) = array_formula_result_items(&context, sheet_id, range, &value)
               {
@@ -1318,6 +1330,10 @@ impl<'doc> WorkbookValueModel<'doc> {
       .as_ref()
       .and_then(|formula| formula.number_format_context.as_ref())
       .and_then(|context| context.format_id);
+    let number_format_context = record
+      .formula
+      .as_ref()
+      .and_then(|formula| formula.number_format_context.clone());
     if let Some(formula) = record.formula.as_mut() {
       formula.evaluated_value = Some(value.clone());
       formula.formula_state = FormulaState::Clean;
@@ -1325,7 +1341,10 @@ impl<'doc> WorkbookValueModel<'doc> {
       record.raw_value = value.clone();
     }
     record.display_value = Some(DisplayValue {
-      text: Cow::Owned(display_text_from_value(&value)),
+      text: Cow::Owned(
+        display_text_from_value_with_number_format(&value, number_format_context.as_ref())
+          .unwrap_or_else(|| display_text_from_value(&value)),
+      ),
       source_value: value,
       number_format_id,
       stale: false,
@@ -2894,6 +2913,8 @@ fn worksheet_value_model<'doc>(
   identity: &WorksheetIdentity<'doc>,
   worksheet: Option<&'doc x::Worksheet>,
   shared_strings: &[String],
+  metadata: &WorkbookMetadata,
+  styles: &WorkbookStyles,
 ) -> Result<WorksheetValueModel<'doc>> {
   let mut cells = BTreeMap::new();
   if let Some(worksheet) = worksheet {
@@ -2916,11 +2937,12 @@ fn worksheet_value_model<'doc>(
           });
         cells.insert(
           address,
-          cell_value_record(identity.id, address, cell, shared_strings)?,
+          cell_value_record(identity.id, address, cell, shared_strings, metadata, styles)?,
         );
       }
     }
   }
+  expand_data_table_formulas(identity.id, &mut cells);
 
   Ok(WorksheetValueModel {
     id: identity.id,
@@ -2929,13 +2951,135 @@ fn worksheet_value_model<'doc>(
   })
 }
 
+fn expand_data_table_formulas<'doc>(
+  sheet: SheetId,
+  cells: &mut BTreeMap<CellAddress, CellValueRecord<'doc>>,
+) {
+  let anchors = cells
+    .values()
+    .filter_map(|record| {
+      let formula = record.formula.as_ref()?;
+      (formula.formula_kind == FormulaKind::DataTable).then_some(formula.clone())
+    })
+    .collect::<Vec<_>>();
+  for anchor in anchors {
+    let Some(range) = anchor.reference else {
+      continue;
+    };
+    for row in range.start.row..=range.end.row {
+      for column in range.start.column..=range.end.column {
+        let address = CellAddress { column, row };
+        let Some(record) = cells.get_mut(&address) else {
+          continue;
+        };
+        let formula_text = data_table_formula_text(address, range, &anchor);
+        let parsed_formula = parse_formula(
+          sheet,
+          Cow::Owned(formula_text.clone()),
+          FormulaGrammar::ExcelA1,
+        );
+        let raw_value = record.raw_value.clone();
+        record.formula = Some(FormulaCell {
+          address,
+          formula_kind: FormulaKind::DataTable,
+          formula_text: Cow::Owned(formula_text),
+          reference: Some(range),
+          input1: anchor.input1.clone(),
+          input2: anchor.input2.clone(),
+          data_table_row: anchor.data_table_row,
+          data_table2d: anchor.data_table2d,
+          input1_deleted: anchor.input1_deleted,
+          input2_deleted: anchor.input2_deleted,
+          assigns_value_to_name: anchor.assigns_value_to_name,
+          parsed_formula: Some(parsed_formula),
+          cached_value: Some(raw_value).filter(|value| !matches!(value, FormulaValue::Blank)),
+          evaluated_value: None,
+          formula_state: FormulaState::CachedOnly,
+          number_format_context: anchor.number_format_context.clone(),
+          dirty: anchor.dirty,
+          volatile: anchor.volatile,
+        });
+      }
+    }
+  }
+}
+
+fn data_table_formula_text<'doc>(
+  address: CellAddress,
+  range: CellRange,
+  formula: &FormulaCell<'doc>,
+) -> String {
+  let row_input = formula.input1.as_ref().map(|range| range_text(range.range));
+  let column_input = formula.input2.as_ref().map(|range| range_text(range.range));
+  if formula.data_table2d {
+    return format!(
+      "TABLE({},{},{},{})",
+      address_text(CellAddress {
+        column: range.start.column.saturating_sub(1),
+        row: address.row,
+      }),
+      column_input.unwrap_or_default(),
+      row_input.unwrap_or_default(),
+      address_text(CellAddress {
+        column: address.column,
+        row: range.start.row.saturating_sub(1),
+      })
+    );
+  }
+  let varying_input = if formula.data_table_row {
+    address_text(CellAddress {
+      column: address.column,
+      row: range.start.row.saturating_sub(1),
+    })
+  } else {
+    address_text(CellAddress {
+      column: range.start.column.saturating_sub(1),
+      row: address.row,
+    })
+  };
+  format!("TABLE({},{})", varying_input, row_input.unwrap_or_default())
+}
+
+fn range_text(range: CellRange) -> String {
+  let start = address_text(range.start);
+  let end = address_text(range.end);
+  if start == end {
+    start
+  } else {
+    format!("{start}:{end}")
+  }
+}
+
+fn address_text(address: CellAddress) -> String {
+  format!(
+    "{}{}",
+    column_index_to_name(address.column),
+    address.row.saturating_add(1)
+  )
+}
+
 fn cell_value_record<'doc>(
   sheet: SheetId,
   address: CellAddress,
   cell: &'doc x::Cell,
   shared_strings: &[String],
+  metadata: &WorkbookMetadata,
+  styles: &WorkbookStyles,
 ) -> Result<CellValueRecord<'doc>> {
-  let raw_value = cell_value(cell, shared_strings);
+  let mut raw_value = cell_value(cell, shared_strings);
+  if metadata.is_dynamic_array_spill(cell, &raw_value) {
+    raw_value = FormulaValue::Error(FormulaErrorValue::Spill);
+  }
+  let number_format_context = cell
+    .style_index
+    .and_then(|index| styles.number_format_context(index))
+    .or_else(|| {
+      cell.style_index.map(|index| NumberFormatContext {
+        format_id: Some(index),
+        format_code: None,
+        locale: None,
+      })
+    });
   let dirty = cell.cell_formula.as_ref().is_some_and(|formula| {
     formula.calculate_cell.is_some_and(|value| value.as_bool())
       || formula
@@ -2983,19 +3127,20 @@ fn cell_value_record<'doc>(
       } else {
         FormulaState::CachedOnly
       },
-      number_format_context: cell.style_index.map(|index| NumberFormatContext {
-        format_id: Some(index),
-        format_code: None,
-        locale: None,
-      }),
+      number_format_context: number_format_context.clone(),
       dirty,
       volatile,
     }
   });
+  let display_text =
+    display_text_from_value_with_number_format(&raw_value, number_format_context.as_ref())
+      .unwrap_or_else(|| cell_display_text(cell, shared_strings));
   let display_value = Some(DisplayValue {
-    text: Cow::Owned(cell_display_text(cell, shared_strings)),
+    text: Cow::Owned(display_text),
     source_value: raw_value.clone(),
-    number_format_id: cell.style_index,
+    number_format_id: number_format_context
+      .as_ref()
+      .and_then(|context| context.format_id),
     stale: formula
       .as_ref()
       .is_some_and(|formula| formula.formula_state == FormulaState::Stale),
@@ -3093,6 +3238,132 @@ fn shared_strings(
       .map(shared_string_item_text)
       .collect(),
   )
+}
+
+#[derive(Clone, Debug, Default)]
+struct WorkbookMetadata {
+  dynamic_array_cell_metadata: BTreeSet<u32>,
+}
+
+impl WorkbookMetadata {
+  fn is_dynamic_array_spill(&self, cell: &x::Cell, value: &FormulaValue<'_>) -> bool {
+    matches!(value, FormulaValue::Error(FormulaErrorValue::Value))
+      && cell.value_meta_index.is_some()
+      && cell
+        .cell_meta_index
+        .is_some_and(|index| self.dynamic_array_cell_metadata.contains(&index))
+  }
+}
+
+fn workbook_metadata(
+  document: &mut SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+) -> Result<WorkbookMetadata> {
+  let Some(metadata_part) = workbook_part.cell_metadata_part(document) else {
+    return Ok(WorkbookMetadata::default());
+  };
+  let metadata = metadata_part
+    .root_element(document)
+    .map_err(|error| FormulaError::Package(error.to_string()))?;
+  let dynamic_array_type_indices = metadata
+    .metadata_types
+    .as_ref()
+    .map(|types| {
+      types
+        .metadata_type
+        .iter()
+        .enumerate()
+        .filter(|(_, metadata_type)| metadata_type.name.eq_ignore_ascii_case("XLDAPR"))
+        .flat_map(|(index, _)| [index as u32, index as u32 + 1])
+        .collect::<BTreeSet<_>>()
+    })
+    .unwrap_or_default();
+  let dynamic_array_cell_metadata = metadata
+    .cell_metadata
+    .as_ref()
+    .map(|cell_metadata| {
+      cell_metadata
+        .metadata_block
+        .iter()
+        .enumerate()
+        .filter(|(_, block)| {
+          block
+            .metadata_record
+            .iter()
+            .any(|record| dynamic_array_type_indices.contains(&record.type_index))
+        })
+        .flat_map(|(index, _)| [index as u32, index as u32 + 1])
+        .collect::<BTreeSet<_>>()
+    })
+    .unwrap_or_default();
+  Ok(WorkbookMetadata {
+    dynamic_array_cell_metadata,
+  })
+}
+
+#[derive(Clone, Debug, Default)]
+struct WorkbookStyles {
+  cell_number_formats: BTreeMap<u32, NumberFormatContext<'static>>,
+}
+
+impl WorkbookStyles {
+  fn number_format_context(&self, style_index: u32) -> Option<NumberFormatContext<'static>> {
+    self.cell_number_formats.get(&style_index).cloned()
+  }
+}
+
+fn workbook_styles(
+  document: &mut SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+) -> Result<WorkbookStyles> {
+  let Some(styles_part) = workbook_part.workbook_styles_part(document) else {
+    return Ok(WorkbookStyles::default());
+  };
+  let stylesheet = styles_part
+    .root_element(document)
+    .map_err(|error| FormulaError::Package(error.to_string()))?;
+  let format_codes = stylesheet
+    .numbering_formats
+    .as_ref()
+    .map(|formats| {
+      formats
+        .numbering_format
+        .iter()
+        .map(|format| (format.number_format_id, format.format_code.clone()))
+        .collect::<BTreeMap<_, _>>()
+    })
+    .unwrap_or_default();
+  let cell_number_formats = stylesheet
+    .cell_formats
+    .as_ref()
+    .map(|formats| {
+      formats
+        .xml_children
+        .iter()
+        .filter_map(|choice| match choice {
+          x::CellFormatsChoice::CellFormat(format) => Some(format.as_ref()),
+          x::CellFormatsChoice::XmlAny(_) => None,
+        })
+        .enumerate()
+        .filter_map(|(index, format)| {
+          let format_id = format.number_format_id?;
+          Some((
+            index as u32,
+            NumberFormatContext {
+              format_id: Some(format_id),
+              format_code: format_codes
+                .get(&format_id)
+                .map(|code| Cow::Owned(code.clone())),
+              locale: None,
+            },
+          ))
+        })
+        .collect::<BTreeMap<_, _>>()
+    })
+    .unwrap_or_default();
+  Ok(WorkbookStyles {
+    cell_number_formats,
+  })
 }
 
 fn shared_string_item_text(item: &x::SharedStringItem) -> String {
@@ -3444,31 +3715,96 @@ fn shared_formula_groups<'doc>(
       let FormulaKind::SharedDefinition { group_index } = formula.formula_kind else {
         continue;
       };
+      let (origin, range) = shared_formula_group_geometry(sheet, *address, formula);
       groups.push(SharedFormulaGroup {
         index: group_index,
         sheet: sheet.id,
-        origin: *address,
-        range: formula.reference,
+        origin,
+        range,
         formula_text: formula.formula_text.clone(),
         dependents: sheet
           .cells
           .iter()
           .filter_map(|(dependent_address, dependent_record)| {
-            dependent_record
-              .formula
-              .as_ref()
-              .and_then(|dependent_formula| match dependent_formula.formula_kind {
-                FormulaKind::SharedDependent {
-                  group_index: dependent_index,
-                } if dependent_index == group_index => Some(*dependent_address),
-                _ => None,
-              })
+            let dependent_formula = dependent_record.formula.as_ref()?;
+            if *dependent_address == origin {
+              return None;
+            }
+            match dependent_formula.formula_kind {
+              FormulaKind::SharedDependent {
+                group_index: dependent_index,
+              } if dependent_index == group_index => Some(*dependent_address),
+              FormulaKind::SharedDefinition {
+                group_index: dependent_index,
+              } if dependent_index == group_index && *dependent_address != origin => {
+                Some(*dependent_address)
+              }
+              FormulaKind::Normal
+                if range.is_some_and(|range| range_contains(range, *dependent_address))
+                  && dependent_formula.formula_text
+                    == translate_shared_formula_text(
+                      &formula.formula_text,
+                      *address,
+                      *dependent_address,
+                    ) =>
+              {
+                Some(*dependent_address)
+              }
+              _ => None,
+            }
           })
           .collect(),
       });
     }
   }
   groups
+}
+
+fn range_contains(range: CellRange, address: CellAddress) -> bool {
+  let min_column = range.start.column.min(range.end.column);
+  let max_column = range.start.column.max(range.end.column);
+  let min_row = range.start.row.min(range.end.row);
+  let max_row = range.start.row.max(range.end.row);
+  (min_column..=max_column).contains(&address.column) && (min_row..=max_row).contains(&address.row)
+}
+
+fn shared_formula_group_geometry<'doc>(
+  sheet: &WorksheetValueModel<'doc>,
+  definition_address: CellAddress,
+  definition: &FormulaCell<'doc>,
+) -> (CellAddress, Option<CellRange>) {
+  let Some(mut range) = definition.reference else {
+    return (definition_address, None);
+  };
+  let mut origin = definition_address;
+  while origin.row > 0
+    && range.start.column == definition_address.column
+    && range.end.column == definition_address.column
+    && range.start == definition_address
+  {
+    let previous = CellAddress {
+      column: origin.column,
+      row: origin.row - 1,
+    };
+    let Some(previous_formula) = sheet
+      .cells
+      .get(&previous)
+      .and_then(|record| record.formula.as_ref())
+    else {
+      break;
+    };
+    if previous_formula.formula_kind != FormulaKind::Normal {
+      break;
+    }
+    if previous_formula.formula_text
+      != translate_shared_formula_text(&definition.formula_text, definition_address, previous)
+    {
+      break;
+    }
+    origin = previous;
+    range.start = previous;
+  }
+  (origin, Some(range))
 }
 
 fn array_formula_groups<'doc>(
@@ -21187,6 +21523,18 @@ fn display_text_from_value(value: &FormulaValue<'_>) -> String {
   }
 }
 
+fn display_text_from_value_with_number_format(
+  value: &FormulaValue<'_>,
+  context: Option<&NumberFormatContext<'_>>,
+) -> Option<String> {
+  let FormulaValue::Number(number) = value else {
+    return None;
+  };
+  let format = context?.format_code.as_deref()?;
+  let format = select_number_format_section(format, *number);
+  format_simple_number_pattern(*number, &format)
+}
+
 fn format_text(
   value: &FormulaValue<'_>,
   format: &FormulaValue<'_>,
@@ -21302,6 +21650,9 @@ fn format_date_pattern(number: f64, format: &str, date_system: DateSystem) -> Op
 
 fn format_simple_number_pattern(number: f64, format: &str) -> Option<String> {
   let numeric = strip_number_format_directives(format.trim());
+  if numeric.eq_ignore_ascii_case("General") {
+    return None;
+  }
   if numeric.starts_with('"') && numeric.ends_with('"') {
     return Some(numeric.trim_matches('"').to_string());
   }
@@ -21492,6 +21843,12 @@ fn strip_number_format_directives(format: &str) -> String {
         if literal == '"' {
           break;
         }
+        result.push(literal);
+      }
+      continue;
+    }
+    if ch == '\\' {
+      if let Some(literal) = chars.next() {
         result.push(literal);
       }
       continue;
@@ -24100,24 +24457,134 @@ fn calc_chain(
   )
 }
 
-fn external_references<'doc>(workbook: &'doc x::Workbook) -> Vec<ExternalReference<'doc>> {
-  workbook
+fn external_references<'doc>(
+  document: &mut SpreadsheetDocument,
+  workbook_part: &WorkbookPart,
+  workbook: &'doc x::Workbook,
+) -> Result<Vec<ExternalReference<'doc>>> {
+  let reference_ids = workbook
     .external_references
     .as_ref()
     .map(|references| {
       references
         .external_reference
         .iter()
-        .map(|reference| ExternalReference {
-          id: Cow::Borrowed(reference.id.as_str()),
-          target: None,
-          sheet_names: Vec::new(),
-          defined_names: Vec::new(),
-          unavailable: true,
-        })
-        .collect()
+        .map(|reference| reference.id.clone())
+        .collect::<Vec<_>>()
     })
-    .unwrap_or_default()
+    .unwrap_or_default();
+  let external_parts = ordered_external_workbook_parts(document, workbook_part, &reference_ids);
+  let mut references = Vec::with_capacity(reference_ids.len().max(external_parts.len()));
+  for (index, part) in external_parts.iter().enumerate() {
+    let id = workbook_part
+      .get_id_of_part(document, part)
+      .map(|id| Cow::Owned(id.to_string()))
+      .or_else(|| reference_ids.get(index).map(|id| Cow::Owned(id.clone())))
+      .unwrap_or_else(|| Cow::Owned(format!("rId{}", index + 1)));
+    references.push(external_reference_from_part(document, part, id, index + 1)?);
+  }
+  Ok(references)
+}
+
+fn external_reference_from_part<'doc>(
+  document: &mut SpreadsheetDocument,
+  part: &ooxmlsdk::parts::external_workbook_part::ExternalWorkbookPart,
+  id: Cow<'doc, str>,
+  link_index: usize,
+) -> Result<ExternalReference<'doc>> {
+  let Some((book_relationship_id, sheet_names, defined_names)) = ({
+    let link = part
+      .root_element(document)
+      .map_err(|error| FormulaError::Package(error.to_string()))?;
+    if let Some(x::ExternalLinkChoice::ExternalBook(book)) = &link.external_link_choice {
+      Some((
+        book.id.clone(),
+        book
+          .sheet_names
+          .as_ref()
+          .map(|names| {
+            names
+              .sheet_name
+              .iter()
+              .map(|name| Cow::Owned(name.val.clone().unwrap_or_default()))
+              .collect::<Vec<_>>()
+          })
+          .unwrap_or_default(),
+        book
+          .external_defined_names
+          .as_ref()
+          .map(|names| {
+            names
+              .external_defined_name
+              .iter()
+              .map(|name| external_defined_name(link_index, name))
+              .map(DefinedName::into_owned)
+              .collect::<Vec<_>>()
+          })
+          .unwrap_or_default(),
+      ))
+    } else {
+      None
+    }
+  }) else {
+    return Ok(ExternalReference {
+      id,
+      target: None,
+      sheet_names: Vec::new(),
+      defined_names: Vec::new(),
+      unavailable: true,
+    });
+  };
+  let target = part
+    .get_external_relationship(document, book_relationship_id.as_str())
+    .map(|relationship| Cow::Owned(relationship.target().to_string()));
+  Ok(ExternalReference {
+    id,
+    target,
+    sheet_names,
+    defined_names,
+    unavailable: false,
+  })
+}
+
+fn external_defined_name<'doc>(
+  link_index: usize,
+  name: &'doc x::ExternalDefinedName,
+) -> DefinedName<'doc> {
+  let formula_text: Cow<'doc, str> = Cow::Owned(normalize_external_defined_name_formula(
+    link_index,
+    name.refers_to.as_deref().unwrap_or_default(),
+  ));
+  let parsed_formula = Some(parse_formula(
+    SheetId(name.sheet_id.unwrap_or_default()),
+    formula_text.clone(),
+    FormulaGrammar::ExcelA1,
+  ));
+  let dependencies = parsed_formula
+    .as_ref()
+    .map(|parsed| parsed.dependencies.clone())
+    .unwrap_or_default();
+  DefinedName {
+    name: Cow::Borrowed(name.name.as_str()),
+    sheet: name.sheet_id.map(SheetId),
+    formula_text,
+    parsed_formula,
+    dependencies,
+    hidden: false,
+    built_in: None,
+  }
+}
+
+fn normalize_external_defined_name_formula(link_index: usize, formula: &str) -> String {
+  let formula = formula.trim().strip_prefix('=').unwrap_or(formula.trim());
+  if formula.starts_with('[') {
+    return formula.to_string();
+  }
+  let Some((sheet, reference)) = formula.split_once('!') else {
+    return formula.to_string();
+  };
+  let sheet = sheet.trim_matches('\'');
+  format!("[{link_index}]{sheet}!{reference}")
 }
 
 fn external_cached_cells<'doc>(
@@ -24225,7 +24692,10 @@ fn external_cached_cells_from_part<'doc>(
   Ok(cells)
 }
 
-fn defined_names<'doc>(workbook: &'doc x::Workbook) -> Vec<DefinedName<'doc>> {
+fn defined_names<'doc>(
+  workbook: &'doc x::Workbook,
+  identity: &WorkbookIdentity<'doc>,
+) -> Vec<DefinedName<'doc>> {
   workbook
     .defined_names
     .as_ref()
@@ -24234,7 +24704,11 @@ fn defined_names<'doc>(workbook: &'doc x::Workbook) -> Vec<DefinedName<'doc>> {
         .defined_name
         .iter()
         .map(|name| {
-          let sheet = name.local_sheet_id.map(SheetId);
+          let sheet = name
+            .local_sheet_id
+            .and_then(|index| usize::try_from(index).ok())
+            .and_then(|index| identity.sheets.get(index))
+            .map(|sheet| sheet.id);
           let formula_text: Cow<'doc, str> = name
             .xml_content
             .as_deref()
@@ -24477,7 +24951,14 @@ mod tests {
       ..x::Worksheet::default()
     };
 
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 0, row: 0 }).unwrap();
 
     assert_eq!(record.raw_value, FormulaValue::Number(2.0));
@@ -24534,8 +25015,14 @@ mod tests {
       ..x::Worksheet::default()
     };
 
-    let sheet =
-      worksheet_value_model(&identity, Some(&worksheet), &["Shared".to_string()]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &["Shared".to_string()],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 1, row: 0 }).unwrap();
 
     assert_eq!(
@@ -24575,7 +25062,14 @@ mod tests {
       ..x::Worksheet::default()
     };
 
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 0, row: 0 }).unwrap();
 
     assert_eq!(record.raw_value, FormulaValue::Number(4.1));
@@ -24624,7 +25118,16 @@ mod tests {
       }),
       ..x::Worksheet::default()
     };
-    let mut sheets = vec![worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap()];
+    let mut sheets = vec![
+      worksheet_value_model(
+        &identity,
+        Some(&worksheet),
+        &[],
+        &WorkbookMetadata::default(),
+        &WorkbookStyles::default(),
+      )
+      .unwrap(),
+    ];
     resolve_shared_formula_dependents(&mut sheets);
     let groups = shared_formula_groups(&sheets);
 
@@ -24700,7 +25203,14 @@ mod tests {
       }),
       ..x::Worksheet::default()
     };
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
     let arrays = array_formula_groups(std::slice::from_ref(&sheet));
     let tables = data_tables(&[sheet]);
 
@@ -24991,9 +25501,33 @@ mod tests {
       }),
       ..x::Workbook::default()
     };
-    let names = defined_names(&workbook);
+    let identity = WorkbookIdentity {
+      sheets: vec![
+        WorksheetIdentity {
+          id: SheetId(3),
+          name: Cow::Borrowed("First"),
+          relationship_id: None,
+          visible: true,
+        },
+        WorksheetIdentity {
+          id: SheetId(7),
+          name: Cow::Borrowed("Second"),
+          relationship_id: None,
+          visible: true,
+        },
+        WorksheetIdentity {
+          id: SheetId(9),
+          name: Cow::Borrowed("Third"),
+          relationship_id: None,
+          visible: true,
+        },
+      ],
+      ..WorkbookIdentity::default()
+    };
+    let names = defined_names(&workbook, &identity);
     let graph = dependency_graph(&[], &names);
 
+    assert_eq!(names[0].sheet, Some(SheetId(9)));
     assert_eq!(graph.defined_name_nodes.len(), 1);
     assert_eq!(graph.defined_name_edges.len(), 1);
     assert!(matches!(
@@ -25032,7 +25566,14 @@ mod tests {
       ..x::Worksheet::default()
     };
 
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
     let formula = sheet
       .cells
       .get(&CellAddress { column: 0, row: 0 })
@@ -25101,7 +25642,14 @@ mod tests {
       ..x::Worksheet::default()
     };
 
-    let sheet = worksheet_value_model(&identity, Some(&worksheet), &[]).unwrap();
+    let sheet = worksheet_value_model(
+      &identity,
+      Some(&worksheet),
+      &[],
+      &WorkbookMetadata::default(),
+      &WorkbookStyles::default(),
+    )
+    .unwrap();
 
     assert!(sheet.cells.contains_key(&CellAddress { column: 0, row: 1 }));
     assert!(sheet.cells.contains_key(&CellAddress { column: 1, row: 1 }));

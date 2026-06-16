@@ -14,13 +14,13 @@ use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
 use ooxmlsdk::sdk::SdkPart;
 use regex::RegexBuilder;
-use rustfft::FftPlanner;
 use statrs::distribution::{
   Binomial, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, Hypergeometric, LogNormal,
   Normal, StudentsT, Weibull,
 };
 use statrs::function::gamma as statrs_gamma;
 
+use crate::calc::CalcEngine;
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
   FormulaValue, QualifiedAddress, QualifiedRange, Result, SheetId, SheetName,
@@ -1166,6 +1166,7 @@ impl<'doc> WorkbookValueModel<'doc> {
 
   pub fn evaluate_supported_formulas(&mut self) -> EvaluationReport<'doc> {
     let targets = self.evaluation_targets();
+    let engine = CalcEngine::new();
     let mut evaluated = Vec::new();
     let mut unsupported = Vec::new();
 
@@ -1185,6 +1186,7 @@ impl<'doc> WorkbookValueModel<'doc> {
           };
           let context = FormulaEvaluator {
             book: &book,
+            engine: &engine,
             current_sheet: sheet_id,
             current_cell: Some(address),
             grammar: parsed.grammar,
@@ -2299,8 +2301,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     if !unsupported.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
+    let engine = CalcEngine::new();
     FormulaEvaluator {
       book: self,
+      engine: &engine,
       current_sheet,
       current_cell,
       grammar,
@@ -2337,8 +2341,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     {
       return Some(value);
     }
+    let engine = CalcEngine::new();
     FormulaEvaluator {
       book: self,
+      engine: &engine,
       current_sheet,
       current_cell,
       grammar: formula.grammar,
@@ -2433,8 +2439,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     self
       .evaluate_relative_formula_text(current_sheet, formula, base, address)
       .is_some_and(|value| {
+        let engine = CalcEngine::new();
         FormulaEvaluator {
           book: self,
+          engine: &engine,
           current_sheet,
           current_cell: Some(address),
           grammar: FormulaGrammar::ExcelA1,
@@ -2454,8 +2462,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     address: CellAddress,
   ) -> Option<f64> {
     let value = self.evaluate_relative_formula_text(current_sheet, formula, base, address)?;
+    let engine = CalcEngine::new();
     FormulaEvaluator {
       book: self,
+      engine: &engine,
       current_sheet,
       current_cell: Some(address),
       grammar: FormulaGrammar::ExcelA1,
@@ -2541,8 +2551,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         .cloned()
         .unwrap_or_default(),
       FormulaValue::Reference(reference) => {
+        let engine = CalcEngine::new();
         let context = FormulaEvaluator {
           book: self,
+          engine: &engine,
           current_sheet,
           current_cell,
           grammar: FormulaGrammar::ExcelA1,
@@ -2574,8 +2586,10 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       return FormulaValue::Error(FormulaErrorValue::Value);
     }
     if matches!(value, FormulaValue::Reference(_)) {
+      let engine = CalcEngine::new();
       FormulaEvaluator {
         book: self,
+        engine: &engine,
         current_sheet,
         current_cell,
         grammar: FormulaGrammar::ExcelA1,
@@ -4180,6 +4194,7 @@ impl<'a, 'doc> FormulaAstParser<'a, 'doc> {
 
 struct FormulaEvaluator<'a, 'doc> {
   book: &'a FormulaEvaluationBook<'doc>,
+  engine: &'a CalcEngine,
   current_sheet: SheetId,
   current_cell: Option<CellAddress>,
   grammar: FormulaGrammar,
@@ -4196,6 +4211,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   fn with_array_context(&self) -> Self {
     Self {
       book: self.book,
+      engine: self.engine,
       current_sheet: self.current_sheet,
       current_cell: self.current_cell,
       grammar: self.grammar,
@@ -4208,6 +4224,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   fn with_current_value(&self, current_value: FormulaValue<'doc>) -> Self {
     Self {
       book: self.book,
+      engine: self.engine,
       current_sheet: self.current_sheet,
       current_cell: self.current_cell,
       grammar: self.grammar,
@@ -6290,6 +6307,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let mut evaluator = FormulaEvaluator {
       book: self.book,
+      engine: self.engine,
       current_sheet: self.current_sheet,
       current_cell: self.current_cell,
       grammar: self.grammar,
@@ -13693,7 +13711,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
     }
 
-    let values = fourier_values(values, real_input, inverse);
+    let values = self.engine.fourier_values(values, real_input, inverse);
     let scale = if inverse {
       1.0 / point_count as f64
     } else {
@@ -22417,63 +22435,6 @@ fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
   sum.finish()
 }
 
-fn fourier_values(
-  mut values: Vec<Complex<f64>>,
-  real_input: bool,
-  inverse: bool,
-) -> Vec<Complex<f64>> {
-  if real_input && values.len() > 1 && values.len() % 2 == 0 {
-    return fourier_even_real_values(&values, inverse);
-  }
-  let mut planner = FftPlanner::<f64>::new();
-  let fft = if inverse {
-    planner.plan_fft_inverse(values.len())
-  } else {
-    planner.plan_fft_forward(values.len())
-  };
-  fft.process(&mut values);
-  values
-}
-
-fn fourier_even_real_values(input: &[Complex<f64>], inverse: bool) -> Vec<Complex<f64>> {
-  let point_count = input.len();
-  let half_count = point_count / 2;
-  let mut work = Vec::with_capacity(half_count);
-  for index in 0..half_count {
-    work.push(Complex::new(input[index * 2].re, input[index * 2 + 1].re));
-  }
-
-  let mut planner = FftPlanner::<f64>::new();
-  let fft = if inverse {
-    planner.plan_fft_inverse(half_count)
-  } else {
-    planner.plan_fft_forward(half_count)
-  };
-  fft.process(&mut work);
-
-  let mut output = vec![Complex::new(0.0, 0.0); point_count];
-  let twiddle_sign = if inverse { 2.0 } else { -2.0 };
-  for index in 0..half_count {
-    let reverse_index = if index == 0 { 0 } else { half_count - index };
-    let y1 = work[index];
-    let y2 = work[reverse_index];
-    let angle = twiddle_sign * std::f64::consts::PI * index as f64 / point_count as f64;
-    let twiddle_real = angle.cos();
-    let twiddle_imaginary = angle.sin();
-    let result_real =
-      0.5 * (y1.re + y2.re + twiddle_real * (y1.im + y2.im) + twiddle_imaginary * (y1.re - y2.re));
-    let result_imaginary =
-      0.5 * (y1.im - y2.im + twiddle_imaginary * (y1.im + y2.im) - twiddle_real * (y1.re - y2.re));
-    output[index] = Complex::new(result_real, result_imaginary);
-    if index == 0 {
-      output[half_count] = Complex::new(y1.re - y1.im, 0.0);
-    } else {
-      output[half_count + reverse_index] = Complex::new(result_real, -result_imaginary);
-    }
-  }
-  output
-}
-
 fn approx_floor(value: f64) -> f64 {
   approx_value(value).floor()
 }
@@ -27181,8 +27142,10 @@ mod tests {
       "SUM(MyTable1[[#This Row],[This is the first column]:[This is the,second column]])",
     );
     assert!(unsupported.is_empty());
+    let engine = CalcEngine::new();
     let evaluator = FormulaEvaluator {
       book: &book,
+      engine: &engine,
       current_sheet: SheetId(1),
       current_cell: Some(CellAddress { column: 0, row: 1 }),
       grammar: FormulaGrammar::ExcelA1,
@@ -27246,8 +27209,10 @@ mod tests {
     };
     let (ast, unsupported) = parse_formula_ast(SheetId(1), "SUBTOTAL(109,A1:A4)");
     assert!(unsupported.is_empty());
+    let engine = CalcEngine::new();
     let evaluator = FormulaEvaluator {
       book: &book,
+      engine: &engine,
       current_sheet: SheetId(1),
       current_cell: Some(CellAddress { column: 0, row: 4 }),
       grammar: FormulaGrammar::ExcelA1,

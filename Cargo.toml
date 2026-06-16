@@ -77,6 +77,7 @@ krilla = { version = "0.6.0", default-features = false, features = [
 ] }
 krilla-svg = "0.3.0"
 libm = "0.2.16"
+num-complex = "0.4.6"
 rustfft = "6.4.1"
 rustybuzz = "0.20.1"
 statrs = { version = "0.18.0", default-features = false }

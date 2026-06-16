@@ -8,13 +8,13 @@ use icu_collator::options::{CollatorOptions, Strength};
 use icu_collator::{Collator, CollatorBorrowed, CollatorPreferences};
 use icu_locale::Locale;
 use icu_properties::{CodePointMapData, props::GeneralCategory};
+use num_complex::Complex;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
 use ooxmlsdk::sdk::SdkPart;
 use regex::RegexBuilder;
 use rustfft::FftPlanner;
-use rustfft::num_complex::Complex;
 use statrs::distribution::{
   Binomial, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, Hypergeometric, LogNormal,
   Normal, StudentsT, Weibull,
@@ -13693,14 +13693,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
     }
 
-    let mut planner = FftPlanner::<f64>::new();
-    let fft = if inverse {
-      planner.plan_fft_inverse(point_count)
-    } else {
-      planner.plan_fft_forward(point_count)
-    };
-    fft.process(&mut values);
-
+    let values = fourier_values(values, real_input, inverse);
     let scale = if inverse {
       1.0 / point_count as f64
     } else {
@@ -22424,6 +22417,63 @@ fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
   sum.finish()
 }
 
+fn fourier_values(
+  mut values: Vec<Complex<f64>>,
+  real_input: bool,
+  inverse: bool,
+) -> Vec<Complex<f64>> {
+  if real_input && values.len() > 1 && values.len() % 2 == 0 {
+    return fourier_even_real_values(&values, inverse);
+  }
+  let mut planner = FftPlanner::<f64>::new();
+  let fft = if inverse {
+    planner.plan_fft_inverse(values.len())
+  } else {
+    planner.plan_fft_forward(values.len())
+  };
+  fft.process(&mut values);
+  values
+}
+
+fn fourier_even_real_values(input: &[Complex<f64>], inverse: bool) -> Vec<Complex<f64>> {
+  let point_count = input.len();
+  let half_count = point_count / 2;
+  let mut work = Vec::with_capacity(half_count);
+  for index in 0..half_count {
+    work.push(Complex::new(input[index * 2].re, input[index * 2 + 1].re));
+  }
+
+  let mut planner = FftPlanner::<f64>::new();
+  let fft = if inverse {
+    planner.plan_fft_inverse(half_count)
+  } else {
+    planner.plan_fft_forward(half_count)
+  };
+  fft.process(&mut work);
+
+  let mut output = vec![Complex::new(0.0, 0.0); point_count];
+  let twiddle_sign = if inverse { 2.0 } else { -2.0 };
+  for index in 0..half_count {
+    let reverse_index = if index == 0 { 0 } else { half_count - index };
+    let y1 = work[index];
+    let y2 = work[reverse_index];
+    let angle = twiddle_sign * std::f64::consts::PI * index as f64 / point_count as f64;
+    let twiddle_real = angle.cos();
+    let twiddle_imaginary = angle.sin();
+    let result_real =
+      0.5 * (y1.re + y2.re + twiddle_real * (y1.im + y2.im) + twiddle_imaginary * (y1.re - y2.re));
+    let result_imaginary =
+      0.5 * (y1.im - y2.im + twiddle_imaginary * (y1.im + y2.im) - twiddle_real * (y1.re - y2.re));
+    output[index] = Complex::new(result_real, result_imaginary);
+    if index == 0 {
+      output[half_count] = Complex::new(y1.re - y1.im, 0.0);
+    } else {
+      output[half_count + reverse_index] = Complex::new(result_real, -result_imaginary);
+    }
+  }
+  output
+}
+
 fn approx_floor(value: f64) -> f64 {
   approx_value(value).floor()
 }
@@ -27974,6 +28024,95 @@ mod tests {
   }
 
   #[test]
+  fn evaluation_book_fourier_real_even_matches_libreoffice() {
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_sheet(SheetId(1), "Fourier")
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A1").unwrap(),
+        FormulaValue::Number(1.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A2").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A3").unwrap(),
+        FormulaValue::Number(3.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("A4").unwrap(),
+        FormulaValue::Number(4.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C1").unwrap(),
+        FormulaValue::Number(10.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("D1").unwrap(),
+        FormulaValue::Number(0.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C2").unwrap(),
+        FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("D2").unwrap(),
+        FormulaValue::Number(2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C3").unwrap(),
+        FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("D3").unwrap(),
+        FormulaValue::Number(0.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("C4").unwrap(),
+        FormulaValue::Number(-2.0),
+      )
+      .with_cell(
+        SheetId(1),
+        CellAddress::parse_a1("D4").unwrap(),
+        FormulaValue::Number(-2.0),
+      )
+      .build();
+
+    // Source: LibreOffice sc/qa/unit/data/functions/array/fods/fourier.fods.
+    assert_formula_matrix_numbers_close(
+      &book,
+      "FOURIER(A1:A4,1)",
+      &[&[10.0, 0.0], &[-2.0, 2.0], &[-2.0, 0.0], &[-2.0, -2.0]],
+    );
+    assert_formula_matrix_numbers_close(
+      &book,
+      "FOURIER(A1:A4,1,,1)",
+      &[
+        &[10.0, 0.0],
+        &[2.0_f64.sqrt() * 2.0, 3.0 * std::f64::consts::FRAC_PI_4],
+        &[2.0, std::f64::consts::PI],
+        &[2.0_f64.sqrt() * 2.0, -3.0 * std::f64::consts::FRAC_PI_4],
+      ],
+    );
+    assert_formula_matrix_numbers_close(
+      &book,
+      "FOURIER(C1:D4,1,1)",
+      &[&[1.0, 0.0], &[2.0, 0.0], &[3.0, 0.0], &[4.0, 0.0]],
+    );
+  }
+
+  #[test]
   fn evaluation_book_builder_and_libreoffice_scalar_array_semantics() {
     let book = FormulaEvaluationBookBuilder::new()
       .with_sheet(SheetId(1), "Formula")
@@ -29191,5 +29330,35 @@ mod tests {
       (actual - expected).abs() <= 1.0e-9,
       "expected {expected}, got {actual} for {formula}"
     );
+  }
+
+  fn assert_formula_matrix_numbers_close(
+    book: &FormulaEvaluationBook<'_>,
+    formula: &str,
+    expected: &[&[f64]],
+  ) {
+    let Some(FormulaValue::Matrix(actual)) = book.evaluate_formula_text(SheetId(1), None, formula)
+    else {
+      panic!("expected matrix for {formula}");
+    };
+    assert_eq!(actual.len(), expected.len(), "row count for {formula}");
+    for (row_index, (actual_row, expected_row)) in actual.iter().zip(expected.iter()).enumerate() {
+      assert_eq!(
+        actual_row.len(),
+        expected_row.len(),
+        "column count at row {row_index} for {formula}"
+      );
+      for (column_index, (actual_value, expected_value)) in
+        actual_row.iter().zip(expected_row.iter()).enumerate()
+      {
+        let FormulaValue::Number(actual_number) = actual_value else {
+          panic!("expected number at row {row_index}, column {column_index} for {formula}");
+        };
+        assert!(
+          (actual_number - expected_value).abs() <= 1.0e-9,
+          "expected {expected_value}, got {actual_number} at row {row_index}, column {column_index} for {formula}"
+        );
+      }
+    }
   }
 }

@@ -1369,6 +1369,7 @@ dependencies = [
  "icu_locale",
  "icu_properties",
  "libm",
+ "num-complex",
  "ooxmlsdk",
  "regex",
  "rustfft",

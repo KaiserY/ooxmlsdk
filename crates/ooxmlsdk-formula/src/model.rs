@@ -41,7 +41,7 @@ use crate::calc::financial::{
   financial_vdb, financial_xirr, financial_xnpv, is_coupon_frequency,
 };
 use crate::calc::matrix::{
-  apply_householder, determinant, lup_decompose, lup_solve, qr_decompose, solve_lower, solve_upper,
+  apply_householder, determinant, lup_decompose, lup_solve, solve_lower, solve_upper,
 };
 use crate::calc::numeric::{
   CeilingFloorKind, KahanSum, NumericError, approx_add, approx_ceil, approx_equal, approx_floor,
@@ -58,6 +58,11 @@ use crate::calc::query::{
 };
 use crate::calc::radix::{
   base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
+};
+use crate::calc::regression::{
+  RegressionModel, RegressionScalarState, RegressionState,
+  regression_model as calc_regression_model, regression_state as calc_regression_state,
+  scalar_state as regression_scalar_state_from_slices,
 };
 use crate::calc::special::{
   BesselKind, SpecialError, bessel, erf, erfc, gamma, lo_beta_dist, lo_beta_dist_pdf,
@@ -12289,24 +12294,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let y_values = self.value_numbers(&self.evaluate(args.first()?)?);
     let x_values = self.value_numbers(&self.evaluate(args.get(1)?)?);
-    let count = y_values.len().min(x_values.len());
-    if count < 2 {
+    let state = regression_scalar_state_from_slices(&y_values, &x_values);
+    if state.count < 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Div0));
     }
-    let x_mean = x_values.iter().take(count).sum::<f64>() / count as f64;
-    let y_mean = y_values.iter().take(count).sum::<f64>() / count as f64;
-    let mut numerator = 0.0;
-    let mut denominator = 0.0;
-    for index in 0..count {
-      let x_delta = x_values[index] - x_mean;
-      numerator += x_delta * (y_values[index] - y_mean);
-      denominator += x_delta * x_delta;
-    }
-    if denominator == 0.0 {
-      Some(FormulaValue::Error(FormulaErrorValue::Div0))
-    } else {
-      Some(FormulaValue::Number(numerator / denominator))
-    }
+    state
+      .slope()
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
   }
 
   fn evaluate_intercept(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12321,11 +12316,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     regression_scalar_state_for_values(self, &y_value, &x_value).map(|state| {
-      if state.x_sum_sq == 0.0 {
-        FormulaValue::Error(FormulaErrorValue::Div0)
-      } else {
-        FormulaValue::Number(state.y_mean - state.xy_sum / state.x_sum_sq * state.x_mean)
-      }
+      state
+        .intercept()
+        .map(FormulaValue::Number)
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Div0))
     })
   }
 
@@ -12342,11 +12336,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     regression_scalar_state_for_values(self, &y_value, &x_value).map(|state| {
-      if state.x_sum_sq == 0.0 {
-        FormulaValue::Error(FormulaErrorValue::Div0)
-      } else {
-        FormulaValue::Number(state.y_mean + state.xy_sum / state.x_sum_sq * (x - state.x_mean))
-      }
+      state
+        .forecast(x)
+        .map(FormulaValue::Number)
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Div0))
     })
   }
 
@@ -12493,26 +12486,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn evaluate_rsq(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     regression_scalar_state(self, args).map(|state| {
-      if state.x_sum_sq == 0.0 || state.y_sum_sq == 0.0 {
-        FormulaValue::Error(FormulaErrorValue::Div0)
-      } else {
-        let pearson = state.xy_sum / (state.x_sum_sq * state.y_sum_sq).sqrt();
-        FormulaValue::Number(pearson * pearson)
-      }
+      state
+        .r_squared()
+        .map(FormulaValue::Number)
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Div0))
     })
   }
 
   fn evaluate_steyx(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     regression_scalar_state(self, args).map(|state| {
-      if state.count < 3 || state.x_sum_sq == 0.0 {
-        FormulaValue::Error(FormulaErrorValue::Div0)
-      } else {
-        FormulaValue::Number(
-          ((state.y_sum_sq - state.xy_sum * state.xy_sum / state.x_sum_sq)
-            / (state.count as f64 - 2.0))
-            .sqrt(),
-        )
-      }
+      state
+        .steyx()
+        .map(FormulaValue::Number)
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::Div0))
     })
   }
 
@@ -18420,23 +18406,6 @@ impl RegressionData {
   }
 }
 
-#[derive(Clone, Debug)]
-struct RegressionModel {
-  slopes: Vec<f64>,
-  intercept: f64,
-}
-
-impl RegressionModel {
-  fn predict(&self, row: &[f64]) -> f64 {
-    self.intercept
-      + row
-        .iter()
-        .zip(&self.slopes)
-        .map(|(x, slope)| x * slope)
-        .sum::<f64>()
-  }
-}
-
 fn regression_coefficients<'doc>(
   data: &RegressionData,
   constant: bool,
@@ -18446,7 +18415,7 @@ fn regression_coefficients<'doc>(
   if data.case == RegressionCase::Simple {
     return simple_regression_coefficients(data, constant, stats, log_regression);
   }
-  let mut state = regression_state(data, constant)?;
+  let mut state = calc_regression_state(&data.y, &data.design, constant)?;
   let k = data.k();
   let rows = if stats { 5 } else { 1 };
   let mut result = vec![vec![FormulaValue::Error(FormulaErrorValue::NA); k + 1]; rows];
@@ -18563,28 +18532,9 @@ fn simple_regression_coefficients<'doc>(
 
 fn regression_model(data: &RegressionData, constant: bool) -> Option<RegressionModel> {
   if data.case == RegressionCase::Simple {
-    return simple_regression_model(data, constant);
+    return calc_regression_model(&data.y, &data.design, constant);
   }
-  regression_state(data, constant).map(|state| state.model)
-}
-
-#[derive(Clone, Debug)]
-struct RegressionState {
-  centered_x: Vec<Vec<f64>>,
-  centered_y: Vec<f64>,
-  means: Vec<f64>,
-  r_diagonal: Vec<f64>,
-  model: RegressionModel,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct RegressionScalarState {
-  count: usize,
-  x_mean: f64,
-  y_mean: f64,
-  xy_sum: f64,
-  x_sum_sq: f64,
-  y_sum_sq: f64,
+  calc_regression_state(&data.y, &data.design, constant).map(|state| state.model)
 }
 
 fn regression_scalar_state<'doc>(
@@ -18608,135 +18558,7 @@ fn regression_scalar_state_for_values<'doc>(
 ) -> Option<RegressionScalarState> {
   let y_values = evaluator.value_numbers(y_value);
   let x_values = evaluator.value_numbers(x_value);
-  let count = y_values.len().min(x_values.len());
-  if count < 2 {
-    return Some(RegressionScalarState {
-      count,
-      x_mean: 0.0,
-      y_mean: 0.0,
-      xy_sum: 0.0,
-      x_sum_sq: 0.0,
-      y_sum_sq: 0.0,
-    });
-  }
-  let x_mean = x_values.iter().take(count).sum::<f64>() / count as f64;
-  let y_mean = y_values.iter().take(count).sum::<f64>() / count as f64;
-  let mut xy_sum = 0.0;
-  let mut x_sum_sq = 0.0;
-  let mut y_sum_sq = 0.0;
-  for index in 0..count {
-    let x_delta = x_values[index] - x_mean;
-    let y_delta = y_values[index] - y_mean;
-    xy_sum += x_delta * y_delta;
-    x_sum_sq += x_delta * x_delta;
-    y_sum_sq += y_delta * y_delta;
-  }
-  Some(RegressionScalarState {
-    count,
-    x_mean,
-    y_mean,
-    xy_sum,
-    x_sum_sq,
-    y_sum_sq,
-  })
-}
-
-fn regression_state(data: &RegressionData, constant: bool) -> Option<RegressionState> {
-  let n = data.n();
-  let k = data.k();
-  if (constant && n < k + 1) || (!constant && n < k) || n < 1 || k < 1 {
-    return None;
-  }
-  let mut centered_x = data.design.clone();
-  let mut centered_y = data.y.clone();
-  let mut means = vec![0.0; k];
-  let mut mean_y = 0.0;
-  if constant {
-    mean_y = centered_y.iter().sum::<f64>() / n as f64;
-    for value in &mut centered_y {
-      *value = approx_sub(*value, mean_y);
-    }
-    for column in 0..k {
-      means[column] = centered_x.iter().map(|row| row[column]).sum::<f64>() / n as f64;
-      for row in &mut centered_x {
-        row[column] = approx_sub(row[column], means[column]);
-      }
-    }
-  }
-  let mut qr = centered_x.clone();
-  let r_diagonal = qr_decompose(&mut qr, k, n)?;
-  if r_diagonal.contains(&0.0) {
-    return None;
-  }
-  let mut z = centered_y.clone();
-  for column in 0..k {
-    apply_householder(&qr, column, &mut z, n);
-  }
-  let mut slopes = z.iter().take(k).copied().collect::<Vec<_>>();
-  solve_upper(&qr, &r_diagonal, &mut slopes, k);
-  let intercept = if constant {
-    mean_y
-      - means
-        .iter()
-        .zip(&slopes)
-        .map(|(mean, slope)| mean * slope)
-        .sum::<f64>()
-  } else {
-    0.0
-  };
-  Some(RegressionState {
-    centered_x: qr,
-    centered_y,
-    means,
-    r_diagonal,
-    model: RegressionModel { slopes, intercept },
-  })
-}
-
-fn simple_regression_model(data: &RegressionData, constant: bool) -> Option<RegressionModel> {
-  // Source: LibreOffice sc/source/core/tool/interpr5.cxx
-  // ScInterpreter::CalculateRGPRKP nCase==1.
-  if data.case != RegressionCase::Simple {
-    return None;
-  }
-  let n = data.n();
-  if (constant && n < 2) || n < 1 {
-    return None;
-  }
-  let x = data
-    .design
-    .iter()
-    .map(|row| row.first().copied())
-    .collect::<Option<Vec<_>>>()?;
-  let mut y = data.y.clone();
-  let mut x_values = x;
-  let mut mean_y = 0.0;
-  let mut mean_x = 0.0;
-  if constant {
-    mean_y = kahan_sum(y.iter().copied()) / n as f64;
-    for value in &mut y {
-      *value = approx_sub(*value, mean_y);
-    }
-    mean_x = kahan_sum(x_values.iter().copied()) / n as f64;
-    for value in &mut x_values {
-      *value = approx_sub(*value, mean_x);
-    }
-  }
-  let sum_xy = kahan_sum(x_values.iter().zip(&y).map(|(x, y)| x * y));
-  let sum_x2 = kahan_sum(x_values.iter().map(|value| value * value));
-  if sum_x2 == 0.0 {
-    return None;
-  }
-  let slope = sum_xy / sum_x2;
-  let intercept = if constant {
-    mean_y - slope * mean_x
-  } else {
-    0.0
-  };
-  Some(RegressionModel {
-    slopes: vec![slope],
-    intercept,
-  })
+  Some(regression_scalar_state_from_slices(&y_values, &x_values))
 }
 
 fn regression_fill_stats<'doc>(

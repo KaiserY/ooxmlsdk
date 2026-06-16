@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use num_complex::Complex;
 
 pub(crate) mod fourier;
+pub(crate) mod numeric;
 
 #[derive(Default)]
 pub(crate) struct CalcEngine {

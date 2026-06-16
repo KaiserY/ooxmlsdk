@@ -44,10 +44,12 @@ use crate::calc::matrix::{
   apply_householder, determinant, lup_decompose, lup_solve, qr_decompose, solve_lower, solve_upper,
 };
 use crate::calc::numeric::{
-  KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
-  even_odd, floor_to_i32, floor_to_u32, floor_to_u64, floor_to_usize, kahan_sum,
-  normalize_formula_number, round_direction, round_half_away_from_zero, round_to_decimal_places,
-  round_to_significant_digits, sign_number, trunc_to_u32,
+  CeilingFloorKind, KahanSum, NumericError, approx_add, approx_ceil, approx_equal, approx_floor,
+  approx_sub, ceiling as numeric_ceiling, ceiling_excel_legacy, even_odd, floor as numeric_floor,
+  floor_excel_legacy, floor_to_i32, floor_to_u32, floor_to_u64, floor_to_usize, formula_mod,
+  kahan_sum, mround, normalize_formula_number, quotient, round_direction,
+  round_half_away_from_zero, round_to_decimal_places, round_to_significant_digits, sign_number,
+  trunc_to_u32,
 };
 use crate::calc::query::{
   FindTextError, QueryOp, QuerySearchType, detect_query_search_type, find_byte_text_position,
@@ -6117,16 +6119,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(divisor) = self.number(divisor) else {
       return FormulaValue::Error(FormulaErrorValue::Value);
     };
-    if divisor == 0.0 {
-      return FormulaValue::Error(FormulaErrorValue::Div0);
-    }
-    let result = approx_sub(number, approx_floor(number / divisor) * divisor);
-    if (divisor > 0.0 && result >= 0.0 && result < divisor)
-      || (divisor < 0.0 && result <= 0.0 && result > divisor)
-    {
-      FormulaValue::Number(result)
-    } else {
-      FormulaValue::Error(FormulaErrorValue::Value)
+    match formula_mod(number, divisor) {
+      Ok(result) => FormulaValue::Number(result),
+      Err(error) => FormulaValue::Error(numeric_error_value(error)),
     }
   }
 
@@ -10132,12 +10127,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(multiple) = self.number_arg(args, 1) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    if multiple == 0.0 {
-      return Some(FormulaValue::Number(0.0));
-    }
-    Some(FormulaValue::Number(
-      approx_value(number / multiple).round() * multiple,
-    ))
+    Some(FormulaValue::Number(mround(number, multiple)))
   }
 
   fn evaluate_quotient(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -10146,10 +10136,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let numerator = self.number(&self.evaluate(args.first()?)?)?;
     let denominator = self.number(&self.evaluate(args.get(1)?)?)?;
-    if denominator == 0.0 {
-      Some(FormulaValue::Error(FormulaErrorValue::Div0))
-    } else {
-      Some(FormulaValue::Number((numerator / denominator).trunc()))
+    match quotient(numerator, denominator) {
+      Ok(result) => Some(FormulaValue::Number(result)),
+      Err(error) => Some(FormulaValue::Error(numeric_error_value(error))),
     }
   }
 
@@ -11449,35 +11438,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(value) = self.number(value) else {
       return FormulaValue::Error(FormulaErrorValue::Value);
     };
-    let significance = self.ceiling_floor_significance(value, significance, kind);
-    if value == 0.0 || significance == 0.0 {
-      return FormulaValue::Number(0.0);
-    }
-    match kind {
-      CeilingFloorKind::Odff if value * significance < 0.0 => {
-        FormulaValue::Error(FormulaErrorValue::IllegalArgument)
-      }
-      CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
-        FormulaValue::Number(approx_floor(value / significance) * significance)
-      }
-      CeilingFloorKind::Odff => {
-        FormulaValue::Number(approx_ceil(value / significance) * significance)
-      }
-      CeilingFloorKind::Math => {
-        let significance = if value * significance < 0.0 {
-          -significance
-        } else {
-          significance
-        };
-        if !abs_mode && value < 0.0 {
-          FormulaValue::Number(approx_floor(value / significance) * significance)
-        } else {
-          FormulaValue::Number(approx_ceil(value / significance) * significance)
-        }
-      }
-      CeilingFloorKind::Precise => {
-        FormulaValue::Number(approx_ceil(value / significance) * significance)
-      }
+    let significance = significance.and_then(|value| self.number(value));
+    match numeric_ceiling(value, significance, abs_mode, kind) {
+      Ok(result) => FormulaValue::Number(result),
+      Err(error) => FormulaValue::Error(numeric_error_value(error)),
     }
   }
 
@@ -11527,55 +11491,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(value) = self.number(value) else {
       return FormulaValue::Error(FormulaErrorValue::Value);
     };
-    let significance = self.ceiling_floor_significance(value, significance, kind);
-    if value == 0.0 || significance == 0.0 {
-      return FormulaValue::Number(0.0);
-    }
-    match kind {
-      CeilingFloorKind::Odff if value * significance < 0.0 => {
-        FormulaValue::Error(FormulaErrorValue::IllegalArgument)
-      }
-      CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
-        FormulaValue::Number(approx_ceil(value / significance) * significance)
-      }
-      CeilingFloorKind::Odff => {
-        FormulaValue::Number(approx_floor(value / significance) * significance)
-      }
-      CeilingFloorKind::Math => {
-        let significance = if value * significance < 0.0 {
-          -significance
-        } else {
-          significance
-        };
-        if !abs_mode && value < 0.0 {
-          FormulaValue::Number(approx_ceil(value / significance) * significance)
-        } else {
-          FormulaValue::Number(approx_floor(value / significance) * significance)
-        }
-      }
-      CeilingFloorKind::Precise => {
-        FormulaValue::Number(approx_floor(value / significance) * significance)
-      }
-    }
-  }
-
-  fn ceiling_floor_significance(
-    &self,
-    value: f64,
-    significance: Option<&FormulaValue<'doc>>,
-    kind: CeilingFloorKind,
-  ) -> f64 {
-    match kind {
-      CeilingFloorKind::Odff => significance
-        .and_then(|value| self.number(value))
-        .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
-      CeilingFloorKind::Math => significance
-        .and_then(|value| self.number(value))
-        .unwrap_or(1.0),
-      CeilingFloorKind::Precise => significance
-        .and_then(|value| self.number(value))
-        .unwrap_or(1.0)
-        .abs(),
+    let significance = significance.and_then(|value| self.number(value));
+    match numeric_floor(value, significance, abs_mode, kind) {
+      Ok(result) => FormulaValue::Number(result),
+      Err(error) => FormulaValue::Error(numeric_error_value(error)),
     }
   }
 
@@ -11585,20 +11504,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = self.number(&self.evaluate(args.get(1)?)?)?;
-    if value == 0.0 || significance == 0.0 {
-      return Some(FormulaValue::Number(0.0));
+    match ceiling_excel_legacy(value, significance) {
+      Ok(result) => Some(FormulaValue::Number(result)),
+      Err(error) => Some(FormulaValue::Error(numeric_error_value(error))),
     }
-    if value * significance > 0.0 {
-      return Some(FormulaValue::Number(
-        approx_ceil(value / significance) * significance,
-      ));
-    }
-    if value < 0.0 {
-      return Some(FormulaValue::Number(
-        approx_floor(value / -significance) * -significance,
-      ));
-    }
-    Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
   }
 
   fn evaluate_floor_excel_legacy(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -11607,23 +11516,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let value = self.number(&self.evaluate(args.first()?)?)?;
     let significance = self.number(&self.evaluate(args.get(1)?)?)?;
-    if value == 0.0 {
-      return Some(FormulaValue::Number(0.0));
+    match floor_excel_legacy(value, significance) {
+      Ok(result) => Some(FormulaValue::Number(result)),
+      Err(error) => Some(FormulaValue::Error(numeric_error_value(error))),
     }
-    if value * significance > 0.0 {
-      return Some(FormulaValue::Number(
-        approx_floor(value / significance) * significance,
-      ));
-    }
-    if significance == 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
-    }
-    if value < 0.0 {
-      return Some(FormulaValue::Number(
-        approx_ceil(value / -significance) * -significance,
-      ));
-    }
-    Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
   }
 
   fn evaluate_percentile(
@@ -16183,13 +16079,6 @@ enum EtsKind {
   StatMult,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CeilingFloorKind {
-  Odff,
-  Math,
-  Precise,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum SumProductScalar {
   Number(f64),
@@ -19710,6 +19599,14 @@ fn special_error_value(error: SpecialError) -> FormulaErrorValue {
     SpecialError::IllegalArgument => FormulaErrorValue::IllegalArgument,
     SpecialError::Num => FormulaErrorValue::Num,
     SpecialError::Div0 => FormulaErrorValue::Div0,
+  }
+}
+
+fn numeric_error_value(error: NumericError) -> FormulaErrorValue {
+  match error {
+    NumericError::IllegalArgument => FormulaErrorValue::IllegalArgument,
+    NumericError::Div0 => FormulaErrorValue::Div0,
+    NumericError::Value => FormulaErrorValue::Value,
   }
 }
 

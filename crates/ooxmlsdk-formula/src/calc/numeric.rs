@@ -2,6 +2,20 @@ pub use crate::calc::combinatorics::{gcd_number, lcm_number};
 
 use num_traits::ToPrimitive;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NumericError {
+  IllegalArgument,
+  Div0,
+  Value,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CeilingFloorKind {
+  Odff,
+  Math,
+  Precise,
+}
+
 pub fn sign_number(value: f64) -> f64 {
   if value < 0.0 {
     -1.0
@@ -227,6 +241,140 @@ pub fn even_odd(value: f64, even: bool) -> f64 {
   sign * magnitude
 }
 
+pub fn formula_mod(number: f64, divisor: f64) -> Result<f64, NumericError> {
+  if divisor == 0.0 {
+    return Err(NumericError::Div0);
+  }
+  let result = approx_sub(number, approx_floor(number / divisor) * divisor);
+  if (divisor > 0.0 && result >= 0.0 && result < divisor)
+    || (divisor < 0.0 && result <= 0.0 && result > divisor)
+  {
+    Ok(result)
+  } else {
+    Err(NumericError::Value)
+  }
+}
+
+pub fn mround(number: f64, multiple: f64) -> f64 {
+  if multiple == 0.0 {
+    return 0.0;
+  }
+  approx_value(number / multiple).round() * multiple
+}
+
+pub fn quotient(numerator: f64, denominator: f64) -> Result<f64, NumericError> {
+  if denominator == 0.0 {
+    Err(NumericError::Div0)
+  } else {
+    Ok((numerator / denominator).trunc())
+  }
+}
+
+pub fn ceiling(
+  value: f64,
+  significance: Option<f64>,
+  abs_mode: bool,
+  kind: CeilingFloorKind,
+) -> Result<f64, NumericError> {
+  let significance = ceiling_floor_significance(value, significance, kind);
+  if value == 0.0 || significance == 0.0 {
+    return Ok(0.0);
+  }
+  match kind {
+    CeilingFloorKind::Odff if value * significance < 0.0 => Err(NumericError::IllegalArgument),
+    CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
+      Ok(approx_floor(value / significance) * significance)
+    }
+    CeilingFloorKind::Odff => Ok(approx_ceil(value / significance) * significance),
+    CeilingFloorKind::Math => {
+      let significance = if value * significance < 0.0 {
+        -significance
+      } else {
+        significance
+      };
+      if !abs_mode && value < 0.0 {
+        Ok(approx_floor(value / significance) * significance)
+      } else {
+        Ok(approx_ceil(value / significance) * significance)
+      }
+    }
+    CeilingFloorKind::Precise => Ok(approx_ceil(value / significance) * significance),
+  }
+}
+
+pub fn floor(
+  value: f64,
+  significance: Option<f64>,
+  abs_mode: bool,
+  kind: CeilingFloorKind,
+) -> Result<f64, NumericError> {
+  let significance = ceiling_floor_significance(value, significance, kind);
+  if value == 0.0 || significance == 0.0 {
+    return Ok(0.0);
+  }
+  match kind {
+    CeilingFloorKind::Odff if value * significance < 0.0 => Err(NumericError::IllegalArgument),
+    CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
+      Ok(approx_ceil(value / significance) * significance)
+    }
+    CeilingFloorKind::Odff => Ok(approx_floor(value / significance) * significance),
+    CeilingFloorKind::Math => {
+      let significance = if value * significance < 0.0 {
+        -significance
+      } else {
+        significance
+      };
+      if !abs_mode && value < 0.0 {
+        Ok(approx_ceil(value / significance) * significance)
+      } else {
+        Ok(approx_floor(value / significance) * significance)
+      }
+    }
+    CeilingFloorKind::Precise => Ok(approx_floor(value / significance) * significance),
+  }
+}
+
+fn ceiling_floor_significance(
+  value: f64,
+  significance: Option<f64>,
+  kind: CeilingFloorKind,
+) -> f64 {
+  match kind {
+    CeilingFloorKind::Odff => significance.unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
+    CeilingFloorKind::Math => significance.unwrap_or(1.0),
+    CeilingFloorKind::Precise => significance.unwrap_or(1.0).abs(),
+  }
+}
+
+pub fn ceiling_excel_legacy(value: f64, significance: f64) -> Result<f64, NumericError> {
+  if value == 0.0 || significance == 0.0 {
+    return Ok(0.0);
+  }
+  if value * significance > 0.0 {
+    return Ok(approx_ceil(value / significance) * significance);
+  }
+  if value < 0.0 {
+    return Ok(approx_floor(value / -significance) * -significance);
+  }
+  Err(NumericError::IllegalArgument)
+}
+
+pub fn floor_excel_legacy(value: f64, significance: f64) -> Result<f64, NumericError> {
+  if value == 0.0 {
+    return Ok(0.0);
+  }
+  if value * significance > 0.0 {
+    return Ok(approx_floor(value / significance) * significance);
+  }
+  if significance == 0.0 {
+    return Err(NumericError::IllegalArgument);
+  }
+  if value < 0.0 {
+    return Ok(approx_ceil(value / -significance) * -significance);
+  }
+  Err(NumericError::IllegalArgument)
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KahanSum {
   sum: f64,
@@ -430,5 +578,43 @@ mod tests {
     assert_eq!(trunc_to_u32(-1.0), None);
     assert_eq!(trunc_to_usize(3.9), Some(3));
     assert_eq!(floor_to_u64(f64::INFINITY), None);
+  }
+
+  #[test]
+  fn numeric_multiple_helpers_match_spreadsheet_edges() {
+    assert_eq!(formula_mod(-3.0, 2.0), Ok(1.0));
+    assert_eq!(formula_mod(1.0, 0.0), Err(NumericError::Div0));
+    assert_eq!(mround(1.45, 0.1), 1.5);
+    assert_eq!(quotient(-10.0, 3.0), Ok(-3.0));
+    assert_eq!(quotient(5.0, 0.0), Err(NumericError::Div0));
+  }
+
+  #[test]
+  fn ceiling_and_floor_helpers_match_spreadsheet_modes() {
+    assert_eq!(
+      ceiling(2.1, Some(1.0), false, CeilingFloorKind::Odff),
+      Ok(3.0)
+    );
+    assert_eq!(
+      floor(2.9, Some(1.0), false, CeilingFloorKind::Odff),
+      Ok(2.0)
+    );
+    assert_eq!(
+      ceiling(2.0, Some(-1.0), false, CeilingFloorKind::Odff),
+      Err(NumericError::IllegalArgument)
+    );
+    assert_eq!(
+      ceiling(-2.5, Some(-2.0), false, CeilingFloorKind::Math),
+      Ok(-2.0)
+    );
+    assert_eq!(
+      floor(-2.5, Some(-2.0), false, CeilingFloorKind::Precise),
+      Ok(-4.0)
+    );
+    assert_eq!(ceiling_excel_legacy(-2.5, 2.0), Ok(-2.0));
+    assert_eq!(
+      floor_excel_legacy(2.5, -2.0),
+      Err(NumericError::IllegalArgument)
+    );
   }
 }

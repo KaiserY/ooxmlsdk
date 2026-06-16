@@ -70,6 +70,12 @@ pub(crate) enum LexLogicalFunction {
   Not,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum TextLiteral<'a> {
+  Borrowed(&'a str),
+  Owned(String),
+}
+
 impl LexLogicalFunction {
   pub(crate) fn name(self) -> &'static str {
     match self {
@@ -248,6 +254,46 @@ pub(crate) fn formula_body_start(source: &str) -> usize {
   formula_body_start_parser
     .parse_next(&mut input)
     .unwrap_or(0)
+}
+
+pub(crate) fn formula_text_literal(source: &str, start: usize) -> Option<TextLiteral<'_>> {
+  if source.as_bytes().get(start) != Some(&b'"') {
+    return None;
+  }
+  let body_start = start + 1;
+  let mut index = body_start;
+  let mut segment_start = body_start;
+  let mut parsed = None::<String>;
+  while index < source.len() {
+    let char_start = index;
+    let ch = source[index..].chars().next()?;
+    index += ch.len_utf8();
+    if ch != '"' {
+      continue;
+    }
+    if source[index..].starts_with('"') {
+      let output = parsed.get_or_insert_with(String::new);
+      output.push_str(&source[segment_start..char_start]);
+      output.push('"');
+      index += 1;
+      segment_start = index;
+      continue;
+    }
+    return Some(match parsed {
+      Some(mut output) => {
+        output.push_str(&source[segment_start..char_start]);
+        TextLiteral::Owned(output)
+      }
+      None => TextLiteral::Borrowed(&source[body_start..char_start]),
+    });
+  }
+  Some(match parsed {
+    Some(mut output) => {
+      output.push_str(&source[segment_start..]);
+      TextLiteral::Owned(output)
+    }
+    None => TextLiteral::Borrowed(&source[body_start..]),
+  })
 }
 
 fn formula_body_start_parser(input: &mut &str) -> WinnowResult<usize> {

@@ -55,8 +55,17 @@ pub(crate) enum SemanticTokenKind {
   Function { volatile: bool },
   Boolean(bool),
   ExternalReference(ExternalReferenceSpans),
-  Word,
+  ReferenceCandidate,
+  Name,
   Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SemanticWordKind {
+  Boolean(bool),
+  ExternalReference(ExternalReferenceSpans),
+  ReferenceCandidate,
+  Name,
 }
 
 pub(crate) struct SemanticTokens<'a> {
@@ -102,18 +111,42 @@ fn semantic_token_kind(source: &str, token: LexToken) -> SemanticTokenKind {
         SemanticTokenKind::Function {
           volatile: is_volatile_function_name(value),
         }
-      } else if value.eq_ignore_ascii_case("TRUE") {
-        SemanticTokenKind::Boolean(true)
-      } else if value.eq_ignore_ascii_case("FALSE") {
-        SemanticTokenKind::Boolean(false)
-      } else if let Some(reference) = external_reference_spans(value) {
-        SemanticTokenKind::ExternalReference(reference.offset(token.start))
       } else {
-        SemanticTokenKind::Word
+        match semantic_word_kind(value) {
+          SemanticWordKind::Boolean(value) => SemanticTokenKind::Boolean(value),
+          SemanticWordKind::ExternalReference(reference) => {
+            SemanticTokenKind::ExternalReference(reference.offset(token.start))
+          }
+          SemanticWordKind::ReferenceCandidate => SemanticTokenKind::ReferenceCandidate,
+          SemanticWordKind::Name => SemanticTokenKind::Name,
+        }
       }
     }
     LexTokenKind::Unsupported => SemanticTokenKind::Unsupported,
   }
+}
+
+pub(crate) fn semantic_word_kind(source: &str) -> SemanticWordKind {
+  if source.eq_ignore_ascii_case("TRUE") {
+    return SemanticWordKind::Boolean(true);
+  }
+  if source.eq_ignore_ascii_case("FALSE") {
+    return SemanticWordKind::Boolean(false);
+  }
+  if let Some(reference) = external_reference_spans(source) {
+    return SemanticWordKind::ExternalReference(reference);
+  }
+  if is_reference_candidate(source) {
+    SemanticWordKind::ReferenceCandidate
+  } else {
+    SemanticWordKind::Name
+  }
+}
+
+fn is_reference_candidate(source: &str) -> bool {
+  source
+    .bytes()
+    .any(|byte| byte.is_ascii_digit() || matches!(byte, b'$' | b':' | b'!' | b'.' | b'[' | b']'))
 }
 
 pub(crate) fn external_reference_spans(source: &str) -> Option<ExternalReferenceSpans> {

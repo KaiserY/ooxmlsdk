@@ -3338,15 +3338,20 @@ pub(crate) fn parse_formula_legacy<'doc>(
   let mut dependencies = Vec::new();
   let mut unsupported = Vec::new();
   let text = source.as_ref().get(body_start..).unwrap_or(source.as_ref());
+  let borrowed_text = match &source {
+    Cow::Borrowed(value) => Some(value.get(body_start..).unwrap_or(value)),
+    Cow::Owned(_) => None,
+  };
 
   for token in crate::parser::semantic_tokens(text) {
     let lexeme = &text[token.start..token.end];
     match token.kind {
       crate::parser::SemanticTokenKind::Text => {
-        let (value, _) = parse_formula_string(text, token.start);
-        tokens.push(FormulaToken::Literal(FormulaValue::String(Cow::Owned(
-          value,
-        ))));
+        tokens.push(FormulaToken::Literal(formula_text_value(
+          text,
+          borrowed_text,
+          token.start,
+        )));
       }
       crate::parser::SemanticTokenKind::Number(value) => {
         tokens.push(FormulaToken::Literal(FormulaValue::Number(value)));
@@ -3388,7 +3393,7 @@ pub(crate) fn parse_formula_legacy<'doc>(
         dependencies.push(FormulaDependency::External(external.clone()));
         tokens.push(FormulaToken::ExternalReference(external));
       }
-      crate::parser::SemanticTokenKind::Word => {
+      crate::parser::SemanticTokenKind::ReferenceCandidate => {
         let word = lexeme;
         if let Some(range) = parse_formula_range(sheet, word) {
           dependencies.push(dependency_from_range(sheet, &range));
@@ -3397,6 +3402,11 @@ pub(crate) fn parse_formula_legacy<'doc>(
           dependencies.push(FormulaDependency::Name(Cow::Owned(word.to_string())));
           tokens.push(FormulaToken::Name(Cow::Owned(word.to_string())));
         }
+      }
+      crate::parser::SemanticTokenKind::Name => {
+        let word = lexeme;
+        dependencies.push(FormulaDependency::Name(Cow::Owned(word.to_string())));
+        tokens.push(FormulaToken::Name(Cow::Owned(word.to_string())));
       }
       crate::parser::SemanticTokenKind::Unsupported => {
         let feature = lexeme.to_string();
@@ -3502,10 +3512,9 @@ fn formula_ast_from_syntax<'doc>(
 ) -> Option<FormulaAst<'doc>> {
   match ast {
     crate::parser::SyntaxNode::Blank => Some(FormulaAst::Literal(FormulaValue::Blank)),
-    crate::parser::SyntaxNode::Text(span) => {
-      let (value, _) = parse_formula_string(text, span.start);
-      Some(FormulaAst::Literal(FormulaValue::String(Cow::Owned(value))))
-    }
+    crate::parser::SyntaxNode::Text(span) => Some(FormulaAst::Literal(formula_text_value_owned(
+      text, span.start,
+    ))),
     crate::parser::SyntaxNode::Number(value) => {
       Some(FormulaAst::Literal(FormulaValue::Number(*value)))
     }
@@ -3564,19 +3573,21 @@ fn formula_ast_from_syntax_word<'doc>(
   span: crate::parser::SyntaxSpan,
 ) -> Option<FormulaAst<'doc>> {
   let word = text.get(span.start..span.end)?;
-  if let Some(external) = crate::parser::external_reference_spans(word)
-    .map(|reference| external_reference_id_from_spans(word, reference))
-  {
-    return Some(FormulaAst::ExternalReference(external));
-  }
-  if let Some(range) = parse_formula_range(sheet, word) {
-    return Some(FormulaAst::Reference(range));
-  }
-  if word.eq_ignore_ascii_case("TRUE") {
-    return Some(FormulaAst::Literal(FormulaValue::Boolean(true)));
-  }
-  if word.eq_ignore_ascii_case("FALSE") {
-    return Some(FormulaAst::Literal(FormulaValue::Boolean(false)));
+  match crate::parser::semantic_word_kind(word) {
+    crate::parser::SemanticWordKind::Boolean(value) => {
+      return Some(FormulaAst::Literal(FormulaValue::Boolean(value)));
+    }
+    crate::parser::SemanticWordKind::ExternalReference(reference) => {
+      return Some(FormulaAst::ExternalReference(
+        external_reference_id_from_spans(word, reference),
+      ));
+    }
+    crate::parser::SemanticWordKind::ReferenceCandidate => {
+      if let Some(range) = parse_formula_range(sheet, word) {
+        return Some(FormulaAst::Reference(range));
+      }
+    }
+    crate::parser::SemanticWordKind::Name => {}
   }
   Some(FormulaAst::Name(Cow::Owned(word.to_string())))
 }
@@ -19587,26 +19598,31 @@ fn dependency_from_range<'doc>(
   }
 }
 
-fn parse_formula_string(value: &str, start: usize) -> (String, usize) {
-  let mut parsed = String::new();
-  let mut index = start + 1;
-  while index < value.len() {
-    let Some(ch) = value[index..].chars().next() else {
-      break;
-    };
-    index += ch.len_utf8();
-    if ch == '"' {
-      if value[index..].starts_with('"') {
-        parsed.push('"');
-        index += 1;
-      } else {
-        break;
+fn formula_text_value<'doc>(
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  start: usize,
+) -> FormulaValue<'doc> {
+  if let Some(borrowed_text) = borrowed_text {
+    return match crate::parser::formula_text_literal(borrowed_text, start) {
+      Some(crate::parser::TextLiteral::Borrowed(value)) => {
+        FormulaValue::String(Cow::Borrowed(value))
       }
-    } else {
-      parsed.push(ch);
-    }
+      Some(crate::parser::TextLiteral::Owned(value)) => FormulaValue::String(Cow::Owned(value)),
+      None => FormulaValue::String(Cow::Borrowed("")),
+    };
   }
-  (parsed, index)
+  formula_text_value_owned(text, start)
+}
+
+fn formula_text_value_owned<'doc>(text: &str, start: usize) -> FormulaValue<'doc> {
+  match crate::parser::formula_text_literal(text, start) {
+    Some(crate::parser::TextLiteral::Borrowed(value)) => {
+      FormulaValue::String(Cow::Owned(value.to_string()))
+    }
+    Some(crate::parser::TextLiteral::Owned(value)) => FormulaValue::String(Cow::Owned(value)),
+    None => FormulaValue::String(Cow::Borrowed("")),
+  }
 }
 
 fn parse_grouped_formula_number(value: &str) -> Option<f64> {

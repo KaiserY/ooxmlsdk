@@ -2,6 +2,7 @@ use std::cell::RefCell;
 
 use num_complex::Complex;
 
+pub mod combinatorics;
 pub mod complex;
 pub(crate) mod fourier;
 pub mod numeric;

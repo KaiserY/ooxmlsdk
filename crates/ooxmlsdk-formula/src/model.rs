@@ -21,14 +21,16 @@ use statrs::distribution::{
 use statrs::function::gamma as statrs_gamma;
 
 use crate::calc::CalcEngine;
+use crate::calc::combinatorics::{
+  combination_count, gcd_number, lcm_number, permutation_count, permutation_with_repetition_count,
+};
 use crate::calc::complex::{
   FormulaComplex, binary_suffix, format_complex_number as format_formula_complex_number,
   parse_complex_number,
 };
 use crate::calc::numeric::{
   KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
-  even_odd, gcd_number, is_representable_integer, kahan_sum, lcm_number, normalize_formula_number,
-  round_direction,
+  even_odd, is_representable_integer, kahan_sum, normalize_formula_number, round_direction,
 };
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
@@ -10393,26 +10395,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let Some(mut count) = self.number_arg(args, 0).map(approx_floor) else {
+    let Some(count) = self.number_arg(args, 0).map(approx_floor) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     let Some(chosen) = self.number_arg(args, 1).map(approx_floor) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    if count < 0.0 || chosen < 0.0 || chosen > count {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    match combination_count(count, chosen, repetition, log_gamma) {
+      Some(value) => Some(FormulaValue::Number(value)),
+      None => Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     }
-    if repetition {
-      if count == 0.0 && chosen == 0.0 {
-        return Some(FormulaValue::Number(0.0));
-      }
-      count += chosen - 1.0;
-    }
-    Some(FormulaValue::Number(
-      (log_gamma(count + 1.0) - log_gamma(chosen + 1.0) - log_gamma(count - chosen + 1.0))
-        .exp()
-        .round(),
-    ))
   }
 
   fn evaluate_permut(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -10421,14 +10413,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let count = self.number(&self.evaluate(args.first()?)?)?.floor();
     let chosen = self.number(&self.evaluate(args.get(1)?)?)?.floor();
-    if count < 0.0 || chosen < 0.0 || chosen > count {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    match permutation_count(count, chosen, log_gamma) {
+      Some(value) => Some(FormulaValue::Number(value)),
+      None => Some(FormulaValue::Error(FormulaErrorValue::Num)),
     }
-    Some(FormulaValue::Number(
-      (log_gamma(count + 1.0) - log_gamma(count - chosen + 1.0))
-        .exp()
-        .round(),
-    ))
   }
 
   fn evaluate_permutationa(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -19974,10 +19962,9 @@ fn kth_value(mut values: Vec<f64>, k: f64, descending: bool) -> Option<f64> {
 fn permutationa_value<'doc>(count: f64, chosen: f64) -> FormulaValue<'doc> {
   let count = approx_floor(count);
   let chosen = approx_floor(chosen);
-  if count < 0.0 || chosen < 0.0 {
-    FormulaValue::Error(FormulaErrorValue::Num)
-  } else {
-    FormulaValue::Number(count.powf(chosen))
+  match permutation_with_repetition_count(count, chosen) {
+    Some(value) => FormulaValue::Number(value),
+    None => FormulaValue::Error(FormulaErrorValue::Num),
   }
 }
 

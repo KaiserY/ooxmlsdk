@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.10.2"
+version = "0.10.3"
 edition = "2024"
 rust-version = "1.88"
 authors = ["KaiserY"]
@@ -26,15 +26,15 @@ categories = ["parser-implementations"]
 readme = "README.md"
 
 [workspace.dependencies]
-ooxmlsdk = { version = "0.10.2", path = "crates/ooxmlsdk", default-features = false }
-ooxmlsdk-build = { version = "0.10.2", path = "crates/ooxmlsdk-build" }
-ooxmlsdk-derive = { version = "0.10.2", path = "crates/ooxmlsdk-derive" }
-ooxmlsdk-fonts = { version = "0.10.2", path = "crates/ooxmlsdk-fonts" }
-ooxmlsdk-formula = { version = "0.10.2", path = "crates/ooxmlsdk-formula" }
-ooxmlsdk-layout = { version = "0.10.2", path = "crates/ooxmlsdk-layout" }
-ooxmlsdk-pdf = { version = "0.10.2", path = "crates/ooxmlsdk-pdf" }
-ooxmlsdk-pdf-test = { version = "0.10.2", path = "crates/ooxmlsdk-pdf-test" }
-ooxmlsdk-test = { version = "0.10.2", path = "crates/ooxmlsdk-test" }
+ooxmlsdk = { version = "0.10.3", path = "crates/ooxmlsdk", default-features = false }
+ooxmlsdk-build = { version = "0.10.3", path = "crates/ooxmlsdk-build" }
+ooxmlsdk-derive = { version = "0.10.3", path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-fonts = { version = "0.10.3", path = "crates/ooxmlsdk-fonts" }
+ooxmlsdk-formula = { version = "0.10.3", path = "crates/ooxmlsdk-formula" }
+ooxmlsdk-layout = { version = "0.10.3", path = "crates/ooxmlsdk-layout" }
+ooxmlsdk-pdf = { version = "0.10.3", path = "crates/ooxmlsdk-pdf" }
+ooxmlsdk-pdf-test = { version = "0.10.3", path = "crates/ooxmlsdk-pdf-test" }
+ooxmlsdk-test = { version = "0.10.3", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.40.1"
 regex = "1.12.4"
@@ -53,17 +53,17 @@ crc32fast = "1.5.0"
 flate2 = "1.1.9"
 encoding_rs = "0.8.35"
 lopdf = "0.41.0"
-pdfium-render = "0.9.1"
+pdfium-render = "0.9.2"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 walkdir = "2.5.0"
-toml = "1.1"
-fontdb = "0.23"
+toml = "1.1.2"
+fontdb = "0.23.0"
 hypher = "0.1.7"
-icu_collator = { version = "2.2", features = ["compiled_data"] }
-icu_locale = { version = "2.2", features = ["compiled_data"] }
-icu_properties = { version = "2.2", features = ["compiled_data"] }
-icu_segmenter = { version = "2.2", features = ["compiled_data"] }
+icu_collator = { version = "2.2.0", features = ["compiled_data"] }
+icu_locale = { version = "2.2.0", features = ["compiled_data"] }
+icu_properties = { version = "2.2.0", features = ["compiled_data"] }
+icu_segmenter = { version = "2.2.0", features = ["compiled_data"] }
 image = { version = "0.25.10", default-features = false, features = [
   "png",
   "jpeg",
@@ -78,12 +78,13 @@ krilla = { version = "0.6.0", default-features = false, features = [
 krilla-svg = "0.3.0"
 libm = "0.2.16"
 num-complex = "0.4.6"
+num-integer = "0.1.46"
 rustfft = "6.4.1"
 rustybuzz = "0.20.1"
 statrs = { version = "0.18.0", default-features = false }
 ttf-parser = "0.25.1"
 unicode-bidi = "0.3.18"
-unicode-script = "0.5"
+unicode-script = "0.5.8"
 
 [profile.dev]
 incremental = false

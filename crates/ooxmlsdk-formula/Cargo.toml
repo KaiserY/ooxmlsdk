@@ -19,6 +19,7 @@ icu_locale = { workspace = true }
 icu_properties = { workspace = true }
 libm = { workspace = true }
 num-complex = { workspace = true }
+num-integer = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 regex = { workspace = true }
 rustfft = { workspace = true }

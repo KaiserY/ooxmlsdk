@@ -1,3 +1,5 @@
+pub use crate::calc::combinatorics::{gcd_number, lcm_number};
+
 pub fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   if value == 0.0 || !value.is_finite() {
     return value;
@@ -68,24 +70,6 @@ pub fn even_odd(value: f64, even: bool) -> f64 {
     magnitude += 1.0;
   }
   sign * magnitude
-}
-
-pub fn gcd_number(mut left: f64, mut right: f64) -> f64 {
-  left = left.abs();
-  right = right.abs();
-  while right != 0.0 {
-    let remainder = left % right;
-    left = right;
-    right = remainder;
-  }
-  left
-}
-
-pub fn lcm_number(left: f64, right: f64) -> f64 {
-  if left == 0.0 || right == 0.0 {
-    return 0.0;
-  }
-  (left / gcd_number(left, right) * right).abs()
 }
 
 #[derive(Clone, Copy, Debug, Default)]

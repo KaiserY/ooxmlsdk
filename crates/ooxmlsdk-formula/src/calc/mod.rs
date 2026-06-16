@@ -6,6 +6,7 @@ pub mod combinatorics;
 pub mod complex;
 pub(crate) mod fourier;
 pub mod numeric;
+pub mod special;
 
 #[derive(Default)]
 pub(crate) struct CalcEngine {

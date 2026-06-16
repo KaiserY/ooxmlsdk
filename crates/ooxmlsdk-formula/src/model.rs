@@ -3324,106 +3324,87 @@ fn parse_formula<'doc>(
   source: Cow<'doc, str>,
   grammar: FormulaGrammar,
 ) -> ParsedFormula<'doc> {
+  let body_start = crate::parser::formula_body_start(source.as_ref());
+  parse_formula_legacy(sheet, source, grammar, body_start)
+}
+
+pub(crate) fn parse_formula_legacy<'doc>(
+  sheet: SheetId,
+  source: Cow<'doc, str>,
+  grammar: FormulaGrammar,
+  body_start: usize,
+) -> ParsedFormula<'doc> {
   let mut tokens = Vec::new();
   let mut dependencies = Vec::new();
   let mut unsupported = Vec::new();
-  let text = source.as_ref().strip_prefix('=').unwrap_or(source.as_ref());
-  let mut index = 0usize;
+  let text = source.as_ref().get(body_start..).unwrap_or(source.as_ref());
 
-  while index < text.len() {
-    let Some(ch) = text[index..].chars().next() else {
-      break;
-    };
-    if ch.is_whitespace() {
-      index += ch.len_utf8();
-      continue;
-    }
-    if ch == '"' {
-      let (value, next) = parse_formula_string(text, index);
-      tokens.push(FormulaToken::Literal(FormulaValue::String(Cow::Owned(
-        value,
-      ))));
-      index = next;
-      continue;
-    }
-    if ch.is_ascii_digit()
-      || (ch == '.'
-        && text[index + ch.len_utf8()..].starts_with(|next: char| next.is_ascii_digit()))
-    {
-      let (value, next) = parse_formula_number(text, index);
-      tokens.push(FormulaToken::Literal(FormulaValue::Number(value)));
-      index = next;
-      continue;
-    }
-    if let Some((error, next)) = parse_formula_error_literal_at(text, index) {
-      tokens.push(FormulaToken::Literal(FormulaValue::Error(error_value(
-        error,
-      ))));
-      index = next;
-      continue;
-    }
-    if let Some((operator, next)) = parse_formula_operator(text, index) {
-      tokens.push(FormulaToken::Operator(operator));
-      index = next;
-      continue;
-    }
-
-    match ch {
-      '{' => {
+  for token in crate::parser::semantic_tokens(text) {
+    let lexeme = &text[token.start..token.end];
+    match token.kind {
+      crate::parser::SemanticTokenKind::Text => {
+        let (value, _) = parse_formula_string(text, token.start);
+        tokens.push(FormulaToken::Literal(FormulaValue::String(Cow::Owned(
+          value,
+        ))));
+      }
+      crate::parser::SemanticTokenKind::Number(value) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Number(value)));
+      }
+      crate::parser::SemanticTokenKind::Error(error) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Error(
+          formula_error_from_lex(error),
+        )));
+      }
+      crate::parser::SemanticTokenKind::Operator(operator) => {
+        tokens.push(FormulaToken::Operator(formula_operator_from_lex(operator)));
+      }
+      crate::parser::SemanticTokenKind::ArrayOpen => {
         tokens.push(FormulaToken::ArrayOpen);
-        index += ch.len_utf8();
       }
-      '}' => {
+      crate::parser::SemanticTokenKind::ArrayClose => {
         tokens.push(FormulaToken::ArrayClose);
-        index += ch.len_utf8();
       }
-      ',' => {
+      crate::parser::SemanticTokenKind::ArgumentSeparator => {
         tokens.push(FormulaToken::Separator(FormulaSeparator::Argument));
-        index += ch.len_utf8();
       }
-      ';' => {
+      crate::parser::SemanticTokenKind::RowSeparator => {
         tokens.push(FormulaToken::Separator(FormulaSeparator::Row));
-        index += ch.len_utf8();
       }
-      '|' => {
-        tokens.push(FormulaToken::Separator(FormulaSeparator::Row));
-        index += ch.len_utf8();
+      crate::parser::SemanticTokenKind::ParenOpen
+      | crate::parser::SemanticTokenKind::ParenClose => {}
+      crate::parser::SemanticTokenKind::Function { volatile } => {
+        let word = lexeme;
+        if volatile {
+          dependencies.push(FormulaDependency::Volatile);
+        }
+        tokens.push(FormulaToken::Function(Cow::Owned(word.to_string())));
       }
-      '(' | ')' => {
-        index += ch.len_utf8();
+      crate::parser::SemanticTokenKind::Boolean(value) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Boolean(value)));
       }
-      _ if is_formula_word_char(ch) => {
-        let (word, next) = parse_formula_word(text, index);
-        let next_non_space = text[next..].chars().find(|ch| !ch.is_whitespace());
-        if next_non_space == Some('(') {
-          if is_volatile_function(word) {
-            dependencies.push(FormulaDependency::Volatile);
-          }
-          tokens.push(FormulaToken::Function(Cow::Owned(word.to_string())));
-        } else if let Some(external) = parse_external_reference_id(word) {
-          dependencies.push(FormulaDependency::External(external.clone()));
-          tokens.push(FormulaToken::ExternalReference(external));
-        } else if let Some(range) = parse_formula_range(sheet, word) {
+      crate::parser::SemanticTokenKind::ExternalReference(reference) => {
+        let external = external_reference_id_from_spans(text, reference);
+        dependencies.push(FormulaDependency::External(external.clone()));
+        tokens.push(FormulaToken::ExternalReference(external));
+      }
+      crate::parser::SemanticTokenKind::Word => {
+        let word = lexeme;
+        if let Some(range) = parse_formula_range(sheet, word) {
           dependencies.push(dependency_from_range(sheet, &range));
           tokens.push(FormulaToken::Reference(range));
-        } else if is_formula_error_literal(word) {
-          tokens.push(FormulaToken::Literal(FormulaValue::Error(error_value(
-            word,
-          ))));
         } else {
           dependencies.push(FormulaDependency::Name(Cow::Owned(word.to_string())));
           tokens.push(FormulaToken::Name(Cow::Owned(word.to_string())));
         }
-        index = next;
       }
-      _ => {
-        let feature = ch.to_string();
+      crate::parser::SemanticTokenKind::Unsupported => {
+        let feature = lexeme.to_string();
         unsupported.push(UnsupportedFormulaFeature {
           feature: Cow::Owned(feature.clone()),
           reason: Cow::Borrowed("unrecognized formula character"),
         });
         tokens.push(FormulaToken::Unsupported(Cow::Owned(feature)));
-        index += ch.len_utf8();
       }
     }
   }
@@ -3441,6 +3422,45 @@ fn parse_formula<'doc>(
   }
 }
 
+fn formula_operator_from_lex(operator: crate::parser::LexOperator) -> FormulaOperator {
+  match operator {
+    crate::parser::LexOperator::Add => FormulaOperator::Add,
+    crate::parser::LexOperator::Subtract => FormulaOperator::Subtract,
+    crate::parser::LexOperator::Multiply => FormulaOperator::Multiply,
+    crate::parser::LexOperator::Divide => FormulaOperator::Divide,
+    crate::parser::LexOperator::Power => FormulaOperator::Power,
+    crate::parser::LexOperator::Concat => FormulaOperator::Concat,
+    crate::parser::LexOperator::Equal => FormulaOperator::Equal,
+    crate::parser::LexOperator::NotEqual => FormulaOperator::NotEqual,
+    crate::parser::LexOperator::Less => FormulaOperator::Less,
+    crate::parser::LexOperator::LessOrEqual => FormulaOperator::LessOrEqual,
+    crate::parser::LexOperator::Greater => FormulaOperator::Greater,
+    crate::parser::LexOperator::GreaterOrEqual => FormulaOperator::GreaterOrEqual,
+    crate::parser::LexOperator::Range => FormulaOperator::Range,
+    crate::parser::LexOperator::Union => FormulaOperator::Union,
+    crate::parser::LexOperator::Intersection => FormulaOperator::Intersection,
+    crate::parser::LexOperator::Percent => FormulaOperator::Percent,
+  }
+}
+
+fn formula_error_from_lex(error: crate::parser::LexErrorValue) -> FormulaErrorValue {
+  match error {
+    crate::parser::LexErrorValue::Null => FormulaErrorValue::Null,
+    crate::parser::LexErrorValue::Div0 => FormulaErrorValue::Div0,
+    crate::parser::LexErrorValue::Value => FormulaErrorValue::Value,
+    crate::parser::LexErrorValue::Ref => FormulaErrorValue::Ref,
+    crate::parser::LexErrorValue::Name => FormulaErrorValue::Name,
+    crate::parser::LexErrorValue::Num => FormulaErrorValue::Num,
+    crate::parser::LexErrorValue::NA => FormulaErrorValue::NA,
+    crate::parser::LexErrorValue::GettingData => FormulaErrorValue::GettingData,
+    crate::parser::LexErrorValue::Spill => FormulaErrorValue::Spill,
+    crate::parser::LexErrorValue::Calc => FormulaErrorValue::Calc,
+    crate::parser::LexErrorValue::IllegalArgument => FormulaErrorValue::IllegalArgument,
+    crate::parser::LexErrorValue::Parameter => FormulaErrorValue::Parameter,
+    crate::parser::LexErrorValue::Unknown => FormulaErrorValue::Unknown,
+  }
+}
+
 fn parse_formula_ast<'doc>(
   sheet: SheetId,
   text: &str,
@@ -3448,479 +3468,117 @@ fn parse_formula_ast<'doc>(
   Option<FormulaAst<'doc>>,
   Vec<UnsupportedFormulaFeature<'doc>>,
 ) {
-  let mut parser = FormulaAstParser::new(sheet, text);
-  let ast = parser.parse_expression();
-  parser.skip_ws();
-  if ast.is_some() && parser.is_end() {
-    (ast, parser.unsupported)
-  } else {
-    parser.unsupported.push(UnsupportedFormulaFeature {
-      feature: Cow::Owned(text.to_string()),
-      reason: Cow::Borrowed("formula expression is not fully parsed"),
-    });
-    (None, parser.unsupported)
-  }
-}
-
-struct FormulaAstParser<'a, 'doc> {
-  sheet: SheetId,
-  text: &'a str,
-  index: usize,
-  unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
-}
-
-impl<'a, 'doc> FormulaAstParser<'a, 'doc> {
-  fn new(sheet: SheetId, text: &'a str) -> Self {
-    Self {
-      sheet,
-      text,
-      index: 0,
-      unsupported: Vec::new(),
-    }
-  }
-
-  fn parse_expression(&mut self) -> Option<FormulaAst<'doc>> {
-    self.parse_logical()
-  }
-
-  fn parse_logical(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_comparison()?;
-    loop {
-      self.skip_ws();
-      let Some(name) = self.consume_adjacent_logical_function_name() else {
-        break;
-      };
-      let mut args = self.parse_argument_list()?;
-      args.insert(0, left);
-      left = FormulaAst::Function {
-        name: Cow::Owned(name.to_string()),
-        args,
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_comparison(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_union()?;
-    loop {
-      self.skip_ws();
-      let Some(op) = self.consume_comparison_operator() else {
-        break;
-      };
-      let right = self.parse_union()?;
-      left = FormulaAst::Binary {
-        op,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_union(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_intersection()?;
-    loop {
-      self.skip_ws();
-      if !self.consume_char('~') {
-        break;
-      }
-      let right = self.parse_intersection()?;
-      left = FormulaAst::Binary {
-        op: FormulaOperator::Union,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_intersection(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_range()?;
-    loop {
-      self.skip_ws();
-      if !self.consume_char('!') {
-        break;
-      }
-      let right = self.parse_range()?;
-      left = FormulaAst::Binary {
-        op: FormulaOperator::Intersection,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_range(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_concat()?;
-    loop {
-      self.skip_ws();
-      if !self.consume_char(':') {
-        break;
-      }
-      let right = self.parse_concat()?;
-      left = FormulaAst::Binary {
-        op: FormulaOperator::Range,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_concat(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_add_sub()?;
-    loop {
-      self.skip_ws();
-      if !self.consume_char('&') {
-        break;
-      }
-      let right = self.parse_add_sub()?;
-      left = FormulaAst::Binary {
-        op: FormulaOperator::Concat,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_add_sub(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_mul_div()?;
-    loop {
-      self.skip_ws();
-      let op = if self.consume_char('+') {
-        FormulaOperator::Add
-      } else if self.consume_char('-') {
-        FormulaOperator::Subtract
-      } else {
-        break;
-      };
-      let right = self.parse_mul_div()?;
-      left = FormulaAst::Binary {
-        op,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_mul_div(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut left = self.parse_power()?;
-    loop {
-      self.skip_ws();
-      let op = if self.consume_char('*') {
-        FormulaOperator::Multiply
-      } else if self.consume_char('/') {
-        FormulaOperator::Divide
-      } else {
-        break;
-      };
-      let right = self.parse_power()?;
-      left = FormulaAst::Binary {
-        op,
-        left: Box::new(left),
-        right: Box::new(right),
-      };
-    }
-    Some(left)
-  }
-
-  fn parse_power(&mut self) -> Option<FormulaAst<'doc>> {
-    let left = self.parse_unary()?;
-    self.skip_ws();
-    if self.consume_char('^') {
-      let right = self.parse_power()?;
-      Some(FormulaAst::Binary {
-        op: FormulaOperator::Power,
-        left: Box::new(left),
-        right: Box::new(right),
-      })
-    } else {
-      Some(left)
-    }
-  }
-
-  fn parse_unary(&mut self) -> Option<FormulaAst<'doc>> {
-    self.skip_ws();
-    if self.consume_char('+') {
-      return Some(FormulaAst::Unary {
-        op: FormulaOperator::UnaryPlus,
-        expr: Box::new(self.parse_unary()?),
-      });
-    }
-    if self.consume_char('-') {
-      return Some(FormulaAst::Unary {
-        op: FormulaOperator::UnaryMinus,
-        expr: Box::new(self.parse_unary()?),
-      });
-    }
-    self.parse_percent()
-  }
-
-  fn parse_percent(&mut self) -> Option<FormulaAst<'doc>> {
-    let mut expr = self.parse_primary()?;
-    loop {
-      self.skip_ws();
-      if !self.consume_char('%') {
-        break;
-      }
-      expr = FormulaAst::Unary {
-        op: FormulaOperator::Percent,
-        expr: Box::new(expr),
-      };
-    }
-    Some(expr)
-  }
-
-  fn parse_primary(&mut self) -> Option<FormulaAst<'doc>> {
-    self.skip_ws();
-    if self.consume_char('(') {
-      let expr = self.parse_expression()?;
-      self.skip_ws();
-      if !self.consume_char(')') {
-        self.unsupported.push(UnsupportedFormulaFeature {
+  let syntax = crate::parser::parse_syntax_ast(text);
+  let mut unsupported = Vec::new();
+  for issue in syntax.issues {
+    match issue {
+      crate::parser::SyntaxIssue::MissingClosingParenthesis => {
+        unsupported.push(UnsupportedFormulaFeature {
           feature: Cow::Borrowed("parenthesized expression"),
           reason: Cow::Borrowed("missing closing parenthesis"),
         });
       }
-      return Some(expr);
     }
-    if self.peek_char() == Some('"') {
-      let (value, next) = parse_formula_string(self.text, self.index);
-      self.index = next;
-      return Some(FormulaAst::Literal(FormulaValue::String(Cow::Owned(value))));
-    }
-    if self.peek_char() == Some('{') {
-      return self.parse_array();
-    }
-    if self.starts_number() {
-      let (value, next) = parse_formula_number(self.text, self.index);
-      self.index = next;
-      return Some(FormulaAst::Literal(FormulaValue::Number(value)));
-    }
-    if let Some((error, next)) = parse_formula_error_literal_at(self.text, self.index) {
-      self.index = next;
-      return Some(FormulaAst::Literal(FormulaValue::Error(error_value(error))));
-    }
-    self.parse_identifier_reference_or_function()
   }
+  let ast = syntax
+    .ast
+    .as_ref()
+    .and_then(|ast| formula_ast_from_syntax(sheet, text, ast));
+  if ast.is_some() && syntax.complete {
+    (ast, unsupported)
+  } else {
+    unsupported.push(UnsupportedFormulaFeature {
+      feature: Cow::Owned(text.to_string()),
+      reason: Cow::Borrowed("formula expression is not fully parsed"),
+    });
+    (None, unsupported)
+  }
+}
 
-  fn parse_array(&mut self) -> Option<FormulaAst<'doc>> {
-    self.consume_char('{');
-    let mut rows = Vec::new();
-    let mut row = Vec::new();
-    loop {
-      self.skip_ws();
-      if self.consume_char('}') {
-        if !row.is_empty() {
-          rows.push(row);
-        } else if !rows.is_empty() {
-          rows.push(vec![FormulaAst::Literal(FormulaValue::Blank)]);
-        }
-        break;
-      }
-      if self.consume_char(',') {
-        row.push(FormulaAst::Literal(FormulaValue::Blank));
-        continue;
-      }
-      if self.consume_char(';') || self.consume_char('|') {
-        if row.is_empty() {
-          row.push(FormulaAst::Literal(FormulaValue::Blank));
-        }
-        rows.push(row);
-        row = Vec::new();
-        continue;
-      }
-      row.push(self.parse_expression()?);
-      self.skip_ws();
-      if self.consume_char(',') {
-        continue;
-      }
-      if self.consume_char(';') || self.consume_char('|') {
-        rows.push(row);
-        row = Vec::new();
-        continue;
-      }
-      if self.consume_char('}') {
-        rows.push(row);
-        break;
-      }
-      return None;
+fn formula_ast_from_syntax<'doc>(
+  sheet: SheetId,
+  text: &str,
+  ast: &crate::parser::SyntaxNode,
+) -> Option<FormulaAst<'doc>> {
+  match ast {
+    crate::parser::SyntaxNode::Blank => Some(FormulaAst::Literal(FormulaValue::Blank)),
+    crate::parser::SyntaxNode::Text(span) => {
+      let (value, _) = parse_formula_string(text, span.start);
+      Some(FormulaAst::Literal(FormulaValue::String(Cow::Owned(value))))
     }
-    Some(FormulaAst::Array(rows))
+    crate::parser::SyntaxNode::Number(value) => {
+      Some(FormulaAst::Literal(FormulaValue::Number(*value)))
+    }
+    crate::parser::SyntaxNode::Error(error) => Some(FormulaAst::Literal(FormulaValue::Error(
+      formula_error_from_lex(*error),
+    ))),
+    crate::parser::SyntaxNode::Word(span) => formula_ast_from_syntax_word(sheet, text, *span),
+    crate::parser::SyntaxNode::Unary { op, expr } => {
+      let op = match op {
+        crate::parser::LexOperator::Add => FormulaOperator::UnaryPlus,
+        crate::parser::LexOperator::Subtract => FormulaOperator::UnaryMinus,
+        crate::parser::LexOperator::Percent => FormulaOperator::Percent,
+        _ => return None,
+      };
+      Some(FormulaAst::Unary {
+        op,
+        expr: Box::new(formula_ast_from_syntax(sheet, text, expr)?),
+      })
+    }
+    crate::parser::SyntaxNode::Binary { op, left, right } => Some(FormulaAst::Binary {
+      op: formula_operator_from_lex(*op),
+      left: Box::new(formula_ast_from_syntax(sheet, text, left)?),
+      right: Box::new(formula_ast_from_syntax(sheet, text, right)?),
+    }),
+    crate::parser::SyntaxNode::Function { name, args } => Some(FormulaAst::Function {
+      name: Cow::Owned(text.get(name.start..name.end)?.to_string()),
+      args: formula_ast_args_from_syntax(sheet, text, args)?,
+    }),
+    crate::parser::SyntaxNode::LogicalFunction { function, args } => Some(FormulaAst::Function {
+      name: Cow::Borrowed(function.name()),
+      args: formula_ast_args_from_syntax(sheet, text, args)?,
+    }),
+    crate::parser::SyntaxNode::Array(rows) => Some(FormulaAst::Array(
+      rows
+        .iter()
+        .map(|row| formula_ast_args_from_syntax(sheet, text, row))
+        .collect::<Option<Vec<_>>>()?,
+    )),
   }
+}
 
-  fn parse_identifier_reference_or_function(&mut self) -> Option<FormulaAst<'doc>> {
-    let start = self.index;
-    let (_, next) = parse_formula_word(self.text, self.index);
-    if next == start {
-      return None;
-    }
-    let word = &self.text[start..next];
-    self.index = next;
-    self.skip_ws();
-    if let Some((range, next)) = parse_reference_prefix_before_intersection(self.sheet, word, start)
-    {
-      self.index = next;
-      return Some(FormulaAst::Reference(range));
-    }
-    if self.peek_char() == Some('(') {
-      let args = self.parse_argument_list()?;
-      return Some(FormulaAst::Function {
-        name: Cow::Owned(word.to_string()),
-        args,
-      });
-    }
-    if let Some(external) = parse_external_reference_id(word) {
-      return Some(FormulaAst::ExternalReference(external));
-    }
-    if let Some(range) = parse_formula_range(self.sheet, word) {
-      return Some(FormulaAst::Reference(range));
-    }
-    if is_formula_error_literal(word) {
-      return Some(FormulaAst::Literal(FormulaValue::Error(error_value(word))));
-    }
-    if word.eq_ignore_ascii_case("TRUE") {
-      return Some(FormulaAst::Literal(FormulaValue::Boolean(true)));
-    }
-    if word.eq_ignore_ascii_case("FALSE") {
-      return Some(FormulaAst::Literal(FormulaValue::Boolean(false)));
-    }
-    Some(FormulaAst::Name(Cow::Owned(word.to_string())))
-  }
+fn formula_ast_args_from_syntax<'doc>(
+  sheet: SheetId,
+  text: &str,
+  args: &[crate::parser::SyntaxNode],
+) -> Option<Vec<FormulaAst<'doc>>> {
+  args
+    .iter()
+    .map(|arg| formula_ast_from_syntax(sheet, text, arg))
+    .collect()
+}
 
-  fn parse_argument_list(&mut self) -> Option<Vec<FormulaAst<'doc>>> {
-    if !self.consume_char('(') {
-      return None;
-    }
-    let mut args = Vec::new();
-    loop {
-      self.skip_ws();
-      if self.consume_char(')') {
-        break;
-      }
-      if self.consume_char(',') {
-        args.push(FormulaAst::Literal(FormulaValue::Blank));
-        continue;
-      }
-      args.push(self.parse_expression()?);
-      self.skip_ws();
-      if self.consume_char(')') {
-        break;
-      }
-      if !self.consume_char(',') {
-        return None;
-      }
-      self.skip_ws();
-      if self.peek_char() == Some(')') {
-        args.push(FormulaAst::Literal(FormulaValue::Blank));
-      }
-    }
-    Some(args)
+fn formula_ast_from_syntax_word<'doc>(
+  sheet: SheetId,
+  text: &str,
+  span: crate::parser::SyntaxSpan,
+) -> Option<FormulaAst<'doc>> {
+  let word = text.get(span.start..span.end)?;
+  if let Some(external) = crate::parser::external_reference_spans(word)
+    .map(|reference| external_reference_id_from_spans(word, reference))
+  {
+    return Some(FormulaAst::ExternalReference(external));
   }
-
-  fn consume_comparison_operator(&mut self) -> Option<FormulaOperator> {
-    if self.consume_str("<>") {
-      Some(FormulaOperator::NotEqual)
-    } else if self.consume_str("<=") {
-      Some(FormulaOperator::LessOrEqual)
-    } else if self.consume_str(">=") {
-      Some(FormulaOperator::GreaterOrEqual)
-    } else if self.consume_char('=') {
-      Some(FormulaOperator::Equal)
-    } else if self.consume_char('<') {
-      Some(FormulaOperator::Less)
-    } else if self.consume_char('>') {
-      Some(FormulaOperator::Greater)
-    } else {
-      None
-    }
+  if let Some(range) = parse_formula_range(sheet, word) {
+    return Some(FormulaAst::Reference(range));
   }
-
-  fn consume_adjacent_logical_function_name(&mut self) -> Option<&'static str> {
-    let rest = &self.text[self.index..];
-    let name = if rest
-      .get(..3)
-      .is_some_and(|value| value.eq_ignore_ascii_case("AND"))
-    {
-      "AND"
-    } else if rest
-      .get(..2)
-      .is_some_and(|value| value.eq_ignore_ascii_case("OR"))
-    {
-      "OR"
-    } else if rest
-      .get(..3)
-      .is_some_and(|value| value.eq_ignore_ascii_case("NOT"))
-    {
-      "NOT"
-    } else {
-      return None;
-    };
-    let next = self.index + name.len();
-    if next < self.text.len() {
-      let next_char = self.text[next..].chars().next()?;
-      if is_formula_word_char(next_char) {
-        return None;
-      }
-    }
-    let mut probe = next;
-    while let Some(ch) = self.text[probe..].chars().next() {
-      if !ch.is_whitespace() {
-        break;
-      }
-      probe += ch.len_utf8();
-    }
-    if self.text[probe..].starts_with('(') {
-      self.index = next;
-      Some(name)
-    } else {
-      None
-    }
+  if word.eq_ignore_ascii_case("TRUE") {
+    return Some(FormulaAst::Literal(FormulaValue::Boolean(true)));
   }
-
-  fn skip_ws(&mut self) {
-    while self.peek_char().is_some_and(char::is_whitespace) {
-      self.index += self.peek_char().map(char::len_utf8).unwrap_or_default();
-    }
+  if word.eq_ignore_ascii_case("FALSE") {
+    return Some(FormulaAst::Literal(FormulaValue::Boolean(false)));
   }
-
-  fn is_end(&self) -> bool {
-    self.index >= self.text.len()
-  }
-
-  fn starts_number(&self) -> bool {
-    let mut chars = self.text[self.index..].chars();
-    match chars.next() {
-      Some(ch) if ch.is_ascii_digit() => true,
-      Some('.') => chars.next().is_some_and(|ch| ch.is_ascii_digit()),
-      _ => false,
-    }
-  }
-
-  fn peek_char(&self) -> Option<char> {
-    self.text[self.index..].chars().next()
-  }
-
-  fn consume_char(&mut self, expected: char) -> bool {
-    if self.peek_char() == Some(expected) {
-      self.index += expected.len_utf8();
-      true
-    } else {
-      false
-    }
-  }
-
-  fn consume_str(&mut self, expected: &str) -> bool {
-    if self.text[self.index..].starts_with(expected) {
-      self.index += expected.len();
-      true
-    } else {
-      false
-    }
-  }
+  Some(FormulaAst::Name(Cow::Owned(word.to_string())))
 }
 
 struct FormulaEvaluator<'a, 'doc> {
@@ -19887,35 +19545,6 @@ fn index_matrix<'doc>(
     .unwrap_or(FormulaValue::Error(FormulaErrorValue::Ref))
 }
 
-fn parse_reference_prefix_before_intersection<'doc>(
-  sheet: SheetId,
-  token: &str,
-  start: usize,
-) -> Option<(QualifiedRange<'doc>, usize)> {
-  let mut quoted = false;
-  let mut chars = token.char_indices().peekable();
-  while let Some((index, ch)) = chars.next() {
-    match ch {
-      '\'' => {
-        if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      '!' if !quoted => {
-        let prefix = &token[..index];
-        if prefix.contains(':') {
-          let range = parse_formula_range(sheet, prefix)?;
-          return Some((range, start + index));
-        }
-      }
-      _ => {}
-    }
-  }
-  None
-}
-
 fn push_unique_qualified_range<'doc>(
   ranges: &mut Vec<QualifiedRange<'doc>>,
   range: QualifiedRange<'doc>,
@@ -19925,18 +19554,23 @@ fn push_unique_qualified_range<'doc>(
   }
 }
 
-fn parse_external_reference_id<'doc>(token: &str) -> Option<ExternalReferenceId<'doc>> {
-  let (book, rest) = token.strip_prefix('[')?.split_once(']')?;
-  let (sheet, name) = rest.rsplit_once('!').map_or((None, rest), |(sheet, name)| {
-    (Some(sheet.trim_matches('\'')), name)
-  });
-  Some(ExternalReferenceId {
-    book: Some(Cow::Owned(book.to_string())),
-    sheet: sheet
-      .filter(|sheet| !sheet.is_empty())
-      .map(|sheet| Cow::Owned(sheet.replace("''", "'"))),
-    name: (!name.is_empty()).then(|| Cow::Owned(name.to_string())),
-  })
+fn external_reference_id_from_spans<'doc>(
+  source: &str,
+  reference: crate::parser::ExternalReferenceSpans,
+) -> ExternalReferenceId<'doc> {
+  ExternalReferenceId {
+    book: Some(Cow::Owned(span_text(source, reference.book).to_string())),
+    sheet: reference
+      .sheet
+      .map(|sheet| Cow::Owned(span_text(source, sheet).replace("''", "'"))),
+    name: reference
+      .name
+      .map(|name| Cow::Owned(span_text(source, name).to_string())),
+  }
+}
+
+fn span_text(source: &str, span: crate::parser::SemanticSpan) -> &str {
+  source.get(span.start..span.end).unwrap_or_default()
 }
 
 fn dependency_from_range<'doc>(
@@ -19973,29 +19607,6 @@ fn parse_formula_string(value: &str, start: usize) -> (String, usize) {
     }
   }
   (parsed, index)
-}
-
-fn parse_formula_number(value: &str, start: usize) -> (f64, usize) {
-  let mut index = start;
-  let mut previous_was_exponent = false;
-  while index < value.len() {
-    let Some(ch) = value[index..].chars().next() else {
-      break;
-    };
-    if ch.is_ascii_digit() || ch == '.' || matches!(ch, 'E' | 'e') {
-      previous_was_exponent = matches!(ch, 'E' | 'e');
-      index += ch.len_utf8();
-    } else if matches!(ch, '+' | '-') && previous_was_exponent {
-      previous_was_exponent = false;
-      index += ch.len_utf8();
-    } else {
-      break;
-    }
-  }
-  (
-    value[start..index].parse::<f64>().unwrap_or_default(),
-    index,
-  )
 }
 
 fn parse_grouped_formula_number(value: &str) -> Option<f64> {
@@ -20048,126 +19659,6 @@ fn is_matrix_argument(value: &FormulaValue<'_>) -> bool {
     value,
     FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
   )
-}
-
-fn parse_formula_operator(value: &str, start: usize) -> Option<(FormulaOperator, usize)> {
-  let rest = &value[start..];
-  let (operator, width) = if rest.starts_with("<>") {
-    (FormulaOperator::NotEqual, 2)
-  } else if rest.starts_with("<=") {
-    (FormulaOperator::LessOrEqual, 2)
-  } else if rest.starts_with(">=") {
-    (FormulaOperator::GreaterOrEqual, 2)
-  } else {
-    match rest.chars().next()? {
-      '+' => (FormulaOperator::Add, 1),
-      '-' => (FormulaOperator::Subtract, 1),
-      '*' => (FormulaOperator::Multiply, 1),
-      '/' => (FormulaOperator::Divide, 1),
-      '^' => (FormulaOperator::Power, 1),
-      '&' => (FormulaOperator::Concat, 1),
-      '=' => (FormulaOperator::Equal, 1),
-      '<' => (FormulaOperator::Less, 1),
-      '>' => (FormulaOperator::Greater, 1),
-      ':' => (FormulaOperator::Range, 1),
-      '~' => (FormulaOperator::Union, 1),
-      '!' => (FormulaOperator::Intersection, 1),
-      '%' => (FormulaOperator::Percent, 1),
-      _ => return None,
-    }
-  };
-  Some((operator, start + width))
-}
-
-fn parse_formula_word(value: &str, start: usize) -> (&str, usize) {
-  let mut index = start;
-  let mut quoted = false;
-  let mut table_ref_depth = 0i32;
-  while index < value.len() {
-    let Some(ch) = value[index..].chars().next() else {
-      break;
-    };
-    if table_ref_depth > 0 {
-      match ch {
-        '[' => table_ref_depth += 1,
-        ']' => table_ref_depth -= 1,
-        _ => {}
-      }
-      index += ch.len_utf8();
-      continue;
-    }
-    if ch == '\'' {
-      quoted = !quoted;
-      index += ch.len_utf8();
-      continue;
-    }
-    if !quoted && ch == '[' {
-      table_ref_depth += 1;
-      index += ch.len_utf8();
-      continue;
-    }
-    if !quoted && ch == ':' && should_stop_formula_word_at_range_operator(value, index) {
-      break;
-    }
-    if !quoted && !is_formula_word_char(ch) {
-      break;
-    }
-    index += ch.len_utf8();
-  }
-  (&value[start..index], index)
-}
-
-fn is_formula_word_char(ch: char) -> bool {
-  ch.is_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#')
-}
-
-fn should_stop_formula_word_at_range_operator(value: &str, index: usize) -> bool {
-  let mut next = index + ':'.len_utf8();
-  while next < value.len() {
-    let Some(ch) = value[next..].chars().next() else {
-      break;
-    };
-    if !ch.is_whitespace() {
-      break;
-    }
-    next += ch.len_utf8();
-  }
-  if value[next..].starts_with('(') {
-    return true;
-  }
-  let Some(ch) = value[next..].chars().next() else {
-    return false;
-  };
-  if !(ch.is_ascii_alphabetic() || ch == '_' || ch == '.') {
-    return false;
-  }
-  let start = next;
-  next += ch.len_utf8();
-  while next < value.len() {
-    let Some(ch) = value[next..].chars().next() else {
-      break;
-    };
-    if !(ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_')) {
-      break;
-    }
-    next += ch.len_utf8();
-  }
-  if value[start..next]
-    .chars()
-    .any(|ch| ch.is_ascii_digit() || ch == '.')
-  {
-    return false;
-  }
-  while next < value.len() {
-    let Some(ch) = value[next..].chars().next() else {
-      break;
-    };
-    if !ch.is_whitespace() {
-      break;
-    }
-    next += ch.len_utf8();
-  }
-  value[next..].starts_with('(')
 }
 
 fn cell_in_range(address: CellAddress, range: &CellRange) -> bool {
@@ -20279,37 +19770,8 @@ fn compatible_range_sheet_name<'doc>(
   }
 }
 
-fn is_volatile_function(value: &str) -> bool {
-  // Source: LibreOffice formula/source/core/api/FormulaCompiler.cxx IsOpCodeVolatile.
-  matches!(
-    value.to_ascii_uppercase().as_str(),
-    "RAND"
-      | "TODAY"
-      | "NOW"
-      | "FORMULA"
-      | "INFO"
-      | "INDIRECT"
-      | "OFFSET"
-      | "DEBUGVAR"
-      | "RANDARRAY"
-      | "RANDBETWEEN"
-  )
-}
-
 fn is_formula_error_literal(value: &str) -> bool {
   formula_error_literals().contains(&value)
-}
-
-fn parse_formula_error_literal_at(value: &str, start: usize) -> Option<(&str, usize)> {
-  let rest = value.get(start..)?;
-  formula_error_literals()
-    .iter()
-    .find(|literal| {
-      rest
-        .get(..literal.len())
-        .is_some_and(|prefix| prefix == **literal)
-    })
-    .map(|literal| (*literal, start + literal.len()))
 }
 
 fn formula_error_literals() -> &'static [&'static str] {
@@ -21470,6 +20932,62 @@ mod tests {
 
   #[test]
   fn parses_external_and_volatile_formula_dependencies() {
+    let forced = parse_formula(
+      SheetId(1),
+      Cow::Borrowed("==NOW()"),
+      FormulaGrammar::ExcelA1,
+    );
+
+    assert!(
+      forced
+        .dependencies
+        .iter()
+        .any(|dependency| matches!(dependency, FormulaDependency::Volatile))
+    );
+    assert!(
+      forced
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::Function(name) if name.as_ref() == "NOW"))
+    );
+
+    let boolean = parse_formula(SheetId(1), Cow::Borrowed("TRUE"), FormulaGrammar::ExcelA1);
+
+    assert!(
+      boolean
+        .tokens
+        .iter()
+        .any(|token| matches!(token, FormulaToken::Literal(FormulaValue::Boolean(true))))
+    );
+    assert!(!boolean.dependencies.iter().any(
+      |dependency| matches!(dependency, FormulaDependency::Name(name) if name.as_ref() == "TRUE")
+    ));
+
+    let not_available = parse_formula(SheetId(1), Cow::Borrowed("#N/A"), FormulaGrammar::ExcelA1);
+
+    assert!(not_available.tokens.iter().any(|token| matches!(
+      token,
+      FormulaToken::Literal(FormulaValue::Error(FormulaErrorValue::NA))
+    )));
+    assert!(not_available.unsupported.is_empty());
+
+    let quoted_external = parse_formula(
+      SheetId(1),
+      Cow::Borrowed("[Book.xlsx]'Q''1'!$A$1"),
+      FormulaGrammar::ExcelA1,
+    );
+
+    assert!(quoted_external.dependencies.iter().any(|dependency| {
+      matches!(
+        dependency,
+        FormulaDependency::External(ExternalReferenceId {
+          book: Some(book),
+          sheet: Some(sheet),
+          name: Some(name),
+        }) if book.as_ref() == "Book.xlsx" && sheet.as_ref() == "Q'1" && name.as_ref() == "$A$1"
+      )
+    }));
+
     let parsed = parse_formula(
       SheetId(1),
       Cow::Borrowed("RAND()+[Book.xlsx]'Q1'!$A$1+LocalName"),

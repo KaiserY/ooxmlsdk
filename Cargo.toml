@@ -86,6 +86,7 @@ statrs = { version = "0.18.0", default-features = false }
 ttf-parser = "0.25.1"
 unicode-bidi = "0.3.18"
 unicode-script = "0.5.8"
+winnow = "1.0.3"
 
 [profile.dev]
 incremental = false

@@ -26,3 +26,4 @@ regex = { workspace = true }
 rustfft = { workspace = true }
 statrs = { workspace = true }
 thiserror = { workspace = true }
+winnow = { workspace = true }

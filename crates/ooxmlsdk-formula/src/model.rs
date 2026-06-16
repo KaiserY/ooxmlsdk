@@ -4627,14 +4627,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .number_arg(args, 0)
         .map(|value| FormulaValue::Number(sign_number(value)))
         .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
-      "INT" => {
-        let Some(arg) = args.first() else {
-          return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
-        };
-        Some(FormulaValue::Number(approx_floor(
-          self.number(&self.evaluate(arg)?)?,
-        )))
-      }
+      "INT" => self.evaluate_numeric_unary(args, approx_floor),
       "TRUNC" => self.evaluate_trunc(args),
       "MOD" => self.evaluate_mod(args),
       "EVEN" => Some(FormulaValue::Number(even_odd(
@@ -11711,65 +11704,60 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     kind: CeilingFloorKind,
   ) -> Option<FormulaValue<'doc>> {
-    if kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()) {
+    if (kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()))
+      || (kind != CeilingFloorKind::Precise && !(1..=3).contains(&args.len()))
+    {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let value = self.number(&self.evaluate(args.first()?)?)?;
-    let significance = match kind {
-      CeilingFloorKind::Odff => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
-        _ => {
-          if value < 0.0 {
-            -1.0
-          } else {
-            1.0
-          }
+    let value = self.evaluate(args.first()?)?;
+    let significance = args
+      .get(1)
+      .filter(|arg| !is_missing_argument(arg))
+      .and_then(|arg| self.evaluate(arg));
+    let abs_mode = args
+      .get(2)
+      .and_then(|arg| self.evaluate(arg))
+      .is_some_and(|value| self.truthy(&value));
+    if self.array_context
+      && (is_matrix_argument(&value) || significance.as_ref().is_some_and(is_matrix_argument))
+    {
+      return match significance {
+        Some(significance) => {
+          self.map_binary_values(value, significance, |evaluator, value, significance| {
+            Some(evaluator.ceiling_value(value, Some(significance), abs_mode, kind))
+          })
         }
-      },
-      CeilingFloorKind::Math => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(1.0),
-        _ => 1.0,
-      },
-      CeilingFloorKind::Precise => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(1.0)
-          .abs(),
-        _ => 1.0,
-      },
+        None => self.map_unary_values(value, |evaluator, value| {
+          Some(evaluator.ceiling_value(value, None, abs_mode, kind))
+        }),
+      };
+    }
+    Some(self.ceiling_value(&value, significance.as_ref(), abs_mode, kind))
+  }
+
+  fn ceiling_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    significance: Option<&FormulaValue<'doc>>,
+    abs_mode: bool,
+    kind: CeilingFloorKind,
+  ) -> FormulaValue<'doc> {
+    let Some(value) = self.number(value) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
     };
+    let significance = self.ceiling_floor_significance(value, significance, kind);
     if value == 0.0 || significance == 0.0 {
-      return Some(FormulaValue::Number(0.0));
+      return FormulaValue::Number(0.0);
     }
     match kind {
+      CeilingFloorKind::Odff if value * significance < 0.0 => {
+        FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+      }
+      CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
+        FormulaValue::Number(approx_floor(value / significance) * significance)
+      }
       CeilingFloorKind::Odff => {
-        if value * significance < 0.0 {
-          Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
-        } else if value < 0.0 {
-          let abs_mode = args
-            .get(2)
-            .and_then(|arg| self.evaluate(arg))
-            .is_some_and(|value| self.truthy(&value));
-          let quotient = value / significance;
-          Some(FormulaValue::Number(
-            if abs_mode {
-              approx_ceil(quotient)
-            } else {
-              approx_floor(quotient)
-            } * significance,
-          ))
-        } else {
-          Some(FormulaValue::Number(
-            approx_ceil(value / significance) * significance,
-          ))
-        }
+        FormulaValue::Number(approx_ceil(value / significance) * significance)
       }
       CeilingFloorKind::Math => {
         let significance = if value * significance < 0.0 {
@@ -11777,22 +11765,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         } else {
           significance
         };
-        let abs_mode = args
-          .get(2)
-          .and_then(|arg| self.evaluate(arg))
-          .is_some_and(|value| self.truthy(&value));
-        let quotient = value / significance;
-        Some(FormulaValue::Number(
-          if !abs_mode && value < 0.0 {
-            approx_floor(quotient)
-          } else {
-            approx_ceil(quotient)
-          } * significance,
-        ))
+        if !abs_mode && value < 0.0 {
+          FormulaValue::Number(approx_floor(value / significance) * significance)
+        } else {
+          FormulaValue::Number(approx_ceil(value / significance) * significance)
+        }
       }
-      CeilingFloorKind::Precise => Some(FormulaValue::Number(
-        approx_ceil(value / significance) * significance,
-      )),
+      CeilingFloorKind::Precise => {
+        FormulaValue::Number(approx_ceil(value / significance) * significance)
+      }
     }
   }
 
@@ -11801,65 +11782,60 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     kind: CeilingFloorKind,
   ) -> Option<FormulaValue<'doc>> {
-    if kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()) {
+    if (kind == CeilingFloorKind::Precise && !(1..=2).contains(&args.len()))
+      || (kind != CeilingFloorKind::Precise && !(1..=3).contains(&args.len()))
+    {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let value = self.number(&self.evaluate(args.first()?)?)?;
-    let significance = match kind {
-      CeilingFloorKind::Odff => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
-        _ => {
-          if value < 0.0 {
-            -1.0
-          } else {
-            1.0
-          }
+    let value = self.evaluate(args.first()?)?;
+    let significance = args
+      .get(1)
+      .filter(|arg| !is_missing_argument(arg))
+      .and_then(|arg| self.evaluate(arg));
+    let abs_mode = args
+      .get(2)
+      .and_then(|arg| self.evaluate(arg))
+      .is_some_and(|value| self.truthy(&value));
+    if self.array_context
+      && (is_matrix_argument(&value) || significance.as_ref().is_some_and(is_matrix_argument))
+    {
+      return match significance {
+        Some(significance) => {
+          self.map_binary_values(value, significance, |evaluator, value, significance| {
+            Some(evaluator.floor_value(value, Some(significance), abs_mode, kind))
+          })
         }
-      },
-      CeilingFloorKind::Math => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(1.0),
-        _ => 1.0,
-      },
-      CeilingFloorKind::Precise => match args.get(1) {
-        Some(arg) if !is_missing_argument(arg) => self
-          .evaluate(arg)
-          .and_then(|value| self.number(&value))
-          .unwrap_or(1.0)
-          .abs(),
-        _ => 1.0,
-      },
+        None => self.map_unary_values(value, |evaluator, value| {
+          Some(evaluator.floor_value(value, None, abs_mode, kind))
+        }),
+      };
+    }
+    Some(self.floor_value(&value, significance.as_ref(), abs_mode, kind))
+  }
+
+  fn floor_value(
+    &self,
+    value: &FormulaValue<'doc>,
+    significance: Option<&FormulaValue<'doc>>,
+    abs_mode: bool,
+    kind: CeilingFloorKind,
+  ) -> FormulaValue<'doc> {
+    let Some(value) = self.number(value) else {
+      return FormulaValue::Error(FormulaErrorValue::Value);
     };
+    let significance = self.ceiling_floor_significance(value, significance, kind);
     if value == 0.0 || significance == 0.0 {
-      return Some(FormulaValue::Number(0.0));
+      return FormulaValue::Number(0.0);
     }
     match kind {
+      CeilingFloorKind::Odff if value * significance < 0.0 => {
+        FormulaValue::Error(FormulaErrorValue::IllegalArgument)
+      }
+      CeilingFloorKind::Odff if !abs_mode && value < 0.0 => {
+        FormulaValue::Number(approx_ceil(value / significance) * significance)
+      }
       CeilingFloorKind::Odff => {
-        if value * significance < 0.0 {
-          Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
-        } else if value < 0.0 {
-          let abs_mode = args
-            .get(2)
-            .and_then(|arg| self.evaluate(arg))
-            .is_some_and(|value| self.truthy(&value));
-          let quotient = value / significance;
-          Some(FormulaValue::Number(
-            if abs_mode {
-              approx_floor(quotient)
-            } else {
-              approx_ceil(quotient)
-            } * significance,
-          ))
-        } else {
-          Some(FormulaValue::Number(
-            approx_floor(value / significance) * significance,
-          ))
-        }
+        FormulaValue::Number(approx_floor(value / significance) * significance)
       }
       CeilingFloorKind::Math => {
         let significance = if value * significance < 0.0 {
@@ -11867,22 +11843,35 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         } else {
           significance
         };
-        let abs_mode = args
-          .get(2)
-          .and_then(|arg| self.evaluate(arg))
-          .is_some_and(|value| self.truthy(&value));
-        let quotient = value / significance;
-        Some(FormulaValue::Number(
-          if !abs_mode && value < 0.0 {
-            approx_ceil(quotient)
-          } else {
-            approx_floor(quotient)
-          } * significance,
-        ))
+        if !abs_mode && value < 0.0 {
+          FormulaValue::Number(approx_ceil(value / significance) * significance)
+        } else {
+          FormulaValue::Number(approx_floor(value / significance) * significance)
+        }
       }
-      CeilingFloorKind::Precise => Some(FormulaValue::Number(
-        approx_floor(value / significance) * significance,
-      )),
+      CeilingFloorKind::Precise => {
+        FormulaValue::Number(approx_floor(value / significance) * significance)
+      }
+    }
+  }
+
+  fn ceiling_floor_significance(
+    &self,
+    value: f64,
+    significance: Option<&FormulaValue<'doc>>,
+    kind: CeilingFloorKind,
+  ) -> f64 {
+    match kind {
+      CeilingFloorKind::Odff => significance
+        .and_then(|value| self.number(value))
+        .unwrap_or(if value < 0.0 { -1.0 } else { 1.0 }),
+      CeilingFloorKind::Math => significance
+        .and_then(|value| self.number(value))
+        .unwrap_or(1.0),
+      CeilingFloorKind::Precise => significance
+        .and_then(|value| self.number(value))
+        .unwrap_or(1.0)
+        .abs(),
     }
   }
 
@@ -16777,6 +16766,26 @@ impl EtsCalculation {
       }
       self.refill();
     }
+    if high_error > low_error {
+      if low_error < self.mse {
+        self.alpha = low;
+        if self.double_smoothing {
+          self.calc_gamma();
+        } else {
+          self.calc_beta_gamma();
+        }
+        self.refill();
+      }
+    } else if high_error < self.mse {
+      self.alpha = high;
+      if self.double_smoothing {
+        self.calc_gamma();
+      } else {
+        self.calc_beta_gamma();
+      }
+      self.refill();
+    }
+    self.calc_accuracy();
   }
 
   fn calc_beta_gamma(&mut self) {
@@ -16814,6 +16823,17 @@ impl EtsCalculation {
       self.calc_gamma();
       self.refill();
     }
+    if high_error > low_error {
+      if low_error < self.mse {
+        self.beta = low;
+        self.calc_gamma();
+        self.refill();
+      }
+    } else if high_error < self.mse {
+      self.beta = high;
+      self.calc_gamma();
+      self.refill();
+    }
   }
 
   fn calc_gamma(&mut self) {
@@ -16844,6 +16864,15 @@ impl EtsCalculation {
         mid = (mid + high) / 2.0;
       }
       self.gamma = mid;
+      self.refill();
+    }
+    if high_error > low_error {
+      if low_error < self.mse {
+        self.gamma = low;
+        self.refill();
+      }
+    } else if high_error < self.mse {
+      self.gamma = high;
       self.refill();
     }
   }
@@ -22371,13 +22400,16 @@ fn fraction_bit_count(value: f64) -> u32 {
   let bits = value.to_bits();
   let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023;
   if exponent >= 52 {
-    0
-  } else if exponent < 0 {
+    return 0;
+  }
+  let fraction = bits & ((1_u64 << 52) - 1);
+  let least_significant = if fraction == 0 {
     53
   } else {
-    let mask = (1_u64 << (52 - exponent as u32)) - 1;
-    (bits & mask).count_ones()
-  }
+    fraction.trailing_zeros() + 1
+  };
+  let fraction_significant = 53 - least_significant as i32;
+  (fraction_significant - exponent).max(0) as u32
 }
 
 fn display_text_from_value(value: &FormulaValue<'_>) -> String {
@@ -24888,6 +24920,13 @@ fn is_multicell_scalar_argument(value: &FormulaValue<'_>) -> bool {
   }
 }
 
+fn is_matrix_argument(value: &FormulaValue<'_>) -> bool {
+  matches!(
+    value,
+    FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+  )
+}
+
 fn parse_formula_operator(value: &str, start: usize) -> Option<(FormulaOperator, usize)> {
   let rest = &value[start..];
   let (operator, width) = if rest.starts_with("<>") {
@@ -26745,6 +26784,185 @@ mod tests {
         .and_then(|record| record.display_value.as_ref())
         .map(|display| display.text.as_ref()),
       Some("4")
+    );
+  }
+
+  #[test]
+  fn evaluator_ceiling_broadcasts_array_arguments_like_libreoffice() {
+    let book = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 10, row: 3 }),
+          FormulaValue::Number(7.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 10, row: 4 }),
+          FormulaValue::Number(8.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 10, row: 5 }),
+          FormulaValue::Number(9.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 11, row: 2 }),
+          FormulaValue::Number(2.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 12, row: 2 }),
+          FormulaValue::Number(3.0),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    let parsed = parse_formula_with_context(
+      FormulaParseContext {
+        current_sheet: SheetId(1),
+        current_cell: Some(CellAddress { column: 11, row: 3 }),
+        grammar: FormulaGrammar::OpenFormula,
+      },
+      Cow::Borrowed("of:=CEILING([.K4:.K6];[.L3:.M3])"),
+    );
+
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(
+        SheetId(1),
+        Some(CellAddress { column: 11, row: 3 }),
+        &parsed,
+        true,
+      ),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Number(8.0), FormulaValue::Number(9.0)],
+        vec![FormulaValue::Number(8.0), FormulaValue::Number(9.0)],
+        vec![FormulaValue::Number(10.0), FormulaValue::Number(9.0)],
+      ]))
+    );
+
+    let book = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 5, row: 9 }),
+          FormulaValue::Number(7.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 10 }),
+          FormulaValue::Number(8.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 5, row: 11 }),
+          FormulaValue::Number(9.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 6, row: 8 }),
+          FormulaValue::Number(2.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 7, row: 8 }),
+          FormulaValue::Number(3.0),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+    let parsed = parse_formula_with_context(
+      FormulaParseContext {
+        current_sheet: SheetId(1),
+        current_cell: Some(CellAddress { column: 6, row: 9 }),
+        grammar: FormulaGrammar::OpenFormula,
+      },
+      Cow::Borrowed("of:=[.F10:.F12]-[.G9:.H9]*INT([.F10:.F12]/[.G9:.H9])"),
+    );
+
+    assert_eq!(
+      book.evaluate_parsed_formula_raw(
+        SheetId(1),
+        Some(CellAddress { column: 6, row: 9 }),
+        &parsed,
+        true,
+      ),
+      Some(FormulaValue::Matrix(vec![
+        vec![FormulaValue::Number(1.0), FormulaValue::Number(1.0)],
+        vec![FormulaValue::Number(0.0), FormulaValue::Number(2.0)],
+        vec![FormulaValue::Number(1.0), FormulaValue::Number(0.0)],
+      ]))
+    );
+  }
+
+  #[test]
+  fn evaluator_round_matches_libreoffice_corrected_rounding() {
+    let book = FormulaEvaluationBook::default();
+
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ROUND(1.1267819797944982,12)"),
+      Some(FormulaValue::Number(1.126781979795))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "ROUND(1.1267819797945,12)"),
+      Some(FormulaValue::Number(1.126781979795))
+    );
+  }
+
+  #[test]
+  fn evaluator_forecast_ets_matches_libreoffice_endpoint_search() {
+    let book = FormulaEvaluationBook {
+      cells: BTreeMap::from([
+        (
+          (SheetId(1), CellAddress { column: 12, row: 0 }),
+          FormulaValue::Number(1.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 12, row: 1 }),
+          FormulaValue::Number(2.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 12, row: 2 }),
+          FormulaValue::Number(3.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 12, row: 3 }),
+          FormulaValue::Number(4.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 12, row: 4 }),
+          FormulaValue::Number(5.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 13, row: 0 }),
+          FormulaValue::Number(2.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 13, row: 1 }),
+          FormulaValue::Number(4.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 13, row: 2 }),
+          FormulaValue::Number(7.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 13, row: 3 }),
+          FormulaValue::Number(8.0),
+        ),
+        (
+          (SheetId(1), CellAddress { column: 13, row: 4 }),
+          FormulaValue::Number(11.0),
+        ),
+      ]),
+      ..FormulaEvaluationBook::default()
+    };
+
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "ROUND(FORECAST.ETS.ADD(6,N1:N5,M1:M5),12)"
+      ),
+      Some(FormulaValue::Number(12.5))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        None,
+        "ROUND(FORECAST.ETS.MULT(6,N1:N5,M1:M5),12)"
+      ),
+      Some(FormulaValue::Number(11.908196123559))
     );
   }
 

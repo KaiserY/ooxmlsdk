@@ -1367,6 +1367,7 @@ dependencies = [
  "encoding_rs",
  "icu_collator",
  "icu_locale",
+ "icu_properties",
  "libm",
  "ooxmlsdk",
  "regex",

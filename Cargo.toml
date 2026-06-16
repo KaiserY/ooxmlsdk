@@ -62,6 +62,7 @@ fontdb = "0.23"
 hypher = "0.1.7"
 icu_collator = { version = "2.2", features = ["compiled_data"] }
 icu_locale = { version = "2.2", features = ["compiled_data"] }
+icu_properties = { version = "2.2", features = ["compiled_data"] }
 icu_segmenter = { version = "2.2", features = ["compiled_data"] }
 image = { version = "0.25.10", default-features = false, features = [
   "png",

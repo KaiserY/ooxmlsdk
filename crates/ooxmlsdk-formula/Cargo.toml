@@ -16,6 +16,7 @@ readme.workspace = true
 encoding_rs = { workspace = true }
 icu_collator = { workspace = true }
 icu_locale = { workspace = true }
+icu_properties = { workspace = true }
 libm = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 regex = { workspace = true }

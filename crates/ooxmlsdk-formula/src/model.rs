@@ -7,6 +7,7 @@ use encoding_rs::WINDOWS_1252;
 use icu_collator::options::{CollatorOptions, Strength};
 use icu_collator::{Collator, CollatorBorrowed, CollatorPreferences};
 use icu_locale::Locale;
+use icu_properties::{CodePointMapData, props::GeneralCategory};
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::workbook_part::WorkbookPart;
 use ooxmlsdk::schemas::x;
@@ -15,10 +16,10 @@ use regex::RegexBuilder;
 use rustfft::FftPlanner;
 use rustfft::num_complex::Complex;
 use statrs::distribution::{
-  Binomial, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, FisherSnedecor, Hypergeometric,
-  LogNormal, NegativeBinomial, Normal, Poisson, StudentsT, Weibull,
+  Binomial, Continuous, ContinuousCDF, Discrete, DiscreteCDF, Exp, Hypergeometric, LogNormal,
+  Normal, StudentsT, Weibull,
 };
-use statrs::function::{erf as statrs_erf, gamma as statrs_gamma};
+use statrs::function::gamma as statrs_gamma;
 
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
@@ -4810,9 +4811,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
         }
       }
-      "SUMSQ" => Some(FormulaValue::Number(kahan_sum(
-        self.numeric_values(args).map(|value| value * value),
-      ))),
+      "SUMSQ" => match self.numeric_aggregate(args, true) {
+        Ok(aggregate) => Some(FormulaValue::Number(kahan_sum(
+          aggregate.values.into_iter().map(|value| value * value),
+        ))),
+        Err(error) => Some(FormulaValue::Error(error)),
+      },
       "SUMPRODUCT" => self.evaluate_sumproduct(args),
       "ROUND" => {
         let value = self.number(&self.evaluate(args.first()?)?)?;
@@ -4857,9 +4861,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "EOMONTH" => self.evaluate_eomonth(args),
       "EDATE" => self.evaluate_edate(args),
       "ISLEAPYEAR" => self.evaluate_is_leap_year(args),
-      "TRIM" => Some(FormulaValue::String(Cow::Owned(trim_formula_text(
-        &self.text(&self.evaluate(args.first()?)?),
-      )))),
+      "TRIM" => self.evaluate_trim(args),
       "UPPER" => Some(FormulaValue::String(Cow::Owned(
         self.text(&self.evaluate(args.first()?)?).to_uppercase(),
       ))),
@@ -4879,17 +4881,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       "LEN" => self.evaluate_len(args, false),
       "LENB" => self.evaluate_len(args, true),
-      "T" => match self.evaluate(args.first()?)? {
-        FormulaValue::String(text) => Some(FormulaValue::String(text)),
-        _ => Some(FormulaValue::String(Cow::Borrowed(""))),
-      },
-      "VALUE" => self
-        .text(&self.evaluate(args.first()?)?)
-        .trim()
-        .parse::<f64>()
-        .ok()
-        .map(FormulaValue::Number)
-        .or(Some(FormulaValue::Error(FormulaErrorValue::Value))),
+      "T" => self.evaluate_t(args),
+      "VALUE" => self.evaluate_value(args),
       "NUMBERVALUE" => self.evaluate_numbervalue(args),
       "DOLLAR" => self.evaluate_dollar(args),
       "FIXED" => self.evaluate_fixed(args),
@@ -4949,9 +4942,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             FormulaErrorValue::IllegalArgument,
           )))
       }
-      "CLEAN" => Some(FormulaValue::String(Cow::Owned(clean_formula_text(
-        &self.text(&self.evaluate(args.first()?)?),
-      )))),
+      "CLEAN" => self.evaluate_clean(args),
       "CHOOSE" => self.evaluate_choose(args),
       "CONCAT" | "CONCATENATE" => Some(FormulaValue::String(Cow::Owned(
         self.values(args).map(|value| self.text(&value)).collect(),
@@ -4963,11 +4954,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "FINDB" => self.evaluate_findb(args),
       "SEARCH" => self.evaluate_find(args, false),
       "SEARCHB" => self.evaluate_findb(args),
-      "REPT" => Some(FormulaValue::String(Cow::Owned(
-        self
-          .text(&self.evaluate(args.first()?)?)
-          .repeat(self.number(&self.evaluate(args.get(1)?)?)?.max(0.0) as usize),
-      ))),
+      "REPT" => {
+        let text = self.text(&self.evaluate(args.first()?)?);
+        let count = self.number(&self.evaluate(args.get(1)?)?)?;
+        if count < 0.0 {
+          return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+        }
+        Some(FormulaValue::String(Cow::Owned(
+          text.repeat(count as usize),
+        )))
+      }
       "SUBSTITUTE" => self.evaluate_substitute(args),
       "REPLACE" => self.evaluate_replace(args),
       "TEXTBEFORE" => self.evaluate_text_before_after(args, false),
@@ -4989,16 +4985,29 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "DEVSQ" => self.evaluate_devsq(args),
       "AVEDEV" => self.evaluate_avedev(args),
       "AVERAGEA" => self.evaluate_averagea(args),
-      "STDEV.P" | "STDEVP" => variance_slice(&self.numeric_args(args), false)
-        .map(|value| FormulaValue::Number(value.sqrt())),
-      "STDEV.S" | "STDEV" => variance_slice(&self.numeric_args(args), true)
+      "STDEV.P" | "STDEVP" => match self.st_var_numbers(args, true) {
+        Ok(values) => {
+          variance_slice(&values, false).map(|value| FormulaValue::Number(value.sqrt()))
+        }
+        Err(error) => Some(FormulaValue::Error(error)),
+      },
+      "STDEV.S" => match self.st_var_numbers(args, true) {
+        Ok(values) => variance_slice(&values, true)
+          .map(|value| FormulaValue::Number(value.sqrt()))
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
+        Err(error) => Some(FormulaValue::Error(error)),
+      },
+      "STDEV" => variance_slice(&self.numeric_args(args), true)
         .map(|value| FormulaValue::Number(value.sqrt()))
         .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
       "STDEVA" => self.evaluate_stdeva(args, true),
       "STDEVPA" => self.evaluate_stdeva(args, false),
-      "VAR.P" | "VARP" => variance_slice(&self.numeric_args(args), false)
-        .map(FormulaValue::Number)
-        .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
+      "VAR.P" | "VARP" => match self.st_var_numbers(args, true) {
+        Ok(values) => variance_slice(&values, false)
+          .map(FormulaValue::Number)
+          .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
+        Err(error) => Some(FormulaValue::Error(error)),
+      },
       "VAR.S" | "VAR" => variance_slice(&self.numeric_args(args), true)
         .map(FormulaValue::Number)
         .or(Some(FormulaValue::Error(FormulaErrorValue::Unknown))),
@@ -5008,9 +5017,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "SKEW.P" | "SKEWP" => self.evaluate_skew(args, true),
       "GEOMEAN" => self.evaluate_geo_har_mean(args, false),
       "HARMEAN" => self.evaluate_geo_har_mean(args, true),
-      "GAUSS" => Some(FormulaValue::Number(
-        norm_s_dist(self.number(&self.evaluate(args.first()?)?)?) - 0.5,
-      )),
+      "GAUSS" => Some(FormulaValue::Number(lo_gauss(
+        self.number(&self.evaluate(args.first()?)?)?,
+      ))),
       "TEXT" => self.evaluate_text(args),
       "TIMEVALUE" => Some(timevalue(&self.text(&self.evaluate(args.first()?)?))),
       "BASISODATETIME" => self.evaluate_basis_o_datetime(args),
@@ -5143,9 +5152,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "COVAR" => self.evaluate_covariance(args, false),
       "CORREL" => self.evaluate_correl(args),
       "PEARSON" => self.evaluate_correl(args),
-      "PHI" => Some(FormulaValue::Number(
-        Normal::standard().pdf(self.number(&self.evaluate(args.first()?)?)?),
-      )),
+      "PHI" => Some(FormulaValue::Number(lo_phi(
+        self.number(&self.evaluate(args.first()?)?)?,
+      ))),
       "ERF.PRECISE" => Some(FormulaValue::Number(erf(
         self.number(&self.evaluate(args.first()?)?)?,
       ))),
@@ -5154,8 +5163,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "EXPON.DIST" | "EXPONDIST" => self.evaluate_expon_dist(args),
       "F.DIST" => self.evaluate_f_dist(args),
       "F.DIST.RT" | "FDIST" | "LEGACY.FDIST" => self.evaluate_f_dist_rt(args),
-      "F.INV" => self.evaluate_f_inv(args, false),
-      "F.INV.RT" | "FINV" | "LEGACY.FINV" => self.evaluate_f_inv(args, true),
+      "F.INV" | "FINV" => self.evaluate_f_inv(args, false),
+      "F.INV.RT" | "LEGACY.FINV" => self.evaluate_f_inv(args, true),
       "F.TEST" | "FTEST" => self.evaluate_f_test(args),
       "GAMMA.DIST" | "GAMMADIST" => self.evaluate_gamma_dist(args),
       "GAMMA.INV" | "GAMMAINV" => self.evaluate_gamma_inv(args),
@@ -5166,10 +5175,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "HYPGEOM.DIST" | "HYPGEOMDIST" => self.evaluate_hypgeom_dist(args),
       "LOGNORM.DIST" | "LOGNORMDIST" => self.evaluate_lognorm_dist(args),
       "LOGNORM.INV" | "LOGINV" => self.evaluate_lognorm_inv(args),
-      "MODE.MULT" | "MODE.SNGL" | "MODE" => mode_slice(&self.numeric_args(args))
-        .map(FormulaValue::Number)
-        .or(Some(FormulaValue::Error(FormulaErrorValue::NA))),
-      "NEGBINOM.DIST" | "NEGBINOMDIST" => self.evaluate_negbinom_dist(args),
+      "MODE.MULT" => self.evaluate_mode_ms(args, false),
+      "MODE.SNGL" => self.evaluate_mode_ms(args, true),
+      "MODE" => self.evaluate_mode(args),
+      "NEGBINOM.DIST" => self.evaluate_negbinom_dist(args, true),
+      "NEGBINOMDIST" => self.evaluate_negbinom_dist(args, false),
       "NORM.DIST" | "NORMDIST" => self.evaluate_norm_dist(args),
       "NORM.INV" | "NORMINV" => self.evaluate_norm_inv(args),
       "NORM.S.DIST" | "NORMSDIST" | "LEGACY.NORMSDIST" => self.evaluate_norm_s_dist(args),
@@ -5178,7 +5188,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "PERCENTILE.INC" | "PERCENTILE" => self.evaluate_percentile(args, PercentileKind::Inc),
       "PERCENTRANK" | "PERCENTRANK.INC" => self.evaluate_percent_rank(args, PercentileKind::Inc),
       "PERCENTRANK.EXC" => self.evaluate_percent_rank(args, PercentileKind::Exc),
-      "POISSON.DIST" | "POISSON" => self.evaluate_poisson_dist(args),
+      "POISSON.DIST" => self.evaluate_poisson_dist(args, false),
+      "POISSON" => self.evaluate_poisson_dist(args, true),
       "QUARTILE.EXC" => self.evaluate_quartile(args, PercentileKind::Exc),
       "QUARTILE.INC" | "QUARTILE" => self.evaluate_quartile(args, PercentileKind::Inc),
       "RANK.AVG" => self.evaluate_rank(args, true),
@@ -5186,7 +5197,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "KURT" => self.evaluate_kurt(args),
       "T.DIST" => self.evaluate_t_dist(args),
       "T.DIST.2T" => self.evaluate_t_dist_tails(args, 2),
-      "T.DIST.RT" | "TDIST" | "LEGACY.TDIST" => self.evaluate_t_dist_tails(args, 1),
+      "T.DIST.RT" => self.evaluate_t_dist_tails(args, 1),
+      "TDIST" | "LEGACY.TDIST" => self.evaluate_t_dist_legacy(args),
       "T.INV" => self.evaluate_t_inv(args, false),
       "T.INV.2T" | "TINV" => self.evaluate_t_inv(args, true),
       "T.TEST" | "TTEST" => self.evaluate_t_test(args),
@@ -5300,7 +5312,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       "INFO" => self.evaluate_info(args),
       "REGEX" => self.evaluate_regex(args),
       "ENCODEURL" => self.evaluate_encodeurl(args),
-      "ROT" | "ORG.OPENOFFICE.ROT13" => self.evaluate_rot13(args),
+      "ORG.OPENOFFICE.ROT13" => self.evaluate_rot13(args),
       "GETPIVOTDATA" => self.evaluate_getpivotdata(args),
       "COLOR" | "ORG.LIBREOFFICE.COLOR" => self.evaluate_color(args),
       "DHFG" | "OF" => Some(FormulaValue::Error(FormulaErrorValue::Name)),
@@ -5339,6 +5351,138 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Some(FormulaValue::Number(
       ((alpha << 24) | (red << 16) | (green << 8) | blue) as f64,
     ))
+  }
+
+  fn evaluate_clean(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let value = self.evaluate(args.first()?)?;
+    if self.array_context && matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
+      return Some(FormulaValue::Matrix(
+        self
+          .matrix_values(&value)
+          .into_iter()
+          .map(|row| {
+            row
+              .into_iter()
+              .map(|value| {
+                FormulaValue::String(Cow::Owned(clean_formula_text(&display_text_from_value(
+                  &value,
+                ))))
+              })
+              .collect()
+          })
+          .collect(),
+      ));
+    }
+    Some(FormulaValue::String(Cow::Owned(clean_formula_text(
+      &self.text(&value),
+    ))))
+  }
+
+  fn evaluate_trim(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let value = self.evaluate(args.first()?)?;
+    if self.array_context && matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
+      return Some(FormulaValue::Matrix(
+        self
+          .matrix_values(&value)
+          .into_iter()
+          .map(|row| {
+            row
+              .into_iter()
+              .map(|value| {
+                FormulaValue::String(Cow::Owned(trim_formula_text(&display_text_from_value(
+                  &value,
+                ))))
+              })
+              .collect()
+          })
+          .collect(),
+      ));
+    }
+    if is_multicell_scalar_argument(&value) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    Some(FormulaValue::String(Cow::Owned(trim_formula_text(
+      &self.text(&value),
+    ))))
+  }
+
+  fn evaluate_t(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScInterpreter::ScT.
+    let value = self.evaluate(args.first()?)?;
+    let value = match value {
+      FormulaValue::Reference(reference) => self.scalar_reference_value(&reference),
+      FormulaValue::Matrix(rows) => rows
+        .into_iter()
+        .next()
+        .and_then(|row| row.into_iter().next())
+        .unwrap_or_default(),
+      value => value,
+    };
+    match value {
+      FormulaValue::String(text) => Some(FormulaValue::String(text)),
+      FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+      _ => Some(FormulaValue::String(Cow::Borrowed(""))),
+    }
+  }
+
+  fn evaluate_value(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScInterpreter::ScValue.
+    let value = self.evaluate(args.first()?)?;
+    if self.array_context && matches!(value, FormulaValue::Reference(_) | FormulaValue::Matrix(_)) {
+      return Some(FormulaValue::Matrix(
+        self
+          .matrix_values(&value)
+          .into_iter()
+          .map(|row| {
+            row
+              .into_iter()
+              .map(|value| self.value_from_formatter_text(&value))
+              .collect()
+          })
+          .collect(),
+      ));
+    }
+    let value = match value {
+      FormulaValue::Reference(reference) => {
+        if reference.range.cell_count_hint() != 1 {
+          return Some(FormulaValue::Error(FormulaErrorValue::Value));
+        }
+        self.scalar_reference_value(&reference)
+      }
+      value => value,
+    };
+    Some(self.value_from_formatter_text(&value))
+  }
+
+  fn value_from_formatter_text(&self, value: &FormulaValue<'doc>) -> FormulaValue<'doc> {
+    match value {
+      FormulaValue::Blank => return FormulaValue::Number(0.0),
+      FormulaValue::Number(number) => return FormulaValue::Number(*number),
+      FormulaValue::Error(error) => return FormulaValue::Error(*error),
+      _ => {}
+    }
+    let text = self.text(value);
+    let text = text.trim();
+    if text.is_empty() {
+      return FormulaValue::Number(0.0);
+    }
+    let parsed = text
+      .parse::<f64>()
+      .ok()
+      .or_else(|| parse_grouped_formula_number(text))
+      .or_else(|| parse_date_input(text, self.book.date_system).map(f64::floor))
+      .or_else(|| match timevalue(text) {
+        FormulaValue::Number(number) => Some(number),
+        _ => None,
+      })
+      .or_else(|| {
+        text
+          .strip_prefix('$')
+          .and_then(|value| parse_grouped_formula_number(value.trim()))
+      });
+    parsed
+      .map(FormulaValue::Number)
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Value))
   }
 
   fn evaluate_getpivotdata(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -5592,22 +5736,37 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         FormulaValue::Blank => {
           return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
         }
-        value => self.text(&value),
+        value => {
+          let text = self.text(&value);
+          if text.chars().count() != 1 {
+            return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+          }
+          text
+        }
       }
     } else {
-      ".".to_string()
+      String::new()
     };
     let group = args
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .map(|value| self.text(&value))
-      .unwrap_or_else(|| ",".to_string());
+      .unwrap_or_default();
+    if !decimal.is_empty() && group.contains(&decimal) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
     let percent_count = text.chars().rev().take_while(|ch| *ch == '%').count();
     text.truncate(text.len() - percent_count);
     text = text
       .chars()
       .filter(|ch| !ch.is_whitespace() && !group.contains(*ch))
       .collect();
+    if text.is_empty() {
+      return Some(FormulaValue::Number(0.0));
+    }
+    if decimal.is_empty() && text.contains('.') {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
     if decimal != "." && !decimal.is_empty() {
       text = text.replace(&decimal, ".");
     }
@@ -6818,6 +6977,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(value) = args.first().and_then(|arg| self.evaluate(arg)) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
+    if matches!(value, FormulaValue::Matrix(_) | FormulaValue::RefList(_)) {
+      return Some(FormulaValue::Number(64.0));
+    }
     Some(FormulaValue::Number(match self.first_value(&value) {
       FormulaValue::Number(_) => 1.0,
       FormulaValue::String(_) => 2.0,
@@ -6850,7 +7012,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     for pair in args.chunks_exact(2) {
-      if self.truthy(&self.evaluate(&pair[0])?) {
+      let condition = self.evaluate(&pair[0])?;
+      if let FormulaValue::Error(error) = condition {
+        return Some(FormulaValue::Error(error));
+      }
+      if self.truthy(&condition) {
         return self.evaluate(&pair[1]);
       }
     }
@@ -6862,6 +7028,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let selector = self.scalar_value(self.evaluate(args.first()?)?);
+    if let FormulaValue::Error(error) = &selector {
+      return Some(FormulaValue::Error(*error));
+    }
     let pairs_len = if args.len().is_multiple_of(2) {
       args.len() - 2
     } else {
@@ -6869,6 +7038,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     };
     for pair in args[1..=pairs_len].chunks_exact(2) {
       let candidate = self.scalar_value(self.evaluate(&pair[0])?);
+      if let FormulaValue::Error(error) = &candidate {
+        return Some(FormulaValue::Error(*error));
+      }
       let matches = match (&selector, &candidate) {
         (FormulaValue::String(left), FormulaValue::String(right)) => {
           left.eq_ignore_ascii_case(right)
@@ -7253,15 +7425,22 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let serial = self.date_number_from_value(&self.evaluate(args.first()?)?)? as i64;
-    let mode = args
-      .get(1)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0) as i32;
+    let mode = match args.get(1).and_then(|arg| self.evaluate(arg)) {
+      Some(FormulaValue::Reference(_) | FormulaValue::Matrix(_) | FormulaValue::RefList(_)) => {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      Some(FormulaValue::Blank) | None => 1.0,
+      Some(value) => self.number(&value)?,
+    } as i32;
     let weekday = weekday_index_from_serial(serial) as i32;
     let year = date_from_serial_with_system(serial as i32, self.book.date_system)?.0;
     let jan1 = date_serial_with_system(year, 1, 1, self.book.date_system)? as i64;
     let jan1_weekday = weekday_index_from_serial(jan1) as i32;
+    if matches!(mode, 21 | 150) {
+      return iso_weeknum_from_serial_with_system(serial as i32, self.book.date_system)
+        .map(|value| FormulaValue::Number(value as f64))
+        .or(Some(FormulaValue::Error(FormulaErrorValue::Value)));
+    }
     let week_start = match mode {
       1 | 17 => 6,
       2 | 11 => 0,
@@ -7355,7 +7534,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let start = self.date_number_from_value(&self.evaluate(args.first()?)?)? as i32;
     let end = self.date_number_from_value(&self.evaluate(args.get(1)?)?)? as i32;
-    let mode = self.number(&self.evaluate(args.get(2)?)?)? as i32;
+    let mode_arg = self.evaluate(args.get(2)?)?;
+    if matches!(mode_arg, FormulaValue::Blank) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let mode = self.number(&mode_arg)? as i32;
     if !matches!(mode, 0 | 1) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
@@ -7395,11 +7578,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let serial = self
       .date_number_from_value(&self.evaluate(args.first()?)?)?
       .floor() as i64;
-    let flag = args
-      .get(1)
-      .and_then(|arg| self.evaluate(arg))
-      .and_then(|value| self.number(&value))
-      .unwrap_or(1.0) as i32;
+    let flag = match args.get(1).and_then(|arg| self.evaluate(arg)) {
+      Some(FormulaValue::Reference(_) | FormulaValue::Matrix(_) | FormulaValue::RefList(_)) => {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      Some(value) => self.number(&value).unwrap_or(1.0),
+      None => 1.0,
+    } as i32;
     let monday_zero = weekday_index_from_serial(serial) as i32;
     Some(FormulaValue::Number(match flag {
       1 => {
@@ -8180,28 +8365,21 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn evaluate_sheets(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     if let Some(arg) = args.first() {
+      if let Some(count) = self.sheets_count_from_ast(arg) {
+        return Some(FormulaValue::Number(count as f64));
+      }
       let Some(value) = self.evaluate(arg) else {
         return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
       };
       return match value {
         FormulaValue::Reference(_) => Some(FormulaValue::Number(1.0)),
-        FormulaValue::Matrix(_) => Some(FormulaValue::Number(1.0)),
+        FormulaValue::Matrix(_) => Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
         _ => Some(FormulaValue::Error(FormulaErrorValue::Value)),
       };
     }
-    let mut sheets = self
-      .book
-      .sheet_names
-      .iter()
-      .map(|sheet| sheet.id)
-      .collect::<Vec<_>>();
-    sheets.extend(self.book.cells.keys().map(|(sheet, _)| *sheet));
-    sheets.extend(self.book.formulas.keys().map(|(sheet, _)| *sheet));
-    sheets.extend(self.book.row_states.keys().map(|(sheet, _)| *sheet));
-    sheets.extend(self.book.tables.values().map(|table| table.sheet));
-    sheets.sort_unstable();
-    sheets.dedup();
-    Some(FormulaValue::Number(sheets.len().max(1) as f64))
+    Some(FormulaValue::Number(
+      self.book.sheet_names.len().max(1) as f64
+    ))
   }
 
   fn evaluate_sheet(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -8211,6 +8389,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       };
       match value {
         FormulaValue::Reference(reference) => self.range_sheet(&reference),
+        FormulaValue::String(name) => {
+          let Some(sheet) = self.book.sheet_id_by_name(name.as_ref()) else {
+            return Some(FormulaValue::Error(FormulaErrorValue::Value));
+          };
+          sheet
+        }
         _ => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
       }
     } else {
@@ -8224,6 +8408,41 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .map(|index| index + 1)
       .unwrap_or(sheet.0 as usize + 1);
     Some(FormulaValue::Number(index as f64))
+  }
+
+  fn sheets_count_from_ast(&self, arg: &FormulaAst<'doc>) -> Option<u32> {
+    // Source: LibreOffice sc/source/core/tool/interpr1.cxx ScInterpreter::ScSheets.
+    match arg {
+      FormulaAst::Reference(reference) => Some(self.reference_sheet_count(reference)),
+      FormulaAst::Name(name) => self.three_d_reference_sheet_count(name.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn reference_sheet_count(&self, reference: &QualifiedRange<'doc>) -> u32 {
+    let start = self.range_sheet(reference).0;
+    let end = reference
+      .sheet_name
+      .as_ref()
+      .and_then(|name| self.book.sheet_id_by_name(name.0.as_ref()))
+      .map(|sheet| sheet.0)
+      .unwrap_or(start);
+    start.abs_diff(end) + 1
+  }
+
+  fn three_d_reference_sheet_count(&self, text: &str) -> Option<u32> {
+    let (left, right) = text.split_once(':')?;
+    let left = QualifiedAddress::parse_a1(self.current_sheet, left).ok()?;
+    let right = QualifiedAddress::parse_a1(self.current_sheet, right).ok()?;
+    let left_sheet = left
+      .sheet_name
+      .as_ref()
+      .and_then(|name| self.book.sheet_id_by_name(name.0.as_ref()))?;
+    let right_sheet = right
+      .sheet_name
+      .as_ref()
+      .and_then(|name| self.book.sheet_id_by_name(name.0.as_ref()))?;
+    Some(left_sheet.0.abs_diff(right_sheet.0) + 1)
   }
 
   fn evaluate_formula_text(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -8371,8 +8590,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn evaluate_mid(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let text = self.text(&self.evaluate(args.first()?)?);
-    let start = self.number(&self.evaluate(args.get(1)?)?)? as usize;
-    let len = self.number(&self.evaluate(args.get(2)?)?)? as usize;
+    let start = self.number(&self.evaluate(args.get(1)?)?)?;
+    let len = self.number(&self.evaluate(args.get(2)?)?)?;
+    if start < 1.0 || len < 0.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let start = start as usize;
+    let len = len as usize;
     Some(FormulaValue::String(Cow::Owned(
       text
         .chars()
@@ -8559,28 +8783,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !(0..=3999).contains(&value) {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut number = value;
-    let mut output = String::new();
-    for (arabic, roman) in [
-      (1000, "M"),
-      (900, "CM"),
-      (500, "D"),
-      (400, "CD"),
-      (100, "C"),
-      (90, "XC"),
-      (50, "L"),
-      (40, "XL"),
-      (10, "X"),
-      (9, "IX"),
-      (5, "V"),
-      (4, "IV"),
-      (1, "I"),
-    ] {
-      while number >= arabic {
-        output.push_str(roman);
-        number -= arabic;
-      }
+    let mode = args
+      .get(1)
+      .and_then(|arg| self.evaluate(arg))
+      .and_then(|value| self.number(&value))
+      .map(approx_floor)
+      .unwrap_or(0.0);
+    if !(0.0..5.0).contains(&mode) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
+    let output = roman_text_libreoffice(value as u16, mode as u16);
     Some(FormulaValue::String(Cow::Owned(output)))
   }
 
@@ -8662,7 +8874,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if let FormulaValue::Error(error) = display {
       return Some(FormulaValue::Matrix(vec![
         vec![FormulaValue::Error(error)],
-        vec![FormulaValue::Error(error)],
+        vec![FormulaValue::String(Cow::Owned(url))],
       ]));
     }
     Some(FormulaValue::Matrix(vec![
@@ -9553,7 +9765,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     for row in matrix {
       let mut out = Vec::with_capacity(columns);
       for value in row {
-        let Some(number) = self.number(&value) else {
+        let Some(number) = matrix_stat_number(&value) else {
           return Some(FormulaValue::Error(FormulaErrorValue::Value));
         };
         out.push(number);
@@ -9576,7 +9788,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let mut values = vec![vec![0.0; columns * 2]; rows];
     for row in 0..rows {
       for column in 0..columns {
-        let Some(number) = self.number(&matrix[row][column]) else {
+        let Some(number) = matrix_stat_number(&matrix[row][column]) else {
           return Some(FormulaValue::Error(FormulaErrorValue::Value));
         };
         values[row][column] = number;
@@ -11568,9 +11780,41 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(quartile) = self.number_arg(args, 1) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
+    let quartile = approx_floor(quartile);
     percentile_sorted(&mut values, quartile / 4.0, kind)
       .map(FormulaValue::Number)
-      .or(Some(FormulaValue::Error(FormulaErrorValue::Num)))
+      .or(Some(FormulaValue::Error(
+        FormulaErrorValue::IllegalArgument,
+      )))
+  }
+
+  fn evaluate_mode(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    let values = self.numeric_args(args);
+    mode_slice(&values)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
+  }
+
+  fn evaluate_mode_ms(
+    &self,
+    args: &[FormulaAst<'doc>],
+    single: bool,
+  ) -> Option<FormulaValue<'doc>> {
+    let values = self.mode_ms_numeric_args(args);
+    let modes = mode_ms_values(&values)?;
+    if single {
+      return modes
+        .first()
+        .copied()
+        .map(FormulaValue::Number)
+        .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
+    }
+    Some(FormulaValue::Matrix(
+      modes
+        .into_iter()
+        .map(|value| vec![FormulaValue::Number(value)])
+        .collect(),
+    ))
   }
 
   fn evaluate_rank(&self, args: &[FormulaAst<'doc>], average: bool) -> Option<FormulaValue<'doc>> {
@@ -12120,10 +12364,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let rows = actual.len();
     let columns = actual.first()?.len();
-    let mut chi = 0.0;
+    let mut chi = KahanSum::default();
     let mut has_value = false;
-    for row in 0..rows {
-      for column in 0..columns {
+    for column in 0..columns {
+      for row in 0..rows {
         match (&actual[row][column], &expected[row][column]) {
           (FormulaValue::Blank, _) | (_, FormulaValue::Blank) => {}
           (left, right) => {
@@ -12142,7 +12386,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             if term.is_infinite() {
               return Some(FormulaValue::Error(FormulaErrorValue::Num));
             }
-            chi += term;
+            chi.add(term);
           }
         }
       }
@@ -12158,7 +12402,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if df == 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    Some(FormulaValue::Number(lo_chi_dist(chi, df)))
+    Some(FormulaValue::Number(lo_chi_dist(chi.finish(), df)))
   }
 
   fn evaluate_confidence_norm(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12672,31 +12916,38 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_f_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if !(3..=4).contains(&args.len()) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let x = self.number(&self.evaluate(args.first()?)?)?;
     let df1 = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
     let df2 = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
-    let cumulative = self.truthy(&self.evaluate(args.get(3)?)?);
-    if x < 0.0 || df1 <= 0.0 || df2 <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let cumulative = args
+      .get(3)
+      .and_then(|arg| self.evaluate(arg))
+      .map(|value| self.truthy(&value))
+      .unwrap_or(true);
+    if x < 0.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let dist = FisherSnedecor::new(df1, df2).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(x)
+      1.0 - lo_f_dist_right_tail(x, df1, df2)
     } else {
-      dist.pdf(x)
+      lo_f_dist_pdf(x, df1, df2)
     }))
   }
 
   fn evaluate_f_dist_rt(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.len() != 3 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let x = self.number(&self.evaluate(args.first()?)?)?;
     let df1 = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
     let df2 = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
-    if x < 0.0 || df1 <= 0.0 || df2 <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if x < 0.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    Some(FormulaValue::Number(
-      FisherSnedecor::new(df1, df2).ok()?.sf(x),
-    ))
+    Some(FormulaValue::Number(lo_f_dist_right_tail(x, df1, df2)))
   }
 
   fn evaluate_f_inv(
@@ -12704,17 +12955,23 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     right_tail: bool,
   ) -> Option<FormulaValue<'doc>> {
+    if args.len() != 3 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let p = self.number(&self.evaluate(args.first()?)?)?;
     let df1 = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
     let df2 = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
-    if !(0.0..=1.0).contains(&p) || df1 <= 0.0 || df2 <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if p <= 0.0 || p > 1.0 || df1 < 1.0 || df2 < 1.0 || df1 >= 1.0e10 || df2 >= 1.0e10 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    Some(FormulaValue::Number(
-      FisherSnedecor::new(df1, df2)
-        .ok()?
-        .inverse_cdf(if right_tail { 1.0 - p } else { p }),
-    ))
+    match lo_iterate_inverse(
+      |x| (if right_tail { p } else { 1.0 - p }) - lo_f_dist_right_tail(x, df1, df2),
+      df1 * 0.5,
+      df1,
+    ) {
+      Ok(value) => Some(FormulaValue::Number(value)),
+      Err(error) => Some(FormulaValue::Error(error)),
+    }
   }
 
   fn evaluate_f_test(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12741,8 +12998,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         left.len() as f64 - 1.0,
       )
     };
-    let cdf = FisherSnedecor::new(df1, df2).ok()?.cdf(f);
-    Some(FormulaValue::Number(2.0 * cdf.min(1.0 - cdf)))
+    let right_tail = lo_f_dist_right_tail(f, df1, df2);
+    Some(FormulaValue::Number(2.0 * right_tail.min(1.0 - right_tail)))
   }
 
   fn evaluate_gamma_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12884,14 +13141,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .map(|value| self.truthy(&value))
       .unwrap_or(true);
-    if x <= 0.0 || sigma <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if sigma <= 0.0 || (!cumulative && x <= 0.0) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let dist = LogNormal::new(mean, sigma).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(x)
+      if x <= 0.0 {
+        0.0
+      } else {
+        lo_integral_phi((x.ln() - mean) / sigma)
+      }
     } else {
-      dist.pdf(x)
+      lo_phi((x.ln() - mean) / sigma) / sigma / x
     }))
   }
 
@@ -12913,22 +13173,36 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     ))
   }
 
-  fn evaluate_negbinom_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_negbinom_dist(
+    &self,
+    args: &[FormulaAst<'doc>],
+    microsoft: bool,
+  ) -> Option<FormulaValue<'doc>> {
+    if (microsoft && args.len() != 4) || (!microsoft && args.len() != 3) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let failures = self.number(&self.evaluate(args.first()?)?)?.floor();
     let successes = self.number(&self.evaluate(args.get(1)?)?)?.floor();
     let p = self.number(&self.evaluate(args.get(2)?)?)?;
-    let cumulative = args
-      .get(3)
-      .and_then(|arg| self.evaluate(arg))
-      .is_some_and(|value| self.truthy(&value));
-    if failures < 0.0 || successes < 1.0 || !(0.0..=1.0).contains(&p) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let cumulative = microsoft
+      && args
+        .get(3)
+        .and_then(|arg| self.evaluate(arg))
+        .is_some_and(|value| self.truthy(&value));
+    if (microsoft && (failures < 0.0 || successes < 1.0))
+      || (!microsoft && failures + successes <= 1.0)
+      || !(0.0..=1.0).contains(&p)
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let dist = NegativeBinomial::new(successes, p).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(failures as u64)
+      1.0 - lo_beta_dist(1.0 - p, failures + 1.0, successes)
     } else {
-      dist.pmf(failures as u64)
+      let mut factor = p.powf(successes);
+      for i in 0..failures as u32 {
+        factor *= (f64::from(i) + successes) / f64::from(i + 1) * (1.0 - p);
+      }
+      factor
     }))
   }
 
@@ -12953,11 +13227,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if sigma <= 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let dist = Normal::new(mean, sigma).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(x)
+      lo_integral_phi((x - mean) / sigma)
     } else {
-      dist.pdf(x)
+      lo_phi((x - mean) / sigma) / sigma
     }))
   }
 
@@ -12996,11 +13269,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .and_then(|arg| self.evaluate(arg))
       .map(|value| self.truthy(&value))
       .unwrap_or(true);
-    let dist = Normal::new(0.0, 1.0).ok()?;
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(z)
+      lo_integral_phi(z)
     } else {
-      dist.pdf(z)
+      lo_phi(z)
     }))
   }
 
@@ -13019,19 +13291,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
-      .unwrap_or(3.0)
-      .floor();
+      .map(approx_floor)
+      .unwrap_or(3.0);
     if significance < 1.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let denominator = match kind {
-      PercentileKind::Inc => values.len() as f64 - 1.0,
-      PercentileKind::Exc => values.len() as f64 + 1.0,
-    };
-    let offset = match kind {
-      PercentileKind::Inc => 0.0,
-      PercentileKind::Exc => 1.0,
-    };
+    if values.len() == 1 {
+      return Some(FormulaValue::Number(1.0));
+    }
     let round_result = |value: f64| {
       if value == 0.0 {
         value
@@ -13040,27 +13307,54 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         (value * 10f64.powf(-exp)).round() / 10f64.powf(-exp)
       }
     };
-    for (index, value) in values.iter().enumerate() {
-      if *value == x {
-        return Some(FormulaValue::Number(round_result(
-          (index as f64 + offset) / denominator,
-        )));
+
+    let size = values.len();
+    let result = if x == values[0] {
+      match kind {
+        PercentileKind::Inc => 0.0,
+        PercentileKind::Exc => 1.0 / (size + 1) as f64,
       }
-      if *value > x {
-        let previous = values[index - 1];
-        let fraction = (x - previous) / (*value - previous);
-        return Some(FormulaValue::Number(round_result(
-          (index as f64 - 1.0 + fraction + offset) / denominator,
-        )));
+    } else {
+      let mut old_count = 0usize;
+      let mut old_value = values[0];
+      let mut index = 1usize;
+      while index < size && values[index] < x {
+        if values[index] != old_value {
+          old_count = index;
+          old_value = values[index];
+        }
+        index += 1;
       }
-    }
-    Some(FormulaValue::Number(round_result(match kind {
-      PercentileKind::Inc => 1.0,
-      PercentileKind::Exc => values.len() as f64 / denominator,
-    })))
+      if values[index] != old_value {
+        old_count = index;
+      }
+      if x == values[index] {
+        match kind {
+          PercentileKind::Inc => old_count as f64 / (size - 1) as f64,
+          PercentileKind::Exc => (index + 1) as f64 / (size + 1) as f64,
+        }
+      } else if old_count == 0 {
+        0.0
+      } else {
+        let fraction = (x - values[old_count - 1]) / (values[old_count] - values[old_count - 1]);
+        match kind {
+          PercentileKind::Inc => (old_count as f64 - 1.0 + fraction) / (size - 1) as f64,
+          PercentileKind::Exc => (old_count as f64 + fraction) / (size + 1) as f64,
+        }
+      }
+    };
+    Some(FormulaValue::Number(round_result(result)))
   }
 
-  fn evaluate_poisson_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+  fn evaluate_poisson_dist(
+    &self,
+    args: &[FormulaAst<'doc>],
+    odff: bool,
+  ) -> Option<FormulaValue<'doc>> {
+    let min_args = if odff { 2 } else { 3 };
+    if args.len() < min_args || args.len() > 3 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
     let x = self.number(&self.evaluate(args.first()?)?)?.floor();
     let lambda = self.number(&self.evaluate(args.get(1)?)?)?;
     let cumulative = args
@@ -13069,14 +13363,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .map(|value| self.truthy(&value))
       .unwrap_or(true);
     if x < 0.0 || lambda <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let dist = Poisson::new(lambda).ok()?;
-    Some(FormulaValue::Number(if cumulative {
-      dist.cdf(x as u64)
-    } else {
-      dist.pmf(x as u64)
-    }))
+    Some(FormulaValue::Number(lo_poisson_dist(x, lambda, cumulative)))
   }
 
   fn evaluate_fisher(
@@ -13445,17 +13734,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 
   fn evaluate_t_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
-    let t = self.number(&self.evaluate(args.first()?)?)?;
-    let df = self.number(&self.evaluate(args.get(1)?)?)?;
-    let cumulative = self.truthy(&self.evaluate(args.get(2)?)?);
-    if df <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if args.len() != 3 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
     }
-    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
+    let t = self.number(&self.evaluate(args.first()?)?)?;
+    let df = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
+    let cumulative = self.truthy(&self.evaluate(args.get(2)?)?);
+    if df < 1.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
     Some(FormulaValue::Number(if cumulative {
-      dist.cdf(t)
+      lo_t_dist(t, df, 4)
     } else {
-      dist.pdf(t)
+      lo_t_dist(t, df, 3)
     }))
   }
 
@@ -13464,17 +13755,33 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     tails: i32,
   ) -> Option<FormulaValue<'doc>> {
-    let t = self.number(&self.evaluate(args.first()?)?)?;
-    let df = self.number(&self.evaluate(args.get(1)?)?)?;
-    if t < 0.0 || df <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if args.len() != 2 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
     }
-    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
+    let t = self.number(&self.evaluate(args.first()?)?)?;
+    let df = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
+    if df < 1.0 || (tails == 2 && t < 0.0) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let result = lo_t_dist(t, df, tails);
     Some(FormulaValue::Number(match tails {
-      1 => dist.sf(t),
-      2 => 2.0 * dist.sf(t),
+      1 if t < 0.0 => 1.0 - result,
+      1 | 2 => result,
       _ => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
     }))
+  }
+
+  fn evaluate_t_dist_legacy(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
+    if args.len() != 3 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+    }
+    let t = self.number(&self.evaluate(args.first()?)?)?;
+    let df = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
+    let tails = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?);
+    if t < 0.0 || df < 1.0 || (tails != 1.0 && tails != 2.0) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    Some(FormulaValue::Number(lo_t_dist(t, df, tails as i32)))
   }
 
   fn evaluate_t_inv(
@@ -13482,26 +13789,44 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     two_tailed: bool,
   ) -> Option<FormulaValue<'doc>> {
-    let p = self.number(&self.evaluate(args.first()?)?)?;
-    let df = self.number(&self.evaluate(args.get(1)?)?)?;
-    if !(0.0..1.0).contains(&p) || df <= 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    if args.len() != 2 {
+      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
     }
-    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
-    Some(FormulaValue::Number(if two_tailed {
-      dist.inverse_cdf(1.0 - p / 2.0)
+    let p = self.number(&self.evaluate(args.first()?)?)?;
+    let df = approx_floor(self.number(&self.evaluate(args.get(1)?)?)?);
+    if df < 1.0 || p <= 0.0 || p > 1.0 || (!two_tailed && p == 1.0) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    if two_tailed {
+      return match lo_iterate_inverse(|x| p - lo_t_dist(x, df, 2), df * 0.5, df) {
+        Ok(value) => Some(FormulaValue::Number(value)),
+        Err(error) => Some(FormulaValue::Error(error)),
+      };
+    }
+    if p < 0.5 {
+      match lo_iterate_inverse(|x| 1.0 - p - lo_t_dist(x, df, 4), df * 0.5, df) {
+        Ok(value) => Some(FormulaValue::Number(-value)),
+        Err(error) => Some(FormulaValue::Error(error)),
+      }
     } else {
-      dist.inverse_cdf(p)
-    }))
+      match lo_iterate_inverse(|x| p - lo_t_dist(x, df, 4), df * 0.5, df) {
+        Ok(value) => Some(FormulaValue::Number(value)),
+        Err(error) => Some(FormulaValue::Error(error)),
+      }
+    }
   }
 
   fn evaluate_t_test(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let left = self.value_numbers(&self.evaluate(args.first()?)?);
     let right = self.value_numbers(&self.evaluate(args.get(1)?)?);
-    let tails = self.number(&self.evaluate(args.get(2)?)?)? as i32;
-    let test_type = self.number(&self.evaluate(args.get(3)?)?)? as i32;
-    if left.is_empty() || right.is_empty() || !(1..=2).contains(&tails) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    let tails = approx_floor(self.number(&self.evaluate(args.get(2)?)?)?) as i32;
+    let test_type = approx_floor(self.number(&self.evaluate(args.get(3)?)?)?) as i32;
+    if left.is_empty()
+      || right.is_empty()
+      || !(1..=2).contains(&tails)
+      || !(1..=3).contains(&test_type)
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
     let mean_left = mean(&left)?;
     let mean_right = mean(&right)?;
@@ -13515,6 +13840,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         .collect::<Vec<_>>();
       let mean_diff = mean(&diffs)?;
       let sd_diff = variance_slice(&diffs, true)?.sqrt();
+      if sd_diff == 0.0 {
+        return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+      }
       (
         mean_diff.abs() / (sd_diff / (diffs.len() as f64).sqrt()),
         diffs.len() as f64 - 1.0,
@@ -13534,12 +13862,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         + var_right.powi(2) / ((right.len() as f64).powi(2) * (right.len() - 1) as f64);
       ((mean_left - mean_right).abs() / se, df_num / df_den)
     };
-    let dist = StudentsT::new(0.0, 1.0, df).ok()?;
-    Some(FormulaValue::Number(match tails {
-      1 => dist.sf(t),
-      2 => 2.0 * dist.sf(t),
-      _ => return Some(FormulaValue::Error(FormulaErrorValue::Num)),
-    }))
+    Some(FormulaValue::Number(lo_t_dist(t, df, tails)))
   }
 
   fn evaluate_weibull_dist(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -13629,10 +13952,19 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   ) -> Option<FormulaValue<'doc>> {
     let mut start = self.number(&self.evaluate(args.first()?)?)?.floor() as i64;
     let mut end = self.number(&self.evaluate(args.get(1)?)?)?.floor() as i64;
-    let weekend_arg = intl
-      .then(|| args.get(2).and_then(|arg| self.evaluate(arg)))
-      .flatten();
-    let Some(weekend) = weekend_mask(weekend_arg.as_ref(), false, self) else {
+    let weekend_arg = if intl {
+      args.get(2).and_then(|arg| self.evaluate(arg))
+    } else {
+      args.get(3).and_then(|arg| self.evaluate(arg))
+    };
+    let weekend = if intl {
+      weekend_mask(weekend_arg.as_ref(), false, self)
+    } else if args.len() == 4 {
+      old_networkdays_weekend_mask(weekend_arg.as_ref(), self)
+    } else {
+      weekend_mask(None, false, self)
+    };
+    let Some(weekend) = weekend else {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
     let holiday_arg = args
@@ -13673,9 +14005,29 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let weekend_arg = intl
-      .then(|| args.get(2).and_then(|arg| self.evaluate(arg)))
-      .flatten();
+    let weekend_arg = if intl {
+      match args.get(2) {
+        Some(arg) if is_missing_argument(arg) => None,
+        Some(arg) => {
+          let value = self.evaluate(arg)?;
+          match value {
+            FormulaValue::Reference(reference) => {
+              if reference.range.cell_count_hint() != 1 {
+                return Some(FormulaValue::Error(FormulaErrorValue::Value));
+              }
+              Some(self.scalar_reference_value(&reference))
+            }
+            FormulaValue::RefList(_) => {
+              return Some(FormulaValue::Error(FormulaErrorValue::Value));
+            }
+            value => Some(value),
+          }
+        }
+        None => None,
+      }
+    } else {
+      None
+    };
     let Some(weekend) = weekend_mask(weekend_arg.as_ref(), true, self) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     };
@@ -14874,6 +15226,112 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn numeric_args(&self, args: &[FormulaAst<'doc>]) -> Vec<f64> {
     self.numeric_values(args).collect()
+  }
+
+  fn st_var_numbers(
+    &self,
+    args: &[FormulaAst<'doc>],
+    direct_text_error: bool,
+  ) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+    let mut values = Vec::new();
+    for arg in args {
+      self.collect_st_var_numbers_from_ast(arg, direct_text_error, &mut values)?;
+    }
+    Ok(values)
+  }
+
+  fn collect_st_var_numbers_from_ast(
+    &self,
+    ast: &FormulaAst<'doc>,
+    direct_text_error: bool,
+    values: &mut Vec<f64>,
+  ) -> std::result::Result<(), FormulaErrorValue> {
+    match ast {
+      FormulaAst::Binary {
+        op: FormulaOperator::Union,
+        left,
+        right,
+      } => {
+        self.collect_st_var_numbers_from_ast(left, direct_text_error, values)?;
+        self.collect_st_var_numbers_from_ast(right, direct_text_error, values)?;
+      }
+      _ => match self.evaluate(ast).unwrap_or_default() {
+        FormulaValue::Reference(reference) => {
+          values.extend(self.value_numbers(&FormulaValue::Reference(reference)))
+        }
+        FormulaValue::RefList(ranges) => {
+          for range in ranges {
+            values.extend(self.value_numbers(&FormulaValue::Reference(range)));
+          }
+        }
+        FormulaValue::Matrix(rows) => {
+          values.extend(self.value_numbers(&FormulaValue::Matrix(rows)))
+        }
+        FormulaValue::String(text) => {
+          if let Ok(value) = text.trim().parse::<f64>() {
+            values.push(value);
+          } else if direct_text_error {
+            return Err(FormulaErrorValue::Value);
+          }
+        }
+        FormulaValue::Error(error) => return Err(error),
+        value => values.extend(self.number(&value)),
+      },
+    }
+    Ok(())
+  }
+
+  fn mode_ms_numeric_args(&self, args: &[FormulaAst<'doc>]) -> Vec<f64> {
+    let mut values = Vec::new();
+    let array_evaluator = self.with_array_context();
+    for arg in args {
+      let ranges = self.reference_ranges_from_ast(arg);
+      if !ranges.is_empty() {
+        for range in ranges {
+          self.push_range_numbers_column_major(&range, &mut values);
+        }
+        continue;
+      }
+      let Some(value) = array_evaluator.evaluate(arg) else {
+        continue;
+      };
+      match value {
+        FormulaValue::Reference(reference) => {
+          self.push_range_numbers_column_major(&reference, &mut values);
+        }
+        FormulaValue::RefList(ranges) => {
+          for range in ranges {
+            self.push_range_numbers_column_major(&range, &mut values);
+          }
+        }
+        value => values.extend(self.value_numbers(&value)),
+      }
+    }
+    values
+  }
+
+  fn push_range_numbers_column_major(
+    &self,
+    reference: &QualifiedRange<'doc>,
+    values: &mut Vec<f64>,
+  ) {
+    if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+      return;
+    }
+    let sheet = self.range_sheet(reference);
+    let start_column = reference.range.start.column.min(reference.range.end.column);
+    let end_column = reference.range.start.column.max(reference.range.end.column);
+    let start_row = reference.range.start.row.min(reference.range.end.row);
+    let end_row = reference.range.start.row.max(reference.range.end.row);
+    for column in start_column..=end_column {
+      for row in start_row..=end_row {
+        match self.book.cell_value(sheet, CellAddress { column, row }) {
+          FormulaValue::Number(value) => values.push(value),
+          FormulaValue::Boolean(value) => values.push(if value { 1.0 } else { 0.0 }),
+          _ => {}
+        }
+      }
+    }
   }
 
   fn value_numbers(&self, value: &FormulaValue<'doc>) -> Vec<f64> {
@@ -18844,11 +19302,11 @@ fn variance_slice(values: &[f64], sample: bool) -> Option<f64> {
   if values.is_empty() || (sample && values.len() < 2) {
     return None;
   }
-  let mean = mean(values)?;
+  let mean = kahan_sum(values.iter().copied()) / values.len() as f64;
   let sum = values
     .iter()
     .map(|value| {
-      let delta = value - mean;
+      let delta = approx_sub(*value, mean);
       delta * delta
     })
     .sum::<f64>();
@@ -18905,6 +19363,37 @@ fn mode_slice(values: &[f64]) -> Option<f64> {
     }
   }
   best_value
+}
+
+fn mode_ms_values(values: &[f64]) -> Option<Vec<f64>> {
+  let mut counts: Vec<(f64, usize)> = Vec::new();
+  for value in values {
+    if let Some((_, count)) = counts
+      .iter_mut()
+      .find(|(candidate, _)| *candidate == *value)
+    {
+      *count += 1;
+    } else {
+      counts.push((*value, 1));
+    }
+  }
+  let max_count = counts.iter().map(|(_, count)| *count).max().unwrap_or(0);
+  if max_count <= 1 {
+    return None;
+  }
+  let mut modes = Vec::new();
+  for value in values {
+    if modes.iter().any(|mode| mode == value) {
+      continue;
+    }
+    if counts
+      .iter()
+      .any(|(candidate, count)| *candidate == *value && *count == max_count)
+    {
+      modes.push(*value);
+    }
+  }
+  Some(modes)
 }
 
 fn kth_value(mut values: Vec<f64>, k: f64, descending: bool) -> Option<f64> {
@@ -18964,7 +19453,15 @@ fn weekend_mask(
     return Some(mask);
   };
   let text = match value {
+    FormulaValue::Blank if workday_function => return None,
     FormulaValue::Blank => String::new(),
+    FormulaValue::Matrix(rows) => {
+      return weekend_mask(
+        rows.first().and_then(|row| row.first()),
+        workday_function,
+        evaluator,
+      );
+    }
     FormulaValue::Number(number) => {
       if (1.0..=17.0).contains(number) {
         display_text_from_value(&FormulaValue::Number(number.floor()))
@@ -18984,6 +19481,9 @@ fn weekend_mask(
     mask[5] = true;
     mask[6] = true;
     return Some(mask);
+  }
+  if workday_function && text == "1111111" {
+    return None;
   }
   match text.len() {
     1 => match text.as_str() {
@@ -19046,6 +19546,31 @@ fn weekend_mask(
   Some(mask)
 }
 
+fn old_networkdays_weekend_mask(
+  value: Option<&FormulaValue<'_>>,
+  evaluator: &FormulaEvaluator<'_, '_>,
+) -> Option<[bool; 7]> {
+  // Source: LibreOffice sc/source/core/tool/interpr2.cxx GetWeekendAndHolidayMasks.
+  let value = value?;
+  let values = evaluator
+    .matrix_values(value)
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+  if values.len() != 7 {
+    return None;
+  }
+  let mut source = [false; 7];
+  for (index, value) in values.iter().enumerate() {
+    source[index] = evaluator.number(value)? != 0.0;
+  }
+  let mut mask = [false; 7];
+  for index in 0..7 {
+    mask[index] = source[if index == 6 { 0 } else { index + 1 }];
+  }
+  Some(mask)
+}
+
 fn half_width_like_asc(text: &str) -> String {
   let mut output = String::with_capacity(text.len());
   for ch in text.chars() {
@@ -19084,6 +19609,8 @@ fn full_width_like_jis(text: &str) -> String {
   while let Some(ch) = chars.next() {
     match ch {
       '!'..='~' => output.push(match ch {
+        '"' => '\u{201D}',
+        '\'' => '\u{2019}',
         '\\' => '\u{FFE5}',
         '`' => '\u{2018}',
         _ => char::from_u32(ch as u32 + 0xFEE0).unwrap_or(ch),
@@ -19767,18 +20294,18 @@ fn trim_formula_text(value: &str) -> String {
 
 fn proper_formula_text(value: &str) -> String {
   let mut result = String::with_capacity(value.len());
-  let mut start_word = true;
+  let mut previous_was_letter = false;
   for ch in value.chars() {
-    if ch.is_alphanumeric() {
-      if start_word {
-        result.extend(ch.to_uppercase());
-      } else {
+    if ch.is_alphabetic() {
+      if previous_was_letter {
         result.extend(ch.to_lowercase());
+      } else {
+        result.extend(ch.to_uppercase());
       }
-      start_word = false;
+      previous_was_letter = true;
     } else {
       result.push(ch);
-      start_word = true;
+      previous_was_letter = false;
     }
   }
   result
@@ -19820,12 +20347,18 @@ fn clean_formula_text(value: &str) -> String {
   let mut output = String::with_capacity(value.len());
   let mut index = 0usize;
   while index < chars.len() {
+    if chars.get(index).copied() == Some('\u{00c2}')
+      && chars.get(index + 1).copied() == Some('\u{00a0}')
+    {
+      index += 1;
+      continue;
+    }
     if legacy_c1_text_len(&chars[index..]).is_some() {
       index += 2;
       continue;
     }
     let ch = chars[index];
-    if !ch.is_control() && !is_unicode_noncharacter(ch) {
+    if !ch.is_control() && is_unicode_defined(ch) && !is_unicode_noncharacter(ch) {
       output.push(ch);
     }
     index += 1;
@@ -19867,6 +20400,10 @@ fn legacy_c1_text_len(chars: &[char]) -> Option<usize> {
 fn is_unicode_noncharacter(ch: char) -> bool {
   let code = ch as u32;
   (0xfdd0..=0xfdef).contains(&code) || code & 0xfffe == 0xfffe
+}
+
+fn is_unicode_defined(ch: char) -> bool {
+  CodePointMapData::<GeneralCategory>::new().get(ch) != GeneralCategory::Unassigned
 }
 
 fn parse_complex_number(value: &str) -> Option<(f64, f64, char)> {
@@ -20624,6 +21161,56 @@ fn lo_beta_dist(x_in: f64, alpha: f64, beta: f64) -> f64 {
   result.clamp(0.0, 1.0)
 }
 
+fn lo_f_dist_right_tail(x: f64, df1: f64, df2: f64) -> f64 {
+  lo_beta_dist(df2 / (df2 + df1 * x), df2 / 2.0, df1 / 2.0)
+}
+
+fn lo_f_dist_pdf(x: f64, df1: f64, df2: f64) -> f64 {
+  (df1 / df2).powf(df1 / 2.0) * x.powf(df1 / 2.0 - 1.0)
+    / ((1.0 + x * df1 / df2).powf((df1 + df2) / 2.0) * lo_beta(df1 / 2.0, df2 / 2.0))
+}
+
+fn lo_t_dist(t: f64, df: f64, kind: i32) -> f64 {
+  let x = df / (df + t * t);
+  match kind {
+    1 => 0.5 * lo_beta_dist(x, df / 2.0, 0.5),
+    2 => lo_beta_dist(x, df / 2.0, 0.5),
+    3 => (1.0 + t * t / df).powf(-(df + 1.0) / 2.0) / (df.sqrt() * lo_beta(0.5, df / 2.0)),
+    4 => {
+      let result = 0.5 * lo_beta_dist(x, df / 2.0, 0.5);
+      if t < 0.0 { result } else { 1.0 - result }
+    }
+    _ => f64::NAN,
+  }
+}
+
+fn lo_poisson_dist(x: f64, lambda: f64, cumulative: bool) -> f64 {
+  if !cumulative {
+    if lambda > 712.0 {
+      return (x * lambda.ln() - lambda - lo_log_gamma(x + 1.0)).exp();
+    }
+    let mut value = 1.0;
+    for i in 0..(x as u32) {
+      value *= lambda / f64::from(i + 1);
+    }
+    return value * (-lambda).exp();
+  }
+  if lambda > 712.0 {
+    return lo_up_reg_igamma(x + 1.0, lambda).unwrap_or(f64::NAN);
+  }
+  if x >= 936.0 {
+    return 1.0;
+  }
+  let mut summand = (-lambda).exp();
+  let mut sum = KahanSum::default();
+  sum.add(summand);
+  for i in 1..=(x as u32) {
+    summand = summand * lambda / f64::from(i);
+    sum.add(summand);
+  }
+  sum.finish()
+}
+
 fn lo_binom_dist_pmf(x: f64, n: f64, p: f64) -> f64 {
   let q = (0.5 - p) + 0.5;
   let mut factor = q.powf(n);
@@ -20840,8 +21427,7 @@ fn chisq_dist_value<'doc>(
 }
 
 fn chisq_inv_value<'doc>(p: f64, df: f64, right_tail: bool) -> FormulaValue<'doc> {
-  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && !(0.0..1.0).contains(&p))
-  {
+  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && (p < 0.0 || p >= 1.0)) {
     return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
   let result = if right_tail {
@@ -20948,7 +21534,7 @@ where
 }
 
 fn norm_s_dist(x: f64) -> f64 {
-  Normal::standard().cdf(x)
+  lo_integral_phi(x)
 }
 
 fn norm_s_inv(p: f64) -> f64 {
@@ -20962,6 +21548,104 @@ fn norm_s_inv(p: f64) -> f64 {
     return f64::INFINITY;
   }
   Normal::standard().inverse_cdf(p)
+}
+
+fn lo_phi(x: f64) -> f64 {
+  0.39894228040143268 * (-(x * x) / 2.0).exp()
+}
+
+fn lo_integral_phi(x: f64) -> f64 {
+  0.5 * erfc(-x * std::f64::consts::FRAC_1_SQRT_2)
+}
+
+fn lo_taylor(polynomial: &[f64], x: f64) -> f64 {
+  let Some((&last, terms)) = polynomial.split_last() else {
+    return 0.0;
+  };
+  let mut value = last;
+  for coefficient in terms.iter().rev() {
+    value = value * x + *coefficient;
+  }
+  value
+}
+
+fn lo_gauss(x: f64) -> f64 {
+  let x_abs = x.abs();
+  let x_short = approx_floor(x_abs) as u16;
+  let value = if x_short == 0 {
+    const T0: [f64; 12] = [
+      0.39894228040143268,
+      -0.06649038006690545,
+      0.00997355701003582,
+      -0.00118732821548045,
+      0.00011543468761616,
+      -0.00000944465625950,
+      0.00000066596935163,
+      -0.00000004122667415,
+      0.00000000227352982,
+      0.00000000011301172,
+      0.00000000000511243,
+      -0.00000000000021218,
+    ];
+    lo_taylor(&T0, x_abs * x_abs) * x_abs
+  } else if x_short <= 2 {
+    const T2: [f64; 24] = [
+      0.47724986805182079,
+      0.05399096651318805,
+      -0.05399096651318805,
+      0.02699548325659403,
+      -0.00449924720943234,
+      -0.00224962360471617,
+      0.00134977416282970,
+      -0.00011783742691370,
+      -0.00011515930357476,
+      0.00003704737285544,
+      0.00000282690796889,
+      -0.00000354513195524,
+      0.00000037669563126,
+      0.00000019202407921,
+      -0.00000005226908590,
+      -0.00000000491799345,
+      0.00000000366377919,
+      -0.00000000015981997,
+      -0.00000000017381238,
+      0.00000000002624031,
+      0.00000000000560919,
+      -0.00000000000172127,
+      -0.00000000000008634,
+      0.00000000000007894,
+    ];
+    lo_taylor(&T2, x_abs - 2.0)
+  } else if x_short <= 4 {
+    const T4: [f64; 21] = [
+      0.49996832875816688,
+      0.00013383022576489,
+      -0.00026766045152977,
+      0.00033457556441221,
+      -0.00028996548915725,
+      0.00018178605666397,
+      -0.00008252863922168,
+      0.00002551802519049,
+      -0.00000391665839292,
+      -0.00000074018205222,
+      0.00000064422023359,
+      -0.00000017370155340,
+      0.00000000909595465,
+      0.00000000944943118,
+      -0.00000000329957075,
+      0.00000000029492075,
+      0.00000000011874477,
+      -0.00000000004420396,
+      0.00000000000361422,
+      0.00000000000143638,
+      -0.00000000000045848,
+    ];
+    lo_taylor(&T4, x_abs - 4.0)
+  } else {
+    const ASYMPT: [f64; 5] = [-1.0, 1.0, -3.0, 15.0, -105.0];
+    0.5 + lo_phi(x_abs) * lo_taylor(&ASYMPT, 1.0 / (x_abs * x_abs)) / x_abs
+  };
+  if x < 0.0 { -value } else { value }
 }
 
 fn propagate_binary_error(
@@ -21016,11 +21700,11 @@ fn should_ignore_to_row_column_value(value: &FormulaValue<'_>, ignore: i32) -> b
 }
 
 fn erf(x: f64) -> f64 {
-  statrs_erf::erf(x)
+  libm::erf(x)
 }
 
 fn erfc(x: f64) -> f64 {
-  statrs_erf::erfc(x)
+  libm::erfc(x)
 }
 
 fn rtl_round(value: f64, decimal_places: i32) -> f64 {
@@ -23577,6 +24261,43 @@ fn index_matrix<'doc>(
     .and_then(|row_values| row_values.get(column as usize - 1))
     .cloned()
     .unwrap_or(FormulaValue::Error(FormulaErrorValue::Ref))
+}
+
+fn roman_text_libreoffice(value: u16, mode: u16) -> String {
+  // Source: LibreOffice sc/source/core/tool/interpr2.cxx ScInterpreter::ScRoman.
+  const CHARS: [char; 7] = ['M', 'D', 'C', 'L', 'X', 'V', 'I'];
+  const VALUES: [u16; 7] = [1000, 500, 100, 50, 10, 5, 1];
+  let max_index = VALUES.len() - 1;
+  let mut number = value;
+  let mut output = String::new();
+  for i in 0..=(max_index / 2) {
+    let mut index = 2 * i;
+    let digit = number / VALUES[index];
+    if digit % 5 == 4 {
+      let index2 = if digit == 4 { index - 1 } else { index - 2 };
+      let mut steps = 0;
+      while steps < mode && index < max_index {
+        steps += 1;
+        if VALUES[index2] - VALUES[index + 1] <= number {
+          index += 1;
+        } else {
+          steps = mode;
+        }
+      }
+      output.push(CHARS[index]);
+      output.push(CHARS[index2]);
+      number = number + VALUES[index] - VALUES[index2];
+    } else {
+      if digit > 4 {
+        output.push(CHARS[index - 1]);
+      }
+      for _ in 0..(digit % 5) {
+        output.push(CHARS[index]);
+      }
+      number %= VALUES[index];
+    }
+  }
+  output
 }
 
 fn parse_reference_prefix_before_intersection<'doc>(
@@ -26431,7 +27152,7 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "HYPERLINK(\"url\",1/0)"),
       Some(FormulaValue::Matrix(vec![
         vec![FormulaValue::Error(FormulaErrorValue::Div0)],
-        vec![FormulaValue::Error(FormulaErrorValue::Div0)],
+        vec![FormulaValue::String(Cow::Borrowed("url"))],
       ]))
     );
     assert_eq!(

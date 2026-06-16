@@ -5,6 +5,7 @@ use num_complex::Complex;
 pub mod combinatorics;
 pub mod complex;
 pub mod datetime;
+pub mod financial;
 pub(crate) mod fourier;
 pub mod matrix;
 pub mod numeric;

@@ -2,8 +2,9 @@ use std::cell::RefCell;
 
 use num_complex::Complex;
 
+pub mod complex;
 pub(crate) mod fourier;
-pub(crate) mod numeric;
+pub mod numeric;
 
 #[derive(Default)]
 pub(crate) struct CalcEngine {

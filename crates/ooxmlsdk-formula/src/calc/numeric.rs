@@ -1,4 +1,4 @@
-pub(crate) fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
+pub fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   if value == 0.0 || !value.is_finite() {
     return value;
   }
@@ -57,7 +57,7 @@ fn round_direction_basic(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   }
 }
 
-pub(crate) fn even_odd(value: f64, even: bool) -> f64 {
+pub fn even_odd(value: f64, even: bool) -> f64 {
   if value == 0.0 {
     return if even { 0.0 } else { 1.0 };
   }
@@ -70,7 +70,7 @@ pub(crate) fn even_odd(value: f64, even: bool) -> f64 {
   sign * magnitude
 }
 
-pub(crate) fn gcd_number(mut left: f64, mut right: f64) -> f64 {
+pub fn gcd_number(mut left: f64, mut right: f64) -> f64 {
   left = left.abs();
   right = right.abs();
   while right != 0.0 {
@@ -81,7 +81,7 @@ pub(crate) fn gcd_number(mut left: f64, mut right: f64) -> f64 {
   left
 }
 
-pub(crate) fn lcm_number(left: f64, right: f64) -> f64 {
+pub fn lcm_number(left: f64, right: f64) -> f64 {
   if left == 0.0 || right == 0.0 {
     return 0.0;
   }
@@ -89,14 +89,14 @@ pub(crate) fn lcm_number(left: f64, right: f64) -> f64 {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct KahanSum {
+pub struct KahanSum {
   sum: f64,
   error: f64,
   memory: f64,
 }
 
 impl KahanSum {
-  pub(crate) fn add(&mut self, value: f64) {
+  pub fn add(&mut self, value: f64) {
     if value == 0.0 {
       return;
     }
@@ -108,7 +108,7 @@ impl KahanSum {
     self.memory = value;
   }
 
-  pub(crate) fn finish(mut self) -> f64 {
+  pub fn finish(mut self) -> f64 {
     let total = self.sum + self.error;
     if self.memory == 0.0 {
       return total;
@@ -134,7 +134,7 @@ impl KahanSum {
   }
 }
 
-pub(crate) fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+pub fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
   let mut sum = KahanSum::default();
   for value in values {
     sum.add(value);
@@ -143,16 +143,16 @@ pub(crate) fn kahan_sum(values: impl IntoIterator<Item = f64>) -> f64 {
 }
 
 #[inline]
-pub(crate) fn approx_floor(value: f64) -> f64 {
+pub fn approx_floor(value: f64) -> f64 {
   approx_value(value).floor()
 }
 
 #[inline]
-pub(crate) fn approx_ceil(value: f64) -> f64 {
+pub fn approx_ceil(value: f64) -> f64 {
   approx_value(value).ceil()
 }
 
-pub(crate) fn approx_equal(left: f64, right: f64) -> bool {
+pub fn approx_equal(left: f64, right: f64) -> bool {
   if left == right {
     return true;
   }
@@ -174,21 +174,21 @@ pub(crate) fn approx_equal(left: f64, right: f64) -> bool {
   !(is_representable_integer(left) && is_representable_integer(right))
 }
 
-pub(crate) fn approx_sub(left: f64, right: f64) -> f64 {
+pub fn approx_sub(left: f64, right: f64) -> f64 {
   if ((left < 0.0 && right < 0.0) || (left > 0.0 && right > 0.0)) && approx_equal(left, right) {
     return 0.0;
   }
   normalize_duration_difference(left, right, left - right)
 }
 
-pub(crate) fn approx_add(left: f64, right: f64) -> f64 {
+pub fn approx_add(left: f64, right: f64) -> f64 {
   if ((left < 0.0 && right > 0.0) || (right < 0.0 && left > 0.0)) && approx_equal(left, -right) {
     return 0.0;
   }
   left + right
 }
 
-pub(crate) fn normalize_formula_number(value: f64) -> f64 {
+pub fn normalize_formula_number(value: f64) -> f64 {
   if approx_equal(value, 0.0) { 0.0 } else { value }
 }
 
@@ -204,7 +204,7 @@ fn normalize_duration_difference(left: f64, right: f64, value: f64) -> f64 {
   value
 }
 
-pub(crate) fn approx_value(value: f64) -> f64 {
+pub fn approx_value(value: f64) -> f64 {
   const TWO_POW_41: f64 = 2_199_023_255_552.0;
   if value == 0.0 || !value.is_finite() || value.abs() > TWO_POW_41 {
     return value;
@@ -231,7 +231,7 @@ fn pow10_exp(exp: i32) -> f64 {
   10_f64.powi(exp)
 }
 
-pub(crate) fn is_representable_integer(value: f64) -> bool {
+pub fn is_representable_integer(value: f64) -> bool {
   value.is_finite() && value >= 0.0 && value < 2_f64.powi(53) && value.fract() == 0.0
 }
 

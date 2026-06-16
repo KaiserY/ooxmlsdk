@@ -21,6 +21,10 @@ use statrs::distribution::{
 use statrs::function::gamma as statrs_gamma;
 
 use crate::calc::CalcEngine;
+use crate::calc::complex::{
+  FormulaComplex, binary_suffix, format_complex_number as format_formula_complex_number,
+  parse_complex_number,
+};
 use crate::calc::numeric::{
   KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
   even_odd, gcd_number, is_representable_integer, kahan_sum, lcm_number, normalize_formula_number,
@@ -13762,9 +13766,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     };
     let value = parse_complex_number(&self.text(&self.evaluate(arg)?))?;
     Some(FormulaValue::Number(if imaginary {
-      value.1
+      value.imaginary()
     } else {
-      value.0
+      value.real()
     }))
   }
 
@@ -13779,10 +13783,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if suffix != "i" && suffix != "j" && !suffix.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      real,
-      imaginary,
-      if suffix == "j" { 'j' } else { 'i' },
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::new(real, imaginary, if suffix == "j" { 'j' } else { 'i' }),
     ))))
   }
 
@@ -13790,16 +13792,16 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 1 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let (real, imaginary, _) = parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
-    Some(FormulaValue::Number(imaginary.atan2(real)))
+    let value = parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
+    Some(FormulaValue::Number(value.imaginary().atan2(value.real())))
   }
 
   fn evaluate_complex_abs(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     if args.len() != 1 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let (real, imaginary, _) = parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
-    Some(FormulaValue::Number(real.hypot(imaginary)))
+    let value = parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
+    Some(FormulaValue::Number(value.value().norm()))
   }
 
   fn evaluate_complex_unary(
@@ -13810,11 +13812,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 1 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let (real, imaginary, suffix) =
-      parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
-    let result = op(Complex::new(real, imaginary));
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      result.re, result.im, suffix,
+    let value = parse_complex_number(&self.text(&self.evaluate(args.first()?)?))?;
+    let result = op(value.value());
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::from_value(result, value.suffix()),
     ))))
   }
 
@@ -13840,15 +13841,12 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    let suffix = if left.2 == 'j' || right.2 == 'j' {
-      'j'
-    } else {
-      'i'
-    };
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      op(left.0, right.0),
-      op(left.1, right.1),
-      suffix,
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::new(
+        op(left.real(), right.real()),
+        op(left.imaginary(), right.imaginary()),
+        binary_suffix(left, right),
+      ),
     ))))
   }
 
@@ -13870,20 +13868,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    if right.0 == 0.0 && right.1 == 0.0 {
+    if right.real() == 0.0 && right.imaginary() == 0.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let result = Complex::new(left.0, left.1) / Complex::new(right.0, right.1);
+    let result = left.value() / right.value();
     if !result.re.is_finite() || !result.im.is_finite() {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let suffix = if left.2 == 'j' || right.2 == 'j' {
-      'j'
-    } else {
-      'i'
-    };
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      result.re, result.im, suffix,
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::from_value(result, binary_suffix(left, right)),
     ))))
   }
 
@@ -13891,7 +13884,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 2 {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
-    let Some((real, imaginary, suffix)) = args
+    let Some(value) = args
       .first()
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| parse_complex_number(&self.text(&value)))
@@ -13899,9 +13892,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
     let power = self.number(&self.evaluate(args.get(1)?)?)?;
-    let result = Complex::new(real, imaginary).powf(power);
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      result.re, result.im, suffix,
+    let result = value.value().powf(power);
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::from_value(result, value.suffix()),
     ))))
   }
 
@@ -13910,28 +13903,27 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     product: bool,
   ) -> Option<FormulaValue<'doc>> {
-    let mut real = if product { 1.0 } else { 0.0 };
-    let mut imaginary = 0.0;
+    let mut total = if product {
+      Complex::new(1.0, 0.0)
+    } else {
+      Complex::new(0.0, 0.0)
+    };
     let mut suffix = 'i';
     for source in self.values(args) {
       let Some(value) = parse_complex_number(&self.text(&source)) else {
         return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
       };
-      if value.2 == 'j' {
+      if value.suffix() == 'j' {
         suffix = 'j';
       }
       if product {
-        let next_real = real * value.0 - imaginary * value.1;
-        let next_imaginary = real * value.1 + imaginary * value.0;
-        real = next_real;
-        imaginary = next_imaginary;
+        total *= value.value();
       } else {
-        real += value.0;
-        imaginary += value.1;
+        total += value.value();
       }
     }
-    Some(FormulaValue::String(Cow::Owned(format_complex_number(
-      real, imaginary, suffix,
+    Some(FormulaValue::String(Cow::Owned(format_complex_result(
+      FormulaComplex::from_value(total, suffix),
     ))))
   }
 
@@ -20921,72 +20913,8 @@ fn is_unicode_defined(ch: char) -> bool {
   CodePointMapData::<GeneralCategory>::new().get(ch) != GeneralCategory::Unassigned
 }
 
-fn parse_complex_number(value: &str) -> Option<(f64, f64, char)> {
-  let normalized;
-  let value = if value.contains(',') {
-    normalized = value.replace(',', ".");
-    normalized.trim()
-  } else {
-    value.trim()
-  };
-  if value == "i" || value == "j" {
-    return Some((0.0, 1.0, value.chars().next()?));
-  }
-  let suffix = value.chars().last()?;
-  if suffix != 'i' && suffix != 'j' {
-    return value.parse::<f64>().ok().map(|real| (real, 0.0, 'i'));
-  }
-  let body = &value[..value.len() - suffix.len_utf8()];
-  if body.is_empty() || body == "+" {
-    return Some((0.0, 1.0, suffix));
-  }
-  if body == "-" {
-    return Some((0.0, -1.0, suffix));
-  }
-  let mut split = None;
-  for (index, ch) in body.char_indices().skip(1) {
-    let previous = body[..index].chars().next_back();
-    if (ch == '+' || ch == '-') && !matches!(previous, Some('e' | 'E')) {
-      split = Some(index);
-    }
-  }
-  if let Some(index) = split {
-    let real = body[..index].parse::<f64>().ok()?;
-    let imaginary = parse_complex_imaginary_part(&body[index..])?;
-    Some((real, imaginary, suffix))
-  } else {
-    parse_complex_imaginary_part(body).map(|imaginary| (0.0, imaginary, suffix))
-  }
-}
-
-fn parse_complex_imaginary_part(value: &str) -> Option<f64> {
-  match value {
-    "" | "+" => Some(1.0),
-    "-" => Some(-1.0),
-    _ => value.parse::<f64>().ok(),
-  }
-}
-
-fn format_complex_number(real: f64, imaginary: f64, suffix: char) -> String {
-  let has_imaginary = imaginary != 0.0;
-  let has_real = !has_imaginary || real != 0.0;
-  let mut output = String::new();
-  if has_real {
-    output.push_str(&format_complex_component(real, false));
-  }
-  if has_imaginary {
-    if imaginary == 1.0 {
-      if has_real {
-        output.push('+');
-      }
-    } else if imaginary == -1.0 {
-      output.push('-');
-    } else {
-      output.push_str(&format_complex_component(imaginary, has_real));
-    }
-    output.push(suffix);
-  }
-  output
+fn format_complex_result(value: FormulaComplex) -> String {
+  format_formula_complex_number(value, format_complex_component)
 }
 
 fn format_complex_component(value: f64, leading_sign: bool) -> String {
@@ -27977,7 +27905,11 @@ mod tests {
       Some(FormulaValue::String(Cow::Borrowed("5+12i")))
     );
     assert_eq!(
-      format_complex_number(-0.0787746170678337, 0.586433260393873, 'i'),
+      format_complex_result(FormulaComplex::new(
+        -0.0787746170678337,
+        0.586433260393873,
+        'i'
+      )),
       "-0.0787746170678337+0.586433260393873i"
     );
     assert_eq!(

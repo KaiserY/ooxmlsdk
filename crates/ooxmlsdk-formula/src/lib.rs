@@ -1,5 +1,5 @@
 mod address;
-mod calc;
+pub mod calc;
 mod error;
 mod model;
 mod provider;

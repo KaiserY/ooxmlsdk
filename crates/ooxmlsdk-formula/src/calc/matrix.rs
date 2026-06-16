@@ -96,6 +96,37 @@ pub fn determinant(mut matrix: Vec<Vec<f64>>) -> f64 {
   det
 }
 
+pub fn matrix_multiply(left: &[Vec<f64>], right: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
+  let rows = left.len();
+  let shared = left.first().map_or(0, Vec::len);
+  let right_rows = right.len();
+  let columns = right.first().map_or(0, Vec::len);
+  if rows == 0
+    || shared == 0
+    || right_rows == 0
+    || columns == 0
+    || left.iter().any(|row| row.len() != shared)
+    || right.iter().any(|row| row.len() != columns)
+    || shared != right_rows
+  {
+    return None;
+  }
+
+  let mut result = Vec::with_capacity(rows);
+  for left_row in left {
+    let mut result_row = Vec::with_capacity(columns);
+    for column in 0..columns {
+      result_row.push(kahan_product_sum(
+        0..shared,
+        |index| left_row[index],
+        |index| right[index][column],
+      ));
+    }
+    result.push(result_row);
+  }
+  Some(result)
+}
+
 pub fn lup_decompose(matrix: &mut [Vec<f64>]) -> Option<LupDecomposition> {
   let n = matrix.len();
   if matrix.iter().any(|row| row.len() != n) {
@@ -225,6 +256,18 @@ mod tests {
 
     let mut matrix = vec![vec![1.0, 2.0], vec![3.0]];
     assert!(lup_decompose(&mut matrix).is_none());
+  }
+
+  #[test]
+  fn matrix_multiply_rejects_bad_shapes_and_multiplies() {
+    assert_eq!(
+      matrix_multiply(
+        &[vec![1.0, 2.0], vec![3.0, 4.0]],
+        &[vec![5.0, 6.0], vec![7.0, 8.0]]
+      ),
+      Some(vec![vec![19.0, 22.0], vec![43.0, 50.0]])
+    );
+    assert!(matrix_multiply(&[vec![1.0, 2.0]], &[vec![1.0, 2.0]]).is_none());
   }
 
   #[test]

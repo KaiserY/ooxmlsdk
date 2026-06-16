@@ -41,7 +41,8 @@ use crate::calc::financial::{
   financial_vdb, financial_xirr, financial_xnpv, is_coupon_frequency,
 };
 use crate::calc::matrix::{
-  apply_householder, determinant, lup_decompose, lup_solve, solve_lower, solve_upper,
+  apply_householder, determinant, lup_decompose, lup_solve, matrix_multiply, solve_lower,
+  solve_upper,
 };
 use crate::calc::numeric::{
   CeilingFloorKind, KahanSum, NumericError, approx_add, approx_ceil, approx_equal, approx_floor,
@@ -60,7 +61,7 @@ use crate::calc::radix::{
   base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
 };
 use crate::calc::regression::{
-  RegressionModel, RegressionScalarState, RegressionState,
+  EtsCalculation, EtsError, EtsKind, RegressionModel, RegressionScalarState, RegressionState,
   regression_model as calc_regression_model, regression_state as calc_regression_state,
   scalar_state as regression_scalar_state_from_slices,
 };
@@ -71,7 +72,10 @@ use crate::calc::special::{
   lo_iterate_inverse, lo_phi, lo_poisson_dist, lo_t_dist, log_gamma, norm_s_dist, norm_s_inv,
 };
 use crate::calc::statistics::{
-  PercentileKind, kth_value, mean, mode_ms_values, mode_slice, percentile_sorted, variance_slice,
+  PercentileKind, StatisticsError, correlation, covariance, deviation_sum_squares,
+  frequency_counts, kth_value, kurtosis, mean, mode_ms_values, mode_slice, percent_rank,
+  percentile_sorted, rank_value, skewness, sum_x2 as stats_sum_x2, sum_xmy2 as stats_sum_xmy2,
+  trim_mean, variance_slice,
 };
 use crate::calc::text::{
   baht_text, clean_formula_text, full_width_like_jis, half_width_like_asc, leftb, legacy_char_text,
@@ -9511,21 +9515,36 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let right_columns = (0..columns)
-      .map(|column| right.iter().map(|row| &row[column]).collect::<Vec<_>>())
+    let left_numbers = left
+      .iter()
+      .map(|row| {
+        row
+          .iter()
+          .map(|value| self.number(value).unwrap_or(0.0))
+          .collect::<Vec<_>>()
+      })
       .collect::<Vec<_>>();
-    let mut result = Vec::with_capacity(rows);
-    for left_row in &left {
-      let mut result_row = Vec::with_capacity(columns);
-      for right_column in &right_columns {
-        let mut total = 0.0;
-        for (left_value, right_value) in left_row.iter().zip(right_column) {
-          total += self.number(left_value).unwrap_or(0.0) * self.number(right_value).unwrap_or(0.0);
-        }
-        result_row.push(FormulaValue::Number(total));
-      }
-      result.push(result_row);
-    }
+    let right_numbers = right
+      .iter()
+      .map(|row| {
+        row
+          .iter()
+          .map(|value| self.number(value).unwrap_or(0.0))
+          .collect::<Vec<_>>()
+      })
+      .collect::<Vec<_>>();
+    let Some(result_numbers) = matrix_multiply(&left_numbers, &right_numbers) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    let result = result_numbers
+      .into_iter()
+      .map(|row| {
+        row
+          .into_iter()
+          .map(FormulaValue::Number)
+          .collect::<Vec<_>>()
+      })
+      .collect::<Vec<_>>();
     if rows == 1 && columns == 1 {
       return result.into_iter().next()?.into_iter().next();
     }
@@ -9541,7 +9560,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if matrix_dimensions(&left) != matrix_dimensions(&right) {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut total = KahanSum::default();
+    let mut left_numbers = Vec::new();
+    let mut right_numbers = Vec::new();
     for (left_row, right_row) in left.iter().zip(&right) {
       for (left_value, right_value) in left_row.iter().zip(right_row) {
         let Some(left_number) = matrix_stat_number(left_value) else {
@@ -9550,15 +9570,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let Some(right_number) = matrix_stat_number(right_value) else {
           continue;
         };
-        total.add(left_number * left_number);
-        if plus {
-          total.add(right_number * right_number);
-        } else {
-          total.add(-(right_number * right_number));
-        }
+        left_numbers.push(left_number);
+        right_numbers.push(right_number);
       }
     }
-    Some(FormulaValue::Number(total.finish()))
+    stats_sum_x2(&left_numbers, &right_numbers, plus).map(FormulaValue::Number)
   }
 
   fn evaluate_sumxmy2(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -9570,7 +9586,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if matrix_dimensions(&left) != matrix_dimensions(&right) {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    let mut total = KahanSum::default();
+    let mut left_numbers = Vec::new();
+    let mut right_numbers = Vec::new();
     for (left_row, right_row) in left.iter().zip(&right) {
       for (left_value, right_value) in left_row.iter().zip(right_row) {
         let Some(left_number) = matrix_stat_number(left_value) else {
@@ -9579,11 +9596,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         let Some(right_number) = matrix_stat_number(right_value) else {
           continue;
         };
-        let difference = approx_sub(left_number, right_number);
-        total.add(difference * difference);
+        left_numbers.push(left_number);
+        right_numbers.push(right_number);
       }
     }
-    Some(FormulaValue::Number(total.finish()))
+    stats_sum_xmy2(&left_numbers, &right_numbers).map(FormulaValue::Number)
   }
 
   fn evaluate_frequency(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -9591,30 +9608,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return None;
     }
     let array_evaluator = self.with_array_context();
-    let mut data = self.value_numbers(&array_evaluator.evaluate(args.first()?)?);
+    let data = self.value_numbers(&array_evaluator.evaluate(args.first()?)?);
     let bins = self.value_numbers(&array_evaluator.evaluate(args.get(1)?)?);
-    if data.is_empty() {
+    let Some(counts) = frequency_counts(data, &bins) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
-    }
-    data.sort_by(|left, right| left.total_cmp(right));
-    let mut ordered_bins = bins
-      .iter()
-      .copied()
-      .enumerate()
-      .map(|(index, value)| (value, index))
-      .collect::<Vec<_>>();
-    ordered_bins.sort_by(|left, right| left.0.total_cmp(&right.0));
-    let mut counts = vec![0usize; bins.len() + 1];
-    let mut data_index = 0;
-    for (bin_value, original_index) in ordered_bins {
-      let mut count = 0;
-      while data_index < data.len() && data[data_index] <= bin_value {
-        count += 1;
-        data_index += 1;
-      }
-      counts[original_index] = count;
-    }
-    counts[bins.len()] = data.len() - data_index;
+    };
     Some(FormulaValue::Matrix(
       counts
         .into_iter()
@@ -9790,7 +9788,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if args.len() != 2 {
       return None;
     }
-    let mut values = self.value_numbers(&self.evaluate(args.first()?)?);
+    let values = self.value_numbers(&self.evaluate(args.first()?)?);
     let alpha = self.number(&self.evaluate(args.get(1)?)?)?;
     if !(0.0..1.0).contains(&alpha) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
@@ -9798,19 +9796,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if values.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
-    values.sort_by(|left, right| left.total_cmp(right));
-    let mut trim = approx_floor(alpha * values.len() as f64) as usize;
-    if !trim.is_multiple_of(2) {
-      trim -= 1;
-    }
-    trim /= 2;
-    if trim * 2 >= values.len() {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
-    }
-    let kept = &values[trim..values.len() - trim];
-    Some(FormulaValue::Number(
-      kept.iter().sum::<f64>() / kept.len() as f64,
-    ))
+    trim_mean(values, alpha)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
   }
 
   fn evaluate_large_small(
@@ -9968,16 +9956,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if values.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Div0));
     }
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
-    Some(FormulaValue::Number(
-      values
-        .iter()
-        .map(|value| {
-          let delta = value - mean;
-          delta * delta
-        })
-        .sum(),
-    ))
+    deviation_sum_squares(&values).map(FormulaValue::Number)
   }
 
   fn evaluate_avedev(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -10805,34 +10784,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     population: bool,
   ) -> Option<FormulaValue<'doc>> {
     let values = self.numeric_args(args);
-    let count = values.len() as f64;
-    if count < 3.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+    match skewness(&values, population) {
+      Ok(value) => Some(FormulaValue::Number(value)),
+      Err(error) => Some(FormulaValue::Error(statistics_error_value(error))),
     }
-    let mean = values.iter().sum::<f64>() / count;
-    let variance_sum = values
-      .iter()
-      .map(|value| {
-        let diff = value - mean;
-        diff * diff
-      })
-      .sum::<f64>();
-    let std_dev = (variance_sum / if population { count } else { count - 1.0 }).sqrt();
-    if std_dev == 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
-    }
-    let cube_sum = values
-      .iter()
-      .map(|value| {
-        let normalized = (value - mean) / std_dev;
-        normalized * normalized * normalized
-      })
-      .sum::<f64>();
-    Some(FormulaValue::Number(if population {
-      cube_sum / count
-    } else {
-      cube_sum * count / (count - 1.0) / (count - 2.0)
-    }))
   }
 
   fn evaluate_geo_har_mean(
@@ -11595,55 +11550,22 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(range_value) = args.get(1).and_then(|arg| self.evaluate(arg)) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let mut values = self.value_numbers(&range_value);
+    let values = self.value_numbers(&range_value);
     let ascending = args
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .is_some_and(|value| self.truthy(&value));
-    values.sort_by(f64::total_cmp);
-    if !ascending {
-      values.reverse();
-    }
-    let positions = values
-      .iter()
-      .enumerate()
-      .filter_map(|(index, candidate)| (*candidate == value).then_some(index as f64 + 1.0))
-      .collect::<Vec<_>>();
-    if positions.is_empty() {
-      return Some(FormulaValue::Error(FormulaErrorValue::NA));
-    }
-    Some(FormulaValue::Number(if average {
-      positions.iter().sum::<f64>() / positions.len() as f64
-    } else {
-      positions[0]
-    }))
+    rank_value(values, value, ascending, average)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
   }
 
   fn evaluate_kurt(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let values = self.numeric_args(args);
-    let n = values.len();
-    if n < 4 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+    match kurtosis(&values) {
+      Ok(value) => Some(FormulaValue::Number(value)),
+      Err(error) => Some(FormulaValue::Error(statistics_error_value(error))),
     }
-    let mean = values.iter().sum::<f64>() / n as f64;
-    let mut second = 0.0;
-    let mut fourth = 0.0;
-    for value in &values {
-      let diff = value - mean;
-      let square = diff * diff;
-      second += square;
-      fourth += square * square;
-    }
-    if second == 0.0 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
-    }
-    let n = n as f64;
-    let sample_variance = second / (n - 1.0);
-    let sample_fourth = fourth / (sample_variance * sample_variance);
-    Some(FormulaValue::Number(
-      n * (n + 1.0) * sample_fourth / ((n - 1.0) * (n - 2.0) * (n - 3.0))
-        - 3.0 * (n - 1.0) * (n - 1.0) / ((n - 2.0) * (n - 3.0)),
-    ))
   }
 
   fn evaluate_beta_dist(
@@ -12245,47 +12167,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(pairs) = covariance_pairs(&left, &right) else {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     };
-    let count = pairs.len();
-    if count == 0 || (sample && count < 2) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
-    }
-    let left_mean = pairs.iter().map(|(left, _)| *left).sum::<f64>() / count as f64;
-    let right_mean = pairs.iter().map(|(_, right)| *right).sum::<f64>() / count as f64;
-    let sum = pairs
-      .iter()
-      .map(|(left, right)| (left - left_mean) * (right - right_mean))
-      .sum::<f64>();
-    Some(FormulaValue::Number(
-      sum / if sample { count - 1 } else { count } as f64,
-    ))
+    covariance(&pairs, sample)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Value)))
   }
 
   fn evaluate_correl(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let left = self.value_numbers(&self.evaluate(args.first()?)?);
     let right = self.value_numbers(&self.evaluate(args.get(1)?)?);
-    let count = left.len().min(right.len());
-    if count < 2 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Div0));
-    }
-    let left_mean = left.iter().take(count).sum::<f64>() / count as f64;
-    let right_mean = right.iter().take(count).sum::<f64>() / count as f64;
-    let mut numerator = 0.0;
-    let mut left_sum = 0.0;
-    let mut right_sum = 0.0;
-    for index in 0..count {
-      let left_delta = left[index] - left_mean;
-      let right_delta = right[index] - right_mean;
-      numerator += left_delta * right_delta;
-      left_sum += left_delta * left_delta;
-      right_sum += right_delta * right_delta;
-    }
-    if left_sum == 0.0 || right_sum == 0.0 {
-      Some(FormulaValue::Error(FormulaErrorValue::Div0))
-    } else {
-      Some(FormulaValue::Number(
-        numerator / (left_sum * right_sum).sqrt(),
-      ))
-    }
+    correlation(&left, &right)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
   }
 
   fn evaluate_slope(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -12438,7 +12330,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       kind,
     ) {
       Ok(calc) => calc,
-      Err(error) => return Some(FormulaValue::Error(error)),
+      Err(error) => return Some(FormulaValue::Error(ets_error_value(error))),
     };
     match kind {
       EtsKind::Season => Some(FormulaValue::Number(calc.samples_in_period as f64)),
@@ -13045,12 +12937,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     args: &[FormulaAst<'doc>],
     kind: PercentileKind,
   ) -> Option<FormulaValue<'doc>> {
-    let mut values = self.value_numbers(&self.evaluate(args.first()?)?);
-    values.sort_by(f64::total_cmp);
+    let values = self.value_numbers(&self.evaluate(args.first()?)?);
     let x = self.number(&self.evaluate(args.get(1)?)?)?;
-    if values.is_empty() || x < *values.first()? || x > *values.last()? {
-      return Some(FormulaValue::Error(FormulaErrorValue::NA));
-    }
     let significance = args
       .get(2)
       .and_then(|arg| self.evaluate(arg))
@@ -13060,54 +12948,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if significance < 1.0 {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    if values.len() == 1 {
-      return Some(FormulaValue::Number(1.0));
-    }
-    let round_result = |value: f64| {
-      if value == 0.0 {
-        value
-      } else {
-        let exp = value.abs().log10().floor() + 1.0 - significance;
-        (value * 10f64.powf(-exp)).round() / 10f64.powf(-exp)
-      }
-    };
-
-    let size = values.len();
-    let result = if x == values[0] {
-      match kind {
-        PercentileKind::Inc => 0.0,
-        PercentileKind::Exc => 1.0 / (size + 1) as f64,
-      }
-    } else {
-      let mut old_count = 0usize;
-      let mut old_value = values[0];
-      let mut index = 1usize;
-      while index < size && values[index] < x {
-        if values[index] != old_value {
-          old_count = index;
-          old_value = values[index];
-        }
-        index += 1;
-      }
-      if values[index] != old_value {
-        old_count = index;
-      }
-      if x == values[index] {
-        match kind {
-          PercentileKind::Inc => old_count as f64 / (size - 1) as f64,
-          PercentileKind::Exc => (index + 1) as f64 / (size + 1) as f64,
-        }
-      } else if old_count == 0 {
-        0.0
-      } else {
-        let fraction = (x - values[old_count - 1]) / (values[old_count] - values[old_count - 1]);
-        match kind {
-          PercentileKind::Inc => (old_count as f64 - 1.0 + fraction) / (size - 1) as f64,
-          PercentileKind::Exc => (old_count as f64 + fraction) / (size + 1) as f64,
-        }
-      }
-    };
-    Some(FormulaValue::Number(round_result(result)))
+    percent_rank(values, x, significance, kind)
+      .map(FormulaValue::Number)
+      .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
   }
 
   fn evaluate_poisson_dist(
@@ -16056,15 +15899,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum EtsKind {
-  Add,
-  Mult,
-  Season,
-  StatAdd,
-  StatMult,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum SumProductScalar {
   Number(f64),
@@ -16080,579 +15914,6 @@ enum CouponFunction {
   Ncd,
   Num,
   Pcd,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct EtsDataPoint {
-  x: f64,
-  y: f64,
-}
-
-#[derive(Clone, Debug)]
-struct EtsCalculation {
-  data: Vec<EtsDataPoint>,
-  base: Vec<f64>,
-  trend: Vec<f64>,
-  period_index: Vec<f64>,
-  forecast_values: Vec<f64>,
-  samples_in_period: usize,
-  step_size: f64,
-  alpha: f64,
-  beta: f64,
-  gamma: f64,
-  mae: f64,
-  mase: f64,
-  mse: f64,
-  rmse: f64,
-  smape: f64,
-  additive: bool,
-  double_smoothing: bool,
-  initialized: bool,
-}
-
-impl EtsCalculation {
-  const MIN_RESOLUTION: f64 = 0.001;
-
-  fn new(
-    timeline: &[f64],
-    values: &[f64],
-    samples_in_period: usize,
-    data_completion: bool,
-    aggregation: i32,
-    target: Option<f64>,
-    kind: EtsKind,
-  ) -> std::result::Result<Self, FormulaErrorValue> {
-    let mut data = timeline
-      .iter()
-      .zip(values)
-      .map(|(x, y)| EtsDataPoint { x: *x, y: *y })
-      .collect::<Vec<_>>();
-    data.sort_by(|left, right| left.x.total_cmp(&right.x));
-    if let Some(target) = target
-      && target < data.first().map_or(0.0, |point| point.x)
-    {
-      return Err(FormulaErrorValue::Num);
-    }
-
-    let mut index = 1usize;
-    let mut step_size = f64::MAX;
-    while index < data.len() {
-      let mut step = data[index].x - data[index - 1].x;
-      if step == 0.0 {
-        aggregate_duplicate_ets_points(&mut data, index, aggregation)?;
-        if index < data.len() {
-          step = data[index].x - data[index - 1].x;
-        } else {
-          step = step_size;
-        }
-      }
-      if step > 0.0 && step < step_size {
-        step_size = step;
-      }
-      index += 1;
-    }
-    if data.len() < 2 || !step_size.is_finite() || step_size == f64::MAX {
-      return Err(FormulaErrorValue::Value);
-    }
-    let mut has_gap = false;
-    for index in 1..data.len() {
-      let step = data[index].x - data[index - 1].x;
-      if step != step_size {
-        if (step % step_size).abs() >= f64::EPSILON {
-          return Err(FormulaErrorValue::Value);
-        }
-        has_gap = true;
-      }
-    }
-    if has_gap {
-      fill_ets_gaps(&mut data, step_size, data_completion)?;
-    }
-
-    let mut samples_in_period = if samples_in_period != 1 {
-      samples_in_period
-    } else {
-      ets_period_len(&data)
-    };
-    let double_smoothing = samples_in_period == 0 || samples_in_period == 1;
-    if double_smoothing {
-      samples_in_period = 0;
-    }
-    let additive = matches!(kind, EtsKind::Add | EtsKind::Season | EtsKind::StatAdd);
-    let mut calculation = Self {
-      base: vec![0.0; data.len()],
-      trend: vec![0.0; data.len()],
-      period_index: vec![0.0; data.len()],
-      forecast_values: vec![0.0; data.len()],
-      samples_in_period,
-      step_size,
-      alpha: 0.0,
-      beta: 0.0,
-      gamma: 0.0,
-      mae: 0.0,
-      mase: 0.0,
-      mse: 0.0,
-      rmse: 0.0,
-      smape: 0.0,
-      additive,
-      double_smoothing,
-      initialized: false,
-      data,
-    };
-    calculation.init_data()?;
-    Ok(calculation)
-  }
-
-  fn init_data(&mut self) -> std::result::Result<(), FormulaErrorValue> {
-    self.forecast_values[0] = self.data[0].y;
-    self.prefill_trend()?;
-    self.prefill_period_index()?;
-    self.base[0] = if self.double_smoothing {
-      self.data[0].y
-    } else {
-      self.data[0].y / self.period_index[0]
-    };
-    Ok(())
-  }
-
-  fn prefill_trend(&mut self) -> std::result::Result<(), FormulaErrorValue> {
-    if self.double_smoothing {
-      self.trend[0] = (self.data.last().unwrap().y - self.data[0].y) / (self.data.len() - 1) as f64;
-      return Ok(());
-    }
-    if self.data.len() < 2 * self.samples_in_period {
-      return Err(FormulaErrorValue::Value);
-    }
-    let mut sum = 0.0;
-    for index in 0..self.samples_in_period {
-      sum += self.data[index + self.samples_in_period].y - self.data[index].y;
-    }
-    self.trend[0] = sum / (self.samples_in_period * self.samples_in_period) as f64;
-    Ok(())
-  }
-
-  fn prefill_period_index(&mut self) -> std::result::Result<(), FormulaErrorValue> {
-    if self.double_smoothing {
-      return Ok(());
-    }
-    let periods = self.data.len() / self.samples_in_period;
-    let mut period_average = vec![0.0; periods];
-    for (period, average) in period_average.iter_mut().enumerate() {
-      let start = period * self.samples_in_period;
-      *average = self.data[start..start + self.samples_in_period]
-        .iter()
-        .map(|point| point.y)
-        .sum::<f64>()
-        / self.samples_in_period as f64;
-      if *average == 0.0 {
-        return Err(FormulaErrorValue::Div0);
-      }
-    }
-    for sample in 0..self.samples_in_period {
-      let mut total = 0.0;
-      for (period, average) in period_average.iter().enumerate() {
-        let trend_adjust =
-          (sample as f64 - 0.5 * (self.samples_in_period - 1) as f64) * self.trend[0];
-        let y = self.data[period * self.samples_in_period + sample].y;
-        total += if self.additive {
-          y - (*average + trend_adjust)
-        } else {
-          y / (*average + trend_adjust)
-        };
-      }
-      self.period_index[sample] = total / periods as f64;
-    }
-    if self.samples_in_period < self.data.len() {
-      self.period_index[self.samples_in_period] = 0.0;
-    }
-    Ok(())
-  }
-
-  fn initialize(&mut self) {
-    if self.initialized {
-      return;
-    }
-    self.calc_alpha_beta_gamma();
-    self.initialized = true;
-    self.calc_accuracy();
-  }
-
-  fn calc_alpha_beta_gamma(&mut self) {
-    self.alpha = 0.0;
-    if self.double_smoothing {
-      self.beta = 0.0;
-      self.calc_gamma();
-    } else {
-      self.calc_beta_gamma();
-    }
-    self.refill();
-    let mut low_error = self.mse;
-    self.alpha = 1.0;
-    if self.double_smoothing {
-      self.calc_gamma();
-    } else {
-      self.calc_beta_gamma();
-    }
-    self.refill();
-    let mut high_error = self.mse;
-    self.alpha = 0.5;
-    if self.double_smoothing {
-      self.calc_gamma();
-    } else {
-      self.calc_beta_gamma();
-    }
-    self.refill();
-    if low_error == self.mse && self.mse == high_error {
-      self.alpha = 0.0;
-      if self.double_smoothing {
-        self.calc_gamma();
-      } else {
-        self.calc_beta_gamma();
-      }
-      self.refill();
-      return;
-    }
-    let mut low = 0.0;
-    let mut mid = 0.5;
-    let mut high = 1.0;
-    while high - mid > Self::MIN_RESOLUTION {
-      if high_error > low_error {
-        high = mid;
-        high_error = self.mse;
-        mid = (low + mid) / 2.0;
-      } else {
-        low = mid;
-        low_error = self.mse;
-        mid = (mid + high) / 2.0;
-      }
-      self.alpha = mid;
-      if self.double_smoothing {
-        self.calc_gamma();
-      } else {
-        self.calc_beta_gamma();
-      }
-      self.refill();
-    }
-    if high_error > low_error {
-      if low_error < self.mse {
-        self.alpha = low;
-        if self.double_smoothing {
-          self.calc_gamma();
-        } else {
-          self.calc_beta_gamma();
-        }
-        self.refill();
-      }
-    } else if high_error < self.mse {
-      self.alpha = high;
-      if self.double_smoothing {
-        self.calc_gamma();
-      } else {
-        self.calc_beta_gamma();
-      }
-      self.refill();
-    }
-    self.calc_accuracy();
-  }
-
-  fn calc_beta_gamma(&mut self) {
-    self.beta = 0.0;
-    self.calc_gamma();
-    self.refill();
-    let mut low_error = self.mse;
-    self.beta = 1.0;
-    self.calc_gamma();
-    self.refill();
-    let mut high_error = self.mse;
-    self.beta = 0.5;
-    self.calc_gamma();
-    self.refill();
-    if low_error == self.mse && self.mse == high_error {
-      self.beta = 0.0;
-      self.calc_gamma();
-      self.refill();
-      return;
-    }
-    let mut low = 0.0;
-    let mut mid = 0.5;
-    let mut high = 1.0;
-    while high - mid > Self::MIN_RESOLUTION {
-      if high_error > low_error {
-        high = mid;
-        high_error = self.mse;
-        mid = (low + mid) / 2.0;
-      } else {
-        low = mid;
-        low_error = self.mse;
-        mid = (mid + high) / 2.0;
-      }
-      self.beta = mid;
-      self.calc_gamma();
-      self.refill();
-    }
-    if high_error > low_error {
-      if low_error < self.mse {
-        self.beta = low;
-        self.calc_gamma();
-        self.refill();
-      }
-    } else if high_error < self.mse {
-      self.beta = high;
-      self.calc_gamma();
-      self.refill();
-    }
-  }
-
-  fn calc_gamma(&mut self) {
-    self.gamma = 0.0;
-    self.refill();
-    let mut low_error = self.mse;
-    self.gamma = 1.0;
-    self.refill();
-    let mut high_error = self.mse;
-    self.gamma = 0.5;
-    self.refill();
-    if low_error == self.mse && self.mse == high_error {
-      self.gamma = 0.0;
-      self.refill();
-      return;
-    }
-    let mut low = 0.0;
-    let mut mid = 0.5;
-    let mut high = 1.0;
-    while high - mid > Self::MIN_RESOLUTION {
-      if high_error > low_error {
-        high = mid;
-        high_error = self.mse;
-        mid = (low + mid) / 2.0;
-      } else {
-        low = mid;
-        low_error = self.mse;
-        mid = (mid + high) / 2.0;
-      }
-      self.gamma = mid;
-      self.refill();
-    }
-    if high_error > low_error {
-      if low_error < self.mse {
-        self.gamma = low;
-        self.refill();
-      }
-    } else if high_error < self.mse {
-      self.gamma = high;
-      self.refill();
-    }
-  }
-
-  fn refill(&mut self) {
-    for index in 1..self.data.len() {
-      if self.double_smoothing {
-        self.base[index] = self.alpha * self.data[index].y
-          + (1.0 - self.alpha) * (self.base[index - 1] + self.trend[index - 1]);
-        self.trend[index] = self.gamma * (self.base[index] - self.base[index - 1])
-          + (1.0 - self.gamma) * self.trend[index - 1];
-        self.forecast_values[index] = self.base[index - 1] + self.trend[index - 1];
-      } else {
-        let period_index = if self.additive {
-          if index > self.samples_in_period {
-            index - self.samples_in_period
-          } else {
-            index
-          }
-        } else if index >= self.samples_in_period {
-          index - self.samples_in_period
-        } else {
-          index
-        };
-        if self.additive {
-          self.base[index] = self.alpha * (self.data[index].y - self.period_index[period_index])
-            + (1.0 - self.alpha) * (self.base[index - 1] + self.trend[index - 1]);
-          self.period_index[index] = self.beta * (self.data[index].y - self.base[index])
-            + (1.0 - self.beta) * self.period_index[period_index];
-        } else {
-          self.base[index] = self.alpha * (self.data[index].y / self.period_index[period_index])
-            + (1.0 - self.alpha) * (self.base[index - 1] + self.trend[index - 1]);
-          self.period_index[index] = self.beta * (self.data[index].y / self.base[index])
-            + (1.0 - self.beta) * self.period_index[period_index];
-        }
-        self.trend[index] = self.gamma * (self.base[index] - self.base[index - 1])
-          + (1.0 - self.gamma) * self.trend[index - 1];
-        self.forecast_values[index] = if self.additive {
-          self.base[index - 1] + self.trend[index - 1] + self.period_index[period_index]
-        } else {
-          (self.base[index - 1] + self.trend[index - 1]) * self.period_index[period_index]
-        };
-      }
-    }
-    self.calc_accuracy();
-  }
-
-  fn calc_accuracy(&mut self) {
-    let mut sum_abs_error = 0.0;
-    let mut sum_divisor = 0.0;
-    let mut sum_error_sq = 0.0;
-    let mut sum_abs_percent_error = 0.0;
-    for index in 1..self.data.len() {
-      let error = self.forecast_values[index] - self.data[index].y;
-      sum_abs_error += error.abs();
-      sum_error_sq += error * error;
-      sum_abs_percent_error +=
-        error.abs() / (self.forecast_values[index].abs() + self.data[index].y.abs());
-    }
-    for index in 2..self.data.len() {
-      sum_divisor += (self.data[index].y - self.data[index - 1].y).abs();
-    }
-    let count = (self.data.len() - 1) as f64;
-    self.mae = sum_abs_error / count;
-    self.mase = if sum_divisor == 0.0 {
-      0.0
-    } else {
-      sum_abs_error / (count * sum_divisor / (count - 1.0))
-    };
-    self.mse = sum_error_sq / count;
-    self.rmse = self.mse.sqrt();
-    self.smape = sum_abs_percent_error * 2.0 / count;
-  }
-
-  fn forecast(&mut self, target: f64) -> f64 {
-    self.initialize();
-    let last = self.data.len() - 1;
-    if target <= self.data[last].x {
-      let index = ((target - self.data[0].x) / self.step_size) as usize;
-      let interpolate = (target - self.data[0].x) % self.step_size;
-      let mut result = self.data[index].y;
-      if interpolate >= Self::MIN_RESOLUTION && index + 1 < self.forecast_values.len() {
-        let factor = interpolate / self.step_size;
-        result += factor * (self.forecast_values[index + 1] - result);
-      }
-      return result;
-    }
-    let steps = ((target - self.data[last].x) / self.step_size) as usize;
-    let interpolate = (target - self.data[last].x) % self.step_size;
-    let mut result = self.forecast_future(steps);
-    if interpolate >= Self::MIN_RESOLUTION {
-      let next = self.forecast_future(steps + 1);
-      result += interpolate / self.step_size * (next - result);
-    }
-    result
-  }
-
-  fn forecast_future(&self, steps: usize) -> f64 {
-    let last = self.data.len() - 1;
-    if self.double_smoothing {
-      self.base[last] + steps as f64 * self.trend[last]
-    } else {
-      let index = last - self.samples_in_period + (steps % self.samples_in_period);
-      if self.additive {
-        self.base[last] + steps as f64 * self.trend[last] + self.period_index[index]
-      } else {
-        (self.base[last] + steps as f64 * self.trend[last]) * self.period_index[index]
-      }
-    }
-  }
-
-  fn statistic(&mut self, index: i32) -> f64 {
-    self.initialize();
-    match index {
-      1 => self.alpha,
-      2 => self.gamma,
-      3 => self.beta,
-      4 => self.mase,
-      5 => self.smape,
-      6 => self.mae,
-      7 => self.rmse,
-      8 => self.step_size,
-      9 => self.samples_in_period as f64,
-      _ => f64::NAN,
-    }
-  }
-}
-
-fn aggregate_duplicate_ets_points(
-  data: &mut Vec<EtsDataPoint>,
-  index: usize,
-  aggregation: i32,
-) -> std::result::Result<(), FormulaErrorValue> {
-  let x = data[index - 1].x;
-  let mut values = vec![data[index - 1].y];
-  while index < data.len() && data[index].x == x {
-    values.push(data.remove(index).y);
-  }
-  data[index - 1].y = match aggregation {
-    1 => values[0],
-    2 | 3 => values.len() as f64,
-    4 => values
-      .into_iter()
-      .reduce(f64::max)
-      .ok_or(FormulaErrorValue::Value)?,
-    5 => {
-      values.sort_by(f64::total_cmp);
-      if values.len() % 2 == 1 {
-        values[values.len() / 2]
-      } else {
-        (values[values.len() / 2] + values[values.len() / 2 - 1]) / 2.0
-      }
-    }
-    6 => values
-      .into_iter()
-      .reduce(f64::min)
-      .ok_or(FormulaErrorValue::Value)?,
-    7 => kahan_sum(values.iter().copied()),
-    _ => return Err(FormulaErrorValue::IllegalArgument),
-  };
-  Ok(())
-}
-
-fn fill_ets_gaps(
-  data: &mut Vec<EtsDataPoint>,
-  step_size: f64,
-  data_completion: bool,
-) -> std::result::Result<(), FormulaErrorValue> {
-  let original_count = data.len() as f64;
-  let mut missing_count = 0usize;
-  let mut index = 1usize;
-  while index < data.len() {
-    let distance = data[index].x - data[index - 1].x;
-    if distance > step_size {
-      let y = if data_completion {
-        (data[index].y + data[index - 1].y) / 2.0
-      } else {
-        0.0
-      };
-      let mut x = data[index - 1].x + step_size;
-      while x < data[index].x {
-        data.insert(index, EtsDataPoint { x, y });
-        missing_count += 1;
-        if missing_count as f64 / original_count > 0.3 {
-          return Err(FormulaErrorValue::Value);
-        }
-        index += 1;
-        x += step_size;
-      }
-    }
-    index += 1;
-  }
-  Ok(())
-}
-
-fn ets_period_len(data: &[EtsDataPoint]) -> usize {
-  let mut best = data.len();
-  let mut best_error = f64::MAX;
-  for period_len in (1..=data.len() / 2).rev() {
-    let periods = data.len() / period_len;
-    let start = data.len() - (periods * period_len) + 1;
-    let mut mean_error = 0.0;
-    for index in start..(data.len() - period_len) {
-      mean_error += ((data[index].y - data[index - 1].y)
-        - (data[period_len + index].y - data[period_len + index - 1].y))
-        .abs();
-    }
-    mean_error /= ((periods - 1) * period_len - 1) as f64;
-    if mean_error <= best_error || mean_error == 0.0 {
-      best = period_len;
-      best_error = mean_error;
-    }
-  }
-  best
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19429,6 +18690,22 @@ fn numeric_error_value(error: NumericError) -> FormulaErrorValue {
     NumericError::IllegalArgument => FormulaErrorValue::IllegalArgument,
     NumericError::Div0 => FormulaErrorValue::Div0,
     NumericError::Value => FormulaErrorValue::Value,
+  }
+}
+
+fn ets_error_value(error: EtsError) -> FormulaErrorValue {
+  match error {
+    EtsError::IllegalArgument => FormulaErrorValue::IllegalArgument,
+    EtsError::Num => FormulaErrorValue::Num,
+    EtsError::Value => FormulaErrorValue::Value,
+    EtsError::Div0 => FormulaErrorValue::Div0,
+  }
+}
+
+fn statistics_error_value(error: StatisticsError) -> FormulaErrorValue {
+  match error {
+    StatisticsError::Div0 => FormulaErrorValue::Div0,
+    StatisticsError::IllegalArgument => FormulaErrorValue::IllegalArgument,
   }
 }
 

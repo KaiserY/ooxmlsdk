@@ -1371,6 +1371,7 @@ dependencies = [
  "libm",
  "num-complex",
  "num-integer",
+ "num-traits",
  "ooxmlsdk",
  "regex",
  "rustfft",

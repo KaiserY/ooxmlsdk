@@ -1,5 +1,7 @@
 pub use crate::calc::combinatorics::{gcd_number, lcm_number};
 
+use num_traits::ToPrimitive;
+
 pub fn round_direction(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   if value == 0.0 || !value.is_finite() {
     return value;
@@ -57,6 +59,149 @@ fn round_direction_basic(value: f64, digits: i32, away_from_zero: bool) -> f64 {
   } else {
     rounded / factor
   }
+}
+
+pub fn round_to_decimal_places(value: f64, decimal_places: i32) -> f64 {
+  if !value.is_finite() || value == 0.0 {
+    return value;
+  }
+  let original = value;
+  let sign = value.is_sign_negative();
+  let mut value = value.abs();
+  if decimal_places >= 0 && (value >= 2_f64.powi(52) || is_representable_integer(value)) {
+    return original;
+  }
+  let mut places = decimal_places;
+  let mut factor = 0.0;
+  if places != 0 {
+    if places > 0 {
+      let exponent = ((value.to_bits() >> 52) & 0x7ff) as i32 - 1023;
+      let decimals = 52 - exponent;
+      if decimals <= 0 {
+        return original;
+      }
+      if decimals < places {
+        places = decimals;
+      }
+    }
+    factor = 10_f64.powi(places.abs());
+    if factor == 0.0 || (places < 0 && !factor.is_finite()) {
+      return 0.0;
+    }
+    if !factor.is_finite() {
+      return original;
+    }
+    if places < 0 {
+      value /= factor;
+    } else {
+      value *= factor;
+    }
+    if !value.is_finite() {
+      return original;
+    }
+  }
+  if value < 2_f64.powi(52) {
+    value = approx_floor(value + 0.5);
+  }
+  if places != 0 {
+    if places < 0 {
+      value *= factor;
+    } else {
+      value /= factor;
+    }
+  }
+  if !value.is_finite() {
+    return original;
+  }
+  if sign { -value } else { value }
+}
+
+pub fn round_to_significant_digits(value: f64, digits: f64) -> f64 {
+  let scale = value.abs().log10().floor() + 1.0 - digits;
+  let mut input = value;
+  let factor = 10.0_f64.powf(scale.abs());
+  if scale < 0.0 {
+    input *= factor;
+  } else {
+    input /= factor;
+  }
+  let mut result = round_to_decimal_places(input, 0);
+  if scale < 0.0 {
+    result /= factor;
+  } else {
+    result *= factor;
+  }
+  result
+}
+
+pub fn round_half_away_from_zero(value: f64, digits: i32) -> f64 {
+  if value == 0.0 || !value.is_finite() {
+    return value;
+  }
+  let factor = 10_f64.powi(digits.abs());
+  if factor == 0.0 || !factor.is_finite() {
+    return value;
+  }
+  let scaled = if digits < 0 {
+    value / factor
+  } else {
+    value * factor
+  };
+  let rounded = if scaled.is_sign_negative() {
+    (scaled - 0.5).ceil()
+  } else {
+    (scaled + 0.5).floor()
+  };
+  if digits < 0 {
+    rounded * factor
+  } else {
+    rounded / factor
+  }
+}
+
+#[inline]
+pub fn floor_to_u16(value: f64) -> Option<u16> {
+  value.is_finite().then(|| value.floor())?.to_u16()
+}
+
+#[inline]
+pub fn floor_to_u32(value: f64) -> Option<u32> {
+  value.is_finite().then(|| value.floor())?.to_u32()
+}
+
+#[inline]
+pub fn floor_to_u64(value: f64) -> Option<u64> {
+  value.is_finite().then(|| value.floor())?.to_u64()
+}
+
+#[inline]
+pub fn floor_to_usize(value: f64) -> Option<usize> {
+  value.is_finite().then(|| value.floor())?.to_usize()
+}
+
+#[inline]
+pub fn floor_to_i32(value: f64) -> Option<i32> {
+  value.is_finite().then(|| value.floor())?.to_i32()
+}
+
+#[inline]
+pub fn trunc_to_i32(value: f64) -> Option<i32> {
+  value.is_finite().then(|| value.trunc())?.to_i32()
+}
+
+#[inline]
+pub fn trunc_to_u32(value: f64) -> Option<u32> {
+  value.is_finite().then(|| value.trunc())?.to_u32()
+}
+
+#[inline]
+pub fn trunc_to_u64(value: f64) -> Option<u64> {
+  value.is_finite().then(|| value.trunc())?.to_u64()
+}
+
+#[inline]
+pub fn trunc_to_usize(value: f64) -> Option<usize> {
+  value.is_finite().then(|| value.trunc())?.to_usize()
 }
 
 pub fn even_odd(value: f64, even: bool) -> f64 {
@@ -255,5 +400,25 @@ mod tests {
     assert_eq!(approx_floor(3.000000000000001), 3.0);
     assert_eq!(approx_ceil(2.999999999999999), 3.0);
     assert!(approx_equal(0.1 + 0.2, 0.3));
+  }
+
+  #[test]
+  fn decimal_rounding_helpers_preserve_spreadsheet_edges() {
+    assert_eq!(round_to_decimal_places(2.5, 0), 3.0);
+    assert_eq!(round_to_decimal_places(-2.5, 0), -3.0);
+    assert_eq!(round_to_decimal_places(1234.5, -2), 1200.0);
+    assert_eq!(round_to_significant_digits(12345.0, 3.0), 12300.0);
+    assert_eq!(round_half_away_from_zero(-1.25, 1), -1.3);
+  }
+
+  #[test]
+  fn numeric_conversions_reject_non_finite_and_out_of_range_values() {
+    assert_eq!(floor_to_u16(42.9), Some(42));
+    assert_eq!(floor_to_i32(-1.2), Some(-2));
+    assert_eq!(floor_to_usize(7.8), Some(7));
+    assert_eq!(trunc_to_i32(-1.9), Some(-1));
+    assert_eq!(trunc_to_u32(-1.0), None);
+    assert_eq!(trunc_to_usize(3.9), Some(3));
+    assert_eq!(floor_to_u64(f64::INFINITY), None);
   }
 }

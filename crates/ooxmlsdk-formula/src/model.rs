@@ -45,7 +45,9 @@ use crate::calc::matrix::{
 };
 use crate::calc::numeric::{
   KahanSum, approx_add, approx_ceil, approx_equal, approx_floor, approx_sub, approx_value,
-  even_odd, is_representable_integer, kahan_sum, normalize_formula_number, round_direction,
+  even_odd, floor_to_i32, floor_to_u32, floor_to_u64, floor_to_usize, kahan_sum,
+  normalize_formula_number, round_direction, round_half_away_from_zero, round_to_decimal_places,
+  round_to_significant_digits, trunc_to_u32,
 };
 use crate::calc::special::{
   SpecialError, erf, erfc, gamma, lo_beta_dist, lo_beta_dist_pdf, lo_binom_dist_pmf,
@@ -4534,7 +4536,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           .and_then(|arg| self.evaluate(arg))
           .and_then(|value| self.number(&value))
           .unwrap_or(0.0) as i32;
-        Some(FormulaValue::Number(rtl_round(value, digits)))
+        Some(FormulaValue::Number(round_to_decimal_places(value, digits)))
       }
       "ROUNDSIG" => self.evaluate_roundsig(args),
       "ROUNDUP" => self.evaluate_round_direction(args, true),
@@ -5669,12 +5671,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(digits) = self.number(digits) else {
       return FormulaValue::Error(FormulaErrorValue::Value);
     };
-    let digits = approx_floor(digits) as i32;
+    let Some(digits) = floor_to_i32(approx_floor(digits)) else {
+      return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
+    };
     if !(-15..=15).contains(&digits) {
       return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
     }
     FormulaValue::String(Cow::Owned(format_dollar_value(
-      rtl_round(value, digits),
+      round_to_decimal_places(value, digits),
       digits.max(0) as usize,
     )))
   }
@@ -5716,12 +5720,17 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let digits = args
+    let digits = match args
       .get(1)
       .and_then(|arg| self.evaluate(arg))
       .and_then(|value| self.number(&value))
-      .map(approx_floor)
-      .unwrap_or(2.0) as i32;
+    {
+      Some(digits) => match floor_to_i32(approx_floor(digits)) {
+        Some(digits) => digits,
+        None => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+      },
+      None => 2,
+    };
     if !(-15..=15).contains(&digits) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
@@ -5729,7 +5738,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .get(2)
       .and_then(|arg| self.evaluate(arg))
       .is_some_and(|value| self.truthy(&value));
-    let rounded = rtl_round(value, digits);
+    let rounded = round_to_decimal_places(value, digits);
     let text = if digits >= 0 {
       format!("{rounded:.digits$}", digits = digits as usize)
     } else {
@@ -5744,7 +5753,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
 
   fn evaluate_decimal(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
     let text = self.text(&self.evaluate(args.first()?)?);
-    let radix = self.number(&self.evaluate(args.get(1)?)?)? as u32;
+    let radix = self.number(&self.evaluate(args.get(1)?)?)?;
+    let Some(radix) = trunc_to_u32(radix) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
     if !(2..=36).contains(&radix) {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
@@ -5773,7 +5785,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    Some(FormulaValue::Number(op(left as u64, right as u64) as f64))
+    let Some(left) = floor_to_u64(left) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
+    let Some(right) = floor_to_u64(right) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
+    Some(FormulaValue::Number(op(left, right) as f64))
   }
 
   fn evaluate_bit_shift(
@@ -5790,11 +5808,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let Some(shift) = self.number_arg(args, 1).map(approx_floor) else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
-    let shift = shift as i32;
+    let Some(shift) = floor_to_i32(shift) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
     if !(0.0..281_474_976_710_656.0).contains(&value) || shift.abs() > 53 {
       return Some(FormulaValue::Error(FormulaErrorValue::Num));
     }
-    let value = value as u64;
+    let Some(value) = floor_to_u64(value) else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Num));
+    };
     let result = if left_shift == (shift >= 0) {
       value.checked_shl(shift.unsigned_abs()).unwrap_or(0)
     } else {
@@ -5852,7 +5874,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let radix = approx_floor(self.number(radix)?);
     let min_len_value = approx_floor(self.number(min_len)?);
     let min_len = if (1.0..u16::MAX as f64).contains(&min_len_value) {
-      min_len_value as usize
+      floor_to_usize(min_len_value)?
     } else if min_len_value == 0.0 {
       1
     } else {
@@ -5861,7 +5883,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if value < 0.0 || !(2.0..=36.0).contains(&radix) {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
-    let mut text = format_radix(value as i128, radix as u32)?;
+    let radix = floor_to_u32(radix)?;
+    let mut text = format_radix(value as i128, radix)?;
     if text.len() < min_len {
       text = format!("{}{}", "0".repeat(min_len - text.len()), text);
     }
@@ -6135,7 +6158,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if value == 0.0 {
       return Some(FormulaValue::Number(0.0));
     }
-    Some(FormulaValue::Number(round_significant(value, digits)))
+    Some(FormulaValue::Number(round_to_significant_digits(
+      value, digits,
+    )))
   }
 
   fn evaluate_raw_subtract(&self, args: &[FormulaAst<'doc>]) -> Option<FormulaValue<'doc>> {
@@ -20391,80 +20416,6 @@ fn should_ignore_to_row_column_value(value: &FormulaValue<'_>, ignore: i32) -> b
     || (ignore_errors && matches!(value, FormulaValue::Error(_)))
 }
 
-fn rtl_round(value: f64, decimal_places: i32) -> f64 {
-  // Source: LibreOffice sal/rtl/math.cxx rtl_math_round.
-  if !value.is_finite() || value == 0.0 {
-    return value;
-  }
-  let original = value;
-  let sign = value.is_sign_negative();
-  let mut value = value.abs();
-  if decimal_places >= 0 && (value >= 2_f64.powi(52) || is_representable_integer(value)) {
-    return original;
-  }
-  let mut places = decimal_places;
-  let mut factor = 0.0;
-  if places != 0 {
-    if places > 0 {
-      let exponent = ((value.to_bits() >> 52) & 0x7ff) as i32 - 1023;
-      let decimals = 52 - exponent;
-      if decimals <= 0 {
-        return original;
-      }
-      if decimals < places {
-        places = decimals;
-      }
-    }
-    factor = 10_f64.powi(places.abs());
-    if factor == 0.0 || (places < 0 && !factor.is_finite()) {
-      return 0.0;
-    }
-    if !factor.is_finite() {
-      return original;
-    }
-    if places < 0 {
-      value /= factor;
-    } else {
-      value *= factor;
-    }
-    if !value.is_finite() {
-      return original;
-    }
-  }
-  if value < 2_f64.powi(52) {
-    value = approx_floor(value + 0.5);
-  }
-  if places != 0 {
-    if places < 0 {
-      value *= factor;
-    } else {
-      value /= factor;
-    }
-  }
-  if !value.is_finite() {
-    return original;
-  }
-  if sign { -value } else { value }
-}
-
-fn round_significant(value: f64, digits: f64) -> f64 {
-  let scale = value.abs().log10().floor() + 1.0 - digits;
-  let mut input = value;
-  let factor = 10.0_f64.powf(scale.abs());
-  if scale < 0.0 {
-    input *= factor;
-  } else {
-    input /= factor;
-  }
-  let mut result = rtl_round(input, 0);
-  if scale < 0.0 {
-    result /= factor;
-  } else {
-    result *= factor;
-  }
-  result
-}
-
 fn display_text_from_value(value: &FormulaValue<'_>) -> String {
   match value {
     FormulaValue::Number(value) if value.is_finite() && value.fract() == 0.0 => value.to_string(),
@@ -21011,31 +20962,6 @@ fn pad_integer_part(text: String, min_digits: usize) -> String {
   result
 }
 
-fn round_half_away_from_zero(value: f64, digits: i32) -> f64 {
-  if value == 0.0 || !value.is_finite() {
-    return value;
-  }
-  let factor = 10_f64.powi(digits.abs());
-  if factor == 0.0 || !factor.is_finite() {
-    return value;
-  }
-  let scaled = if digits < 0 {
-    value / factor
-  } else {
-    value * factor
-  };
-  let rounded = if scaled.is_sign_negative() {
-    (scaled - 0.5).ceil()
-  } else {
-    (scaled + 0.5).floor()
-  };
-  if digits < 0 {
-    rounded * factor
-  } else {
-    rounded / factor
-  }
-}
-
 fn timevalue(text: &str) -> FormulaValue<'static> {
   let text = text.trim();
   let text = time_text_suffix(text);
@@ -21118,12 +21044,12 @@ fn euro_convert(
   } else {
     let mut intermediate = value / from_rate;
     if precision != 0.0 {
-      intermediate = rtl_round(intermediate, precision as i32);
+      intermediate = round_to_decimal_places(intermediate, precision as i32);
     }
     intermediate * to_rate
   };
   if !full_precision && !from.eq_ignore_ascii_case(to) {
-    result = rtl_round(result, to_decimals);
+    result = round_to_decimal_places(result, to_decimals);
   }
   Some(result)
 }

@@ -79,6 +79,7 @@ krilla-svg = "0.3.0"
 libm = "0.2.16"
 num-complex = "0.4.6"
 num-integer = "0.1.46"
+num-traits = "0.2.19"
 rustfft = "6.4.1"
 rustybuzz = "0.20.1"
 statrs = { version = "0.18.0", default-features = false }

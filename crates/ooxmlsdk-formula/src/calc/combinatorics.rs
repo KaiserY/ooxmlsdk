@@ -1,5 +1,7 @@
 const MAX_EXACT_F64_INTEGER: u64 = 1_u64 << 53;
 
+use num_traits::ToPrimitive;
+
 pub fn gcd_number(left: f64, right: f64) -> f64 {
   let left = left.abs();
   let right = right.abs();
@@ -76,7 +78,7 @@ fn exact_u64(value: f64) -> Option<u64> {
     && (0.0..=MAX_EXACT_F64_INTEGER as f64).contains(&value)
     && value.fract() == 0.0
   {
-    Some(value as u64)
+    value.to_u64()
   } else {
     None
   }

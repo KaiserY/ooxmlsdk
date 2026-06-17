@@ -50,11 +50,8 @@ pub(crate) fn evaluate_formula_text_raw<'doc>(
 
 impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
   pub(crate) fn evaluate_code(&self, code: &FormulaCode<'doc>) -> Option<FormulaValue<'doc>> {
-    if let DirectEvaluation::Value(value) = self.evaluate_code_direct(code) {
-      return Some(value);
-    }
-    let ast = ast_from_code(code)?;
-    self.compat_evaluator().evaluate(&ast)
+    let evaluator = self.compat_evaluator();
+    evaluate_code_with_context(code, &evaluator)
   }
 
   pub(crate) fn compat_evaluator(&self) -> FormulaEvaluator<'_, 'doc> {
@@ -69,373 +66,31 @@ impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
       current_value: None,
     }
   }
+}
 
-  fn evaluate_code_direct(&self, code: &FormulaCode<'doc>) -> DirectEvaluation<'doc> {
-    let evaluator = self.compat_evaluator();
-    self.evaluate_ops_range(
-      &code.ops,
-      FormulaArgRange {
-        start: 0,
-        end: code.ops.len(),
-      },
-      &evaluator,
-    )
+pub(crate) fn evaluate_code_with_context<'doc>(
+  code: &FormulaCode<'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if let DirectEvaluation::Value(value) = evaluate_code_direct(code, evaluator) {
+    return Some(value);
   }
+  let ast = ast_from_code(code)?;
+  evaluator.evaluate(&ast)
+}
 
-  fn evaluate_ops_range(
-    &self,
-    ops: &[FormulaOp<'doc>],
-    range: FormulaArgRange,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> DirectEvaluation<'doc> {
-    if range.start > range.end || range.end > ops.len() {
-      return DirectEvaluation::Unsupported;
-    }
-    let mut stack = Vec::with_capacity(range.end - range.start);
-    let mut index = range.start;
-    while index < range.end {
-      if let Some(call_index) = control_call_starting_at(ops, index, range.end) {
-        let FormulaOp::Call {
-          arg_ranges,
-          control: Some(control),
-          ..
-        } = &ops[call_index]
-        else {
-          return DirectEvaluation::Unsupported;
-        };
-        let Some(value) =
-          self.evaluate_control_call(*control, EvalArgs::new(ops, arg_ranges), evaluator)
-        else {
-          return DirectEvaluation::Unsupported;
-        };
-        stack.push(EvalOperand::Value(value));
-        index = call_index + 1;
-        continue;
-      }
-      let op = &ops[index];
-      match op {
-        FormulaOp::PushBlank => stack.push(EvalOperand::Value(FormulaValue::Blank)),
-        FormulaOp::PushText(value) => {
-          stack.push(EvalOperand::Value(FormulaValue::String(value.clone())));
-        }
-        FormulaOp::PushNumber(value) => {
-          stack.push(EvalOperand::Value(FormulaValue::Number(*value)));
-        }
-        FormulaOp::PushBoolean(value) => {
-          stack.push(EvalOperand::Value(FormulaValue::Boolean(*value)));
-        }
-        FormulaOp::PushError(value) => {
-          stack.push(EvalOperand::Value(FormulaValue::Error(*value)));
-        }
-        FormulaOp::PushReference(value) => stack.push(EvalOperand::Reference(value.clone())),
-        FormulaOp::PushExternal(value) => stack.push(EvalOperand::ExternalReference(value.clone())),
-        FormulaOp::PushName(value) => stack.push(EvalOperand::Name(value.clone())),
-        FormulaOp::Unary(op) => {
-          let Some(value) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
-            return DirectEvaluation::Unsupported;
-          };
-          let Some(value) = evaluator.evaluate_unary_value(*op, value) else {
-            return DirectEvaluation::Unsupported;
-          };
-          stack.push(EvalOperand::Value(value));
-        }
-        FormulaOp::Binary(op) => {
-          let Some(right) = stack.pop() else {
-            return DirectEvaluation::Unsupported;
-          };
-          if matches!(
-            op,
-            FormulaOperator::Range | FormulaOperator::Union | FormulaOperator::Intersection
-          ) {
-            let Some(left) = stack.pop() else {
-              return DirectEvaluation::Unsupported;
-            };
-            let Some(value) = evaluate_reference_binary(evaluator, *op, left, right) else {
-              return DirectEvaluation::Unsupported;
-            };
-            stack.push(EvalOperand::Value(value));
-            continue;
-          }
-          let Some(left) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
-            return DirectEvaluation::Unsupported;
-          };
-          let right_evaluator = evaluator.with_current_value(left.clone());
-          let Some(right) = right.into_value(&right_evaluator) else {
-            return DirectEvaluation::Unsupported;
-          };
-          let Some(value) = evaluator.evaluate_binary_values(*op, left, right) else {
-            return DirectEvaluation::Unsupported;
-          };
-          stack.push(EvalOperand::Value(value));
-        }
-        FormulaOp::Call {
-          name,
-          function,
-          argc,
-          control,
-          arg_ranges,
-          ..
-        } => {
-          if control.is_some() || stack.len() < *argc {
-            return DirectEvaluation::Unsupported;
-          }
-          let _ = EvalArgs::new(ops, arg_ranges);
-          let args = stack.split_off(stack.len() - *argc);
-          let mut values = Vec::with_capacity(*argc);
-          for arg in args {
-            let Some(value) = arg.into_value(evaluator) else {
-              return DirectEvaluation::Unsupported;
-            };
-            values.push(value);
-          }
-          let Some(value) = crate::function::evaluate_function(
-            evaluator,
-            *function,
-            name,
-            crate::function::FunctionArgs::new_values(&values),
-          ) else {
-            return DirectEvaluation::Unsupported;
-          };
-          stack.push(EvalOperand::Value(value));
-        }
-        FormulaOp::Array { row_lengths } => {
-          let count = row_lengths.iter().sum::<usize>();
-          if stack.len() < count {
-            return DirectEvaluation::Unsupported;
-          }
-          let values = stack.split_off(stack.len() - count);
-          let mut values = values.into_iter();
-          let mut rows = Vec::with_capacity(row_lengths.len());
-          for row_len in row_lengths {
-            let mut row = Vec::with_capacity(*row_len);
-            for value in values.by_ref().take(*row_len) {
-              let Some(value) = value.into_value(evaluator) else {
-                return DirectEvaluation::Unsupported;
-              };
-              row.push(value);
-            }
-            rows.push(row);
-          }
-          stack.push(EvalOperand::Value(FormulaValue::Matrix(rows)));
-        }
-      }
-      index += 1;
-    }
-    match stack.pop() {
-      Some(value) if stack.is_empty() => value
-        .into_value(evaluator)
-        .map(DirectEvaluation::Value)
-        .unwrap_or(DirectEvaluation::Unsupported),
-      _ => DirectEvaluation::Unsupported,
-    }
-  }
-
-  fn evaluate_arg(
-    &self,
-    arg: EvalArg<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    match self.evaluate_ops_range(arg.ops, arg.range, evaluator) {
-      DirectEvaluation::Value(value) => Some(value),
-      DirectEvaluation::Unsupported => None,
-    }
-  }
-
-  fn evaluate_control_call(
-    &self,
-    control: FormulaControlOp,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    match control {
-      FormulaControlOp::IfJump => self.evaluate_if_control(args, evaluator),
-      FormulaControlOp::IfErrorJump => self.evaluate_if_error_control(args, evaluator, false),
-      FormulaControlOp::IfNaJump => self.evaluate_if_error_control(args, evaluator, true),
-      FormulaControlOp::ChooseJump => self.evaluate_choose_control(args, evaluator),
-      FormulaControlOp::IfsJump => self.evaluate_ifs_control(args, evaluator),
-      FormulaControlOp::SwitchJump => self.evaluate_switch_control(args, evaluator),
-      FormulaControlOp::LetBind => self.evaluate_let_control(args, evaluator),
-    }
-  }
-
-  fn evaluate_if_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    let condition = self.evaluate_arg(args.get(0)?, evaluator)?;
-    let if_value = |arg: Option<EvalArg<'_, 'doc>>, default: FormulaValue<'doc>| {
-      let Some(arg) = arg else {
-        return Some(default);
-      };
-      Some(match self.evaluate_arg(arg, evaluator)? {
-        FormulaValue::Blank => FormulaValue::Number(0.0),
-        value => value,
-      })
-    };
-    if evaluator.array_context
-      && matches!(
-        condition,
-        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
-      )
-    {
-      let true_value = if_value(args.get(1), FormulaValue::Boolean(true))?;
-      let false_value = if_value(args.get(2), FormulaValue::Boolean(false))?;
-      return evaluator.map_if_values(condition, true_value, false_value);
-    }
-    if let FormulaValue::Error(error) = evaluator.first_value(&condition) {
-      return Some(FormulaValue::Error(error));
-    }
-    if evaluator.truthy(&condition) {
-      if_value(args.get(1), FormulaValue::Boolean(true))
-    } else {
-      if_value(args.get(2), FormulaValue::Boolean(false))
-    }
-  }
-
-  fn evaluate_if_error_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-    na_only: bool,
-  ) -> Option<FormulaValue<'doc>> {
-    if args.len() != 2 {
-      return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
-    }
-    let value_arg = args.get(0)?;
-    if is_missing_arg(value_arg) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
-    }
-    let value = self
-      .evaluate_arg(value_arg, evaluator)
-      .unwrap_or(FormulaValue::Error(FormulaErrorValue::Unknown));
-    if evaluator.array_context
-      && matches!(
-        value,
-        FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
-      )
-    {
-      let fallback = self.evaluate_arg(args.get(1)?, evaluator)?;
-      return evaluator.map_if_error_values(value, fallback, na_only);
-    }
-    let value = evaluator.scalar_value(value);
-    if value_error_matches(&value, na_only) {
-      self.evaluate_arg(args.get(1)?, evaluator)
-    } else {
-      Some(value)
-    }
-  }
-
-  fn evaluate_choose_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    let index = evaluator
-      .number(&self.evaluate_arg(args.get(0)?, evaluator)?)?
-      .floor() as usize;
-    if index == 0 || index >= args.len() {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
-    }
-    self.evaluate_arg(args.get(index)?, evaluator)
-  }
-
-  fn evaluate_ifs_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    if args.len() < 2 || !args.len().is_multiple_of(2) {
-      return None;
-    }
-    let mut index = 0;
-    while index < args.len() {
-      let condition = self.evaluate_arg(args.get(index)?, evaluator)?;
-      if let FormulaValue::Error(error) = condition {
-        return Some(FormulaValue::Error(error));
-      }
-      if evaluator.truthy(&condition) {
-        return self.evaluate_arg(args.get(index + 1)?, evaluator);
-      }
-      index += 2;
-    }
-    Some(FormulaValue::Error(FormulaErrorValue::NA))
-  }
-
-  fn evaluate_switch_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    if args.len() < 3 {
-      return None;
-    }
-    let selector = evaluator.scalar_value(self.evaluate_arg(args.get(0)?, evaluator)?);
-    if let FormulaValue::Error(error) = &selector {
-      return Some(FormulaValue::Error(*error));
-    }
-    let pairs_len = if args.len().is_multiple_of(2) {
-      args.len() - 2
-    } else {
-      args.len() - 1
-    };
-    let mut index = 1;
-    while index <= pairs_len {
-      let candidate = evaluator.scalar_value(self.evaluate_arg(args.get(index)?, evaluator)?);
-      if let FormulaValue::Error(error) = &candidate {
-        return Some(FormulaValue::Error(*error));
-      }
-      let matches = match (&selector, &candidate) {
-        (FormulaValue::String(left), FormulaValue::String(right)) => {
-          left.eq_ignore_ascii_case(right)
-        }
-        _ => evaluator.compare(&selector, &candidate, FormulaOperator::Equal),
-      };
-      if matches {
-        return Some(evaluator.scalar_value(self.evaluate_arg(args.get(index + 1)?, evaluator)?));
-      }
-      index += 2;
-    }
-    if args.len().is_multiple_of(2) {
-      Some(evaluator.scalar_value(self.evaluate_arg(args.get(args.len() - 1)?, evaluator)?))
-    } else {
-      Some(FormulaValue::Error(FormulaErrorValue::NA))
-    }
-  }
-
-  fn evaluate_let_control(
-    &self,
-    args: EvalArgs<'_, 'doc>,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<FormulaValue<'doc>> {
-    if args.len() < 3 || args.len().is_multiple_of(2) {
-      return Some(FormulaValue::Error(FormulaErrorValue::Value));
-    }
-    let mut local_evaluator = FormulaEvaluator {
-      book: evaluator.book,
-      engine: evaluator.engine,
-      current_sheet: evaluator.current_sheet,
-      current_cell: evaluator.current_cell,
-      grammar: evaluator.grammar,
-      locals: evaluator.locals.clone(),
-      array_context: evaluator.array_context,
-      current_value: evaluator.current_value.clone(),
-    };
-    let mut local_names = BTreeMap::new();
-    let mut index = 0;
-    while index + 2 < args.len() {
-      let name = let_binding_name_from_arg(args.get(index)?)?;
-      if name.is_empty() || local_names.insert(name.clone(), ()).is_some() {
-        return Some(FormulaValue::Error(FormulaErrorValue::Value));
-      }
-      let value = self
-        .evaluate_arg(args.get(index + 1)?, &local_evaluator)?
-        .into_owned();
-      local_evaluator.locals.insert(name, value);
-      index += 2;
-    }
-    self.evaluate_arg(args.get(args.len() - 1)?, &local_evaluator)
-  }
+fn evaluate_code_direct<'doc>(
+  code: &FormulaCode<'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> DirectEvaluation<'doc> {
+  evaluate_ops_range(
+    &code.ops,
+    FormulaArgRange {
+      start: 0,
+      end: code.ops.len(),
+    },
+    evaluator,
+  )
 }
 
 enum DirectEvaluation<'doc> {
@@ -443,27 +98,344 @@ enum DirectEvaluation<'doc> {
   Unsupported,
 }
 
-fn control_call_starting_at<'doc>(
+fn evaluate_ops_range<'doc>(
   ops: &[FormulaOp<'doc>],
-  index: usize,
-  end: usize,
-) -> Option<usize> {
+  range: FormulaArgRange,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> DirectEvaluation<'doc> {
+  if range.start > range.end || range.end > ops.len() {
+    return DirectEvaluation::Unsupported;
+  }
+  let mut stack = Vec::with_capacity(range.end - range.start);
+  let mut index = range.start;
+  while index < range.end {
+    if let Some(call_index) = call_starting_at(ops, index, range.end) {
+      let FormulaOp::Call {
+        name,
+        function,
+        arg_ranges,
+        control,
+        ..
+      } = &ops[call_index]
+      else {
+        return DirectEvaluation::Unsupported;
+      };
+      let args = EvalArgs::new(ops, arg_ranges);
+      let Some(value) = (match control {
+        Some(control) => evaluate_control_call(*control, args, evaluator),
+        None => crate::function::evaluate_function(
+          evaluator,
+          *function,
+          name,
+          crate::function::FunctionArgs::new_lazy(args),
+        ),
+      }) else {
+        return DirectEvaluation::Unsupported;
+      };
+      stack.push(EvalOperand::Value(value));
+      index = call_index + 1;
+      continue;
+    }
+    let op = &ops[index];
+    match op {
+      FormulaOp::PushBlank => stack.push(EvalOperand::Value(FormulaValue::Blank)),
+      FormulaOp::PushText(value) => {
+        stack.push(EvalOperand::Value(FormulaValue::String(value.clone())));
+      }
+      FormulaOp::PushNumber(value) => {
+        stack.push(EvalOperand::Value(FormulaValue::Number(*value)));
+      }
+      FormulaOp::PushBoolean(value) => {
+        stack.push(EvalOperand::Value(FormulaValue::Boolean(*value)));
+      }
+      FormulaOp::PushError(value) => {
+        stack.push(EvalOperand::Value(FormulaValue::Error(*value)));
+      }
+      FormulaOp::PushReference(value) => stack.push(EvalOperand::Reference(value.clone())),
+      FormulaOp::PushExternal(value) => stack.push(EvalOperand::ExternalReference(value.clone())),
+      FormulaOp::PushName(value) => stack.push(EvalOperand::Name(value.clone())),
+      FormulaOp::Unary(op) => {
+        let Some(value) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
+          return DirectEvaluation::Unsupported;
+        };
+        let Some(value) = evaluator.evaluate_unary_value(*op, value) else {
+          return DirectEvaluation::Unsupported;
+        };
+        stack.push(EvalOperand::Value(value));
+      }
+      FormulaOp::Binary(op) => {
+        let Some(right) = stack.pop() else {
+          return DirectEvaluation::Unsupported;
+        };
+        if matches!(
+          op,
+          FormulaOperator::Range | FormulaOperator::Union | FormulaOperator::Intersection
+        ) {
+          let Some(left) = stack.pop() else {
+            return DirectEvaluation::Unsupported;
+          };
+          let Some(value) = evaluate_reference_binary(evaluator, *op, left, right) else {
+            return DirectEvaluation::Unsupported;
+          };
+          stack.push(EvalOperand::Value(value));
+          index += 1;
+          continue;
+        }
+        let Some(left) = stack.pop().and_then(|value| value.into_value(evaluator)) else {
+          return DirectEvaluation::Unsupported;
+        };
+        let right_evaluator = evaluator.with_current_value(left.clone());
+        let Some(right) = right.into_value(&right_evaluator) else {
+          return DirectEvaluation::Unsupported;
+        };
+        let Some(value) = evaluator.evaluate_binary_values(*op, left, right) else {
+          return DirectEvaluation::Unsupported;
+        };
+        stack.push(EvalOperand::Value(value));
+      }
+      FormulaOp::Call { .. } => return DirectEvaluation::Unsupported,
+      FormulaOp::Array { row_lengths } => {
+        let count = row_lengths.iter().sum::<usize>();
+        if stack.len() < count {
+          return DirectEvaluation::Unsupported;
+        }
+        let values = stack.split_off(stack.len() - count);
+        let mut values = values.into_iter();
+        let mut rows = Vec::with_capacity(row_lengths.len());
+        for row_len in row_lengths {
+          let mut row = Vec::with_capacity(*row_len);
+          for value in values.by_ref().take(*row_len) {
+            let Some(value) = value.into_value(evaluator) else {
+              return DirectEvaluation::Unsupported;
+            };
+            row.push(value);
+          }
+          rows.push(row);
+        }
+        stack.push(EvalOperand::Value(FormulaValue::Matrix(rows)));
+      }
+    }
+    index += 1;
+  }
+  match stack.pop() {
+    Some(value) if stack.is_empty() => value
+      .into_value(evaluator)
+      .map(DirectEvaluation::Value)
+      .unwrap_or(DirectEvaluation::Unsupported),
+    _ => DirectEvaluation::Unsupported,
+  }
+}
+
+pub(crate) fn evaluate_arg_direct<'doc>(
+  arg: EvalArg<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  match evaluate_ops_range(arg.ops, arg.range, evaluator) {
+    DirectEvaluation::Value(value) => Some(value),
+    DirectEvaluation::Unsupported => None,
+  }
+}
+
+fn evaluate_control_call<'doc>(
+  control: FormulaControlOp,
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  match control {
+    FormulaControlOp::IfJump => evaluate_if_control(args, evaluator),
+    FormulaControlOp::IfErrorJump => evaluate_if_error_control(args, evaluator, false),
+    FormulaControlOp::IfNaJump => evaluate_if_error_control(args, evaluator, true),
+    FormulaControlOp::ChooseJump => evaluate_choose_control(args, evaluator),
+    FormulaControlOp::IfsJump => evaluate_ifs_control(args, evaluator),
+    FormulaControlOp::SwitchJump => evaluate_switch_control(args, evaluator),
+    FormulaControlOp::LetBind => evaluate_let_control(args, evaluator),
+  }
+}
+
+fn evaluate_if_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let condition = evaluate_arg_direct(args.get(0)?, evaluator)?;
+  let if_value = |arg: Option<EvalArg<'_, 'doc>>, default: FormulaValue<'doc>| {
+    let Some(arg) = arg else {
+      return Some(default);
+    };
+    Some(match evaluate_arg_direct(arg, evaluator)? {
+      FormulaValue::Blank => FormulaValue::Number(0.0),
+      value => value,
+    })
+  };
+  if evaluator.array_context
+    && matches!(
+      condition,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    let true_value = if_value(args.get(1), FormulaValue::Boolean(true))?;
+    let false_value = if_value(args.get(2), FormulaValue::Boolean(false))?;
+    return evaluator.map_if_values(condition, true_value, false_value);
+  }
+  if let FormulaValue::Error(error) = evaluator.first_value(&condition) {
+    return Some(FormulaValue::Error(error));
+  }
+  if evaluator.truthy(&condition) {
+    if_value(args.get(1), FormulaValue::Boolean(true))
+  } else {
+    if_value(args.get(2), FormulaValue::Boolean(false))
+  }
+}
+
+fn evaluate_if_error_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  na_only: bool,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() != 2 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+  }
+  let value_arg = args.get(0)?;
+  if is_missing_arg(value_arg) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+  }
+  let value = evaluate_arg_direct(value_arg, evaluator)
+    .unwrap_or(FormulaValue::Error(FormulaErrorValue::Unknown));
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    let fallback = evaluate_arg_direct(args.get(1)?, evaluator)?;
+    return evaluator.map_if_error_values(value, fallback, na_only);
+  }
+  let value = evaluator.scalar_value(value);
+  if value_error_matches(&value, na_only) {
+    evaluate_arg_direct(args.get(1)?, evaluator)
+  } else {
+    Some(value)
+  }
+}
+
+fn evaluate_choose_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let index = evaluator
+    .number(&evaluate_arg_direct(args.get(0)?, evaluator)?)?
+    .floor() as usize;
+  if index == 0 || index >= args.len() {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  evaluate_arg_direct(args.get(index)?, evaluator)
+}
+
+fn evaluate_ifs_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() < 2 || !args.len().is_multiple_of(2) {
+    return None;
+  }
+  let mut index = 0;
+  while index < args.len() {
+    let condition = evaluate_arg_direct(args.get(index)?, evaluator)?;
+    if let FormulaValue::Error(error) = condition {
+      return Some(FormulaValue::Error(error));
+    }
+    if evaluator.truthy(&condition) {
+      return evaluate_arg_direct(args.get(index + 1)?, evaluator);
+    }
+    index += 2;
+  }
+  Some(FormulaValue::Error(FormulaErrorValue::NA))
+}
+
+fn evaluate_switch_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() < 3 {
+    return None;
+  }
+  let selector = evaluator.scalar_value(evaluate_arg_direct(args.get(0)?, evaluator)?);
+  if let FormulaValue::Error(error) = &selector {
+    return Some(FormulaValue::Error(*error));
+  }
+  let pairs_len = if args.len().is_multiple_of(2) {
+    args.len() - 2
+  } else {
+    args.len() - 1
+  };
+  let mut index = 1;
+  while index <= pairs_len {
+    let candidate = evaluator.scalar_value(evaluate_arg_direct(args.get(index)?, evaluator)?);
+    if let FormulaValue::Error(error) = &candidate {
+      return Some(FormulaValue::Error(*error));
+    }
+    let matches = match (&selector, &candidate) {
+      (FormulaValue::String(left), FormulaValue::String(right)) => left.eq_ignore_ascii_case(right),
+      _ => evaluator.compare(&selector, &candidate, FormulaOperator::Equal),
+    };
+    if matches {
+      return Some(evaluator.scalar_value(evaluate_arg_direct(args.get(index + 1)?, evaluator)?));
+    }
+    index += 2;
+  }
+  if args.len().is_multiple_of(2) {
+    Some(evaluator.scalar_value(evaluate_arg_direct(args.get(args.len() - 1)?, evaluator)?))
+  } else {
+    Some(FormulaValue::Error(FormulaErrorValue::NA))
+  }
+}
+
+fn evaluate_let_control<'doc>(
+  args: EvalArgs<'_, 'doc>,
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() < 3 || args.len().is_multiple_of(2) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let mut local_evaluator = FormulaEvaluator {
+    book: evaluator.book,
+    engine: evaluator.engine,
+    current_sheet: evaluator.current_sheet,
+    current_cell: evaluator.current_cell,
+    grammar: evaluator.grammar,
+    locals: evaluator.locals.clone(),
+    array_context: evaluator.array_context,
+    current_value: evaluator.current_value.clone(),
+  };
+  let mut local_names = BTreeMap::new();
+  let mut index = 0;
+  while index + 2 < args.len() {
+    let name = let_binding_name_from_arg(args.get(index)?)?;
+    if name.is_empty() || local_names.insert(name.clone(), ()).is_some() {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let value = evaluate_arg_direct(args.get(index + 1)?, &local_evaluator)?.into_owned();
+    local_evaluator.locals.insert(name, value);
+    index += 2;
+  }
+  evaluate_arg_direct(args.get(args.len() - 1)?, &local_evaluator)
+}
+
+fn call_starting_at<'doc>(ops: &[FormulaOp<'doc>], index: usize, end: usize) -> Option<usize> {
   let mut selected = None;
   for call_index in index..end {
     let FormulaOp::Call {
-      arg_ranges,
-      control: Some(_),
-      ..
+      arg_ranges, argc, ..
     } = &ops[call_index]
     else {
       continue;
     };
-    if arg_ranges
-      .first()
-      .is_some_and(|range| range.start == index && range.end <= call_index)
-      && arg_ranges
-        .iter()
-        .all(|range| range.start <= range.end && range.end <= call_index)
+    if (*argc == 0 && call_index == index)
+      || (arg_ranges
+        .first()
+        .is_some_and(|range| range.start == index && range.end <= call_index)
+        && arg_ranges
+          .iter()
+          .all(|range| range.start <= range.end && range.end <= call_index))
     {
       selected = Some(call_index);
     }

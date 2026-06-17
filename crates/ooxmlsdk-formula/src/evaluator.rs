@@ -103,6 +103,7 @@ pub(crate) use context::{
 #[cfg(test)]
 pub(crate) use context::{format_complex_result, valid_date_serial_with_system};
 pub(crate) use engine::{
-  FormulaEvaluatorEngine, ast_from_code, evaluate_formula_text_raw, evaluate_parsed_formula_raw,
+  FormulaEvaluatorEngine, evaluate_arg_direct, evaluate_code_with_context,
+  evaluate_formula_text_raw, evaluate_parsed_formula_raw,
 };
 pub(crate) use stack::{EvalArg, EvalArgs, EvalOperand};

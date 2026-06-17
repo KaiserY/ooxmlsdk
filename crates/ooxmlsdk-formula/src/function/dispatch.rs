@@ -10,7 +10,7 @@ use crate::calc::regression::EtsKind;
 use crate::calc::special::{BesselKind, erf, erfc, lo_gauss, lo_phi, log_gamma};
 use crate::calc::statistics::{PercentileKind, percentile_sorted, variance_slice};
 use crate::calc::text::{
-  legacy_char_text, legacy_text_code, proper_formula_text, rot13_formula_text,
+  legacy_char_text, legacy_text_code, proper_formula_text, rot13_formula_text, text_byte_len,
 };
 use crate::evaluator::{
   CouponFunction, DatabaseFunction, DatePart, TimePart, datevalue, rtl_cos, rtl_sin, rtl_tan,
@@ -33,10 +33,10 @@ fn evaluate_function_id<'doc>(
   function: FormulaFunctionId,
   args: FunctionArgs<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  if let Some(args) = args.as_values() {
-    return evaluate_function_values(evaluator, function, args);
+  if let Some(values) = args.materialize_values(evaluator) {
+    return evaluate_function_values(evaluator, function, &values);
   }
-  let args = args.as_ast();
+  let args = args.as_ast()?;
   match function {
     FormulaFunctionId::OrgDotOpenofficeDotErrortype => evaluator.evaluate_error_type_raw(args),
     FormulaFunctionId::ComDotMicrosoftDotCeiling => evaluator.evaluate_ceiling_excel_legacy(args),
@@ -956,6 +956,53 @@ fn evaluate_function_values<'doc>(
     FormulaFunctionId::Counta => Some(FormulaValue::Number(
       count_all_values(evaluator, args) as f64
     )),
+    FormulaFunctionId::Iserror if args.len() == 1 => {
+      evaluate_information_error_value(evaluator, args.first()?, |_| true)
+    }
+    FormulaFunctionId::Isna if args.len() == 1 => {
+      evaluate_information_error_value(evaluator, args.first()?, |error| {
+        error == FormulaErrorValue::NA
+      })
+    }
+    FormulaFunctionId::Iserr if args.len() == 1 => {
+      evaluate_information_error_value(evaluator, args.first()?, |error| {
+        error != FormulaErrorValue::NA
+      })
+    }
+    FormulaFunctionId::Isblank if args.len() == 1 => {
+      evaluate_isblank_value(evaluator, args.first()?)
+    }
+    FormulaFunctionId::Istext if args.len() == 1 => Some(FormulaValue::Boolean(matches!(
+      evaluator.information_scalar_value(args.first()?.clone()),
+      Some(FormulaValue::String(_))
+    ))),
+    FormulaFunctionId::Isnontext if args.len() == 1 => Some(FormulaValue::Boolean(!matches!(
+      evaluator.information_scalar_value(args.first()?.clone()),
+      Some(FormulaValue::String(_))
+    ))),
+    FormulaFunctionId::Islogical if args.len() == 1 => Some(FormulaValue::Boolean(matches!(
+      evaluator.information_scalar_value(args.first()?.clone()),
+      Some(FormulaValue::Boolean(_))
+    ))),
+    FormulaFunctionId::Isnumber if args.len() == 1 => {
+      evaluate_isnumber_value(evaluator, args.first()?)
+    }
+    FormulaFunctionId::Isref if args.len() == 1 => Some(FormulaValue::Boolean(matches!(
+      args.first()?,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_)
+    ))),
+    FormulaFunctionId::ErrorDotType if args.len() == 1 => {
+      evaluate_error_type_value(evaluator, args.first()?)
+    }
+    FormulaFunctionId::Type if args.len() == 1 => evaluate_type_value(evaluator, args.first()?),
+    FormulaFunctionId::N if args.len() == 1 => evaluate_n_value(evaluator, args.first()?),
+    FormulaFunctionId::Len if args.len() == 1 => {
+      evaluate_len_value(evaluator, args.first()?, false)
+    }
+    FormulaFunctionId::Lenb if args.len() == 1 => {
+      evaluate_len_value(evaluator, args.first()?, true)
+    }
+    FormulaFunctionId::Info if args.len() == 1 => evaluate_info_value(evaluator, args.first()?),
     FormulaFunctionId::Abs if args.len() == 1 => Some(FormulaValue::Number(
       scalar_number_arg(evaluator, args, 0)?.abs(),
     )),
@@ -981,6 +1028,130 @@ fn evaluate_function_values<'doc>(
         Some(FormulaValue::Number(result))
       } else {
         Some(FormulaValue::Error(FormulaErrorValue::Num))
+      }
+    }
+    FormulaFunctionId::Even if args.len() == 1 => Some(FormulaValue::Number(even_odd(
+      scalar_number_arg(evaluator, args, 0)?,
+      true,
+    ))),
+    FormulaFunctionId::Odd if args.len() == 1 => Some(FormulaValue::Number(even_odd(
+      scalar_number_arg(evaluator, args, 0)?,
+      false,
+    ))),
+    FormulaFunctionId::Iseven if args.len() == 1 => Some(FormulaValue::Boolean(
+      approx_floor(scalar_number_arg(evaluator, args, 0)?.abs()) as i64 % 2 == 0,
+    )),
+    FormulaFunctionId::Isodd if args.len() == 1 => Some(FormulaValue::Boolean(
+      approx_floor(scalar_number_arg(evaluator, args, 0)?.abs()) as i64 % 2 != 0,
+    )),
+    FormulaFunctionId::Sqrtpi if args.len() == 1 => {
+      let value = scalar_number_arg(evaluator, args, 0)?;
+      if value < 0.0 {
+        Some(FormulaValue::Error(FormulaErrorValue::Num))
+      } else {
+        Some(FormulaValue::Number((value * std::f64::consts::PI).sqrt()))
+      }
+    }
+    FormulaFunctionId::Radians if args.len() == 1 => Some(FormulaValue::Number(
+      scalar_number_arg(evaluator, args, 0)?.to_radians(),
+    )),
+    FormulaFunctionId::Degrees if args.len() == 1 => Some(FormulaValue::Number(
+      scalar_number_arg(evaluator, args, 0)?.to_degrees(),
+    )),
+    FormulaFunctionId::Sin if args.len() == 1 => scalar_numeric_unary_arg(evaluator, args, rtl_sin),
+    FormulaFunctionId::Csc if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / rtl_sin(value))
+    }
+    FormulaFunctionId::Cos if args.len() == 1 => scalar_numeric_unary_arg(evaluator, args, rtl_cos),
+    FormulaFunctionId::Sec if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / rtl_cos(value))
+    }
+    FormulaFunctionId::Tan if args.len() == 1 => scalar_numeric_unary_arg(evaluator, args, rtl_tan),
+    FormulaFunctionId::Cot if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / rtl_tan(value))
+    }
+    FormulaFunctionId::Sinh if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::sinh)
+    }
+    FormulaFunctionId::Csch if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / value.sinh())
+    }
+    FormulaFunctionId::Cosh if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::cosh)
+    }
+    FormulaFunctionId::Sech if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / value.cosh())
+    }
+    FormulaFunctionId::Tanh if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::tanh)
+    }
+    FormulaFunctionId::Coth if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| 1.0 / value.tanh())
+    }
+    FormulaFunctionId::Asin if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::asin)
+    }
+    FormulaFunctionId::Asinh if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::asinh)
+    }
+    FormulaFunctionId::Acos if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::acos)
+    }
+    FormulaFunctionId::Acosh if args.len() == 1 => scalar_numeric_unary_checked_arg(
+      evaluator,
+      args,
+      |value| (value >= 1.0).then(|| value.acosh()),
+      FormulaErrorValue::IllegalArgument,
+    ),
+    FormulaFunctionId::Acot if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, |value| {
+        std::f64::consts::FRAC_PI_2 - value.atan()
+      })
+    }
+    FormulaFunctionId::Atan if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::atan)
+    }
+    FormulaFunctionId::Atanh if args.len() == 1 => scalar_numeric_unary_checked_arg(
+      evaluator,
+      args,
+      |value| (value.abs() < 1.0).then(|| value.atanh()),
+      FormulaErrorValue::IllegalArgument,
+    ),
+    FormulaFunctionId::Acoth if args.len() == 1 => scalar_numeric_unary_checked_arg(
+      evaluator,
+      args,
+      |value| (value.abs() > 1.0).then(|| (1.0 / value).atanh()),
+      FormulaErrorValue::IllegalArgument,
+    ),
+    FormulaFunctionId::Atan2 if args.len() == 2 => Some(FormulaValue::Number(
+      scalar_number_arg(evaluator, args, 1)?.atan2(scalar_number_arg(evaluator, args, 0)?),
+    )),
+    FormulaFunctionId::Exp if args.len() == 1 => {
+      scalar_numeric_unary_arg(evaluator, args, f64::exp)
+    }
+    FormulaFunctionId::Ln if args.len() == 1 => scalar_numeric_unary_checked_arg(
+      evaluator,
+      args,
+      |value| (value > 0.0).then(|| value.ln()),
+      FormulaErrorValue::IllegalArgument,
+    ),
+    FormulaFunctionId::Log10 if args.len() == 1 => scalar_numeric_unary_checked_arg(
+      evaluator,
+      args,
+      |value| (value > 0.0).then(|| value.log10()),
+      FormulaErrorValue::IllegalArgument,
+    ),
+    FormulaFunctionId::Log if (1..=2).contains(&args.len()) => {
+      let value = scalar_number_arg(evaluator, args, 0)?;
+      let base = if args.len() == 2 {
+        scalar_number_arg(evaluator, args, 1)?
+      } else {
+        10.0
+      };
+      if value > 0.0 && base > 0.0 && base != 1.0 {
+        Some(FormulaValue::Number(value.log(base)))
+      } else {
+        Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
       }
     }
     FormulaFunctionId::Not if args.len() == 1 => {
@@ -1012,6 +1183,223 @@ fn scalar_number_arg<'doc>(
     return None;
   }
   evaluator.number(value)
+}
+
+fn evaluate_information_error_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  matches_error: impl Fn(FormulaErrorValue) -> bool + Copy,
+) -> Option<FormulaValue<'doc>> {
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    return evaluator.map_unary_values(value.clone(), |_, value| {
+      Some(FormulaValue::Boolean(matches!(
+        value,
+        FormulaValue::Error(error) if matches_error(*error)
+      )))
+    });
+  }
+  Some(FormulaValue::Boolean(matches!(
+    evaluator.first_value(value),
+    FormulaValue::Error(error) if matches_error(error)
+  )))
+}
+
+fn evaluate_isblank_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    return None;
+  }
+  if let FormulaValue::Reference(reference) = value
+    && reference.range.cell_count_hint() == 1
+  {
+    let sheet = evaluator.range_sheet(reference);
+    if evaluator
+      .book
+      .formulas
+      .contains_key(&(sheet, reference.range.start))
+    {
+      return Some(FormulaValue::Boolean(false));
+    }
+  }
+  Some(FormulaValue::Boolean(matches!(
+    evaluator.first_value(value),
+    FormulaValue::Blank
+  )))
+}
+
+fn evaluate_isnumber_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    return evaluator.map_unary_values(value.clone(), |_, value| {
+      Some(FormulaValue::Boolean(matches!(
+        value,
+        FormulaValue::Number(_) | FormulaValue::Boolean(_)
+      )))
+    });
+  }
+  Some(FormulaValue::Boolean(matches!(
+    evaluator.information_scalar_value(value.clone()),
+    Some(FormulaValue::Number(_) | FormulaValue::Boolean(_))
+  )))
+}
+
+fn evaluate_error_type_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let Some(FormulaValue::Error(error)) = evaluator.first_error_value(value) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::NA));
+  };
+  let code = match error {
+    FormulaErrorValue::Null => 1.0,
+    FormulaErrorValue::Div0 => 2.0,
+    FormulaErrorValue::Value => 3.0,
+    FormulaErrorValue::Ref => 4.0,
+    FormulaErrorValue::Name => 5.0,
+    FormulaErrorValue::Num => 6.0,
+    FormulaErrorValue::NA => 7.0,
+    FormulaErrorValue::GettingData
+    | FormulaErrorValue::Spill
+    | FormulaErrorValue::Calc
+    | FormulaErrorValue::IllegalArgument
+    | FormulaErrorValue::Parameter => return Some(FormulaValue::Error(FormulaErrorValue::NA)),
+    FormulaErrorValue::Unknown => return Some(FormulaValue::Error(FormulaErrorValue::Unknown)),
+  };
+  Some(FormulaValue::Number(code))
+}
+
+fn evaluate_type_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if matches!(value, FormulaValue::Matrix(_) | FormulaValue::RefList(_)) {
+    return Some(FormulaValue::Number(64.0));
+  }
+  Some(FormulaValue::Number(match evaluator.first_value(value) {
+    FormulaValue::Number(_) => 1.0,
+    FormulaValue::String(_) => 2.0,
+    FormulaValue::Boolean(_) => 1.0,
+    FormulaValue::Error(_) => 16.0,
+    FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => 64.0,
+    FormulaValue::Blank => 1.0,
+  }))
+}
+
+fn evaluate_n_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    return None;
+  }
+  match value {
+    FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1 => {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    FormulaValue::RefList(_) => return Some(FormulaValue::Error(FormulaErrorValue::Value)),
+    _ => {}
+  }
+  Some(FormulaValue::Number(match evaluator.first_value(value) {
+    FormulaValue::Number(value) => value,
+    FormulaValue::Boolean(value) => {
+      if value {
+        1.0
+      } else {
+        0.0
+      }
+    }
+    FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
+    _ => 0.0,
+  }))
+}
+
+fn evaluate_len_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  bytes: bool,
+) -> Option<FormulaValue<'doc>> {
+  if evaluator.array_context
+    && matches!(
+      value,
+      FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+    )
+  {
+    return None;
+  }
+  let text = evaluator.text(value);
+  Some(FormulaValue::Number(if bytes {
+    text_byte_len(&text) as f64
+  } else {
+    text.chars().count() as f64
+  }))
+}
+
+fn evaluate_info_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let key = evaluator.text(value).to_ascii_uppercase();
+  match key.as_str() {
+    "SYSTEM" => Some(FormulaValue::String(Cow::Borrowed("LINUX"))),
+    "OSVERSION" | "RELEASE" => Some(FormulaValue::String(Cow::Borrowed(""))),
+    "NUMFILE" => Some(FormulaValue::Number(1.0)),
+    "RECALC" => Some(FormulaValue::String(Cow::Borrowed("Automatic"))),
+    "DIRECTORY" | "MEMAVAIL" | "MEMUSED" | "ORIGIN" | "TOTMEM" => {
+      Some(FormulaValue::Error(FormulaErrorValue::NA))
+    }
+    _ => Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+  }
+}
+
+fn scalar_numeric_unary_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: &[FormulaValue<'doc>],
+  op: impl Fn(f64) -> f64,
+) -> Option<FormulaValue<'doc>> {
+  scalar_numeric_unary_checked_arg(
+    evaluator,
+    args,
+    |value| Some(op(value)),
+    FormulaErrorValue::Unknown,
+  )
+}
+
+fn scalar_numeric_unary_checked_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: &[FormulaValue<'doc>],
+  op: impl Fn(f64) -> Option<f64>,
+  error: FormulaErrorValue,
+) -> Option<FormulaValue<'doc>> {
+  let value = scalar_number_arg(evaluator, args, 0)?;
+  Some(match op(value) {
+    Some(result) if result.is_finite() => FormulaValue::Number(result),
+    Some(_) => FormulaValue::Error(FormulaErrorValue::Value),
+    None => FormulaValue::Error(error),
+  })
 }
 
 fn should_fallback_scalar_value<'doc>(

@@ -37,8 +37,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if !parsed.unsupported.is_empty() {
       return None;
     }
-    let ast = crate::evaluator::ast_from_code(parsed.code.as_ref()?)?;
-    self.evaluate(&ast).map(FormulaValue::into_owned)
+    evaluate_code_with_context(parsed.code.as_ref()?, self).map(FormulaValue::into_owned)
   }
 
   pub(crate) fn evaluate_external_reference(

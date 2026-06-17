@@ -12,7 +12,7 @@ use crate::calc::statistics::{PercentileKind, percentile_sorted, variance_slice}
 use crate::calc::text::{
   legacy_char_text, legacy_text_code, proper_formula_text, rot13_formula_text,
 };
-use crate::model::{
+use crate::evaluator::{
   CouponFunction, DatabaseFunction, DatePart, FormulaAst, FormulaEvaluator, TimePart, datevalue,
   rtl_cos, rtl_sin, rtl_tan, timevalue,
 };

@@ -3,6 +3,7 @@ pub mod calc;
 mod code;
 mod dependency;
 mod error;
+mod evaluator;
 mod function;
 mod model;
 mod parser;

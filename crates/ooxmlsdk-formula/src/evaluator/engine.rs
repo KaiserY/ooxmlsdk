@@ -1,15 +1,15 @@
 use super::*;
 
-pub(super) struct FormulaEvaluatorEngine<'book, 'engine, 'doc> {
-  pub(super) book: &'book FormulaEvaluationBook<'doc>,
-  pub(super) engine: &'engine CalcEngine,
-  pub(super) current_sheet: SheetId,
-  pub(super) current_cell: Option<CellAddress>,
-  pub(super) grammar: FormulaGrammar,
-  pub(super) array_context: bool,
+pub(crate) struct FormulaEvaluatorEngine<'book, 'engine, 'doc> {
+  pub(crate) book: &'book FormulaEvaluationBook<'doc>,
+  pub(crate) engine: &'engine CalcEngine,
+  pub(crate) current_sheet: SheetId,
+  pub(crate) current_cell: Option<CellAddress>,
+  pub(crate) grammar: FormulaGrammar,
+  pub(crate) array_context: bool,
 }
 
-pub(super) fn evaluate_parsed_formula_raw<'doc>(
+pub(crate) fn evaluate_parsed_formula_raw<'doc>(
   book: &FormulaEvaluationBook<'doc>,
   current_sheet: SheetId,
   current_cell: Option<CellAddress>,
@@ -36,7 +36,7 @@ pub(super) fn evaluate_parsed_formula_raw<'doc>(
   .evaluate_code(formula.code.as_ref()?)
 }
 
-pub(super) fn evaluate_formula_text_raw<'doc>(
+pub(crate) fn evaluate_formula_text_raw<'doc>(
   book: &FormulaEvaluationBook<'doc>,
   current_sheet: SheetId,
   current_cell: Option<CellAddress>,
@@ -49,12 +49,12 @@ pub(super) fn evaluate_formula_text_raw<'doc>(
 }
 
 impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
-  pub(super) fn evaluate_code(&self, code: &FormulaCode<'doc>) -> Option<FormulaValue<'doc>> {
+  pub(crate) fn evaluate_code(&self, code: &FormulaCode<'doc>) -> Option<FormulaValue<'doc>> {
     let ast = ast_from_code(code)?;
     self.compat_evaluator().evaluate(&ast)
   }
 
-  pub(super) fn compat_evaluator(&self) -> FormulaEvaluator<'_, 'doc> {
+  pub(crate) fn compat_evaluator(&self) -> FormulaEvaluator<'_, 'doc> {
     FormulaEvaluator {
       book: self.book,
       engine: self.engine,
@@ -68,7 +68,7 @@ impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
   }
 }
 
-pub(super) fn ast_from_code<'doc>(code: &FormulaCode<'doc>) -> Option<FormulaAst<'doc>> {
+pub(crate) fn ast_from_code<'doc>(code: &FormulaCode<'doc>) -> Option<FormulaAst<'doc>> {
   let mut stack = Vec::with_capacity(code.ops.len());
   for op in &code.ops {
     match op {

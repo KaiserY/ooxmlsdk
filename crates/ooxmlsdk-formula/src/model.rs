@@ -91,6 +91,7 @@ use crate::dependency::{
   DependencyGraph, DependencyGraphBuilder, ExternalReferenceId, FormulaDependency, cow_span_text,
   dependencies_from_code, external_reference_id_from_spans,
 };
+use crate::function::{canonical_function_name, normalize_function_name};
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
   FormulaValue, QualifiedAddress, QualifiedRange, Result, SheetId, SheetName,
@@ -271,20 +272,6 @@ pub fn normalize_r1c1_formula_text(formula: &str, base: CellAddress) -> String {
 
 pub fn r1c1_whole_axis_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
   crate::parser::r1c1_whole_axis_reference_to_a1(reference, base)
-}
-
-fn canonical_function_name(name: &str) -> String {
-  let mut upper = name
-    .trim_start_matches("_xlfn.")
-    .trim_start_matches("_xlws.")
-    .to_ascii_uppercase();
-  for prefix in ["COM.MICROSOFT.", "ORG.LIBREOFFICE.", "ORG.OPENOFFICE."] {
-    if let Some(stripped) = upper.strip_prefix(prefix) {
-      upper = stripped.to_string();
-      break;
-    }
-  }
-  upper
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -3345,21 +3332,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     name: &Cow<'doc, str>,
     args: &[FormulaAst<'doc>],
   ) -> Option<FormulaValue<'doc>> {
-    let raw_upper = name
-      .trim_start_matches("_xlfn.")
-      .trim_start_matches("_xlws.")
-      .to_ascii_uppercase();
-    if raw_upper == "ORG.OPENOFFICE.ERRORTYPE" {
+    let raw_upper = normalize_function_name(name);
+    if raw_upper.as_ref() == "ORG.OPENOFFICE.ERRORTYPE" {
       return self.evaluate_error_type_raw(args);
     }
-    if raw_upper == "COM.MICROSOFT.CEILING" {
+    if raw_upper.as_ref() == "COM.MICROSOFT.CEILING" {
       return self.evaluate_ceiling_excel_legacy(args);
     }
-    if raw_upper == "COM.MICROSOFT.FLOOR" {
+    if raw_upper.as_ref() == "COM.MICROSOFT.FLOOR" {
       return self.evaluate_floor_excel_legacy(args);
     }
     let upper = canonical_function_name(name);
-    match upper.as_str() {
+    match upper.as_ref() {
       "LET" => self.evaluate_let(args),
       "IF" => self.evaluate_if(args),
       "IFERROR" => self.evaluate_if_error(args, false),
@@ -14327,7 +14311,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         }
         intersections
       }
-      FormulaAst::Function { name, args } if canonical_function_name(name) == "XLOOKUP" => {
+      FormulaAst::Function { name, args }
+        if canonical_function_name(name).as_ref() == "XLOOKUP" =>
+      {
         self.xlookup_reference_ranges(args).unwrap_or_default()
       }
       FormulaAst::Name(_) | FormulaAst::ExternalReference(_) | FormulaAst::Function { .. } => self

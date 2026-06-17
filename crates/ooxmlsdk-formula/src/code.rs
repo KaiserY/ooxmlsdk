@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use crate::dependency::{ExternalReferenceId, cow_span_text, external_reference_id_from_spans};
+use crate::function::{FormulaFunctionId, resolve_function_name};
 use crate::{FormulaErrorValue, FormulaOperator, FormulaValue, QualifiedRange, SheetId, parser};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -41,6 +42,7 @@ pub(crate) enum FormulaOp<'doc> {
   Binary(FormulaOperator),
   Call {
     name: Cow<'doc, str>,
+    function: Option<FormulaFunctionId>,
     argc: usize,
     volatile: bool,
   },
@@ -64,10 +66,12 @@ impl<'doc> FormulaOp<'doc> {
       FormulaOp::Binary(value) => FormulaOp::Binary(value),
       FormulaOp::Call {
         name,
+        function,
         argc,
         volatile,
       } => FormulaOp::Call {
         name: Cow::Owned(name.into_owned()),
+        function,
         argc,
         volatile,
       },
@@ -116,18 +120,27 @@ fn lower_node<'doc>(
       for arg in args {
         lower_node(sheet, source, borrowed_source, arg, ops)?;
       }
+      let name = cow_span_text(source, borrowed_source, *name);
+      let function = resolve_function_name(name.as_ref());
       ops.push(FormulaOp::Call {
-        name: cow_span_text(source, borrowed_source, *name),
+        name,
+        function,
         argc: args.len(),
         volatile: *volatile,
       });
     }
-    parser::FormulaAst::LogicalFunction { function, args } => {
+    parser::FormulaAst::LogicalFunction {
+      function: logical_function,
+      args,
+    } => {
       for arg in args {
         lower_node(sheet, source, borrowed_source, arg, ops)?;
       }
+      let name = Cow::Borrowed(logical_function.name());
+      let function = resolve_function_name(name.as_ref());
       ops.push(FormulaOp::Call {
-        name: Cow::Borrowed(function.name()),
+        name,
+        function,
         argc: args.len(),
         volatile: false,
       });

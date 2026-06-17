@@ -140,7 +140,13 @@ pub(crate) fn dependencies_from_code<'doc>(
       FormulaOp::PushExternal(external) => {
         dependencies.push(FormulaDependency::External(external.clone()));
       }
-      FormulaOp::Call { volatile, .. } if *volatile => {
+      FormulaOp::Call {
+        function, volatile, ..
+      } if *volatile
+        || function
+          .as_ref()
+          .is_some_and(|function| function.is_volatile()) =>
+      {
         dependencies.push(FormulaDependency::Volatile);
       }
       _ => {}

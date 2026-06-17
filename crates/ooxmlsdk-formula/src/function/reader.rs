@@ -1,5 +1,5 @@
 use super::FunctionArgs;
-use crate::evaluator::{FormulaEvaluator, QueryGrid, evaluate_arg_direct};
+use crate::evaluator::{FormulaEvaluator, QueryValueSource, evaluate_arg_direct};
 use crate::{FormulaErrorValue, FormulaValue, QualifiedRange};
 
 #[derive(Clone, Copy)]
@@ -48,10 +48,10 @@ impl<'args, 'eval, 'doc> FunctionArgReader<'args, 'eval, 'doc> {
     }
   }
 
-  pub(crate) fn query_grid(self, index: usize) -> Option<QueryGrid<'doc>> {
+  pub(crate) fn query_source(self, index: usize) -> Option<QueryValueSource<'doc>> {
     match self.args {
-      FunctionArgs::Ast(args) => self.evaluator.query_grid_from_ast(args.get(index)?),
-      FunctionArgs::Lazy(_) => self.evaluator.query_grid_from_value(self.value(index)?),
+      FunctionArgs::Ast(args) => self.evaluator.query_source_from_ast(args.get(index)?),
+      FunctionArgs::Lazy(_) => self.evaluator.query_source_from_value(self.value(index)?),
     }
   }
 

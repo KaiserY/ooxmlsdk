@@ -91,20 +91,25 @@ use crate::{
 mod ast;
 mod context;
 mod engine;
+mod query;
 mod stack;
 
 pub(crate) use ast::{FormulaAst, has_missing_required_argument, is_missing_argument};
 pub(crate) use context::{
-  CouponFunction, DatabaseFunction, DatePart, FormulaEvaluator, IfsAggregate, QueryGrid, TimePart,
-  column_index_to_name, datevalue, display_text_from_value,
-  display_text_from_value_with_number_format, error_text, error_text_value, error_value,
-  qualified_range, range_intersection_value, rtl_cos, rtl_sin, rtl_tan,
-  split_indirect_intersection, timevalue,
+  CouponFunction, DatabaseFunction, DatePart, FormulaEvaluator, TimePart, column_index_to_name,
+  datevalue, display_text_from_value, display_text_from_value_with_number_format, error_text,
+  error_text_value, error_value, parse_date_input, qualified_range, range_intersection_value,
+  rtl_cos, rtl_sin, rtl_tan, split_indirect_intersection, timevalue,
 };
 #[cfg(test)]
 pub(crate) use context::{format_complex_result, valid_date_serial_with_system};
 pub(crate) use engine::{
   FormulaEvaluatorEngine, evaluate_arg_direct, evaluate_code_with_context,
   evaluate_formula_text_raw, evaluate_parsed_formula_raw,
+};
+pub(crate) use query::{
+  CriteriaPlan, DatabaseCriteriaPlan, FieldCriteriaPlan, IfsAggregate, LookupPlan,
+  QueryValueSource, compare_numbers, compare_text, database_criterion_cell_present,
+  database_criterion_entry_present, query_candidate_number,
 };
 pub(crate) use stack::{EvalArg, EvalArgs, EvalOperand};

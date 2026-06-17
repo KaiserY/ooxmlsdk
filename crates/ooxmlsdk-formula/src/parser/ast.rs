@@ -22,6 +22,7 @@ pub(crate) enum FormulaAst {
   },
   Function {
     name: SemanticSpan,
+    volatile: bool,
     args: Vec<FormulaAst>,
   },
   LogicalFunction {

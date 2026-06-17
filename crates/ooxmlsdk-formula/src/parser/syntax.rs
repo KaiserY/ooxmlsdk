@@ -1,6 +1,6 @@
 use super::ast::FormulaAst;
 use super::lex::{LexLogicalFunction, LexOperator, LexToken, LexTokenKind, lex_tokens};
-use super::semantic::{SemanticSpan, semantic_word_kind};
+use super::semantic::{SemanticSpan, is_volatile_function_name, semantic_word_kind};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SyntaxIssue {
@@ -270,6 +270,7 @@ impl<'a> SyntaxParser<'a> {
     {
       return Some(FormulaAst::Function {
         name,
+        volatile: is_volatile_function_name(self.source.get(name.start..name.end)?),
         args: self.parse_argument_list()?,
       });
     }

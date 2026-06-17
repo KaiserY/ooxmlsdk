@@ -83,7 +83,10 @@ use crate::calc::text::{
   text_byte_len, trim_formula_text,
 };
 use crate::calc::units::convert_unit;
-use crate::parser::formula_error_from_lex;
+use crate::dependency::{
+  DependencyGraph, DependencyGraphBuilder, ExternalReferenceId, FormulaDependency, cow_span_text,
+  dependencies_from_ast, external_reference_id_from_spans,
+};
 use crate::{
   AddressFlags, CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue,
   FormulaValue, QualifiedAddress, QualifiedRange, Result, SheetId, SheetName,
@@ -684,6 +687,7 @@ pub struct ParsedFormula<'doc> {
   pub source: Cow<'doc, str>,
   pub grammar: FormulaGrammar,
   pub tokens: Vec<FormulaToken<'doc>>,
+  pub(crate) syntax_ast: Option<crate::parser::FormulaAst>,
   pub ast: Option<FormulaAst<'doc>>,
   pub dependencies: Vec<FormulaDependency<'doc>>,
   pub unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
@@ -699,6 +703,7 @@ impl<'doc> ParsedFormula<'doc> {
         .into_iter()
         .map(FormulaToken::into_owned)
         .collect(),
+      syntax_ast: self.syntax_ast,
       ast: self.ast.map(FormulaAst::into_owned),
       dependencies: self
         .dependencies
@@ -880,47 +885,6 @@ pub enum FormulaOpcode {
   DefinedName,
   Matrix,
   Missing,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum FormulaDependency<'doc> {
-  Cell {
-    sheet: SheetId,
-    address: CellAddress,
-  },
-  Range(QualifiedRange<'doc>),
-  Name(Cow<'doc, str>),
-  External(ExternalReferenceId<'doc>),
-  Volatile,
-}
-
-impl<'doc> FormulaDependency<'doc> {
-  fn into_owned(self) -> FormulaDependency<'static> {
-    match self {
-      FormulaDependency::Cell { sheet, address } => FormulaDependency::Cell { sheet, address },
-      FormulaDependency::Range(value) => FormulaDependency::Range(value.into_owned()),
-      FormulaDependency::Name(value) => FormulaDependency::Name(Cow::Owned(value.into_owned())),
-      FormulaDependency::External(value) => FormulaDependency::External(value.into_owned()),
-      FormulaDependency::Volatile => FormulaDependency::Volatile,
-    }
-  }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExternalReferenceId<'doc> {
-  pub book: Option<Cow<'doc, str>>,
-  pub sheet: Option<Cow<'doc, str>>,
-  pub name: Option<Cow<'doc, str>>,
-}
-
-impl<'doc> ExternalReferenceId<'doc> {
-  fn into_owned(self) -> ExternalReferenceId<'static> {
-    ExternalReferenceId {
-      book: self.book.map(|value| Cow::Owned(value.into_owned())),
-      sheet: self.sheet.map(|value| Cow::Owned(value.into_owned())),
-      name: self.name.map(|value| Cow::Owned(value.into_owned())),
-    }
-  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1420,9 +1384,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         sheet: defined_name.sheet,
         name_upper: defined_name.name.to_ascii_uppercase(),
       };
-      if let Some(array) =
-        crate::parser::parse_array_constant_formula(defined_name.formula_text.as_ref())
-      {
+      if let Some(array) = parse_array_constant_formula(defined_name.formula_text.as_ref()) {
         defined_arrays.insert(key.clone(), array);
       }
       defined_names.insert(key, Cow::Borrowed(defined_name.formula_text.as_ref()));
@@ -1531,7 +1493,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     formula: &str,
     grammar: FormulaGrammar,
   ) -> Option<FormulaValue<'doc>> {
-    let (ast, unsupported) = crate::parser::parse_formula_ast(current_sheet, formula);
+    let (ast, unsupported) = parse_formula_ast(current_sheet, formula);
     if !unsupported.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     }
@@ -2000,39 +1962,6 @@ fn evaluation_cell_value<'doc>(record: &'doc CellValueRecord<'doc>) -> FormulaVa
         .or_else(|| formula.cached_value.clone())
     })
     .unwrap_or_else(|| record.raw_value.clone())
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct DependencyGraph<'doc> {
-  pub nodes: Vec<DependencyNode>,
-  pub edges: Vec<DependencyEdge<'doc>>,
-  pub defined_name_nodes: Vec<DefinedNameNode<'doc>>,
-  pub defined_name_edges: Vec<DefinedNameDependencyEdge<'doc>>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct DependencyNode {
-  pub sheet: SheetId,
-  pub cell: CellAddress,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct DependencyEdge<'doc> {
-  pub from: DependencyNode,
-  pub to: FormulaDependency<'doc>,
-  pub volatile: bool,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DefinedNameNode<'doc> {
-  pub sheet: Option<SheetId>,
-  pub name: Cow<'doc, str>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct DefinedNameDependencyEdge<'doc> {
-  pub from: DefinedNameNode<'doc>,
-  pub to: FormulaDependency<'doc>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -2867,50 +2796,29 @@ fn dependency_graph<'doc>(
   sheets: &[WorksheetValueModel<'doc>],
   defined_names: &[DefinedName<'doc>],
 ) -> DependencyGraph<'doc> {
-  let mut graph = DependencyGraph::default();
+  let mut graph = DependencyGraphBuilder::default();
   for sheet in sheets {
     for (address, record) in &sheet.cells {
       let Some(formula) = &record.formula else {
         continue;
       };
-      let node = DependencyNode {
-        sheet: sheet.id,
-        cell: *address,
-      };
-      graph.nodes.push(node);
       let dependencies = formula
         .parsed_formula
         .as_ref()
         .map(|parsed| parsed.dependencies.clone())
         .unwrap_or_else(|| formula_dependencies(sheet.id, &formula.formula_text));
-      for dependency in dependencies {
-        graph.edges.push(DependencyEdge {
-          from: node,
-          to: dependency,
-          volatile: formula.volatile,
-        });
-      }
+      graph.add_formula(sheet.id, *address, dependencies, formula.volatile);
     }
   }
   for defined_name in defined_names {
-    let node = DefinedNameNode {
-      sheet: defined_name.sheet,
-      name: defined_name.name.clone(),
-    };
-    graph.defined_name_nodes.push(node.clone());
     let dependencies = defined_name
       .parsed_formula
       .as_ref()
       .map(|parsed| parsed.dependencies.clone())
       .unwrap_or_else(|| defined_name.dependencies.clone());
-    for dependency in dependencies {
-      graph.defined_name_edges.push(DefinedNameDependencyEdge {
-        from: node.clone(),
-        to: dependency,
-      });
-    }
+    graph.add_defined_name(defined_name.sheet, defined_name.name.clone(), dependencies);
   }
-  graph
+  graph.finish()
 }
 
 fn formula_dependencies<'doc>(
@@ -2953,7 +2861,411 @@ fn parse_formula<'doc>(
   source: Cow<'doc, str>,
   grammar: FormulaGrammar,
 ) -> ParsedFormula<'doc> {
-  crate::parser::parse_formula(sheet, source, grammar)
+  lower_formula_parser_formula(sheet, source, grammar)
+}
+
+fn lower_formula_parser_formula<'doc>(
+  sheet: SheetId,
+  source: Cow<'doc, str>,
+  grammar: FormulaGrammar,
+) -> ParsedFormula<'doc> {
+  let parsed = crate::parser::FormulaParser::new(source.as_ref()).parse();
+  let text = parsed.body;
+  let borrowed_text = match &source {
+    Cow::Borrowed(value) => Some(value.get(parsed.body_start..).unwrap_or(value)),
+    Cow::Owned(_) => None,
+  };
+  let lowered = lower_formula_parser_body(sheet, text, borrowed_text, parsed.body_parse);
+
+  ParsedFormula {
+    source,
+    grammar,
+    tokens: lowered.tokens,
+    syntax_ast: lowered.syntax_ast,
+    ast: lowered.ast,
+    dependencies: lowered.dependencies,
+    unsupported: lowered.unsupported,
+  }
+}
+
+fn parse_formula_ast<'doc>(
+  sheet: SheetId,
+  text: &str,
+) -> (
+  Option<FormulaAst<'doc>>,
+  Vec<UnsupportedFormulaFeature<'doc>>,
+) {
+  let parsed = crate::parser::FormulaParser::new(text).parse_syntax();
+  let mut unsupported =
+    formula_parse_issues_to_unsupported(parsed.body, None, parsed.syntax_parse.issues);
+  let ast = formula_ast_from_parser_ast(
+    sheet,
+    parsed.body,
+    None,
+    parsed.syntax_parse.ast.as_ref(),
+    &mut unsupported,
+  );
+  (ast, unsupported)
+}
+
+fn parse_array_constant_formula<'doc>(formula: &str) -> Option<Vec<Vec<FormulaValue<'doc>>>> {
+  crate::parser::parse_array_constant(formula).map(|array| {
+    array
+      .rows
+      .into_iter()
+      .map(|row| {
+        row
+          .into_iter()
+          .map(formula_value_from_array_constant)
+          .collect()
+      })
+      .collect()
+  })
+}
+
+struct LoweredFormula<'doc> {
+  tokens: Vec<FormulaToken<'doc>>,
+  syntax_ast: Option<crate::parser::FormulaAst>,
+  ast: Option<FormulaAst<'doc>>,
+  dependencies: Vec<FormulaDependency<'doc>>,
+  unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
+}
+
+fn lower_formula_parser_body<'doc>(
+  sheet: SheetId,
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  parsed: crate::parser::FormulaBodyParse,
+) -> LoweredFormula<'doc> {
+  let crate::parser::FormulaBodyParse {
+    tokens: parsed_tokens,
+    ast: parser_ast,
+    issues,
+  } = parsed;
+  let mut tokens = Vec::with_capacity(parsed_tokens.len());
+  let mut unsupported = Vec::new();
+
+  for token in parsed_tokens {
+    match token.kind {
+      crate::parser::FormulaBodyTokenKind::Text => {
+        tokens.push(FormulaToken::Literal(formula_text_value(
+          text,
+          borrowed_text,
+          token.span.start,
+        )));
+      }
+      crate::parser::FormulaBodyTokenKind::Number(value) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Number(value)));
+      }
+      crate::parser::FormulaBodyTokenKind::Error(error) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Error(
+          formula_error_from_lex(error),
+        )));
+      }
+      crate::parser::FormulaBodyTokenKind::Operator(operator) => {
+        tokens.push(FormulaToken::Operator(formula_operator_from_lex(operator)));
+      }
+      crate::parser::FormulaBodyTokenKind::ArrayOpen => {
+        tokens.push(FormulaToken::ArrayOpen);
+      }
+      crate::parser::FormulaBodyTokenKind::ArrayClose => {
+        tokens.push(FormulaToken::ArrayClose);
+      }
+      crate::parser::FormulaBodyTokenKind::ArgumentSeparator => {
+        tokens.push(FormulaToken::Separator(FormulaSeparator::Argument));
+      }
+      crate::parser::FormulaBodyTokenKind::RowSeparator => {
+        tokens.push(FormulaToken::Separator(FormulaSeparator::Row));
+      }
+      crate::parser::FormulaBodyTokenKind::Function { volatile: _ } => {
+        let word = cow_span_text(text, borrowed_text, token.span);
+        tokens.push(FormulaToken::Function(word));
+      }
+      crate::parser::FormulaBodyTokenKind::Boolean(value) => {
+        tokens.push(FormulaToken::Literal(FormulaValue::Boolean(value)));
+      }
+      crate::parser::FormulaBodyTokenKind::ExternalReference(reference) => {
+        let external = external_reference_id_from_spans(text, borrowed_text, reference);
+        tokens.push(FormulaToken::ExternalReference(external));
+      }
+      crate::parser::FormulaBodyTokenKind::ReferenceCandidate => {
+        let word = cow_span_text(text, borrowed_text, token.span);
+        if let Some(range) = crate::parser::parse_formula_range(sheet, word.as_ref()) {
+          tokens.push(FormulaToken::Reference(range));
+        } else {
+          tokens.push(FormulaToken::Name(word));
+        }
+      }
+      crate::parser::FormulaBodyTokenKind::Name => {
+        let word = cow_span_text(text, borrowed_text, token.span);
+        tokens.push(FormulaToken::Name(word));
+      }
+      crate::parser::FormulaBodyTokenKind::Unsupported => {
+        tokens.push(FormulaToken::Unsupported(cow_span_text(
+          text,
+          borrowed_text,
+          token.span,
+        )));
+      }
+    }
+  }
+
+  unsupported.extend(formula_parse_issues_to_unsupported(
+    text,
+    borrowed_text,
+    issues,
+  ));
+  let ast = formula_ast_from_parser_ast(
+    sheet,
+    text,
+    borrowed_text,
+    parser_ast.as_ref(),
+    &mut unsupported,
+  );
+  let dependencies = dependencies_from_ast(sheet, text, borrowed_text, parser_ast.as_ref());
+
+  LoweredFormula {
+    tokens,
+    syntax_ast: parser_ast,
+    ast,
+    dependencies,
+    unsupported,
+  }
+}
+
+fn formula_operator_from_lex(operator: crate::parser::LexOperator) -> FormulaOperator {
+  match operator {
+    crate::parser::LexOperator::Add => FormulaOperator::Add,
+    crate::parser::LexOperator::Subtract => FormulaOperator::Subtract,
+    crate::parser::LexOperator::Multiply => FormulaOperator::Multiply,
+    crate::parser::LexOperator::Divide => FormulaOperator::Divide,
+    crate::parser::LexOperator::Power => FormulaOperator::Power,
+    crate::parser::LexOperator::Concat => FormulaOperator::Concat,
+    crate::parser::LexOperator::Equal => FormulaOperator::Equal,
+    crate::parser::LexOperator::NotEqual => FormulaOperator::NotEqual,
+    crate::parser::LexOperator::Less => FormulaOperator::Less,
+    crate::parser::LexOperator::LessOrEqual => FormulaOperator::LessOrEqual,
+    crate::parser::LexOperator::Greater => FormulaOperator::Greater,
+    crate::parser::LexOperator::GreaterOrEqual => FormulaOperator::GreaterOrEqual,
+    crate::parser::LexOperator::Range => FormulaOperator::Range,
+    crate::parser::LexOperator::Union => FormulaOperator::Union,
+    crate::parser::LexOperator::Intersection => FormulaOperator::Intersection,
+    crate::parser::LexOperator::Percent => FormulaOperator::Percent,
+  }
+}
+
+fn formula_error_from_lex(error: crate::parser::LexErrorValue) -> FormulaErrorValue {
+  match error {
+    crate::parser::LexErrorValue::Null => FormulaErrorValue::Null,
+    crate::parser::LexErrorValue::Div0 => FormulaErrorValue::Div0,
+    crate::parser::LexErrorValue::Value => FormulaErrorValue::Value,
+    crate::parser::LexErrorValue::Ref => FormulaErrorValue::Ref,
+    crate::parser::LexErrorValue::Name => FormulaErrorValue::Name,
+    crate::parser::LexErrorValue::Num => FormulaErrorValue::Num,
+    crate::parser::LexErrorValue::NA => FormulaErrorValue::NA,
+    crate::parser::LexErrorValue::GettingData => FormulaErrorValue::GettingData,
+    crate::parser::LexErrorValue::Spill => FormulaErrorValue::Spill,
+    crate::parser::LexErrorValue::Calc => FormulaErrorValue::Calc,
+    crate::parser::LexErrorValue::IllegalArgument => FormulaErrorValue::IllegalArgument,
+    crate::parser::LexErrorValue::Parameter => FormulaErrorValue::Parameter,
+    crate::parser::LexErrorValue::Unknown => FormulaErrorValue::Unknown,
+  }
+}
+
+fn formula_ast_from_parser_ast<'doc>(
+  sheet: SheetId,
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  ast: Option<&crate::parser::FormulaAst>,
+  unsupported: &mut Vec<UnsupportedFormulaFeature<'doc>>,
+) -> Option<FormulaAst<'doc>> {
+  let converted = ast.and_then(|ast| formula_ast_from_node(sheet, text, borrowed_text, ast));
+  if converted.is_none()
+    && ast.is_some()
+    && !unsupported
+      .iter()
+      .any(|issue| issue.reason.as_ref() == "formula expression is not fully parsed")
+  {
+    unsupported.push(UnsupportedFormulaFeature {
+      feature: borrowed_text
+        .map(Cow::Borrowed)
+        .unwrap_or_else(|| Cow::Owned(text.to_string())),
+      reason: Cow::Borrowed("formula expression is not fully parsed"),
+    });
+  }
+  converted
+}
+
+fn formula_parse_issues_to_unsupported<'doc>(
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  issues: Vec<crate::parser::FormulaParseIssue>,
+) -> Vec<UnsupportedFormulaFeature<'doc>> {
+  issues
+    .into_iter()
+    .map(|issue| match issue {
+      crate::parser::FormulaParseIssue::UnrecognizedCharacter(span) => UnsupportedFormulaFeature {
+        feature: cow_span_text(text, borrowed_text, span),
+        reason: Cow::Borrowed("unrecognized formula character"),
+      },
+      crate::parser::FormulaParseIssue::MissingClosingParenthesis => UnsupportedFormulaFeature {
+        feature: Cow::Borrowed("parenthesized expression"),
+        reason: Cow::Borrowed("missing closing parenthesis"),
+      },
+      crate::parser::FormulaParseIssue::IncompleteExpression => UnsupportedFormulaFeature {
+        feature: borrowed_text
+          .map(Cow::Borrowed)
+          .unwrap_or_else(|| Cow::Owned(text.to_string())),
+        reason: Cow::Borrowed("formula expression is not fully parsed"),
+      },
+    })
+    .collect()
+}
+
+fn formula_ast_from_node<'doc>(
+  sheet: SheetId,
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  ast: &crate::parser::FormulaAst,
+) -> Option<FormulaAst<'doc>> {
+  match ast {
+    crate::parser::FormulaAst::Blank => Some(FormulaAst::Literal(FormulaValue::Blank)),
+    crate::parser::FormulaAst::Text(span) => Some(FormulaAst::Literal(formula_text_value(
+      text,
+      borrowed_text,
+      span.start,
+    ))),
+    crate::parser::FormulaAst::Number(value) => {
+      Some(FormulaAst::Literal(FormulaValue::Number(*value)))
+    }
+    crate::parser::FormulaAst::Error(error) => Some(FormulaAst::Literal(FormulaValue::Error(
+      formula_error_from_lex(*error),
+    ))),
+    crate::parser::FormulaAst::Word { span, kind } => {
+      formula_ast_from_node_word(sheet, text, borrowed_text, *span, *kind)
+    }
+    crate::parser::FormulaAst::Unary { op, expr } => {
+      let op = match op {
+        crate::parser::LexOperator::Add => FormulaOperator::UnaryPlus,
+        crate::parser::LexOperator::Subtract => FormulaOperator::UnaryMinus,
+        crate::parser::LexOperator::Percent => FormulaOperator::Percent,
+        _ => return None,
+      };
+      Some(FormulaAst::Unary {
+        op,
+        expr: Box::new(formula_ast_from_node(sheet, text, borrowed_text, expr)?),
+      })
+    }
+    crate::parser::FormulaAst::Binary { op, left, right } => Some(FormulaAst::Binary {
+      op: formula_operator_from_lex(*op),
+      left: Box::new(formula_ast_from_node(sheet, text, borrowed_text, left)?),
+      right: Box::new(formula_ast_from_node(sheet, text, borrowed_text, right)?),
+    }),
+    crate::parser::FormulaAst::Function { name, args, .. } => Some(FormulaAst::Function {
+      name: cow_span_text(text, borrowed_text, *name),
+      args: formula_ast_args_from_node(sheet, text, borrowed_text, args)?,
+    }),
+    crate::parser::FormulaAst::LogicalFunction { function, args } => Some(FormulaAst::Function {
+      name: Cow::Borrowed(function.name()),
+      args: formula_ast_args_from_node(sheet, text, borrowed_text, args)?,
+    }),
+    crate::parser::FormulaAst::Array(rows) => Some(FormulaAst::Array(
+      rows
+        .iter()
+        .map(|row| formula_ast_args_from_node(sheet, text, borrowed_text, row))
+        .collect::<Option<Vec<_>>>()?,
+    )),
+  }
+}
+
+fn formula_ast_args_from_node<'doc>(
+  sheet: SheetId,
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  args: &[crate::parser::FormulaAst],
+) -> Option<Vec<FormulaAst<'doc>>> {
+  args
+    .iter()
+    .map(|arg| formula_ast_from_node(sheet, text, borrowed_text, arg))
+    .collect()
+}
+
+fn formula_ast_from_node_word<'doc>(
+  sheet: SheetId,
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  span: crate::parser::SemanticSpan,
+  kind: crate::parser::SemanticWordKind,
+) -> Option<FormulaAst<'doc>> {
+  let word = text.get(span.start..span.end)?;
+  match kind {
+    crate::parser::SemanticWordKind::Boolean(value) => {
+      return Some(FormulaAst::Literal(FormulaValue::Boolean(value)));
+    }
+    crate::parser::SemanticWordKind::ExternalReference(reference) => {
+      return Some(FormulaAst::ExternalReference(
+        external_reference_id_from_spans(
+          word,
+          borrowed_text.and_then(|source| source.get(span.start..span.end)),
+          reference,
+        ),
+      ));
+    }
+    crate::parser::SemanticWordKind::ReferenceCandidate => {
+      if let Some(range) = crate::parser::parse_formula_range(sheet, word) {
+        return Some(FormulaAst::Reference(range));
+      }
+    }
+    crate::parser::SemanticWordKind::Name => {}
+  }
+  Some(FormulaAst::Name(cow_span_text(text, borrowed_text, span)))
+}
+
+fn formula_text_value<'doc>(
+  text: &str,
+  borrowed_text: Option<&'doc str>,
+  start: usize,
+) -> FormulaValue<'doc> {
+  if let Some(borrowed_text) = borrowed_text {
+    return match crate::parser::formula_text_literal(borrowed_text, start) {
+      Some(crate::parser::TextLiteral::Borrowed(value)) => {
+        FormulaValue::String(Cow::Borrowed(value))
+      }
+      Some(crate::parser::TextLiteral::Owned(value)) => FormulaValue::String(Cow::Owned(value)),
+      None => FormulaValue::String(Cow::Borrowed("")),
+    };
+  }
+  formula_text_value_owned(text, start)
+}
+
+fn formula_text_value_owned<'doc>(text: &str, start: usize) -> FormulaValue<'doc> {
+  match crate::parser::formula_text_literal(text, start) {
+    Some(crate::parser::TextLiteral::Borrowed(value)) => {
+      FormulaValue::String(Cow::Owned(value.to_string()))
+    }
+    Some(crate::parser::TextLiteral::Owned(value)) => FormulaValue::String(Cow::Owned(value)),
+    None => FormulaValue::String(Cow::Borrowed("")),
+  }
+}
+
+fn formula_value_from_array_constant<'doc>(
+  value: crate::parser::ArrayConstantValue<'_>,
+) -> FormulaValue<'doc> {
+  match value {
+    crate::parser::ArrayConstantValue::Blank => FormulaValue::Blank,
+    crate::parser::ArrayConstantValue::Number(value) => FormulaValue::Number(value),
+    crate::parser::ArrayConstantValue::Boolean(value) => FormulaValue::Boolean(value),
+    crate::parser::ArrayConstantValue::Error(value) => {
+      FormulaValue::Error(formula_error_from_lex(value))
+    }
+    crate::parser::ArrayConstantValue::Text(value) => match value {
+      crate::parser::TextLiteral::Borrowed(value) => FormulaValue::String(Cow::Owned(value.into())),
+      crate::parser::TextLiteral::Owned(value) => FormulaValue::String(Cow::Owned(value)),
+    },
+    crate::parser::ArrayConstantValue::Raw(value) => {
+      FormulaValue::String(Cow::Owned(value.trim_matches('"').to_string()))
+    }
+  }
 }
 
 struct FormulaEvaluator<'a, 'doc> {
@@ -3062,7 +3374,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     {
       return Some(FormulaValue::Reference(reference));
     }
-    let (ast, unsupported) = crate::parser::parse_formula_ast(self.current_sheet, formula.as_ref());
+    let (ast, unsupported) = parse_formula_ast(self.current_sheet, formula.as_ref());
     if !unsupported.is_empty() {
       return None;
     }
@@ -20993,7 +21305,7 @@ mod tests {
       )]),
       ..FormulaEvaluationBook::default()
     };
-    let (ast, unsupported) = crate::parser::parse_formula_ast(
+    let (ast, unsupported) = parse_formula_ast(
       SheetId(1),
       "SUM(MyTable1[[#This Row],[This is the first column]:[This is the,second column]])",
     );
@@ -21063,7 +21375,7 @@ mod tests {
       ]),
       ..FormulaEvaluationBook::default()
     };
-    let (ast, unsupported) = crate::parser::parse_formula_ast(SheetId(1), "SUBTOTAL(109,A1:A4)");
+    let (ast, unsupported) = parse_formula_ast(SheetId(1), "SUBTOTAL(109,A1:A4)");
     assert!(unsupported.is_empty());
     let engine = CalcEngine::new();
     let evaluator = FormulaEvaluator {
@@ -22008,11 +22320,12 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "N(A1:E1)"),
       Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
-    let (ast, unsupported) = crate::parser::parse_formula_ast(SheetId(1), "N(A1:E1)");
+    let (ast, unsupported) = parse_formula_ast(SheetId(1), "N(A1:E1)");
     let formula = ParsedFormula {
       source: Cow::Borrowed("N(A1:E1)"),
       grammar: FormulaGrammar::ExcelA1,
       tokens: Vec::new(),
+      syntax_ast: None,
       ast,
       dependencies: Vec::new(),
       unsupported,
@@ -22112,11 +22425,12 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "AGGREGATE(3,6,F1:H1)"),
       Some(FormulaValue::Number(2.0))
     );
-    let (ast, unsupported) = crate::parser::parse_formula_ast(SheetId(1), "ISNUMBER(A1:D1)");
+    let (ast, unsupported) = parse_formula_ast(SheetId(1), "ISNUMBER(A1:D1)");
     let formula = ParsedFormula {
       source: Cow::Borrowed("ISNUMBER(A1:D1)"),
       grammar: FormulaGrammar::ExcelA1,
       tokens: Vec::new(),
+      syntax_ast: None,
       ast,
       dependencies: Vec::new(),
       unsupported,
@@ -22202,11 +22516,12 @@ mod tests {
       book.evaluate_formula_text(SheetId(1), None, "ISBLANK(A3)"),
       Some(FormulaValue::Boolean(false))
     );
-    let (ast, unsupported) = crate::parser::parse_formula_ast(SheetId(1), "ISBLANK(A1:A4)");
+    let (ast, unsupported) = parse_formula_ast(SheetId(1), "ISBLANK(A1:A4)");
     let formula = ParsedFormula {
       source: Cow::Borrowed("ISBLANK(A1:A4)"),
       grammar: FormulaGrammar::ExcelA1,
       tokens: Vec::new(),
+      syntax_ast: None,
       ast,
       dependencies: Vec::new(),
       unsupported,

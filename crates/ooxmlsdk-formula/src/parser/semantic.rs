@@ -193,7 +193,7 @@ fn next_non_space_char(source: &str, mut index: usize) -> Option<char> {
   None
 }
 
-fn is_volatile_function_name(value: &str) -> bool {
+pub(crate) fn is_volatile_function_name(value: &str) -> bool {
   value.eq_ignore_ascii_case("RAND")
     || value.eq_ignore_ascii_case("TODAY")
     || value.eq_ignore_ascii_case("NOW")

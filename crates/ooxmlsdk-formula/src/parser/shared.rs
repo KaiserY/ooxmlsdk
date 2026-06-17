@@ -11,68 +11,77 @@ pub(crate) fn translate_shared_formula_text(
     return formula.to_string();
   }
 
-  let chars = formula.chars().collect::<Vec<_>>();
-  let mut output = String::new();
+  let mut output = String::with_capacity(formula.len());
   let mut index = 0;
-  while index < chars.len() {
-    match chars[index] {
+  while let Some((ch, next)) = next_char(formula, index) {
+    match ch {
       '"' => {
         let start = index;
-        index += 1;
-        while index < chars.len() {
-          let ch = chars[index];
-          index += 1;
-          if ch == '"' {
-            if chars.get(index) == Some(&'"') {
-              index += 1;
-              continue;
-            }
-            break;
-          }
-        }
-        output.extend(chars[start..index].iter());
+        index = skip_quoted(formula, index, '"');
+        output.push_str(&formula[start..index]);
       }
       '\'' => {
         let start = index;
-        index += 1;
-        while index < chars.len() {
-          let ch = chars[index];
-          index += 1;
-          if ch == '\'' {
-            if chars.get(index) == Some(&'\'') {
-              index += 1;
-              continue;
+        index = skip_quoted(formula, index, '\'');
+        if next_char(formula, index).is_some_and(|(ch, _)| ch == '!') {
+          index += '!'.len_utf8();
+          while let Some((ch, next)) = next_char(formula, index) {
+            if !is_a1_tail_char(ch) {
+              break;
             }
-            break;
+            index = next;
           }
-        }
-        if chars.get(index) == Some(&'!') {
-          index += 1;
-          while index < chars.len() && is_a1_tail_char(chars[index]) {
-            index += 1;
-          }
-          let token = chars[start..index].iter().collect::<String>();
-          output.push_str(&translate_reference_token(&token, delta_col, delta_row));
+          output.push_str(&translate_reference_token(
+            &formula[start..index],
+            delta_col,
+            delta_row,
+          ));
         } else {
-          output.extend(chars[start..index].iter());
+          output.push_str(&formula[start..index]);
         }
       }
       ch if is_formula_token_start(ch) => {
         let start = index;
-        index += 1;
-        while index < chars.len() && is_formula_token_char(chars[index]) {
-          index += 1;
+        index = next;
+        while let Some((ch, next)) = next_char(formula, index) {
+          if !is_formula_token_char(ch) {
+            break;
+          }
+          index = next;
         }
-        let token = chars[start..index].iter().collect::<String>();
-        output.push_str(&translate_reference_token(&token, delta_col, delta_row));
+        output.push_str(&translate_reference_token(
+          &formula[start..index],
+          delta_col,
+          delta_row,
+        ));
       }
-      ch => {
-        output.push(ch);
-        index += 1;
+      _ => {
+        output.push_str(&formula[index..next]);
+        index = next;
       }
     }
   }
   output
+}
+
+fn next_char(source: &str, index: usize) -> Option<(char, usize)> {
+  let ch = source.get(index..)?.chars().next()?;
+  Some((ch, index + ch.len_utf8()))
+}
+
+fn skip_quoted(source: &str, mut index: usize, quote: char) -> usize {
+  index += quote.len_utf8();
+  while let Some((ch, next)) = next_char(source, index) {
+    index = next;
+    if ch == quote {
+      if next_char(source, index).is_some_and(|(next, _)| next == quote) {
+        index += quote.len_utf8();
+        continue;
+      }
+      break;
+    }
+  }
+  index
 }
 
 fn is_formula_token_start(ch: char) -> bool {

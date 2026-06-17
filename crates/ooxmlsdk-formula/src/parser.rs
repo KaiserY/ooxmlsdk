@@ -2,7 +2,6 @@ mod array;
 mod ast;
 mod formula;
 mod lex;
-mod lower;
 mod reference;
 mod semantic;
 mod shared;
@@ -19,9 +18,6 @@ pub(crate) use formula::{
 pub(crate) use lex::{
   LexErrorValue, LexOperator, TextLiteral, formula_error_value, formula_text_literal,
   grouped_formula_number,
-};
-pub(crate) use lower::{
-  formula_error_from_lex, parse_array_constant_formula, parse_formula, parse_formula_ast,
 };
 pub(crate) use reference::parse_formula_range;
 pub(crate) use semantic::{ExternalReferenceSpans, SemanticSpan, SemanticWordKind};

@@ -20,6 +20,7 @@ pub(crate) struct FormulaEvaluator<'a, 'doc> {
   pub(crate) locals: BTreeMap<String, FormulaValue<'doc>>,
   pub(crate) array_context: bool,
   pub(crate) current_value: Option<FormulaValue<'doc>>,
+  pub(crate) calc_a1_indirect_bang_reference: bool,
 }
 
 impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
@@ -33,6 +34,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       locals: self.locals.clone(),
       array_context: true,
       current_value: self.current_value.clone(),
+      calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
     }
   }
 
@@ -46,6 +48,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       locals: self.locals.clone(),
       array_context: self.array_context,
       current_value: Some(current_value),
+      calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
     }
   }
 
@@ -737,25 +740,55 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       return Some(FormulaValue::Error(FormulaErrorValue::Value));
     }
     let index = match match_mode {
-      0 => search_vector(self, &lookup, &vector, QueryOp::Equal, search, true),
+      0 => search_vector_with_type(
+        self,
+        &lookup,
+        &vector,
+        QueryOp::Equal,
+        search,
+        QuerySearchType::Normal,
+        SearchVectorFlags::new(true, false).with_first_exact(),
+      ),
       -1 => search_vector_with_type(
         self,
         &lookup,
         &vector,
-        QueryOp::LessOrEqual,
+        QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(false, true),
-      ),
+        SearchVectorFlags::new(true, true).with_first_exact(),
+      )
+      .or_else(|| {
+        search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::LessOrEqual,
+          search,
+          QuerySearchType::Normal,
+          SearchVectorFlags::new(false, true),
+        )
+      }),
       1 => search_vector_with_type(
         self,
         &lookup,
         &vector,
-        QueryOp::GreaterOrEqual,
+        QueryOp::Equal,
         search,
         QuerySearchType::Normal,
-        SearchVectorFlags::new(false, true),
-      ),
+        SearchVectorFlags::new(true, true).with_first_exact(),
+      )
+      .or_else(|| {
+        search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::GreaterOrEqual,
+          search,
+          QuerySearchType::Normal,
+          SearchVectorFlags::new(false, true),
+        )
+      }),
       2 | 3 => search_vector_with_type(
         self,
         &lookup,
@@ -771,13 +804,232 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         } else {
           QuerySearchType::Normal
         },
-        SearchVectorFlags::new(true, false),
+        SearchVectorFlags::new(true, false).with_first_exact(),
       ),
       _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
     };
     index
       .map(|index| FormulaValue::Number(index as f64 + 1.0))
       .or(Some(FormulaValue::Error(FormulaErrorValue::NA)))
+  }
+
+  pub(crate) fn evaluate_xlookup_reader(
+    &self,
+    args: FunctionArgReader<'_, '_, 'doc>,
+  ) -> Option<FormulaValue<'doc>> {
+    if !(3..=6).contains(&args.len()) {
+      return None;
+    }
+    let lookup = self.scalar_value(args.value(0)?);
+    let lookup_array = args.array_value(1)?;
+    let return_array = args.value(2)?;
+    let matrix = self.matrix_values(&lookup_array);
+    let (lookup_rows, lookup_columns) = matrix_dimensions(&matrix);
+    if lookup_rows > 1 && lookup_columns > 1 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let (vector, lookup_vertical) = lookup_vector(&matrix)?;
+    if !self.xlookup_return_shape_matches(&return_array, vector.len(), lookup_vertical) {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let match_mode = args
+      .raw_arg(4)
+      .filter(|_| !args.is_missing(4))
+      .and_then(|_| args.value(4))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(0.0) as i32;
+    let search_mode = args
+      .raw_arg(5)
+      .filter(|_| !args.is_missing(5))
+      .and_then(|_| args.value(5))
+      .and_then(|value| self.number(&value))
+      .unwrap_or(1.0) as i32;
+    let search = LookupSearchMode::from_excel(search_mode)?;
+    if matches!(match_mode, 2 | 3)
+      && matches!(
+        search,
+        LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending
+      )
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    let index = if matches!(lookup, FormulaValue::Blank) && match_mode == 0 {
+      vector
+        .iter()
+        .position(|value| matches!(value, FormulaValue::Blank))
+    } else {
+      match match_mode {
+        0 => search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::Equal,
+          search,
+          QuerySearchType::Normal,
+          SearchVectorFlags::new(true, true).with_first_exact(),
+        ),
+        -1 => search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::Equal,
+          search,
+          QuerySearchType::Normal,
+          SearchVectorFlags::new(true, true).with_first_exact(),
+        )
+        .or_else(|| {
+          search_vector_with_type(
+            self,
+            &lookup,
+            &vector,
+            QueryOp::LessOrEqual,
+            search,
+            QuerySearchType::Normal,
+            SearchVectorFlags::new(false, true),
+          )
+        }),
+        1 => search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::Equal,
+          search,
+          QuerySearchType::Normal,
+          SearchVectorFlags::new(true, true).with_first_exact(),
+        )
+        .or_else(|| {
+          search_vector_with_type(
+            self,
+            &lookup,
+            &vector,
+            QueryOp::GreaterOrEqual,
+            search,
+            QuerySearchType::Normal,
+            SearchVectorFlags::new(false, true),
+          )
+        }),
+        2 | 3 => search_vector_with_type(
+          self,
+          &lookup,
+          &vector,
+          QueryOp::Equal,
+          search,
+          if !matches!(lookup, FormulaValue::String(_)) {
+            QuerySearchType::Normal
+          } else if match_mode == 2 && may_be_wildcard(self.text(&lookup).as_ref()) {
+            QuerySearchType::Wildcard
+          } else if match_mode == 3 && may_be_regex(self.text(&lookup).as_ref()) {
+            QuerySearchType::Regex
+          } else {
+            QuerySearchType::Normal
+          },
+          SearchVectorFlags::new(true, true).with_first_exact(),
+        ),
+        _ => return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument)),
+      }
+    };
+    let Some(index) = index else {
+      return args
+        .raw_arg(3)
+        .filter(|_| !args.is_missing(3))
+        .and_then(|_| args.value(3))
+        .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
+    };
+    Some(self.xlookup_return_value(return_array, index, lookup_vertical))
+  }
+
+  fn xlookup_return_value(
+    &self,
+    return_array: FormulaValue<'doc>,
+    index: usize,
+    lookup_vertical: bool,
+  ) -> FormulaValue<'doc> {
+    if let FormulaValue::Reference(reference) = &return_array {
+      let start_row = reference.range.start.row.min(reference.range.end.row);
+      let end_row = reference.range.start.row.max(reference.range.end.row);
+      let start_column = reference.range.start.column.min(reference.range.end.column);
+      let end_column = reference.range.start.column.max(reference.range.end.column);
+      let range = if lookup_vertical {
+        let row = start_row.saturating_add(index as u32);
+        if row > end_row {
+          return FormulaValue::Error(FormulaErrorValue::NA);
+        }
+        CellRange::new(
+          CellAddress {
+            column: start_column,
+            row,
+          },
+          CellAddress {
+            column: end_column,
+            row,
+          },
+        )
+      } else {
+        let column = start_column.saturating_add(index as u32);
+        if column > end_column {
+          return FormulaValue::Error(FormulaErrorValue::NA);
+        }
+        CellRange::new(
+          CellAddress {
+            column,
+            row: start_row,
+          },
+          CellAddress {
+            column,
+            row: end_row,
+          },
+        )
+      };
+      return FormulaValue::Reference(QualifiedRange {
+        sheet: reference.sheet,
+        sheet_name: reference.sheet_name.clone(),
+        end_sheet_name: reference.end_sheet_name.clone(),
+        range,
+        start_flags: reference.start_flags,
+        end_flags: reference.end_flags,
+      });
+    }
+    let matrix = self.matrix_values(&return_array);
+    let Some(vector) = lookup_vector_with_orientation(&matrix, lookup_vertical) else {
+      return FormulaValue::Error(FormulaErrorValue::NA);
+    };
+    vector
+      .get(index)
+      .cloned()
+      .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA))
+  }
+
+  fn xlookup_return_shape_matches(
+    &self,
+    return_array: &FormulaValue<'doc>,
+    lookup_len: usize,
+    lookup_vertical: bool,
+  ) -> bool {
+    match return_array {
+      FormulaValue::Reference(reference) => {
+        let rows = reference.range.start.row.abs_diff(reference.range.end.row) as usize + 1;
+        let columns = reference
+          .range
+          .start
+          .column
+          .abs_diff(reference.range.end.column) as usize
+          + 1;
+        if lookup_vertical {
+          rows == lookup_len
+        } else {
+          columns == lookup_len
+        }
+      }
+      value => {
+        let matrix = self.matrix_values(value);
+        let (rows, columns) = matrix_dimensions(&matrix);
+        if lookup_vertical {
+          rows == lookup_len
+        } else {
+          columns == lookup_len
+        }
+      }
+    }
   }
 
   pub(crate) fn evaluate_sheets_reader(
@@ -1180,6 +1432,24 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       ignore_errors: false,
       ignore_nested: true,
     };
+    if let [FormulaValue::RefList(ranges)] = values.as_slice() {
+      let mut rows = Vec::with_capacity(ranges.len());
+      for range in ranges {
+        let value = aggregate_function_value(
+          self,
+          function.rem_euclid(100),
+          &[FormulaValue::Reference(range.clone())],
+          None,
+          options,
+        )
+        .map(|result| match result {
+          Ok(value) => FormulaValue::Number(value),
+          Err(error) => FormulaValue::Error(error),
+        })?;
+        rows.push(vec![value]);
+      }
+      return Some(FormulaValue::Matrix(rows));
+    }
     aggregate_function_value(self, function.rem_euclid(100), &values, None, options).map(|result| {
       match result {
         Ok(value) => FormulaValue::Number(value),
@@ -2319,6 +2589,11 @@ impl SearchVectorFlags {
       first_exact: false,
     }
   }
+
+  fn with_first_exact(mut self) -> Self {
+    self.first_exact = true;
+    self
+  }
 }
 
 fn search_vector<'doc>(
@@ -3193,27 +3468,34 @@ fn aggregate_count_numbers_value<'doc>(
 ) -> usize {
   match value {
     FormulaValue::Reference(reference) => {
-      if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
-        return 0;
-      }
       let sheet = evaluator.range_sheet(reference);
+      let range = if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+        let Some(range) = evaluator.book.data_area_subrange(sheet, reference.range) else {
+          return 0;
+        };
+        range
+      } else {
+        reference.range
+      };
       let mut count = 0usize;
-      for row in reference.range.start.row..=reference.range.end.row {
-        if (options.ignore_filtered && evaluator.book.row_filtered(sheet, row))
-          || (options.ignore_hidden && evaluator.book.row_hidden(sheet, row))
-        {
-          continue;
-        }
-        for column in reference.range.start.column..=reference.range.end.column {
-          let address = CellAddress { column, row };
-          if options.ignore_nested && evaluator.book.is_nested_aggregate(sheet, address) {
+      for sheet in aggregate_reference_sheet_ids(evaluator, reference) {
+        for row in range.start.row..=range.end.row {
+          if (options.ignore_filtered && evaluator.book.row_filtered(sheet, row))
+            || (options.ignore_hidden && evaluator.book.row_hidden(sheet, row))
+          {
             continue;
           }
-          if matches!(
-            evaluator.book.cell_value(sheet, address),
-            FormulaValue::Number(_)
-          ) {
-            count += 1;
+          for column in range.start.column..=range.end.column {
+            let address = CellAddress { column, row };
+            if options.ignore_nested && evaluator.book.is_nested_aggregate(sheet, address) {
+              continue;
+            }
+            if matches!(
+              evaluator.book.cell_value(sheet, address),
+              FormulaValue::Number(_)
+            ) {
+              count += 1;
+            }
           }
         }
       }
@@ -3237,22 +3519,29 @@ fn collect_aggregate_numbers<'doc>(
 ) -> std::result::Result<(), FormulaErrorValue> {
   match value {
     FormulaValue::Reference(reference) => {
-      if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
-        return Ok(());
-      }
       let sheet = evaluator.range_sheet(reference);
-      for row in reference.range.start.row..=reference.range.end.row {
-        if (options.ignore_filtered && evaluator.book.row_filtered(sheet, row))
-          || (options.ignore_hidden && evaluator.book.row_hidden(sheet, row))
-        {
-          continue;
-        }
-        for column in reference.range.start.column..=reference.range.end.column {
-          let address = CellAddress { column, row };
-          if options.ignore_nested && evaluator.book.is_nested_aggregate(sheet, address) {
+      let range = if reference.range.cell_count_hint() > MAX_EXPANDED_RANGE_CELLS {
+        let Some(range) = evaluator.book.data_area_subrange(sheet, reference.range) else {
+          return Ok(());
+        };
+        range
+      } else {
+        reference.range
+      };
+      for sheet in aggregate_reference_sheet_ids(evaluator, reference) {
+        for row in range.start.row..=range.end.row {
+          if (options.ignore_filtered && evaluator.book.row_filtered(sheet, row))
+            || (options.ignore_hidden && evaluator.book.row_hidden(sheet, row))
+          {
             continue;
           }
-          collect_aggregate_scalar(evaluator.book.cell_value(sheet, address), options, values)?;
+          for column in range.start.column..=range.end.column {
+            let address = CellAddress { column, row };
+            if options.ignore_nested && evaluator.book.is_nested_aggregate(sheet, address) {
+              continue;
+            }
+            collect_aggregate_scalar(evaluator.book.cell_value(sheet, address), options, values)?;
+          }
         }
       }
       Ok(())
@@ -3265,6 +3554,44 @@ fn collect_aggregate_numbers<'doc>(
     }
     value => collect_aggregate_scalar(value.clone(), options, values),
   }
+}
+
+fn aggregate_reference_sheet_ids<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  reference: &QualifiedRange<'doc>,
+) -> Vec<SheetId> {
+  let start = evaluator.range_sheet(reference);
+  let Some(end_name) = reference.end_sheet_name.as_ref() else {
+    return vec![start];
+  };
+  let Some(end) = evaluator.book.sheet_id_by_name(end_name.0.as_ref()) else {
+    return vec![start];
+  };
+  let Some(start_index) = evaluator
+    .book
+    .sheet_names
+    .iter()
+    .position(|sheet| sheet.id == start)
+  else {
+    return vec![start];
+  };
+  let Some(end_index) = evaluator
+    .book
+    .sheet_names
+    .iter()
+    .position(|sheet| sheet.id == end)
+  else {
+    return vec![start];
+  };
+  let (start_index, end_index) = if start_index <= end_index {
+    (start_index, end_index)
+  } else {
+    (end_index, start_index)
+  };
+  evaluator.book.sheet_names[start_index..=end_index]
+    .iter()
+    .map(|sheet| sheet.id)
+    .collect()
 }
 
 fn collect_aggregate_scalar(
@@ -3514,6 +3841,7 @@ pub(crate) fn split_indirect_intersection(formula: &str) -> Option<(&str, &str)>
         depth -= 1;
         if depth == 0 {
           let rest = formula[index + ch.len_utf8()..].trim();
+          let rest = rest.strip_prefix('!').unwrap_or(rest).trim_start();
           if rest.to_ascii_uppercase().starts_with("INDIRECT(") {
             return Some((&formula[..=index], rest));
           }

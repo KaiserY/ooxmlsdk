@@ -36,7 +36,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     match op {
       FormulaOperator::Add => self.numeric_binary(left, right, approx_add),
-      FormulaOperator::Subtract => self.numeric_binary(left, right, approx_sub),
+      FormulaOperator::Subtract => self.numeric_binary(left, right, formula_subtract),
       FormulaOperator::Multiply => self.numeric_binary(left, right, |a, b| a * b),
       FormulaOperator::Divide => {
         if matches!(left, FormulaValue::Reference(_) | FormulaValue::Matrix(_))
@@ -59,11 +59,22 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
         }
       }
       FormulaOperator::Power => self.numeric_binary(left, right, f64::powf),
-      FormulaOperator::Concat => Some(FormulaValue::String(Cow::Owned(format!(
-        "{}{}",
-        self.text(&left),
-        self.text(&right)
-      )))),
+      FormulaOperator::Concat => {
+        if self.array_context && (is_matrix_argument(&left) || is_matrix_argument(&right)) {
+          return self.map_binary_values(left, right, |evaluator, left, right| {
+            Some(FormulaValue::String(Cow::Owned(format!(
+              "{}{}",
+              evaluator.text(left),
+              evaluator.text(right)
+            ))))
+          });
+        }
+        Some(FormulaValue::String(Cow::Owned(format!(
+          "{}{}",
+          self.text(&left),
+          self.text(&right)
+        ))))
+      }
       FormulaOperator::Union => {
         let mut rows = self.matrix_values(&left);
         rows.extend(self.matrix_values(&right));
@@ -99,4 +110,11 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       _ => None,
     }
   }
+}
+
+fn is_matrix_argument(value: &FormulaValue<'_>) -> bool {
+  matches!(
+    value,
+    FormulaValue::Reference(_) | FormulaValue::RefList(_) | FormulaValue::Matrix(_)
+  )
 }

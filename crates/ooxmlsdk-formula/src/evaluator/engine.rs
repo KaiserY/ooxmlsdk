@@ -7,6 +7,7 @@ pub(crate) struct FormulaEvaluatorEngine<'book, 'engine, 'doc> {
   pub(crate) current_cell: Option<CellAddress>,
   pub(crate) grammar: FormulaGrammar,
   pub(crate) array_context: bool,
+  pub(crate) calc_a1_indirect_bang_reference: bool,
 }
 
 pub(crate) fn evaluate_parsed_formula_raw<'doc>(
@@ -32,6 +33,12 @@ pub(crate) fn evaluate_parsed_formula_raw<'doc>(
     current_cell,
     grammar: formula.grammar,
     array_context,
+    calc_a1_indirect_bang_reference: formula.grammar == FormulaGrammar::CalcA1
+      && !formula.source.trim_start().starts_with('=')
+      && formula.source.to_ascii_uppercase().contains("INDIRECT")
+      && formula.source.contains('!')
+      && !formula.source.to_ascii_uppercase().contains(";0)")
+      && !formula.source.to_ascii_uppercase().contains(",0)"),
   }
   .evaluate_code(formula.code.as_ref()?)
 }
@@ -64,6 +71,7 @@ impl<'book, 'engine, 'doc> FormulaEvaluatorEngine<'book, 'engine, 'doc> {
       locals: BTreeMap::new(),
       array_context: self.array_context,
       current_value: None,
+      calc_a1_indirect_bang_reference: self.calc_a1_indirect_bang_reference,
     }
   }
 }
@@ -404,6 +412,7 @@ fn evaluate_let_control<'doc>(
     locals: evaluator.locals.clone(),
     array_context: evaluator.array_context,
     current_value: evaluator.current_value.clone(),
+    calc_a1_indirect_bang_reference: evaluator.calc_a1_indirect_bang_reference,
   };
   let mut local_names = BTreeMap::new();
   let mut index = 0;

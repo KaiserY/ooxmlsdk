@@ -551,7 +551,11 @@ fn should_stop_formula_word_at_range_operator(original: &str, input: &str) -> bo
 }
 
 fn is_formula_word_char(ch: char) -> bool {
-  ch.is_alphanumeric() || matches!(ch, '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#')
+  ch.is_alphanumeric()
+    || matches!(
+      ch,
+      '$' | ':' | '!' | '\'' | '[' | ']' | '.' | '_' | '#' | '@'
+    )
 }
 
 fn skip_whitespace(input: &mut &str) {

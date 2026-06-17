@@ -499,7 +499,7 @@ impl FormulaFunctionId {
 }
 
 pub(crate) fn normalize_function_name(name: &str) -> Cow<'_, str> {
-  let name = strip_excel_function_prefix(name);
+  let name = strip_excel_function_prefix(name.trim_start_matches('@'));
   if name.as_bytes().iter().any(u8::is_ascii_lowercase) {
     Cow::Owned(name.to_ascii_uppercase())
   } else {

@@ -1,5 +1,5 @@
 use crate::calc::matrix::{apply_householder, qr_decompose, solve_upper};
-use crate::calc::numeric::{approx_sub, kahan_sum};
+use crate::calc::numeric::{KahanSum, approx_sub, kahan_sum};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RegressionModel {
@@ -396,18 +396,18 @@ impl EtsCalculation {
       }
     }
     for sample in 0..self.samples_in_period {
-      let mut total = 0.0;
+      let mut total = KahanSum::default();
       for (period, average) in period_average.iter().enumerate() {
         let trend_adjust =
           (sample as f64 - 0.5 * (self.samples_in_period - 1) as f64) * self.trend[0];
         let y = self.data[period * self.samples_in_period + sample].y;
-        total += if self.additive {
+        total.add(if self.additive {
           y - (*average + trend_adjust)
         } else {
           y / (*average + trend_adjust)
-        };
+        });
       }
-      self.period_index[sample] = total / periods as f64;
+      self.period_index[sample] = total.finish() / periods as f64;
     }
     if self.samples_in_period < self.data.len() {
       self.period_index[self.samples_in_period] = 0.0;
@@ -635,30 +635,32 @@ impl EtsCalculation {
   }
 
   fn calc_accuracy(&mut self) {
-    let mut sum_abs_error = 0.0;
-    let mut sum_divisor = 0.0;
-    let mut sum_error_sq = 0.0;
-    let mut sum_abs_percent_error = 0.0;
+    let mut sum_abs_error = KahanSum::default();
+    let mut sum_divisor = KahanSum::default();
+    let mut sum_error_sq = KahanSum::default();
+    let mut sum_abs_percent_error = KahanSum::default();
     for index in 1..self.data.len() {
       let error = self.forecast_values[index] - self.data[index].y;
-      sum_abs_error += error.abs();
-      sum_error_sq += error * error;
-      sum_abs_percent_error +=
-        error.abs() / (self.forecast_values[index].abs() + self.data[index].y.abs());
+      sum_abs_error.add(error.abs());
+      sum_error_sq.add(error * error);
+      sum_abs_percent_error
+        .add(error.abs() / (self.forecast_values[index].abs() + self.data[index].y.abs()));
     }
     for index in 2..self.data.len() {
-      sum_divisor += (self.data[index].y - self.data[index - 1].y).abs();
+      sum_divisor.add((self.data[index].y - self.data[index - 1].y).abs());
     }
     let count = (self.data.len() - 1) as f64;
+    let sum_abs_error = sum_abs_error.finish();
+    let sum_divisor = sum_divisor.finish();
     self.mae = sum_abs_error / count;
     self.mase = if sum_divisor == 0.0 {
       0.0
     } else {
       sum_abs_error / (count * sum_divisor / (count - 1.0))
     };
-    self.mse = sum_error_sq / count;
+    self.mse = sum_error_sq.finish() / count;
     self.rmse = self.mse.sqrt();
-    self.smape = sum_abs_percent_error * 2.0 / count;
+    self.smape = sum_abs_percent_error.finish() * 2.0 / count;
   }
 
   pub fn forecast(&mut self, target: f64) -> f64 {

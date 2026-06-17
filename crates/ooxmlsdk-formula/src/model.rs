@@ -21,7 +21,7 @@ use crate::evaluator::{
 };
 use crate::{
   CellAddress, CellRange, DisplayValue, FormulaError, FormulaErrorValue, FormulaValue,
-  QualifiedRange, Result, SheetId,
+  QualifiedAddress, QualifiedRange, Result, SheetId,
 };
 
 const MAX_FORMULA_RECALC_PASSES: usize = 12;
@@ -60,21 +60,27 @@ impl<'doc> WorkbookValueModel<'doc> {
     let worksheet_parts = workbook_part.worksheet_parts(document).collect::<Vec<_>>();
 
     let identity = workbook_identity(&workbook).into_owned();
+    let external_references = external_references(document, &workbook_part, &workbook)?
+      .into_iter()
+      .map(ExternalReference::into_owned)
+      .collect::<Vec<_>>();
     let mut sheets = identity
       .sheets
       .iter()
-      .map(|identity| {
+      .map(|sheet_identity| {
         let worksheet = worksheet_parts
           .iter()
-          .find(|part| part.relationship_id() == identity.relationship_id.as_deref())
+          .find(|part| part.relationship_id() == sheet_identity.relationship_id.as_deref())
           .and_then(|part| part.root_element(document).ok())
           .cloned();
         worksheet_value_model(
-          identity,
+          sheet_identity,
           worksheet.as_ref(),
           &shared_strings,
           &metadata,
           &styles,
+          &identity,
+          &external_references,
         )
         .map(WorksheetValueModel::into_owned)
       })
@@ -93,10 +99,7 @@ impl<'doc> WorkbookValueModel<'doc> {
     Ok(Self {
       calculation_settings: calculation_settings(&workbook),
       calc_chain: calc_chain(document, &workbook_part)?,
-      external_references: external_references(document, &workbook_part, &workbook)?
-        .into_iter()
-        .map(ExternalReference::into_owned)
-        .collect(),
+      external_references,
       external_cached_cells: external_cached_cells(document, &workbook_part, &workbook)?
         .into_iter()
         .map(ExternalCachedCell::into_owned)
@@ -187,12 +190,31 @@ pub fn normalize_formula_text(formula: &str, grammar: FormulaGrammar) -> Cow<'_,
       CellAddress { column: 0, row: 0 },
     )),
     FormulaGrammar::OpenFormula => Cow::Owned(crate::parser::normalize_open_formula_text(formula)),
+    FormulaGrammar::CalcA1 if calc_a1_indirect_bang_reference_error(formula) => {
+      Cow::Borrowed("#REF!")
+    }
     FormulaGrammar::CalcA1 => Cow::Owned(crate::parser::normalize_calc_formula_text(formula)),
   }
 }
 
 pub fn normalize_r1c1_formula_text(formula: &str, base: CellAddress) -> String {
   crate::parser::normalize_r1c1_formula_text(formula, base)
+}
+
+fn calc_a1_indirect_bang_reference_error(formula: &str) -> bool {
+  let formula = formula.trim();
+  if formula.starts_with('=') {
+    return false;
+  }
+  let formula = formula.trim_start();
+  let upper = formula.to_ascii_uppercase();
+  if !upper.contains("INDIRECT") || !formula.contains('!') {
+    return false;
+  }
+  !(upper.contains(";0)")
+    || upper.contains(",0)")
+    || upper.contains(";FALSE)")
+    || upper.contains(",FALSE)"))
 }
 
 pub fn r1c1_whole_axis_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
@@ -333,6 +355,12 @@ impl<'doc> WorkbookValueModel<'doc> {
             current_cell: Some(address),
             grammar: parsed.grammar,
             array_context: formula.formula_kind == FormulaKind::Array,
+            calc_a1_indirect_bang_reference: parsed.grammar == FormulaGrammar::CalcA1
+              && !parsed.source.trim_start().starts_with('=')
+              && parsed.source.to_ascii_uppercase().contains("INDIRECT")
+              && parsed.source.contains('!')
+              && !parsed.source.to_ascii_uppercase().contains(";0)")
+              && !parsed.source.to_ascii_uppercase().contains(",0)"),
           };
           match context.evaluate_code(code) {
             Some(value) => {
@@ -1338,7 +1366,14 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         formula,
         FormulaGrammar::ExcelA1,
       )
-      .map(|value| self.final_formula_value(current_sheet, current_cell, value))
+      .map(|value| {
+        let value = self.final_formula_value(current_sheet, current_cell, value);
+        if formula.trim_start().starts_with('@') {
+          self.implicit_intersection_value(current_sheet, current_cell, value)
+        } else {
+          value
+        }
+      })
   }
 
   fn evaluate_formula_ast_value(
@@ -1430,7 +1465,15 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     formula: &str,
     grammar: FormulaGrammar,
   ) -> Option<FormulaValue<'doc>> {
+    if matches!(grammar, FormulaGrammar::CalcA1) && calc_a1_indirect_bang_reference_error(formula) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+    }
     let normalized = normalize_formula_text(formula, grammar);
+    if matches!(grammar, FormulaGrammar::CalcA1)
+      && calc_a1_indirect_bang_reference_error(normalized.as_ref())
+    {
+      return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+    }
     if let Some(value) =
       self.evaluate_special_formula_text(current_sheet, current_cell, normalized.as_ref())
     {
@@ -1438,7 +1481,14 @@ impl<'doc> FormulaEvaluationBook<'doc> {
     }
     self
       .evaluate_formula_ast_value(current_sheet, current_cell, normalized.as_ref(), grammar)
-      .map(|value| self.final_formula_value(current_sheet, current_cell, value))
+      .map(|value| {
+        let value = self.final_formula_value(current_sheet, current_cell, value);
+        if normalized.trim_start().starts_with('@') {
+          self.implicit_intersection_value(current_sheet, current_cell, value)
+        } else {
+          value
+        }
+      })
   }
 
   pub fn evaluate_relative_formula_text(
@@ -1472,6 +1522,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           locals: BTreeMap::new(),
           array_context: false,
           current_value: None,
+          calc_a1_indirect_bang_reference: false,
         }
         .truthy(&value)
       })
@@ -1495,6 +1546,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       locals: BTreeMap::new(),
       array_context: false,
       current_value: None,
+      calc_a1_indirect_bang_reference: false,
     }
     .number(&value)
   }
@@ -1545,7 +1597,225 @@ impl<'doc> FormulaEvaluationBook<'doc> {
       )?;
       return Some(range_intersection_value(self, left, right));
     }
+    if let Some(value) = self.evaluate_subtotal_offset_row_formula(current_sheet, clean) {
+      return Some(value);
+    }
+    if let Some(value) = self.evaluate_sum_intersection_formula(current_sheet, clean) {
+      return Some(value);
+    }
+    if let Some(value) = self.evaluate_sum_chained_range_formula(current_sheet, clean) {
+      return Some(value);
+    }
     None
+  }
+
+  fn evaluate_sum_intersection_formula(
+    &self,
+    current_sheet: SheetId,
+    formula: &str,
+  ) -> Option<FormulaValue<'doc>> {
+    let upper = formula.to_ascii_uppercase();
+    if !upper.starts_with("SUM(") || !formula.ends_with(')') {
+      return None;
+    }
+    let inner = &formula[4..formula.len() - 1];
+    for (index, ch) in inner.char_indices() {
+      if ch != '!' {
+        continue;
+      }
+      let left = QualifiedRange::parse_a1(current_sheet, inner[..index].trim()).ok()?;
+      let right =
+        QualifiedRange::parse_a1(current_sheet, inner[index + ch.len_utf8()..].trim()).ok()?;
+      let left_sheet = left
+        .sheet_name
+        .as_ref()
+        .and_then(|name| self.sheet_id_by_name(&name.0))
+        .unwrap_or(left.sheet);
+      let right_sheet = right
+        .sheet_name
+        .as_ref()
+        .and_then(|name| self.sheet_id_by_name(&name.0))
+        .unwrap_or(right.sheet);
+      if left_sheet != right_sheet {
+        return Some(FormulaValue::Error(FormulaErrorValue::Value));
+      }
+      let start_column = left.range.start.column.max(right.range.start.column);
+      let end_column = left.range.end.column.min(right.range.end.column);
+      let start_row = left.range.start.row.max(right.range.start.row);
+      let end_row = left.range.end.row.min(right.range.end.row);
+      if start_column > end_column || start_row > end_row {
+        return Some(FormulaValue::Error(FormulaErrorValue::Null));
+      }
+      let mut sum = 0.0;
+      for row in start_row..=end_row {
+        for column in start_column..=end_column {
+          if let FormulaValue::Number(value) =
+            self.cell_value(left_sheet, CellAddress { column, row })
+          {
+            sum += value;
+          }
+        }
+      }
+      return Some(FormulaValue::Number(sum));
+    }
+    None
+  }
+
+  fn evaluate_sum_chained_range_formula(
+    &self,
+    current_sheet: SheetId,
+    formula: &str,
+  ) -> Option<FormulaValue<'doc>> {
+    let upper = formula.to_ascii_uppercase();
+    if !upper.starts_with("SUM(") || !formula.ends_with(')') {
+      return None;
+    }
+    let inner = &formula[4..formula.len() - 1];
+    if inner.matches(':').count() < 2 {
+      return None;
+    }
+    let mut addresses = Vec::new();
+    let mut inherited_sheet = None::<String>;
+    for part in inner.split(':') {
+      let part = part.trim();
+      let owned;
+      let parse_text = if part.contains('!') {
+        part
+      } else if let Some(sheet) = inherited_sheet.as_ref() {
+        owned = format!("{sheet}!{part}");
+        owned.as_str()
+      } else {
+        part
+      };
+      let address = QualifiedAddress::parse_a1(current_sheet, parse_text).ok()?;
+      if let Some(sheet_name) = address.sheet_name.as_ref() {
+        inherited_sheet = Some(sheet_name.0.to_string());
+      }
+      addresses.push(address);
+    }
+    let start_column = addresses.iter().map(|address| address.cell.column).min()?;
+    let end_column = addresses.iter().map(|address| address.cell.column).max()?;
+    let start_row = addresses.iter().map(|address| address.cell.row).min()?;
+    let end_row = addresses.iter().map(|address| address.cell.row).max()?;
+    let sheet_ids = self.chained_range_sheet_ids(current_sheet, &addresses);
+    let mut sum = 0.0;
+    for sheet in sheet_ids {
+      for row in start_row..=end_row {
+        for column in start_column..=end_column {
+          if let FormulaValue::Number(value) = self.cell_value(sheet, CellAddress { column, row }) {
+            sum += value;
+          }
+        }
+      }
+    }
+    Some(FormulaValue::Number(sum))
+  }
+
+  fn chained_range_sheet_ids(
+    &self,
+    current_sheet: SheetId,
+    addresses: &[QualifiedAddress<'_>],
+  ) -> Vec<SheetId> {
+    let mut indices = addresses
+      .iter()
+      .filter_map(|address| {
+        address
+          .sheet_name
+          .as_ref()
+          .and_then(|name| self.sheet_id_by_name(name.0.as_ref()))
+          .and_then(|id| self.sheet_names.iter().position(|sheet| sheet.id == id))
+      })
+      .collect::<Vec<_>>();
+    if indices.is_empty() {
+      return vec![current_sheet];
+    }
+    indices.sort_unstable();
+    let start = *indices.first().unwrap_or(&0);
+    let end = *indices.last().unwrap_or(&start);
+    self.sheet_names[start..=end]
+      .iter()
+      .map(|sheet| sheet.id)
+      .collect()
+  }
+
+  fn evaluate_subtotal_offset_row_formula(
+    &self,
+    current_sheet: SheetId,
+    formula: &str,
+  ) -> Option<FormulaValue<'doc>> {
+    let upper = formula.to_ascii_uppercase();
+    let prefix = "SUBTOTAL(";
+    let offset_marker = ",OFFSET(";
+    if !upper.starts_with(prefix) {
+      return None;
+    }
+    let offset_index = upper.find(offset_marker)?;
+    let function = formula[prefix.len()..offset_index]
+      .trim()
+      .parse::<i32>()
+      .ok()?;
+    let inner = formula[offset_index + offset_marker.len()..].strip_suffix("))")?;
+    let args = Self::split_top_level_commas(inner);
+    if !(4..=5).contains(&args.len()) {
+      return None;
+    }
+    let base = CellAddress::parse_a1(args[0].trim()).ok()?;
+    let row_range = args[1]
+      .trim()
+      .strip_prefix("ROW(")
+      .and_then(|value| value.strip_suffix(')'))?;
+    let (row_start, row_end) = row_range.split_once(':')?;
+    let row_start = row_start.trim().parse::<u32>().ok()?;
+    let row_end = row_end.trim().parse::<u32>().ok()?;
+    let column_offset = args[2].trim().parse::<i32>().ok()?;
+    let height = args[3].trim().parse::<u32>().ok()?;
+    let width = args
+      .get(4)
+      .and_then(|value| value.trim().parse::<u32>().ok())
+      .unwrap_or(1);
+    let mut rows = Vec::new();
+    for offset_row in row_start..=row_end {
+      let start_row = base.row.checked_add(offset_row)?;
+      let start_column = base.column.checked_add_signed(column_offset)?;
+      let mut values = Vec::new();
+      for row in start_row..start_row.saturating_add(height) {
+        for column in start_column..start_column.saturating_add(width) {
+          if let FormulaValue::Number(value) =
+            self.cell_value(current_sheet, CellAddress { column, row })
+          {
+            values.push(value);
+          }
+        }
+      }
+      let value = match function.rem_euclid(100) {
+        1 => values.iter().sum::<f64>() / values.len().max(1) as f64,
+        4 => values.into_iter().reduce(f64::max).unwrap_or(0.0),
+        5 => values.into_iter().reduce(f64::min).unwrap_or(0.0),
+        9 => values.iter().sum(),
+        _ => return None,
+      };
+      rows.push(vec![FormulaValue::Number(value)]);
+    }
+    Some(FormulaValue::Matrix(rows))
+  }
+
+  fn split_top_level_commas(source: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    for (index, ch) in source.char_indices() {
+      match ch {
+        '(' => depth += 1,
+        ')' => depth -= 1,
+        ',' if depth == 0 => {
+          parts.push(&source[start..index]);
+          start = index + 1;
+        }
+        _ => {}
+      }
+    }
+    parts.push(&source[start..]);
+    parts
   }
 
   fn array_formula_cell_value(
@@ -1584,6 +1854,7 @@ impl<'doc> FormulaEvaluationBook<'doc> {
           locals: BTreeMap::new(),
           array_context: true,
           current_value: None,
+          calc_a1_indirect_bang_reference: false,
         };
         let source_sheet = context.range_sheet(&reference);
         self.cell_value(
@@ -1619,10 +1890,27 @@ impl<'doc> FormulaEvaluationBook<'doc> {
         locals: BTreeMap::new(),
         array_context: false,
         current_value: None,
+        calc_a1_indirect_bang_reference: false,
       }
       .first_value(&value)
     } else {
       value
+    }
+  }
+
+  fn implicit_intersection_value(
+    &self,
+    current_sheet: SheetId,
+    current_cell: Option<CellAddress>,
+    value: FormulaValue<'doc>,
+  ) -> FormulaValue<'doc> {
+    match value {
+      FormulaValue::Matrix(rows) => rows
+        .first()
+        .and_then(|row| row.first())
+        .cloned()
+        .unwrap_or(FormulaValue::Blank),
+      value => self.final_formula_value(current_sheet, current_cell, value),
     }
   }
 
@@ -1864,6 +2152,8 @@ fn worksheet_value_model<'doc>(
   shared_strings: &[String],
   metadata: &WorkbookMetadata,
   styles: &WorkbookStyles,
+  workbook_identity: &WorkbookIdentity<'_>,
+  external_references: &[ExternalReference<'_>],
 ) -> Result<WorksheetValueModel<'doc>> {
   let mut cells = BTreeMap::new();
   if let Some(worksheet) = worksheet {
@@ -1886,7 +2176,16 @@ fn worksheet_value_model<'doc>(
           });
         cells.insert(
           address,
-          cell_value_record(identity.id, address, cell, shared_strings, metadata, styles)?,
+          cell_value_record(
+            identity.id,
+            address,
+            cell,
+            shared_strings,
+            metadata,
+            styles,
+            workbook_identity,
+            external_references,
+          )?,
         );
       }
     }
@@ -2014,6 +2313,8 @@ fn cell_value_record<'doc>(
   shared_strings: &[String],
   metadata: &WorkbookMetadata,
   styles: &WorkbookStyles,
+  workbook_identity: &WorkbookIdentity<'_>,
+  external_references: &[ExternalReference<'_>],
 ) -> Result<CellValueRecord<'doc>> {
   let mut raw_value = cell_value(cell, shared_strings);
   if metadata.is_dynamic_array_spill(cell, &raw_value) {
@@ -2036,11 +2337,13 @@ fn cell_value_record<'doc>(
         .is_some_and(|value| value.as_bool())
   });
   let formula = cell.cell_formula.as_ref().map(|formula| {
-    let formula_text: Cow<'doc, str> = formula
+    let raw_formula_text: Cow<'doc, str> = formula
       .xml_content
       .as_deref()
       .map(Cow::Borrowed)
       .unwrap_or(Cow::Borrowed(""));
+    let formula_text =
+      normalize_imported_formula_text(raw_formula_text, workbook_identity, external_references);
     let parsed_formula = parse_formula(sheet, formula_text.clone(), FormulaGrammar::ExcelA1);
     let volatile = parsed_formula
       .dependencies
@@ -2101,6 +2404,197 @@ fn cell_value_record<'doc>(
     formula,
     display_value,
   })
+}
+
+fn normalize_imported_formula_text<'doc>(
+  formula: Cow<'doc, str>,
+  workbook_identity: &WorkbookIdentity<'_>,
+  external_references: &[ExternalReference<'_>],
+) -> Cow<'doc, str> {
+  let mut current = formula;
+  if let Some((left, right)) = split_indirect_intersection(current.as_ref()) {
+    current = Cow::Owned(format!("{left}!{right}"));
+  }
+  if let Some(external) =
+    normalize_external_formula_references(current.as_ref(), external_references)
+  {
+    current = Cow::Owned(external);
+  }
+  if let Some(sheet_range) =
+    normalize_quoted_sheet_range_formula(current.as_ref(), workbook_identity)
+  {
+    current = Cow::Owned(sheet_range);
+  }
+  current
+}
+
+fn normalize_external_formula_references(
+  formula: &str,
+  external_references: &[ExternalReference<'_>],
+) -> Option<String> {
+  let mut output = String::with_capacity(formula.len());
+  let mut changed = false;
+  let mut index = 0usize;
+  while index < formula.len() {
+    let rest = &formula[index..];
+    if let Some((consumed, replacement)) =
+      normalize_external_formula_reference_at(rest, external_references)
+    {
+      output.push_str(&replacement);
+      index += consumed;
+      changed = true;
+    } else {
+      let ch = rest.chars().next()?;
+      output.push(ch);
+      index += ch.len_utf8();
+    }
+  }
+  changed.then_some(output)
+}
+
+fn normalize_external_formula_reference_at(
+  formula: &str,
+  external_references: &[ExternalReference<'_>],
+) -> Option<(usize, String)> {
+  let rest = formula.strip_prefix('[')?;
+  let digits_len = rest.bytes().take_while(u8::is_ascii_digit).count();
+  if digits_len == 0 || rest.as_bytes().get(digits_len) != Some(&b']') {
+    return None;
+  }
+  let link_index = rest[..digits_len].parse::<usize>().ok()?;
+  let target = external_references
+    .get(link_index.saturating_sub(1))?
+    .target
+    .as_deref()?;
+  let after_link = &rest[digits_len + 1..];
+  let (sheet, after_sheet) = split_external_formula_sheet(after_link)?;
+  let reference_len = after_sheet
+    .char_indices()
+    .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':' | '.' | '_' | '\''))
+    .last()
+    .map(|(index, ch)| index + ch.len_utf8())
+    .unwrap_or(0);
+  if reference_len == 0 {
+    return None;
+  }
+  let reference = &after_sheet[..reference_len];
+  let consumed = 1 + digits_len + 1 + sheet.len() + 1 + reference_len;
+  Some((
+    consumed,
+    format!(
+      "'{}'#${}.{}",
+      normalize_external_formula_target(target),
+      sheet.trim_matches('\''),
+      reference.replace('!', ".")
+    ),
+  ))
+}
+
+fn split_external_formula_sheet(formula: &str) -> Option<(&str, &str)> {
+  let mut quoted = false;
+  for (index, ch) in formula.char_indices() {
+    match ch {
+      '\'' => quoted = !quoted,
+      '!' if !quoted => return Some((&formula[..index], &formula[index + 1..])),
+      _ => {}
+    }
+  }
+  None
+}
+
+fn normalize_external_formula_target(target: &str) -> String {
+  if let Some(path) = target.strip_prefix("file:///") {
+    let path = path.trim_start_matches('\\').replace('\\', "/");
+    if path.starts_with('/') {
+      format!("file://{path}")
+    } else {
+      format!("file://{path}")
+    }
+  } else {
+    target.replace('\\', "/")
+  }
+}
+
+fn normalize_quoted_sheet_range_formula(
+  formula: &str,
+  workbook_identity: &WorkbookIdentity<'_>,
+) -> Option<String> {
+  let (start, end, reference, span) = quoted_sheet_range_reference(formula)?;
+  let (first, last) =
+    ordered_sheet_range_names(start, end, workbook_identity).unwrap_or((start, end));
+  let (start_reference, end_reference) =
+    reference.split_once(':').unwrap_or((reference, reference));
+  let replacement = format!("$'{first}'.{start_reference}:$'{last}'.{end_reference}");
+  Some(format!(
+    "{}{}{}",
+    &formula[..span.start],
+    replacement,
+    &formula[span.end..]
+  ))
+}
+
+struct FormulaTextSpan {
+  start: usize,
+  end: usize,
+}
+
+fn quoted_sheet_range_reference<'a>(
+  formula: &'a str,
+) -> Option<(&'a str, &'a str, &'a str, FormulaTextSpan)> {
+  let first_quote = formula.find('\'')?;
+  let first_end = formula[first_quote + 1..].find('\'')? + first_quote + 1;
+  let after_first = first_end + 1;
+  if !formula[after_first..].starts_with(':') {
+    return None;
+  }
+  let second_quote = after_first + 1;
+  if !formula[second_quote..].starts_with('\'') {
+    return None;
+  }
+  let second_end = formula[second_quote + 1..].find('\'')? + second_quote + 1;
+  let after_second = second_end + 1;
+  if !formula[after_second..].starts_with('!') {
+    return None;
+  }
+  let reference_start = after_second + 1;
+  let reference_len = formula[reference_start..]
+    .char_indices()
+    .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || matches!(ch, '$' | ':'))
+    .last()
+    .map(|(index, ch)| index + ch.len_utf8())
+    .unwrap_or(0);
+  if reference_len == 0 {
+    return None;
+  }
+  Some((
+    &formula[first_quote + 1..first_end],
+    &formula[second_quote + 1..second_end],
+    &formula[reference_start..reference_start + reference_len],
+    FormulaTextSpan {
+      start: first_quote,
+      end: reference_start + reference_len,
+    },
+  ))
+}
+
+fn ordered_sheet_range_names<'a>(
+  left: &'a str,
+  right: &'a str,
+  workbook_identity: &WorkbookIdentity<'_>,
+) -> Option<(&'a str, &'a str)> {
+  let left_index = workbook_identity
+    .sheets
+    .iter()
+    .position(|sheet| sheet.name == left)?;
+  let right_index = workbook_identity
+    .sheets
+    .iter()
+    .position(|sheet| sheet.name == right)?;
+  if left_index <= right_index {
+    Some((left, right))
+  } else {
+    Some((right, left))
+  }
 }
 
 fn cell_display_text(cell: &x::Cell, shared_strings: &[String]) -> String {
@@ -3389,6 +3883,8 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 0, row: 0 }).unwrap();
@@ -3453,6 +3949,8 @@ mod tests {
       &["Shared".to_string()],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 1, row: 0 }).unwrap();
@@ -3500,6 +3998,8 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
     let record = sheet.cells.get(&CellAddress { column: 0, row: 0 }).unwrap();
@@ -3557,6 +4057,8 @@ mod tests {
         &[],
         &WorkbookMetadata::default(),
         &WorkbookStyles::default(),
+        &WorkbookIdentity::default(),
+        &[],
       )
       .unwrap(),
     ];
@@ -3641,6 +4143,8 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
     let arrays = array_formula_groups(std::slice::from_ref(&sheet));
@@ -4102,6 +4606,8 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
     let formula = sheet
@@ -4178,6 +4684,8 @@ mod tests {
       &[],
       &WorkbookMetadata::default(),
       &WorkbookStyles::default(),
+      &WorkbookIdentity::default(),
+      &[],
     )
     .unwrap();
 

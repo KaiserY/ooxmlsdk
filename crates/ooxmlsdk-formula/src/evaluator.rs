@@ -14,9 +14,9 @@ use crate::calc::datetime::{
 };
 use crate::calc::financial::financial_cum;
 use crate::calc::numeric::{
-  CeilingFloorKind, KahanSum, NumericError, approx_add, approx_equal, approx_floor, approx_sub,
-  ceiling as numeric_ceiling, floor as numeric_floor, floor_to_i32, formula_mod, kahan_sum,
-  normalize_formula_number, round_half_away_from_zero, round_to_decimal_places,
+  CeilingFloorKind, KahanSum, NumericError, approx_add, approx_equal, approx_floor,
+  ceiling as numeric_ceiling, floor as numeric_floor, floor_to_i32, formula_mod, formula_subtract,
+  kahan_sum, normalize_formula_number, round_half_away_from_zero, round_to_decimal_places,
 };
 use crate::calc::query::{
   FindTextError, QueryOp, QuerySearchType, detect_query_search_type, find_byte_text_position,

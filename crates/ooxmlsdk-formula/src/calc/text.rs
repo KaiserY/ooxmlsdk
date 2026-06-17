@@ -51,7 +51,7 @@ pub fn clean_formula_text(value: &str) -> String {
       continue;
     }
     let ch = chars[index];
-    if !ch.is_control() && is_unicode_defined(ch) && !is_unicode_noncharacter(ch) {
+    if !ch.is_control() && is_unicode_defined(ch) {
       output.push(ch);
     }
     index += 1;
@@ -88,11 +88,6 @@ fn legacy_c1_text_len(chars: &[char]) -> Option<usize> {
     .filter_map(|text| text.chars().next())
     .any(|ch| chars.get(1).copied() == Some(ch))
     .then_some(2)
-}
-
-fn is_unicode_noncharacter(ch: char) -> bool {
-  let code = ch as u32;
-  (0xfdd0..=0xfdef).contains(&code) || code & 0xfffe == 0xfffe
 }
 
 fn is_unicode_defined(ch: char) -> bool {
@@ -485,7 +480,7 @@ mod tests {
   fn cleans_control_and_legacy_c1_text() {
     assert_eq!(clean_formula_text("a\u{0007}b"), "ab");
     assert_eq!(clean_formula_text("a\u{00c2}€b"), "ab");
-    assert_eq!(clean_formula_text("a\u{fdd0}b"), "ab");
+    assert_eq!(clean_formula_text("a\u{fdf0}b"), "a\u{fdf0}b");
   }
 
   #[test]

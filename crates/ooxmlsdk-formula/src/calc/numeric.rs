@@ -465,7 +465,11 @@ pub fn approx_sub(left: f64, right: f64) -> f64 {
   if ((left < 0.0 && right < 0.0) || (left > 0.0 && right > 0.0)) && approx_equal(left, right) {
     return 0.0;
   }
-  normalize_duration_difference(left, right, left - right)
+  left - right
+}
+
+pub fn formula_subtract(left: f64, right: f64) -> f64 {
+  normalize_duration_difference(left, right, approx_sub(left, right))
 }
 
 pub fn approx_add(left: f64, right: f64) -> f64 {

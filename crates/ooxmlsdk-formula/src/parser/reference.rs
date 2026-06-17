@@ -45,6 +45,19 @@ pub(crate) fn parse_formula_range<'doc>(
   sheet: SheetId,
   token: &str,
 ) -> Option<QualifiedRange<'doc>> {
+  if let Some(range) = parse_chained_formula_range(sheet, token) {
+    return Some(range);
+  }
+  if let ReferenceParts::Range { start, end } = reference_parts(token)? {
+    let start = span_text(token, start);
+    let end = span_text(token, end);
+    if let Some(range) = parse_formula_range_from_addresses(sheet, start, end) {
+      return Some(range);
+    }
+  }
+  if let Ok(range) = QualifiedRange::parse_a1(sheet, token) {
+    return Some(range);
+  }
   match reference_parts(token)? {
     ReferenceParts::Range { start, end } => {
       let start = span_text(token, start);
@@ -59,6 +72,24 @@ pub(crate) fn parse_formula_range<'doc>(
         .map(|address| qualified_range_from_address(sheet, address))
     }
   }
+}
+
+fn parse_chained_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRange<'doc>> {
+  if token.contains('[') {
+    return None;
+  }
+  let mut parts = token.split(':');
+  let first = parts.next()?;
+  let second = parts.next()?;
+  let third = parts.next()?;
+  let mut range = parse_formula_range_from_addresses(sheet, first, second)?;
+  let third = QualifiedAddress::parse_a1(sheet, third).ok()?;
+  range = extend_qualified_range(&range, &qualified_range_from_address(sheet, third))?;
+  for part in parts {
+    let address = QualifiedAddress::parse_a1(sheet, part).ok()?;
+    range = extend_qualified_range(&range, &qualified_range_from_address(sheet, address))?;
+  }
+  Some(range)
 }
 
 fn parse_formula_range_from_addresses<'doc>(

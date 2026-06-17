@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 
+mod args;
 mod dispatch;
 
+pub(crate) use args::{EvalContext, FunctionArgs};
 pub(crate) use dispatch::evaluate_function;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

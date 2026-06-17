@@ -108,8 +108,10 @@ pub(crate) fn ast_from_code<'doc>(code: &FormulaCode<'doc>) -> Option<FormulaAst
         name,
         function,
         argc,
+        control,
         ..
       } => {
+        let _ = control;
         if stack.len() < *argc {
           return None;
         }

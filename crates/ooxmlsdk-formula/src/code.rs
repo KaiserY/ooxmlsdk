@@ -45,10 +45,22 @@ pub(crate) enum FormulaOp<'doc> {
     function: Option<FormulaFunctionId>,
     argc: usize,
     volatile: bool,
+    control: Option<FormulaControlOp>,
   },
   Array {
     row_lengths: Vec<usize>,
   },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FormulaControlOp {
+  IfJump,
+  IfErrorJump,
+  IfNaJump,
+  IfsJump,
+  SwitchJump,
+  ChooseJump,
+  LetBind,
 }
 
 impl<'doc> FormulaOp<'doc> {
@@ -69,11 +81,13 @@ impl<'doc> FormulaOp<'doc> {
         function,
         argc,
         volatile,
+        control,
       } => FormulaOp::Call {
         name: Cow::Owned(name.into_owned()),
         function,
         argc,
         volatile,
+        control,
       },
       FormulaOp::Array { row_lengths } => FormulaOp::Array { row_lengths },
     }
@@ -127,6 +141,7 @@ fn lower_node<'doc>(
         function,
         argc: args.len(),
         volatile: *volatile,
+        control: control_for_function(function),
       });
     }
     parser::FormulaAst::LogicalFunction {
@@ -143,6 +158,7 @@ fn lower_node<'doc>(
         function,
         argc: args.len(),
         volatile: false,
+        control: control_for_function(function),
       });
     }
     parser::FormulaAst::Array(rows) => {
@@ -157,6 +173,19 @@ fn lower_node<'doc>(
     }
   }
   Some(())
+}
+
+fn control_for_function(function: Option<FormulaFunctionId>) -> Option<FormulaControlOp> {
+  match function? {
+    FormulaFunctionId::If => Some(FormulaControlOp::IfJump),
+    FormulaFunctionId::Iferror => Some(FormulaControlOp::IfErrorJump),
+    FormulaFunctionId::Ifna => Some(FormulaControlOp::IfNaJump),
+    FormulaFunctionId::Ifs => Some(FormulaControlOp::IfsJump),
+    FormulaFunctionId::Switch => Some(FormulaControlOp::SwitchJump),
+    FormulaFunctionId::Choose => Some(FormulaControlOp::ChooseJump),
+    FormulaFunctionId::Let => Some(FormulaControlOp::LetBind),
+    _ => None,
+  }
 }
 
 fn lower_word<'doc>(

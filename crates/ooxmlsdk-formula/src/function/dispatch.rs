@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use num_complex::Complex;
 
-use super::{FormulaFunctionId, resolve_function_name};
+use super::{EvalContext, FormulaFunctionId, FunctionArgs, resolve_function_name};
 use crate::calc::numeric::{
   CeilingFloorKind, approx_floor, even_odd, kahan_sum, round_to_decimal_places, sign_number,
 };
@@ -13,26 +13,27 @@ use crate::calc::text::{
   legacy_char_text, legacy_text_code, proper_formula_text, rot13_formula_text,
 };
 use crate::evaluator::{
-  CouponFunction, DatabaseFunction, DatePart, FormulaAst, FormulaEvaluator, TimePart, datevalue,
-  rtl_cos, rtl_sin, rtl_tan, timevalue,
+  CouponFunction, DatabaseFunction, DatePart, TimePart, datevalue, rtl_cos, rtl_sin, rtl_tan,
+  timevalue,
 };
 use crate::{FormulaErrorValue, FormulaValue};
 
 pub(crate) fn evaluate_function<'doc>(
-  evaluator: &FormulaEvaluator<'_, 'doc>,
+  evaluator: &EvalContext<'_, 'doc>,
   function: Option<FormulaFunctionId>,
   name: &Cow<'doc, str>,
-  args: &[FormulaAst<'doc>],
+  args: FunctionArgs<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
   let function = function.or_else(|| resolve_function_name(name.as_ref()))?;
   evaluate_function_id(evaluator, function, args)
 }
 
 fn evaluate_function_id<'doc>(
-  evaluator: &FormulaEvaluator<'_, 'doc>,
+  evaluator: &EvalContext<'_, 'doc>,
   function: FormulaFunctionId,
-  args: &[FormulaAst<'doc>],
+  args: FunctionArgs<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
+  let args = args.as_ast();
   match function {
     FormulaFunctionId::OrgDotOpenofficeDotErrortype => evaluator.evaluate_error_type_raw(args),
     FormulaFunctionId::ComDotMicrosoftDotCeiling => evaluator.evaluate_ceiling_excel_legacy(args),

@@ -7,9 +7,10 @@ mod syntax;
 
 pub(crate) use array::{ArrayConstantValue, parse_array_constant};
 pub(crate) use formula::{
-  FormulaBodyTokenKind, FormulaNode, FormulaParseIssue, normalize_calc_formula_text,
-  normalize_excel_formula_text, normalize_open_formula_text, normalize_r1c1_formula_text,
-  parse_formula_body, parse_formula_syntax, r1c1_reference_to_a1, r1c1_whole_axis_reference_to_a1,
+  FormulaBodyParse, FormulaBodyTokenKind, FormulaNode, FormulaParseIssue,
+  normalize_calc_formula_text, normalize_excel_formula_text, normalize_open_formula_text,
+  normalize_r1c1_formula_text, parse_formula_source, parse_formula_syntax_source,
+  r1c1_reference_to_a1, r1c1_whole_axis_reference_to_a1,
 };
 pub(crate) use lex::{
   FormulaCursor, LexErrorValue, LexLogicalFunction, LexOperator, LexToken, LexTokenKind,

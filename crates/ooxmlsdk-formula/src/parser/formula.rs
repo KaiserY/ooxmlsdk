@@ -14,9 +14,22 @@ pub(crate) struct FormulaBodyParse {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FormulaSourceParse<'a> {
+  pub body_start: usize,
+  pub body: &'a str,
+  pub body_parse: FormulaBodyParse,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FormulaSyntaxParse {
   pub ast: Option<FormulaNode>,
   pub issues: Vec<FormulaParseIssue>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FormulaSourceSyntaxParse<'a> {
+  pub body: &'a str,
+  pub syntax_parse: FormulaSyntaxParse,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -78,6 +91,37 @@ pub(crate) enum FormulaNode {
     args: Vec<FormulaNode>,
   },
   Array(Vec<Vec<FormulaNode>>),
+}
+
+pub(crate) fn parse_formula_source(source: &str) -> FormulaSourceParse<'_> {
+  parse_formula_source_at_body(source, formula_body_start(source))
+}
+
+pub(crate) fn parse_formula_source_at_body(
+  source: &str,
+  body_start: usize,
+) -> FormulaSourceParse<'_> {
+  let body = source.get(body_start..).unwrap_or(source);
+  FormulaSourceParse {
+    body_start,
+    body,
+    body_parse: parse_formula_body(body),
+  }
+}
+
+pub(crate) fn parse_formula_syntax_source(source: &str) -> FormulaSourceSyntaxParse<'_> {
+  parse_formula_syntax_source_at_body(source, formula_body_start(source))
+}
+
+pub(crate) fn parse_formula_syntax_source_at_body(
+  source: &str,
+  body_start: usize,
+) -> FormulaSourceSyntaxParse<'_> {
+  let body = source.get(body_start..).unwrap_or(source);
+  FormulaSourceSyntaxParse {
+    body,
+    syntax_parse: parse_formula_syntax(body),
+  }
 }
 
 pub(crate) fn parse_formula_body(source: &str) -> FormulaBodyParse {

@@ -284,13 +284,7 @@ impl<'a> SyntaxParser<'a> {
   }
 
   fn parse_argument_list(&mut self) -> Option<Vec<FormulaAst>> {
-    if self
-      .tokens
-      .consume_token_kind(LexTokenKind::ParenOpen)
-      .is_none()
-    {
-      return None;
-    }
+    self.tokens.consume_token_kind(LexTokenKind::ParenOpen)?;
     let mut args = Vec::new();
     loop {
       if self
@@ -316,13 +310,9 @@ impl<'a> SyntaxParser<'a> {
       {
         break;
       }
-      if self
+      self
         .tokens
-        .consume_token_kind(LexTokenKind::ArgumentSeparator)
-        .is_none()
-      {
-        return None;
-      }
+        .consume_token_kind(LexTokenKind::ArgumentSeparator)?;
       if self
         .tokens
         .peek()

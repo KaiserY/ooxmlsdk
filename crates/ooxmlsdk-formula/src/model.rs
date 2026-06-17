@@ -3301,7 +3301,8 @@ mod tests {
   use super::*;
   use crate::calc::complex::FormulaComplex;
   use crate::code::FormulaOp;
-  use crate::evaluator::{format_complex_result, valid_date_serial_with_system};
+  use crate::evaluator::valid_date_serial_with_system;
+  use crate::function::format_complex_result;
 
   #[test]
   fn parses_odf_range_endpoints_with_inherited_sheet_name() {

@@ -115,7 +115,7 @@ pub fn matrix_multiply(left: &[Vec<f64>], right: &[Vec<f64>]) -> Option<Vec<Vec<
   let mut result = Vec::with_capacity(rows);
   for left_row in left {
     let mut result_row = Vec::with_capacity(columns);
-    for column in 0..columns {
+    for (column, _) in right[0].iter().enumerate().take(columns) {
       result_row.push(kahan_product_sum(
         0..shared,
         |index| left_row[index],
@@ -134,10 +134,10 @@ pub fn lup_decompose(matrix: &mut [Vec<f64>]) -> Option<LupDecomposition> {
   }
   let mut determinant_sign = 1.0;
   let mut scale = vec![0.0; n];
-  for row in 0..n {
+  for (row, matrix_row) in matrix.iter().enumerate().take(n) {
     let mut max = 0.0;
-    for column in 0..n {
-      let value = matrix[row][column].abs();
+    for value in matrix_row.iter().take(n) {
+      let value = value.abs();
       if max < value {
         max = value;
       }
@@ -153,8 +153,8 @@ pub fn lup_decompose(matrix: &mut [Vec<f64>]) -> Option<LupDecomposition> {
     let mut max = 0.0;
     let mut pivot_row = pivot;
     let pivot_scale = scale[pivot];
-    for row in pivot..n {
-      let value = pivot_scale * matrix[row][pivot].abs();
+    for (row, matrix_row) in matrix.iter().enumerate().take(n).skip(pivot) {
+      let value = pivot_scale * matrix_row[pivot].abs();
       if max < value {
         max = value;
         pivot_row = row;
@@ -169,13 +169,14 @@ pub fn lup_decompose(matrix: &mut [Vec<f64>]) -> Option<LupDecomposition> {
       matrix.swap(pivot, pivot_row);
       determinant_sign = -determinant_sign;
     }
-    for row in (pivot + 1)..n {
-      let numerator = matrix[row][pivot];
-      let denominator = matrix[pivot][pivot];
-      matrix[row][pivot] = numerator / denominator;
-      for column in (pivot + 1)..n {
-        matrix[row][column] =
-          (matrix[row][column] * denominator - numerator * matrix[pivot][column]) / denominator;
+    let (head, tail) = matrix.split_at_mut(pivot + 1);
+    let pivot_row = &head[pivot];
+    let denominator = pivot_row[pivot];
+    for row_values in tail.iter_mut().take(n - pivot - 1) {
+      let numerator = row_values[pivot];
+      row_values[pivot] = numerator / denominator;
+      for (column, value) in row_values.iter_mut().enumerate().take(n).skip(pivot + 1) {
+        *value = (*value * denominator - numerator * pivot_row[column]) / denominator;
       }
     }
   }

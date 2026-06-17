@@ -421,10 +421,10 @@ fn evaluate_let_control<'doc>(
 
 fn call_starting_at<'doc>(ops: &[FormulaOp<'doc>], index: usize, end: usize) -> Option<usize> {
   let mut selected = None;
-  for call_index in index..end {
+  for (call_index, op) in ops.iter().enumerate().take(end).skip(index) {
     let FormulaOp::Call {
       arg_ranges, argc, ..
-    } = &ops[call_index]
+    } = op
     else {
       continue;
     };

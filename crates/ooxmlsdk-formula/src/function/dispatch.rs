@@ -21,33 +21,32 @@ use crate::calc::financial::{finance_duration, finance_price, financial_pmt};
 use crate::calc::matrix::{determinant, matrix_multiply};
 use crate::calc::numeric::{
   CeilingFloorKind, KahanSum, NumericError, approx_ceil, approx_floor, ceiling_excel_legacy,
-  even_odd, floor_excel_legacy, floor_to_i32, kahan_sum, mround, round_direction,
-  round_to_decimal_places, round_to_significant_digits, sign_number,
+  even_odd, floor_excel_legacy, floor_to_i32, floor_to_u32, floor_to_usize, kahan_sum, mround,
+  round_direction, round_to_decimal_places, round_to_significant_digits, sign_number,
 };
-use crate::calc::radix::convert_from_decimal;
+use crate::calc::radix::{
+  base_number_text, convert_from_decimal, convert_to_decimal, decimal_text_to_number,
+};
 use crate::calc::regression::EtsKind;
 use crate::calc::special::{
-  BesselKind, SpecialError, erf, erfc, lo_chi_dist, lo_chisq_dist_cdf, lo_f_dist_right_tail,
-  lo_gauss, lo_iterate_inverse, lo_phi, log_gamma, norm_s_inv,
+  SpecialError, lo_chi_dist, lo_chisq_dist_cdf, lo_f_dist_right_tail, lo_iterate_inverse,
+  norm_s_inv,
 };
 use crate::calc::statistics::{
   PercentileKind, StatisticsError, covariance, deviation_sum_squares, frequency_counts, kurtosis,
   mode_slice, percent_rank, percentile_sorted, rank_value, skewness, trim_mean, variance_slice,
 };
-use crate::calc::text::{
-  leftb, legacy_char_text, legacy_text_code, proper_formula_text, rightb, rot13_formula_text,
-  text_byte_len, trim_formula_text,
-};
+use crate::calc::text::{leftb, rightb, text_byte_len, trim_formula_text};
 use crate::calc::units::convert_unit;
 use crate::code::FormulaOp;
 use crate::evaluator::{
-  CouponFunction, DatabaseFunction, DatePart, IfsAggregate, TimePart, column_index_to_name,
-  datevalue, display_text_from_value, rtl_cos, rtl_sin, rtl_tan, timevalue,
+  DatabaseFunction, DatePart, IfsAggregate, TimePart, column_index_to_name, compare_text,
+  datevalue, display_text_from_value, error_text_value, rtl_cos, rtl_sin, rtl_tan, timevalue,
 };
 use crate::model::{XLSX_MAX_COLUMN_ZERO_BASED, XLSX_MAX_ROW_ZERO_BASED};
 use crate::{
-  CellAddress, CellRange, FormulaErrorValue, FormulaGrammar, FormulaOperator, FormulaValue,
-  QualifiedRange,
+  CellAddress, CellRange, FormulaErrorValue, FormulaGrammar, FormulaValue, PivotDataRequest,
+  PivotFieldFilter, QualifiedRange,
 };
 
 pub(crate) fn evaluate_function<'doc>(
@@ -423,6 +422,10 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::StdevDotP => evaluate_stdev_reader(evaluator, args, false, false),
     FormulaFunctionId::Stdeva => evaluate_stdev_reader(evaluator, args, true, true),
     FormulaFunctionId::Stdevpa => evaluate_stdev_reader(evaluator, args, false, true),
+    FormulaFunctionId::VarDotS => evaluate_variance_reader(evaluator, args, true, false),
+    FormulaFunctionId::VarDotP => evaluate_variance_reader(evaluator, args, false, false),
+    FormulaFunctionId::Vara => evaluate_variance_reader(evaluator, args, true, true),
+    FormulaFunctionId::Varpa => evaluate_variance_reader(evaluator, args, false, true),
     FormulaFunctionId::Kurt => evaluate_kurt_reader(args),
     FormulaFunctionId::Skew => evaluate_skew_reader(args, false),
     FormulaFunctionId::SkewDotP => evaluate_skew_reader(args, true),
@@ -510,6 +513,10 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Drop if (1..=3).contains(&args.len()) => {
       evaluate_take_drop_reader(evaluator, args, false)
     }
+    FormulaFunctionId::Sort if (1..=4).contains(&args.len()) => {
+      evaluate_sort_reader(evaluator, args)
+    }
+    FormulaFunctionId::Sortby if args.len() >= 2 => evaluate_sortby_reader(evaluator, args),
     FormulaFunctionId::Chooserows if args.len() >= 2 => {
       evaluate_choose_rows_columns_reader(evaluator, args, true)
     }
@@ -616,8 +623,45 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Dollar if (1..=2).contains(&args.len()) => {
       evaluate_dollar_reader(evaluator, args)
     }
+    FormulaFunctionId::Base if (2..=3).contains(&args.len()) => {
+      evaluate_base_reader(evaluator, args)
+    }
+    FormulaFunctionId::Decimal if args.len() == 2 => evaluate_decimal_reader(evaluator, args),
+    FormulaFunctionId::Bin2dec if args.len() == 1 => {
+      evaluate_base_to_decimal_reader(evaluator, args, 2)
+    }
+    FormulaFunctionId::Oct2dec if args.len() == 1 => {
+      evaluate_base_to_decimal_reader(evaluator, args, 8)
+    }
+    FormulaFunctionId::Hex2dec if args.len() == 1 => {
+      evaluate_base_to_decimal_reader(evaluator, args, 16)
+    }
+    FormulaFunctionId::Bin2oct if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 2, 8, -512.0, 511.0)
+    }
+    FormulaFunctionId::Bin2hex if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 2, 16, -512.0, 511.0)
+    }
+    FormulaFunctionId::Oct2bin if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 8, 2, -512.0, 511.0)
+    }
+    FormulaFunctionId::Oct2hex if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 8, 16, -536_870_912.0, 536_870_911.0)
+    }
+    FormulaFunctionId::Hex2bin if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 16, 2, -512.0, 511.0)
+    }
+    FormulaFunctionId::Hex2oct if (1..=2).contains(&args.len()) => {
+      evaluate_base_to_base_reader(evaluator, args, 16, 8, -536_870_912.0, 536_870_911.0)
+    }
+    FormulaFunctionId::Dec2bin if (1..=2).contains(&args.len()) => {
+      evaluate_decimal_to_base_reader(evaluator, args, 2, -512.0, 511.0)
+    }
+    FormulaFunctionId::Dec2oct if (1..=2).contains(&args.len()) => {
+      evaluate_decimal_to_base_reader(evaluator, args, 8, -536_870_912.0, 536_870_911.0)
+    }
     FormulaFunctionId::Dec2hex if (1..=2).contains(&args.len()) => {
-      evaluate_decimal_to_base_reader(evaluator, args, 16)
+      evaluate_decimal_to_base_reader(evaluator, args, 16, -549_755_813_888.0, 549_755_813_887.0)
     }
     FormulaFunctionId::Left if (1..=2).contains(&args.len()) => {
       evaluate_left_reader(evaluator, args, false)
@@ -666,6 +710,9 @@ fn evaluate_function_reader<'doc>(
     }
     FormulaFunctionId::Hlookup if (3..=4).contains(&args.len()) => {
       evaluate_vlookup_reader(evaluator, args, true)
+    }
+    FormulaFunctionId::Getpivotdata if args.len() >= 2 => {
+      evaluate_getpivotdata_reader(evaluator, args)
     }
     FormulaFunctionId::ChisqDotInvDotRt if args.len() == 2 => {
       evaluate_chisq_inv_reader(evaluator, args, true)
@@ -1219,13 +1266,8 @@ fn evaluate_n_value<'doc>(
   }
   Some(FormulaValue::Number(match evaluator.first_value(value) {
     FormulaValue::Number(value) => value,
-    FormulaValue::Boolean(value) => {
-      if value {
-        1.0
-      } else {
-        0.0
-      }
-    }
+    FormulaValue::Boolean(true) => 1.0,
+    FormulaValue::Boolean(false) => 0.0,
     FormulaValue::Error(error) => return Some(FormulaValue::Error(error)),
     _ => 0.0,
   }))
@@ -1572,8 +1614,7 @@ fn evaluate_exact_reader<'doc>(
   let right = evaluator.text(&args.value(1)?);
   Some(FormulaValue::Boolean(
     left == right
-      || ((left.chars().any(|ch| !ch.is_ascii()) || right.chars().any(|ch| !ch.is_ascii()))
-        && left.to_lowercase() == right.to_lowercase()),
+      || ((!left.is_ascii() || !right.is_ascii()) && left.to_lowercase() == right.to_lowercase()),
   ))
 }
 
@@ -1799,6 +1840,29 @@ fn evaluate_stdev_reader<'doc>(
   };
   variance_slice(&values, sample)
     .map(|value| FormulaValue::Number(value.sqrt()))
+    .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
+}
+
+fn evaluate_variance_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  sample: bool,
+  text_as_zero: bool,
+) -> Option<FormulaValue<'doc>> {
+  let values = if text_as_zero {
+    let mut values = Vec::new();
+    for index in 0..args.len() {
+      collect_a_numbers(evaluator, args.value(index)?, &mut values)?;
+    }
+    values
+  } else {
+    match args.numeric_aggregate(true)? {
+      Ok(values) => values,
+      Err(error) => return Some(FormulaValue::Error(error)),
+    }
+  };
+  variance_slice(&values, sample)
+    .map(FormulaValue::Number)
     .or(Some(FormulaValue::Error(FormulaErrorValue::Div0)))
 }
 
@@ -2199,6 +2263,88 @@ fn evaluate_take_drop_reader<'doc>(
   Some(FormulaValue::Matrix(result))
 }
 
+fn evaluate_sort_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (rows, columns) = rectangular_shape(&matrix)?;
+  let sort_indexes = optional_number_values(evaluator, args, 1, &[1.0])?;
+  let sort_orders = optional_number_values(evaluator, args, 2, &[1.0])?;
+  let by_column = args
+    .raw_arg(3)
+    .filter(|_| !args.is_missing(3))
+    .and_then(|_| args.value(3))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let key_limit = if by_column { rows } else { columns };
+  let mut keys = Vec::with_capacity(sort_indexes.len());
+  for (index, sort_index) in sort_indexes.iter().enumerate() {
+    let sort_index = approx_floor(*sort_index);
+    if sort_index < 1.0 || sort_index > key_limit as f64 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    let order = sort_orders
+      .get(index)
+      .or_else(|| sort_orders.first())
+      .copied()
+      .unwrap_or(1.0);
+    if order != 1.0 && order != -1.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    keys.push((sort_index as usize - 1, order == 1.0));
+  }
+  Some(sort_matrix(evaluator, matrix, keys, by_column))
+}
+
+fn evaluate_sortby_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let matrix = evaluator.matrix_values(&args.array_value(0)?);
+  let (rows, columns) = rectangular_shape(&matrix)?;
+  let mut by_column = None;
+  let mut keys = Vec::new();
+  let mut index = 1;
+  while index < args.len() {
+    let key_matrix = evaluator.matrix_values(&args.array_value(index)?);
+    let values = key_matrix.into_iter().flatten().collect::<Vec<_>>();
+    let orientation = if values.len() == rows {
+      false
+    } else if values.len() == columns {
+      true
+    } else {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    };
+    if by_column.is_some_and(|current| current != orientation) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    by_column = Some(orientation);
+    let order = args
+      .raw_arg(index + 1)
+      .filter(|_| !args.is_missing(index + 1))
+      .and_then(|_| args.value(index + 1))
+      .and_then(|value| evaluator.number(&value))
+      .unwrap_or(1.0);
+    if order != 1.0 && order != -1.0 {
+      return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+    }
+    keys.push((values, order == 1.0));
+    index += 2;
+  }
+  let by_column = by_column.unwrap_or(false);
+  let mut order = if by_column {
+    (0..columns).collect::<Vec<_>>()
+  } else {
+    (0..rows).collect::<Vec<_>>()
+  };
+  order.sort_by(|left, right| sort_multi_key_order(evaluator, &keys, *left, *right));
+  Some(if by_column {
+    FormulaValue::Matrix(reorder_columns(&matrix, &order))
+  } else {
+    FormulaValue::Matrix(order.into_iter().map(|row| matrix[row].clone()).collect())
+  })
+}
+
 fn take_drop_bounds(len: usize, arg: Option<isize>, take: bool) -> (usize, usize) {
   let Some(arg) = arg else {
     return (0, len);
@@ -2213,6 +2359,144 @@ fn take_drop_bounds(len: usize, arg: Option<isize>, take: bool) -> (usize, usize
     (0, len - abs)
   } else {
     (abs, len)
+  }
+}
+
+fn rectangular_shape(matrix: &[Vec<FormulaValue<'_>>]) -> Option<(usize, usize)> {
+  let rows = matrix.len();
+  let columns = matrix.first().map_or(0, Vec::len);
+  if rows == 0 || columns == 0 || matrix.iter().any(|row| row.len() != columns) {
+    None
+  } else {
+    Some((rows, columns))
+  }
+}
+
+fn optional_number_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  index: usize,
+  default: &[f64],
+) -> Option<Vec<f64>> {
+  if args.raw_arg(index).is_none() || args.is_missing(index) {
+    return Some(default.to_vec());
+  }
+  evaluator
+    .matrix_values(&args.array_value(index)?)
+    .into_iter()
+    .flatten()
+    .map(|value| evaluator.number(&value))
+    .collect()
+}
+
+fn sort_matrix<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  matrix: Vec<Vec<FormulaValue<'doc>>>,
+  keys: Vec<(usize, bool)>,
+  by_column: bool,
+) -> FormulaValue<'doc> {
+  let (rows, columns) = rectangular_shape(&matrix).unwrap_or((0, 0));
+  if by_column {
+    let mut order = (0..columns).collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+      for (row, ascending) in &keys {
+        let ordering = sort_value_order(evaluator, &matrix[*row][*left], &matrix[*row][*right]);
+        if ordering != std::cmp::Ordering::Equal {
+          return if *ascending {
+            ordering
+          } else {
+            ordering.reverse()
+          };
+        }
+      }
+      left.cmp(right)
+    });
+    FormulaValue::Matrix(reorder_columns(&matrix, &order))
+  } else {
+    let mut order = (0..rows).collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+      for (column, ascending) in &keys {
+        let ordering =
+          sort_value_order(evaluator, &matrix[*left][*column], &matrix[*right][*column]);
+        if ordering != std::cmp::Ordering::Equal {
+          return if *ascending {
+            ordering
+          } else {
+            ordering.reverse()
+          };
+        }
+      }
+      left.cmp(right)
+    });
+    FormulaValue::Matrix(order.into_iter().map(|row| matrix[row].clone()).collect())
+  }
+}
+
+fn reorder_columns<'doc>(
+  matrix: &[Vec<FormulaValue<'doc>>],
+  order: &[usize],
+) -> Vec<Vec<FormulaValue<'doc>>> {
+  matrix
+    .iter()
+    .map(|row| {
+      order
+        .iter()
+        .filter_map(|column| row.get(*column).cloned())
+        .collect()
+    })
+    .collect()
+}
+
+fn sort_multi_key_order<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  keys: &[(Vec<FormulaValue<'doc>>, bool)],
+  left: usize,
+  right: usize,
+) -> std::cmp::Ordering {
+  for (values, ascending) in keys {
+    let ordering = sort_value_order(evaluator, &values[left], &values[right]);
+    if ordering != std::cmp::Ordering::Equal {
+      return if *ascending {
+        ordering
+      } else {
+        ordering.reverse()
+      };
+    }
+  }
+  left.cmp(&right)
+}
+
+fn sort_value_order(
+  evaluator: &EvalContext<'_, '_>,
+  left: &FormulaValue<'_>,
+  right: &FormulaValue<'_>,
+) -> std::cmp::Ordering {
+  match (left, right) {
+    (FormulaValue::Number(left), FormulaValue::Number(right)) => left.total_cmp(right),
+    (FormulaValue::String(left), FormulaValue::String(right)) => {
+      match compare_text(evaluator, left.as_ref(), right.as_ref(), false) {
+        value if value < 0 => std::cmp::Ordering::Less,
+        value if value > 0 => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
+      }
+    }
+    (FormulaValue::Boolean(left), FormulaValue::Boolean(right)) => left.cmp(right),
+    (FormulaValue::Blank, FormulaValue::Blank) => std::cmp::Ordering::Equal,
+    (FormulaValue::Error(left), FormulaValue::Error(right)) => {
+      error_text_value(*left).cmp(error_text_value(*right))
+    }
+    (left, right) => sort_value_rank(left).cmp(&sort_value_rank(right)),
+  }
+}
+
+fn sort_value_rank(value: &FormulaValue<'_>) -> u8 {
+  match value {
+    FormulaValue::Number(_) => 0,
+    FormulaValue::String(_) => 1,
+    FormulaValue::Boolean(_) => 2,
+    FormulaValue::Error(_) => 3,
+    FormulaValue::Blank => 4,
+    FormulaValue::Matrix(_) | FormulaValue::Reference(_) | FormulaValue::RefList(_) => 5,
   }
 }
 
@@ -3095,6 +3379,39 @@ fn evaluate_vlookup_reader<'doc>(
   }
 }
 
+fn evaluate_getpivotdata_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if !args.len().is_multiple_of(2) {
+    return Some(FormulaValue::Error(FormulaErrorValue::Parameter));
+  }
+  let data_field_name = evaluator.text(&args.value(0)?);
+  let Some(block) = evaluator.as_reference(&args.value(1)?) else {
+    return Some(FormulaValue::Error(FormulaErrorValue::Ref));
+  };
+  let mut filters = Vec::new();
+  let mut index = 2;
+  while index + 1 < args.len() {
+    filters.push(PivotFieldFilter {
+      field_name: Cow::Owned(evaluator.text(&args.value(index)?)),
+      match_value: Cow::Owned(evaluator.text(&args.value(index + 1)?)),
+    });
+    index += 2;
+  }
+  let request = PivotDataRequest {
+    current_sheet: evaluator.current_sheet,
+    block,
+    data_field_name: Some(Cow::Owned(data_field_name)),
+    filters,
+  };
+  Some(
+    evaluator
+      .pivot_data(&request)
+      .unwrap_or_else(FormulaValue::Error),
+  )
+}
+
 fn evaluate_mround_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -3114,6 +3431,8 @@ fn evaluate_decimal_to_base_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
   base: u32,
+  min: f64,
+  max: f64,
 ) -> Option<FormulaValue<'doc>> {
   let value = evaluator.number(&args.value(0)?)?;
   let places = args
@@ -3122,18 +3441,107 @@ fn evaluate_decimal_to_base_reader<'doc>(
     .and_then(|_| args.value(1))
     .and_then(|value| evaluator.number(&value))
     .map(|value| value as i32);
-  convert_from_decimal(
-    value,
-    -549_755_813_888.0,
-    549_755_813_887.0,
-    base,
-    places,
-    10,
-  )
-  .map(|value| FormulaValue::String(Cow::Owned(value)))
-  .or(Some(FormulaValue::Error(
-    FormulaErrorValue::IllegalArgument,
-  )))
+  convert_from_decimal(value, min, max, base, places, 10)
+    .map(|value| FormulaValue::String(Cow::Owned(value)))
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn evaluate_base_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let value = approx_floor(evaluator.number(&args.value(0)?)?);
+  let radix = approx_floor(evaluator.number(&args.value(1)?)?);
+  let min_len_value = args
+    .raw_arg(2)
+    .filter(|_| !args.is_missing(2))
+    .and_then(|_| args.value(2))
+    .and_then(|value| evaluator.number(&value))
+    .map(approx_floor)
+    .unwrap_or(1.0);
+  let min_len = if (1.0..u16::MAX as f64).contains(&min_len_value) {
+    floor_to_usize(min_len_value)?
+  } else if min_len_value == 0.0 {
+    1
+  } else {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  };
+  if value < 0.0 || !(2.0..=36.0).contains(&radix) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  base_number_text(value, floor_to_u32(radix)?, min_len)
+    .map(|value| FormulaValue::String(Cow::Owned(value)))
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn evaluate_decimal_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let text = evaluator.text(&args.value(0)?);
+  let base = approx_floor(evaluator.number(&args.value(1)?)?);
+  if !(2.0..=36.0).contains(&base) {
+    return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
+  }
+  decimal_text_to_number(&text, floor_to_u32(base)?)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn evaluate_base_to_decimal_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  base: u32,
+) -> Option<FormulaValue<'doc>> {
+  convert_to_decimal(&base_digits_text(evaluator, &args.value(0)?), base, 10)
+    .map(FormulaValue::Number)
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn evaluate_base_to_base_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+  from_base: u32,
+  to_base: u32,
+  min: f64,
+  max: f64,
+) -> Option<FormulaValue<'doc>> {
+  let value = convert_to_decimal(&base_digits_text(evaluator, &args.value(0)?), from_base, 10)?;
+  let places = args
+    .raw_arg(1)
+    .filter(|_| !args.is_missing(1))
+    .and_then(|_| args.value(1))
+    .and_then(|value| evaluator.number(&value))
+    .map(|value| value as i32);
+  convert_from_decimal(value, min, max, to_base, places, 10)
+    .map(|value| FormulaValue::String(Cow::Owned(value)))
+    .or(Some(FormulaValue::Error(
+      FormulaErrorValue::IllegalArgument,
+    )))
+}
+
+fn base_digits_text<'doc>(evaluator: &EvalContext<'_, 'doc>, value: &FormulaValue<'doc>) -> String {
+  match evaluator.scalar_value(value.clone()) {
+    FormulaValue::Boolean(value) => {
+      if value {
+        "1".to_string()
+      } else {
+        "0".to_string()
+      }
+    }
+    FormulaValue::Number(value) if value.is_finite() => {
+      display_text_from_value(&FormulaValue::Number(approx_floor(value)))
+    }
+    value => evaluator.text(&value),
+  }
 }
 
 fn evaluate_gcd_lcm_reader<'doc>(
@@ -4195,7 +4603,8 @@ fn matrix_item<'doc>(
 }
 
 fn chisq_inv_value<'doc>(p: f64, df: f64, right_tail: bool) -> FormulaValue<'doc> {
-  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && (p < 0.0 || p >= 1.0)) {
+  if df < 1.0 || (right_tail && (p <= 0.0 || p > 1.0)) || (!right_tail && !(0.0..1.0).contains(&p))
+  {
     return FormulaValue::Error(FormulaErrorValue::IllegalArgument);
   }
   let result = if right_tail {
@@ -4242,7 +4651,7 @@ fn number_only(value: &FormulaValue<'_>) -> Option<f64> {
   }
 }
 
-fn format_complex_result(value: FormulaComplex) -> String {
+pub(crate) fn format_complex_result(value: FormulaComplex) -> String {
   format_formula_complex_number(value, format_complex_component)
 }
 

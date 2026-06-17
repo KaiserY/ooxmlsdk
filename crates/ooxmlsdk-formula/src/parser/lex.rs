@@ -266,7 +266,7 @@ pub(crate) fn grouped_formula_number(value: &str) -> Option<f64> {
     return None;
   }
   let (mantissa, _) = trimmed
-    .find(|ch| matches!(ch, 'e' | 'E'))
+    .find(['e', 'E'])
     .map(|index| trimmed.split_at(index))
     .unwrap_or((trimmed, ""));
   let mantissa = mantissa
@@ -296,11 +296,11 @@ pub(crate) fn grouped_formula_number(value: &str) -> Option<f64> {
 
 fn formula_body_start_parser(input: &mut &str) -> WinnowResult<usize> {
   let start_len = input.len();
-  if starts_with_ignore_ascii_case(*input, "of:=") {
+  if starts_with_ignore_ascii_case(input, "of:=") {
     *input = &input["of:=".len()..];
     return Ok(start_len - input.len());
   }
-  if starts_with_ignore_ascii_case(*input, "of:") {
+  if starts_with_ignore_ascii_case(input, "of:") {
     *input = &input["of:".len()..];
     return Ok(start_len - input.len());
   }
@@ -470,10 +470,7 @@ fn scan_formula_word(input: &mut &str) {
   let original = *input;
   let mut quoted = false;
   let mut table_ref_depth = 0i32;
-  loop {
-    let Some(ch) = input.chars().next() else {
-      break;
-    };
+  while let Some(ch) = input.chars().next() {
     if table_ref_depth > 0 {
       match ch {
         '[' => table_ref_depth += 1,
@@ -493,7 +490,7 @@ fn scan_formula_word(input: &mut &str) {
       consume_one_char(input);
       continue;
     }
-    if !quoted && ch == ':' && should_stop_formula_word_at_range_operator(original, *input) {
+    if !quoted && ch == ':' && should_stop_formula_word_at_range_operator(original, input) {
       break;
     }
     if !quoted && !is_formula_word_char(ch) {

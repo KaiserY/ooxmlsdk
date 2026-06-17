@@ -210,7 +210,7 @@ pub fn find_byte_text_position(
   if start == 0 {
     return Err(FindTextError::Value);
   }
-  if start - 1 >= haystack_len {
+  if start > haystack_len {
     return Err(FindTextError::NotAvailable);
   }
   let tail = rightb(haystack, haystack_len - start + 1);

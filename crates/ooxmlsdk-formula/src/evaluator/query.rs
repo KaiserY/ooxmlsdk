@@ -308,10 +308,6 @@ impl<'doc> CriteriaPlan<'doc> {
     }
   }
 
-  pub(crate) fn matches_empty_source(&self) -> bool {
-    self.match_empty
-  }
-
   pub(crate) fn with_op(mut self, op: QueryOp) -> Self {
     self.op = op;
     self

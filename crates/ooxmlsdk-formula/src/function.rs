@@ -6,6 +6,8 @@ mod reader;
 
 pub(crate) use args::{EvalContext, FunctionArgs};
 pub(crate) use dispatch::evaluate_function;
+#[cfg(test)]
+pub(crate) use dispatch::format_complex_result;
 pub(crate) use reader::FunctionArgReader;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -502,21 +504,6 @@ pub(crate) fn normalize_function_name(name: &str) -> Cow<'_, str> {
     Cow::Owned(name.to_ascii_uppercase())
   } else {
     Cow::Borrowed(name)
-  }
-}
-
-pub(crate) fn canonical_function_name(name: &str) -> Cow<'_, str> {
-  let normalized = normalize_function_name(name);
-  match normalized {
-    Cow::Borrowed(name) => Cow::Borrowed(strip_known_namespace_prefix(name)),
-    Cow::Owned(name) => {
-      let stripped = strip_known_namespace_prefix(name.as_str());
-      if stripped.len() == name.len() {
-        Cow::Owned(name)
-      } else {
-        Cow::Owned(stripped.to_string())
-      }
-    }
   }
 }
 

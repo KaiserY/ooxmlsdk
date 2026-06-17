@@ -22,7 +22,7 @@ impl FourierEngine {
     real_input: bool,
     inverse: bool,
   ) -> Vec<Complex<f64>> {
-    if real_input && values.len() > 1 && values.len() % 2 == 0 {
+    if real_input && values.len() > 1 && values.len().is_multiple_of(2) {
       return self.even_real_values(&values, inverse);
     }
     self.planned_fft(values.len(), inverse).process(&mut values);

@@ -1,46 +1,6 @@
+use super::ast::FormulaAst;
 use super::lex::{LexLogicalFunction, LexOperator, LexToken, LexTokenKind, lex_tokens};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct SyntaxSpan {
-  pub start: usize,
-  pub end: usize,
-}
-
-impl From<LexToken> for SyntaxSpan {
-  fn from(token: LexToken) -> Self {
-    Self {
-      start: token.start,
-      end: token.end,
-    }
-  }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum SyntaxNode {
-  Blank,
-  Text(SyntaxSpan),
-  Number(f64),
-  Error(super::LexErrorValue),
-  Word(SyntaxSpan),
-  Unary {
-    op: LexOperator,
-    expr: Box<SyntaxNode>,
-  },
-  Binary {
-    op: LexOperator,
-    left: Box<SyntaxNode>,
-    right: Box<SyntaxNode>,
-  },
-  Function {
-    name: SyntaxSpan,
-    args: Vec<SyntaxNode>,
-  },
-  LogicalFunction {
-    function: LexLogicalFunction,
-    args: Vec<SyntaxNode>,
-  },
-  Array(Vec<Vec<SyntaxNode>>),
-}
+use super::semantic::{SemanticSpan, semantic_word_kind};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SyntaxIssue {
@@ -49,7 +9,7 @@ pub(crate) enum SyntaxIssue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SyntaxParse {
-  pub ast: Option<SyntaxNode>,
+  pub ast: Option<FormulaAst>,
   pub complete: bool,
   pub issues: Vec<SyntaxIssue>,
 }
@@ -64,7 +24,10 @@ pub(crate) fn parse_syntax_ast(source: &str) -> SyntaxParse {
   }
 }
 
-pub(super) fn parse_syntax_ast_from_tokens(source: &str, tokens: &[LexToken]) -> SyntaxParse {
+pub(super) fn parse_syntax_ast_from_tokens<'a>(
+  source: &'a str,
+  tokens: &'a [LexToken],
+) -> SyntaxParse {
   let mut parser = SyntaxParser::from_tokens(source, tokens);
   let ast = parser.parse_expression();
   SyntaxParse {
@@ -76,7 +39,7 @@ pub(super) fn parse_syntax_ast_from_tokens(source: &str, tokens: &[LexToken]) ->
 
 struct SyntaxParser<'a> {
   source: &'a str,
-  tokens: SyntaxTokens,
+  tokens: SyntaxTokens<'a>,
   issues: Vec<SyntaxIssue>,
 }
 
@@ -89,7 +52,7 @@ impl<'a> SyntaxParser<'a> {
     }
   }
 
-  fn from_tokens(source: &'a str, tokens: &[LexToken]) -> Self {
+  fn from_tokens(source: &'a str, tokens: &'a [LexToken]) -> Self {
     Self {
       source,
       tokens: SyntaxTokens::from_tokens(source, tokens),
@@ -97,17 +60,17 @@ impl<'a> SyntaxParser<'a> {
     }
   }
 
-  fn parse_expression(&mut self) -> Option<SyntaxNode> {
+  fn parse_expression(&mut self) -> Option<FormulaAst> {
     self.parse_expression_bp(0)
   }
 
-  fn parse_expression_bp(&mut self, min_bp: u8) -> Option<SyntaxNode> {
+  fn parse_expression_bp(&mut self, min_bp: u8) -> Option<FormulaAst> {
     let mut left = self.parse_prefix()?;
     loop {
       let had_ws = self.tokens.ws_before_next();
 
       let start = self.tokens.position();
-      if let Some(function) = self.tokens.consume_logical_function_call(self.source) {
+      if let Some(function) = self.tokens.consume_logical_function_call() {
         let left_bp = logical_binding_power();
         if left_bp < min_bp {
           self.tokens.set_position(start);
@@ -115,7 +78,7 @@ impl<'a> SyntaxParser<'a> {
         }
         let mut args = self.parse_argument_list()?;
         args.insert(0, left);
-        left = SyntaxNode::LogicalFunction { function, args };
+        left = FormulaAst::LogicalFunction { function, args };
         continue;
       }
 
@@ -127,7 +90,7 @@ impl<'a> SyntaxParser<'a> {
             break;
           }
           self.tokens.advance();
-          left = SyntaxNode::Unary {
+          left = FormulaAst::Unary {
             op,
             expr: Box::new(left),
           };
@@ -140,7 +103,7 @@ impl<'a> SyntaxParser<'a> {
           }
           self.tokens.advance();
           let right = self.parse_expression_bp(right_bp)?;
-          left = SyntaxNode::Binary {
+          left = FormulaAst::Binary {
             op,
             left: Box::new(left),
             right: Box::new(right),
@@ -156,7 +119,7 @@ impl<'a> SyntaxParser<'a> {
         }
         let before_rhs = self.tokens.position();
         if let Some(right) = self.parse_expression_bp(right_bp) {
-          left = SyntaxNode::Binary {
+          left = FormulaAst::Binary {
             op: LexOperator::Intersection,
             left: Box::new(left),
             right: Box::new(right),
@@ -171,9 +134,9 @@ impl<'a> SyntaxParser<'a> {
     Some(left)
   }
 
-  fn parse_prefix(&mut self) -> Option<SyntaxNode> {
+  fn parse_prefix(&mut self) -> Option<FormulaAst> {
     if let Some(op) = self.tokens.consume_operator_where(prefix_operator) {
-      return Some(SyntaxNode::Unary {
+      return Some(FormulaAst::Unary {
         op,
         expr: Box::new(self.parse_expression_bp(prefix_binding_power())?),
       });
@@ -194,7 +157,7 @@ impl<'a> SyntaxParser<'a> {
       return Some(expr);
     }
     if let Some(token) = self.tokens.consume_token_kind(LexTokenKind::Text) {
-      return Some(SyntaxNode::Text(token.into()));
+      return Some(FormulaAst::Text(token_span(token)));
     }
     if self
       .tokens
@@ -207,11 +170,11 @@ impl<'a> SyntaxParser<'a> {
       match token.kind {
         LexTokenKind::Number(value) => {
           self.tokens.advance();
-          return Some(SyntaxNode::Number(value));
+          return Some(FormulaAst::Number(value));
         }
         LexTokenKind::Error(error) => {
           self.tokens.advance();
-          return Some(SyntaxNode::Error(error));
+          return Some(FormulaAst::Error(error));
         }
         _ => {}
       }
@@ -219,7 +182,7 @@ impl<'a> SyntaxParser<'a> {
     self.parse_word_or_function()
   }
 
-  fn parse_array(&mut self) -> Option<SyntaxNode> {
+  fn parse_array(&mut self) -> Option<FormulaAst> {
     let mut rows = Vec::new();
     let mut row = Vec::new();
     loop {
@@ -231,7 +194,7 @@ impl<'a> SyntaxParser<'a> {
         if !row.is_empty() {
           rows.push(row);
         } else if !rows.is_empty() {
-          rows.push(vec![SyntaxNode::Blank]);
+          rows.push(vec![FormulaAst::Blank]);
         }
         break;
       }
@@ -240,7 +203,7 @@ impl<'a> SyntaxParser<'a> {
         .consume_token_kind(LexTokenKind::ArgumentSeparator)
         .is_some()
       {
-        row.push(SyntaxNode::Blank);
+        row.push(FormulaAst::Blank);
         continue;
       }
       if self
@@ -249,7 +212,7 @@ impl<'a> SyntaxParser<'a> {
         .is_some()
       {
         if row.is_empty() {
-          row.push(SyntaxNode::Blank);
+          row.push(FormulaAst::Blank);
         }
         rows.push(row);
         row = Vec::new();
@@ -282,34 +245,42 @@ impl<'a> SyntaxParser<'a> {
       }
       return None;
     }
-    Some(SyntaxNode::Array(rows))
+    Some(FormulaAst::Array(rows))
   }
 
-  fn parse_word_or_function(&mut self) -> Option<SyntaxNode> {
+  fn parse_word_or_function(&mut self) -> Option<FormulaAst> {
     let token = self.tokens.peek()?;
     if token.kind != LexTokenKind::Word {
       return None;
     }
     if let Some(split) = split_word_before_intersection(self.source, token) {
-      self.tokens.advance_split_word(self.source, split.end);
-      return Some(SyntaxNode::Word(split));
+      self.tokens.advance_split_word(split.end);
+      let word = self.source.get(split.start..split.end)?;
+      return Some(FormulaAst::Word {
+        span: split,
+        kind: semantic_word_kind(word),
+      });
     }
-    let name = SyntaxSpan::from(token);
+    let name = token_span(token);
     self.tokens.advance();
     if self
       .tokens
       .peek()
       .is_some_and(|token| token.kind == LexTokenKind::ParenOpen)
     {
-      return Some(SyntaxNode::Function {
+      return Some(FormulaAst::Function {
         name,
         args: self.parse_argument_list()?,
       });
     }
-    Some(SyntaxNode::Word(name))
+    let word = self.source.get(name.start..name.end)?;
+    Some(FormulaAst::Word {
+      span: name,
+      kind: semantic_word_kind(word),
+    })
   }
 
-  fn parse_argument_list(&mut self) -> Option<Vec<SyntaxNode>> {
+  fn parse_argument_list(&mut self) -> Option<Vec<FormulaAst>> {
     if self
       .tokens
       .consume_token_kind(LexTokenKind::ParenOpen)
@@ -331,7 +302,7 @@ impl<'a> SyntaxParser<'a> {
         .consume_token_kind(LexTokenKind::ArgumentSeparator)
         .is_some()
       {
-        args.push(SyntaxNode::Blank);
+        args.push(FormulaAst::Blank);
         continue;
       }
       args.push(self.parse_expression()?);
@@ -354,75 +325,53 @@ impl<'a> SyntaxParser<'a> {
         .peek()
         .is_some_and(|token| token.kind == LexTokenKind::ParenClose)
       {
-        args.push(SyntaxNode::Blank);
+        args.push(FormulaAst::Blank);
       }
     }
     Some(args)
   }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct SyntaxToken {
-  token: LexToken,
-  preceded_by_ws: bool,
+enum SyntaxTokenInput<'a> {
+  Borrowed(&'a [LexToken]),
+  Owned(Vec<LexToken>),
 }
 
-struct SyntaxTokens {
-  tokens: Vec<SyntaxToken>,
+struct SyntaxTokens<'a> {
+  source: &'a str,
+  tokens: SyntaxTokenInput<'a>,
   index: usize,
 }
 
-impl SyntaxTokens {
-  fn new(source: &str) -> Self {
+impl<'a> SyntaxTokens<'a> {
+  fn new(source: &'a str) -> Self {
     Self {
-      tokens: Self::tokens_from(source, 0),
+      source,
+      tokens: SyntaxTokenInput::Owned(Self::tokens_from(source, 0)),
       index: 0,
     }
   }
 
-  fn from_tokens(source: &str, tokens: &[LexToken]) -> Self {
+  fn from_tokens(source: &'a str, tokens: &'a [LexToken]) -> Self {
     Self {
-      tokens: Self::tokens_from_absolute(source, 0, tokens.iter().copied()),
+      source,
+      tokens: SyntaxTokenInput::Borrowed(tokens),
       index: 0,
     }
   }
 
-  fn tokens_from(source: &str, offset: usize) -> Vec<SyntaxToken> {
-    let tokens = lex_tokens(source.get(offset..).unwrap_or_default()).map(|token| LexToken {
-      kind: token.kind,
-      start: token.start + offset,
-      end: token.end + offset,
-    });
-    Self::tokens_from_absolute(source, offset, tokens)
-  }
-
-  fn tokens_from_absolute(
-    source: &str,
-    mut previous_end: usize,
-    tokens: impl IntoIterator<Item = LexToken>,
-  ) -> Vec<SyntaxToken> {
-    tokens
-      .into_iter()
-      .map(|token| {
-        let token = LexToken {
-          kind: token.kind,
-          start: token.start,
-          end: token.end,
-        };
-        let preceded_by_ws = source
-          .get(previous_end..token.start)
-          .is_some_and(|text| !text.is_empty());
-        previous_end = token.end;
-        SyntaxToken {
-          token,
-          preceded_by_ws,
-        }
+  fn tokens_from(source: &str, offset: usize) -> Vec<LexToken> {
+    lex_tokens(source.get(offset..).unwrap_or_default())
+      .map(|token| LexToken {
+        kind: token.kind,
+        start: token.start + offset,
+        end: token.end + offset,
       })
       .collect()
   }
 
   fn is_end(&self) -> bool {
-    self.index >= self.tokens.len()
+    self.index >= self.len()
   }
 
   fn position(&self) -> usize {
@@ -430,11 +379,11 @@ impl SyntaxTokens {
   }
 
   fn set_position(&mut self, index: usize) {
-    self.index = index.min(self.tokens.len());
+    self.index = index.min(self.len());
   }
 
   fn peek(&self) -> Option<LexToken> {
-    self.tokens.get(self.index).map(|entry| entry.token)
+    self.token_at(self.index)
   }
 
   fn advance(&mut self) -> Option<LexToken> {
@@ -444,11 +393,22 @@ impl SyntaxTokens {
   }
 
   fn ws_before_next(&self) -> bool {
+    let token = match self.token_at(self.index) {
+      Some(token) => token,
+      None => return false,
+    };
+    let previous_end = if self.index == 0 {
+      0
+    } else {
+      self
+        .token_at(self.index - 1)
+        .map(|token| token.end)
+        .unwrap_or_default()
+    };
     self
-      .tokens
-      .get(self.index)
-      .map(|entry| entry.preceded_by_ws)
-      .unwrap_or(false)
+      .source
+      .get(previous_end..token.start)
+      .is_some_and(|text| !text.is_empty())
   }
 
   fn consume_token_kind(&mut self, kind: LexTokenKind) -> Option<LexToken> {
@@ -474,31 +434,57 @@ impl SyntaxTokens {
     Some(operator)
   }
 
-  fn consume_logical_function_call(&mut self, source: &str) -> Option<LexLogicalFunction> {
+  fn consume_logical_function_call(&mut self) -> Option<LexLogicalFunction> {
     let token = self.peek()?;
     if token.kind != LexTokenKind::Word {
       return None;
     }
-    let word = source.get(token.start..token.end)?;
+    let word = self.source.get(token.start..token.end)?;
     let function = logical_function_name(word)?;
-    let next = self.tokens.get(self.index + 1)?;
-    if next.token.kind != LexTokenKind::ParenOpen {
+    let next = self.token_at(self.index + 1)?;
+    if next.kind != LexTokenKind::ParenOpen {
       return None;
     }
     self.advance();
     Some(function)
   }
 
-  fn advance_split_word(&mut self, source: &str, end: usize) {
-    if self.tokens.get(self.index).is_none() {
+  fn advance_split_word(&mut self, end: usize) {
+    if self.token_at(self.index).is_none() {
       return;
     }
-    if let Some(entry) = self.tokens.get_mut(self.index) {
-      entry.token.end = end;
+    self.materialize();
+    let tail = Self::tokens_from(self.source, end);
+    let SyntaxTokenInput::Owned(tokens) = &mut self.tokens else {
+      return;
+    };
+    tokens[self.index].end = end;
+    self.index += 1;
+    tokens.splice(self.index.., tail);
+  }
+
+  fn len(&self) -> usize {
+    match &self.tokens {
+      SyntaxTokenInput::Borrowed(tokens) => tokens.len(),
+      SyntaxTokenInput::Owned(tokens) => tokens.len(),
     }
-    self.advance();
-    let tail = Self::tokens_from(source, end);
-    self.tokens.splice(self.index..self.tokens.len(), tail);
+  }
+
+  fn token_at(&self, index: usize) -> Option<LexToken> {
+    match &self.tokens {
+      SyntaxTokenInput::Borrowed(tokens) => tokens.get(index).copied(),
+      SyntaxTokenInput::Owned(tokens) => tokens.get(index).copied(),
+    }
+  }
+
+  fn materialize(&mut self) {
+    let owned = match &self.tokens {
+      SyntaxTokenInput::Borrowed(tokens) => Some(tokens.to_vec()),
+      SyntaxTokenInput::Owned(_) => None,
+    };
+    if let Some(tokens) = owned {
+      self.tokens = SyntaxTokenInput::Owned(tokens);
+    }
   }
 }
 
@@ -549,7 +535,14 @@ fn prefix_operator(operator: LexOperator) -> bool {
   matches!(operator, LexOperator::Add | LexOperator::Subtract)
 }
 
-fn split_word_before_intersection(source: &str, token: LexToken) -> Option<SyntaxSpan> {
+fn token_span(token: LexToken) -> SemanticSpan {
+  SemanticSpan {
+    start: token.start,
+    end: token.end,
+  }
+}
+
+fn split_word_before_intersection(source: &str, token: LexToken) -> Option<SemanticSpan> {
   let word = &source[token.start..token.end];
   let mut quoted = false;
   let mut chars = word.char_indices().peekable();
@@ -563,7 +556,7 @@ fn split_word_before_intersection(source: &str, token: LexToken) -> Option<Synta
         }
       }
       '!' if !quoted && word[..index].contains(':') => {
-        return Some(SyntaxSpan {
+        return Some(SemanticSpan {
           start: token.start,
           end: token.start + index,
         });
@@ -600,7 +593,7 @@ mod tests {
     assert!(parse.issues.is_empty());
     assert!(matches!(
       parse.ast,
-      Some(SyntaxNode::Binary {
+      Some(FormulaAst::Binary {
         op: LexOperator::Intersection,
         ..
       })
@@ -615,7 +608,7 @@ mod tests {
     assert!(parse.issues.is_empty());
     assert!(matches!(
       parse.ast,
-      Some(SyntaxNode::Binary {
+      Some(FormulaAst::Binary {
         op: LexOperator::Add,
         ..
       })

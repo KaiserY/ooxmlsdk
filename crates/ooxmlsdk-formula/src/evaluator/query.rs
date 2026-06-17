@@ -342,13 +342,9 @@ impl<'doc> CriteriaPlan<'doc> {
       );
     }
     match &self.operand {
-      CriteriaOperand::Number { value, source_text } => self.matches_number(
-        evaluator,
-        candidate,
-        candidate_query_empty,
-        *value,
-        source_text,
-      ),
+      CriteriaOperand::Number { value, source_text } => {
+        self.matches_number(evaluator, candidate, *value, source_text)
+      }
       CriteriaOperand::Text(pattern) => self.matches_text(evaluator, candidate, pattern),
       CriteriaOperand::Blank => self.compare_ordering(Some(match candidate {
         FormulaValue::Blank => 0,
@@ -371,14 +367,15 @@ impl<'doc> CriteriaPlan<'doc> {
     &self,
     evaluator: &FormulaEvaluator<'_, 'doc>,
     candidate: &FormulaValue<'doc>,
-    candidate_query_empty: bool,
     query: f64,
     source_text: &Option<Cow<'doc, str>>,
   ) -> bool {
-    let Some(candidate_number) = query_candidate_number(candidate, candidate_query_empty) else {
+    let Some(candidate_number) =
+      criteria_candidate_number(candidate, matches!(self.op, QueryOp::Equal))
+    else {
       if let Some(source_text) = source_text
         && let FormulaValue::String(candidate_text) = candidate
-        && matches!(self.op, QueryOp::Equal | QueryOp::NotEqual)
+        && self.op == QueryOp::Equal
       {
         let matched = if self.match_whole_cell {
           compare_text(evaluator, candidate_text, source_text, self.case_sensitive) == 0
@@ -387,11 +384,7 @@ impl<'doc> CriteriaPlan<'doc> {
         } else {
           lookup_text_contains(candidate_text, source_text)
         };
-        return if self.op == QueryOp::Equal {
-          matched
-        } else {
-          !matched
-        };
+        return matched;
       }
       return matches!(self.op, QueryOp::NotEqual);
     };
@@ -847,6 +840,21 @@ pub(crate) fn query_candidate_number(value: &FormulaValue<'_>, query_empty: bool
   match value {
     FormulaValue::Number(value) => Some(*value),
     FormulaValue::Boolean(value) => Some(if *value { 1.0 } else { 0.0 }),
+    _ => None,
+  }
+}
+
+fn criteria_candidate_text_number(value: &FormulaValue<'_>) -> Option<f64> {
+  let FormulaValue::String(text) = value else {
+    return None;
+  };
+  text.trim().parse::<f64>().ok()
+}
+
+fn criteria_candidate_number(value: &FormulaValue<'_>, parse_text: bool) -> Option<f64> {
+  match value {
+    FormulaValue::Number(value) => Some(*value),
+    FormulaValue::String(_) if parse_text => criteria_candidate_text_number(value),
     _ => None,
   }
 }

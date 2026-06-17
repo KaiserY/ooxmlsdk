@@ -929,13 +929,33 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
     };
     let Some(index) = index else {
-      return args
+      let value = args
         .raw_arg(3)
         .filter(|_| !args.is_missing(3))
         .and_then(|_| args.value(3))
-        .or(Some(FormulaValue::Error(FormulaErrorValue::NA)));
+        .unwrap_or(FormulaValue::Error(FormulaErrorValue::NA));
+      return Some(self.xlookup_not_found_value(value, &return_array, lookup_vertical));
     };
     Some(self.xlookup_return_value(return_array, index, lookup_vertical))
+  }
+
+  fn xlookup_not_found_value(
+    &self,
+    value: FormulaValue<'doc>,
+    return_array: &FormulaValue<'doc>,
+    lookup_vertical: bool,
+  ) -> FormulaValue<'doc> {
+    if !self.array_context || matches!(value, FormulaValue::Error(_)) {
+      return value;
+    }
+    let (rows, columns) = xlookup_result_dimensions(self, return_array, lookup_vertical);
+    if rows <= 1 && columns <= 1 {
+      return value;
+    }
+    let mut matrix =
+      vec![vec![FormulaValue::String(Cow::Borrowed("")); columns.max(1)]; rows.max(1)];
+    matrix[0][0] = value;
+    FormulaValue::Matrix(matrix)
   }
 
   fn xlookup_return_value(
@@ -980,14 +1000,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           },
         )
       };
-      return FormulaValue::Reference(QualifiedRange {
+      let reference = QualifiedRange {
         sheet: reference.sheet,
         sheet_name: reference.sheet_name.clone(),
         end_sheet_name: reference.end_sheet_name.clone(),
         range,
         start_flags: reference.start_flags,
         end_flags: reference.end_flags,
-      });
+      };
+      if self.array_context && reference.range.cell_count_hint() > 1 {
+        return FormulaValue::Matrix(self.matrix_values(&FormulaValue::Reference(reference)));
+      }
+      return FormulaValue::Reference(reference);
     }
     let matrix = self.matrix_values(&return_array);
     let Some(vector) = lookup_vector_with_orientation(&matrix, lookup_vertical) else {
@@ -1422,6 +1446,10 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
+    let function_id = function.rem_euclid(100);
+    if !(1..=11).contains(&function_id) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
     let mut values = Vec::with_capacity(args.len().saturating_sub(1));
     for index in 1..args.len() {
       values.push(args.value(index)?);
@@ -1437,7 +1465,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       for range in ranges {
         let value = aggregate_function_value(
           self,
-          function.rem_euclid(100),
+          function_id,
           &[FormulaValue::Reference(range.clone())],
           None,
           options,
@@ -1450,11 +1478,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       }
       return Some(FormulaValue::Matrix(rows));
     }
-    aggregate_function_value(self, function.rem_euclid(100), &values, None, options).map(|result| {
-      match result {
-        Ok(value) => FormulaValue::Number(value),
-        Err(error) => FormulaValue::Error(error),
-      }
+    aggregate_function_value(self, function_id, &values, None, options).map(|result| match result {
+      Ok(value) => FormulaValue::Number(value),
+      Err(error) => FormulaValue::Error(error),
     })
   }
 
@@ -2476,7 +2502,6 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
           return 0;
         }
         let sheet = self.range_sheet(reference);
-        let single_cell = reference.range.cell_count_hint() == 1;
         let mut count = 0usize;
         for row in reference.range.start.row..=reference.range.end.row {
           for column in reference.range.start.column..=reference.range.end.column {
@@ -2485,7 +2510,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
             let formula = self.book.formula_text(sheet, address).is_some();
             let is_blank = match value {
               FormulaValue::Blank => !formula,
-              FormulaValue::String(ref text) => text.is_empty() && (single_cell || formula),
+              FormulaValue::String(ref text) => text.is_empty(),
               _ => false,
             };
             if is_blank {
@@ -2686,6 +2711,17 @@ fn search_vector_with_type<'doc>(
     LookupSearchMode::BinaryAscending | LookupSearchMode::BinaryDescending => {
       if search_type != QuerySearchType::Normal {
         return None;
+      }
+      if range_lookup {
+        return search_vector_with_type(
+          evaluator,
+          lookup,
+          vector,
+          op,
+          LookupSearchMode::Forward,
+          search_type,
+          flags,
+        );
       }
       lookup_binary_search(
         evaluator,
@@ -3020,6 +3056,30 @@ fn formula_error_matches(value: &FormulaValue<'_>, na_only: bool) -> bool {
 
 pub(crate) fn matrix_dimensions<T>(matrix: &[Vec<T>]) -> (usize, usize) {
   (matrix.len(), matrix.first().map_or(0, Vec::len))
+}
+
+fn xlookup_result_dimensions<'doc>(
+  evaluator: &FormulaEvaluator<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  lookup_vertical: bool,
+) -> (usize, usize) {
+  let (rows, columns) = match value {
+    FormulaValue::Reference(reference) => (
+      reference.range.start.row.abs_diff(reference.range.end.row) as usize + 1,
+      reference
+        .range
+        .start
+        .column
+        .abs_diff(reference.range.end.column) as usize
+        + 1,
+    ),
+    value => matrix_dimensions(&evaluator.matrix_values(value)),
+  };
+  if lookup_vertical {
+    (1, columns)
+  } else {
+    (rows, 1)
+  }
 }
 
 fn ranges_intersect(left: &CellRange, right: &CellRange) -> bool {

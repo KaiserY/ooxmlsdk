@@ -48,8 +48,8 @@ use crate::evaluator::{
 };
 use crate::model::{XLSX_MAX_COLUMN_ZERO_BASED, XLSX_MAX_ROW_ZERO_BASED};
 use crate::{
-  CellAddress, CellRange, FormulaErrorValue, FormulaGrammar, FormulaValue, PivotDataRequest,
-  PivotFieldFilter, QualifiedRange,
+  CellAddress, CellRange, DateSystem, FormulaErrorValue, FormulaGrammar, FormulaValue,
+  PivotDataRequest, PivotFieldFilter, QualifiedRange,
 };
 
 pub(crate) fn evaluate_function<'doc>(
@@ -126,6 +126,7 @@ fn evaluate_function_reader<'doc>(
     ),
     FormulaFunctionId::Mina => evaluate_mina_maxa_reader(evaluator, args, false),
     FormulaFunctionId::Maxa => evaluate_mina_maxa_reader(evaluator, args, true),
+    FormulaFunctionId::Averagea => evaluate_averagea_reader(evaluator, args),
     FormulaFunctionId::Count => Some(FormulaValue::Number(args.count_numbers()? as f64)),
     FormulaFunctionId::Counta => Some(FormulaValue::Number(args.count_all_values()? as f64)),
     FormulaFunctionId::Countblank if args.len() == 1 => Some(FormulaValue::Number(
@@ -241,6 +242,7 @@ fn evaluate_function_reader<'doc>(
       evaluate_fixed_reader(evaluator, args)
     }
     FormulaFunctionId::Concat => evaluate_concat_reader(evaluator, args),
+    FormulaFunctionId::Textjoin => evaluate_textjoin_reader(evaluator, args),
     FormulaFunctionId::Exact if args.len() == 2 => evaluate_exact_reader(evaluator, args),
     FormulaFunctionId::Find if (2..=3).contains(&args.len()) => {
       evaluate_find_reader(evaluator, args, true, false)
@@ -647,11 +649,14 @@ fn evaluate_function_reader<'doc>(
       evaluate_iso_weeknum_reader(evaluator, args)
     }
     FormulaFunctionId::Today if args.is_empty() => evaluator.evaluate_today(),
-    FormulaFunctionId::Networkdays if (2..=4).contains(&args.len()) => {
+    FormulaFunctionId::Networkdays if (2..=3).contains(&args.len()) => {
       evaluator.evaluate_networkdays_reader(args, false)
     }
     FormulaFunctionId::NetworkdaysDotIntl if (2..=4).contains(&args.len()) => {
       evaluator.evaluate_networkdays_reader(args, true)
+    }
+    FormulaFunctionId::Networkdays | FormulaFunctionId::NetworkdaysDotIntl => {
+      Some(FormulaValue::Error(FormulaErrorValue::Value))
     }
     FormulaFunctionId::Workday if (2..=3).contains(&args.len()) => {
       evaluator.evaluate_workday_reader(args, false)
@@ -828,10 +833,15 @@ fn evaluate_function_reader<'doc>(
     FormulaFunctionId::Dollarfr if args.len() == 2 => {
       evaluate_dollar_decimal_reader(evaluator, args, false)
     }
+    FormulaFunctionId::Delta if (1..=2).contains(&args.len()) => {
+      evaluate_delta_reader(evaluator, args)
+    }
+    FormulaFunctionId::Delta => Some(FormulaValue::Error(FormulaErrorValue::Value)),
     FormulaFunctionId::Euroconvert if (3..=5).contains(&args.len()) => {
       evaluator.evaluate_euroconvert_reader(args)
     }
     FormulaFunctionId::Pmt if (3..=5).contains(&args.len()) => evaluate_pmt_reader(evaluator, args),
+    FormulaFunctionId::Pv if (3..=5).contains(&args.len()) => evaluate_pv_reader(evaluator, args),
     FormulaFunctionId::Npv if args.len() >= 2 => evaluate_npv_reader(evaluator, args),
     FormulaFunctionId::Ispmt if args.len() == 4 => evaluate_ispmt_reader(evaluator, args),
     FormulaFunctionId::Rri if args.len() == 3 => evaluate_rri_reader(evaluator, args),
@@ -1329,10 +1339,13 @@ fn evaluate_areas_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
-  if args.len() != 1 {
+  if args.is_empty() {
     return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
   }
-  let ranges = args.reference_ranges(0)?;
+  let mut ranges = Vec::new();
+  for index in 0..args.len() {
+    ranges.extend(args.reference_ranges(index)?);
+  }
   if !ranges.is_empty() {
     return Some(FormulaValue::Number(ranges.len() as f64));
   }
@@ -1653,6 +1666,97 @@ fn evaluate_concat_reader<'doc>(
   Some(FormulaValue::String(Cow::Owned(output)))
 }
 
+fn evaluate_textjoin_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  if args.len() < 3 {
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  }
+  let delimiters = match textjoin_delimiters(evaluator, &args.value(0)?) {
+    Ok(delimiters) => delimiters,
+    Err(error) => return Some(FormulaValue::Error(error)),
+  };
+  let ignore_empty_value = evaluator.scalar_value(args.value(1)?);
+  if let FormulaValue::Error(error) = ignore_empty_value {
+    return Some(FormulaValue::Error(error));
+  }
+  let ignore_empty = evaluator.truthy(&ignore_empty_value);
+  let mut output = String::new();
+  let mut value_count = 0usize;
+  for index in 2..args.len() {
+    let value = args.value(index)?;
+    if let Err(error) = textjoin_value_text(
+      evaluator,
+      &value,
+      &delimiters,
+      ignore_empty,
+      &mut output,
+      &mut value_count,
+    ) {
+      return Some(FormulaValue::Error(error));
+    }
+  }
+  Some(FormulaValue::String(Cow::Owned(output)))
+}
+
+fn textjoin_delimiters<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> Result<Vec<String>, FormulaErrorValue> {
+  let mut delimiters = Vec::new();
+  for value in evaluator.matrix_values(value).into_iter().flatten() {
+    match value {
+      FormulaValue::Error(error) => return Err(error),
+      value => delimiters.push(evaluator.text(&value)),
+    }
+  }
+  if delimiters.is_empty() {
+    delimiters.push(String::new());
+  }
+  Ok(delimiters)
+}
+
+fn textjoin_value_text<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+  delimiters: &[String],
+  ignore_empty: bool,
+  output: &mut String,
+  value_count: &mut usize,
+) -> Result<(), FormulaErrorValue> {
+  for value in evaluator.matrix_values(value).into_iter().flatten() {
+    match value {
+      FormulaValue::Error(error) => return Err(error),
+      FormulaValue::Blank => {
+        if ignore_empty {
+          continue;
+        }
+        textjoin_push_value("", delimiters, output, value_count);
+      }
+      FormulaValue::String(text) if text.is_empty() && ignore_empty => {}
+      value => {
+        let text = evaluator.text(&value);
+        textjoin_push_value(&text, delimiters, output, value_count);
+      }
+    }
+  }
+  Ok(())
+}
+
+fn textjoin_push_value(
+  text: &str,
+  delimiters: &[String],
+  output: &mut String,
+  value_count: &mut usize,
+) {
+  if *value_count > 0 {
+    output.push_str(&delimiters[(*value_count - 1) % delimiters.len()]);
+  }
+  output.push_str(text);
+  *value_count += 1;
+}
+
 fn concat_value_text<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   value: &FormulaValue<'doc>,
@@ -1791,6 +1895,22 @@ fn evaluate_mina_maxa_reader<'doc>(
   } else {
     values.into_iter().reduce(f64::min).unwrap_or(0.0)
   }))
+}
+
+fn evaluate_averagea_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let mut values = Vec::new();
+  for index in 0..args.len() {
+    collect_a_numbers(evaluator, args.value(index)?, &mut values)?;
+  }
+  if values.is_empty() {
+    return Some(FormulaValue::Error(FormulaErrorValue::Div0));
+  }
+  Some(FormulaValue::Number(
+    values.iter().sum::<f64>() / values.len() as f64,
+  ))
 }
 
 fn collect_a_numbers<'doc>(
@@ -2667,15 +2787,35 @@ fn evaluate_date_reader<'doc>(
   if year < 0 {
     return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
-  if year < 100 {
-    year = expand_two_digit_year(year);
+  if evaluator.book.date_system == DateSystem::LibreOffice {
+    if year < 100 {
+      year = expand_two_digit_year(year);
+    }
+    let (normalized_year, normalized_month, normalized_day) =
+      normalized_date_components(year, month, day)?;
+    if !is_valid_libreoffice_gregorian_date(normalized_year, normalized_month, normalized_day) {
+      return Some(FormulaValue::Error(FormulaErrorValue::Value));
+    }
+    return date_serial_with_system(year, month, day, evaluator.book.date_system)
+      .map(FormulaValue::Number);
   }
-  let (normalized_year, normalized_month, normalized_day) =
-    normalized_date_components(year, month, day)?;
-  if !is_valid_libreoffice_gregorian_date(normalized_year, normalized_month, normalized_day) {
-    return Some(FormulaValue::Error(FormulaErrorValue::Value));
+  excel_date_function_serial(year, month, day, evaluator.book.date_system).map(FormulaValue::Number)
+}
+
+fn excel_date_function_serial(
+  mut year: i32,
+  month: i32,
+  day: i32,
+  date_system: DateSystem,
+) -> Option<f64> {
+  if year < 1900 {
+    year += 1900;
   }
-  date_serial_with_system(year, month, day, evaluator.book.date_system).map(FormulaValue::Number)
+  let month_index = month - 1;
+  let normalized_year = year + month_index.div_euclid(12);
+  let normalized_month = month_index.rem_euclid(12) + 1;
+  date_serial_with_system(normalized_year, normalized_month, 1, date_system)
+    .map(|serial| serial + f64::from(day - 1))
 }
 
 fn evaluate_time_reader<'doc>(
@@ -4765,6 +4905,36 @@ fn evaluate_pmt_reader<'doc>(
   }
 }
 
+fn evaluate_pv_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let rate = evaluator.number(&args.value(0)?)?;
+  let nper = evaluator.number(&args.value(1)?)?;
+  let pmt = evaluator.number(&args.value(2)?)?;
+  let fv = args
+    .raw_arg(3)
+    .and_then(|_| args.value(3))
+    .and_then(|value| evaluator.number(&value))
+    .unwrap_or(0.0);
+  let pay_in_advance = args
+    .raw_arg(4)
+    .and_then(|_| args.value(4))
+    .is_some_and(|value| evaluator.truthy(&value));
+  let result = if rate == 0.0 {
+    -((nper * pmt) + fv)
+  } else {
+    let rate1 = rate + 1.0;
+    (((1.0 - rate1.powf(nper)) / rate) * if pay_in_advance { rate1 } else { 1.0 } * pmt - fv)
+      / rate1.powf(nper)
+  };
+  if result.is_finite() {
+    Some(FormulaValue::Number(result))
+  } else {
+    Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument))
+  }
+}
+
 fn evaluate_ispmt_reader<'doc>(
   evaluator: &EvalContext<'_, 'doc>,
   args: FunctionArgReader<'_, '_, 'doc>,
@@ -4815,6 +4985,19 @@ fn evaluate_dollar_decimal_reader<'doc>(
     integer + decimal * fraction * 10.0_f64.powf(-fraction.log10().ceil())
   };
   Some(FormulaValue::Number(result))
+}
+
+fn evaluate_delta_reader<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: FunctionArgReader<'_, '_, 'doc>,
+) -> Option<FormulaValue<'doc>> {
+  let left = evaluator.number(&args.value(0)?)?;
+  let right = if args.len() == 2 {
+    evaluator.number(&args.value(1)?)?
+  } else {
+    0.0
+  };
+  Some(FormulaValue::Number(if left == right { 1.0 } else { 0.0 }))
 }
 
 fn evaluate_covariance_reader<'doc>(

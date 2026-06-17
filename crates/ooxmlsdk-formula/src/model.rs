@@ -6522,7 +6522,7 @@ mod tests {
   }
 
   #[test]
-  fn evaluation_book_countblank_matches_libreoffice_formula_result_rules() {
+  fn evaluation_book_countblank_counts_empty_strings_like_excel() {
     let book = FormulaEvaluationBookBuilder::new()
       .with_cell(
         SheetId(1),
@@ -6550,7 +6550,7 @@ mod tests {
 
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "COUNTBLANK(A1:A4)"),
-      Some(FormulaValue::Number(2.0))
+      Some(FormulaValue::Number(3.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "ISBLANK(A1)"),
@@ -6873,6 +6873,9 @@ mod tests {
         FormulaValue::Number(2001.0),
       )
       .build();
+    let lo_book = FormulaEvaluationBookBuilder::new()
+      .with_date_system(DateSystem::LibreOffice)
+      .build();
 
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DATE(,1,31)"),
@@ -6883,16 +6886,28 @@ mod tests {
       Some(FormulaValue::Number(30316.0))
     );
     assert_eq!(
-      book.evaluate_formula_text(SheetId(1), None, "DATE(0,12,31)"),
+      lo_book.evaluate_formula_text(SheetId(1), None, "DATE(0,12,31)"),
       Some(FormulaValue::Number(36891.0))
     );
     assert_eq!(
-      book.evaluate_formula_text(SheetId(1), None, "DATE(100,1,1)"),
+      lo_book.evaluate_formula_text(SheetId(1), None, "DATE(100,1,1)"),
       Some(FormulaValue::Error(FormulaErrorValue::Value))
     );
     assert_eq!(
-      book.evaluate_formula_text(SheetId(1), None, "DATE(1582,10,15)"),
-      Some(FormulaValue::Number(-115859.0))
+      lo_book.evaluate_formula_text(SheetId(1), None, "DATE(1582,10,15)"),
+      Some(FormulaValue::Number(-115858.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(1900,2,29)"),
+      Some(FormulaValue::Number(60.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(1900,2,30)"),
+      Some(FormulaValue::Number(61.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(SheetId(1), None, "DATE(104,1,1)"),
+      Some(FormulaValue::Number(37987.0))
     );
     assert_eq!(
       book.evaluate_formula_text(SheetId(1), None, "DAY(\"1899-12-29T15:26:14\")"),

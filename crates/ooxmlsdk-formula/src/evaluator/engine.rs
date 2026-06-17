@@ -299,7 +299,7 @@ fn evaluate_if_error_control<'doc>(
   na_only: bool,
 ) -> Option<FormulaValue<'doc>> {
   if args.len() != 2 {
-    return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
+    return Some(FormulaValue::Error(FormulaErrorValue::Value));
   }
   let value_arg = args.get(0)?;
   if is_missing_arg(value_arg) {

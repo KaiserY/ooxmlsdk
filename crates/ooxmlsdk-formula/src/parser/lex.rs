@@ -130,20 +130,11 @@ pub(crate) fn lex_tokens(source: &str) -> LexTokens<'_> {
 pub(crate) struct FormulaCursor<'a> {
   source: &'a str,
   index: usize,
-  consumed_ws: bool,
 }
 
 impl<'a> FormulaCursor<'a> {
   pub(crate) fn new(source: &'a str) -> Self {
-    Self {
-      source,
-      index: 0,
-      consumed_ws: false,
-    }
-  }
-
-  pub(crate) fn source(&self) -> &'a str {
-    self.source
+    Self { source, index: 0 }
   }
 
   pub(crate) fn index(&self) -> usize {
@@ -153,7 +144,6 @@ impl<'a> FormulaCursor<'a> {
   pub(crate) fn set_index(&mut self, index: usize) -> bool {
     if self.source.get(index..).is_some() {
       self.index = index;
-      self.consumed_ws = false;
       true
     } else {
       false
@@ -165,25 +155,9 @@ impl<'a> FormulaCursor<'a> {
   }
 
   pub(crate) fn skip_ws(&mut self) {
-    let _ = self.consume_ws();
-  }
-
-  pub(crate) fn consume_ws(&mut self) -> bool {
     let mut input = self.rest();
-    let start_len = input.len();
     skip_whitespace(&mut input);
     self.index = self.source.len() - input.len();
-    let consumed_ws = input.len() != start_len;
-    if consumed_ws {
-      self.consumed_ws = true;
-    }
-    consumed_ws
-  }
-
-  pub(crate) fn take_consumed_ws(&mut self) -> bool {
-    let consumed_ws = self.consumed_ws;
-    self.consumed_ws = false;
-    consumed_ws
   }
 
   pub(crate) fn is_end(&self) -> bool {
@@ -201,7 +175,6 @@ impl<'a> FormulaCursor<'a> {
       return None;
     }
     self.index = token.end;
-    self.consumed_ws = false;
     Some(token)
   }
 
@@ -217,51 +190,7 @@ impl<'a> FormulaCursor<'a> {
       return None;
     }
     self.index = token.end;
-    self.consumed_ws = false;
     Some(operator)
-  }
-
-  pub(crate) fn consume_adjacent_logical_function(&mut self) -> Option<LexLogicalFunction> {
-    let rest = self.rest();
-    let function = if rest
-      .get(..3)
-      .is_some_and(|value| value.eq_ignore_ascii_case("AND"))
-    {
-      LexLogicalFunction::And
-    } else if rest
-      .get(..2)
-      .is_some_and(|value| value.eq_ignore_ascii_case("OR"))
-    {
-      LexLogicalFunction::Or
-    } else if rest
-      .get(..3)
-      .is_some_and(|value| value.eq_ignore_ascii_case("NOT"))
-    {
-      LexLogicalFunction::Not
-    } else {
-      return None;
-    };
-    let next = self.index + function.name().len();
-    if next < self.source.len() {
-      let next_char = self.source[next..].chars().next()?;
-      if is_formula_word_char(next_char) {
-        return None;
-      }
-    }
-    let mut probe = next;
-    while let Some(ch) = self.source[probe..].chars().next() {
-      if !ch.is_whitespace() {
-        break;
-      }
-      probe += ch.len_utf8();
-    }
-    if self.source[probe..].starts_with('(') {
-      self.index = next;
-      self.consumed_ws = false;
-      Some(function)
-    } else {
-      None
-    }
   }
 }
 

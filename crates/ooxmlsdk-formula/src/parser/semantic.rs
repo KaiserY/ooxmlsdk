@@ -1,5 +1,4 @@
-use super::lex::{LexTokens, lex_tokens};
-use super::{LexErrorValue, LexOperator, LexToken, LexTokenKind};
+use super::lex::{LexErrorValue, LexOperator, LexToken, LexTokenKind};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SemanticToken {
@@ -68,28 +67,11 @@ pub(crate) enum SemanticWordKind {
   Name,
 }
 
-pub(crate) struct SemanticTokens<'a> {
-  source: &'a str,
-  tokens: LexTokens<'a>,
-}
-
-impl Iterator for SemanticTokens<'_> {
-  type Item = SemanticToken;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    let token = self.tokens.next()?;
-    Some(SemanticToken {
-      kind: semantic_token_kind(self.source, token),
-      start: token.start,
-      end: token.end,
-    })
-  }
-}
-
-pub(crate) fn semantic_tokens(source: &str) -> SemanticTokens<'_> {
-  SemanticTokens {
-    source,
-    tokens: lex_tokens(source),
+pub(super) fn semantic_token_from_lex(source: &str, token: LexToken) -> SemanticToken {
+  SemanticToken {
+    kind: semantic_token_kind(source, token),
+    start: token.start,
+    end: token.end,
   }
 }
 

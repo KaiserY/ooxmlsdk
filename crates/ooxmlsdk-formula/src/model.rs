@@ -3141,29 +3141,21 @@ fn parse_formula<'doc>(
   source: Cow<'doc, str>,
   grammar: FormulaGrammar,
 ) -> ParsedFormula<'doc> {
-  parse_formula_with_new_parser(sheet, source, grammar)
+  lower_formula_parser_formula(sheet, source, grammar)
 }
 
-fn parse_formula_with_new_parser<'doc>(
+fn lower_formula_parser_formula<'doc>(
   sheet: SheetId,
   source: Cow<'doc, str>,
   grammar: FormulaGrammar,
 ) -> ParsedFormula<'doc> {
-  lower_new_parser_formula(sheet, source, grammar)
-}
-
-fn lower_new_parser_formula<'doc>(
-  sheet: SheetId,
-  source: Cow<'doc, str>,
-  grammar: FormulaGrammar,
-) -> ParsedFormula<'doc> {
-  let parsed = crate::parser::parse_formula_source(source.as_ref());
+  let parsed = crate::parser::FormulaParser::new(source.as_ref()).parse();
   let text = parsed.body;
   let borrowed_text = match &source {
     Cow::Borrowed(value) => Some(value.get(parsed.body_start..).unwrap_or(value)),
     Cow::Owned(_) => None,
   };
-  let lowered = lower_new_parser_body(sheet, text, borrowed_text, parsed.body_parse);
+  let lowered = lower_formula_parser_body(sheet, text, borrowed_text, parsed.body_parse);
 
   ParsedFormula {
     source,
@@ -3182,7 +3174,7 @@ struct LoweredFormula<'doc> {
   unsupported: Vec<UnsupportedFormulaFeature<'doc>>,
 }
 
-fn lower_new_parser_body<'doc>(
+fn lower_formula_parser_body<'doc>(
   sheet: SheetId,
   text: &str,
   borrowed_text: Option<&'doc str>,
@@ -3331,7 +3323,7 @@ fn parse_formula_ast<'doc>(
   Option<FormulaAst<'doc>>,
   Vec<UnsupportedFormulaFeature<'doc>>,
 ) {
-  let parsed = crate::parser::parse_formula_syntax_source(text);
+  let parsed = crate::parser::FormulaParser::new(text).parse_syntax();
   let mut unsupported =
     formula_parse_issues_to_unsupported(parsed.body, None, parsed.syntax_parse.issues);
   let ast = formula_ast_from_parser_ast(
@@ -3348,7 +3340,7 @@ fn formula_ast_from_parser_ast<'doc>(
   sheet: SheetId,
   text: &str,
   borrowed_text: Option<&'doc str>,
-  ast: Option<&crate::parser::FormulaNode>,
+  ast: Option<&crate::parser::FormulaAst>,
   unsupported: &mut Vec<UnsupportedFormulaFeature<'doc>>,
 ) -> Option<FormulaAst<'doc>> {
   let converted = ast.and_then(|ast| formula_ast_from_node(sheet, text, borrowed_text, ast));
@@ -3398,25 +3390,25 @@ fn formula_ast_from_node<'doc>(
   sheet: SheetId,
   text: &str,
   borrowed_text: Option<&'doc str>,
-  ast: &crate::parser::FormulaNode,
+  ast: &crate::parser::FormulaAst,
 ) -> Option<FormulaAst<'doc>> {
   match ast {
-    crate::parser::FormulaNode::Blank => Some(FormulaAst::Literal(FormulaValue::Blank)),
-    crate::parser::FormulaNode::Text(span) => Some(FormulaAst::Literal(formula_text_value(
+    crate::parser::FormulaAst::Blank => Some(FormulaAst::Literal(FormulaValue::Blank)),
+    crate::parser::FormulaAst::Text(span) => Some(FormulaAst::Literal(formula_text_value(
       text,
       borrowed_text,
       span.start,
     ))),
-    crate::parser::FormulaNode::Number(value) => {
+    crate::parser::FormulaAst::Number(value) => {
       Some(FormulaAst::Literal(FormulaValue::Number(*value)))
     }
-    crate::parser::FormulaNode::Error(error) => Some(FormulaAst::Literal(FormulaValue::Error(
+    crate::parser::FormulaAst::Error(error) => Some(FormulaAst::Literal(FormulaValue::Error(
       formula_error_from_lex(*error),
     ))),
-    crate::parser::FormulaNode::Word { span, kind } => {
+    crate::parser::FormulaAst::Word { span, kind } => {
       formula_ast_from_node_word(sheet, text, borrowed_text, *span, *kind)
     }
-    crate::parser::FormulaNode::Unary { op, expr } => {
+    crate::parser::FormulaAst::Unary { op, expr } => {
       let op = match op {
         crate::parser::LexOperator::Add => FormulaOperator::UnaryPlus,
         crate::parser::LexOperator::Subtract => FormulaOperator::UnaryMinus,
@@ -3428,20 +3420,20 @@ fn formula_ast_from_node<'doc>(
         expr: Box::new(formula_ast_from_node(sheet, text, borrowed_text, expr)?),
       })
     }
-    crate::parser::FormulaNode::Binary { op, left, right } => Some(FormulaAst::Binary {
+    crate::parser::FormulaAst::Binary { op, left, right } => Some(FormulaAst::Binary {
       op: formula_operator_from_lex(*op),
       left: Box::new(formula_ast_from_node(sheet, text, borrowed_text, left)?),
       right: Box::new(formula_ast_from_node(sheet, text, borrowed_text, right)?),
     }),
-    crate::parser::FormulaNode::Function { name, args } => Some(FormulaAst::Function {
+    crate::parser::FormulaAst::Function { name, args } => Some(FormulaAst::Function {
       name: cow_span_text(text, borrowed_text, (*name).into()),
       args: formula_ast_args_from_node(sheet, text, borrowed_text, args)?,
     }),
-    crate::parser::FormulaNode::LogicalFunction { function, args } => Some(FormulaAst::Function {
+    crate::parser::FormulaAst::LogicalFunction { function, args } => Some(FormulaAst::Function {
       name: Cow::Borrowed(function.name()),
       args: formula_ast_args_from_node(sheet, text, borrowed_text, args)?,
     }),
-    crate::parser::FormulaNode::Array(rows) => Some(FormulaAst::Array(
+    crate::parser::FormulaAst::Array(rows) => Some(FormulaAst::Array(
       rows
         .iter()
         .map(|row| formula_ast_args_from_node(sheet, text, borrowed_text, row))

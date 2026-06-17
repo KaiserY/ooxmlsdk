@@ -1,15 +1,18 @@
+use super::lex::{LexToken, formula_body_start, lex_tokens};
 use super::semantic::{
-  ExternalReferenceSpans, SemanticSpan, SemanticTokenKind, SemanticWordKind, semantic_tokens,
-  semantic_word_kind,
+  ExternalReferenceSpans, SemanticSpan, SemanticToken, SemanticTokenKind, SemanticWordKind,
+  semantic_token_from_lex, semantic_word_kind,
 };
-use super::syntax::{SyntaxIssue, SyntaxNode, SyntaxSpan, parse_syntax_ast};
-use super::{LexErrorValue, LexLogicalFunction, LexOperator, formula_body_start};
+use super::syntax::{
+  SyntaxIssue, SyntaxNode, SyntaxParse, SyntaxSpan, parse_syntax_ast, parse_syntax_ast_from_tokens,
+};
+use super::{LexErrorValue, LexLogicalFunction, LexOperator};
 use crate::CellAddress;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FormulaBodyParse {
   pub tokens: Vec<FormulaBodyToken>,
-  pub ast: Option<FormulaNode>,
+  pub ast: Option<FormulaAst>,
   pub issues: Vec<FormulaParseIssue>,
 }
 
@@ -22,7 +25,7 @@ pub(crate) struct FormulaSourceParse<'a> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FormulaSyntaxParse {
-  pub ast: Option<FormulaNode>,
+  pub ast: Option<FormulaAst>,
   pub issues: Vec<FormulaParseIssue>,
 }
 
@@ -64,7 +67,7 @@ pub(crate) enum FormulaParseIssue {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum FormulaNode {
+pub(crate) enum FormulaAst {
   Blank,
   Text(SemanticSpan),
   Number(f64),
@@ -75,58 +78,122 @@ pub(crate) enum FormulaNode {
   },
   Unary {
     op: LexOperator,
-    expr: Box<FormulaNode>,
+    expr: Box<FormulaAst>,
   },
   Binary {
     op: LexOperator,
-    left: Box<FormulaNode>,
-    right: Box<FormulaNode>,
+    left: Box<FormulaAst>,
+    right: Box<FormulaAst>,
   },
   Function {
     name: SemanticSpan,
-    args: Vec<FormulaNode>,
+    args: Vec<FormulaAst>,
   },
   LogicalFunction {
     function: LexLogicalFunction,
-    args: Vec<FormulaNode>,
+    args: Vec<FormulaAst>,
   },
-  Array(Vec<Vec<FormulaNode>>),
+  Array(Vec<Vec<FormulaAst>>),
 }
 
-pub(crate) fn parse_formula_source(source: &str) -> FormulaSourceParse<'_> {
-  parse_formula_source_at_body(source, formula_body_start(source))
+pub(crate) type FormulaNode = FormulaAst;
+
+pub(crate) struct FormulaParser<'a> {
+  source: &'a str,
 }
 
-pub(crate) fn parse_formula_source_at_body(
-  source: &str,
-  body_start: usize,
-) -> FormulaSourceParse<'_> {
-  let body = source.get(body_start..).unwrap_or(source);
-  FormulaSourceParse {
-    body_start,
-    body,
-    body_parse: parse_formula_body(body),
+impl<'a> FormulaParser<'a> {
+  pub(crate) fn new(source: &'a str) -> Self {
+    Self { source }
+  }
+
+  pub(crate) fn parse(self) -> FormulaSourceParse<'a> {
+    let body_start = formula_body_start(self.source);
+    self.parse_at_body(body_start)
+  }
+
+  pub(crate) fn parse_at_body(self, body_start: usize) -> FormulaSourceParse<'a> {
+    let body = self.source.get(body_start..).unwrap_or(self.source);
+    FormulaSourceParse {
+      body_start,
+      body,
+      body_parse: parse_formula_body(body),
+    }
+  }
+
+  pub(crate) fn parse_syntax(self) -> FormulaSourceSyntaxParse<'a> {
+    let body_start = formula_body_start(self.source);
+    self.parse_syntax_at_body(body_start)
+  }
+
+  pub(crate) fn parse_syntax_at_body(self, body_start: usize) -> FormulaSourceSyntaxParse<'a> {
+    let body = self.source.get(body_start..).unwrap_or(self.source);
+    FormulaSourceSyntaxParse {
+      body,
+      syntax_parse: parse_formula_syntax(body),
+    }
   }
 }
 
-pub(crate) fn parse_formula_syntax_source(source: &str) -> FormulaSourceSyntaxParse<'_> {
-  parse_formula_syntax_source_at_body(source, formula_body_start(source))
+fn parse_formula_body(source: &str) -> FormulaBodyParse {
+  let lexed = lex_tokens(source).collect::<Vec<_>>();
+  parse_formula_body_from_tokens(source, &lexed)
 }
 
-pub(crate) fn parse_formula_syntax_source_at_body(
-  source: &str,
-  body_start: usize,
-) -> FormulaSourceSyntaxParse<'_> {
-  let body = source.get(body_start..).unwrap_or(source);
-  FormulaSourceSyntaxParse {
-    body,
-    syntax_parse: parse_formula_syntax(body),
-  }
-}
-
-pub(crate) fn parse_formula_body(source: &str) -> FormulaBodyParse {
+fn parse_formula_body_from_tokens(source: &str, lexed: &[LexToken]) -> FormulaBodyParse {
   let mut issues = Vec::new();
-  let tokens = semantic_tokens(source)
+  let tokens = formula_body_tokens(
+    lexed
+      .iter()
+      .copied()
+      .map(|token| semantic_token_from_lex(source, token)),
+    &mut issues,
+  );
+
+  let syntax = parse_formula_syntax_from_tokens(source, lexed);
+  issues.extend(syntax.issues);
+
+  FormulaBodyParse {
+    tokens,
+    ast: syntax.ast,
+    issues,
+  }
+}
+
+fn parse_formula_syntax(source: &str) -> FormulaSyntaxParse {
+  formula_syntax_from_syntax(source, parse_syntax_ast(source))
+}
+
+fn parse_formula_syntax_from_tokens(source: &str, lexed: &[LexToken]) -> FormulaSyntaxParse {
+  formula_syntax_from_syntax(source, parse_syntax_ast_from_tokens(source, lexed))
+}
+
+fn formula_syntax_from_syntax(source: &str, syntax: SyntaxParse) -> FormulaSyntaxParse {
+  let mut issues = Vec::new();
+  for issue in syntax.issues {
+    match issue {
+      SyntaxIssue::MissingClosingParenthesis => {
+        issues.push(FormulaParseIssue::MissingClosingParenthesis);
+      }
+    }
+  }
+  if syntax.ast.is_none() || !syntax.complete {
+    issues.push(FormulaParseIssue::IncompleteExpression);
+  }
+  let ast = syntax
+    .ast
+    .as_ref()
+    .and_then(|node| formula_ast_from_syntax(source, node));
+
+  FormulaSyntaxParse { ast, issues }
+}
+
+fn formula_body_tokens(
+  tokens: impl IntoIterator<Item = SemanticToken>,
+  issues: &mut Vec<FormulaParseIssue>,
+) -> Vec<FormulaBodyToken> {
+  tokens
+    .into_iter()
     .filter_map(|token| {
       let span = SemanticSpan {
         start: token.start,
@@ -156,83 +223,53 @@ pub(crate) fn parse_formula_body(source: &str) -> FormulaBodyParse {
       };
       Some(FormulaBodyToken { kind, span })
     })
-    .collect();
-
-  let syntax = parse_formula_syntax(source);
-  issues.extend(syntax.issues);
-
-  FormulaBodyParse {
-    tokens,
-    ast: syntax.ast,
-    issues,
-  }
+    .collect()
 }
 
-pub(crate) fn parse_formula_syntax(source: &str) -> FormulaSyntaxParse {
-  let mut issues = Vec::new();
-  let syntax = parse_syntax_ast(source);
-  for issue in syntax.issues {
-    match issue {
-      SyntaxIssue::MissingClosingParenthesis => {
-        issues.push(FormulaParseIssue::MissingClosingParenthesis);
-      }
-    }
-  }
-  if syntax.ast.is_none() || !syntax.complete {
-    issues.push(FormulaParseIssue::IncompleteExpression);
-  }
-  let ast = syntax
-    .ast
-    .as_ref()
-    .and_then(|node| formula_node_from_syntax(source, node));
-
-  FormulaSyntaxParse { ast, issues }
-}
-
-fn formula_node_from_syntax(source: &str, node: &SyntaxNode) -> Option<FormulaNode> {
+fn formula_ast_from_syntax(source: &str, node: &SyntaxNode) -> Option<FormulaAst> {
   match node {
-    SyntaxNode::Blank => Some(FormulaNode::Blank),
-    SyntaxNode::Text(span) => Some(FormulaNode::Text((*span).into())),
-    SyntaxNode::Number(value) => Some(FormulaNode::Number(*value)),
-    SyntaxNode::Error(value) => Some(FormulaNode::Error(*value)),
+    SyntaxNode::Blank => Some(FormulaAst::Blank),
+    SyntaxNode::Text(span) => Some(FormulaAst::Text((*span).into())),
+    SyntaxNode::Number(value) => Some(FormulaAst::Number(*value)),
+    SyntaxNode::Error(value) => Some(FormulaAst::Error(*value)),
     SyntaxNode::Word(span) => {
       let span = SemanticSpan::from(*span);
       let word = source.get(span.start..span.end)?;
-      Some(FormulaNode::Word {
+      Some(FormulaAst::Word {
         span,
         kind: semantic_word_kind(word),
       })
     }
-    SyntaxNode::Unary { op, expr } => Some(FormulaNode::Unary {
+    SyntaxNode::Unary { op, expr } => Some(FormulaAst::Unary {
       op: *op,
-      expr: Box::new(formula_node_from_syntax(source, expr)?),
+      expr: Box::new(formula_ast_from_syntax(source, expr)?),
     }),
-    SyntaxNode::Binary { op, left, right } => Some(FormulaNode::Binary {
+    SyntaxNode::Binary { op, left, right } => Some(FormulaAst::Binary {
       op: *op,
-      left: Box::new(formula_node_from_syntax(source, left)?),
-      right: Box::new(formula_node_from_syntax(source, right)?),
+      left: Box::new(formula_ast_from_syntax(source, left)?),
+      right: Box::new(formula_ast_from_syntax(source, right)?),
     }),
-    SyntaxNode::Function { name, args } => Some(FormulaNode::Function {
+    SyntaxNode::Function { name, args } => Some(FormulaAst::Function {
       name: (*name).into(),
-      args: formula_nodes_from_syntax(source, args)?,
+      args: formula_asts_from_syntax(source, args)?,
     }),
-    SyntaxNode::LogicalFunction { function, args } => Some(FormulaNode::LogicalFunction {
+    SyntaxNode::LogicalFunction { function, args } => Some(FormulaAst::LogicalFunction {
       function: *function,
-      args: formula_nodes_from_syntax(source, args)?,
+      args: formula_asts_from_syntax(source, args)?,
     }),
-    SyntaxNode::Array(rows) => Some(FormulaNode::Array(
+    SyntaxNode::Array(rows) => Some(FormulaAst::Array(
       rows
         .iter()
-        .map(|row| formula_nodes_from_syntax(source, row))
+        .map(|row| formula_asts_from_syntax(source, row))
         .collect::<Option<Vec<_>>>()?,
     )),
   }
 }
 
-fn formula_nodes_from_syntax(source: &str, nodes: &[SyntaxNode]) -> Option<Vec<FormulaNode>> {
+fn formula_asts_from_syntax(source: &str, nodes: &[SyntaxNode]) -> Option<Vec<FormulaAst>> {
   nodes
     .iter()
-    .map(|node| formula_node_from_syntax(source, node))
+    .map(|node| formula_ast_from_syntax(source, node))
     .collect()
 }
 

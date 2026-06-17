@@ -44,12 +44,19 @@ pub(crate) enum FormulaOp<'doc> {
     name: Cow<'doc, str>,
     function: Option<FormulaFunctionId>,
     argc: usize,
+    arg_ranges: Vec<FormulaArgRange>,
     volatile: bool,
     control: Option<FormulaControlOp>,
   },
   Array {
     row_lengths: Vec<usize>,
   },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FormulaArgRange {
+  pub(crate) start: usize,
+  pub(crate) end: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,12 +87,14 @@ impl<'doc> FormulaOp<'doc> {
         name,
         function,
         argc,
+        arg_ranges,
         volatile,
         control,
       } => FormulaOp::Call {
         name: Cow::Owned(name.into_owned()),
         function,
         argc,
+        arg_ranges,
         volatile,
         control,
       },
@@ -131,8 +140,14 @@ fn lower_node<'doc>(
       volatile,
       args,
     } => {
+      let mut arg_ranges = Vec::with_capacity(args.len());
       for arg in args {
+        let start = ops.len();
         lower_node(sheet, source, borrowed_source, arg, ops)?;
+        arg_ranges.push(FormulaArgRange {
+          start,
+          end: ops.len(),
+        });
       }
       let name = cow_span_text(source, borrowed_source, *name);
       let function = resolve_function_name(name.as_ref());
@@ -140,6 +155,7 @@ fn lower_node<'doc>(
         name,
         function,
         argc: args.len(),
+        arg_ranges,
         volatile: *volatile,
         control: control_for_function(function),
       });
@@ -148,8 +164,14 @@ fn lower_node<'doc>(
       function: logical_function,
       args,
     } => {
+      let mut arg_ranges = Vec::with_capacity(args.len());
       for arg in args {
+        let start = ops.len();
         lower_node(sheet, source, borrowed_source, arg, ops)?;
+        arg_ranges.push(FormulaArgRange {
+          start,
+          end: ops.len(),
+        });
       }
       let name = Cow::Borrowed(logical_function.name());
       let function = resolve_function_name(name.as_ref());
@@ -157,6 +179,7 @@ fn lower_node<'doc>(
         name,
         function,
         argc: args.len(),
+        arg_ranges,
         volatile: false,
         control: control_for_function(function),
       });

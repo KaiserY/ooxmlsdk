@@ -956,6 +956,43 @@ fn evaluate_function_values<'doc>(
     FormulaFunctionId::Counta => Some(FormulaValue::Number(
       count_all_values(evaluator, args) as f64
     )),
+    FormulaFunctionId::Abs if args.len() == 1 => Some(FormulaValue::Number(
+      scalar_number_arg(evaluator, args, 0)?.abs(),
+    )),
+    FormulaFunctionId::Sign if args.len() == 1 => Some(FormulaValue::Number(sign_number(
+      scalar_number_arg(evaluator, args, 0)?,
+    ))),
+    FormulaFunctionId::Int if args.len() == 1 => Some(FormulaValue::Number(approx_floor(
+      scalar_number_arg(evaluator, args, 0)?,
+    ))),
+    FormulaFunctionId::Sqrt if args.len() == 1 => {
+      let value = scalar_number_arg(evaluator, args, 0)?;
+      if value < 0.0 {
+        Some(FormulaValue::Error(FormulaErrorValue::Num))
+      } else {
+        Some(FormulaValue::Number(value.sqrt()))
+      }
+    }
+    FormulaFunctionId::Power if args.len() == 2 => {
+      let value = scalar_number_arg(evaluator, args, 0)?;
+      let power = scalar_number_arg(evaluator, args, 1)?;
+      let result = value.powf(power);
+      if result.is_finite() {
+        Some(FormulaValue::Number(result))
+      } else {
+        Some(FormulaValue::Error(FormulaErrorValue::Num))
+      }
+    }
+    FormulaFunctionId::Not if args.len() == 1 => {
+      if should_fallback_scalar_value(evaluator, args.first()?) {
+        return None;
+      }
+      let value = evaluator.scalar_value(args.first()?.clone());
+      match value {
+        FormulaValue::Error(error) => Some(FormulaValue::Error(error)),
+        value => Some(FormulaValue::Boolean(!evaluator.truthy(&value))),
+      }
+    }
     FormulaFunctionId::True if args.is_empty() => Some(FormulaValue::Boolean(true)),
     FormulaFunctionId::False if args.is_empty() => Some(FormulaValue::Boolean(false)),
     FormulaFunctionId::Na if args.is_empty() => Some(FormulaValue::Error(FormulaErrorValue::NA)),
@@ -963,6 +1000,27 @@ fn evaluate_function_values<'doc>(
     FormulaFunctionId::Style if args.is_empty() => Some(FormulaValue::Number(0.0)),
     _ => None,
   }
+}
+
+fn scalar_number_arg<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: &[FormulaValue<'doc>],
+  index: usize,
+) -> Option<f64> {
+  let value = args.get(index)?;
+  if should_fallback_scalar_value(evaluator, value) {
+    return None;
+  }
+  evaluator.number(value)
+}
+
+fn should_fallback_scalar_value<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  value: &FormulaValue<'doc>,
+) -> bool {
+  matches!(value, FormulaValue::Matrix(_) | FormulaValue::RefList(_))
+    || matches!(value, FormulaValue::Reference(reference) if reference.range.cell_count_hint() != 1)
+    || (evaluator.array_context && matches!(value, FormulaValue::Reference(_)))
 }
 
 fn numeric_aggregate_values<'doc>(

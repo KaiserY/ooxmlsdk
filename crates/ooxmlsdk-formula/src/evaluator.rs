@@ -77,7 +77,9 @@ use crate::calc::text::{
   roman_text_libreoffice, text_byte_len, trim_formula_text,
 };
 use crate::calc::units::convert_unit;
-use crate::code::{FormulaCode, FormulaOp, formula_error_from_lex};
+use crate::code::{
+  FormulaArgRange, FormulaCode, FormulaControlOp, FormulaOp, formula_error_from_lex,
+};
 use crate::dependency::ExternalReferenceId;
 use crate::function::{FormulaFunctionId, canonical_function_name};
 use crate::model::*;
@@ -103,4 +105,4 @@ pub(crate) use context::{format_complex_result, valid_date_serial_with_system};
 pub(crate) use engine::{
   FormulaEvaluatorEngine, ast_from_code, evaluate_formula_text_raw, evaluate_parsed_formula_raw,
 };
-pub(crate) use stack::EvalOperand;
+pub(crate) use stack::{EvalArg, EvalArgs, EvalOperand};

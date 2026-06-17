@@ -244,53 +244,23 @@ pub enum FormulaSearchType {
 }
 
 pub fn normalize_formula_text(formula: &str, grammar: FormulaGrammar) -> Cow<'_, str> {
-  let formula = formula.trim();
-  let formula = formula
-    .strip_prefix("of:=")
-    .or_else(|| formula.strip_prefix("of:"))
-    .or_else(|| formula.strip_prefix('='))
-    .unwrap_or(formula);
   match grammar {
-    FormulaGrammar::ExcelA1 => Cow::Borrowed(formula),
-    FormulaGrammar::ExcelR1C1 => Cow::Owned(normalize_r1c1_formula_text(
-      formula,
+    FormulaGrammar::ExcelA1 => Cow::Borrowed(crate::parser::normalize_excel_formula_text(formula)),
+    FormulaGrammar::ExcelR1C1 => Cow::Owned(crate::parser::normalize_r1c1_formula_text(
+      formula.trim(),
       CellAddress { column: 0, row: 0 },
     )),
-    FormulaGrammar::OpenFormula => Cow::Owned(normalize_open_formula_text(formula)),
-    FormulaGrammar::CalcA1 => Cow::Owned(normalize_calc_formula_text(formula)),
+    FormulaGrammar::OpenFormula => Cow::Owned(crate::parser::normalize_open_formula_text(formula)),
+    FormulaGrammar::CalcA1 => Cow::Owned(crate::parser::normalize_calc_formula_text(formula)),
   }
 }
 
 pub fn normalize_r1c1_formula_text(formula: &str, base: CellAddress) -> String {
-  if let Some(reference) = r1c1_whole_axis_reference_to_a1(formula.trim(), base) {
-    reference
-  } else {
-    formula.to_string()
-  }
+  crate::parser::normalize_r1c1_formula_text(formula, base)
 }
 
 pub fn r1c1_whole_axis_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
-  let reference = reference.trim().trim_start_matches('=');
-  if let Some(offset) = parse_r1c1_relative(reference, 'C') {
-    let column = base.column.checked_add_signed(offset)?.checked_add(1)?;
-    let column = column_name(column);
-    return Some(format!("{column}:{column}"));
-  }
-  if let Some(offset) = parse_r1c1_relative(reference, 'R') {
-    let row = base.row.checked_add_signed(offset)?.checked_add(1)?;
-    return Some(format!("{row}:{row}"));
-  }
-  None
-}
-
-fn normalize_open_formula_text(formula: &str) -> String {
-  let text = normalize_open_formula_decimal_commas(formula);
-  let text = normalize_formula_separators(&text);
-  normalize_open_formula_references(&text)
-}
-
-fn normalize_calc_formula_text(formula: &str) -> String {
-  normalize_formula_separators(formula)
+  crate::parser::r1c1_whole_axis_reference_to_a1(reference, base)
 }
 
 fn canonical_function_name(name: &str) -> String {
@@ -305,159 +275,6 @@ fn canonical_function_name(name: &str) -> String {
     }
   }
   upper
-}
-
-fn normalize_formula_separators(formula: &str) -> String {
-  let mut output = String::with_capacity(formula.len());
-  let mut quoted = false;
-  let mut chars = formula.chars().peekable();
-  while let Some(ch) = chars.next() {
-    match ch {
-      '"' => {
-        output.push(ch);
-        if quoted && chars.peek() == Some(&'"') {
-          output.push('"');
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      ';' if !quoted => output.push(','),
-      _ => output.push(ch),
-    }
-  }
-  output
-}
-
-fn normalize_open_formula_decimal_commas(formula: &str) -> String {
-  let mut output = String::with_capacity(formula.len());
-  let mut quoted = false;
-  let mut chars = formula.chars().peekable();
-  while let Some(ch) = chars.next() {
-    match ch {
-      '"' => {
-        output.push(ch);
-        if quoted && chars.peek() == Some(&'"') {
-          output.push('"');
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      ',' if !quoted => {
-        let previous = output.chars().next_back();
-        let next = chars.peek().copied();
-        if previous.is_some_and(|value| value.is_ascii_digit())
-          && next.is_some_and(|value| value.is_ascii_digit())
-        {
-          output.push('.');
-        } else {
-          output.push(ch);
-        }
-      }
-      _ => output.push(ch),
-    }
-  }
-  output
-}
-
-fn normalize_open_formula_references(formula: &str) -> String {
-  let mut output = String::with_capacity(formula.len());
-  let mut chars = formula.chars().peekable();
-  let mut quoted = false;
-  while let Some(ch) = chars.next() {
-    match ch {
-      '"' => {
-        output.push(ch);
-        if quoted && chars.peek() == Some(&'"') {
-          output.push('"');
-          chars.next();
-        } else {
-          quoted = !quoted;
-        }
-      }
-      '[' if !quoted => {
-        let mut reference = String::new();
-        let mut closed = false;
-        for next in chars.by_ref() {
-          if next == ']' {
-            closed = true;
-            break;
-          }
-          reference.push(next);
-        }
-        if closed {
-          output.push_str(&normalize_open_formula_reference(&reference));
-        } else {
-          output.push('[');
-          output.push_str(&reference);
-        }
-      }
-      _ => output.push(ch),
-    }
-  }
-  output
-}
-
-fn normalize_open_formula_reference(reference: &str) -> String {
-  let mut reference = reference.trim_start_matches('.').replace(":.", ":");
-  let first_part_end = reference.find(':').unwrap_or(reference.len());
-  if let Some(dot) = reference[..first_part_end].rfind('.')
-    && !reference[..first_part_end].contains('!')
-  {
-    reference.replace_range(dot..=dot, "!");
-    if reference.starts_with('$') {
-      reference.remove(0);
-    }
-  }
-  reference
-}
-
-fn parse_r1c1_relative(reference: &str, axis: char) -> Option<i32> {
-  let rest = reference.strip_prefix(axis)?;
-  if rest.is_empty() {
-    return Some(0);
-  }
-  let offset = rest.strip_prefix('[')?.strip_suffix(']')?;
-  offset.parse::<i32>().ok()
-}
-
-fn r1c1_reference_to_a1(reference: &str, base: CellAddress) -> Option<String> {
-  let (start, end) = reference.split_once(':').unwrap_or((reference, reference));
-  let start = parse_r1c1_cell(start.trim(), base)?;
-  let end = parse_r1c1_cell(end.trim(), base)?;
-  let start = format!("{}{}", column_index_to_name(start.column), start.row + 1);
-  let end = format!("{}{}", column_index_to_name(end.column), end.row + 1);
-  if start == end {
-    Some(start)
-  } else {
-    Some(format!("{start}:{end}"))
-  }
-}
-
-fn parse_r1c1_cell(reference: &str, base: CellAddress) -> Option<CellAddress> {
-  let reference = reference.trim().trim_start_matches('=');
-  let upper = reference.to_ascii_uppercase();
-  let rest = upper.strip_prefix('R')?;
-  let column_marker = rest.find('C')?;
-  let (row_text, column_text) = rest.split_at(column_marker);
-  let column_text = column_text.strip_prefix('C')?;
-  let row = parse_r1c1_axis(row_text, base.row)?;
-  let column = parse_r1c1_axis(column_text, base.column)?;
-  Some(CellAddress { column, row })
-}
-
-fn parse_r1c1_axis(text: &str, base: u32) -> Option<u32> {
-  if text.is_empty() {
-    return Some(base);
-  }
-  if let Some(relative) = text
-    .strip_prefix('[')
-    .and_then(|text| text.strip_suffix(']'))
-  {
-    return base.checked_add_signed(relative.parse::<i32>().ok()?);
-  }
-  text.parse::<u32>().ok()?.checked_sub(1)
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -3394,7 +3211,7 @@ pub(crate) fn parse_formula_legacy<'doc>(
       }
       crate::parser::FormulaBodyTokenKind::ReferenceCandidate => {
         let word = lexeme;
-        if let Some(range) = parse_formula_range(sheet, word) {
+        if let Some(range) = crate::parser::parse_formula_range(sheet, word) {
           dependencies.push(dependency_from_range(sheet, &range));
           tokens.push(FormulaToken::Reference(range));
         } else {
@@ -3604,7 +3421,7 @@ fn formula_ast_from_node_word<'doc>(
       ));
     }
     crate::parser::SemanticWordKind::ReferenceCandidate => {
-      if let Some(range) = parse_formula_range(sheet, word) {
+      if let Some(range) = crate::parser::parse_formula_range(sheet, word) {
         return Some(FormulaAst::Reference(range));
       }
     }
@@ -4893,7 +4710,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let parsed = text
       .parse::<f64>()
       .ok()
-      .or_else(|| parse_grouped_formula_number(text))
+      .or_else(|| crate::parser::grouped_formula_number(text))
       .or_else(|| parse_date_input(text, self.book.date_system).map(f64::floor))
       .or_else(|| match timevalue(text) {
         FormulaValue::Number(number) => Some(number),
@@ -4902,7 +4719,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
       .or_else(|| {
         text
           .strip_prefix('$')
-          .and_then(|value| parse_grouped_formula_number(value.trim()))
+          .and_then(|value| crate::parser::grouped_formula_number(value.trim()))
       });
     parsed
       .map(FormulaValue::Number)
@@ -5426,7 +5243,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let Some(value) = self
       .number(&value_arg)
-      .or_else(|| parse_grouped_formula_number(&self.text(&value_arg)))
+      .or_else(|| crate::parser::grouped_formula_number(&self.text(&value_arg)))
     else {
       return Some(FormulaValue::Error(FormulaErrorValue::Unknown));
     };
@@ -7203,7 +7020,8 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let text = if use_a1 {
       text.as_str()
     } else {
-      let Some(converted) = r1c1_reference_to_a1(&text, self.current_cell.unwrap_or_default())
+      let Some(converted) =
+        crate::parser::r1c1_reference_to_a1(&text, self.current_cell.unwrap_or_default())
       else {
         return Some(FormulaValue::Error(FormulaErrorValue::Ref));
       };
@@ -15056,8 +14874,9 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     let reference = reference.trim();
     let normalized;
     let reference = if self.grammar == FormulaGrammar::ExcelR1C1 {
-      normalized = r1c1_reference_to_a1(reference, self.current_cell.unwrap_or_default())
-        .unwrap_or_else(|| reference.to_string());
+      normalized =
+        crate::parser::r1c1_reference_to_a1(reference, self.current_cell.unwrap_or_default())
+          .unwrap_or_else(|| reference.to_string());
       normalized.as_str()
     } else {
       reference
@@ -15065,7 +14884,7 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     if let Some(table) = parse_table_reference(self.book, reference, self.current_cell) {
       return Some(table);
     }
-    parse_formula_range(self.current_sheet, reference)
+    crate::parser::parse_formula_range(self.current_sheet, reference)
   }
 
   fn range_values(&self, range: &QualifiedRange<'doc>) -> Vec<FormulaValue<'doc>> {
@@ -19469,52 +19288,6 @@ fn formula_value_from_array_constant<'doc>(
   }
 }
 
-fn parse_formula_range<'doc>(sheet: SheetId, token: &str) -> Option<QualifiedRange<'doc>> {
-  match crate::parser::reference_parts(token)? {
-    crate::parser::ReferenceParts::Range { start, end } => {
-      let start = span_text(token, start);
-      let end = span_text(token, end);
-      parse_formula_range_from_addresses(sheet, start, end)
-        .or_else(|| QualifiedRange::parse_a1(sheet, token).ok())
-    }
-    crate::parser::ReferenceParts::Single(span) => {
-      let value = span_text(token, span);
-      QualifiedAddress::parse_a1(sheet, value)
-        .ok()
-        .map(|address| qualified_range_from_address(sheet, address))
-    }
-  }
-}
-
-fn parse_formula_range_from_addresses<'doc>(
-  sheet: SheetId,
-  start: &str,
-  end: &str,
-) -> Option<QualifiedRange<'doc>> {
-  let start = QualifiedAddress::parse_a1(sheet, start).ok()?;
-  let end = QualifiedAddress::parse_a1(sheet, end).ok()?;
-  extend_qualified_range(
-    &qualified_range_from_address(sheet, start),
-    &qualified_range_from_address(sheet, end),
-  )
-}
-
-fn qualified_range_from_address<'doc>(
-  sheet: SheetId,
-  address: QualifiedAddress<'doc>,
-) -> QualifiedRange<'doc> {
-  QualifiedRange {
-    sheet,
-    sheet_name: address.sheet_name,
-    range: CellRange {
-      start: address.cell,
-      end: address.cell,
-    },
-    start_flags: address.flags,
-    end_flags: address.flags,
-  }
-}
-
 fn index_matrix<'doc>(
   rows: Vec<Vec<FormulaValue<'doc>>>,
   row: u32,
@@ -19649,40 +19422,6 @@ fn formula_text_value_owned<'doc>(text: &str, start: usize) -> FormulaValue<'doc
     Some(crate::parser::TextLiteral::Owned(value)) => FormulaValue::String(Cow::Owned(value)),
     None => FormulaValue::String(Cow::Borrowed("")),
   }
-}
-
-fn parse_grouped_formula_number(value: &str) -> Option<f64> {
-  let trimmed = value.trim();
-  if trimmed.is_empty() {
-    return None;
-  }
-  let (mantissa, _) = trimmed
-    .find(|ch| matches!(ch, 'e' | 'E'))
-    .map(|index| trimmed.split_at(index))
-    .unwrap_or((trimmed, ""));
-  let mantissa = mantissa
-    .strip_prefix('+')
-    .or_else(|| mantissa.strip_prefix('-'))
-    .unwrap_or(mantissa);
-  let (integer, decimal) = mantissa
-    .split_once('.')
-    .map(|(integer, decimal)| (integer, Some(decimal)))
-    .unwrap_or((mantissa, None));
-  if !integer.contains(',') {
-    return trimmed.parse::<f64>().ok();
-  }
-  let mut groups = integer.split(',');
-  let first = groups.next()?;
-  if first.is_empty() || first.len() > 3 || !first.bytes().all(|byte| byte.is_ascii_digit()) {
-    return None;
-  }
-  if !groups.all(|group| group.len() == 3 && group.bytes().all(|byte| byte.is_ascii_digit())) {
-    return None;
-  }
-  if decimal.is_some_and(|decimal| !decimal.bytes().all(|byte| byte.is_ascii_digit())) {
-    return None;
-  }
-  trimmed.replace(',', "").parse::<f64>().ok()
 }
 
 fn is_multicell_scalar_argument(value: &FormulaValue<'_>) -> bool {
@@ -20345,13 +20084,13 @@ mod tests {
 
   #[test]
   fn parses_odf_range_endpoints_with_inherited_sheet_name() {
-    let same_sheet = parse_formula_range(SheetId(3), ".B8:.B95").unwrap();
+    let same_sheet = crate::parser::parse_formula_range(SheetId(3), ".B8:.B95").unwrap();
     assert_eq!(same_sheet.sheet, SheetId(3));
     assert!(same_sheet.sheet_name.is_none());
     assert_eq!(same_sheet.range.start, CellAddress { column: 1, row: 7 });
     assert_eq!(same_sheet.range.end, CellAddress { column: 1, row: 94 });
 
-    let inherited = parse_formula_range(SheetId(3), "Sheet2.C2:.C92").unwrap();
+    let inherited = crate::parser::parse_formula_range(SheetId(3), "Sheet2.C2:.C92").unwrap();
     assert_eq!(inherited.sheet, SheetId(3));
     assert_eq!(inherited.sheet_name.unwrap().0, "Sheet2");
     assert_eq!(inherited.range.start, CellAddress { column: 2, row: 1 });
@@ -21359,6 +21098,45 @@ mod tests {
     let report = workbook.evaluate_supported_formulas();
 
     assert_eq!(report.evaluated[0].value, FormulaValue::Number(8.0));
+  }
+
+  #[test]
+  fn evaluator_resolves_significant_whitespace_intersection() {
+    // Source: LibreOffice sc/qa/unit/ucalc_formula2.cxx::testIntersectionOpExcel.
+    let book = FormulaEvaluationBookBuilder::new()
+      .with_defined_name(None, "horz", "$B$2:$D$2")
+      .with_defined_name(None, "vert", "$C$1:$C$3")
+      .with_cell(
+        SheetId(1),
+        CellAddress { column: 2, row: 1 },
+        FormulaValue::Number(1.0),
+      )
+      .build();
+
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 3 }),
+        "horz vert"
+      ),
+      Some(FormulaValue::Number(1.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 4 }),
+        "(horz vert)*2",
+      ),
+      Some(FormulaValue::Number(2.0))
+    );
+    assert_eq!(
+      book.evaluate_formula_text(
+        SheetId(1),
+        Some(CellAddress { column: 0, row: 5 }),
+        "2*(horz vert)",
+      ),
+      Some(FormulaValue::Number(2.0))
+    );
   }
 
   #[test]

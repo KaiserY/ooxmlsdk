@@ -130,9 +130,41 @@ impl<'a> SyntaxParser<'a> {
   }
 
   fn parse_intersection(&mut self) -> Option<SyntaxNode> {
-    self.parse_left_associative(Self::parse_range, |operator| {
-      operator == LexOperator::Intersection
-    })
+    let mut left = self.parse_range()?;
+    loop {
+      let before_ws = self.cursor.index();
+      let had_ws = self.cursor.take_consumed_ws() || self.cursor.consume_ws();
+      if let Some(op) = self
+        .cursor
+        .consume_operator_where(|operator| operator == LexOperator::Intersection)
+      {
+        let right = self.parse_range()?;
+        left = SyntaxNode::Binary {
+          op,
+          left: Box::new(left),
+          right: Box::new(right),
+        };
+        continue;
+      }
+      if !had_ws || !is_intersection_rhs_start(self.cursor.peek_token_raw()) {
+        break;
+      }
+      let before_rhs = self.cursor.index();
+      if let Some(right) = self.parse_range() {
+        left = SyntaxNode::Binary {
+          op: LexOperator::Intersection,
+          left: Box::new(left),
+          right: Box::new(right),
+        };
+      } else {
+        let _ = self.cursor.set_index(before_rhs);
+        break;
+      }
+      if self.cursor.index() == before_ws {
+        break;
+      }
+    }
+    Some(left)
   }
 
   fn parse_range(&mut self) -> Option<SyntaxNode> {
@@ -351,7 +383,8 @@ impl<'a> SyntaxParser<'a> {
       return Some(SyntaxNode::Word(split));
     }
     let name = SyntaxSpan::from(token);
-    self.cursor.set_index(token.end);
+    let after_name = token.end;
+    self.cursor.set_index(after_name);
     self.cursor.skip_ws();
     if self
       .cursor
@@ -363,6 +396,7 @@ impl<'a> SyntaxParser<'a> {
         args: self.parse_argument_list()?,
       });
     }
+    let _ = self.cursor.set_index(after_name);
     Some(SyntaxNode::Word(name))
   }
 
@@ -444,4 +478,53 @@ fn split_word_before_intersection(source: &str, token: LexToken) -> Option<Synta
     }
   }
   None
+}
+
+fn is_intersection_rhs_start(token: Option<LexToken>) -> bool {
+  token.is_some_and(|token| {
+    matches!(
+      token.kind,
+      LexTokenKind::Text
+        | LexTokenKind::Number(_)
+        | LexTokenKind::Error(_)
+        | LexTokenKind::ArrayOpen
+        | LexTokenKind::ParenOpen
+        | LexTokenKind::Word
+    )
+  })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn parses_significant_whitespace_as_intersection_operator() {
+    let parse = parse_syntax_ast("B2:D2 C1:C3");
+
+    assert!(parse.complete);
+    assert!(parse.issues.is_empty());
+    assert!(matches!(
+      parse.ast,
+      Some(SyntaxNode::Binary {
+        op: LexOperator::Intersection,
+        ..
+      })
+    ));
+  }
+
+  #[test]
+  fn ignores_insignificant_whitespace_before_regular_operators() {
+    let parse = parse_syntax_ast("1 + 2");
+
+    assert!(parse.complete);
+    assert!(parse.issues.is_empty());
+    assert!(matches!(
+      parse.ast,
+      Some(SyntaxNode::Binary {
+        op: LexOperator::Add,
+        ..
+      })
+    ));
+  }
 }

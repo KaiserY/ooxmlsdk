@@ -130,11 +130,16 @@ pub(crate) fn lex_tokens(source: &str) -> LexTokens<'_> {
 pub(crate) struct FormulaCursor<'a> {
   source: &'a str,
   index: usize,
+  consumed_ws: bool,
 }
 
 impl<'a> FormulaCursor<'a> {
   pub(crate) fn new(source: &'a str) -> Self {
-    Self { source, index: 0 }
+    Self {
+      source,
+      index: 0,
+      consumed_ws: false,
+    }
   }
 
   pub(crate) fn source(&self) -> &'a str {
@@ -148,6 +153,7 @@ impl<'a> FormulaCursor<'a> {
   pub(crate) fn set_index(&mut self, index: usize) -> bool {
     if self.source.get(index..).is_some() {
       self.index = index;
+      self.consumed_ws = false;
       true
     } else {
       false
@@ -159,9 +165,25 @@ impl<'a> FormulaCursor<'a> {
   }
 
   pub(crate) fn skip_ws(&mut self) {
+    let _ = self.consume_ws();
+  }
+
+  pub(crate) fn consume_ws(&mut self) -> bool {
     let mut input = self.rest();
+    let start_len = input.len();
     skip_whitespace(&mut input);
     self.index = self.source.len() - input.len();
+    let consumed_ws = input.len() != start_len;
+    if consumed_ws {
+      self.consumed_ws = true;
+    }
+    consumed_ws
+  }
+
+  pub(crate) fn take_consumed_ws(&mut self) -> bool {
+    let consumed_ws = self.consumed_ws;
+    self.consumed_ws = false;
+    consumed_ws
   }
 
   pub(crate) fn is_end(&self) -> bool {
@@ -179,6 +201,7 @@ impl<'a> FormulaCursor<'a> {
       return None;
     }
     self.index = token.end;
+    self.consumed_ws = false;
     Some(token)
   }
 
@@ -194,6 +217,7 @@ impl<'a> FormulaCursor<'a> {
       return None;
     }
     self.index = token.end;
+    self.consumed_ws = false;
     Some(operator)
   }
 
@@ -233,6 +257,7 @@ impl<'a> FormulaCursor<'a> {
     }
     if self.source[probe..].starts_with('(') {
       self.index = next;
+      self.consumed_ws = false;
       Some(function)
     } else {
       None
@@ -306,8 +331,50 @@ pub(crate) fn formula_error_value(source: &str) -> Option<LexErrorValue> {
   input.is_empty().then_some(value)
 }
 
+pub(crate) fn grouped_formula_number(value: &str) -> Option<f64> {
+  let trimmed = value.trim();
+  if trimmed.is_empty() {
+    return None;
+  }
+  let (mantissa, _) = trimmed
+    .find(|ch| matches!(ch, 'e' | 'E'))
+    .map(|index| trimmed.split_at(index))
+    .unwrap_or((trimmed, ""));
+  let mantissa = mantissa
+    .strip_prefix('+')
+    .or_else(|| mantissa.strip_prefix('-'))
+    .unwrap_or(mantissa);
+  let (integer, decimal) = mantissa
+    .split_once('.')
+    .map(|(integer, decimal)| (integer, Some(decimal)))
+    .unwrap_or((mantissa, None));
+  if !integer.contains(',') {
+    return trimmed.parse::<f64>().ok();
+  }
+  let mut groups = integer.split(',');
+  let first = groups.next()?;
+  if first.is_empty() || first.len() > 3 || !first.bytes().all(|byte| byte.is_ascii_digit()) {
+    return None;
+  }
+  if !groups.all(|group| group.len() == 3 && group.bytes().all(|byte| byte.is_ascii_digit())) {
+    return None;
+  }
+  if decimal.is_some_and(|decimal| !decimal.bytes().all(|byte| byte.is_ascii_digit())) {
+    return None;
+  }
+  trimmed.replace(',', "").parse::<f64>().ok()
+}
+
 fn formula_body_start_parser(input: &mut &str) -> WinnowResult<usize> {
   let start_len = input.len();
+  if starts_with_ignore_ascii_case(*input, "of:=") {
+    *input = &input["of:=".len()..];
+    return Ok(start_len - input.len());
+  }
+  if starts_with_ignore_ascii_case(*input, "of:") {
+    *input = &input["of:".len()..];
+    return Ok(start_len - input.len());
+  }
   let _ = opt(literal("=")).parse_next(input)?;
   let _ = opt(literal("=")).parse_next(input)?;
   Ok(start_len - input.len())
@@ -579,6 +646,12 @@ fn consume_one_char(input: &mut &str) {
   }
 }
 
+fn starts_with_ignore_ascii_case(source: &str, prefix: &str) -> bool {
+  source
+    .get(..prefix.len())
+    .is_some_and(|value| value.eq_ignore_ascii_case(prefix))
+}
+
 fn formula_error_literals() -> &'static [(&'static str, LexErrorValue)] {
   &[
     ("#GETTING_DATA", LexErrorValue::GettingData),
@@ -601,4 +674,18 @@ fn formula_error_literals() -> &'static [(&'static str, LexErrorValue)] {
     ("#ERR504!", LexErrorValue::Unknown),
     ("#ERR511!", LexErrorValue::Parameter),
   ]
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn formula_body_start_skips_excel_and_open_formula_prefixes() {
+    assert_eq!(formula_body_start("A1"), 0);
+    assert_eq!(formula_body_start("=A1"), 1);
+    assert_eq!(formula_body_start("==A1"), 2);
+    assert_eq!(formula_body_start("of:=A1"), 4);
+    assert_eq!(formula_body_start("OF:A1"), 3);
+  }
 }

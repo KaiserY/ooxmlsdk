@@ -2,9 +2,11 @@ use std::borrow::Cow;
 
 mod args;
 mod dispatch;
+mod reader;
 
 pub(crate) use args::{EvalContext, FunctionArgs};
 pub(crate) use dispatch::evaluate_function;
+pub(crate) use reader::FunctionArgReader;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum FormulaFunctionId {

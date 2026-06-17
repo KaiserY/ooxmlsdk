@@ -1,5 +1,5 @@
-use crate::FormulaValue;
-use crate::evaluator::{EvalArgs, FormulaAst, FormulaEvaluator, evaluate_arg_direct};
+use super::FunctionArgReader;
+use crate::evaluator::{EvalArgs, FormulaAst, FormulaEvaluator};
 
 pub(crate) type EvalContext<'a, 'doc> = FormulaEvaluator<'a, 'doc>;
 
@@ -25,19 +25,10 @@ impl<'args, 'doc> FunctionArgs<'args, 'doc> {
     }
   }
 
-  pub(crate) fn materialize_values(
+  pub(crate) fn reader<'eval>(
     self,
-    evaluator: &FormulaEvaluator<'_, 'doc>,
-  ) -> Option<Vec<FormulaValue<'doc>>> {
-    match self {
-      Self::Ast(_) => None,
-      Self::Lazy(args) => {
-        let mut values = Vec::with_capacity(args.len());
-        for index in 0..args.len() {
-          values.push(evaluate_arg_direct(args.get(index)?, evaluator)?);
-        }
-        Some(values)
-      }
-    }
+    evaluator: &'eval FormulaEvaluator<'eval, 'doc>,
+  ) -> FunctionArgReader<'args, 'eval, 'doc> {
+    FunctionArgReader::new(self, evaluator)
   }
 }

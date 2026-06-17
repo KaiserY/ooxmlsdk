@@ -89,6 +89,7 @@ use crate::{
 mod ast;
 mod context;
 mod engine;
+mod stack;
 
 pub(crate) use ast::{FormulaAst, has_missing_required_argument, is_missing_argument};
 pub(crate) use context::{
@@ -102,3 +103,4 @@ pub(crate) use context::{format_complex_result, valid_date_serial_with_system};
 pub(crate) use engine::{
   FormulaEvaluatorEngine, ast_from_code, evaluate_formula_text_raw, evaluate_parsed_formula_raw,
 };
+pub(crate) use stack::EvalOperand;

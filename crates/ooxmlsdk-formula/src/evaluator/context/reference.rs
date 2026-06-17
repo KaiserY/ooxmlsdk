@@ -83,6 +83,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   ) -> Option<FormulaValue<'doc>> {
     let left_ranges = self.reference_ranges_from_ast(left);
     let right_ranges = self.reference_ranges_from_ast(right);
+    self.evaluate_intersection_ranges(left_ranges, right_ranges)
+  }
+
+  pub(crate) fn evaluate_intersection_ranges(
+    &self,
+    left_ranges: Vec<QualifiedRange<'doc>>,
+    right_ranges: Vec<QualifiedRange<'doc>>,
+  ) -> Option<FormulaValue<'doc>> {
     if left_ranges.is_empty() || right_ranges.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
@@ -107,6 +115,13 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     right: &FormulaAst<'doc>,
   ) -> Option<FormulaValue<'doc>> {
     let ranges = self.range_reference_ranges_from_ast(left, right);
+    self.evaluate_range_ranges(ranges)
+  }
+
+  pub(crate) fn evaluate_range_ranges(
+    &self,
+    ranges: Vec<QualifiedRange<'doc>>,
+  ) -> Option<FormulaValue<'doc>> {
     if ranges.is_empty() {
       return Some(FormulaValue::Error(FormulaErrorValue::IllegalArgument));
     }
@@ -116,6 +131,18 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     Some(FormulaValue::RefList(ranges))
   }
 
+  pub(crate) fn evaluate_union_ranges(
+    &self,
+    mut left_ranges: Vec<QualifiedRange<'doc>>,
+    right_ranges: Vec<QualifiedRange<'doc>>,
+  ) -> Option<FormulaValue<'doc>> {
+    if left_ranges.is_empty() || right_ranges.is_empty() {
+      return None;
+    }
+    left_ranges.extend(right_ranges);
+    Some(FormulaValue::RefList(left_ranges))
+  }
+
   pub(crate) fn range_reference_ranges_from_ast(
     &self,
     left: &FormulaAst<'doc>,
@@ -123,6 +150,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
   ) -> Vec<QualifiedRange<'doc>> {
     let left_ranges = self.reference_ranges_from_ast(left);
     let right_ranges = self.reference_ranges_from_ast(right);
+    self.range_reference_ranges_from_ranges(left_ranges, right_ranges)
+  }
+
+  pub(crate) fn range_reference_ranges_from_ranges(
+    &self,
+    left_ranges: Vec<QualifiedRange<'doc>>,
+    right_ranges: Vec<QualifiedRange<'doc>>,
+  ) -> Vec<QualifiedRange<'doc>> {
     if left_ranges.len() > 1 || right_ranges.len() > 1 {
       return bounding_qualified_ranges(&left_ranges)
         .zip(bounding_qualified_ranges(&right_ranges))

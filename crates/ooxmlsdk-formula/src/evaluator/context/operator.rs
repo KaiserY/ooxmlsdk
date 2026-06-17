@@ -7,6 +7,14 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     expr: &FormulaAst<'doc>,
   ) -> Option<FormulaValue<'doc>> {
     let value = self.evaluate(expr)?;
+    self.evaluate_unary_value(op, value)
+  }
+
+  pub(crate) fn evaluate_unary_value(
+    &self,
+    op: FormulaOperator,
+    value: FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
     match op {
       FormulaOperator::UnaryPlus => Some(FormulaValue::Number(self.number(&value)?)),
       FormulaOperator::UnaryMinus => Some(FormulaValue::Number(-self.number(&value)?)),
@@ -38,6 +46,15 @@ impl<'a, 'doc> FormulaEvaluator<'a, 'doc> {
     }
     let left = self.evaluate(left)?;
     let right = self.with_current_value(left.clone()).evaluate(right)?;
+    self.evaluate_binary_values(op, left, right)
+  }
+
+  pub(crate) fn evaluate_binary_values(
+    &self,
+    op: FormulaOperator,
+    left: FormulaValue<'doc>,
+    right: FormulaValue<'doc>,
+  ) -> Option<FormulaValue<'doc>> {
     if let Some(error) = propagate_binary_error(&left, &right) {
       return Some(FormulaValue::Error(error));
     }

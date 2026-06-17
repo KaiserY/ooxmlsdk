@@ -33,6 +33,9 @@ fn evaluate_function_id<'doc>(
   function: FormulaFunctionId,
   args: FunctionArgs<'_, 'doc>,
 ) -> Option<FormulaValue<'doc>> {
+  if let Some(args) = args.as_values() {
+    return evaluate_function_values(evaluator, function, args);
+  }
   let args = args.as_ast();
   match function {
     FormulaFunctionId::OrgDotOpenofficeDotErrortype => evaluator.evaluate_error_type_raw(args),
@@ -893,4 +896,161 @@ fn evaluate_function_id<'doc>(
     FormulaFunctionId::Testfuncint => Some(FormulaValue::Number(6.0)),
     FormulaFunctionId::Testfuncsingle => Some(FormulaValue::Number(5.5)),
   }
+}
+
+fn evaluate_function_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  function: FormulaFunctionId,
+  args: &[FormulaValue<'doc>],
+) -> Option<FormulaValue<'doc>> {
+  match function {
+    FormulaFunctionId::Sum => match numeric_aggregate_values(evaluator, args, true) {
+      Ok(values) => Some(FormulaValue::Number(kahan_sum(values))),
+      Err(error) => Some(FormulaValue::Error(error)),
+    },
+    FormulaFunctionId::Product => match numeric_aggregate_values(evaluator, args, true) {
+      Ok(values) => {
+        if values.is_empty() {
+          Some(FormulaValue::Number(0.0))
+        } else {
+          Some(FormulaValue::Number(values.iter().product()))
+        }
+      }
+      Err(error) => Some(FormulaValue::Error(error)),
+    },
+    FormulaFunctionId::Average => {
+      let values = match numeric_aggregate_values(evaluator, args, true) {
+        Ok(values) => values,
+        Err(error) => return Some(FormulaValue::Error(error)),
+      };
+      (!values.is_empty())
+        .then(|| FormulaValue::Number(kahan_sum(values.iter().copied()) / values.len() as f64))
+    }
+    FormulaFunctionId::Min => Some(
+      numeric_aggregate_values(evaluator, args, true)
+        .map(|values| {
+          values
+            .iter()
+            .copied()
+            .reduce(f64::min)
+            .map(FormulaValue::Number)
+            .unwrap_or(FormulaValue::Number(0.0))
+        })
+        .unwrap_or_else(FormulaValue::Error),
+    ),
+    FormulaFunctionId::Max => Some(
+      numeric_aggregate_values(evaluator, args, true)
+        .map(|values| {
+          values
+            .iter()
+            .copied()
+            .reduce(f64::max)
+            .map(FormulaValue::Number)
+            .unwrap_or(FormulaValue::Number(0.0))
+        })
+        .unwrap_or_else(FormulaValue::Error),
+    ),
+    FormulaFunctionId::Count => Some(FormulaValue::Number(
+      count_numbers_values(evaluator, args) as f64
+    )),
+    FormulaFunctionId::Counta => Some(FormulaValue::Number(
+      count_all_values(evaluator, args) as f64
+    )),
+    FormulaFunctionId::True if args.is_empty() => Some(FormulaValue::Boolean(true)),
+    FormulaFunctionId::False if args.is_empty() => Some(FormulaValue::Boolean(false)),
+    FormulaFunctionId::Na if args.is_empty() => Some(FormulaValue::Error(FormulaErrorValue::NA)),
+    FormulaFunctionId::Pi if args.is_empty() => Some(FormulaValue::Number(std::f64::consts::PI)),
+    FormulaFunctionId::Style if args.is_empty() => Some(FormulaValue::Number(0.0)),
+    _ => None,
+  }
+}
+
+fn numeric_aggregate_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: &[FormulaValue<'doc>],
+  text_error: bool,
+) -> std::result::Result<Vec<f64>, FormulaErrorValue> {
+  let mut values = Vec::new();
+  for arg in args {
+    match arg {
+      FormulaValue::Reference(reference) => {
+        evaluator.push_range_numeric_aggregate_values(reference, &mut values)?;
+      }
+      FormulaValue::RefList(ranges) => {
+        for range in ranges {
+          evaluator.push_range_numeric_aggregate_values(range, &mut values)?;
+        }
+      }
+      FormulaValue::Matrix(rows) => {
+        for value in rows.iter().flatten() {
+          match value {
+            FormulaValue::Blank | FormulaValue::String(_) => {}
+            value => {
+              evaluator.push_direct_numeric_aggregate_value(
+                value.clone(),
+                text_error,
+                &mut values,
+              )?;
+            }
+          }
+        }
+      }
+      value => {
+        evaluator.push_direct_numeric_aggregate_value(value.clone(), text_error, &mut values)?;
+      }
+    }
+  }
+  Ok(values)
+}
+
+fn count_numbers_values<'doc>(
+  evaluator: &EvalContext<'_, 'doc>,
+  args: &[FormulaValue<'doc>],
+) -> usize {
+  let mut count = 0usize;
+  for arg in args {
+    match arg {
+      FormulaValue::Reference(reference) => count += evaluator.count_numbers_in_range(reference),
+      FormulaValue::RefList(ranges) => {
+        for range in ranges {
+          count += evaluator.count_numbers_in_range(range);
+        }
+      }
+      FormulaValue::Matrix(rows) => {
+        count += rows
+          .iter()
+          .flatten()
+          .filter(|value| matches!(value, FormulaValue::Number(_) | FormulaValue::Boolean(_)))
+          .count();
+      }
+      FormulaValue::Number(_) | FormulaValue::Boolean(_) => count += 1,
+      FormulaValue::String(value) if value.trim().parse::<f64>().is_ok() => count += 1,
+      FormulaValue::String(_) | FormulaValue::Blank | FormulaValue::Error(_) => {}
+    }
+  }
+  count
+}
+
+fn count_all_values<'doc>(evaluator: &EvalContext<'_, 'doc>, args: &[FormulaValue<'doc>]) -> usize {
+  let mut count = 0usize;
+  for arg in args {
+    match arg {
+      FormulaValue::Reference(reference) => count += evaluator.count_all_values_in_range(reference),
+      FormulaValue::RefList(ranges) => {
+        for range in ranges {
+          count += evaluator.count_all_values_in_range(range);
+        }
+      }
+      FormulaValue::Matrix(rows) => {
+        count += rows
+          .iter()
+          .flatten()
+          .filter(|value| !matches!(value, FormulaValue::Blank))
+          .count();
+      }
+      FormulaValue::Blank => count += 1,
+      _ => count += 1,
+    }
+  }
+  count
 }

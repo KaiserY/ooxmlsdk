@@ -1,5 +1,9 @@
 use std::borrow::Cow;
 
+mod dispatch;
+
+pub(crate) use dispatch::evaluate_function;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum FormulaFunctionId {
   OrgDotOpenofficeDotErrortype,

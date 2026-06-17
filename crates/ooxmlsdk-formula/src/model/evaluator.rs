@@ -104,13 +104,19 @@ pub(super) fn ast_from_code<'doc>(code: &FormulaCode<'doc>) -> Option<FormulaAst
           right: Box::new(right),
         });
       }
-      FormulaOp::Call { name, argc, .. } => {
+      FormulaOp::Call {
+        name,
+        function,
+        argc,
+        ..
+      } => {
         if stack.len() < *argc {
           return None;
         }
         let args = stack.split_off(stack.len() - *argc);
         stack.push(FormulaAst::Function {
           name: name.clone(),
+          function: *function,
           args,
         });
       }
